@@ -42,7 +42,7 @@ PY
   exit 0
 fi
 
-plan_output="$(bash "${CANON_TOOLS_ROOT}/update_agent_canon.sh" plan)"
+plan_output="$(bash "${CANON_TOOLS_ROOT}/update_agent_canon.sh" plan || true)"
 printf '%s\n' "$plan_output"
 
 route="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_route=/{print $2}')"
@@ -50,10 +50,10 @@ dirty_worktree="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_dir
 dirty_update_surface="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_dirty_update_surface=/{print $2}')"
 prefix_mode="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_prefix_mode=/{print $2}')"
 remote_sha="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_remote_sha=/{print $2}')"
+remote_url="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_remote_url=/{print $2}')"
 submodule_worktree_head="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_submodule_worktree_head=/{print $2}')"
 submodule_worktree_status="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_submodule_worktree_status=/{print $2}')"
-submodule_parent_pin_remote_match="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_submodule_parent_pin_remote_match=/{print $2}')"
-submodule_worktree_remote_match="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_submodule_worktree_remote_match=/{print $2}')"
+submodule_parent_pin="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_submodule_parent_pin=/{print $2}')"
 submodule_worktree_clean="not_applicable"
 if [[ "${prefix_mode:-}" == "submodule" ]]; then
   if [[ "${submodule_worktree_status:-}" == "clean" ]]; then
@@ -69,21 +69,71 @@ emit_submodule_worktree_evidence() {
   fi
   echo "AGENT_CANON_LATEST_SUBMODULE_WORKTREE_HEAD=${submodule_worktree_head}"
   echo "AGENT_CANON_LATEST_SUBMODULE_WORKTREE_CLEAN=${submodule_worktree_clean}"
-  echo "AGENT_CANON_LATEST_SUBMODULE_WORKTREE_REMOTE_MATCH=${submodule_worktree_remote_match}"
-  echo "AGENT_CANON_LATEST_SUBMODULE_PARENT_PIN_REMOTE_MATCH=${submodule_parent_pin_remote_match:-unavailable}"
+  echo "AGENT_CANON_LATEST_SUBMODULE_PARENT_PIN=${submodule_parent_pin:-unavailable}"
+  echo "AGENT_CANON_LATEST_SUBMODULE_REMOTE_URL=${remote_url:-unavailable}"
+}
+
+emit_submodule_pin_integrity_block() {
+  local reason="$1"
+  local route_value="$2"
+  echo "AGENT_CANON_LATEST=fail"
+  echo "AGENT_CANON_LATEST_REASON=$reason"
+  echo "AGENT_CANON_LATEST_ROUTE=${route_value:-unknown}"
+  emit_submodule_worktree_evidence
+  echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/agent-canon-pr-workflow.md"
+  echo "AGENT_CANON_LATEST_PARENT_PIN_PENDING=yes"
+  echo "AGENT_CANON_LATEST_NEXT_ACTION=run_make_agent-canon-ensure-latest_then_commit_updated_submodule_pin_with_request_evidence"
+  echo "AGENT_CANON_LATEST_DEPENDENCY_ROUTE=python3 tools/agent_tools/dependency_module_change.py --root . prepare --module ${PREFIX} --branch <source-branch> --owner-evidence <owner-evidence>"
+  echo "$reason" >&2
+  exit 1
+}
+
+emit_submodule_pin_remote_reachable() {
+  local remote_url_value="${1:-}"
+  local pin_ref="${2:-}"
+  if [ -z "${remote_url_value:-}" ] || [ -z "${pin_ref:-}" ]; then
+    return 1
+  fi
+  if ! git -C "$ROOT_DIR/$PREFIX" cat-file -e "$pin_ref^{commit}" 2>/dev/null; then
+    return 1
+  fi
+
+  local normalized_remote="$remote_url_value"
+  local remote_path="$normalized_remote"
+  if [[ "$remote_path" == file://* ]]; then
+    remote_path="${remote_path#file://}"
+  fi
+  if [[ "$normalized_remote" == /* || "$normalized_remote" == ./* || "$normalized_remote" == ../* || -d "$remote_path" ]]; then
+    git -C "$remote_path" cat-file -e "$pin_ref^{commit}" >/dev/null 2>&1 || return 1
+  else
+    if ! git -C "$ROOT_DIR/$PREFIX" fetch --no-write-fetch-head "$normalized_remote" "$pin_ref" >/dev/null 2>&1; then
+      return 1
+    fi
+  fi
+
+  if ! git -C "$ROOT_DIR/$PREFIX" cat-file -e "$pin_ref^{commit}" >/dev/null 2>&1; then
+    return 1
+  fi
+  echo "AGENT_CANON_LATEST_SUBMODULE_PIN_REMOTE_REACHABLE=yes"
+  return 0
+}
+
+ensure_submodule_latest_integrity() {
+  local route_value="${1:-unknown}"
+  if [ "$submodule_parent_pin" != "$submodule_worktree_head" ]; then
+    emit_submodule_pin_integrity_block "submodule-gitlink-worktree-mismatch" "$route_value"
+  fi
+  if ! emit_submodule_pin_remote_reachable "$remote_url" "$submodule_parent_pin"; then
+    echo "AGENT_CANON_LATEST_SUBMODULE_PIN_REMOTE_REACHABLE=no"
+    emit_submodule_pin_integrity_block "submodule-pinned-commit-unreachable-from-configured-remote" "$route_value"
+  fi
+  echo "AGENT_CANON_LATEST_SUBMODULE_PIN_REMOTE_REACHABLE=yes"
 }
 
 case "$route" in
   already_current_tree|already_current_split|already_current_submodule)
-    if [[ "${dirty_update_surface:-}" == "yes" && "${submodule_worktree_remote_match}" != "yes" ]]; then
-      echo "AGENT_CANON_LATEST=fail"
-      echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
-      emit_submodule_worktree_evidence
-      echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-      echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest_with_request_evidence"
-      echo "AGENT_CANON_LATEST_DEPENDENCY_ROUTE=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic <topic> --module ${PREFIX} --branch <source-branch> --owner-evidence <owner-evidence>"
-      echo "AgentCanon vendor update surface is dirty; stop parent mode and prepare the topic workspace source clone before treating the latest gate as clean." >&2
-      exit 1
+    if [[ "${prefix_mode:-}" == "submodule" ]]; then
+      ensure_submodule_latest_integrity "$route"
     fi
     echo "AGENT_CANON_LATEST=pass"
     echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
@@ -98,17 +148,19 @@ case "$route" in
     echo "AgentCanon parent pin is a clean pushed branch head ahead of remote main; treating latest as deferred to the AgentCanon PR workflow." >&2
     ;;
   local_contains_remote)
-    echo "AGENT_CANON_LATEST=fail"
+    ensure_submodule_latest_integrity "$route"
+    echo "AGENT_CANON_LATEST=pass"
     echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
+    echo "AGENT_CANON_LATEST_PARENT_PIN_PENDING=yes"
     emit_submodule_worktree_evidence
-    echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-    echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest"
-    echo "AGENT_CANON_LATEST_DEPENDENCY_ROUTE=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic <topic> --module ${PREFIX} --branch <source-branch> --owner-evidence <owner-evidence>"
-    echo "AgentCanon parent pin contains local shared-canon commits; route them through a topic workspace source clone and PR before treating the parent repository as latest." >&2
-    exit 1
+    echo "AGENT_CANON_LATEST_AUTO_REPAIR=skipped_read_only_check"
+    echo "AGENT_CANON_LATEST_NEXT_ACTION=run_make_agent-canon-ensure-latest_then_commit_updated_submodule_pin_with_request_evidence"
+    echo "AGENT_CANON_LATEST_UPDATE_METHOD=run_make_agent-canon-ensure-latest"
+    echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/agent-canon-pr-workflow.md"
     ;;
   *)
-    if [[ "${prefix_mode:-}" == "submodule" && "${submodule_worktree_remote_match}" == "yes" && "${submodule_worktree_clean}" == "yes" ]]; then
+    if [[ "${prefix_mode:-}" == "submodule" && "${submodule_worktree_clean}" == "yes" ]]; then
+      ensure_submodule_latest_integrity "$route"
       echo "AGENT_CANON_LATEST=pass"
       echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
       emit_submodule_worktree_evidence
@@ -118,7 +170,7 @@ case "$route" in
       echo "AgentCanon submodule worktree is clean and already at remote main; set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and run 'make agent-canon-ensure-latest' to stage the parent gitlink pin." >&2
       exit 0
     fi
-    if [[ "${prefix_mode:-}" == "submodule" && "${submodule_worktree_remote_match}" == "yes" ]]; then
+    if [[ "${prefix_mode:-}" == "submodule" && "${submodule_worktree_clean}" == "no" ]]; then
       echo "AGENT_CANON_LATEST=fail"
       echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
       emit_submodule_worktree_evidence
