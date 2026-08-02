@@ -30,6 +30,21 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_DIR}/../lib/repo_paths.sh"
 WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "${WORKSPACE_ROOT}")"
+CANON_SYNC_TOOL="${CANON_TOOLS_ROOT}/sync_agent_canon.sh"
+if [ ! -f "${CANON_SYNC_TOOL}" ]; then
+  CANON_SYNC_TOOL="${CANON_TOOLS_ROOT}/agent-canon/sync_agent_canon.sh"
+fi
+if [ ! -f "${CANON_SYNC_TOOL}" ]; then
+  echo "AGENT_CANON_PR_SOURCE_TOOLS_ROOT=missing"
+  echo "AGENT_CANON_PR_SOURCE_TOOLS_REASON=agent_canon_source_tools_root_resolve_failed"
+  exit 1
+fi
+AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${HOME}/.tools/agent-canon/cargo-target}"
+AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}"
+if [ ! -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ] \
+  && [ -f "${WORKSPACE_ROOT}/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]; then
+  AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
+fi
 cd "${WORKSPACE_ROOT}"
 
 AGENT_CANON_PR_TEMP_ROOT_CREATED=0
@@ -74,7 +89,7 @@ else
 fi
 run_direct_agent_checks() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
-    bash "${CANON_TOOLS_ROOT}/sync_agent_canon.sh" check
+    bash "${CANON_SYNC_TOOL}" check
   else
     echo "SHARED_SURFACE_DRIFT=not_applicable_standalone_source"
   fi
@@ -87,7 +102,7 @@ run_direct_agent_checks() {
 
 run_shared_surface_status() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
-    bash "${CANON_TOOLS_ROOT}/sync_agent_canon.sh" status
+    bash "${CANON_SYNC_TOOL}" status
   else
     echo "SHARED_SURFACE_STATUS=not_applicable_standalone_source"
   fi
@@ -95,10 +110,38 @@ run_shared_surface_status() {
 
 run_shared_surface_check() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
-    bash "${CANON_TOOLS_ROOT}/sync_agent_canon.sh" check
+    bash "${CANON_SYNC_TOOL}" check
   else
     echo "SHARED_SURFACE_DRIFT=not_applicable_standalone_source"
   fi
+}
+
+run_agent_canon() {
+  if [ -x "${CANON_TOOLS_ROOT}/bin/agent-canon" ]; then
+    "${CANON_TOOLS_ROOT}/bin/agent-canon" "$@"
+    return 0
+  fi
+  if [ -x "${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" ]; then
+    "${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" "$@"
+    return 0
+  fi
+  if [ -x "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon" ]; then
+    "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon" "$@"
+    return 0
+  fi
+  if [ -x "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon" ]; then
+    "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon" "$@"
+    return 0
+  fi
+  if command -v cargo >/dev/null 2>&1 \
+    && [ -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ]; then
+    CARGO_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR}" \
+      cargo run --quiet --manifest-path "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" -- "$@"
+    return 0
+  fi
+  echo "AGENT_CANON_CLI_BLOCKER=agent_canon_cli_unavailable" >&2
+  echo "AGENT_CANON_CLI_REASON=agent-canon CLI binary/shim missing and cargo route unavailable" >&2
+  return 127
 }
 
 agentcanon_pr_branch_dirty() {
@@ -476,7 +519,7 @@ echo ""
 echo "6️⃣  strict dependency review"
 # This graph build is the producer for the strict dependency review and the
 # prepared graph consumers in the subsequent quick CI invocation.
-	"${CANON_TOOLS_ROOT}/bin/agent-canon" graph build --root . --profile default --format json
+	run_agent_canon graph build --root . --profile default --format json
 if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
   python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py"
 fi
@@ -490,7 +533,7 @@ write_pr_gate_receipt
 echo ""
 
 echo "7️⃣  documentation checks"
-	"${CANON_TOOLS_ROOT}/bin/agent-canon" docs check
+	run_agent_canon docs check
 echo ""
 
 echo "8️⃣  repository quick CI"

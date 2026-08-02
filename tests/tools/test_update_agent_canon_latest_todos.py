@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -152,3 +153,183 @@ def test_latest_reports_pending_update_todos_without_failing(tmp_path: Path) -> 
     )
     assert frontier["frontier_state"] == "accepted"
     assert marker["frontier_id"] == frontier["frontier_id"]
+
+
+class DerivedEntrypointFixture(SubmoduleUpdateAgentCanonTest):
+    """Derived entrypoint smoke tests for projected AgentCanon tools."""
+
+    def _source_tools_root(self, repo: Path) -> tuple[int, str]:
+        command = (
+            "source tools/lib/repo_paths.sh; "
+            "agent_canon_source_tools_root .; "
+            "status=$?; "
+            "printf '%s\\n' \"__agent_canon_source_tools_root_status=${status}\";"
+        )
+        run = subprocess.run(
+            ["bash", "-lc", command],
+            cwd=repo,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        status = 1
+        emitted_lines: list[str] = []
+        for line in run.stdout.splitlines():
+            if line.startswith("__agent_canon_source_tools_root_status="):
+                status = int(line.split("=", 1)[1] or 0)
+            else:
+                emitted_lines.append(line)
+        return status, "\n".join(emitted_lines).strip()
+
+    def _make_parent_with_tools_projection_with_fallback(self, tmp_root: Path) -> Path:
+        root = tmp_root / "parent"
+        tmp_root.mkdir(parents=True, exist_ok=True)
+        bare_repo, _source = self.make_agent_canon_remote(tmp_root / "agent-canon")
+        repo = self.make_superproject(root, bare_repo)
+        parent_tool_root = repo / "tools"
+        fallback_sync = parent_tool_root / "sync_agent_canon.sh"
+        fallback_sync.write_text(
+            "\n".join(
+                [
+                    "#!/usr/bin/env bash",
+                    "echo \"AGENT_CANON_SOURCE_TOOLS_ROOT_FALLBACK_EXECUTED\"",
+                    "exit 0",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        fallback_sync.chmod(0o755)
+        return repo
+
+    def _make_parent_with_tools_projection_with_submodule(
+        self, tmp_root: Path, *, init_submodule: bool
+    ) -> Path:
+        repo = self._make_parent_with_tools_projection_with_fallback(tmp_root)
+        if not init_submodule:
+            shutil.rmtree(repo / "vendor" / "agent-canon")
+        return repo
+
+    def _make_parent_with_legacy_projection(self, tmp_root: Path) -> Path:
+        repo_root = tmp_root / "parent"
+        tmp_root.mkdir(parents=True, exist_ok=True)
+        bare_repo, _source = self.make_agent_canon_remote(tmp_root / "agent-canon")
+        repo = self.make_superproject(repo_root, bare_repo)
+        shutil.rmtree(repo / "tools", ignore_errors=True)
+        (repo / "tools").mkdir()
+        os.symlink(
+            Path("../vendor/agent-canon/tools"),
+            repo / "tools" / "agent-canon",
+            target_is_directory=True,
+        )
+        return repo
+
+    def test_source_tools_root_requires_checked_out_vendor_submodule(self, tmp_path: Path) -> None:
+        """Vendor submodule must be checked out before parent-local sync fallback is allowed."""
+        repo = self._make_parent_with_tools_projection_with_submodule(
+            tmp_path, init_submodule=False
+        )
+        status, combined = self._source_tools_root(repo)
+        assert status != 0
+        assert "AGENT_CANON_SOURCE_TOOLS_ROOT_BLOCKER=submodule_vendor_agent_canon_not_checked_out" in combined
+        assert "AGENT_CANON_SOURCE_TOOLS_ROOT_PREFIX=vendor/agent-canon" in combined
+        assert "AGENT_CANON_SOURCE_TOOLS_ROOT_FALLBACK_EXECUTED" not in combined
+
+    def test_source_tools_root_prefers_checked_out_vendor_source_tools(self, tmp_path: Path) -> None:
+        """Checked-out vendor submodule should resolve to vendor/agent-canon/tools."""
+        repo = self._make_parent_with_tools_projection_with_submodule(
+            tmp_path, init_submodule=True
+        )
+        status, resolved = self._source_tools_root(repo)
+        assert status == 0
+        assert f"{repo}/vendor/agent-canon/tools" in resolved
+
+    def test_source_tools_root_prefers_vendor_tools_in_fresh_clone(self, tmp_path: Path) -> None:
+        """Fresh clones should still resolve vendor/agent-canon/tools over parent fallback."""
+        repo = self._make_parent_with_tools_projection_with_submodule(tmp_path, init_submodule=True)
+        fresh_root = tmp_path / "fresh-clone"
+        clone = subprocess.run(
+            ["git", "clone", "--no-local", str(repo), str(fresh_root)],
+            cwd=tmp_path,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert clone.returncode == 0, clone.stdout + clone.stderr
+        fresh_env = os.environ.copy()
+        fresh_env["GIT_ALLOW_PROTOCOL"] = "file"
+        init = subprocess.run(
+            [
+                "git",
+                "-c",
+                "protocol.file.allow=always",
+                "submodule",
+                "update",
+                "--init",
+                "--recursive",
+                "vendor/agent-canon",
+            ],
+            cwd=fresh_root,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=fresh_env,
+        )
+        assert init.returncode == 0, init.stdout + init.stderr
+        (fresh_root / "tools").mkdir(parents=True, exist_ok=True)
+        fallback_sync = fresh_root / "tools" / "sync_agent_canon.sh"
+        fallback_sync.write_text(
+            "\n".join(
+                [
+                    "#!/usr/bin/env bash",
+                    "echo \"AGENT_CANON_SOURCE_TOOLS_ROOT_FALLBACK_EXECUTED\"",
+                    "exit 0",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        fallback_sync.chmod(0o755)
+
+        status, resolved = self._source_tools_root(fresh_root)
+        assert status == 0
+        assert "AGENT_CANON_SOURCE_TOOLS_ROOT_FALLBACK_EXECUTED" not in resolved
+        assert f"{fresh_root}/vendor/agent-canon/tools" in resolved
+
+    def test_latest_entrypoint_reaches_without_legacy_root_lib(self, tmp_path: Path) -> None:
+        """Legacy legacy entrypoint should avoid removed root git_authority path."""
+        repo = self._make_parent_with_legacy_projection(tmp_path / "latest")
+        result = subprocess.run(
+            ["bash", "tools/agent-canon/ci/check_agent_canon_latest.sh"],
+            cwd=repo,
+            env={**os.environ, "PYTHONPATH": f"{repo}/tools/agent-canon/agent_tools"},
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        combined = result.stdout + result.stderr
+        assert "No such file or directory" not in combined
+        assert "AGENT_CANON_LATEST=pass" in combined
+
+    def test_run_all_checks_reaches_agent_canon_cli_without_tools_bin(self, tmp_path: Path) -> None:
+        """run_all_checks should resolve agent-canon CLI route without tools/bin dependency."""
+        repo = self._make_parent_with_legacy_projection(tmp_path / "all_checks")
+        result = subprocess.run(
+            [
+                "bash",
+                "tools/agent-canon/ci/run_all_checks.sh",
+                "--quick",
+                "--skip-docs",
+                "--skip-github-workflows",
+            ],
+            cwd=repo,
+            env={**os.environ},
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, result.stdout + result.stderr
+        combined = result.stdout + result.stderr
+        assert "AGENT_CANON_CLI_MODE" in combined
+        assert "No such file or directory" not in combined

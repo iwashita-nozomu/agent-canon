@@ -70,7 +70,6 @@ source "${SCRIPT_DIR}/../lib/repo_paths.sh"
 WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$WORKSPACE_ROOT")"
 CANON_CI_ROOT="${CANON_TOOLS_ROOT}/ci"
-CANON_BIN="${CANON_TOOLS_ROOT}/bin/agent-canon"
 cd "$WORKSPACE_ROOT"
 
 AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
@@ -79,6 +78,7 @@ if [ ! -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ] \
   AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
 fi
 AGENT_CANON_CARGO_MANIFEST="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml"
+AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${HOME}/.tools/agent-canon/cargo-target}"
 AGENT_CANON_CI_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${AGENT_CANON_SOURCE_ROOT}/.agent-canon/log-archive}"
 mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"
 if [ -n "${AGENT_CANON_CI_EVAL_LOG_DIR:-}" ]; then
@@ -173,6 +173,63 @@ if [[ -n "${PR_GATE_RECEIPT}" ]]; then
   echo "PR_GATE_RECEIPT=accepted"
 fi
 
+resolve_agent_canon_cli() {
+  local root_tool_binary="${CANON_TOOLS_ROOT}/bin/agent-canon"
+  local source_tool_binary="${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon"
+  local source_release_binary="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon"
+  local source_debug_binary="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon"
+  if [ -x "${source_tool_binary}" ]; then
+    AGENT_CANON_CLI_MODE="binary"
+    AGENT_CANON_CLI_CMD="${source_tool_binary}"
+    return 0
+  fi
+  if [ -x "${source_release_binary}" ]; then
+    AGENT_CANON_CLI_MODE="binary"
+    AGENT_CANON_CLI_CMD="${source_release_binary}"
+    return 0
+  fi
+  if [ -x "${source_debug_binary}" ]; then
+    AGENT_CANON_CLI_MODE="binary"
+    AGENT_CANON_CLI_CMD="${source_debug_binary}"
+    return 0
+  fi
+  if [ -x "${root_tool_binary}" ]; then
+    AGENT_CANON_CLI_MODE="binary"
+    AGENT_CANON_CLI_CMD="${root_tool_binary}"
+    return 0
+  fi
+  if command -v cargo >/dev/null 2>&1 && [ -f "${AGENT_CANON_CARGO_MANIFEST}" ]; then
+    AGENT_CANON_CLI_MODE="cargo"
+    AGENT_CANON_CLI_CMD="cargo"
+    return 0
+  fi
+  return 1
+}
+
+run_agent_canon() {
+  if [ "${AGENT_CANON_CLI_MODE:-}" = "binary" ] && [ -n "${AGENT_CANON_CLI_CMD:-}" ]; then
+    "$AGENT_CANON_CLI_CMD" "$@"
+    return $?
+  fi
+  if [ "${AGENT_CANON_CLI_MODE:-}" = "cargo" ] && [ -n "${AGENT_CANON_CLI_CMD:-}" ]; then
+    CARGO_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR}" \
+      cargo run --manifest-path "${AGENT_CANON_CARGO_MANIFEST}" -- "$@"
+    return $?
+  fi
+  echo "AGENT_CANON_CLI_BLOCKER=agent_canon_cli_unavailable" >&2
+  echo "AGENT_CANON_CLI_REASON=agent-canon CLI binary/shim missing and cargo route unavailable" >&2
+  return 127
+}
+
+if ! resolve_agent_canon_cli; then
+  AGENT_CANON_CLI_MODE="missing"
+  AGENT_CANON_CLI_CMD=""
+fi
+echo "AGENT_CANON_CLI_MODE=${AGENT_CANON_CLI_MODE}"
+if [ -n "${AGENT_CANON_CLI_CMD:-}" ]; then
+  echo "AGENT_CANON_CLI_PATH=${AGENT_CANON_CLI_CMD}"
+fi
+
 export PYTHONPATH="${WORKSPACE_ROOT}/python:${PYTHONPATH:-}"
 export JAX_PLATFORMS="${JAX_PLATFORMS:-}"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-}"
@@ -215,7 +272,7 @@ CANON_GRAPH_READY=0
 if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
   echo "✅ canonical graph build consumed from validated PR gate receipt"
   CANON_GRAPH_READY=1
-elif "$CANON_BIN" graph build --root "$WORKSPACE_ROOT" --profile default --format json; then
+elif run_agent_canon graph build --root "$WORKSPACE_ROOT" --profile default --format json; then
   CANON_GRAPH_READY=1
 else
   echo "❌ canonical graph build 失敗"
@@ -284,7 +341,7 @@ else
   EXIT_CODE=1
 fi
 if [ -d python ]; then
-  if "$CANON_BIN" python-algorithm-contract-check --root "$WORKSPACE_ROOT" python 2>&1; then
+  if run_agent_canon python-algorithm-contract-check --root "$WORKSPACE_ROOT" python 2>&1; then
     echo "✅ Python algorithm contract checks 成功"
   else
     echo "❌ Python algorithm contract checks 失敗"
@@ -395,7 +452,7 @@ echo ""
 echo "1️⃣  documentation checks を実行中..."
 if [ "$SKIP_DOCS" -eq 1 ]; then
   echo "DOCS_CHECKS=skip reason=already_checked_by_parent_gate"
-elif "$CANON_BIN" docs check 2>&1; then
+elif run_agent_canon docs check 2>&1; then
   echo "✅ documentation checks 成功"
 else
   echo "❌ documentation checks 失敗"

@@ -98,7 +98,12 @@ git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
 git config --global --add safe.directory "${CLONE_DIR}"
 overlay_current_tree
 cd "${CLONE_DIR}"
-CLONE_TOOLS_ROOT="$(agent_canon_tools_root "${CLONE_DIR}")"
+CLONE_TOOLS_ROOT="$(agent_canon_source_tools_root "${CLONE_DIR}")"
+if [ -z "${CLONE_TOOLS_ROOT}" ]; then
+  echo "fresh_clone_tools_root=missing"
+  echo "fresh_clone_tools_root_reason=agent_canon_source_tools_root_failed"
+  exit 1
+fi
 if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1; then
   rm -rf vendor/agent-canon
   git -c protocol.file.allow=always submodule update --init --recursive vendor/agent-canon

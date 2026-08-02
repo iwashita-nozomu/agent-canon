@@ -40,9 +40,31 @@ agent_canon_source_tools_root() {
   local repository_root="$1"
   local source_prefix="${2:-vendor/agent-canon}"
 
+  if git -C "$repository_root" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    local declared_mode=""
+    declared_mode="$(
+      git -C "$repository_root" ls-tree -d --full-tree HEAD "$source_prefix" 2>/dev/null \
+        | awk '{print $1}'
+    )"
+    if [ "$declared_mode" = "160000" ]; then
+      local submodule_path="${repository_root}/${source_prefix}"
+      if [ ! -f "${submodule_path}/.git" ] && [ ! -d "${submodule_path}/.git" ]; then
+        echo "AGENT_CANON_SOURCE_TOOLS_ROOT_BLOCKER=submodule_vendor_agent_canon_not_checked_out"
+        echo "AGENT_CANON_SOURCE_TOOLS_ROOT_MODE=160000"
+        echo "AGENT_CANON_SOURCE_TOOLS_ROOT_PREFIX=${source_prefix}"
+        return 1
+      fi
+    fi
+  fi
+
   if [ -d "$repository_root/$source_prefix/tools" ] \
     && [ -f "$repository_root/$source_prefix/tools/sync_agent_canon.sh" ]; then
     printf '%s\n' "$repository_root/$source_prefix/tools"
+    return 0
+  fi
+  if [ -d "$repository_root/tools/agent-canon" ] \
+    && [ -f "$repository_root/tools/agent-canon/sync_agent_canon.sh" ]; then
+    printf '%s\n' "$repository_root/tools/agent-canon"
     return 0
   fi
   if [ -d "$repository_root/tools" ] && [ -f "$repository_root/tools/sync_agent_canon.sh" ]; then
