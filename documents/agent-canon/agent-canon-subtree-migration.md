@@ -229,7 +229,7 @@ derived repo で `agent-canon` だけ更新したい場合の既定入口は `up
 通常の動線は high-level `plan -> latest` です。
 `sync_agent_canon.sh ensure-latest` は task 開始時の freshness gate、`link-root` は root view drift 修復、`push` は shared canon を直接 upstream に戻す保守者向け低レベル入口です。
 通常の派生 repo update で `sync_agent_canon.sh pull` を直接選びません。
-derived repo の `vendor/agent-canon/` に local commit または source dirty state がある場合は、parent source surfaceとして扱わず、topic workspace branch cloneへowner-evidence付きで移送してから GitHub PRを開きます。parent modeでdirty stateを保護・stash・再開しません。
+derived repo の intended named `vendor/agent-canon/` source branch では branch / ahead / diverged / dirty state を evidence として保持します。parent mode は、全 local uncommitted / ignored materialized paths と `HEAD` から planned result tree への exact update write set の unpreservable collision、または unresolved merge conflict だけを block し、non-colliding state は保持して normal merge / review flow を続けます。requested topic が current branch と異なる場合だけ owner-evidence付きの topic workspace branch clone へ移送して GitHub PR を開きます。
 `plan` は read-only で route を示します。
 submodule repo では `already_current_submodule` / `submodule_update` を通常 route として扱います。legacy subtree metadata がある branch での `subtree_pull` や `snapshot_import_no_subtree*` 系 route は compatibility appendix だけの扱いです。
 
@@ -300,7 +300,9 @@ repos must migrate `.gitmodules` back to the canonical GitHub URL before normal
 AgentCanon PR work. New AgentCanon changes go through GitHub branches and PRs,
 with the standalone source-branch merge route used before push. A branch created
 from a derived repo must first be materialized as the workspace-root source clone;
-parent vendor dirt is not a supported topology.
+An intended named vendor branch remains the source owner under the canonical
+update-materialization predicate; a differing requested topic is materialized as
+the workspace-root source clone before its AgentCanon PR.
 
 ## 8. 移行フェーズ
 
