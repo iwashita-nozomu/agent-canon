@@ -88,6 +88,34 @@ class ParentRepoReadinessTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("container_config:skipped", result.stdout)
 
+    def test_unconfigured_parent_environment_is_not_a_required_path(self) -> None:
+        """Readiness accepts a parent that does not opt into environment projection."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_parent_fixture(root)
+            (root / ".devcontainer/parent-environment.sh").unlink()
+            (root / ".devcontainer/parent-environment.toml").unlink()
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("PARENT_REPO_READINESS=pass", result.stdout)
+
+    def test_missing_parent_executable_capability_still_fails(self) -> None:
+        """The optional environment change does not weaken executable sources."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_parent_fixture(root)
+            (root / ".devcontainer/post-create-parent.sh").chmod(0o644)
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                ".devcontainer/post-create-parent.sh:not-executable",
+                result.stdout,
+            )
+
     def test_shared_surface_receipt(self) -> None:
         """The shared devcontainer surface carries both exact identity receipt owners."""
         manifest = load_manifest(

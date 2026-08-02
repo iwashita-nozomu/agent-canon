@@ -53,6 +53,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             "github.event.pull_request.head.sha || github.sha",
             text,
         )
+        self.assertIn("persist-credentials: false", text)
+        self.assertIn("AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}", text)
         self.assertFalse(
             any(
                 command in "\n".join(run_lines)
@@ -63,6 +65,49 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 )
             )
         )
+
+    def test_agent_canon_candidate_gate_requires_step_local_read_credential(self) -> None:
+        """The trusted-base token cannot be omitted or promoted to job scope."""
+        source = (
+            REPO_ROOT / ".github" / "workflows" / "agent-canon-static-gates.yml"
+        ).read_text(encoding="utf-8")
+        step_local = "        env:\n          AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}\n"
+        variants = {
+            "missing": source.replace(step_local, ""),
+            "job_scope": source.replace(
+                "    runs-on: ubuntu-latest\n",
+                "    runs-on: ubuntu-latest\n"
+                "    env:\n"
+                "      AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}\n",
+            ).replace(step_local, ""),
+        }
+        for name, workflow_text in variants.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                workflow = (
+                    root / ".github" / "workflows" / "agent-canon-static-gates.yml"
+                )
+                workflow.parent.mkdir(parents=True)
+                workflow.write_text(workflow_text, encoding="utf-8")
+                self.copy_required_surfaces(root)
+
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), "--root", str(root)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(
+                    "missing_step_local_github_read_credential",
+                    result.stdout,
+                )
+                if name == "job_scope":
+                    self.assertIn(
+                        "canonical_candidate_gate_read_credential_must_be_step_local",
+                        result.stdout,
+                    )
 
     def test_direct_workflow_dispatch_input_in_run_fails(self) -> None:
         """Shell run blocks must not interpolate workflow-dispatch inputs."""

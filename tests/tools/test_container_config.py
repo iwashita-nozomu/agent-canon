@@ -512,6 +512,101 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     assert module.validate_generated_compose(repo, pack) == []
 
 
+def test_parent_generator_disables_unconfigured_parent_environment(
+    tmp_path: Path,
+) -> None:
+    """A parent with neither optional environment source omits only that mount."""
+    repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".devcontainer/parent-environment.sh").unlink()
+    (repo / ".devcontainer/parent-environment.toml").unlink()
+    (repo / ".agent-canon").mkdir()
+    home = tmp_path / "home"
+    write_host_zshrc(home)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".agent-canon/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert 'target: "/etc/project-template/parent-environment.sh"' not in compose
+    assert 'target: "/etc/project-template/zsh/.zshrc"' in compose
+    module = load_container_config_module()
+    assert module.validate_parent_environment(repo) == []
+
+
+def test_parent_environment_symlinks_to_existing_sources_pass(tmp_path: Path) -> None:
+    """File reconstructibility, not the root-view inode type, enables the contract."""
+    repo = write_parent_generator_fixture(
+        tmp_path,
+        environment_script="export PROJECT_REGION=tokyo\n",
+        environment_variables=("PROJECT_REGION",),
+    )
+    source_dir = repo / "parent-config"
+    write_file(source_dir, "parent-environment.sh", "export PROJECT_REGION=tokyo\n")
+    write_file(source_dir, "parent-environment.toml", 'variables = ["PROJECT_REGION"]\n')
+    for name in ("parent-environment.sh", "parent-environment.toml"):
+        view = repo / ".devcontainer" / name
+        view.unlink()
+        view.symlink_to(Path("..") / "parent-config" / name)
+    (repo / ".agent-canon").mkdir()
+    home = tmp_path / "home"
+    write_host_zshrc(home)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    module = load_container_config_module()
+    assert module.validate_parent_environment(repo) == []
+
+
+def test_parent_environment_broken_symlink_fails(tmp_path: Path) -> None:
+    """A declared parent environment view must resolve to an actual source file."""
+    repo = write_parent_generator_fixture(tmp_path)
+    script = repo / ".devcontainer/parent-environment.sh"
+    script.unlink()
+    script.symlink_to(Path("..") / "parent-config" / "missing.sh")
+    home = tmp_path / "home"
+    write_host_zshrc(home)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "HOME": str(home)},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "parent environment source does not resolve to a file" in result.stderr
+    module = load_container_config_module()
+    findings = module.validate_parent_environment(repo)
+    assert any(finding.detail == "missing-target" for finding in findings)
+
+
 def test_parent_compose_rejects_malformed_user_and_home_tmpfs(tmp_path: Path) -> None:
     """Parent Compose requires the exact mapped user and HOME tmpfs scalar."""
     repo = write_parent_generator_fixture(tmp_path)

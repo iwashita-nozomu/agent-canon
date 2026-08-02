@@ -63,7 +63,6 @@ class ExpectedPath:
     kind: str
     severity: str = ERROR
     executable: bool = False
-    regular: bool = False
 
 
 @dataclass(frozen=True)
@@ -116,18 +115,6 @@ ENVIRONMENT_PATHS = (
         "file",
         executable=True,
     ),
-    ExpectedPath(
-        ".devcontainer/parent-environment.sh",
-        "devcontainer_environment",
-        "file",
-        regular=True,
-    ),
-    ExpectedPath(
-        ".devcontainer/parent-environment.toml",
-        "devcontainer_environment",
-        "file",
-        regular=True,
-    ),
 )
 
 CONTENT_MARKERS = (
@@ -166,15 +153,6 @@ class ExpectedPathChecker:
                         expected.category,
                         expected.path,
                         "not-executable",
-                    )
-                )
-            if expected.regular and path.is_symlink():
-                findings.append(
-                    Finding(
-                        expected.severity,
-                        expected.category,
-                        expected.path,
-                        "must-be-regular-file",
                     )
                 )
         return tuple(findings)

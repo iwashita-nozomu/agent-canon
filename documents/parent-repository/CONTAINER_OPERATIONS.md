@@ -20,10 +20,13 @@ AgentCanon は mounted developer/agent tool と共有 runtime の source を所�
 
 - 親の `docker/Dockerfile`、runtime pack、workspace Python dependency は親の
   product image contract です。
-- `.devcontainer/parent-environment.sh` は親環境の値を定義する唯一の source です。
-  値が不要な初期状態では空の regular file を置きます。
-- `.devcontainer/parent-environment.toml` は `variables` 配列だけを持ち、shell
-  export 名の ordered manifest になります。
+- `.devcontainer/parent-environment.sh` と
+  `.devcontainer/parent-environment.toml` は optional pair です。両方がない状態は
+  parent environment 無効として成立します。
+- parent environment を有効にする場合、shell file は親環境の値を定義する唯一の
+  source、TOML は `variables` 配列だけを持つ shell export 名の ordered manifest
+  になります。両 path は regular file または regular file へ解決できる Symlink
+  とし、片方だけの宣言と broken / non-file Symlink は失敗です。
 - `vendor/agent-canon/.devcontainer/dependencies.toml` は AgentCanon が必要とする
   mounted tool を独立して宣言します。AgentCanon の pinned PyYAML record は、親が
   宣言する PyYAML の ownership を置き換えません。
@@ -34,12 +37,16 @@ AgentCanon は mounted developer/agent tool と共有 runtime の source を所�
 
 ## zsh startup の入力
 
-親環境を有効にする Compose は次の read-only bind mount を提供します。
+optional pair で親環境を有効にする Compose は次の read-only bind mount を提供します。
 
 ```text
 .devcontainer/parent-environment.sh -> /etc/project-template/parent-environment.sh
 host ~/.zshrc                         -> /etc/project-template/zsh/.zshrc
 ```
+
+parent environment の両 path がない場合は一つ目の mount と source を生成しません。
+宣言された shell path は regular file 自身でも、regular file へ解決できる Symlink
+でも同じ親所有 source として扱います。
 
 host `${HOME}/.zshrc` は明示的な mount source expression です。validator は生成
 Compose の bind type、source expression、target、read-only を静的に検証します。
@@ -47,7 +54,8 @@ Compose の bind type、source expression、target、read-only を静的に検�
 validation は現在の runner host file を probe しません。別の host path を探索したり、
 空の zshrc を生成したりしません。
 
-後続の親 image は image-owned `/etc/project-template/zsh/.zshenv` から mounted
+parent environment が有効な場合、後続の親 image は image-owned
+`/etc/project-template/zsh/.zshenv` から mounted
 `/etc/project-template/parent-environment.sh` を source します。これにより zsh
 process boundary と descendants が同じ parent variables を受け取ります。
 generator は shell script を実行して値を抽出せず、Compose に parent variable の値を
@@ -68,9 +76,9 @@ Compose がこの境界で直接所有する environment は次の三つです�
 - `ZDOTDIR`: image-owned zsh startup directory を指します。
 - `SHELL`: pack の `runtime.shell` と一致します。
 
-親の `.devcontainer/parent-environment.toml` が構造上必要なことは、値や container
-behavior の十分条件ではありません。最終的な親側検証は、validator、readiness、
-runtime pack、image startup の各 owner が担当します。
+parent environment pair の両方不在、または両方が file 実体へ解決できることは、値や
+container behavior の十分条件ではありません。最終的な親側検証は、validator、
+readiness、runtime pack、image startup の各 owner が担当します。
 
 ## lifecycle と validation
 
