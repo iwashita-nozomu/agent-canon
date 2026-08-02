@@ -112,7 +112,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
         self.assertEqual(devcontainer_json.mode, "symlink")
 
     def test_materialized_devcontainer_uses_child_symlink(self) -> None:
-        """manifest materializationは実体directoryと個別symlinkを作る。"""
+        """Manifest materialization creates directory and individual symlinks."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_parent_fixture(root)
@@ -146,7 +146,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 self.assertFalse((devcontainer / name).exists())
 
     def test_legacy_devcontainer_directory_symlink_is_rejected(self) -> None:
-        """whole-directory .devcontainer symlinkはreadinessで拒否する。"""
+        """Whole-directory .devcontainer symlink is rejected by readiness checks."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_parent_fixture(root)
@@ -267,8 +267,8 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_standalone_only_root_document_fails(self) -> None:
-        """Standalone-only AgentCanon docs must not leak into parent root docs."""
+    def test_standalone_only_root_document_passes(self) -> None:
+        """Standalone-only AgentCanon root docs can exist as parent fixture content."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_parent_fixture(root)
@@ -278,12 +278,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
 
             result = self.run_checker(root)
 
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "PARENT_REPO_READINESS_FINDING=error:standalone_only_leak:"
-                "documents/runtime/SHARED_RUNTIME_SURFACES.md:must-not-exist-in-parent-root",
-                result.stdout,
-            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def write_parent_fixture(self, root: Path) -> None:
         """Create a synthetic template-derived parent repo."""

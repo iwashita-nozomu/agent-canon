@@ -89,10 +89,14 @@ disagree, update the manifest first and then adjust this reader-facing policy.
    `toolchain` の受け口（`tool` 層）で確認できること。
 
 `check_agent_canon_latest` はこの所有者契約に従って、
-`update` action と link-root の main 追従を結果として扱い、
-pin の可到達性と `gitlink == submodule worktree HEAD` が成立しない状態は
-`fail` を返します。`deferred` は本契約上は「mainとの差分の更新待ち」
-のみを扱い、到達不能や不一致を隠蔽して通過する経路にはしません。
+`update` action と link-root の main 追従を結果として扱います。
+pin の可到達性と `gitlink == submodule worktree HEAD` は read-only 必須条件であり、
+`fail` を返す唯一の理由です。`dirty`（未追跡含む）自体は
+`AGENT_CANON_LATEST_SUBMODULE_WORKTREE_CLEAN=no` になりますが、read-only では
+`pass` 扱いを維持し、`AGENT_CANON_LATEST_NEXT_ACTION` で更新時の保全方針を示します。
+`deferred` は本契約上は「mainとの差分の更新待ち」だけで、到達不能や不一致を
+更新未実施のまま通過させる経路には使いません。materialization 上書き更新を行う
+場合のみブロックとし、通常 CI/PR の判定からは切り離して扱います。
 
 ## AgentCanon-Owned Symlink Views
 
