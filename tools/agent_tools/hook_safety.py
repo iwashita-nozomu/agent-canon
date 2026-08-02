@@ -53,7 +53,7 @@ PROTECTED_GIT_SUBCOMMANDS = frozenset(
     {"restore", "reset", "clean", "checkout", "switch", "stash", "branch", "worktree"}
 )
 PROTECTED_UPDATE_MODES = frozenset(
-    {"latest", "apply", "merge-main-into-current", "merge-main-into-current-preserve-dirty"}
+    {"latest", "apply", "merge-main-into-current"}
 )
 PROTECTED_MAKE_TARGETS = frozenset(
     {"agent-canon-ensure-latest", "agent-canon-latest", "agent-canon-update"}

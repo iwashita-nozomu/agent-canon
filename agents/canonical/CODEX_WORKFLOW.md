@@ -35,7 +35,7 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces closeou
 1. `agents/skills/README.md` と `$agent-orchestration` skill を読み、routing mode と skill set を先に決める
 1. `agents/TASK_WORKFLOWS.md` で task family を決める
 1. Runtime profile と implementation owner がまだ固定されていない repo-changing task では、広い packet 読解より先に canonical router / semantic-index / dependency review の structured output を取る
-1. `make agent-canon-update-plan` と read-only worktree check で AgentCanon freshness を分類する。更新が必要なら current checkout を保存し、current-task user の explicit approval を得てから、同じ command segment に creation authority/reason と destructive authority/reason の全 4 field を置いた protected wrapper / Make target を実行する。dirty / detached / unpushed / divergent source state は fail-closed blocker にする
+1. `make agent-canon-update-plan` と read-only worktree check で AgentCanon freshness を分類する。更新が必要なら current checkout を保持し、current-task user の explicit approval を得てから、同じ command segment に creation authority/reason と destructive authority/reason の全 4 field を置いた protected wrapper / Make target を実行する。intended named source branch の dirty / unpushed / divergent state は evidence として保持し、Git の仮想 merge conflict または exact update write set と local materialized path の collision だけを typed blocker にする。detached state は source owner identity repair へ route する
 1. 選択された workflow/profile が必要とする Base Runtime Packet だけを読む。inactive profile の packet は `not_applicable` として記録する
 1. Cross-Cutting Packet は選択 route、review gate、または structured tool finding が必要にした slice を読む
 1. 実装を伴う task では `agents/workflows/implementation-waterfall-workflow.md` を読む

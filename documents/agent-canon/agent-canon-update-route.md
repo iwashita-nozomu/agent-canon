@@ -68,27 +68,35 @@ The local-state block predicate for `plan`, `latest`, `apply`, and
 `merge-main-into-current` is exactly:
 
 ```text
-block := unresolved_merge_conflict
+block := materialization_merge_conflict(
+           existing_unresolved_index or virtual_merge_result_conflict
+         )
       or unpreservable_materialization_collision(
-           local_uncommitted_paths intersect exact_update_write_set
+           local_materialized_paths intersect exact_update_write_set
          )
 ```
 
 `exact_update_write_set` is empty when the current commit already contains the
-remote commit. For a fast-forward it is the path set changed from current to
-remote. For diverged history it is the remote-side path set changed from the
-merge base to remote. Equal paths and file/directory prefix collisions are
-unpreservable. Working-tree, index, and untracked paths all contribute to
-`local_uncommitted_paths`.
+remote commit. Otherwise Git computes a virtual merge result with
+`merge-tree --write-tree`; the write set is every path whose tree entry differs
+between current `HEAD` and that result tree. This includes destinations produced
+by Git's rename handling without a second handwritten rename heuristic. An
+existing unresolved index or a conflict reported while producing the virtual
+result is the independently typed `materialization_merge_conflict` blocker.
+
+Equal paths and file/directory prefix collisions are unpreservable.
+`local_materialized_paths` is the union of tracked worktree modifications,
+staged changes, conflicted paths, ordinary untracked paths, and ignored
+untracked paths. Ignored status changes visibility, not whether Git could
+overwrite the materialized path.
 
 A named branch, `ahead` or `diverged` history, parent/worktree pin difference,
 and dirty worktree or update-surface status are state evidence, not blockers.
-The updater leaves non-colliding uncommitted paths in place and uses the normal
-Git merge for committed branch differences. A merge that produces unresolved
-conflicts then satisfies the first block term. This route has no clean-tree
-hard requirement, dirty-path count baseline, stash/reset transaction, or
-compatibility materialization route. Parent pin/root projection eligibility
-remains the separate clean-`main` contract after source publication.
+The updater leaves non-colliding local materialized paths in place and uses the
+normal Git merge and review flow for committed branch differences. This route
+has no clean-tree hard requirement, dirty-path count baseline, stash/reset
+transaction, or compatibility materialization route. Parent pin/root projection
+eligibility remains the separate clean-`main` contract after source publication.
 
 ## Owner Namespace
 

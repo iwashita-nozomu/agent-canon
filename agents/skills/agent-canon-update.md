@@ -92,9 +92,14 @@ TODO state up to date.
    Within the intended named branch, apply the exact local-state acceptance
    predicate from
    `documents/agent-canon/agent-canon-update-route.md#update-materialization-acceptance`.
-   Named branch, ahead/diverged history, and dirty state remain evidence;
-   non-colliding uncommitted paths stay in place while committed differences use
-   the normal merge and review flow.
+   Named branch and ahead/diverged history are state evidence.
+   Dirty state remains evidence, not a blocker. Non-colliding local materialized
+   paths stay in place, including ignored untracked paths, while committed
+   differences use the normal merge and review flow. The exact update write set
+   is the path diff from `HEAD` to Git's virtual merge result tree.
+   Materialization blocks only an independently typed merge conflict or an
+   unpreservable materialization collision; the skill does not derive a second
+   rename heuristic.
    Every mutating wrapper or low-level sync invocation must carry the validated
    branch/destructive authority fields and
    `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` in the same
@@ -219,10 +224,13 @@ python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh ch
   `latest` の更新対象 branch 引数を topic slug に転用しません。
   Under that decision table, a vendor checkout owned by another topic is a
   refusal condition for this topic. Within the intended source branch, use the
-  canonical update materialization predicate and leave non-colliding local paths
-  in place. For parent pin/root projection, only a clean vendor pin projection is
-  eligible, while a differing requested topic may use the managed workspace
-  clone only through the table's topic-identity rule.
+  canonical update materialization predicate: dirty state remains evidence, not
+  a blocker, and non-colliding local materialized paths remain in place. Block
+  only an independently typed merge conflict or an unpreservable materialization
+  collision with the exact update write set. For parent pin/root projection,
+  only a clean vendor pin projection is eligible, while a differing requested
+  topic may use the managed workspace clone only through the table's
+  topic-identity rule.
 - Standalone local source-branch publication follows the canonical transport
   contract in `documents/tools/github_publish.md`: verified remote identity/
   permission, named branch, captured local identity, exact SHA ref push, remote

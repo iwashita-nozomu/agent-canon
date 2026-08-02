@@ -53,7 +53,9 @@ modify a parent checkout or pin.
   topic branch を用意して同一トピックの source lane を再開する。
 - Parent pin/root projection is a separate state and passes only with clean
   `main` plus `worktree HEAD == staged index gitlink`; it does not authorize
-  source editing. A clean named topic branch is the source owner.
+  source editing. The intended named topic branch is the source owner; dirty,
+  ahead, and diverged state are evidence, while virtual/existing merge conflict
+  and unpreservable materialization collision are independently typed blockers.
 - Source branch names use `canon/<topic>-YYYYMMDD`.
 - Reuse the current branch/lifecycle while its immutable identity and push
   authority remain valid. A closed head, conflict, identity drift, or unrelated

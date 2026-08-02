@@ -91,9 +91,7 @@ After an approved update, repair and check root views.
 - `latest`:
   - upstream AgentCanon main を取り込み、template / derived repo の submodule pin、root views、parent TODO boundary を high-level route として処理する
 - `merge-main-into-current`:
-  - 通常 sequence ではなく、`vendor/agent-canon/` に local AgentCanon source commit がある場合の AgentCanon PR route で使う
-- `merge-main-into-current-preserve-dirty`:
-  - standalone source mode only。parent modeでは vendor mutationを拒否し、topic workspace branch clone routeを案内する入口
+  - 通常 sequence ではなく、intended named AgentCanon source branch に local commit がある場合の AgentCanon PR route で使う。ahead / diverged / dirty state は evidence として保持し、仮想 merge conflict または materialization collision だけを block する
 - `link-root`:
   - root の symlink view と synced copy を vendor 正本から再構成する
 - `check`:
@@ -257,17 +255,18 @@ current branch は topic workspace の managed clone で明示し、GitHub main 
 取り込んでから PR にします。`vendor/agent-canon/` は clean pin の readback
 対象であり、source branch ではありません。
 
-Invoke protected `merge-main-into-current-preserve-dirty` only in standalone
-source mode after current-task user approval and with all four inline Git
-authority/reason fields. Parent mode refuses it and routes to the workspace-root
-branch clone.
+Invoke protected `merge-main-into-current` on the intended named source branch
+after current-task user approval and with all four inline Git authority/reason
+fields. The same operation preserves non-colliding local materialized paths in
+standalone and parent-submodule source lanes. Another topic's vendor ownership
+routes to the workspace-root branch clone.
 
-- `blocked_dirty`: parent mode では vendor source を保存・stash・継続せず、owner evidence 付きの topic workspace source clone routeへ移送します。standalone source mode はその source checkout の責務で処理します。
 - `blocked_detached_head`: named branch が無いため、AgentCanon PR branch を作ってから再実行します。
+- `blocked_merge_conflict`: 既存 unresolved index または Git の仮想 merge result が conflict を報告したため、committed branch merge を解決してから再実行します。
+- `blocked_unpreservable_collision`: exact update write set が local materialized path と衝突するため、その path を明示的に materialize または移動してから再実行します。
 - `already_current` / `already_contains_main`: validation 後に branch push または parent pin update へ進みます。
 - `fast_forwarded` / `merged`: validation 後に current AgentCanon branch を GitHub へ push し、AgentCanon PR を開くか更新します。
-- `conflict`: parent mode では vendor checkout 内で conflict を解消せず、独立 topic cloneへ source state を移送してから validation と push に進みます。
-- `merge-main-into-current` と `merge-main-into-current-preserve-dirty` は standalone source modeだけの入口です。parent modeでは vendorをsource branchとして変更せず、topic workspace branch cloneへ停止・移送します。
+- `merge-main-into-current` は standalone source branch と parent submodule の intended named source branch で同じ acceptance predicate を使います。
 
 ### 7.5 subtree から submodule への移行
 

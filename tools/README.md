@@ -401,12 +401,12 @@ findings for resilient test planning.
   - legacy subtree repo では subtree metadata / snapshot import route を使います。
   - `update_agent_canon.sh`
     - `plan` は derived repo から `agent-canon` だけ更新するときの route を出します。
-    - `latest` は通常の最新化を tool-first に実行する唯一の user-facing 入口です。safe な場合は eval / hook log の所有 route、`ensure-latest`、root view check、compiled AgentCanon tool rebuild、AgentCanon update TODO routing / acknowledge まで進めます。submodule repo の vendor local branch、dirty runtime source、diverged history、merge conflict は parent source surfaceとして継続せず、topic workspace branch clone routeを案内して停止します。
+    - `latest` は通常の最新化を tool-first に実行する唯一の user-facing 入口です。safe な場合は eval / hook log の所有 route、`ensure-latest`、root view check、compiled AgentCanon tool rebuild、AgentCanon update TODO routing / acknowledge まで進めます。submodule repo の intended named vendor branch では ahead / diverged / dirty state を evidence として保持し、Git の仮想 merge conflict または exact update write set と local materialized path の collision だけを typed blocker にします。
     - eval / hook result の producer path は `runtime_log_archive_git.py ensure` 後の stable source branch archive を使います。legacy `agents/evals/results/` の inventory、migration authority、retention は `agent-canon-log` policy repository の owner route に従います。新規 producer は source tree の `agents/evals/results/` を作成せず、non-log dirty state は自動退避しません。
     - `apply` は互換用の低レベル入口です。通常の task 開始、PR merge 後の持ち帰り、手動更新は `make agent-canon-ensure-latest` または `make agent-canon-latest` から `latest` に入ります。
     - `rebuild-tools` は現在 checkout されている AgentCanon source から compiled tool cache を作り直します。
       commit SHA が同じでも Rust source が installed binary より新しければ再ビルドします。
-    - `merge-main-into-current` と `merge-main-into-current-preserve-dirty` は standalone source modeだけの入口です。parent modeはvendor source mutationを拒否し、topic workspace branch clone routeを案内します。
+    - `merge-main-into-current` は standalone source branch または parent submodule の intended named source branch に remote `main` を取り込む入口です。non-colliding local materialized paths はその場に残し、別 topic が current vendor を所有する場合だけ topic workspace clone route を使います。
     - compatibility commands for local remotes, source refresh, and direct main alignment are intentionally not user-facing.
   - `rebuild_agent_tools.sh`
     - AgentCanon pin 更新後に `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下の compiled tools を source commit に合わせます。

@@ -94,7 +94,9 @@ fresh create し、親 cloneや代替 pathを作りません。local/remote に 
 
 AgentCanon update はこの一般 route の具体例です。
 
-parent pin/root projection、clean named topic の source owner、requested topic
-identity、dirty fallback の typed next action は、同規約の判定表に従います。
+parent pin/root projection、intended named topic の source owner、requested topic
+identity、別 topic occupancy の fallback action は、同規約の判定表に従います。
+intended branch の dirty / ahead / diverged state は evidence として保持し、仮想
+merge conflict または exact update write set との collision だけを block します。
 `main` は topic 作成の起点であり source owner ではありません。runtime shim や
 workflow は `cmd_latest` の更新対象 branch を topic slug に使いません。

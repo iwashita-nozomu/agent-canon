@@ -386,7 +386,7 @@ route_requires_agent_workflow() {
   local prefix_mode="$2"
 
   case "$route" in
-    submodule_detached|submodule_materialization_collision|unresolved_submodule_merge_conflict)
+    submodule_detached|submodule_merge_conflict|submodule_materialization_collision|unresolved_submodule_merge_conflict)
       return 0
       ;;
     deferred_branch_pr)
@@ -1046,6 +1046,9 @@ cmd_merge_main_into_current() {
   local current_branch=""
   local submodule_status=""
   local collision_path=""
+  local collision_rc=0
+  local materialization_result_tree=""
+  local materialization_result_tree_rc=0
   local merge_log=""
   local result=""
   local conflict_files=""
@@ -1067,7 +1070,7 @@ cmd_merge_main_into_current() {
   echo "agent_canon_merge_pre_head=$pre_head"
 
   echo "agent_canon_merge_worktree_status=$([ -n "$submodule_status" ] && echo dirty || echo clean)"
-  echo "agent_canon_merge_acceptance_predicate=unresolved_merge_conflict_or_unpreservable_materialization_collision"
+  echo "agent_canon_merge_acceptance_predicate=materialization_merge_conflict_or_unpreservable_materialization_collision"
 
   if [ -z "$current_branch" ]; then
     echo "agent_canon_merge_result=blocked_detached_head"
@@ -1077,18 +1080,41 @@ cmd_merge_main_into_current() {
   fi
   if update_materialization_unresolved_conflict "$AGENT_CANON_DIR"; then
     echo "agent_canon_merge_unresolved_merge_conflict=yes"
+    echo "agent_canon_merge_merge_conflict=yes"
+    echo "agent_canon_merge_conflict_type=existing_unresolved_index"
     echo "agent_canon_merge_result=blocked_unresolved_merge_conflict"
     echo "NEXT_ACTION=resolve_agentcanon_merge_conflicts_then_rerun_merge-main-into-current"
     die "current AgentCanon branch has unresolved merge conflicts"
   fi
-  if collision_path="$(update_materialization_collision_path "$AGENT_CANON_DIR" "$pre_head" "$remote_sha")"; then
+  materialization_result_tree="$(
+    update_materialization_result_tree "$AGENT_CANON_DIR" "$pre_head" "$remote_sha"
+  )" || materialization_result_tree_rc=$?
+  if [ "$materialization_result_tree_rc" -eq 2 ]; then
+    echo "agent_canon_merge_unresolved_merge_conflict=no"
+    echo "agent_canon_merge_merge_conflict=yes"
+    echo "agent_canon_merge_conflict_type=virtual_merge_result"
+    echo "agent_canon_merge_result=blocked_merge_conflict"
+    echo "NEXT_ACTION=resolve_committed_branch_merge_conflict_then_rerun_merge-main-into-current"
+    die "current AgentCanon branch conflicts with the virtual merge result"
+  fi
+  [ "$materialization_result_tree_rc" -eq 0 ] \
+    || die "failed to compute the AgentCanon virtual merge result tree"
+  echo "agent_canon_merge_unresolved_merge_conflict=no"
+  echo "agent_canon_merge_merge_conflict=no"
+  echo "agent_canon_merge_conflict_type=none"
+  collision_path="$(
+    update_materialization_collision_path \
+      "$AGENT_CANON_DIR" "$pre_head" "$materialization_result_tree"
+  )" || collision_rc=$?
+  if [ "$collision_rc" -eq 0 ]; then
     echo "agent_canon_merge_materialization_collision=yes"
     printf 'agent_canon_merge_materialization_collision_path=%q\n' "$collision_path"
     echo "agent_canon_merge_result=blocked_unpreservable_collision"
     echo "NEXT_ACTION=materialize_or_move_the_colliding_local_path_then_rerun_merge-main-into-current"
-    die "current AgentCanon branch has a local uncommitted path in the exact remote update write set"
+    die "current AgentCanon branch has a local materialized path in the exact update write set"
   fi
-  echo "agent_canon_merge_unresolved_merge_conflict=no"
+  [ "$collision_rc" -eq 1 ] \
+    || die "failed to compute the AgentCanon materialization collision set"
   echo "agent_canon_merge_materialization_collision=no"
 
   if [ "$pre_head" = "$remote_sha" ]; then

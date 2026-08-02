@@ -248,10 +248,16 @@ submodule_unresolved_merge_conflict() {
     || update_materialization_unresolved_conflict "$ROOT_DIR/$PREFIX"
 }
 
-submodule_materialization_collision_path() {
+submodule_materialization_result_tree() {
   local current_sha="$1"
   local remote_sha="$2"
-  update_materialization_collision_path "$ROOT_DIR/$PREFIX" "$current_sha" "$remote_sha"
+  update_materialization_result_tree "$ROOT_DIR/$PREFIX" "$current_sha" "$remote_sha"
+}
+
+submodule_materialization_collision_path() {
+  local current_sha="$1"
+  local result_tree="$2"
+  update_materialization_collision_path "$ROOT_DIR/$PREFIX" "$current_sha" "$result_tree"
 }
 
 submodule_history_state() {
@@ -264,22 +270,44 @@ materialize_submodule_remote_branch() {
   local current_sha="$1"
   local remote_sha="$2"
   local remote_branch="$3"
+  local result_tree="${4:-}"
   local collision_path=""
+  local collision_rc=0
   local merge_log=""
+  local result_tree_rc=0
 
   if submodule_unresolved_merge_conflict; then
     echo "agent_canon_materialization_unresolved_merge_conflict=yes"
+    echo "agent_canon_materialization_merge_conflict=yes"
+    echo "agent_canon_materialization_conflict_type=existing_unresolved_index"
     echo "agent_canon_materialization_result=blocked_unresolved_merge_conflict"
     return 2
   fi
-  if collision_path="$(submodule_materialization_collision_path "$current_sha" "$remote_sha")"; then
+  if [ -z "$result_tree" ]; then
+    result_tree="$(submodule_materialization_result_tree "$current_sha" "$remote_sha")" \
+      || result_tree_rc=$?
+    if [ "$result_tree_rc" -eq 2 ]; then
+      echo "agent_canon_materialization_unresolved_merge_conflict=no"
+      echo "agent_canon_materialization_merge_conflict=yes"
+      echo "agent_canon_materialization_conflict_type=virtual_merge_result"
+      echo "agent_canon_materialization_result=blocked_merge_conflict"
+      return 2
+    fi
+    [ "$result_tree_rc" -eq 0 ] || return "$result_tree_rc"
+  fi
+  echo "agent_canon_materialization_unresolved_merge_conflict=no"
+  echo "agent_canon_materialization_merge_conflict=no"
+  echo "agent_canon_materialization_conflict_type=none"
+  collision_path="$(submodule_materialization_collision_path "$current_sha" "$result_tree")" \
+    || collision_rc=$?
+  if [ "$collision_rc" -eq 0 ]; then
     echo "agent_canon_materialization_collision=yes"
     printf 'agent_canon_materialization_collision_path=%q\n' "$collision_path"
     echo "agent_canon_materialization_result=blocked_unpreservable_collision"
     return 2
   fi
+  [ "$collision_rc" -eq 1 ] || return "$collision_rc"
 
-  echo "agent_canon_materialization_unresolved_merge_conflict=no"
   echo "agent_canon_materialization_collision=no"
   if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$current_sha"; then
     echo "agent_canon_materialization_result=already_contains_remote"
@@ -1174,8 +1202,9 @@ print_submodule_plan_details() {
   local current_branch="${6:-}"
   local history_state="${7:-unknown}"
   local unresolved_merge_conflict="${8:-no}"
-  local materialization_collision="${9:-no}"
-  local collision_path="${10:-}"
+  local merge_conflict="${9:-no}"
+  local materialization_collision="${10:-no}"
+  local collision_path="${11:-}"
   local deferred_branch=""
   local deferred_remote_branch=""
 
@@ -1186,8 +1215,16 @@ print_submodule_plan_details() {
   echo "agent_canon_plan_submodule_branch=${current_branch:-<detached>}"
   echo "agent_canon_plan_submodule_history_state=$history_state"
   echo "agent_canon_plan_unresolved_merge_conflict=$unresolved_merge_conflict"
+  echo "agent_canon_plan_merge_conflict=$merge_conflict"
+  if [ "$unresolved_merge_conflict" = "yes" ]; then
+    echo "agent_canon_plan_merge_conflict_type=existing_unresolved_index"
+  elif [ "$merge_conflict" = "yes" ]; then
+    echo "agent_canon_plan_merge_conflict_type=virtual_merge_result"
+  else
+    echo "agent_canon_plan_merge_conflict_type=none"
+  fi
   echo "agent_canon_plan_materialization_collision=$materialization_collision"
-  echo "agent_canon_plan_acceptance_predicate=unresolved_merge_conflict_or_unpreservable_materialization_collision"
+  echo "agent_canon_plan_acceptance_predicate=materialization_merge_conflict_or_unpreservable_materialization_collision"
   if [ -n "$collision_path" ]; then
     printf 'agent_canon_plan_materialization_collision_path=%q\n' "$collision_path"
   else
@@ -1245,8 +1282,12 @@ cmd_plan() {
   local submodule_deferred_ref=""
   local submodule_history="unknown"
   local unresolved_merge_conflict="no"
+  local merge_conflict="no"
   local materialization_collision="no"
   local materialization_collision_path=""
+  local materialization_result_tree=""
+  local materialization_result_tree_rc=0
+  local materialization_collision_rc=0
 
   if is_submodule_prefix; then
     prefix_mode="submodule"
@@ -1335,10 +1376,25 @@ cmd_plan() {
     submodule_history="$(submodule_history_state "$submodule_worktree_head" "$remote_sha")"
     if submodule_unresolved_merge_conflict; then
       unresolved_merge_conflict="yes"
-    elif materialization_collision_path="$(
-      submodule_materialization_collision_path "$submodule_worktree_head" "$remote_sha"
-    )"; then
-      materialization_collision="yes"
+    else
+      materialization_result_tree="$(
+        submodule_materialization_result_tree "$submodule_worktree_head" "$remote_sha"
+      )" || materialization_result_tree_rc=$?
+      if [ "$materialization_result_tree_rc" -eq 2 ]; then
+        merge_conflict="yes"
+      elif [ "$materialization_result_tree_rc" -ne 0 ]; then
+        die "failed to compute the AgentCanon virtual merge result tree"
+      else
+        materialization_collision_path="$(
+          submodule_materialization_collision_path \
+            "$submodule_worktree_head" "$materialization_result_tree"
+        )" || materialization_collision_rc=$?
+        if [ "$materialization_collision_rc" -eq 0 ]; then
+          materialization_collision="yes"
+        elif [ "$materialization_collision_rc" -ne 1 ]; then
+          die "failed to compute the AgentCanon materialization collision set"
+        fi
+      fi
     fi
   else
     remote_sha="$(resolve_remote_branch_sha "$remote_url" "$branch")"
@@ -1349,6 +1405,8 @@ cmd_plan() {
   if [ "$prefix_mode" = "submodule" ]; then
     if [ "$unresolved_merge_conflict" = "yes" ]; then
       route="unresolved_submodule_merge_conflict"
+    elif [ "$merge_conflict" = "yes" ]; then
+      route="submodule_merge_conflict"
     elif [ "$materialization_collision" = "yes" ]; then
       route="submodule_materialization_collision"
     elif [ -n "$submodule_worktree_branch" ] \
@@ -1415,7 +1473,8 @@ cmd_plan() {
     print_submodule_plan_details \
       "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" "$remote_sha" \
       "$submodule_deferred_ref" "$submodule_worktree_branch" "$submodule_history" \
-      "$unresolved_merge_conflict" "$materialization_collision" "$materialization_collision_path"
+      "$unresolved_merge_conflict" "$merge_conflict" \
+      "$materialization_collision" "$materialization_collision_path"
   fi
 }
 
@@ -1522,14 +1581,18 @@ cmd_ensure_latest() {
     local remote_url="" local_commit="" worktree_commit="" origin_sha=""
     local submodule_status="" submodule_remote_branch="" parent_pin_status="current"
     local current_branch="" history_state="" collision_path=""
+    local materialization_result_tree=""
     local index_entry="" staged_mode="" staged_sha="" staged_stage="" staged_path=""
     local applied_head="" applied_status=""
     local update_state="" materialization_rc=0
+    local materialization_result_tree_rc=0 materialization_collision_rc=0
 
     submodule_checkout_initialized \
       || die "submodule '$PREFIX' checkout is uninitialized; initialize and attach $branch before updating"
     if submodule_unresolved_merge_conflict; then
       echo "agent_canon_materialization_unresolved_merge_conflict=yes"
+      echo "agent_canon_materialization_merge_conflict=yes"
+      echo "agent_canon_materialization_conflict_type=existing_unresolved_index"
       echo "agent_canon_materialization_result=blocked_unresolved_merge_conflict"
       die "submodule '$PREFIX' update is blocked by an unresolved merge conflict"
     fi
@@ -1561,7 +1624,7 @@ cmd_ensure_latest() {
     echo "agent_canon_latest_branch=$current_branch"
     echo "agent_canon_latest_submodule_branch=$current_branch"
     echo "agent_canon_latest_submodule_history_state=$history_state"
-    echo "agent_canon_latest_acceptance_predicate=unresolved_merge_conflict_or_unpreservable_materialization_collision"
+    echo "agent_canon_latest_acceptance_predicate=materialization_merge_conflict_or_unpreservable_materialization_collision"
     if [ -n "$submodule_remote_branch" ]; then
       echo "agent_canon_latest_remote_branch=origin/$submodule_remote_branch"
     fi
@@ -1569,14 +1632,33 @@ cmd_ensure_latest() {
     echo "agent_canon_worktree_submodule=$worktree_commit"
     echo "agent_canon_remote=$remote_sha"
     echo "agent_canon_latest_parent_pin_status=$parent_pin_status"
-    if collision_path="$(submodule_materialization_collision_path "$worktree_commit" "$remote_sha")"; then
+    materialization_result_tree="$(
+      submodule_materialization_result_tree "$worktree_commit" "$remote_sha"
+    )" || materialization_result_tree_rc=$?
+    if [ "$materialization_result_tree_rc" -eq 2 ]; then
+      echo "agent_canon_materialization_unresolved_merge_conflict=no"
+      echo "agent_canon_materialization_merge_conflict=yes"
+      echo "agent_canon_materialization_conflict_type=virtual_merge_result"
+      echo "agent_canon_materialization_result=blocked_merge_conflict"
+      die "submodule '$PREFIX' update has a virtual merge-result conflict"
+    fi
+    [ "$materialization_result_tree_rc" -eq 0 ] \
+      || die "failed to compute the AgentCanon virtual merge result tree"
+    echo "agent_canon_materialization_unresolved_merge_conflict=no"
+    echo "agent_canon_materialization_merge_conflict=no"
+    echo "agent_canon_materialization_conflict_type=none"
+    collision_path="$(
+      submodule_materialization_collision_path "$worktree_commit" "$materialization_result_tree"
+    )" || materialization_collision_rc=$?
+    if [ "$materialization_collision_rc" -eq 0 ]; then
       echo "agent_canon_materialization_collision=yes"
       printf 'agent_canon_materialization_collision_path=%q\n' "$collision_path"
       echo "agent_canon_materialization_result=blocked_unpreservable_collision"
-      die "submodule '$PREFIX' update would overwrite a local uncommitted path in the exact update write set"
+      die "submodule '$PREFIX' update would overwrite a local materialized path in the exact update write set"
     fi
+    [ "$materialization_collision_rc" -eq 1 ] \
+      || die "failed to compute the AgentCanon materialization collision set"
     echo "agent_canon_materialization_collision=no"
-    echo "agent_canon_materialization_unresolved_merge_conflict=no"
 
     if [ "$current_branch" != "$DEFAULT_BRANCH" ]; then
       update_state="deferred_branch_pr"
@@ -1593,7 +1675,8 @@ cmd_ensure_latest() {
       ensure_surface_sync_safe
     fi
     if [ "$update_state" = "deferred_branch_pr" ]; then
-      materialize_submodule_remote_branch "$worktree_commit" "$remote_sha" "$branch" \
+      materialize_submodule_remote_branch \
+        "$worktree_commit" "$remote_sha" "$branch" "$materialization_result_tree" \
         || materialization_rc=$?
       [ "$materialization_rc" -eq 0 ] || return "$materialization_rc"
       applied_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
@@ -1605,7 +1688,8 @@ cmd_ensure_latest() {
       return
     fi
 
-    materialize_submodule_remote_branch "$worktree_commit" "$remote_sha" "$branch" \
+    materialize_submodule_remote_branch \
+      "$worktree_commit" "$remote_sha" "$branch" "$materialization_result_tree" \
       || materialization_rc=$?
     [ "$materialization_rc" -eq 0 ] || return "$materialization_rc"
     git -C "$ROOT_DIR" add -A -- "$PREFIX"

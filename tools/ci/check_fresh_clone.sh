@@ -118,8 +118,10 @@ assert_update_plan_acceptance() {
   if grep -q '^agent_canon_plan_prefix_mode=submodule$' "${plan_path}"; then
     grep -q '^agent_canon_plan_requires_clean=no$' "${plan_path}"
     grep -q '^agent_canon_plan_unresolved_merge_conflict=no$' "${plan_path}"
+    grep -q '^agent_canon_plan_merge_conflict=no$' "${plan_path}"
+    grep -q '^agent_canon_plan_merge_conflict_type=none$' "${plan_path}"
     grep -q '^agent_canon_plan_materialization_collision=no$' "${plan_path}"
-    grep -q '^agent_canon_plan_acceptance_predicate=unresolved_merge_conflict_or_unpreservable_materialization_collision$' "${plan_path}"
+    grep -q '^agent_canon_plan_acceptance_predicate=materialization_merge_conflict_or_unpreservable_materialization_collision$' "${plan_path}"
   fi
 }
 
@@ -157,9 +159,14 @@ AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:${COMMIT_REQUEST_EVIDENCE_DIGEST}"
 echo "fresh-clone commit request evidence: ${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}"
 
 python3 -m json.tool .devcontainer/devcontainer.json >/dev/null
+runtime_compose_generator="${CLONE_DIR}/.devcontainer/generate-runtime-compose.sh"
+if [ ! -f "${runtime_compose_generator}" ]; then
+  runtime_compose_generator="${CLONE_DIR}/vendor/agent-canon/.devcontainer/generate-runtime-compose.sh"
+fi
+test -f "${runtime_compose_generator}"
 AGENT_CANON_DEVCONTAINER_REPO_ROOT=. \
 AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml \
-bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh >/dev/null
+  bash "${runtime_compose_generator}" >/dev/null
 python3 - <<'PY'
 from __future__ import annotations
 

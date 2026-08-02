@@ -71,17 +71,16 @@ owner 引数または topic environment owner を再利用し、他に明示指�
 | --- | --- | --- |
 | clean `main`、かつ worktree `HEAD == :$PREFIX` staged index gitlink | 不要 | parent pin/root projection pass |
 | clean `main`、明示された独立 parallel stream | requested topic | `--placement workspace` で computed clone のみを fresh create。vendor は clean のまま保持 |
-| clean named topic branch | `current_branch` | current `vendor/<module>` が source owner |
-| dirty、requested topic 未指定 | なし | typed stop: `NEXT_ACTION=topic_identity_required` |
-| dirty、requested topic == named `current_branch` | requested topic | fallback clone を作らず `materialize_current_vendor_topic_commit_push_pr_then_resume` |
-| dirty、requested topic != named `current_branch` | requested topic | `workspace/<sanitized-requested-topic>/agent-canon` fallback。`workspace/main` は生成しない |
-| dirty、requested topic の sanitized identity が `main` | `main` | typed stop: `NEXT_ACTION=topic_identity_required` |
+| named topic branch。committed difference と non-colliding local materialized path を含めてよい | `current_branch` または同一 requested topic | current `vendor/<module>` が source owner。dirty / ahead / diverged は evidence として保持 |
+| named topic branch、requested topic != named `current_branch` | requested topic | `workspace/<sanitized-requested-topic>/agent-canon` fallback。`workspace/main` は生成しない |
+| requested topic の sanitized identity が `main` | `main` | typed stop: `NEXT_ACTION=topic_identity_required` |
 | detached、pin mismatch、merge conflict、または corrupt state | — | source/pin owner を選んだ上で typed repair/rebuild route |
 
-dirty fallback の `current_branch` は named current branch だけを指し、detached
-HEAD は topic identity として扱いません。requested topic と current branch が
-一致する場合の materialize/push/PR は、現在の vendor state を別 workspace に
-複製する route ではありません。
+`current_branch` は named current branch だけを指し、detached HEAD は topic
+identity として扱いません。requested topic と current branch が一致する場合の
+materialize/push/PR は、現在の vendor state を別 workspace に複製する route では
+ありません。intended branch の local state は Git の仮想 merge conflict または
+exact update write set と local materialized path の collision だけで block します。
 
 ## clone を作る条件
 
@@ -230,7 +229,8 @@ readback され、同一 PR へ materialize した証拠が得られたら削除
 gate として扱います。
 merge/readback 後は `vendor/agent-canon` の local `main` branch を `origin/main` へ fast-forward し、
 parent の gitlink を merge 済み commit に一致させます。source edit はその前段の
-clean named topic branch で行い、`main` は projection の pass 状態にだけ使います。
+intended named topic branch で行い、`main` は projection の pass 状態にだけ使います。
+non-colliding local materialized paths は source branch に保持したまま merge/review します。
 未コミット固有差分の状態で parent の pin/update あるいは projection を進めないでください。
 pin projection は、まず `git add vendor/agent-canon` で stage し、
 `sync check` で staged gitlink(`:$PREFIX`)と実体 `HEAD` が一致することを確認して
