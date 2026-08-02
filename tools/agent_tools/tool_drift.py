@@ -294,6 +294,7 @@ CONTRACTS = (
             LinkCheck("tools/agent_tools/evaluate_skill_workflow_prompts.py"),
             LinkCheck("tools/agent_tools/check_agent_runtime_alignment.py"),
             LinkCheck("tools/agent_tools/check_convention_compliance.py"),
+            LinkCheck("tools/ci/agent_canon_pr_graph_selector.py"),
             LinkCheck("tools/ci/check_github_workflows.py"),
             LinkCheck("tools/ci/run_all_checks.sh"),
         ),
@@ -327,6 +328,21 @@ CONTRACTS = (
                 "tools/ci/check_agent_canon_pr.sh",
                 "PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped",
                 "missing-optional-dependency-graph-receipt-status",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                'python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py"',
+                "missing-canonical-dependency-graph-selector",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "selector_reason=%s",
+                "missing-dependency-graph-selector-reason-receipt",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "selector_evidence=%s",
+                "missing-dependency-graph-selector-evidence-receipt",
             ),
         ),
         command_checks=(

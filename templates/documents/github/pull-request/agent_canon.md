@@ -154,8 +154,9 @@ Impact notes:
 - [ ] `bash tools/agent-canon/sync_agent_canon.sh check`
 - [ ] `make agent-canon-pr-check`
 - [ ] Parent gate dependency graph receipt is `prepared` when parent graph
-  migration, a touched dependency manifest, or the selected validation profile
-  requires strict completeness; otherwise it is `skipped`.
+  migration, a touched canonical dependency surface/manifest, or the selected
+  canonical validation profile requires strict completeness; otherwise it is
+  `skipped` with selector reason/evidence.
 - [ ] `bash tools/agent-canon/agent_tools/run_repo_dependency_review.sh
   --fail-missing` was run when the parent gate selector required strict graph
   completeness.

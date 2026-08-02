@@ -7,6 +7,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership po
 downstream design ../../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
 downstream design ../agent-canon/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 downstream implementation ../../tools/ci/run_all_checks.sh repo check runner
+downstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py selects strict parent graph requirement from canonical profile IDs
 downstream implementation ../../tools/catalog.yaml structured tool catalog
 @dependency-end
 -->
@@ -18,20 +19,22 @@ Source of truth: [runtime-profiles-and-check-matrix.json](runtime-profiles-and-c
 AgentCanon ships broad shared surfaces, but not every surface is mandatory for
 every repository task. Treat root views and tools as installed capability, then
 activate only the profile required by the current change.
+Each profile ID and strict_dependency_graph_required value is canonical input
+for parent AgentCanon PR graph selection; unknown IDs fail selection.
 
 ## Profile Classes
 
-| Profile | Activates | Required when |
-| --- | --- | --- |
-| Base project | `README.md`, `QUICK_START.md`, `documents/README.md`, project code and tests | Every template or derived repo |
-| Agent runtime | `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, shared `tools/` | An agent performs or reviews repo work |
-| Devcontainer | `.devcontainer/`, shared post-create helpers | VS Code devcontainer or agent ergonomics are used |
-| Docker runtime | root `docker/`, runtime packs | Dockerfile, image, pack, Jupyter, or container setup changes |
-| GitHub automation | `.github/`, PR templates, Actions helpers | GitHub Actions, PR automation, or GitHub path-constrained copies change |
-| Experiment | `experiments/`, experiment registry, managed runner tools | Experiment topics, formal runs, result summaries, or research workflows change |
-| C++ | parent root remains language-neutral, `cpp/CMakeLists.txt` as the single native project entry, `cpp/cmake/`, `cpp/src/`, `cpp/include/`, `cpp/tests/`, `cpp/experiments/`, C++ OOP checks, `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"` | C or C++ code, build layout, or native artifacts change |
-| Memory and learning | `memory/`, notes promotion, learning workflows | User asks to persist memory, feedback/retrospective is observed, or agent-learning is in scope |
-| Maintenance | inventories, review backlog scan, improvement guide, catalog drift tools | AgentCanon maintenance, repo-wide audit, or scheduled cleanup work |
+| Profile ID | Profile | Activates | Required when | Strict dependency graph |
+| --- | --- | --- | --- | --- |
+| base-project | Base project | `README.md`, `QUICK_START.md`, `documents/README.md`, project code and tests | Every template or derived repo | no |
+| agent-runtime | Agent runtime | `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, shared `tools/` | An agent performs or reviews repo work | no |
+| devcontainer | Devcontainer | `.devcontainer/`, shared post-create helpers | VS Code devcontainer or agent ergonomics are used | no |
+| docker-runtime | Docker runtime | root `docker/`, runtime packs | Dockerfile, image, pack, Jupyter, or container setup changes | no |
+| github-automation | GitHub automation | `.github/`, PR templates, Actions helpers | GitHub Actions, PR automation, or GitHub path-constrained copies change | no |
+| experiment | Experiment | `experiments/`, experiment registry, managed runner tools | Experiment topics, formal runs, result summaries, or research workflows change | no |
+| cpp | C++ | parent root remains language-neutral, `cpp/CMakeLists.txt` as the single native project entry, `cpp/cmake/`, `cpp/src/`, `cpp/include/`, `cpp/tests/`, `cpp/experiments/`, C++ OOP checks, `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"` | C or C++ code, build layout, or native artifacts change | no |
+| memory-and-learning | Memory and learning | `memory/`, notes promotion, learning workflows | User asks to persist memory, feedback/retrospective is observed, or agent-learning is in scope | no |
+| maintenance | Maintenance | inventories, review backlog scan, improvement guide, catalog drift tools | AgentCanon maintenance, repo-wide audit, or scheduled cleanup work | yes |
 
 Compatibility surfaces such as legacy subtree routes may remain documented, but
 only under the matching compatibility profile. They are not the default path for

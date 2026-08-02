@@ -4,11 +4,15 @@
   "summary": [
     "AgentCanon ships broad shared surfaces, but not every surface is mandatory for",
     "every repository task. Treat root views and tools as installed capability, then",
-    "activate only the profile required by the current change."
+    "activate only the profile required by the current change.",
+    "Each profile ID and strict_dependency_graph_required value is canonical input",
+    "for parent AgentCanon PR graph selection; unknown IDs fail selection."
   ],
   "profile_classes": [
     {
+      "id": "base-project",
       "profile": "Base project",
+      "strict_dependency_graph_required": false,
       "activates": [
         "`README.md`",
         "`QUICK_START.md`",
@@ -18,7 +22,9 @@
       "required_when": "Every template or derived repo"
     },
     {
+      "id": "agent-runtime",
       "profile": "Agent runtime",
+      "strict_dependency_graph_required": false,
       "activates": [
         "`AGENTS.md`",
         "`agents/`",
@@ -29,7 +35,9 @@
       "required_when": "An agent performs or reviews repo work"
     },
     {
+      "id": "devcontainer",
       "profile": "Devcontainer",
+      "strict_dependency_graph_required": false,
       "activates": [
         "`.devcontainer/`",
         "shared post-create helpers"
@@ -37,7 +45,9 @@
       "required_when": "VS Code devcontainer or agent ergonomics are used"
     },
     {
+      "id": "docker-runtime",
       "profile": "Docker runtime",
+      "strict_dependency_graph_required": false,
       "activates": [
         "root `docker/`",
         "runtime packs"
@@ -45,7 +55,9 @@
       "required_when": "Dockerfile, image, pack, Jupyter, or container setup changes"
     },
     {
+      "id": "github-automation",
       "profile": "GitHub automation",
+      "strict_dependency_graph_required": false,
       "activates": [
         "`.github/`",
         "PR templates",
@@ -54,7 +66,9 @@
       "required_when": "GitHub Actions, PR automation, or GitHub path-constrained copies change"
     },
     {
+      "id": "experiment",
       "profile": "Experiment",
+      "strict_dependency_graph_required": false,
       "activates": [
         "`experiments/`",
         "experiment registry",
@@ -63,7 +77,9 @@
       "required_when": "Experiment topics, formal runs, result summaries, or research workflows change"
     },
     {
+      "id": "cpp",
       "profile": "C++",
+      "strict_dependency_graph_required": false,
       "activates": [
         "parent root remains language-neutral",
         "`cpp/CMakeLists.txt` as the single native project entry",
@@ -78,7 +94,9 @@
       "required_when": "C or C++ code, build layout, or native artifacts change"
     },
     {
+      "id": "memory-and-learning",
       "profile": "Memory and learning",
+      "strict_dependency_graph_required": false,
       "activates": [
         "`memory/`",
         "notes promotion",
@@ -87,7 +105,9 @@
       "required_when": "User asks to persist memory, feedback/retrospective is observed, or agent-learning is in scope"
     },
     {
+      "id": "maintenance",
       "profile": "Maintenance",
+      "strict_dependency_graph_required": true,
       "activates": [
         "inventories",
         "review backlog scan",

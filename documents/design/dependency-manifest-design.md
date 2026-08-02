@@ -12,8 +12,11 @@ downstream implementation ../../tools/agent_tools/check_dependency_graph.sh vali
 downstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps repo-wide dependency review
 downstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts code dependency evidence separately
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design claims against manifest evidence
+downstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders dependency graph review artifacts
+downstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py selects parent strict graph gating from this canonical dependency surface manifest
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
+downstream implementation ../../tests/tools/test_agent_canon_pr_graph_selector.py verifies parent gate selection from canonical profiles, surfaces, and diff evidence
 downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs owns the sole complete-file manifest parser and source snapshot
 downstream implementation ../../rust/agent-canon/src/graph.rs owns canonical graph materialization and queries
 downstream implementation ../../tools/agent_tools/graph_client.py provides the sole Python graph adapter
@@ -96,16 +99,44 @@ The parent strict graph-completeness gate is selected only when at least one of
 these conditions is true:
 
 - the caller declares a parent graph migration;
-- the change touches a dependency manifest/header or graph-migration surface;
+- the change touches a dependency manifest/header or a downstream surface
+  declared by this design document's canonical dependency manifest;
 - the selected runtime validation profile explicitly requires dependency graph
-  completeness.
+  completeness through its
+  `strict_dependency_graph_required` field in
+  `documents/runtime/runtime-profiles-and-check-matrix.json`.
+
+Profile selection uses one canonical ID in
+`AGENT_CANON_PR_VALIDATION_PROFILE` or comma-separated canonical IDs in
+`AGENT_CANON_PR_VALIDATION_PROFILES`. Supplying both inputs, an empty list
+element, a duplicate, or an unknown ID is a typed selector failure.
 
 When none of these conditions holds, the PR gate emits a typed skipped receipt
-and its quick-CI consumer does not rebuild the parent graph or promote
-repository-wide missing-header diagnostics into a blocker. Standalone
-AgentCanon source PRs retain the strict source graph gate. This separation
-keeps manifest migration debt visible without making unrelated parent pin-only
-changes satisfy a repository-wide completeness baseline.
+with non-empty selector reason/evidence, and its quick-CI consumer does not
+rebuild the parent graph or promote repository-wide missing-header diagnostics
+into a blocker. Standalone AgentCanon source PRs retain the strict source graph
+gate. This separation keeps manifest migration debt visible without making
+unrelated parent pin-only changes satisfy a repository-wide completeness
+baseline.
+
+The selector reads dependency surfaces from this document's downstream
+manifest instead of maintaining a second path list. The manifest therefore
+owns the complete bootstrap surface, including scanners, format and changed-file
+checkers, graph parser/storage and client adapters, report rendering, and the
+selector itself. Strict graph validation remains the semantic authority after
+selection; the bootstrap read only decides whether that authority is required.
+
+CI comparison uses the pull request base SHA from the trusted GitHub event.
+Local and fixture execution supplies an explicit `AGENT_CANON_PR_BASE_REF`.
+Equal-to-HEAD, unresolved, history-unreachable, or failed diff states are typed
+selector failures. They do not become an empty change set. Unknown profile IDs
+and malformed canonical profile/surface owners fail by the same rule.
+
+The receipt's owner/root/PID/status binding and required skipped
+reason/evidence are sufficient for the checker-to-quick-CI handoff. A
+cryptographic nonce against a hostile local caller is outside this trust
+boundary: such a caller can omit the checker entirely, so cryptography would
+not add evidence that the required gate ran.
 
 ## Manifest Block
 
@@ -617,7 +648,8 @@ Each touched file must be converted from `Dependency Files:` to `@dependency-sta
 Phase 4: enable CI fail gate for changed files.
 Full-repo missing-header scan remains report-only until the repository is migrated.
 この repository では full-repo migration、touched dependency-manifest change、または
-graph-required validation profile のときだけ strict baseline を
+canonical profile owner が graph-required と宣言する validation profile のときだけ
+strict baseline を
 `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` で
 有効化します。pin-only parent changes are represented by the skipped receipt
 and do not inherit `target-unresolved` or `manifest-grammar` diagnostics from

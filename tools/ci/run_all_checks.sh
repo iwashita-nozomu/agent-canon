@@ -146,6 +146,8 @@ validate_pr_gate_receipt() {
   local root_identity=""
   local strict_dependency_status=""
   local graph_status=""
+  local selector_reason=""
+  local selector_evidence=""
   if [[ ! -f "${PR_GATE_RECEIPT}" ]]; then
     echo "Invalid PR gate receipt: missing file" >&2
     return 1
@@ -165,10 +167,18 @@ validate_pr_gate_receipt() {
   done
   strict_dependency_status="$(awk -F= '$1 == "strict_dependency" {print $2}' "${PR_GATE_RECEIPT}")"
   graph_status="$(awk -F= '$1 == "graph" {print $2}' "${PR_GATE_RECEIPT}")"
+  selector_reason="$(awk -F= '$1 == "selector_reason" {sub(/^[^=]*=/, ""); print}' "${PR_GATE_RECEIPT}")"
+  selector_evidence="$(awk -F= '$1 == "selector_evidence" {sub(/^[^=]*=/, ""); print}' "${PR_GATE_RECEIPT}")"
   if [[ "${strict_dependency_status}" != "prepared" && "${strict_dependency_status}" != "skipped" ]] \
     || [[ "${graph_status}" != "prepared" && "${graph_status}" != "skipped" ]] \
     || [[ "${strict_dependency_status}" != "${graph_status}" ]]; then
     echo "Invalid PR gate receipt: dependency graph status mismatch" >&2
+    return 1
+  fi
+  if [[ "${strict_dependency_status}" == "skipped" ]] \
+    && [[ -z "${selector_reason}" || -z "${selector_evidence}" \
+      || "${selector_reason}" == *$'\n'* || "${selector_evidence}" == *$'\n'* ]]; then
+    echo "Invalid PR gate receipt: skipped graph selector reason/evidence missing" >&2
     return 1
   fi
   PR_GATE_DEPENDENCY_GRAPH_STATUS="${strict_dependency_status}"
