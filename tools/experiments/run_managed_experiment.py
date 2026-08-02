@@ -484,19 +484,26 @@ class RunGpuAdmissionContext(AbstractContextManager[GpuRunRequest]):
         return False
 
 
-def _provider_gpu_ids(selected_uuids: tuple[str, ...]) -> tuple[int, ...]:
-    """Map only provider-compatible logical IDs; never truncate opaque UUIDs."""
-    if any(not value.isdecimal() for value in selected_uuids):
+def _provider_gpu_ids(selected_uuids: tuple[str, ...]) -> tuple[str, ...]:
+    """Forward validated admission identifiers without changing their identity."""
+    if any(
+        not isinstance(value, str) or not value or value != value.strip()
+        for value in selected_uuids
+    ):
         raise TypedPreflightFailure(
-            "admitted_runner_provider_gpu_uuid_incompatible",
-            "the approved provider schema accepts integer GPU IDs, not full UUIDs",
+            "admitted_runner_provider_gpu_identifier_invalid",
+            "selected GPU identifiers must be non-empty, trimmed strings",
             selected_uuids=selected_uuids,
             provider_field="selected_gpu_ids",
-            required_provider_change=(
-                "accept opaque physical/MIG UUIDs in selected_gpu_ids and gpu_devices"
-            ),
         )
-    return tuple(int(value) for value in selected_uuids)
+    if len(set(selected_uuids)) != len(selected_uuids):
+        raise TypedPreflightFailure(
+            "admitted_runner_provider_gpu_identifier_duplicate",
+            "selected GPU identifiers must preserve the admission uniqueness contract",
+            selected_uuids=selected_uuids,
+            provider_field="selected_gpu_ids",
+        )
+    return tuple(selected_uuids)
 
 
 def _build_managed_run_request(

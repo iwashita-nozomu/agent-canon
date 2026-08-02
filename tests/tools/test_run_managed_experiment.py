@@ -539,8 +539,8 @@ def test_r5_admitted_runner_fake_cli_protocol(tmp_path: Path, monkeypatch: pytes
     assert (result_dir / "runtime" / "managed-run-receipt.json").is_file()
 
 
-def test_r5_provider_request_wire_fields_and_uuid_guard() -> None:
-    """The request uses provider names and never fabricates integer UUIDs."""
+def test_r5_provider_request_wire_fields_forward_opaque_gpu_identifiers() -> None:
+    """The request forwards admission GPU identities without ordinal conversion."""
     from tools.experiments.run_managed_experiment import _provider_gpu_ids
 
     source = SCRIPT.read_text(encoding="utf-8")
@@ -554,9 +554,17 @@ def test_r5_provider_request_wire_fields_and_uuid_guard() -> None:
     assert '"fingerprint"]' in request_builder
     assert '"module_spec":' not in request_builder
     assert '"schema_version": MANAGED_RUN_REQUEST_SCHEMA' not in request_builder
-    with pytest.raises(Exception) as raised:
-        _provider_gpu_ids(("GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",))
-    assert getattr(raised.value, "code", None) == "admitted_runner_provider_gpu_uuid_incompatible"
+    selected = (
+        "MIG-GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/1/2",
+        "GPU-bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+    )
+    assert _provider_gpu_ids(selected) == selected
+    assert tuple(
+        line.strip()
+        for line in request_builder.splitlines()
+        if '"gpu_id": gpu_id' in line
+    ) == ('"gpu_id": gpu_id,',)
+    assert "for uuid, gpu_id in zip(selected_uuids, selected_gpu_ids)" in request_builder
 
 
 def _valid_provider_result(request_fingerprint: str) -> dict[str, object]:

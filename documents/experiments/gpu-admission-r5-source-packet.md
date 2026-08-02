@@ -110,11 +110,12 @@ result は `schema`、`request_fingerprint`、`run_id`、`worker_pid`/`worker_pi
 `descendant_quiescence`、cleanup failure、worker/process-group IDs を実値で検証します。
 result に AgentCanon 独自の `admission_fingerprint` や `result_fingerprint` は要求しません。
 
-provider v1 は GPU ID を非負整数に固定し、task callable を `(case, context)` に固定します。
-AgentCanon の full physical/MIG UUID と topic `main(argv)` を意味を失わずに表現するには、
-provider 側に (a) opaque UUID device ID、(b) main/argv または同等 adapter task の最小 wire
-拡張が必要です。consumer は UUID を整数へ縮退せず、現 provider では typed
-`admitted_runner_provider_gpu_uuid_incompatible` として停止します。
+provider v1 は opaque GPU/MIG identifier を `selected_gpu_ids` と
+`capacity.gpu_devices[].gpu_id` に保持します。AgentCanon は admission で確定した
+non-empty identifier の順序と重複禁止を検証し、その値を整数 ordinal へ変換せず wire
+へ転送します。provider は transport identity と scheduler の内部 numeric key を分離して
+扱うため、consumer が UUID を整数へ再解釈することはありません。`task.callable=main`
+は provider の argv adapter で実行され、parent process は topic module を import しません。
 
 ## 検証と成果物
 

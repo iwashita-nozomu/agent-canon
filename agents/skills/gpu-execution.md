@@ -82,10 +82,11 @@ descendants が quiescent になり、terminal result と completion coverage �
 GPU reservation lock を release しません。CLI 不在、schema 不一致、壊れた result、request
 fingerprint 不一致、quiescence/completion coverage 不明は typed failure です。
 
-provider v1 の `selected_gpu_ids` と `capacity.gpu_devices` は整数専用です。full physical/MIG
-UUID を整数へ縮退せず、GPU run は typed incompatibility で停止します。provider task の
-`(case, context)` と AgentCanon topic `main(argv)` の境界も、provider 側の最小 adapter 拡張
-なしには consumer 側で偽装しません。
+provider v1 の `selected_gpu_ids` と `capacity.gpu_devices[].gpu_id` は opaque
+physical/MIG identifier を保持します。AgentCanon は admission で確定した non-empty
+identifier の順序と重複禁止を維持して、そのまま wire へ転送します。provider は transport
+identity と scheduler の内部 numeric key を分離するため、consumer は UUID を整数へ
+再解釈しません。`task.callable=main` は provider の argv adapter 境界で実行されます。
 
 ## Environment
 
