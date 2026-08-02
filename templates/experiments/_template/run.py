@@ -13,8 +13,10 @@
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
+
+UTC = timezone.utc  # noqa: UP017
 
 VISUALIZE_NOTEBOOK_NAME = "visualize.ipynb"
 EXECUTED_NOTEBOOK_NAME = "visualize_executed.ipynb"

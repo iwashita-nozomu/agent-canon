@@ -42,8 +42,8 @@ import subprocess
 import threading
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field, replace
-from datetime import UTC, datetime
-from enum import StrEnum
+from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Callable, Literal, Mapping, Protocol, Sequence, TypeAlias, cast
@@ -56,6 +56,7 @@ try:
 except ImportError:  # pragma: no cover - this owner is Unix/container-only.
     fcntl = None  # type: ignore[assignment]
 
+UTC = timezone.utc  # noqa: UP017
 
 PLAN_SCHEMA_VERSION = "execution-resource-plan/v1"
 ENVIRONMENT_CERTIFICATE_SCHEMA_VERSION = "environment-certificate/v1"
@@ -117,7 +118,10 @@ SENSITIVE_ENV_PARTS = (
 )
 
 
-class PlanState(StrEnum):
+# StrEnum is unavailable on supported Python <3.11 runtimes.
+class PlanState(str, Enum):  # noqa: UP042
+    __str__ = str.__str__
+
     RESOURCE_DISCOVERED = "resource_discovered"
     PLAN_FROZEN = "plan_frozen"
     ENV_MATERIALIZED = "env_materialized"

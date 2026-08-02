@@ -17,7 +17,7 @@ import hashlib
 import re
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
@@ -28,6 +28,8 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
 from runtime_log_paths import agent_canon_root, eval_results_dir
+
+UTC = timezone.utc  # noqa: UP017
 
 DEFAULT_MANIFEST = eval_manifest_path("report_quality_eval.toml")
 DEFAULT_RESULTS_FAMILY = "report-quality"

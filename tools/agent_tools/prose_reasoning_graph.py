@@ -24,7 +24,7 @@ import subprocess
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TypedDict, cast
 from urllib.parse import quote
@@ -45,6 +45,8 @@ except ImportError:  # pragma: no cover - direct CLI execution
         GraphClientError,
         GraphResponse,
     )
+
+UTC = timezone.utc  # noqa: UP017
 
 SCHEMA_VERSION = 1
 DEFAULT_PROFILE = "writing"

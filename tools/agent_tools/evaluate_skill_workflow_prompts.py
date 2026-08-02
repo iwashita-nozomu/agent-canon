@@ -21,7 +21,7 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import cast
@@ -38,6 +38,8 @@ from eval_manifest_paths import (
 )
 from runtime_log_paths import agent_canon_root, eval_results_dir
 from workflow_monitor import MonitoringEntries, append_monitoring
+
+UTC = timezone.utc  # noqa: UP017
 
 DEFAULT_RESULTS_FAMILY = "skill-workflow-prompt"
 REPORT_STATUS_LINE_LIMIT = 13

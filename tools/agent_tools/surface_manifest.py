@@ -20,7 +20,7 @@ try:
     import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
@@ -270,7 +270,11 @@ def manifest_tables(data: Mapping[str, object], key: str) -> tuple[Mapping[str, 
 def load_manifest(root: Path, prefix: str, raw_manifest: str) -> SurfaceManifest:
     """Load and validate the surface manifest."""
     path = manifest_path(root, prefix, raw_manifest)
-    data = cast(Mapping[str, object], tomllib.loads(path.read_text(encoding="utf-8")))
+    load_toml = cast(
+        Callable[[str], dict[str, object]],
+        getattr(tomllib, "loads"),
+    )
+    data = load_toml(path.read_text(encoding="utf-8"))
     manifest_prefix = string_value(data, "prefix", prefix)
     entries: list[SurfaceEntry] = []
     for group in manifest_tables(data, "group"):

@@ -21,7 +21,7 @@ import re
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 from urllib.parse import urlparse
@@ -42,6 +42,8 @@ from update_lifecycle_contract import (
     validate_record_binding,
     validate_source_main_rebind_receipt,
 )
+
+UTC = timezone.utc  # noqa: UP017
 
 MAX_ERROR_CHARS = 4000
 REMOTE_SCP_RE = re.compile(r"^[^@]+@[^:]+:(?P<slug>[^/]+/[^/]+?)(?:\.git)?/?$")

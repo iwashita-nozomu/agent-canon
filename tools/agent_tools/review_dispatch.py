@@ -28,7 +28,7 @@ import json
 import re
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -43,6 +43,8 @@ from external_artifact_binding import (
 from task_authority import ACTIVE_RUN_POINTER
 from work_log import append_ledger_event, read_ledger_snapshot
 from report_artifact_checks import markdown_without_adjudicated_rejected_hypotheses
+
+UTC = timezone.utc  # noqa: UP017
 
 REVIEW_CANDIDATE_SCHEMA = "agent-canon.review-candidate-event.v1"
 REVIEW_INTENT_SCHEMA = "agent-canon.terminal-resume-intent.v1"
