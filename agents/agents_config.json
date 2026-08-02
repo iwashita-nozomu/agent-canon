@@ -22,30 +22,6 @@
   },
   "always_on_roles": [
     {
-      "id": "terra",
-      "codex_agents": [
-        "terra"
-      ],
-      "activation": "conditional_cross_owner_evidence",
-      "owns": [
-        "cross_owner_integration",
-        "context_reconstruction",
-        "adversarial_contradiction_validation",
-        "owner_closure_handback",
-        "unresolved_escalation_to_sol"
-      ],
-      "required_outputs": [
-        "change_review.md"
-      ],
-      "write_policy": {
-        "mode": "read_only",
-        "allowed_artifacts": [
-          "change_review"
-        ],
-        "notes": "Terra is a conditional read-only cross-cutting specialist. It returns an owner closure, context capsule, and accepted/rejected/escalated handback to the Sol parent; it does not coordinate, implement, or become a general worker."
-      }
-    },
-    {
       "id": "manager",
       "codex_agents": [
         "requirements_organizer"
@@ -753,6 +729,30 @@
           "project_review"
         ],
         "notes": "The project reviewer records repo-wide inventory and integration findings only in the project review artifact."
+      }
+    },
+    {
+      "id": "terra",
+      "codex_agents": [
+        "terra"
+      ],
+      "activation": "conditional_cross_owner_evidence",
+      "owns": [
+        "cross_owner_integration",
+        "context_reconstruction",
+        "adversarial_contradiction_validation",
+        "owner_closure_handback",
+        "unresolved_escalation_to_sol"
+      ],
+      "required_outputs": [
+        "change_review.md"
+      ],
+      "write_policy": {
+        "mode": "read_only",
+        "allowed_artifacts": [
+          "change_review"
+        ],
+        "notes": "Terra is a conditional read-only cross-cutting specialist candidate. It returns an owner closure, context capsule, and accepted/rejected/escalated handback to the Sol parent; it does not coordinate, implement, become a general worker, or activate without evidence."
       }
     },
     {
@@ -1995,7 +1995,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as cpp_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "change_reviewer+cpp_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/8+agents/agents_config.json#/specialist_roles/21",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/22",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2029,7 +2029,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as detailed_design_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "design_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/4",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/3",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2063,7 +2063,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as detailed_designer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "designer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/3",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/2",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2097,7 +2097,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review bounded diffs findings-first; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope.",
       "logical_role_id": "change_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/8",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2131,7 +2131,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as docs_workflow_steward with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "infra_steward+docs_workflow_steward",
-      "role_contract_ref": "agents/agents_config.json#/specialist_roles/9+agents/agents_config.json#/specialist_roles/18",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/9+agents/agents_config.json#/specialist_roles/19",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2165,7 +2165,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as document_flow_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "document_flow_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/5",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/4",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2437,7 +2437,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as manager_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "manager_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/2",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/1",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2607,7 +2607,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as project_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "final_reviewer+project_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/9+agents/agents_config.json#/specialist_roles/17",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/8+agents/agents_config.json#/specialist_roles/17",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2641,7 +2641,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as prompt_config_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "prompt_config_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/specialist_roles/19",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/20",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2675,7 +2675,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not add validation outside that route. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route.",
       "logical_role_id": "change_reviewer+python_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/8+agents/agents_config.json#/specialist_roles/20",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/21",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2709,7 +2709,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as report_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "report_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/specialist_roles/22",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/23",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2777,7 +2777,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as requirements_organizer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "manager",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/1",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/0",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2811,7 +2811,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review exact diffs findings-first against request clauses and owning evidence. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete.",
       "logical_role_id": "change_reviewer+final_reviewer+research_reviewer+experiment_reviewer+infra_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/8+agents/agents_config.json#/always_on_roles/9+agents/agents_config.json#/specialist_roles/1+agents/agents_config.json#/specialist_roles/3+agents/agents_config.json#/specialist_roles/10",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/always_on_roles/8+agents/agents_config.json#/specialist_roles/1+agents/agents_config.json#/specialist_roles/3+agents/agents_config.json#/specialist_roles/10",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2879,7 +2879,7 @@
       "model_reasoning_effort": "xhigh",
       "developer_instructions": "You are acting as ship_reviewer for ship readiness under luna_ship. Constrain edits to one responsibility unit and one-pass materialization only when selected.",
       "logical_role_id": "final_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/9",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/8",
       "profile_id": "luna_ship_xhigh",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2913,7 +2913,7 @@
       "model_reasoning_effort": "medium",
       "developer_instructions": "You are acting as skill_evaluator with skill_evaluator policy. Evaluate policy conformance with explicit evidence and typed outputs.",
       "logical_role_id": "skill_evaluator",
-      "role_contract_ref": "agents/agents_config.json#/specialist_roles/23",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/24",
       "profile_id": "mini_skill_evaluator_medium",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2946,7 +2946,7 @@
       "model_reasoning_effort": "low",
       "developer_instructions": "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.",
       "logical_role_id": "implementer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/6",
       "profile_id": "spark_implementation_low",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2980,9 +2980,9 @@
       "approval_policy": "never",
       "model": "gpt-5.6-terra",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as terra with terra_cross_cutting cross-cutting review capacity. Operate only as a conditional read-only cross-cutting specialist. Activate on multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation. Return owner closure, context capsule, and accepted/rejected/escalated handback; send unresolved findings to Sol. Do not coordinate, implement as a general worker, mutate repository state, create PRs, or make final integration decisions.",
+      "developer_instructions": "You are acting as terra with terra_cross_cutting cross-cutting review capacity. Operate only as a conditional read-only cross-cutting specialist. Activate on multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation. Treat user-provided alternatives and alternatives already present in findings as admissible adversarial-comparison input. Return owner closure, context capsule, and accepted/rejected/escalated handback; send unresolved findings to Sol. Do not invent unrequested alternatives, adopt an architecture, coordinate, implement as a general worker, mutate repository state, create PRs, or make final integration decisions.",
       "logical_role_id": "terra",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/0",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/18",
       "profile_id": "terra_cross_cutting_read_only",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2999,13 +2999,12 @@
       ],
       "forbidden_context": [
         "unrelated_paths",
-        "write_scope",
-        "alternate_architecture"
+        "write_scope"
       ],
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "85a9461247c2a06211e9a5ee60b296907cdd542d7edbc6100155caf49b509a5b"
+      "projection_digest": "d9316e9aa1a118056f400c9f8981ed0d9d1142a1f3f166c8d282d7b5773bd6cf"
     },
     "test_designer": {
       "name": "test_designer",
@@ -3019,7 +3018,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as test_designer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "test_designer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/6",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/5",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -3053,7 +3052,7 @@
       "model_reasoning_effort": "xhigh",
       "developer_instructions": "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.",
       "logical_role_id": "implementer+experimenter+infra_steward",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/2+agents/agents_config.json#/specialist_roles/9",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/6+agents/agents_config.json#/specialist_roles/2+agents/agents_config.json#/specialist_roles/9",
       "profile_id": "luna_implementation_xhigh",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -3833,13 +3832,12 @@
       ],
       "forbidden_context": [
         "unrelated_paths",
-        "write_scope",
-        "alternate_architecture"
+        "write_scope"
       ],
       "return_schema_id": "review_result_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "85a9461247c2a06211e9a5ee60b296907cdd542d7edbc6100155caf49b509a5b"
+      "projection_digest": "d9316e9aa1a118056f400c9f8981ed0d9d1142a1f3f166c8d282d7b5773bd6cf"
     },
     {
       "id": "test_designer",
@@ -3894,6 +3892,6 @@
     "materializer": "tools/agent_tools/model_profile_registry.py",
     "registry_ref": "agents/model_profiles.toml",
     "role_count": 35,
-    "projection_digest": "971ceee63684e9fcfedc3c3a507af48bab867eb39b7e275015c1be90f878e769"
+    "projection_digest": "879d3abc1ac0fc391b9133625d662979f2ebaeef4265ac91da8cd582205b3bea"
   }
 }

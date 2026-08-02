@@ -4798,8 +4798,8 @@ Spark 実装 routing 契約に対するユーザー明示の後続契約であ�
 | ID | 契約 | owner / evidence |
 | --- | --- | --- |
 | TERRA-01 | Sol parent は routing、integration、final authority を保持する。 | Sol; `agents/agents_config.json` |
-| TERRA-02 | Terra は常設登録された conditional read-only cross-cutting specialist とし、coordinator または general worker にはしない。 | Terra; `.codex/agents/terra.toml` |
-| TERRA-03 | Terra の capability は `cross_owner_integration`、`context_reconstruction`、`adversarial_contradiction_validation` の三つに限定する。 | Terra profile; `agents/model_profiles.toml` |
+| TERRA-02 | Terra は canonical 登録された conditional read-only cross-cutting specialist candidate とし、always-on、coordinator、general worker にはしない。task-id のない fallback でも activation evidence なしには選択しない。 | Terra; `agents/agents_config.json` |
+| TERRA-03 | Terra の capability は `cross_owner_integration`、`context_reconstruction`、`adversarial_contradiction_validation` の三つに限定する。ユーザー提示済み、または既存 finding 内の alternative architecture は adversarial comparison 入力として許可し、Terra 自身による未要求の新規案生成、採用、final decision は許可しない。 | Terra profile; `agents/model_profiles.toml` |
 | TERRA-04 | Luna は design、review、ordinary ambiguous implementation を保持し、Spark は fixed mechanical leaf を保持する。 | Luna / Spark; `agents/canonical/CODEX_SUBAGENTS.md` |
 | TERRA-05 | Terra の activation evidence は multi-owner dependency closure、compaction・long-run・incomplete handoff による context reconstruction、または複数案・finding の contradiction validation のいずれかである。 | task topology; `agents/task_catalog.yaml` |
 | TERRA-06 | Terra は owner closure、context capsule、accepted・rejected・escalated の handback を返して終了し、unresolved は Sol に返す。descendant と reservation の cleanup は既存 lifecycle 契約で閉じる。 | Terra / Sol; `agents/agents_config.json` |

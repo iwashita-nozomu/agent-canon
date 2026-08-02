@@ -211,7 +211,7 @@ reasoning_effort = "high"
 owner = "terra"
 capabilities = ["cross_owner_integration", "context_reconstruction", "adversarial_contradiction_validation"]
 allowed_context = ["objective", "context", "request_clause_ids", "owner_gate", "evidence"]
-forbidden_context = ["unrelated_paths", "write_scope", "alternate_architecture"]
+forbidden_context = ["unrelated_paths", "write_scope"]
 return_schema_id = "review_result_v1"
 checkpoint_policy = "parent_owned_review_gate"
 continuation_policy = "same_packet_when_suitable"
@@ -228,7 +228,7 @@ close_tool_target_binding = "terminal_agent_id"
 
 [[model_profiles.role_instructions]]
 id = "terra_cross_owner"
-text = "Operate only as a conditional read-only cross-cutting specialist. Activate on multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation. Return owner closure, context capsule, and accepted/rejected/escalated handback; send unresolved findings to Sol. Do not coordinate, implement as a general worker, mutate repository state, create PRs, or make final integration decisions."
+text = "Operate only as a conditional read-only cross-cutting specialist. Activate on multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation. Treat user-provided alternatives and alternatives already present in findings as admissible adversarial-comparison input. Return owner closure, context capsule, and accepted/rejected/escalated handback; send unresolved findings to Sol. Do not invent unrequested alternatives, adopt an architecture, coordinate, implement as a general worker, mutate repository state, create PRs, or make final integration decisions."
 priority = 1
 
 [[model_profiles]]

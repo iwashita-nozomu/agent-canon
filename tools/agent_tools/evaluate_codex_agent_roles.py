@@ -83,6 +83,7 @@ VALID_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
 DEPRECATED_CODEX_MODELS = {"gpt-5.2", "gpt-5.3-codex"}
 EVALUATOR_AGENT_ID = "skill_evaluator"
 EVALUATOR_ACTIVATION = "explicit_empirical_skill_evaluation"
+TERRA_AGENT_ID = "terra"
 FORBIDDEN_AGENT_PROFILE_KEYS = {"tier", "service_tier", "flex"}
 GENERATED_ROLE_VIEW_MATERIALIZER = "generate_role_views"
 
@@ -427,6 +428,11 @@ def evaluate_routing(root: Path) -> list[Finding]:
             findings.append(Finding("registration", EVALUATOR_AGENT_ID, "must-be-artifacts-only"))
         if "skill_evaluation" not in evaluator.write_policy.allowed_artifacts:
             findings.append(Finding("registration", EVALUATOR_AGENT_ID, "missing-skill-evaluation-artifact"))
+    terra = roles.get(TERRA_AGENT_ID)
+    if terra is None:
+        findings.append(Finding("registration", TERRA_AGENT_ID, "missing-permanent-role"))
+    elif terra.id in {role.id for role in config.always_on_roles}:
+        findings.append(Finding("registration", TERRA_AGENT_ID, "must-not-be-always-on"))
     for role_id, role in roles.items():
         if role_id != EVALUATOR_AGENT_ID and EVALUATOR_AGENT_ID in role.codex_agents:
             findings.append(
