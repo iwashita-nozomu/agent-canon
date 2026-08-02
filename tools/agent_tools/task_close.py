@@ -85,7 +85,6 @@ DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
 AGENT_CANON_PREFIX = "vendor/agent-canon"
 AGENT_CANON_SYNC_CONTROL_PATHS = (
-    ".gitmodules",
     "tools/sync_agent_canon.sh",
     "tools/agent_tools/surface_manifest.py",
     "tools/agent_tools/update_agent_canon.sh",
@@ -649,7 +648,7 @@ def agent_canon_parent_sync_symlink_source_paths(
 
 
 def _gitlink_commit_resolvable(workspace: Path) -> str | None:
-    """Return gitlink commit if parent vendor directory is a submodule and commit resolves."""
+    """Return commit object for the committed vendor/agent-canon gitlink."""
     if not (workspace / AGENT_CANON_PREFIX).is_dir():
         return None
     result = subprocess.run(
@@ -659,10 +658,10 @@ def _gitlink_commit_resolvable(workspace: Path) -> str | None:
         capture_output=True,
         text=True,
     )
-    if result.returncode != 0 or result.stdout.split()[:2] != ["160000", "commit"]:
+    if result.returncode != 0:
         return None
     fields = result.stdout.strip().split()
-    if len(fields) < 3:
+    if len(fields) < 3 or fields[0] != "160000" or fields[1] != "commit":
         return None
     commit = fields[2]
     if not commit:
@@ -675,6 +674,66 @@ def _gitlink_commit_resolvable(workspace: Path) -> str | None:
         text=True,
     )
     return commit if exists.returncode == 0 else None
+
+
+def _parse_gitlink_ref_updates(lines: tuple[str, ...]) -> tuple[str | None, str | None]:
+    """Parse one or more `git diff --raw` lines for submodule hash updates."""
+    for line in lines:
+        fields = line.strip().split()
+        if not fields or not fields[0].startswith(":"):
+            continue
+        mode_old = fields[0].lstrip(":")
+        mode_new = fields[1] if len(fields) > 1 else ""
+        if mode_old != "160000" or mode_new != "160000":
+            continue
+        if len(fields) < 5:
+            continue
+        if len(fields) == 5:
+            path_field = fields[4]
+        else:
+            path_field = fields[5]
+        path = path_field.split("\t", 1)[-1]
+        if not path or path != AGENT_CANON_PREFIX:
+            continue
+        old_hash = fields[2] if fields[2] not in {"0" * 40} else None
+        new_hash = fields[3] if fields[3] not in {"0" * 40} else None
+        return old_hash, new_hash
+    return None, None
+
+
+def _gitlink_update_candidates(workspace: Path) -> tuple[str | None, str | None]:
+    """Read staged and unstaged gitlink hash transitions for vendor/agent-canon."""
+    outputs: list[str] = []
+    for args in (
+        ("git", "diff", "--raw", "--cached", "HEAD", "--", AGENT_CANON_PREFIX),
+        ("git", "diff", "--raw", "HEAD", "--", AGENT_CANON_PREFIX),
+    ):
+        result = subprocess.run(
+            list(args),
+            cwd=workspace,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            continue
+        outputs.extend(result.stdout.splitlines())
+    return _parse_gitlink_ref_updates(tuple(outputs))
+
+
+def _gitlink_target_commit_resolvable(workspace: Path) -> str | None:
+    """Return the targeted gitlink commit object only when vendor/agent-canon is changed."""
+    old_hash, new_hash = _gitlink_update_candidates(workspace)
+    if new_hash is None:
+        return None
+    result = subprocess.run(
+        ["git", "cat-file", "-e", f"{new_hash}^{{commit}}"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return new_hash if result.returncode == 0 else None
 
 
 def _sync_gate_manifest_prefixes(workspace: Path) -> tuple[str, ...]:
@@ -1287,8 +1346,9 @@ def main() -> int:
         changed_all,
         workspace=workspace,
     )
-    updated_parent_gitlink = ".gitmodules" in changed_all
-    parent_gitlink_commit = _gitlink_commit_resolvable(workspace) if updated_parent_gitlink else None
+    parent_gitlink_commit = _gitlink_target_commit_resolvable(workspace)
+    _, changed_gitlink_target = _gitlink_update_candidates(workspace)
+    requires_parent_gitlink_integrity = changed_gitlink_target is not None
     (
         document_structure_paths_ready,
         document_split_decision_route_ready,
@@ -1386,7 +1446,7 @@ def main() -> int:
         if requires_canon_parent_sync
         else True,
         "agent_canon_parent_gitlink_commit": (
-            parent_gitlink_commit is not None if updated_parent_gitlink else True
+            parent_gitlink_commit is not None if requires_parent_gitlink_integrity else True
         ),
         "mapping_error_sets_empty": (
             closeout.get(

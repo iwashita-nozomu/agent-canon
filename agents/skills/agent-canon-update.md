@@ -179,11 +179,11 @@ current-task user approval and rerun
 `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest`
 with all four inline Git authority/reason fields in the same command segment.
 
-Treat this as the mandatory `agentcanon_structure_followup` gate whenever
-   AgentCanon source, the parent submodule pin, `.gitmodules`, root runtime
-   views, shared root-copy surfaces, or parent root sync state changed. Record
-   `agentcanon_structure_followup=required` before the commands and
-   `agentcanon_structure_followup=pass` only after the sync check passes.
+Treat this as the mandatory `agentcanon_structure_followup` gate when this
+owner route reports the parent sync trigger is active for source, submodule pin,
+root runtime views, root-copy surfaces, or sync-control surfaces. Record
+`agentcanon_structure_followup=required` before the commands and
+`agentcanon_structure_followup=pass` only after the sync check passes.
    Template / derived parent roots must run this gate from the parent root after
    AgentCanon source changes are integrated, or while preparing the parent
    pin/root-view PR.

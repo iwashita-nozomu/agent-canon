@@ -10,10 +10,14 @@ from __future__ import annotations
 from tools.agent_tools import capacity_handshake
 from tools.agent_tools.task_close import (
     _gitlink_commit_resolvable,
+    _gitlink_target_commit_resolvable,
+    _gitlink_update_candidates,
     agent_canon_parent_sync_gate_required,
     validate_capacity_lifecycle_closeout,
 )
 from pathlib import Path
+import subprocess
+from types import SimpleNamespace
 
 
 def test_agent_canon_parent_sync_gate_ignores_symlink_source_changes() -> None:
@@ -53,6 +57,39 @@ def test_agent_canon_parent_sync_gate_accepts_gitlink_commit_without_branch_chec
     commit = _gitlink_commit_resolvable(workspace)
     assert commit is None or len(commit) > 0
 
+
+def test_agent_canon_parent_sync_gate_requires_no_full_sync_for_gitlink_only_update() -> None:
+    workspace = Path(__file__).resolve().parents[2]
+    assert not agent_canon_parent_sync_gate_required(
+        ("vendor/agent-canon",),
+        workspace=workspace,
+    )
+
+
+def test_agent_canon_parent_gitlink_integrity_fails_for_unreachable_target(monkeypatch) -> None:
+    workspace = Path(__file__).resolve().parents[2]
+
+    def fake_run(args, check=False, capture_output=False, text=False, cwd=None, **kwargs):
+        if args[:2] == ["git", "diff"] and args[1] == "diff":
+            return SimpleNamespace(
+                returncode=0,
+                stdout=":160000 160000 1111111111111111111111111111111111111111 2222222222222222222222222222222222222222 M\tvendor/agent-canon\n",
+            )
+        if args[:2] == ["git", "cat-file"] and args[1] == "cat-file":
+            return SimpleNamespace(returncode=1, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert _gitlink_target_commit_resolvable(workspace) is None
+
+
+def test_agent_canon_parent_sync_gate_internal_symlink_change_keeps_full_sync_and_integrity_false() -> None:
+    workspace = Path(__file__).resolve().parents[2]
+    changed_paths = ("agents/foo.md", ".vscode/settings.json", "notes/knowledge/file.md")
+    assert not agent_canon_parent_sync_gate_required(changed_paths, workspace=workspace)
+    _, new_hash = _gitlink_update_candidates(workspace)
+    assert new_hash is None
+    assert _gitlink_target_commit_resolvable(workspace) is None
 
 def _readback_record(work_id: str, parent: str) -> capacity_handshake.DescendantLifecycleRecord:
     return capacity_handshake.DescendantLifecycleRecord(
