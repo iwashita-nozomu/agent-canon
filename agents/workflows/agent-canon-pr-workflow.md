@@ -205,6 +205,19 @@ receipt to `run_all_checks.sh`; the quick-CI consumer does not rebuild the
 parent graph or promote dependency-header completeness into a blocker. A
 standalone AgentCanon source checkout retains the strict source graph gate.
 
+When selection is required, the parent checker first builds the complete graph.
+A complete result records `prepared` and runs the full strict dependency review.
+For an incomplete parent graph, the checker uses the same validated base diff as
+the selector and traverses persisted dependency/surface edges in both directions
+from changed paths. Diagnostics declared by that closure, diagnostics whose
+target changed, changed `manifest-grammar`, and diagnostics without confirmed
+base source identity fail. Non-reachable diagnostics whose source identity is
+unchanged from the base are written individually to the acceptance report and
+produce a `scoped` receipt. The quick-CI consumer accepts that bound receipt but
+does not treat the incomplete graph as fresh or run graph-query consumers.
+Explicit parent graph migration and standalone source gates remain full-scope;
+no count-only baseline is an acceptance oracle.
+
 GitHub Actions resolves the comparison base from
 `pull_request.base.sha` in its trusted event payload. Before normal selection,
 `check_agent_canon_pr.sh` invokes `--prepare-ci-base`. The selector first verifies

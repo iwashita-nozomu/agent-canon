@@ -2,7 +2,7 @@
 
 # @dependency-start
 # contract test
-# responsibility Verifies canonical profile/surface selection, trusted diff bases, and typed selector failures.
+# responsibility Verifies canonical selection, trusted diff bases, changed-responsibility reachability, and typed graph failures.
 # upstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py selects parent strict graph gating
 # upstream implementation ../../tools/ci/check_agent_canon_pr.sh prepares and passes the trusted GitHub base
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json owns canonical validation profile IDs and graph requirements
@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -94,6 +95,76 @@ def shallow_pr_checkout(root: Path) -> tuple[Path, Path, str]:
         encoding="utf-8",
     )
     return checkout, event, base
+
+
+def graph_change_fixture(root: Path, extra_base_files: dict[str, str]) -> str:
+    """Create one changed path plus unchanged base-owned graph sources."""
+    git(root, "init", "-b", "main")
+    git(root, "config", "user.email", "selector@example.invalid")
+    git(root, "config", "user.name", "Selector Fixture")
+    (root / "changed.py").write_text("before\n", encoding="utf-8")
+    for relative, content in extra_base_files.items():
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    git(root, "add", ".")
+    git(root, "commit", "-m", "base")
+    base = git(root, "rev-parse", "HEAD")
+    (root / "changed.py").write_text("after\n", encoding="utf-8")
+    git(root, "add", "changed.py")
+    git(root, "commit", "-m", "change")
+    return base
+
+
+def write_graph_result(
+    root: Path,
+    paths: tuple[str, ...],
+    edges: tuple[tuple[str, str], ...],
+    diagnostics: tuple[tuple[str, str, str], ...],
+) -> Path:
+    """Write the minimal persisted graph consumed by acceptance classification."""
+    graph_dir = root / ".agent-canon" / "knowledge-graph"
+    graph_dir.mkdir(parents=True)
+    database = graph_dir / "graph.sqlite"
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "CREATE TABLE nodes(id TEXT, layer TEXT, payload_json TEXT)"
+        )
+        connection.execute(
+            "CREATE TABLE edges(layer TEXT, from_node_id TEXT, to_node_id TEXT)"
+        )
+        connection.execute(
+            "CREATE TABLE diagnostics(layer TEXT, rule TEXT, message TEXT, target_node_id TEXT)"
+        )
+        for path in paths:
+            connection.execute(
+                "INSERT INTO nodes VALUES(?, 'source', ?)",
+                (f"node:source:{path}", json.dumps({"path": path})),
+            )
+        for source, target in edges:
+            connection.execute(
+                "INSERT INTO edges VALUES('source', ?, ?)",
+                (f"node:source:{source}", f"node:source:{target}"),
+            )
+        for code, message, source in diagnostics:
+            target_node = f"node:source:{source}" if source else ""
+            connection.execute(
+                "INSERT INTO diagnostics VALUES('source', ?, ?, ?)",
+                (code, message, target_node),
+            )
+    result = graph_dir / "graph-build.json"
+    result.write_text(
+        json.dumps(
+            {
+                "schema": "agent-canon.graph.build.v1",
+                "status": "incomplete",
+                "exit_code": 1,
+                "db_path": str(database),
+            }
+        ),
+        encoding="utf-8",
+    )
+    return result
 
 
 class AgentCanonPrGraphSelectorTest(unittest.TestCase):
@@ -192,6 +263,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 "tools/agent_tools/check_dependency_headers.py",
                 "tools/agent_tools/render_dependency_manifest_graph.py",
                 "tools/agent_tools/graph_client.py",
+                "tools/ci/check_agent_canon_pr.sh",
+                "tools/ci/run_all_checks.sh",
             }.issubset(surfaces)
         )
 
@@ -258,6 +331,149 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
 
         self.assertEqual(selection.status, "required")
         self.assertIn("dependency_manifest_touched", selection.reason)
+
+    def test_unrelated_base_unresolved_is_reported_without_blocking(self) -> None:
+        """An unchanged non-reachable declaration remains evidence, not a PR blocker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {"legacy.py": "legacy\n"})
+            graph_result = write_graph_result(
+                root,
+                ("changed.py", "legacy.py"),
+                (),
+                (("target-unresolved", "legacy.py:4:missing.md", "legacy.py"),),
+            )
+
+            acceptance = selector.evaluate_built_graph(
+                root,
+                graph_result,
+                {"AGENT_CANON_PR_BASE_REF": base},
+            )
+
+        self.assertEqual(acceptance.status, "pass")
+        self.assertEqual(
+            acceptance.reason,
+            "unrelated_baseline_incompleteness_reported",
+        )
+        self.assertEqual(acceptance.report["blocking_diagnostics"], [])
+        baseline = acceptance.report["baseline_diagnostics"]
+        self.assertEqual(len(baseline), 1)
+        self.assertEqual(baseline[0]["source_path"], "legacy.py")
+
+    def test_reachable_unresolved_blocks_changed_responsibility(self) -> None:
+        """A diagnostic reached through a dependency edge remains a blocker."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {"related.py": "related\n"})
+            graph_result = write_graph_result(
+                root,
+                ("changed.py", "related.py"),
+                (("changed.py", "related.py"),),
+                (("target-unresolved", "related.py:4:missing.md", "related.py"),),
+            )
+
+            acceptance = selector.evaluate_built_graph(
+                root,
+                graph_result,
+                {"AGENT_CANON_PR_BASE_REF": base},
+            )
+
+        self.assertEqual(acceptance.status, "fail")
+        blocking = acceptance.report["blocking_diagnostics"]
+        self.assertEqual(len(blocking), 1)
+        self.assertEqual(blocking[0]["classification"], "changed_responsibility")
+
+    def test_changed_manifest_grammar_blocks_without_target_node(self) -> None:
+        """Invalid grammar in a changed declaration is always in the gate closure."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {})
+            graph_result = write_graph_result(
+                root,
+                ("changed.py",),
+                (),
+                (("manifest-grammar", "changed.py:3:upstream bad", ""),),
+            )
+
+            acceptance = selector.evaluate_built_graph(
+                root,
+                graph_result,
+                {"AGENT_CANON_PR_BASE_REF": base},
+            )
+
+        self.assertEqual(acceptance.status, "fail")
+        blocking = acceptance.report["blocking_diagnostics"]
+        self.assertEqual(blocking[0]["code"], "manifest-grammar")
+        self.assertEqual(blocking[0]["source_path"], "changed.py")
+
+    def test_changed_target_blocks_an_unchanged_unresolved_declaration(self) -> None:
+        """Deleting a declared target keeps its unchanged source in changed scope."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            git(root, "init", "-b", "main")
+            git(root, "config", "user.email", "selector@example.invalid")
+            git(root, "config", "user.name", "Selector Fixture")
+            (root / "legacy.py").write_text("legacy\n", encoding="utf-8")
+            (root / "deleted.md").write_text("target\n", encoding="utf-8")
+            git(root, "add", ".")
+            git(root, "commit", "-m", "base")
+            base = git(root, "rev-parse", "HEAD")
+            (root / "deleted.md").unlink()
+            git(root, "add", "deleted.md")
+            git(root, "commit", "-m", "delete target")
+            graph_result = write_graph_result(
+                root,
+                ("legacy.py",),
+                (),
+                (("target-unresolved", "legacy.py:4:deleted.md", "legacy.py"),),
+            )
+
+            acceptance = selector.evaluate_built_graph(
+                root,
+                graph_result,
+                {"AGENT_CANON_PR_BASE_REF": base},
+            )
+
+        self.assertEqual(acceptance.status, "fail")
+        blocking = acceptance.report["blocking_diagnostics"]
+        self.assertEqual(blocking[0]["target_path"], "deleted.md")
+        self.assertEqual(blocking[0]["classification"], "changed_responsibility")
+
+    def test_explicit_parent_migration_keeps_full_graph_completeness(self) -> None:
+        """A declared migration owns baseline diagnostics across the whole graph."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {"legacy.py": "legacy\n"})
+            graph_result = write_graph_result(
+                root,
+                ("changed.py", "legacy.py"),
+                (),
+                (("target-unresolved", "legacy.py:4:missing.md", "legacy.py"),),
+            )
+
+            acceptance = selector.evaluate_built_graph(
+                root,
+                graph_result,
+                {
+                    "AGENT_CANON_PR_BASE_REF": base,
+                    "AGENT_CANON_PR_PARENT_GRAPH_MIGRATION": "yes",
+                },
+            )
+
+        self.assertEqual(acceptance.status, "fail")
+        self.assertTrue(acceptance.report["full_scope"])
+
+    def test_pr_entrypoint_records_scoped_graph_receipt(self) -> None:
+        """The parent entrypoint and receipt consumer preserve scoped acceptance."""
+        entrypoint = CHECKER_PATH.read_text(encoding="utf-8")
+        quick_ci = (PROJECT_ROOT / "tools" / "ci" / "run_all_checks.sh").read_text(
+            encoding="utf-8"
+        )
+
+        self.assertIn("--evaluate-built-graph", entrypoint)
+        self.assertIn("PR_GATE_DEPENDENCY_GRAPH_STATUS=scoped", entrypoint)
+        self.assertIn('!= "scoped"', quick_ci)
+        self.assertIn("validated_changed_responsibility_graph_receipt", quick_ci)
 
     def test_base_equal_to_head_is_typed_failure(self) -> None:
         """An equal base cannot masquerade as an empty PR diff."""
