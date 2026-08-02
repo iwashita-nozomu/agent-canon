@@ -19,6 +19,9 @@ downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools
 downstream implementation ../../tests/tools/test_agent_canon_pr_graph_selector.py verifies parent gate selection from canonical profiles, surfaces, and diff evidence
 downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs owns the sole complete-file manifest parser and source snapshot
 downstream implementation ../../rust/agent-canon/src/graph.rs owns canonical graph materialization and queries
+downstream implementation ../../rust/agent-canon/src/structured_analysis.rs owns the shared graph storage schema
+downstream implementation ../../rust/agent-canon/src/main.rs dispatches public graph commands
+downstream implementation ../../tools/bin/agent-canon provides the stable bootstrap CLI for public graph commands
 downstream implementation ../../tools/agent_tools/graph_client.py provides the sole Python graph adapter
 downstream design ../structured-analysis/graph-dsl.md maps dependency manifest evidence into Graph DSL Core
 downstream design ../structured-analysis/dependency-header-analysis.md maps manifest graph evidence into structured analysis

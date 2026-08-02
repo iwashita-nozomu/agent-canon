@@ -163,6 +163,32 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         self.assertIn("canonical_dependency_surface_touched", selection.reason)
         self.assertIn("tools/agent_tools/graph_client.py", selection.evidence)
 
+    def test_graph_storage_dispatch_and_bootstrap_surfaces_require_graph(self) -> None:
+        """Every reviewed graph storage/dispatch/bootstrap surface selects strict graph."""
+        reviewed_surfaces = (
+            "rust/agent-canon/src/structured_analysis.rs",
+            "rust/agent-canon/src/main.rs",
+            "tools/bin/agent-canon",
+        )
+        for relative in reviewed_surfaces:
+            with self.subTest(path=relative):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    root = Path(tmp_dir)
+                    base = commit_change(root, relative)
+
+                    selection = selector.select(
+                        root,
+                        PROJECT_ROOT,
+                        {"AGENT_CANON_PR_BASE_REF": base},
+                    )
+
+                self.assertEqual(selection.status, "required")
+                self.assertIn(
+                    "canonical_dependency_surface_touched",
+                    selection.reason,
+                )
+                self.assertIn(relative, selection.evidence)
+
     def test_dependency_manifest_change_requires_graph(self) -> None:
         """A changed dependency header selects strict graph completeness."""
         with tempfile.TemporaryDirectory() as tmp_dir:
