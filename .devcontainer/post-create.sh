@@ -196,7 +196,9 @@ python3 "$agent_canon_root/tools/agent_tools/devcontainer_dependencies.py" \
   "$workspace/.agent-canon/dependency-receipts" --format text
 
 if [ -f "$workspace/docker/install_python_dependencies.sh" ]; then
-  bash "$workspace/docker/install_python_dependencies.sh" "$workspace"
+  dependency_profile="${AGENT_CANON_DEPENDENCY_PROFILE:-full}"
+  bash "$workspace/docker/install_python_dependencies.sh" "$workspace" \
+    --profile "$dependency_profile"
 else
   echo "repo-local Python dependency installer absent; skipping docker/install_python_dependencies.sh"
 fi

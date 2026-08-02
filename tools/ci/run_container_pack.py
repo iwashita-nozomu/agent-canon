@@ -19,6 +19,7 @@ from container_runtime import (
     build_build_command,
     build_run_command,
     build_shell_invocation,
+    build_workspace_setup_command,
     join_shell_lines,
     load_or_default_pack,
     print_label_and_command,
@@ -29,7 +30,9 @@ from container_runtime import (
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
-    parser = argparse.ArgumentParser(description="Build and smoke-test a container runtime pack.")
+    parser = argparse.ArgumentParser(
+        description="Build and smoke-test a container runtime pack."
+    )
     parser.add_argument("--pack", help="Path to a TOML runtime pack definition.")
     parser.add_argument(
         "--builder",
@@ -41,10 +44,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--context", help="Build context override.")
     parser.add_argument("--target", help="Build target override.")
     parser.add_argument("--tag", help="Temporary image tag override.")
-    parser.add_argument("--pull", action="store_true", help="Pull the latest base image.")
-    parser.add_argument("--no-cache", action="store_true", help="Disable the build cache.")
+    parser.add_argument(
+        "--pull", action="store_true", help="Pull the latest base image."
+    )
+    parser.add_argument(
+        "--no-cache", action="store_true", help="Disable the build cache."
+    )
     parser.add_argument("--skip-run", action="store_true", help="Skip the smoke test.")
-    parser.add_argument("--keep-image", action="store_true", help="Keep the built image.")
+    parser.add_argument(
+        "--keep-image", action="store_true", help="Keep the built image."
+    )
     parser.add_argument(
         "--workspace-root",
         default=".",
@@ -60,7 +69,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def cleanup_image(builder: str, image_tag: str) -> None:
     """Remove one image quietly."""
-    subprocess.run([builder, "image", "rm", "-f", image_tag], check=False, capture_output=True)
+    subprocess.run(
+        [builder, "image", "rm", "-f", image_tag], check=False, capture_output=True
+    )
 
 
 def build_smoke_command(pack: ContainerPack) -> list[str]:
@@ -83,7 +94,9 @@ def main() -> int:
         builder = resolve_builder(args.builder, print_only=args.print_only)
         workspace_root = workspace_path(args.workspace_root)
 
-        build_command = build_build_command(builder, pack, pull=args.pull, no_cache=args.no_cache)
+        build_command = build_build_command(
+            builder, pack, pull=args.pull, no_cache=args.no_cache
+        )
         print_label_and_command("build", build_command)
         if args.skip_run:
             if args.print_only:
@@ -95,7 +108,12 @@ def main() -> int:
             builder,
             pack,
             workspace_root=workspace_root,
-            command=build_smoke_command(pack),
+            command=build_workspace_setup_command(
+                build_smoke_command(pack),
+                shell=pack.smoke.shell,
+                container_workspace=pack.runtime.workspace_mount,
+                dependency_profile=pack.runtime.dependency_profile,
+            ),
         )
         print_label_and_command("smoke", smoke_command)
 

@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -51,6 +52,9 @@ LOCAL_FLOCK_FILESYSTEMS = ("btrfs", "ext4", "xfs")
 PROVISION_RECEIPT_NAME = "shared-runtime-provision.json"
 READBACK_RECEIPT_NAME = "shared-runtime-readback.json"
 RUNTIME_ROUTE = "MANAGED_CONTAINER"
+DEPENDENCY_PROFILE_ENV = "AGENT_CANON_DEPENDENCY_PROFILE"
+DEFAULT_DEPENDENCY_PROFILE = "full"
+DEPENDENCY_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 
 
 @dataclass(frozen=True)
@@ -71,6 +75,7 @@ class RuntimeSpec:
     env: tuple[str, ...] = ()
     mounts: tuple[str, ...] = ()
     gpus: str | None = None
+    dependency_profile: str = DEFAULT_DEPENDENCY_PROFILE
 
 
 @dataclass(frozen=True)
@@ -294,6 +299,16 @@ def load_pack(path_like: str | Path) -> ContainerPack:
     gpus = runtime_section.get("gpus")
     if gpus is not None and not isinstance(gpus, str):
         raise ValueError(f"{path}: [runtime].gpus must be a string if present")
+    dependency_profile = runtime_section.get(
+        "dependency_profile", DEFAULT_DEPENDENCY_PROFILE
+    )
+    if (
+        not isinstance(dependency_profile, str)
+        or DEPENDENCY_PROFILE_RE.fullmatch(dependency_profile) is None
+    ):
+        raise ValueError(
+            f"{path}: [runtime].dependency_profile must be a non-empty profile name"
+        )
 
     return ContainerPack(
         name=name,
@@ -313,6 +328,7 @@ def load_pack(path_like: str | Path) -> ContainerPack:
             env=require_string_list(runtime_section, "env", path, "runtime"),
             mounts=require_string_list(runtime_section, "mounts", path, "runtime"),
             gpus=gpus,
+            dependency_profile=dependency_profile,
         ),
     )
 
@@ -392,7 +408,12 @@ def build_run_command(
     resolved_workdir = workdir or pack.runtime.workdir
     resolved_shell = shell or pack.runtime.shell
     resolved_gpus = gpus if gpus is not None else pack.runtime.gpus
-    combined_env = tuple(dict.fromkeys((*pack.runtime.env, *env)))
+    dependency_profile_env = (
+        f"{DEPENDENCY_PROFILE_ENV}={pack.runtime.dependency_profile}"
+    )
+    combined_env = tuple(
+        dict.fromkeys((*pack.runtime.env, *env, dependency_profile_env))
+    )
     combined_mounts = pack.runtime.mounts + mounts
 
     run_command = [builder, "run", "--rm"]
@@ -421,6 +442,34 @@ def build_run_command(
 def build_shell_invocation(shell: str, script: str) -> list[str]:
     """Return a shell invocation for a multi-line script."""
     return [shell, "-lc", script]
+
+
+def build_workspace_setup_command(
+    command: list[str],
+    *,
+    shell: str,
+    container_workspace: str,
+    dependency_profile: str,
+    skip_setup: bool = False,
+) -> list[str]:
+    """Run the repo installer for the pack profile before one command."""
+    if skip_setup:
+        return command
+
+    installer = (
+        f"{container_workspace.rstrip('/')}/docker/install_python_dependencies.sh"
+    )
+    lines = [
+        "set -euo pipefail",
+        (
+            f"if [ -f {shlex.quote(installer)} ]; then "
+            f"bash {shlex.quote(installer)} {shlex.quote(container_workspace)} "
+            f"--profile {shlex.quote(dependency_profile)}; "
+            "fi"
+        ),
+        f"exec {shlex.join(command)}",
+    ]
+    return build_shell_invocation(shell, join_shell_lines(lines))
 
 
 def join_shell_lines(lines: list[str]) -> str:

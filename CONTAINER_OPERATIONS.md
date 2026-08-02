@@ -126,6 +126,14 @@ workspace Python packages. It runs after the shared dependency plan and before
 AgentCanon build/cache/projection. The parent-owned post-create command remains
 the final lifecycle action.
 
+The repo-local runtime pack owns `runtime.dependency_profile` as a first-class
+field. `full` is the default when the field is omitted. Shared pack smoke,
+repo-container, repo-program, Dockerfile Python, nested Codex, and devcontainer
+entrypoints pass that profile to the same mounted-workspace installer. The
+generated devcontainer environment carries it as
+`AGENT_CANON_DEPENDENCY_PROFILE`; post-create consumes that value and does not
+select a second dependency policy.
+
 ## Dockerfile Rules
 
 Keep the project `Dockerfile` focused on the project runtime.

@@ -94,6 +94,7 @@ def write_compose(
     environment_lines = (
         [
             "    environment:",
+            "      AGENT_CANON_DEPENDENCY_PROFILE: full",
             "      AGENT_CANON_WORKSPACE_ROOT: /workspace",
             f"      AGENT_CANON_REPOSITORY_ROOT: {repo_target}",
         ]
@@ -370,6 +371,7 @@ def write_parent_generator_fixture(
     tmp_path: Path,
     *,
     runtime_shell: str = "/bin/zsh",
+    dependency_profile: str = "full",
     environment_script: str = "",
     environment_variables: tuple[str, ...] = (),
 ) -> Path:
@@ -408,6 +410,7 @@ def write_parent_generator_fixture(
                 f'shell = "{runtime_shell}"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
+                f'dependency_profile = "{dependency_profile}"',
                 "",
             ]
         ),
@@ -428,6 +431,7 @@ def test_load_pack_reads_optional_platform_when_present_or_omitted(
     assert implicit_findings == []
     assert implicit is not None
     assert implicit.platform is None
+    assert implicit.dependency_profile == "full"
 
     explicit_pack = repo / "docker/packs/explicit-platform.toml"
     explicit_pack.write_text(
@@ -447,6 +451,7 @@ def test_load_pack_reads_optional_platform_when_present_or_omitted(
                 'shell = "/bin/bash"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
+                'dependency_profile = "gpu"',
                 "",
             ]
         ),
@@ -456,6 +461,7 @@ def test_load_pack_reads_optional_platform_when_present_or_omitted(
     assert explicit_findings == []
     assert explicit is not None
     assert explicit.platform == "linux/amd64"
+    assert explicit.dependency_profile == "gpu"
 
 
 def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> None:
@@ -492,6 +498,7 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     assert 'HOME: "/tmp/project-template-home"' in compose
     assert 'ZDOTDIR: "/etc/project-template/zsh"' in compose
     assert 'SHELL: "/bin/zsh"' in compose
+    assert 'AGENT_CANON_DEPENDENCY_PROFILE: "full"' in compose
     assert 'user: "${LOCAL_UID}:${LOCAL_GID}"' in compose
     assert (
         "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700"

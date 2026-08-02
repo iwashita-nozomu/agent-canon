@@ -70,6 +70,7 @@ def test_runtime_identity(tmp_path: Path) -> None:
                 'shell = "/bin/bash"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
+                'dependency_profile = "gpu"',
                 "env = []",
                 "mounts = []",
                 "",
@@ -138,9 +139,12 @@ def test_runtime_identity(tmp_path: Path) -> None:
     )
     assert "-e OPENAI_API_KEY=test-api-key" in result.stdout
     assert "-e OPENAI_BASE_URL=https://api.example.test/v1" in result.stdout
+    assert "-e AGENT_CANON_DEPENDENCY_PROFILE=gpu" in result.stdout
     assert "/root/.codex" not in result.stdout
     assert "umask 0007" in post_create
     assert '"$devcontainer_dir/finalize-shared-runtime.sh"' in post_create
+    assert 'dependency_profile="${AGENT_CANON_DEPENDENCY_PROFILE:-full}"' in post_create
+    assert '--profile "$dependency_profile"' in post_create
     assert 'echo "codex-state: ${codex_state_status}"' in post_attach
     assert '"schema_version": "shared-runtime-readback/v1"' in finalize
     assert 'readback_receipt="${runtime_root}/shared-runtime-readback.json"' in finalize
