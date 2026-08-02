@@ -19,7 +19,9 @@ import re
 from collections.abc import Mapping, Sequence
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Literal, NotRequired, TypeAlias, TypedDict, TypeVar, cast
+from typing import Literal, TypeAlias, TypeVar, cast
+
+from typing_extensions import NotRequired, TypedDict  # noqa: UP035
 
 JsonScalar: TypeAlias = None | bool | int | float | str
 JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
