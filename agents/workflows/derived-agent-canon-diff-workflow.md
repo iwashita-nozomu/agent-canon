@@ -25,16 +25,16 @@ downstream design ../canonical/CODEX_WORKFLOW.md routes diverged canon workflows
 ## 適用条件
 
 - `git status --short -- vendor/agent-canon` に差分がある
-- `make agent-canon-ensure-latest` または `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh ensure-latest` が `diverged_submodule_history` / unsafe local submodule state で止まる
+- `make agent-canon-ensure-latest` または `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh ensure-latest` が unresolved merge conflict / unpreservable materialization collision で止まる
 - 派生 repo で育った workflow、skill、subagent、tool、runtime entrypoint、shared note を shared canon へ戻したい
 - root の symlink view / synced copy と `vendor/agent-canon/` のどちらを直すべきか判断が必要
 
 ## 固定ルール
 
-- shared canon の source 正本は workspace-root の独立 branch clone です。root symlink view や `vendor/agent-canon` を直接直して解決した扱いにしません。
-- 派生 repo の shared canon source 差分は、`dependency-module-change` の owner-evidence と `--branch` で workspace-root clone に移してから commit します。
-- `ensure-latest` が local divergence や vendor dirt で止まった場合、parent mode では停止し、vendor stateを保存・継続せず、独立 clone routeで差分の行き先を決めます。
-- `vendor/agent-canon/` が local checkout branch を指している状態は parent source topology として認めません。`merge-main-into-current*` は parent modeで拒否され、clean source pin projectionだけを受け取ります。
+- shared canon の source owner は intended named `vendor/agent-canon/` branch です。branch / ahead / diverged / dirty state は evidence として保持し、collision-safe merge / review flow を続けます。
+- `workspace/<topic>/agent-canon` の managed source clone は、vendor checkout が別 topic/branch に占有されている場合だけ使います。
+- intended named `vendor/agent-canon/` source branch の branch / ahead / diverged / dirty state は evidence として保持します。全 local uncommitted / ignored materialized paths と `HEAD` から planned result tree への exact update write set の unpreservable collision、または unresolved merge conflict だけを block します。
+- intended named source branch は parent source topology の source owner として扱い、non-colliding state は normal merge / review flow を続けます。requested topic が current branch と異なる場合だけ独立 clone route を使い、parent pin projection は clean `main` のみを受け取ります。
 - shared canon main に取り込んだあとは、派生 repo 側で `make agent-canon-ensure-latest` を再実行し、submodule worktree HEAD と parent gitlink が shared canon main と同じ commit になるまで閉じません。
 - mutating な latest / apply / ensure-latest / pull / link-root route は、既存のGit authority/reason fieldsと `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` を同じcommand segmentで受け取る。evidence digestはuser request recordまたはcanonical workflow authorization packetのexact bytesのSHA-256で、検証は最初のstaging・checkout・submodule update・root-view mutation・eval-log parkingより前に行う。
 - 自動sync commitは `AgentCanon Sync Automation <agent-canon-sync@automation.invalid>` をAuthor/Committerに固定し、`AgentCanon-*` formal trailersを付ける。
@@ -65,7 +65,7 @@ git diff --stat -- vendor/agent-canon .github/workflows .github/PULL_REQUEST_TEM
 | ----- | ------- | ------------------ |
 | `already_current_submodule` | parent gitlink、submodule worktree、shared canon main が一致 | root drift だけなら `link-root` / `check` へ進む |
 | `submodule_update` | shared canon main が進んでいる | AgentCanon update surface が repairable なら、親 repo の無関係な dirty state があっても `make agent-canon-ensure-latest` を実行し、parent pin commit を作る。unsafe な shared-canon 差分が同時にある場合は、先に AgentCanon branch / PR に出して merge 後に再実行する |
-| `diverged_submodule_history` | local submodule commit と remote main が分岐 | parent modeを停止し、topic workspace branch cloneへsourceを移してAgentCanon PRに出す |
+| `diverged_submodule_history` | local submodule commit と remote main が分岐 | state evidence として保持し、typed conflict / collision がなければ normal merge / review flow を続ける。requested topic が異なる場合だけ topic workspace branch cloneへsourceを移してAgentCanon PRに出す |
 | `already_current_tree` / `already_current_split` | legacy subtree 互換 mode で local tree と shared canon main が一致 | legacy appendix のみ。submodule repo では使わない |
 | `snapshot_import_*` / `subtree_pull` | legacy subtree 互換 mode の update route | maintainer が legacy cleanup として扱い、通常の submodule repo には持ち込まない |
 
@@ -85,7 +85,7 @@ accidental drift は
 ## Stage 2. AgentCanon Branch へ渡す
 
 shared-canon candidate がある場合は、派生 repo から直接 shared canon main を更新しません。
-まず `documents/rule/dependency-module-changes.md` に従って topic workspace branch cloneへsourceを移し、そこでGitHub PRを作ります。parentの vendor checkoutにmerge、stash、保存、再開する経路はありません。
+intended named vendor branch で collision-safe merge / review を行い、そこから GitHub PR を作ります。vendor checkout が別 topic/branch に占有されている場合のみ、`documents/rule/dependency-module-changes.md` に従って topic workspace branch clone へ移して PR を作ります。
 
 ```bash
 python3 tools/agent_tools/dependency_module_change.py --root . prepare \

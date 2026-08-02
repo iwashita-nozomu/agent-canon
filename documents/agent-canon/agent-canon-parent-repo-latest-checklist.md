@@ -105,16 +105,17 @@ binary just because the source commit has not changed yet.
 
 1. If only unrelated parent paths are dirty, keep those changes intact and still run the latest update. Record that the dirty paths were outside the AgentCanon update surface.
 
-1. If latest reports dirty AgentCanon checkout state, stop and select the typed
-   repair route. Prepare the topic workspace branch clone only when another
-   topic occupies the vendor checkout. Detached head, merge conflict,
-   `.gitmodules` change, parent gitlink conflict, or AgentCanon-owned root-view
-   overwrite risk is repaired only after the source/pin owner is selected; no
-   vendor state is restored as a source route.
+1. If latest reports dirty AgentCanon checkout state on the intended named
+   source branch, retain it as evidence and continue when its local materialized
+   paths do not collide with the exact update write set. Prepare the topic
+   workspace branch clone only when another topic occupies the vendor checkout.
+   Detached head, virtual or existing merge conflict, `.gitmodules` change,
+   parent gitlink conflict, or AgentCanon-owned root-view overwrite risk is
+   repaired only after the source/pin owner is selected.
 
-Parent `latest` first handles a clean named topic source owner through the
+Parent `latest` first handles the intended named topic source owner through the
 source PR merge route; its parent pin/root projection phase does not invoke
-`merge-main-into-current*`. A parent checkout on `main` stops at topic creation,
+`merge-main-into-current`. A parent checkout on `main` stops at topic creation,
 and standalone source mode retains its own source-branch merge route.
 
 1. After AgentCanon update or PR merge, restore root views from the manifest and verify drift.
@@ -355,7 +356,7 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 
 ## Failure Routes
 
-- unrelated parent dirty state: allowed for submodule updates when the AgentCanon update surface is clean.
+- unrelated parent dirty state: allowed for submodule updates; the AgentCanon source surface is checked by exact materialization paths.
 - `blocked_eval_transient_artifacts`: task entry found an exact tracked,
   untracked, or ignored
   `reports/agent-eval-runs/<run-id>/<producer>.stdout.txt` / `.stderr.txt`
@@ -367,10 +368,11 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 - stale parent gitlink: not latest, even when `vendor/agent-canon` worktree HEAD already equals AgentCanon remote main; commit the parent gitlink pin before treating the parent repo as latest.
 - local-ahead parent gitlink without pushed branch evidence: AgentCanon branch / PR required; do not treat `local_contains_remote` as latest.
 - clean parent gitlink pinned to a pushed non-main AgentCanon branch head: classify as `deferred_branch_pr`, continue local checks, and rerun `make agent-canon-ensure-latest` after the AgentCanon PR merges.
-- local checkout branch or dirty vendor source: use the clean named topic source
-  owner when available; prepare the managed topic-workspace source clone only
-  for another topic's dirty vendor occupancy. Otherwise use the typed repair /
-  rebuild route; standalone source mode has its own source-branch merge route.
+- local checkout branch or dirty vendor source: use the intended named topic
+  source owner and retain non-colliding local materialized paths. Prepare the
+  managed topic-workspace source clone only for another topic's vendor
+  occupancy. Existing or virtual merge conflict and unpreservable
+  materialization collision have separate typed repair routes.
 - `blocked_shared_canon_workflow`: do not hide shared-canon edits in a parent-only diff; commit the AgentCanon branch, merge main into it, and open an AgentCanon PR.
 - `skipped_source_canon`: running inside standalone AgentCanon; update parent repos after AgentCanon changes are committed.
 - `missing checklist`: restore or update `vendor/agent-canon/`, then rerun

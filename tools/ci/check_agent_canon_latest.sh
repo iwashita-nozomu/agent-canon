@@ -126,6 +126,18 @@ emit_submodule_worktree_evidence() {
   echo "AGENT_CANON_LATEST_SUBMODULE_REMOTE_URL=${remote_url:-unavailable}"
 }
 
+emit_current_checkout_materialization_block() {
+  local reason="$1"
+  echo "AGENT_CANON_LATEST=fail"
+  echo "AGENT_CANON_LATEST_REASON=$reason"
+  echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
+  echo "AGENT_CANON_LATEST_GATED_BY=exact_materialization_merge_conflict_or_collision_predicate"
+  emit_submodule_worktree_evidence
+  echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
+  echo "AGENT_CANON_LATEST_NEXT_ACTION=resolve_agentcanon_materialization_collision_or_merge_conflict_in_current_checkout_then_rerun_latest"
+  echo "AgentCanon update is blocked in the current checkout by the exact materialization conflict/collision predicate; no workspace clone or worktree cleanup route is selected." >&2
+}
+
 emit_submodule_pin_integrity_block() {
   local reason="$1"
   local route_value="$2"
@@ -226,6 +238,18 @@ case "$route" in
     if [[ "${prefix_mode:-}" == "submodule" ]] && [ "$submodule_parent_pin" != "$submodule_worktree_head" ]; then
       emit_submodule_pin_integrity_block "submodule-gitlink-worktree-mismatch" "${route:-unknown}"
     fi
+    if [[ "${prefix_mode:-}" == "submodule" ]]; then
+      case "$route" in
+        submodule_materialization_collision)
+          emit_current_checkout_materialization_block "submodule-materialization-collision"
+          exit 1
+          ;;
+        submodule_merge_conflict|unresolved_submodule_merge_conflict)
+          emit_current_checkout_materialization_block "submodule-merge-conflict"
+          exit 1
+          ;;
+      esac
+    fi
     if [[ "${prefix_mode:-}" == "submodule" && "${submodule_worktree_clean}" == "yes" ]]; then
       echo "AGENT_CANON_LATEST=pass"
       echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
@@ -251,10 +275,9 @@ case "$route" in
     echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
     emit_submodule_worktree_evidence
     if [[ "${dirty_update_surface:-${dirty_worktree:-}}" == "yes" && "${prefix_mode:-}" == "submodule" ]]; then
-      echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-      echo "AGENT_CANON_LATEST_NEXT_ACTION=commit_agentcanon_branch_then_open_agent-canon_PR_then_after_merge_run_make_agent-canon-ensure-latest_with_request_evidence"
-      echo "AGENT_CANON_LATEST_DEPENDENCY_ROUTE=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic <topic> --module ${PREFIX} --branch <source-branch> --owner-evidence <owner-evidence>"
-      echo "Route shared-canon local changes through a topic workspace branch and PR, then bring back only the clean pin with 'make agent-canon-ensure-latest'." >&2
+      echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/agent-canon-pr-workflow.md"
+      echo "AGENT_CANON_LATEST_NEXT_ACTION=resolve_or_commit_agentcanon_source_branch_then_rerun_latest_with_request_evidence"
+      echo "Route the exact AgentCanon update surface through its current source branch; a workspace clone is selected only for a vendor checkout occupied by a different active topic or branch." >&2
     elif [[ "${dirty_worktree:-}" == "yes" && "${prefix_mode:-}" == "submodule" ]]; then
       echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/agent-canon-pr-workflow.md"
       echo "AGENT_CANON_LATEST_NEXT_ACTION=run_make_agent-canon-ensure-latest_parent_dirty_outside_update_surface_ok_with_request_evidence"
@@ -262,7 +285,7 @@ case "$route" in
     else
       echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/agent-canon-pr-workflow.md"
       echo "AGENT_CANON_LATEST_NEXT_ACTION=run_make_agent-canon-ensure-latest_or_merge_agent-canon_PR_first_with_request_evidence"
-      echo "Set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and run 'make agent-canon-ensure-latest' after cleaning the worktree, or merge the shared-canon changes upstream first." >&2
+      echo "Set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and run 'make agent-canon-ensure-latest', or merge the shared-canon changes upstream first." >&2
     fi
     exit 1
     ;;
