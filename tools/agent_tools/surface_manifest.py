@@ -100,6 +100,7 @@ class SurfaceEntry:
     source: str
     local_override_allowed: bool
     optional: bool
+    sync_control: bool
 
     def source_or_default(self) -> str:
         """Return the source path relative to AgentCanon prefix."""
@@ -209,6 +210,7 @@ def entry_from_mapping(mapping: Mapping[str, object]) -> SurfaceEntry:
                 default_local_override(owner),
             ),
             optional=bool_value(mapping, "optional", False),
+            sync_control=bool_value(mapping, "sync_control", False),
         )
     )
 
@@ -236,6 +238,7 @@ def entries_from_group(mapping: Mapping[str, object]) -> tuple[SurfaceEntry, ...
                         default_local_override(owner),
                     ),
                     optional=bool_value(mapping, "optional", False),
+                    sync_control=bool_value(mapping, "sync_control", False),
                 )
             )
         )
@@ -363,6 +366,7 @@ def normalized_snapshot(manifest: SurfaceManifest) -> Mapping[str, object]:
                 "class": entry.surface_class,
                 "local_override_allowed": entry.local_override_allowed,
                 "optional": entry.optional,
+                "sync_control": entry.sync_control,
             }
             for entry in manifest.entries
         ],

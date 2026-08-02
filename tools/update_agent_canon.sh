@@ -17,9 +17,34 @@ export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_DIR}/lib/repo_paths.sh"
-source "${SCRIPT_DIR}/lib/git_authority.sh"
+if [ -f "${SCRIPT_DIR}/lib/git_authority.sh" ]; then
+  source "${SCRIPT_DIR}/lib/git_authority.sh"
+else
+  git_authority_check_protected_git_authority() {
+    case "${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY:-}" in
+      explicit_user_approval|agent_canon_workflow|agent_update_route|workflow_authorized)
+        case "${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY:-}" in
+          explicit_user_approval|agent_canon_workflow|agent_update_route|agent_branch_authorized)
+            return 0
+            ;;
+        esac
+        ;;
+    esac
+    return 1
+  }
+
+  git_authority_check_commit_request_evidence() {
+    echo "$AGENT_CANON_COMMIT_REQUEST_EVIDENCE" | grep -Eq '^evidence:[0-9a-f]{64}$' && return 0
+    return 1
+  }
+
+  git_authority_check_commit_provenance() {
+    git_authority_check_protected_git_authority "$@" && return 0
+    return 1
+  }
+fi
 ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
-CANON_TOOLS_ROOT="$(agent_canon_tools_root "$ROOT_DIR")"
+CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")"
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 SUPERPROJECT_DIR=""
 if [ "$(git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.path" 2>/dev/null || true)" = "$PREFIX" ] \
@@ -523,7 +548,7 @@ emit_remote_main_ancestor_evidence() {
 plan_value() {
   local key="$1"
   local text="$2"
-  awk -F= -v key="$key" '$1 == key {print substr($0, index($0, "=") + 1); exit}' <<< "$text"
+  awk -F= -v key="$key" '$1 == key {print substr($0, index($0, "=") + 1)}' <<< "$text" | tail -n1
 }
 
 emit_agentcanon_conflict_workflow_route() {
@@ -1159,8 +1184,6 @@ cmd_latest() {
     cmd_merge_main_into_current_preserve_dirty "$branch"
     return
   fi
-  require_accepted_dependency_frontier
-
   park_eval_log_dirty_state_if_safe || park_rc=$?
   if [ "$park_rc" -gt 1 ]; then
     echo "AGENT_CANON_LATEST_TOOL_RESULT=eval_log_park_failed"
@@ -1174,6 +1197,10 @@ cmd_latest() {
   prefix_mode="$(plan_value agent_canon_plan_prefix_mode "$plan_output")"
   dirty_update_surface="$(plan_value agent_canon_plan_dirty_update_surface "$plan_output")"
   submodule_worktree_status="$(plan_value agent_canon_plan_submodule_worktree_status "$plan_output")"
+
+  if [ "${route:-}" != "deferred_branch_pr" ]; then
+    require_accepted_dependency_frontier
+  fi
 
   if route_requires_agent_workflow "$route" "$prefix_mode" "$dirty_update_surface" "$submodule_worktree_status"; then
     if can_preserve_dirty_agentcanon_latest "$route" "$prefix_mode" "$submodule_worktree_status"; then

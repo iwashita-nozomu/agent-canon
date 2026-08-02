@@ -75,6 +75,29 @@ these fields:
 separate long hard-coded list of root paths. If the manifest and this document
 disagree, update the manifest first and then adjust this reader-facing policy.
 
+### sync_control と full-sync trigger の責務
+
+`shared-runtime-surfaces.toml` の `sync_control=true` は、共有 Runtime を
+更新する `tools/sync_agent_canon.sh` の対象領域（`sync` 系スクリプトや checker の
+実行結果を含む）を明示します。これは次の3条件を満たすときのみ
+`full sync` 系の判定が成立することを意味します。
+
+1. リフレッシュ対象の materialized copy / root link topology / sync 実装・manifest
+   自体のパスが変更されたとき。
+2. 変更したパスの実体が同一であることが、`check` コマンドで再現可能であること。
+3. ノード（対象パス）ごとに remote / pin / manifest の参照整合が
+   `toolchain` の受け口（`tool` 層）で確認できること。
+
+`check_agent_canon_latest` はこの所有者契約に従って、
+`update` action と link-root の main 追従を結果として扱います。
+pin の可到達性と `gitlink == submodule worktree HEAD` は read-only 必須条件であり、
+`fail` を返す唯一の理由です。`dirty`（未追跡含む）自体は
+`AGENT_CANON_LATEST_SUBMODULE_WORKTREE_CLEAN=no` になりますが、read-only では
+`pass` 扱いを維持し、`AGENT_CANON_LATEST_NEXT_ACTION` で更新時の保全方針を示します。
+`deferred` は本契約上は「mainとの差分の更新待ち」だけで、到達不能や不一致を
+更新未実施のまま通過させる経路には使いません。materialization 上書き更新を行う
+場合のみブロックとし、通常 CI/PR の判定からは切り離して扱います。
+
 ## AgentCanon-Owned Symlink Views
 
 AgentCanon-owned runtime and policy paths are symlink views in the template root.

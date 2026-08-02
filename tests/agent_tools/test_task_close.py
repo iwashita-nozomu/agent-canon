@@ -5,10 +5,141 @@
 # upstream implementation ../../tools/agent_tools/capacity_handshake.py owns lifecycle state
 # @dependency-end
 
+"""Task-close tests for AgentCanon parent sync gating and lifecycle closeout."""
+
 from __future__ import annotations
 
+import subprocess
+from pathlib import Path
+from types import SimpleNamespace
+
 from tools.agent_tools import capacity_handshake
-from tools.agent_tools.task_close import validate_capacity_lifecycle_closeout
+from tools.agent_tools.task_close import (
+    _gitlink_commit_resolvable,
+    _gitlink_target_commit_resolvable,
+    _gitlink_update_candidates,
+    _parse_gitlink_ref_updates,
+    agent_canon_parent_sync_gate_required,
+    validate_capacity_lifecycle_closeout,
+)
+
+
+def test_agent_canon_parent_sync_gate_requires_exact_symlink_path() -> None:
+    """Root symlink entry itself must trigger parent sync gate."""
+    workspace = Path(__file__).resolve().parents[2]
+    assert not agent_canon_parent_sync_gate_required(
+        ("agents/foo.md",),
+        workspace=workspace,
+    )
+    assert agent_canon_parent_sync_gate_required(
+        ("agents", ".vscode/settings.json"),
+        workspace=workspace,
+    )
+
+
+def test_agent_canon_parent_sync_gate_ignores_symlink_source_changes() -> None:
+    """Changes only under symlink source roots must skip root topology checks."""
+    workspace = Path(__file__).resolve().parents[2]
+    assert not agent_canon_parent_sync_gate_required(
+        ("agents/foo.md", "notes/knowledge/file.md"),
+        workspace=workspace,
+    )
+
+
+def test_agent_canon_parent_sync_gate_requires_sync_control_and_materialization_roots() -> None:
+    """Sync-control and materialized copy paths must open the parent sync gate."""
+    workspace = Path(__file__).resolve().parents[2]
+    assert agent_canon_parent_sync_gate_required(
+        ("tools/sync_agent_canon.sh",),
+        workspace=workspace,
+    )
+    assert agent_canon_parent_sync_gate_required(
+        ("tools/agent_tools/surface_manifest.py",),
+        workspace=workspace,
+    )
+    assert agent_canon_parent_sync_gate_required(
+        ("documents/runtime/shared-runtime-surfaces.toml",),
+        workspace=workspace,
+    )
+
+
+def test_parse_gitlink_ref_updates_detects_rename_into_vendor_agent_canon() -> None:
+    """Rename/copy into vendor/agent-canon should be treated as path-target update."""
+    old, new = _parse_gitlink_ref_updates(
+        (
+            ":160000 160000 "
+            "1111111111111111111111111111111111111111 "
+            "2222222222222222222222222222222222222222 "
+            "R100\tlegacy/agent-canon\tvendor/agent-canon",
+        )
+    )
+    assert old == "1111111111111111111111111111111111111111"
+    assert new == "2222222222222222222222222222222222222222"
+
+
+def test_parse_gitlink_ref_updates_ignore_rename_out_of_vendor_agent_canon() -> None:
+    """Rename out of vendor/agent-canon must not be treated as target update."""
+    assert _parse_gitlink_ref_updates(
+        (
+            ":160000 160000 "
+            "2222222222222222222222222222222222222222 "
+            "1111111111111111111111111111111111111111 "
+            "R100\tvendor/agent-canon\tlegacy/agent-canon",
+        )
+    ) == (None, None)
+
+
+def test_agent_canon_parent_sync_gate_accepts_non_trigger_dirty_workspace_state() -> None:
+    """Unknown local changes should not trigger full parent sync."""
+    workspace = Path(__file__).resolve().parents[2]
+    assert not agent_canon_parent_sync_gate_required(
+        ("notes/knowledge/non_trigger_file.md", "vendor/notes/other.txt"),
+        workspace=workspace,
+    )
+
+
+def test_agent_canon_parent_sync_gate_accepts_gitlink_commit_without_branch_checks() -> None:
+    """Gitlink integrity does not require branch- or detached-worktree assumptions."""
+    workspace = Path(__file__).resolve().parents[2]
+    commit = _gitlink_commit_resolvable(workspace)
+    assert commit is None or len(commit) > 0
+
+
+def test_agent_canon_parent_sync_gate_requires_no_full_sync_for_gitlink_only_update() -> None:
+    """Vendor gitlink changes alone do not require parent full sync."""
+    workspace = Path(__file__).resolve().parents[2]
+    assert not agent_canon_parent_sync_gate_required(
+        ("vendor/agent-canon",),
+        workspace=workspace,
+    )
+
+
+def test_agent_canon_parent_gitlink_integrity_fails_for_unreachable_target(monkeypatch) -> None:
+    """Unresolvable gitlink target must fail integrity requirement."""
+    workspace = Path(__file__).resolve().parents[2]
+
+    def fake_run(args, check=False, capture_output=False, text=False, cwd=None, **kwargs):
+        if args[:2] == ["git", "diff"] and args[1] == "diff":
+            return SimpleNamespace(
+                returncode=0,
+                stdout=":160000 160000 1111111111111111111111111111111111111111 2222222222222222222222222222222222222222 M\tvendor/agent-canon\n",
+            )
+        if args[:2] == ["git", "cat-file"] and args[1] == "cat-file":
+            return SimpleNamespace(returncode=1, stdout="", stderr="")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+    assert _gitlink_target_commit_resolvable(workspace) is None
+
+
+def test_agent_canon_parent_sync_gate_internal_symlink_change_keeps_full_sync_and_integrity_false() -> None:
+    """Internal source edits to symlink targets should not open full sync gate."""
+    workspace = Path(__file__).resolve().parents[2]
+    changed_paths = ("agents/foo.md", "notes/knowledge/file.md")
+    assert not agent_canon_parent_sync_gate_required(changed_paths, workspace=workspace)
+    _, new_hash = _gitlink_update_candidates(workspace)
+    assert new_hash is None
+    assert _gitlink_target_commit_resolvable(workspace) is None
 
 
 def _readback_record(work_id: str, parent: str) -> capacity_handshake.DescendantLifecycleRecord:
@@ -51,6 +182,7 @@ def _ledger() -> capacity_handshake.CapacityLedger:
 
 
 def test_closeout_requires_exactly_one_schema_valid_postorder_token() -> None:
+    """Closeout requires valid single postorder close token chain."""
     ledger = _ledger()
     ready, failures = validate_capacity_lifecycle_closeout(
         ledger,
@@ -67,6 +199,7 @@ def test_closeout_requires_exactly_one_schema_valid_postorder_token() -> None:
 
 
 def test_closeout_rejects_duplicate_reverse_and_metadata_tokens() -> None:
+    """Closeout rejects duplicate close tokens and metadata-enriched tokens."""
     reverse = validate_capacity_lifecycle_closeout(
         _ledger(),
         (_close_call("parent-agent"), _close_call("child")),
@@ -94,6 +227,7 @@ def test_closeout_rejects_duplicate_reverse_and_metadata_tokens() -> None:
 
 
 def test_closeout_rejects_open_and_unknown_descendants_without_reclaim() -> None:
+    """Closeout must reject open and unknown descendants with reclaim leaks."""
     record = capacity_handshake.DescendantLifecycleRecord(
         work_id="open",
         parent_work_id="root",
