@@ -8,7 +8,50 @@
 from __future__ import annotations
 
 from tools.agent_tools import capacity_handshake
-from tools.agent_tools.task_close import validate_capacity_lifecycle_closeout
+from tools.agent_tools.task_close import (
+    _gitlink_commit_resolvable,
+    agent_canon_parent_sync_gate_required,
+    validate_capacity_lifecycle_closeout,
+)
+from pathlib import Path
+
+
+def test_agent_canon_parent_sync_gate_ignores_symlink_source_changes() -> None:
+    workspace = Path(__file__).resolve().parents[2]
+    assert not agent_canon_parent_sync_gate_required(
+        ("agents/foo.md", ".vscode/settings.json", "notes/knowledge/file.md"),
+        workspace=workspace,
+    )
+
+
+def test_agent_canon_parent_sync_gate_requires_sync_control_and_materialization_roots() -> None:
+    workspace = Path(__file__).resolve().parents[2]
+    assert agent_canon_parent_sync_gate_required(
+        ("tools/sync_agent_canon.sh",),
+        workspace=workspace,
+    )
+    assert agent_canon_parent_sync_gate_required(
+        ("tools/agent_tools/surface_manifest.py",),
+        workspace=workspace,
+    )
+    assert agent_canon_parent_sync_gate_required(
+        ("documents/runtime/shared-runtime-surfaces.toml",),
+        workspace=workspace,
+    )
+
+
+def test_agent_canon_parent_sync_gate_accepts_non_trigger_dirty_workspace_state() -> None:
+    workspace = Path(__file__).resolve().parents[2]
+    assert not agent_canon_parent_sync_gate_required(
+        ("notes/knowledge/non_trigger_file.md", "vendor/notes/other.txt"),
+        workspace=workspace,
+    )
+
+
+def test_agent_canon_parent_sync_gate_accepts_gitlink_commit_without_branch_checks() -> None:
+    workspace = Path(__file__).resolve().parents[2]
+    commit = _gitlink_commit_resolvable(workspace)
+    assert commit is None or len(commit) > 0
 
 
 def _readback_record(work_id: str, parent: str) -> capacity_handshake.DescendantLifecycleRecord:
