@@ -465,13 +465,12 @@ def test_load_pack_reads_optional_platform_when_present_or_omitted(
 
 
 def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> None:
-    """Parent generation uses pack shell, read-only sources, and mapped HOME tmpfs."""
+    """Fresh parent generation creates output state and projects its zsh contract."""
     repo = write_parent_generator_fixture(
         tmp_path,
         environment_script='export PROJECT_REGION="tokyo"\n',
         environment_variables=("PROJECT_REGION",),
     )
-    (repo / ".agent-canon").mkdir()
     home = tmp_path / "home"
     write_host_zshrc(home)
 
