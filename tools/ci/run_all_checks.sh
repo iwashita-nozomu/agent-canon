@@ -2,6 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Runs all checks CI automation.
+# upstream design ../../documents/design/dependency-manifest-design.md scoped parent graph receipt contract
+# upstream implementation ./check_agent_canon_pr.sh writes owner/root/PID/status-bound parent graph receipts
 # upstream implementation ../agent_tools/check_dependency_headers.py validates changed-file dependency manifests
 # upstream implementation ../agent_tools/scan_dependency_headers.sh scans changed-file manifest coverage
 # upstream implementation ../agent_tools/check_dependency_header_format.sh validates changed-file manifest syntax
@@ -169,8 +171,12 @@ validate_pr_gate_receipt() {
   graph_status="$(awk -F= '$1 == "graph" {print $2}' "${PR_GATE_RECEIPT}")"
   selector_reason="$(awk -F= '$1 == "selector_reason" {sub(/^[^=]*=/, ""); print}' "${PR_GATE_RECEIPT}")"
   selector_evidence="$(awk -F= '$1 == "selector_evidence" {sub(/^[^=]*=/, ""); print}' "${PR_GATE_RECEIPT}")"
-  if [[ "${strict_dependency_status}" != "prepared" && "${strict_dependency_status}" != "skipped" ]] \
-    || [[ "${graph_status}" != "prepared" && "${graph_status}" != "skipped" ]] \
+  if [[ "${strict_dependency_status}" != "prepared" \
+    && "${strict_dependency_status}" != "scoped" \
+    && "${strict_dependency_status}" != "skipped" ]] \
+    || [[ "${graph_status}" != "prepared" \
+      && "${graph_status}" != "scoped" \
+      && "${graph_status}" != "skipped" ]] \
     || [[ "${strict_dependency_status}" != "${graph_status}" ]]; then
     echo "Invalid PR gate receipt: dependency graph status mismatch" >&2
     return 1
@@ -320,6 +326,8 @@ if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
   if [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "prepared" ]]; then
     echo "✅ canonical graph build consumed from validated PR gate receipt"
     CANON_GRAPH_READY=1
+  elif [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "scoped" ]]; then
+    echo "✅ changed-responsibility graph gate consumed; unrelated baseline incompleteness remains reported"
   else
     echo "⏭️ canonical graph build skipped: parent PR graph completeness not required"
   fi
@@ -338,6 +346,9 @@ fi
 if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ] \
   && [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "prepared" ]]; then
   echo "DEPENDENCY_HEADER_CHECKS=skip reason=validated_strict_pr_gate_receipt"
+elif [ "$PR_GATE_RECEIPT_VALID" -eq 1 ] \
+  && [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "scoped" ]]; then
+  echo "DEPENDENCY_HEADER_CHECKS=skip reason=validated_changed_responsibility_graph_receipt"
 elif [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
   echo "DEPENDENCY_HEADER_CHECKS=skip reason=parent_pr_graph_completeness_not_required"
 elif [ "$CANON_GRAPH_READY" -eq 1 ]; then
@@ -442,6 +453,9 @@ if [ "$CANON_GRAPH_READY" -eq 1 ]; then
 elif [ "$PR_GATE_RECEIPT_VALID" -eq 1 ] \
   && [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "skipped" ]]; then
   echo "⏭️ tool/convention drift checks skipped: parent PR graph completeness not required"
+elif [ "$PR_GATE_RECEIPT_VALID" -eq 1 ] \
+  && [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "scoped" ]]; then
+  echo "⏭️ tool/convention drift checks skipped: graph is incomplete outside changed responsibility"
 else
   echo "⏭️ tool/convention drift checks skipped: canonical graph build failed"
 fi

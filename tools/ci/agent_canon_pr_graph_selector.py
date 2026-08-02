@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Selects parent PR strict dependency graph gating from canonical profiles, dependency surfaces, and a validated PR diff base.
+# responsibility Selects and evaluates parent PR graph gating from canonical owners, a validated diff base, and persisted graph reachability.
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json canonical validation profile owner
 # upstream design ../../documents/design/dependency-manifest-design.md canonical dependency surface owner and parent gate contract
 # downstream implementation ./check_agent_canon_pr.sh consumes the typed selector verdict
 # downstream implementation ../../tests/tools/test_agent_canon_pr_graph_selector.py verifies required, skipped, and fail-closed selections
 # @dependency-end
-"""Select whether a parent AgentCanon PR requires strict graph completeness."""
+"""Select and evaluate parent AgentCanon PR dependency graph acceptance."""
 
 from __future__ import annotations
 
@@ -16,12 +16,16 @@ import base64
 import hashlib
 import json
 import os
+import posixpath
 import re
+import sqlite3
+import stat
 import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
+from urllib.parse import quote
 
 PROFILE_INVENTORY = Path("documents/runtime/runtime-profiles-and-check-matrix.json")
 DEPENDENCY_SURFACE_OWNER = Path("documents/design/dependency-manifest-design.md")
@@ -83,6 +87,16 @@ class PreparedBase:
     fetched: bool
 
 
+@dataclass(frozen=True)
+class GraphAcceptance:
+    """Changed-responsibility acceptance for one incomplete parent graph."""
+
+    status: str
+    reason: str
+    evidence: str
+    report: Mapping[str, object]
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Create the selector CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -101,6 +115,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--trusted-base-sha",
         help="Trusted base SHA prepared by the GitHub PR entrypoint.",
     )
+    parser.add_argument(
+        "--evaluate-built-graph",
+        action="store_true",
+        help="Classify an incomplete built graph against the validated PR diff.",
+    )
+    parser.add_argument(
+        "--graph-result",
+        help="JSON result emitted by the incomplete graph build.",
+    )
+    parser.add_argument(
+        "--report-out",
+        help="Write changed-responsibility and baseline diagnostics as JSON.",
+    )
     return parser
 
 
@@ -118,6 +145,13 @@ def emit_base(status: str, reason: str, evidence: str, base_sha: str = "") -> No
     print(f"AGENT_CANON_PR_BASE_FETCH_EVIDENCE={evidence}")
     if base_sha:
         print(f"AGENT_CANON_PR_TRUSTED_BASE_SHA={base_sha}")
+
+
+def emit_acceptance(status: str, reason: str, evidence: str) -> None:
+    """Emit one line-safe changed-responsibility graph verdict."""
+    print(f"AGENT_CANON_PR_GRAPH_ACCEPTANCE={status}")
+    print(f"AGENT_CANON_PR_GRAPH_ACCEPTANCE_REASON={reason}")
+    print(f"AGENT_CANON_PR_GRAPH_ACCEPTANCE_EVIDENCE={evidence}")
 
 
 def run_git(
@@ -546,6 +580,282 @@ def changed_paths_digest(paths: Sequence[str]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
+def path_is_changed(path: str, changed_paths: Sequence[str]) -> bool:
+    """Return whether an exact changed path owns the graph path."""
+    return any(
+        path == changed or path.startswith(f"{changed.rstrip('/')}/")
+        for changed in changed_paths
+    )
+
+
+def diagnostic_source_path(
+    target_node_id: str,
+    message: str,
+    node_paths: Mapping[str, str],
+) -> str:
+    """Resolve the declaring source path for one persisted graph diagnostic."""
+    if target_node_id in node_paths:
+        return node_paths[target_node_id]
+    return message.partition(":")[0]
+
+
+def diagnostic_target_path(source_path: str, code: str, message: str) -> str:
+    """Resolve a target diagnostic's declared path without touching the filesystem."""
+    if not code.startswith("target-"):
+        return ""
+    fields = message.split(":", 2)
+    if len(fields) != 3 or not source_path or fields[0] != source_path:
+        return ""
+    declared = fields[2]
+    if declared.startswith("/"):
+        return ""
+    normalized = posixpath.normpath(
+        posixpath.join(posixpath.dirname(source_path), declared)
+    )
+    if normalized == ".." or normalized.startswith("../"):
+        return ""
+    return normalized
+
+
+def graph_database_path(root: Path, graph_result_path: Path) -> Path:
+    """Validate the graph result and return its canonical persisted database."""
+    try:
+        payload: object = json.loads(graph_result_path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        raise SelectorFailure(
+            "graph_build_result_invalid",
+            f"path={graph_result_path}",
+        ) from None
+    if not isinstance(payload, dict):
+        raise SelectorFailure("graph_build_result_invalid", "detail=not_object")
+    result = cast(dict[str, object], payload)
+    if (
+        result.get("schema") != "agent-canon.graph.build.v1"
+        or result.get("status") != "incomplete"
+        or result.get("exit_code") != 1
+    ):
+        raise SelectorFailure(
+            "graph_build_result_invalid",
+            "detail=expected_incomplete_build",
+        )
+    expected = root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
+    raw_db_path = result.get("db_path")
+    if not isinstance(raw_db_path, str) or not raw_db_path:
+        raise SelectorFailure("graph_build_result_invalid", "detail=db_path_missing")
+    candidate = Path(raw_db_path)
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    try:
+        candidate_stat = candidate.lstat()
+        resolved = candidate.resolve(strict=True)
+        expected_resolved = expected.resolve(strict=True)
+    except OSError:
+        raise SelectorFailure(
+            "graph_database_unavailable",
+            f"path={expected}",
+        ) from None
+    if (
+        resolved != expected_resolved
+        or stat.S_ISLNK(candidate_stat.st_mode)
+        or not stat.S_ISREG(candidate_stat.st_mode)
+    ):
+        raise SelectorFailure(
+            "graph_database_identity_invalid",
+            f"path={candidate}",
+        )
+    return resolved
+
+
+def read_graph_acceptance_facts(
+    database: Path,
+) -> tuple[dict[str, str], dict[str, set[str]], list[dict[str, str]]]:
+    """Read path, reachability, and diagnostic facts from one immutable graph."""
+    uri = f"file:{quote(database.as_posix(), safe='/')}?mode=ro&immutable=1"
+    connection: sqlite3.Connection | None = None
+    try:
+        connection = sqlite3.connect(uri, uri=True)
+        node_paths: dict[str, str] = {}
+        node_rows = cast(
+            list[tuple[str, str]],
+            connection.execute(
+                "SELECT id, payload_json FROM nodes WHERE layer='source'"
+            ).fetchall(),
+        )
+        for node_id, payload_json in node_rows:
+            raw_payload: object = json.loads(payload_json)
+            if not isinstance(raw_payload, dict):
+                continue
+            payload = cast(dict[str, object], raw_payload)
+            path = payload.get("path")
+            if isinstance(path, str):
+                node_paths[node_id] = path
+        adjacency: dict[str, set[str]] = {node_id: set() for node_id in node_paths}
+        edge_rows = cast(
+            list[tuple[str, str]],
+            connection.execute(
+                "SELECT from_node_id, to_node_id FROM edges WHERE layer='source'"
+            ).fetchall(),
+        )
+        for from_node, to_node in edge_rows:
+            if from_node in adjacency and to_node in adjacency:
+                adjacency[from_node].add(to_node)
+                adjacency[to_node].add(from_node)
+        diagnostics: list[dict[str, str]] = []
+        diagnostic_rows = cast(
+            list[tuple[str, str, str]],
+            connection.execute(
+                "SELECT rule, message, target_node_id FROM diagnostics WHERE layer='source'"
+            ).fetchall(),
+        )
+        for rule, message, target_node_id in diagnostic_rows:
+            source_path = diagnostic_source_path(
+                target_node_id,
+                message,
+                node_paths,
+            )
+            diagnostics.append(
+                {
+                    "code": rule,
+                    "message": message,
+                    "source_path": source_path,
+                    "target_path": diagnostic_target_path(
+                        source_path,
+                        rule,
+                        message,
+                    ),
+                }
+            )
+    except (json.JSONDecodeError, sqlite3.Error):
+        raise SelectorFailure(
+            "graph_database_invalid",
+            f"path={database}",
+        ) from None
+    finally:
+        if connection is not None:
+            connection.close()
+    return node_paths, adjacency, diagnostics
+
+
+def graph_reachable_paths(
+    node_paths: Mapping[str, str],
+    adjacency: Mapping[str, set[str]],
+    changed_paths: Sequence[str],
+    full_scope: bool,
+) -> frozenset[str]:
+    """Return the dependency/surface closure owned by the changed responsibility."""
+    if full_scope:
+        return frozenset(node_paths.values())
+    pending = [
+        node_id
+        for node_id, path in node_paths.items()
+        if path_is_changed(path, changed_paths)
+    ]
+    visited = set(pending)
+    while pending:
+        node_id = pending.pop()
+        for adjacent in adjacency.get(node_id, set()):
+            if adjacent not in visited:
+                visited.add(adjacent)
+                pending.append(adjacent)
+    return frozenset(node_paths[node_id] for node_id in visited)
+
+
+def base_source_is_unchanged(
+    root: Path,
+    diff: DiffEvidence,
+    source_path: str,
+) -> bool:
+    """Confirm that a non-reachable diagnostic source is represented by the base."""
+    if not source_path or path_is_changed(source_path, diff.changed_paths):
+        return False
+    direct = run_git(
+        root,
+        ["cat-file", "-e", f"{diff.base_sha}:{source_path}"],
+    )
+    if direct.returncode == 0:
+        return True
+    parts = source_path.split("/")
+    for index in range(1, len(parts)):
+        ancestor = "/".join(parts[:index])
+        base_tree = run_git(root, ["ls-tree", diff.base_sha, "--", ancestor])
+        head_tree = run_git(root, ["ls-tree", diff.head_sha, "--", ancestor])
+        if (
+            base_tree.returncode == 0
+            and base_tree.stdout.startswith("160000 ")
+            and base_tree.stdout == head_tree.stdout
+        ):
+            return True
+    return False
+
+
+def evaluate_built_graph(
+    root: Path,
+    graph_result_path: Path,
+    environment: Mapping[str, str],
+    trusted_base_sha: str | None = None,
+) -> GraphAcceptance:
+    """Gate only diagnostics reached from the exact changed responsibility."""
+    diff = load_diff(root, environment, trusted_base_sha)
+    database = graph_database_path(root, graph_result_path)
+    node_paths, adjacency, diagnostics = read_graph_acceptance_facts(database)
+    full_scope = migration_requested(environment)
+    reachable_paths = graph_reachable_paths(
+        node_paths,
+        adjacency,
+        diff.changed_paths,
+        full_scope,
+    )
+    blocking: list[dict[str, str]] = []
+    baseline: list[dict[str, str]] = []
+    for diagnostic in diagnostics:
+        source_path = diagnostic["source_path"]
+        target_path = diagnostic["target_path"]
+        if (
+            full_scope
+            or source_path in reachable_paths
+            or path_is_changed(source_path, diff.changed_paths)
+            or (target_path and path_is_changed(target_path, diff.changed_paths))
+        ):
+            blocking.append({**diagnostic, "classification": "changed_responsibility"})
+            continue
+        if not base_source_is_unchanged(root, diff, source_path):
+            blocking.append({**diagnostic, "classification": "base_identity_unconfirmed"})
+            continue
+        baseline.append({**diagnostic, "classification": "unchanged_base_source"})
+    report: dict[str, object] = {
+        "schema": "agent-canon.pr-graph-acceptance.v1",
+        "base_sha": diff.base_sha,
+        "head_sha": diff.head_sha,
+        "changed_paths": list(diff.changed_paths),
+        "changed_paths_sha256": changed_paths_digest(diff.changed_paths),
+        "full_scope": full_scope,
+        "reachable_paths": sorted(reachable_paths),
+        "blocking_diagnostics": blocking,
+        "baseline_diagnostics": baseline,
+    }
+    report_digest = hashlib.sha256(
+        json.dumps(report, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    evidence = (
+        f"base={diff.base_sha};changed_paths_sha256={changed_paths_digest(diff.changed_paths)};"
+        f"reachable={len(reachable_paths)};blocking={len(blocking)};"
+        f"baseline_reported={len(baseline)};report_sha256={report_digest}"
+    )
+    if blocking:
+        return GraphAcceptance(
+            "fail",
+            "changed_responsibility_graph_incomplete",
+            evidence,
+            report,
+        )
+    return GraphAcceptance(
+        "pass",
+        "unrelated_baseline_incompleteness_reported",
+        evidence,
+        report,
+    )
+
+
 def select(
     root: Path,
     source_root: Path,
@@ -594,6 +904,42 @@ def select(
 def main() -> int:
     """Run the selector and emit a typed result."""
     args = build_parser().parse_args()
+    if args.evaluate_built_graph:
+        if not args.graph_result or not args.report_out:
+            emit_acceptance(
+                "fail",
+                "graph_acceptance_arguments_missing",
+                "required=graph_result,report_out",
+            )
+            return EXIT_FAILURE
+        try:
+            acceptance = evaluate_built_graph(
+                Path(args.root).resolve(),
+                Path(args.graph_result).resolve(),
+                os.environ,
+                args.trusted_base_sha,
+            )
+            report_out = Path(args.report_out)
+            report_out.parent.mkdir(parents=True, exist_ok=True)
+            report_out.write_text(
+                json.dumps(acceptance.report, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
+        except (OSError, SelectorFailure) as error:
+            if isinstance(error, SelectorFailure):
+                reason = error.reason
+                evidence = error.evidence
+            else:
+                reason = "graph_acceptance_report_write_failed"
+                evidence = f"error={type(error).__name__}"
+            emit_acceptance("fail", reason, evidence)
+            return EXIT_FAILURE
+        emit_acceptance(
+            acceptance.status,
+            acceptance.reason,
+            acceptance.evidence,
+        )
+        return EXIT_REQUIRED if acceptance.status == "pass" else EXIT_FAILURE
     if args.prepare_ci_base:
         try:
             prepared = prepare_ci_base(Path(args.root).resolve(), os.environ)
