@@ -38,7 +38,9 @@ MANIFEST_CHANGE_RE = re.compile(
     re.MULTILINE,
 )
 HEX_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+HEX_FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
 FULL_HISTORY_DEEPEN = "2147483647"
+GRAPH_PROFILE = "default"
 
 
 class SelectorFailure(RuntimeError):
@@ -95,6 +97,47 @@ class GraphAcceptance:
     reason: str
     evidence: str
     report: Mapping[str, object]
+
+
+@dataclass(frozen=True)
+class FileIdentity:
+    """Stable filesystem identity used to reject concurrent replacement."""
+
+    device: int
+    inode: int
+    mode: int
+    size: int
+    modified_ns: int
+    changed_ns: int
+
+
+@dataclass(frozen=True)
+class GraphBuildIdentity:
+    """One command result bound to its canonical persisted graph identity."""
+
+    result_path: Path
+    result_file_identity: FileIdentity
+    database: Path
+    database_file_identity: FileIdentity
+    root: str
+    profile: str
+    snapshot_head: str
+    input_fingerprint: str
+    graph_fingerprint: str
+    publication: str
+    integration_record: Mapping[str, object]
+
+    def report(self) -> dict[str, str]:
+        """Return the identity fields preserved in the scoped receipt."""
+        return {
+            "root": self.root,
+            "profile": self.profile,
+            "snapshot_head": self.snapshot_head,
+            "input_fingerprint": self.input_fingerprint,
+            "graph_fingerprint": self.graph_fingerprint,
+            "publication": self.publication,
+            "db_path": str(self.database),
+        }
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -617,8 +660,76 @@ def diagnostic_target_path(source_path: str, code: str, message: str) -> str:
     return normalized
 
 
-def graph_database_path(root: Path, graph_result_path: Path) -> Path:
-    """Validate the graph result and return its canonical persisted database."""
+def regular_file_identity(
+    path: Path,
+    unavailable_reason: str,
+    invalid_reason: str,
+) -> FileIdentity:
+    """Read one non-symlink regular-file identity or fail closed."""
+    try:
+        metadata = path.lstat()
+    except OSError:
+        raise SelectorFailure(unavailable_reason, f"path={path}") from None
+    if stat.S_ISLNK(metadata.st_mode) or not stat.S_ISREG(metadata.st_mode):
+        raise SelectorFailure(invalid_reason, f"path={path}")
+    return FileIdentity(
+        metadata.st_dev,
+        metadata.st_ino,
+        metadata.st_mode,
+        metadata.st_size,
+        metadata.st_mtime_ns,
+        metadata.st_ctime_ns,
+    )
+
+
+def assert_file_identity(path: Path, expected: FileIdentity, artifact: str) -> None:
+    """Reject removal, mutation, or replacement after identity capture."""
+    try:
+        current = regular_file_identity(
+            path,
+            "graph_identity_replaced",
+            "graph_identity_replaced",
+        )
+    except SelectorFailure:
+        raise SelectorFailure(
+            "graph_identity_replaced",
+            f"artifact={artifact};path={path}",
+        ) from None
+    if current != expected:
+        raise SelectorFailure(
+            "graph_identity_replaced",
+            f"artifact={artifact};path={path}",
+        )
+
+
+def required_identity_string(
+    payload: Mapping[str, object],
+    field: str,
+    owner: str,
+    pattern: re.Pattern[str] | None = None,
+) -> str:
+    """Read one required canonical identity scalar."""
+    value = payload.get(field)
+    if not isinstance(value, str) or not value:
+        raise SelectorFailure(
+            "graph_identity_missing",
+            f"owner={owner};field={field}",
+        )
+    if pattern is not None and not pattern.fullmatch(value):
+        raise SelectorFailure(
+            "graph_identity_invalid",
+            f"owner={owner};field={field}",
+        )
+    return value
+
+
+def graph_build_identity(root: Path, graph_result_path: Path) -> GraphBuildIdentity:
+    """Validate one build result and capture its canonical database identity."""
+    result_file_identity = regular_file_identity(
+        graph_result_path,
+        "graph_build_result_unavailable",
+        "graph_build_result_invalid",
+    )
     try:
         payload: object = json.loads(graph_result_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -626,55 +737,191 @@ def graph_database_path(root: Path, graph_result_path: Path) -> Path:
             "graph_build_result_invalid",
             f"path={graph_result_path}",
         ) from None
+    assert_file_identity(graph_result_path, result_file_identity, "graph_build_result")
     if not isinstance(payload, dict):
         raise SelectorFailure("graph_build_result_invalid", "detail=not_object")
     result = cast(dict[str, object], payload)
     if (
         result.get("schema") != "agent-canon.graph.build.v1"
+        or result.get("command") != "build"
         or result.get("status") != "incomplete"
+        or result.get("graph_status") != "incomplete"
         or result.get("exit_code") != 1
     ):
         raise SelectorFailure(
             "graph_build_result_invalid",
             "detail=expected_incomplete_build",
         )
-    expected = root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
-    raw_db_path = result.get("db_path")
-    if not isinstance(raw_db_path, str) or not raw_db_path:
-        raise SelectorFailure("graph_build_result_invalid", "detail=db_path_missing")
-    candidate = Path(raw_db_path)
-    if not candidate.is_absolute():
-        candidate = root / candidate
+    raw_integration = result.get("integration_record")
+    if not isinstance(raw_integration, dict):
+        raise SelectorFailure(
+            "graph_identity_missing",
+            "owner=graph_build_result;field=integration_record",
+        )
+    integration = cast(dict[str, object], raw_integration)
+    if (
+        integration.get("schema") != "agent-canon.graph.integration.v1"
+        or integration.get("source_snapshot_profile") != "parent"
+        or integration.get("verified") is not True
+    ):
+        raise SelectorFailure(
+            "graph_identity_invalid",
+            "owner=integration_record;field=schema,source_snapshot_profile,verified",
+        )
+
+    canonical_root = root.resolve(strict=True)
+    expected_database = canonical_root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
+    result_root = required_identity_string(result, "root", "graph_build_result")
+    record_root = required_identity_string(integration, "root", "integration_record")
+    result_profile = required_identity_string(result, "profile", "graph_build_result")
+    record_profile = required_identity_string(integration, "profile", "integration_record")
+    result_database = required_identity_string(result, "db_path", "graph_build_result")
+    record_database = required_identity_string(integration, "db_path", "integration_record")
+    result_input = required_identity_string(
+        result,
+        "input_fingerprint",
+        "graph_build_result",
+        HEX_FINGERPRINT_RE,
+    )
+    record_input = required_identity_string(
+        integration,
+        "input_fingerprint",
+        "integration_record",
+        HEX_FINGERPRINT_RE,
+    )
+    result_graph = required_identity_string(
+        result,
+        "graph_fingerprint",
+        "graph_build_result",
+        HEX_FINGERPRINT_RE,
+    )
+    record_graph = required_identity_string(
+        integration,
+        "graph_fingerprint",
+        "integration_record",
+        HEX_FINGERPRINT_RE,
+    )
+    snapshot_head = required_identity_string(
+        integration,
+        "snapshot_head",
+        "integration_record",
+        HEX_SHA_RE,
+    ).lower()
+    publication = required_identity_string(
+        result,
+        "publication",
+        "graph_build_result",
+    )
+    if (
+        result_root != str(canonical_root)
+        or record_root != result_root
+        or result_profile != GRAPH_PROFILE
+        or record_profile != result_profile
+        or result_database != str(expected_database)
+        or record_database != result_database
+        or result_input != record_input
+        or result_graph != record_graph
+        or publication != "published"
+        or result.get("durability") != "durable"
+    ):
+        raise SelectorFailure(
+            "graph_identity_mismatch",
+            "fields=root,profile,db_path,input_fingerprint,graph_fingerprint,publication",
+        )
+
+    database_file_identity = regular_file_identity(
+        expected_database,
+        "graph_database_unavailable",
+        "graph_database_identity_invalid",
+    )
     try:
-        candidate_stat = candidate.lstat()
-        resolved = candidate.resolve(strict=True)
-        expected_resolved = expected.resolve(strict=True)
+        resolved_database = expected_database.resolve(strict=True)
     except OSError:
         raise SelectorFailure(
             "graph_database_unavailable",
-            f"path={expected}",
+            f"path={expected_database}",
         ) from None
-    if (
-        resolved != expected_resolved
-        or stat.S_ISLNK(candidate_stat.st_mode)
-        or not stat.S_ISREG(candidate_stat.st_mode)
-    ):
+    if resolved_database != expected_database:
         raise SelectorFailure(
             "graph_database_identity_invalid",
-            f"path={candidate}",
+            f"path={expected_database}",
         )
-    return resolved
+    return GraphBuildIdentity(
+        graph_result_path,
+        result_file_identity,
+        resolved_database,
+        database_file_identity,
+        result_root,
+        result_profile,
+        snapshot_head,
+        result_input,
+        result_graph,
+        publication,
+        integration,
+    )
 
 
-def read_graph_acceptance_facts(
-    database: Path,
+def read_bound_graph_acceptance_facts(
+    build: GraphBuildIdentity,
+    expected_head: str,
 ) -> tuple[dict[str, str], dict[str, set[str]], list[dict[str, str]]]:
-    """Read path, reachability, and diagnostic facts from one immutable graph."""
-    uri = f"file:{quote(database.as_posix(), safe='/')}?mode=ro&immutable=1"
+    """Bind persisted integration metadata, then read classification facts."""
+    uri = f"file:{quote(build.database.as_posix(), safe='/')}?mode=ro&immutable=1"
     connection: sqlite3.Connection | None = None
+    pending_error: SelectorFailure | None = None
+    node_paths: dict[str, str] = {}
+    adjacency: dict[str, set[str]] = {}
+    diagnostics: list[dict[str, str]] = []
     try:
         connection = sqlite3.connect(uri, uri=True)
-        node_paths: dict[str, str] = {}
+        assert_file_identity(build.database, build.database_file_identity, "graph_database")
+        metadata_rows = cast(
+            list[tuple[str, str]],
+            connection.execute(
+                "SELECT key, value FROM metadata WHERE key IN "
+                "('integration_record','snapshot_head','input_fingerprint','graph_fingerprint')"
+            ).fetchall(),
+        )
+        metadata = {key: value for key, value in metadata_rows}
+        required_keys = {
+            "integration_record",
+            "snapshot_head",
+            "input_fingerprint",
+            "graph_fingerprint",
+        }
+        missing = sorted(required_keys.difference(metadata))
+        if missing or len(metadata_rows) != len(required_keys):
+            raise SelectorFailure(
+                "graph_identity_missing",
+                f"owner=graph_database_metadata;fields={','.join(missing) or 'duplicate'}",
+            )
+        raw_persisted: object = json.loads(metadata["integration_record"])
+        if not isinstance(raw_persisted, dict):
+            raise SelectorFailure(
+                "graph_identity_invalid",
+                "owner=graph_database_metadata;field=integration_record",
+            )
+        persisted = cast(dict[str, object], raw_persisted)
+        if persisted != build.integration_record:
+            raise SelectorFailure(
+                "graph_identity_mismatch",
+                "owners=graph_build_result,graph_database_metadata;field=integration_record",
+            )
+        if (
+            metadata["snapshot_head"].lower() != build.snapshot_head
+            or metadata["input_fingerprint"] != build.input_fingerprint
+            or metadata["graph_fingerprint"] != build.graph_fingerprint
+        ):
+            raise SelectorFailure(
+                "graph_identity_mismatch",
+                "owners=integration_record,graph_database_metadata;fields=snapshot_head,input_fingerprint,graph_fingerprint",
+            )
+        if build.snapshot_head != expected_head.lower():
+            raise SelectorFailure(
+                "graph_snapshot_head_stale",
+                f"snapshot_head={build.snapshot_head};expected_head={expected_head.lower()}",
+            )
+
         node_rows = cast(
             list[tuple[str, str]],
             connection.execute(
@@ -685,11 +932,11 @@ def read_graph_acceptance_facts(
             raw_payload: object = json.loads(payload_json)
             if not isinstance(raw_payload, dict):
                 continue
-            payload = cast(dict[str, object], raw_payload)
-            path = payload.get("path")
+            node_payload = cast(dict[str, object], raw_payload)
+            path = node_payload.get("path")
             if isinstance(path, str):
                 node_paths[node_id] = path
-        adjacency: dict[str, set[str]] = {node_id: set() for node_id in node_paths}
+        adjacency = {node_id: set() for node_id in node_paths}
         edge_rows = cast(
             list[tuple[str, str]],
             connection.execute(
@@ -700,7 +947,6 @@ def read_graph_acceptance_facts(
             if from_node in adjacency and to_node in adjacency:
                 adjacency[from_node].add(to_node)
                 adjacency[to_node].add(from_node)
-        diagnostics: list[dict[str, str]] = []
         diagnostic_rows = cast(
             list[tuple[str, str, str]],
             connection.execute(
@@ -725,14 +971,20 @@ def read_graph_acceptance_facts(
                     ),
                 }
             )
+    except SelectorFailure as error:
+        pending_error = error
     except (json.JSONDecodeError, sqlite3.Error):
-        raise SelectorFailure(
+        pending_error = SelectorFailure(
             "graph_database_invalid",
-            f"path={database}",
-        ) from None
+            f"path={build.database}",
+        )
     finally:
         if connection is not None:
             connection.close()
+    assert_file_identity(build.result_path, build.result_file_identity, "graph_build_result")
+    assert_file_identity(build.database, build.database_file_identity, "graph_database")
+    if pending_error is not None:
+        raise pending_error
     return node_paths, adjacency, diagnostics
 
 
@@ -796,8 +1048,11 @@ def evaluate_built_graph(
 ) -> GraphAcceptance:
     """Gate only diagnostics reached from the exact changed responsibility."""
     diff = load_diff(root, environment, trusted_base_sha)
-    database = graph_database_path(root, graph_result_path)
-    node_paths, adjacency, diagnostics = read_graph_acceptance_facts(database)
+    build_identity = graph_build_identity(root, graph_result_path)
+    node_paths, adjacency, diagnostics = read_bound_graph_acceptance_facts(
+        build_identity,
+        diff.head_sha,
+    )
     full_scope = migration_requested(environment)
     reachable_paths = graph_reachable_paths(
         node_paths,
@@ -826,6 +1081,7 @@ def evaluate_built_graph(
         "schema": "agent-canon.pr-graph-acceptance.v1",
         "base_sha": diff.base_sha,
         "head_sha": diff.head_sha,
+        "graph_identity": build_identity.report(),
         "changed_paths": list(diff.changed_paths),
         "changed_paths_sha256": changed_paths_digest(diff.changed_paths),
         "full_scope": full_scope,

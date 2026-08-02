@@ -117,6 +117,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             import json
             import os
             import sqlite3
+            import subprocess
             import sys
             from pathlib import Path
 
@@ -125,11 +126,39 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 raise SystemExit(0)
             root = Path(args[args.index("--root") + 1]).resolve()
             scenario = os.environ["GRAPH_GATE_FIXTURE_SCENARIO"]
-            source_path = "legacy.py" if scenario == "unrelated" else "related.py"
+            source_path = "related.py" if scenario == "reachable" else "legacy.py"
             graph_dir = root / ".agent-canon" / "knowledge-graph"
             graph_dir.mkdir(parents=True, exist_ok=True)
             database = graph_dir / "graph.sqlite"
+            snapshot_head = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            if scenario == "stale_head":
+                snapshot_head = "0" * 40
+            input_fingerprint = "1" * 64
+            graph_fingerprint = "2" * 64
+            integration_record = {
+                "schema": "agent-canon.graph.integration.v1",
+                "root": str(root),
+                "db_path": str(database),
+                "schema_version": "fixture",
+                "profile": "default",
+                "source_snapshot_profile": "parent",
+                "snapshot_head": snapshot_head,
+                "input_fingerprint": input_fingerprint,
+                "graph_fingerprint": graph_fingerprint,
+                "contract_fingerprint": "fixture",
+                "producer_artifacts": [],
+                "runtime_evidence": None,
+                "verified": True,
+                "verification_code": "source-facts-readback-v1",
+            }
             with sqlite3.connect(database) as connection:
+                connection.execute("CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT)")
                 connection.execute("CREATE TABLE nodes(id TEXT, layer TEXT, payload_json TEXT)")
                 connection.execute(
                     "CREATE TABLE edges(layer TEXT, from_node_id TEXT, to_node_id TEXT)"
@@ -151,23 +180,40 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                     "INSERT INTO diagnostics VALUES('source', 'target-unresolved', ?, ?)",
                     (f"{source_path}:4:missing.md", f"node:source:{source_path}"),
                 )
-            print(
-                json.dumps(
+                for key, value in (
+                    ("integration_record", json.dumps(integration_record)),
+                    ("snapshot_head", snapshot_head),
+                    ("input_fingerprint", input_fingerprint),
+                    ("graph_fingerprint", graph_fingerprint),
+                ):
+                    connection.execute("INSERT INTO metadata VALUES(?, ?)", (key, value))
+            result = {
+                "schema": "agent-canon.graph.build.v1",
+                "command": "build",
+                "status": "incomplete",
+                "graph_status": "incomplete",
+                "exit_code": 1,
+                "root": str(root),
+                "profile": "default",
+                "db_path": str(database),
+                "input_fingerprint": input_fingerprint,
+                "graph_fingerprint": graph_fingerprint,
+                "integration_record": integration_record,
+                "publication": "published",
+                "durability": "durable",
+                "unresolved_count": 1,
+                "unresolved": [
                     {
-                        "schema": "agent-canon.graph.build.v1",
-                        "status": "incomplete",
-                        "exit_code": 1,
-                        "db_path": str(database),
-                        "unresolved_count": 1,
-                        "unresolved": [
-                            {
-                                "code": "target-unresolved",
-                                "message": f"{source_path}:4:missing.md",
-                            }
-                        ],
+                        "code": "target-unresolved",
+                        "message": f"{source_path}:4:missing.md",
                     }
-                )
-            )
+                ],
+            }
+            if scenario == "missing_identity":
+                del result["integration_record"]
+            elif scenario == "stale_fingerprint":
+                result["input_fingerprint"] = "3" * 64
+            print(json.dumps(result))
             raise SystemExit(1)
             """,
         )
@@ -305,14 +351,23 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
 
     def test_real_pr_check_routes_incomplete_graph_to_scoped_or_blocking_selector(self) -> None:
         """The same incomplete build reaches selector acceptance in both outcomes."""
-        unrelated, unrelated_state = self.run_pr_check("unrelated")
-        self.assertEqual(unrelated.returncode, 0, unrelated.stdout + unrelated.stderr)
-        self.assertIn('"status": "incomplete"', unrelated.stdout)
-        self.assertIn("AGENT_CANON_PR_GRAPH_ACCEPTANCE=pass", unrelated.stdout)
-        self.assertIn("QUICK_CI_RECEIPT_GRAPH=scoped", unrelated.stdout)
-        self.assertNotIn("REPO_DEPENDENCY_REVIEW_CALLED", unrelated.stdout)
-        receipt = unrelated_state / "consumed.receipt"
+        valid, valid_state = self.run_pr_check("valid_binding")
+        self.assertEqual(valid.returncode, 0, valid.stdout + valid.stderr)
+        self.assertIn('"status": "incomplete"', valid.stdout)
+        self.assertIn("AGENT_CANON_PR_GRAPH_ACCEPTANCE=pass", valid.stdout)
+        self.assertIn("QUICK_CI_RECEIPT_GRAPH=scoped", valid.stdout)
+        self.assertNotIn("REPO_DEPENDENCY_REVIEW_CALLED", valid.stdout)
+        receipt = valid_state / "consumed.receipt"
         self.assertIn("graph=scoped", receipt.read_text(encoding="utf-8"))
+        report = (
+            valid_state
+            / "dependency-review"
+            / "agent-canon-pr"
+            / "changed-responsibility-acceptance.json"
+        )
+        valid_identity = json.loads(report.read_text(encoding="utf-8"))["graph_identity"]
+        self.assertEqual(valid_identity["publication"], "published")
+        self.assertEqual(valid_identity["profile"], "default")
 
         reachable, reachable_state = self.run_pr_check("reachable")
         self.assertEqual(reachable.returncode, 2, reachable.stdout + reachable.stderr)
@@ -334,6 +389,36 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             payload["blocking_diagnostics"][0]["classification"],
             "changed_responsibility",
         )
+
+    def test_real_pr_check_rejects_missing_or_stale_graph_identity(self) -> None:
+        """Identity defects fail before scoped/full diagnostic classification."""
+        scenarios = {
+            "missing_identity": "graph_identity_missing",
+            "stale_fingerprint": "graph_identity_mismatch",
+            "stale_head": "graph_snapshot_head_stale",
+        }
+        for scenario, reason in scenarios.items():
+            with self.subTest(scenario=scenario):
+                result, state = self.run_pr_check(scenario)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertIn("AGENT_CANON_PR_GRAPH_ACCEPTANCE=fail", result.stdout)
+                self.assertIn(
+                    f"AGENT_CANON_PR_GRAPH_ACCEPTANCE_REASON={reason}",
+                    result.stdout,
+                )
+                self.assertIn(
+                    "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=changed_responsibility_failed",
+                    result.stdout,
+                )
+                self.assertNotIn("QUICK_CI_RECEIPT_GRAPH=scoped", result.stdout)
+                self.assertNotIn("REPO_DEPENDENCY_REVIEW_CALLED", result.stdout)
+                report = (
+                    state
+                    / "dependency-review"
+                    / "agent-canon-pr"
+                    / "changed-responsibility-acceptance.json"
+                )
+                self.assertFalse(report.exists())
 
 
 if __name__ == "__main__":
