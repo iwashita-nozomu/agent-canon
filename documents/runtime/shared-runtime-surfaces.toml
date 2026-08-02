@@ -72,14 +72,14 @@ sync_control = true
 
 [[surface]]
 path = "documents/runtime/SHARED_RUNTIME_SURFACES.md"
-mode = "regular"
+mode = "standalone_only"
 owner = "agent-canon"
 class = "standalone_only"
 sync_control = true
 
 [[surface]]
 path = "documents/runtime/shared-runtime-surfaces.toml"
-mode = "regular"
+mode = "standalone_only"
 owner = "agent-canon"
 class = "standalone_only"
 sync_control = true

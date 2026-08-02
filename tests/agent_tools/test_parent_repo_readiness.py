@@ -28,6 +28,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from surface_manifest import (  # noqa: E402
     load_manifest,
     render_regular_specs,
+    render_root_absent_paths,
     target_for_entry,
 )
 
@@ -267,8 +268,18 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_standalone_only_root_document_passes(self) -> None:
-        """Standalone-only AgentCanon root docs can exist as parent fixture content."""
+    def test_standalone_only_root_document_absence_is_expected(self) -> None:
+        """Standalone-only AgentCanon root docs should be absent in parent fixtures."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_parent_fixture(root)
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_standalone_only_root_document_stale_copy_fails(self) -> None:
+        """Stale parent copies of standalone-only root docs should fail readiness."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_parent_fixture(root)
@@ -278,7 +289,31 @@ class ParentRepoReadinessTest(unittest.TestCase):
 
             result = self.run_checker(root)
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "PARENT_REPO_READINESS_FINDING=error:standalone_only_leak:"
+                "documents/runtime/SHARED_RUNTIME_SURFACES.md:must-not-exist-in-parent-root",
+                result.stdout,
+            )
+
+    def test_standalone_only_entries_not_in_regular_specs_root_absent_paths(self) -> None:
+        """Standalone-only manifest entries must appear in root-absent, not regular specs."""
+        manifest = load_manifest(
+            PROJECT_ROOT,
+            ".",
+            "documents/runtime/shared-runtime-surfaces.toml",
+        )
+        regular_specs = render_regular_specs(manifest.entries, manifest.prefix)
+        root_absent_specs = render_root_absent_paths(manifest.entries)
+
+        self.assertNotIn("documents/runtime/SHARED_RUNTIME_SURFACES.md", regular_specs)
+        self.assertNotIn(
+            "documents/runtime/shared-runtime-surfaces.toml", regular_specs
+        )
+        self.assertIn("documents/runtime/SHARED_RUNTIME_SURFACES.md", root_absent_specs)
+        self.assertIn(
+            "documents/runtime/shared-runtime-surfaces.toml", root_absent_specs
+        )
 
     def write_parent_fixture(self, root: Path) -> None:
         """Create a synthetic template-derived parent repo."""

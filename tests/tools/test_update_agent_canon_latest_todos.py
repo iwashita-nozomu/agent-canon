@@ -104,7 +104,7 @@ def test_latest_reports_pending_update_todos_without_failing(tmp_path: Path) -> 
     bare_repo, _work_dir = fixture.make_agent_canon_remote(tmp_path)
     repo = fixture.make_superproject(tmp_path, bare_repo)
     todo_tool = repo / "tools" / "agent_tools" / "agent_canon_update_todos.py"
-    todo_tool.parent.mkdir(parents=True)
+    todo_tool.parent.mkdir(parents=True, exist_ok=True)
     todo_tool.write_text(
         "\n".join(
             [
