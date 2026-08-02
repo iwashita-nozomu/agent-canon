@@ -13,7 +13,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_DIR}/../lib/repo_paths.sh"
 ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
-CANON_TOOLS_ROOT="$(agent_canon_tools_root "$ROOT_DIR")"
+CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")"
 cd "$ROOT_DIR"
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 

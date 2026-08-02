@@ -35,3 +35,19 @@ agent_canon_tools_root() {
     printf '%s\n' "$repository_root/tools/agent-canon"
   fi
 }
+
+agent_canon_source_tools_root() {
+  local repository_root="$1"
+  local source_prefix="${2:-vendor/agent-canon}"
+
+  if [ -d "$repository_root/$source_prefix/tools" ] \
+    && [ -f "$repository_root/$source_prefix/tools/sync_agent_canon.sh" ]; then
+    printf '%s\n' "$repository_root/$source_prefix/tools"
+    return 0
+  fi
+  if [ -d "$repository_root/tools" ] && [ -f "$repository_root/tools/sync_agent_canon.sh" ]; then
+    printf '%s\n' "$repository_root/tools"
+    return 0
+  fi
+  return 1
+}

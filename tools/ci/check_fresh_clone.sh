@@ -14,7 +14,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_DIR}/../lib/repo_paths.sh"
 ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
-CANON_TOOLS_ROOT="$(agent_canon_tools_root "$ROOT_DIR")"
+CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")"
 TMP_DIR="$(mktemp -d -t template-fresh-clone-XXXXXX)"
 TOPIC_ROOT="${TMP_DIR}/workspace/fresh-clone"
 CLONE_DIR="${TOPIC_ROOT}/agent-canon"

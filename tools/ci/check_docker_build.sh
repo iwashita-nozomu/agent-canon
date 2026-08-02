@@ -10,7 +10,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_DIR}/../lib/repo_paths.sh"
 WORKSPACE_ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
-CANON_CI_ROOT="$(agent_canon_tools_root "$WORKSPACE_ROOT")/ci"
+CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$WORKSPACE_ROOT")"
+CANON_CI_ROOT="${CANON_TOOLS_ROOT}/ci"
 cd "$WORKSPACE_ROOT"
 
 PYTHON_BIN="${PYTHON_BIN:-}"
