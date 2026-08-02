@@ -28,6 +28,7 @@ upstream design ./SHARED_RUNTIME_SURFACES.md shared runtime surface ownership po
 downstream design ../../agents/canonical/CODEX_WORKFLOW.md Codex execution workflow
 downstream design ../agent-canon/agent-canon-parent-repo-latest-checklist.md parent repo latest-state checklist
 downstream implementation ../../tools/ci/run_all_checks.sh repo check runner
+downstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py selects strict parent graph requirement from canonical profile IDs
 downstream implementation ../../tools/catalog.yaml structured tool catalog
 @dependency-end
 -->
@@ -102,6 +103,13 @@ def require_string_list(value: object, field: str) -> list[str]:
     return strings
 
 
+def require_bool(value: object, field: str) -> bool:
+    """Return a required boolean field."""
+    if not isinstance(value, bool):
+        raise ValueError(f"{field} must be a boolean")
+    return value
+
+
 def require_object_list(value: object, field: str) -> list[dict[str, object]]:
     """Return a required list of objects."""
     if not isinstance(value, list):
@@ -128,7 +136,12 @@ def collect_profile_class_rows(items: list[dict[str, object]]) -> list[list[str]
     """Collect Markdown table rows for profile classes."""
     profile_rows: list[list[str]] = []
     for item in items:
+        profile_id = require_string(item.get("id"), "profile_classes.id")
         profile = require_string(item.get("profile"), "profile_classes.profile")
+        strict_dependency_graph_required = require_bool(
+            item.get("strict_dependency_graph_required"),
+            "profile_classes.strict_dependency_graph_required",
+        )
         activates = require_string_list(
             item.get("activates"),
             "profile_classes.activates",
@@ -137,7 +150,15 @@ def collect_profile_class_rows(items: list[dict[str, object]]) -> list[list[str]
             item.get("required_when"),
             "profile_classes.required_when",
         )
-        profile_rows.append([profile, ", ".join(activates), required_when])
+        profile_rows.append(
+            [
+                profile_id,
+                profile,
+                ", ".join(activates),
+                required_when,
+                "yes" if strict_dependency_graph_required else "no",
+            ]
+        )
     return profile_rows
 
 
@@ -250,7 +271,19 @@ def bridge_inventory_to_markdown(inventory: dict[str, object], inventory_rel_lin
 
     output.append("## Profile Classes\n\n")
     profile_rows = collect_profile_class_rows(profile_classes)
-    output.append(render_table(["Profile", "Activates", "Required when"], profile_rows) + "\n")
+    output.append(
+        render_table(
+            [
+                "Profile ID",
+                "Profile",
+                "Activates",
+                "Required when",
+                "Strict dependency graph",
+            ],
+            profile_rows,
+        )
+        + "\n"
+    )
 
     output.append(render_paragraph(compatibility_note) + "\n\n")
 

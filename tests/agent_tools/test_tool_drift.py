@@ -309,15 +309,14 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_pr_check_must_run_strict_dependency_review(self) -> None:
-        """The AgentCanon PR check must include strict dependency review."""
+    def test_pr_check_must_select_dependency_graph_requirement(self) -> None:
+        """The AgentCanon PR check must select strict graph completeness explicitly."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_agent_canon_pr_contract(root)
             script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
-                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"\n',
-                "",
+                "if agentcanon_pr_dependency_graph_required; then\n", "if true; then\n"
             )
             script.write_text(text, encoding="utf-8")
 
@@ -325,11 +324,60 @@ class CheckToolConventionDriftTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "missing-required-command:agent_canon_pr_check:"
+                "missing-required-text:agent_canon_pr_check:"
                 "tools/ci/check_agent_canon_pr.sh:"
-                "missing-strict-dependency-review",
+                "missing-conditional-dependency-graph-gate",
                 result.stdout,
             )
+
+    def test_pr_check_requires_optional_dependency_graph_receipt_status(self) -> None:
+        """The PR check must carry an explicit prepared-or-skipped graph receipt."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_agent_canon_pr_contract(root)
+            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            text = script.read_text(encoding="utf-8").replace(
+                "PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped\n", ""
+            )
+            script.write_text(text, encoding="utf-8")
+
+            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-required-text:agent_canon_pr_check:"
+                "tools/ci/check_agent_canon_pr.sh:"
+                "missing-optional-dependency-graph-receipt-status",
+                result.stdout,
+            )
+
+    def test_pr_check_requires_selector_reason_and_evidence_receipt(self) -> None:
+        """Skipped graph receipts retain the selector's reason and evidence."""
+        for marker, detail in (
+            ("selector_reason=%s", "missing-dependency-graph-selector-reason-receipt"),
+            (
+                "selector_evidence=%s",
+                "missing-dependency-graph-selector-evidence-receipt",
+            ),
+        ):
+            with self.subTest(marker=marker):
+                with tempfile.TemporaryDirectory() as tmp_dir:
+                    root = Path(tmp_dir)
+                    self.write_agent_canon_pr_contract(root)
+                    script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+                    script.write_text(
+                        script.read_text(encoding="utf-8").replace(marker, "removed", 1),
+                        encoding="utf-8",
+                    )
+
+                    result = self.run_checker(root, "--contract", "agent_canon_pr_check")
+
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn(
+                    "missing-required-text:agent_canon_pr_check:"
+                    f"tools/ci/check_agent_canon_pr.sh:{detail}",
+                    result.stdout,
+                )
 
     def test_pr_check_strict_dependency_review_command_does_not_count_comment(self) -> None:
         """Dependency-review command only in comments is rejected."""
@@ -908,16 +956,39 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py prompt eval",
                     "# upstream implementation ../agent_tools/check_agent_runtime_alignment.py runtime alignment",
                     "# upstream implementation ../agent_tools/check_convention_compliance.py convention gate",
+                    "# upstream implementation ./agent_canon_pr_graph_selector.py graph selector",
                     "# upstream implementation ./check_github_workflows.py github checks",
                     "# upstream implementation ./run_all_checks.sh quick ci",
                     "# @dependency-end",
-                    'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
+                    "agentcanon_pr_dependency_graph_required() { return 0; }",
+                    'python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py"',
+                    "PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped",
+                    "if agentcanon_pr_dependency_graph_required; then",
+                    '  bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
+                    '  PR_GATE_DEPENDENCY_GRAPH_STATUS=prepared',
+                    "fi",
+                    "printf 'selector_reason=%s\\n' \"${PR_GATE_DEPENDENCY_GRAPH_REASON}\"",
+                    "printf 'selector_evidence=%s\\n' \"${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE}\"",
+                    'write_pr_gate_receipt "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" "${PR_GATE_DEPENDENCY_GRAPH_REASON}" "${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE}"',
                     'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \\',
                     'python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"',
                     'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
                     'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"',
                     "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",
                     "SHARED_SURFACE_STATUS=not_applicable_standalone_source",
+                    "",
+                ]
+            ),
+        )
+        self.write_file(
+            root,
+            "tools/ci/agent_canon_pr_graph_selector.py",
+            "\n".join(
+                [
+                    "# @dependency-start",
+                    "# responsibility Selects parent graph gating.",
+                    "# downstream implementation ./check_agent_canon_pr.sh PR gate",
+                    "# @dependency-end",
                     "",
                 ]
             ),

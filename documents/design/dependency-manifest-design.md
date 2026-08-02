@@ -12,10 +12,16 @@ downstream implementation ../../tools/agent_tools/check_dependency_graph.sh vali
 downstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh wraps repo-wide dependency review
 downstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts code dependency evidence separately
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design claims against manifest evidence
+downstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders dependency graph review artifacts
+downstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py selects parent strict graph gating from this canonical dependency surface manifest
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
+downstream implementation ../../tests/tools/test_agent_canon_pr_graph_selector.py verifies parent gate selection from canonical profiles, surfaces, and diff evidence
 downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs owns the sole complete-file manifest parser and source snapshot
 downstream implementation ../../rust/agent-canon/src/graph.rs owns canonical graph materialization and queries
+downstream implementation ../../rust/agent-canon/src/structured_analysis.rs owns the shared graph storage schema
+downstream implementation ../../rust/agent-canon/src/main.rs dispatches public graph commands
+downstream implementation ../../tools/bin/agent-canon provides the stable bootstrap CLI for public graph commands
 downstream implementation ../../tools/agent_tools/graph_client.py provides the sole Python graph adapter
 downstream design ../structured-analysis/graph-dsl.md maps dependency manifest evidence into Graph DSL Core
 downstream design ../structured-analysis/dependency-header-analysis.md maps manifest graph evidence into structured analysis
@@ -80,6 +86,60 @@ bounded dependency closure and token context from the canonical graph, checks
 the returned typed evidence, and reports unsupported tokens or parent
 contradictions. It does not parse dependency headers or open evidence files as
 a second fact authority.
+
+## Parent PR Gate Selection Contract
+
+Dependency-manifest completeness is a conditional parent-repository PR gate,
+not an unconditional prerequisite for publishing an AgentCanon gitlink. Every
+parent pin publication still requires the gitlink to resolve to a reachable
+commit, the staged gitlink to equal the checked-out `vendor/agent-canon` HEAD,
+and the changed shared/root projection to pass its existing materialization
+check. An actual materialization collision remains a blocker. A local parent
+branch being ahead, behind, diverged, or dirty is preserved as repository state
+and is not a failure predicate on its own.
+
+The parent strict graph-completeness gate is selected only when at least one of
+these conditions is true:
+
+- the caller declares a parent graph migration;
+- the change touches a dependency manifest/header or a downstream surface
+  declared by this design document's canonical dependency manifest;
+- the selected runtime validation profile explicitly requires dependency graph
+  completeness through its
+  `strict_dependency_graph_required` field in
+  `documents/runtime/runtime-profiles-and-check-matrix.json`.
+
+Profile selection uses one canonical ID in
+`AGENT_CANON_PR_VALIDATION_PROFILE` or comma-separated canonical IDs in
+`AGENT_CANON_PR_VALIDATION_PROFILES`. Supplying both inputs, an empty list
+element, a duplicate, or an unknown ID is a typed selector failure.
+
+When none of these conditions holds, the PR gate emits a typed skipped receipt
+with non-empty selector reason/evidence, and its quick-CI consumer does not
+rebuild the parent graph or promote repository-wide missing-header diagnostics
+into a blocker. Standalone AgentCanon source PRs retain the strict source graph
+gate. This separation keeps manifest migration debt visible without making
+unrelated parent pin-only changes satisfy a repository-wide completeness
+baseline.
+
+The selector reads dependency surfaces from this document's downstream
+manifest instead of maintaining a second path list. The manifest therefore
+owns the complete bootstrap surface, including scanners, format and changed-file
+checkers, graph parser/storage and client adapters, report rendering, and the
+selector itself. Strict graph validation remains the semantic authority after
+selection; the bootstrap read only decides whether that authority is required.
+
+CI comparison uses the pull request base SHA from the trusted GitHub event.
+Local and fixture execution supplies an explicit `AGENT_CANON_PR_BASE_REF`.
+Equal-to-HEAD, unresolved, history-unreachable, or failed diff states are typed
+selector failures. They do not become an empty change set. Unknown profile IDs
+and malformed canonical profile/surface owners fail by the same rule.
+
+The receipt's owner/root/PID/status binding and required skipped
+reason/evidence are sufficient for the checker-to-quick-CI handoff. A
+cryptographic nonce against a hostile local caller is outside this trust
+boundary: such a caller can omit the checker entirely, so cryptography would
+not add evidence that the required gate ran.
 
 ## Manifest Block
 
@@ -562,7 +622,10 @@ Responsibilities:
 - automatically write `dependency_graph.tsv` when `--report-dir` is set
 - accept `--search-hits-file` and write `dependency_edit_scope.txt` when `--report-dir` is set
 
-Template repos expose `make dependency-review-surfaces` to run strict review against both the parent root view and `vendor/agent-canon` source tree.
+Template repos expose `make dependency-review-surfaces` to run an explicit
+strict review against both the parent root view and `vendor/agent-canon` source
+tree. The AgentCanon parent PR gate invokes this wrapper only when its
+migration, touched-manifest, or selected-profile condition is active.
 
 ## Migration Plan
 
@@ -587,8 +650,15 @@ Each touched file must be converted from `Dependency Files:` to `@dependency-sta
 
 Phase 4: enable CI fail gate for changed files.
 Full-repo missing-header scan remains report-only until the repository is migrated.
-この repository では full-repo migration 後の strict baseline を `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` で固定します。
-goal-driven cleanup や shared surface migration の closeout では、この strict baseline を繰り返し実行して `DEPENDENCY_HEADER_SCAN_MISSING=0` と `REPO_DEPENDENCY_REVIEW=pass` が安定することを evidence にします。
+この repository では full-repo migration、touched dependency-manifest change、または
+canonical profile owner が graph-required と宣言する validation profile のときだけ
+strict baseline を
+`bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` で
+有効化します。pin-only parent changes are represented by the skipped receipt
+and do not inherit `target-unresolved` or `manifest-grammar` diagnostics from
+the parent root as unrelated blockers. Goal-driven cleanup or shared-surface
+migration closeout repeats the strict baseline and records stable
+`DEPENDENCY_HEADER_SCAN_MISSING=0` and `REPO_DEPENDENCY_REVIEW=pass` evidence.
 
 Phase 5: remove legacy `Dependency Files:` wording from remaining docs after all checkable files use dependency manifest blocks.
 

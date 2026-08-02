@@ -17,6 +17,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_all_checks.sh"
 PR_SCRIPT = PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_pr.sh"
+PR_SELECTOR = PROJECT_ROOT / "tools" / "ci" / "agent_canon_pr_graph_selector.py"
 PRE_REVIEW_SCRIPT = PROJECT_ROOT / "tools" / "ci" / "pre_review.sh"
 PYTHON_QUALITY_SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_python_quality_checks.sh"
 
@@ -77,6 +78,57 @@ class RunAllChecksScriptTest(unittest.TestCase):
         legacy_profile = "integration" + "_only"
         self.assertNotIn(legacy_flag, pr_text)
         self.assertNotIn(legacy_profile, pr_text)
+
+    def test_pr_gate_receipt_accepts_prepared_or_skipped_dependency_graph(self) -> None:
+        """Parent PRs may skip graph completeness when its profile does not require it."""
+        ci_text = SCRIPT.read_text(encoding="utf-8")
+        pr_text = PR_SCRIPT.read_text(encoding="utf-8")
+        selector_text = PR_SELECTOR.read_text(encoding="utf-8")
+
+        self.assertIn('PR_GATE_DEPENDENCY_GRAPH_STATUS="not_applicable"', ci_text)
+        self.assertIn('strict_dependency_status}" != "prepared"', ci_text)
+        self.assertIn('strict_dependency_status}" != "skipped"', ci_text)
+        self.assertIn(
+            "PR_GATE_DEPENDENCY_GRAPH_STATUS=\"${strict_dependency_status}\"",
+            ci_text,
+        )
+        self.assertIn("PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped", pr_text)
+        self.assertIn("parent_graph_completeness_not_selected", selector_text)
+        self.assertIn("write_pr_gate_receipt \\", pr_text)
+        self.assertIn('"${PR_GATE_DEPENDENCY_GRAPH_REASON}"', pr_text)
+        self.assertIn('"${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE}"', pr_text)
+        self.assertIn("selector_reason=%s", pr_text)
+        self.assertIn("selector_evidence=%s", pr_text)
+        self.assertIn(
+            "skipped graph selector reason/evidence missing",
+            ci_text,
+        )
+        self.assertIn(
+            "parent PR graph completeness not required",
+            ci_text,
+        )
+
+    def test_pr_gate_keeps_gitlink_and_projection_integrity_checks(self) -> None:
+        """Graph completeness is optional, but publication/projection integrity remains required."""
+        pr_text = PR_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("agentcanon_pr_branch_integrity", pr_text)
+        self.assertIn("submodule-gitlink-worktree-mismatch", pr_text)
+        self.assertIn("submodule-pinned-commit-unreachable-from-configured-remote", pr_text)
+        self.assertIn("run_shared_surface_check", pr_text)
+        self.assertIn("AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required", pr_text)
+        self.assertNotIn("blocked_dirty_agentcanon_branch", pr_text)
+
+    def test_pr_gate_delegates_profile_surface_and_diff_selection(self) -> None:
+        """The shell gate delegates selection to the canonical fail-closed helper."""
+        pr_text = PR_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("agent_canon_pr_graph_selector.py", pr_text)
+        self.assertNotIn("agentcanon-shared-surface", pr_text)
+        self.assertNotIn("full-confidence-candidate", pr_text)
+        self.assertNotIn("agentcanon_pr_graph_migration_surface_touched", pr_text)
+        self.assertNotIn("git diff --name-only", pr_text)
+        self.assertNotIn("git diff --unified=0", pr_text)
 
     def test_python_quality_checks_are_shared(self) -> None:
         """Run-all and pre-review should use the same Python quality runner."""

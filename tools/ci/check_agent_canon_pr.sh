@@ -8,6 +8,7 @@
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
 # upstream design ../../templates/documents/github/pull-request/agent_canon.md canonical template-side AgentCanon PR checklist
 # upstream implementation ../agent_tools/run_repo_dependency_review.sh strict dependency review
+# upstream implementation ./agent_canon_pr_graph_selector.py selects parent graph gating from canonical profiles, dependency surfaces, and trusted diff evidence
 # upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py skill/workflow prompt parity eval
 # upstream implementation ../agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../agent_tools/generated_artifact_guard.py rejects regenerated report leftovers before PR check pass
@@ -149,6 +150,40 @@ run_agent_canon() {
   return 127
 }
 
+PR_GATE_DEPENDENCY_GRAPH_REASON=""
+PR_GATE_DEPENDENCY_GRAPH_EVIDENCE=""
+agentcanon_pr_dependency_graph_required() {
+  local selector_output=""
+  local selector_rc=0
+  local selector_status=""
+
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
+    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=required reason=standalone_source"
+    PR_GATE_DEPENDENCY_GRAPH_REASON="standalone_source"
+    PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="source_root=${AGENT_CANON_SOURCE_ROOT}"
+    return 0
+  fi
+  if selector_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}")"; then
+    selector_rc=0
+  else
+    selector_rc=$?
+  fi
+  printf '%s\n' "${selector_output}"
+  selector_status="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH" {print $2}' <<<"${selector_output}")"
+  PR_GATE_DEPENDENCY_GRAPH_REASON="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON" {sub(/^[^=]*=/, ""); print}' <<<"${selector_output}")"
+  PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE" {sub(/^[^=]*=/, ""); print}' <<<"${selector_output}")"
+  case "${selector_rc}:${selector_status}" in
+    0:required) return 0 ;;
+    10:skipped) return 1 ;;
+    *)
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail rc=${selector_rc} status=${selector_status:-missing}" >&2
+      return 2
+      ;;
+  esac
+}
+
 agentcanon_pr_branch_dirty() {
   local submodule_dirty=""
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
@@ -233,9 +268,8 @@ agentcanon_pr_update_precondition() {
     return 0
   fi
   if [[ -n "${REMOTE_URL:-}" && -n "${REMOTE_URL#<unset>}" ]] && agentcanon_pr_branch_dirty; then
-    echo "AGENT_CANON_PR_UPDATE_GATE=blocked_dirty_agentcanon_branch"
-    echo "AGENT_CANON_PR_UPDATE_NEXT=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_agent-canon-pr-check"
-    return 2
+    echo "AGENT_CANON_PR_UPDATE_STATE=dirty_agentcanon_worktree_preserved"
+    echo "AGENT_CANON_PR_UPDATE_NEXT=run_make_agent-canon-ensure-latest_with_dirty_worktree_preserved"
   fi
   submodule_head="$(git -C vendor/agent-canon rev-parse HEAD 2>/dev/null || true)"
   parent_pin="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
@@ -345,16 +379,33 @@ run_pr_quick_ci() {
 
 write_pr_gate_receipt() {
   local root_identity=""
+  local dependency_graph_status="${1:-}"
+  local selector_reason="${2:-}"
+  local selector_evidence="${3:-}"
   if ! root_identity="$(realpath -e "${WORKSPACE_ROOT}")"; then
     echo "Unable to record PR gate root identity" >&2
+    return 1
+  fi
+  case "${dependency_graph_status}" in
+    prepared|skipped) ;;
+    *)
+      echo "Invalid PR gate dependency graph status: ${dependency_graph_status}" >&2
+      return 1
+      ;;
+  esac
+  if [[ -z "${selector_reason}" || -z "${selector_evidence}" \
+    || "${selector_reason}" == *$'\n'* || "${selector_evidence}" == *$'\n'* ]]; then
+    echo "Invalid PR gate dependency graph selector reason/evidence" >&2
     return 1
   fi
   {
     printf 'owner=check_agent_canon_pr.sh\n'
     printf 'root_identity=%s\n' "${root_identity}"
     printf 'parent_pid=%s\n' "$$"
-    printf 'strict_dependency=prepared\n'
-    printf 'graph=prepared\n'
+    printf 'strict_dependency=%s\n' "${dependency_graph_status}"
+    printf 'graph=%s\n' "${dependency_graph_status}"
+    printf 'selector_reason=%s\n' "${selector_reason}"
+    printf 'selector_evidence=%s\n' "${selector_evidence}"
   } >"${PR_GATE_RECEIPT}"
 }
 
@@ -521,20 +572,35 @@ echo "5️⃣  agent runtime checks"
 run_pr_agent_checks
 echo ""
 
-echo "6️⃣  strict dependency review"
-# This graph build is the producer for the strict dependency review and the
-# prepared graph consumers in the subsequent quick CI invocation.
-	run_agent_canon graph build --root . --profile default --format json
-if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py"
+echo "6️⃣  dependency graph completeness"
+PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped
+PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=0
+if agentcanon_pr_dependency_graph_required; then
+  # This graph build is the producer for the strict dependency review and the
+  # prepared graph consumers in the subsequent quick CI invocation.
+  run_agent_canon graph build --root . --profile default --format json
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
+    python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py"
+  fi
+  bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/render_dependency_manifest_graph.py" \
+    --root . \
+    --scope full \
+    --markdown-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.md" \
+    --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
+  PR_GATE_DEPENDENCY_GRAPH_STATUS=prepared
+else
+  PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=$?
+  if [[ "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}" -ne 1 ]]; then
+    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=selector_failed"
+    exit "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}"
+  fi
+  echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required"
 fi
-bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
-	python3 "${CANON_TOOLS_ROOT}/agent_tools/render_dependency_manifest_graph.py" \
-  --root . \
-  --scope full \
-  --markdown-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.md" \
-  --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
-write_pr_gate_receipt
+write_pr_gate_receipt \
+  "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" \
+  "${PR_GATE_DEPENDENCY_GRAPH_REASON}" \
+  "${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE}"
 echo ""
 
 echo "7️⃣  documentation checks"
