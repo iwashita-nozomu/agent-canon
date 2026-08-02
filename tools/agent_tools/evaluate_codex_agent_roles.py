@@ -83,6 +83,7 @@ VALID_REASONING_EFFORTS = {"low", "medium", "high", "xhigh"}
 DEPRECATED_CODEX_MODELS = {"gpt-5.2", "gpt-5.3-codex"}
 EVALUATOR_AGENT_ID = "skill_evaluator"
 EVALUATOR_ACTIVATION = "explicit_empirical_skill_evaluation"
+TERRA_AGENT_ID = "terra"
 FORBIDDEN_AGENT_PROFILE_KEYS = {"tier", "service_tier", "flex"}
 GENERATED_ROLE_VIEW_MATERIALIZER = "generate_role_views"
 
@@ -316,8 +317,8 @@ def evaluate_generated_role_projection(
         catalog = load_task_catalog(load_team_config(root / "agents" / "agents_config.json"), root=root)
         derivation = declared_team_capacity_derivation(catalog)
         peak = derivation.peak_family
-        if derivation.requested_max_threads() != 26 or peak.workflow_family_id != "research_driven_change" or peak.direct_frontier_count != 20 or peak.nested_reservation_count != 6:
-            findings.append(Finding("capacity-attribution", "role_topology_defaults", "declared-20-plus-6-does-not-derive-26"))
+        if derivation.requested_max_threads() != 27 or peak.workflow_family_id != "research_driven_change" or peak.direct_frontier_count != 21 or peak.nested_reservation_count != 6:
+            findings.append(Finding("capacity-attribution", "role_topology_defaults", "declared-21-plus-6-does-not-derive-27"))
         for family in catalog.workflow_families:
             request = family.get("capacity_request")
             if not isinstance(request, dict) or request.get("topology_source") != "role_topology" or request.get("write_scope_source") != "team_manifest.run.write_scopes":
@@ -427,6 +428,11 @@ def evaluate_routing(root: Path) -> list[Finding]:
             findings.append(Finding("registration", EVALUATOR_AGENT_ID, "must-be-artifacts-only"))
         if "skill_evaluation" not in evaluator.write_policy.allowed_artifacts:
             findings.append(Finding("registration", EVALUATOR_AGENT_ID, "missing-skill-evaluation-artifact"))
+    terra = roles.get(TERRA_AGENT_ID)
+    if terra is None:
+        findings.append(Finding("registration", TERRA_AGENT_ID, "missing-permanent-role"))
+    elif terra.id in {role.id for role in config.always_on_roles}:
+        findings.append(Finding("registration", TERRA_AGENT_ID, "must-not-be-always-on"))
     for role_id, role in roles.items():
         if role_id != EVALUATOR_AGENT_ID and EVALUATOR_AGENT_ID in role.codex_agents:
             findings.append(

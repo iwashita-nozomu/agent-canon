@@ -2474,8 +2474,8 @@ required_regex = ["generated_role_view_v1", "generate_role_views", "closed eight
 [[evals.checklist]]
 id = "P5-RUNTIME-PROJECTION-2"
 critical = true
-description = "Requires declared topology derivation, exact 20+6 proof, and typed capacity requests."
-required_regex = ["declared_team_peak_plus_nested_reservations_v1", "requested_max_threads.*26", "direct_frontier_count == 20", "nested_reservation_count == 6", "task_catalog_capacity_request_v1", "team_manifest.run.write_scopes"]
+description = "Requires declared topology derivation, exact 21+6 proof, and typed capacity requests."
+required_regex = ["declared_team_peak_plus_nested_reservations_v1", "requested_max_threads.*27", "direct_frontier_count == 21", "nested_reservation_count == 6", "task_catalog_capacity_request_v1", "team_manifest.run.write_scopes"]
 
 [[evals]]
 id = "p5-role-profile-attribution"
@@ -2487,4 +2487,4 @@ description = "The role evaluator attributes profile and capacity evidence witho
 id = "P5-ROLE-ATTRIBUTION-1"
 critical = true
 description = "Requires profile attribution and numeric-spawn duplicate rejection."
-required_regex = ["profile-attribution", "numeric-spawn-budget-duplicate", "declared-20-plus-6-does-not-derive-26"]
+required_regex = ["profile-attribution", "numeric-spawn-budget-duplicate", "declared-21-plus-6-does-not-derive-27"]

@@ -4787,3 +4787,29 @@ implementation-route result with no fallback. A ready Spark packet launches
 immediately, materializes its complete unit once, and then enters only its
 named owner gate. A structural gap reserves and resumes the same Spark after
 the exact repair; any other missing field queues unchanged ready work.
+
+## 16. Terra 横断 role 追加契約
+
+この節は、`documents/design/codex-spark-implementation-routing.md` の既存の
+Spark 実装 routing 契約に対するユーザー明示の後続契約であり、
+`agents/canonical/CODEX_SUBAGENTS.md` の既存の Sol・Luna・Spark の責務を
+再割当てしない。
+
+| ID | 契約 | owner / evidence |
+| --- | --- | --- |
+| TERRA-01 | Sol parent は routing、integration、final authority を保持する。 | Sol; `agents/agents_config.json` |
+| TERRA-02 | Terra は canonical 登録された conditional read-only cross-cutting specialist candidate とし、always-on、coordinator、general worker にはしない。task-id のない fallback でも activation evidence なしには選択しない。 | Terra; `agents/agents_config.json` |
+| TERRA-03 | Terra の capability は `cross_owner_integration`、`context_reconstruction`、`adversarial_contradiction_validation` の三つに限定する。ユーザー提示済み、または既存 finding 内の alternative architecture は adversarial comparison 入力として許可し、Terra 自身による未要求の新規案生成、採用、final decision は許可しない。 | Terra profile; `agents/model_profiles.toml` |
+| TERRA-04 | Luna は design、review、ordinary ambiguous implementation を保持し、Spark は fixed mechanical leaf を保持する。 | Luna / Spark; `agents/canonical/CODEX_SUBAGENTS.md` |
+| TERRA-05 | Terra の activation evidence は multi-owner dependency closure、compaction・long-run・incomplete handoff による context reconstruction、または複数案・finding の contradiction validation のいずれかである。 | task topology; `agents/task_catalog.yaml` |
+| TERRA-06 | Terra は owner closure、context capsule、accepted・rejected・escalated の handback を返して終了し、unresolved は Sol に返す。descendant と reservation の cleanup は既存 lifecycle 契約で閉じる。 | Terra / Sol; `agents/agents_config.json` |
+| TERRA-07 | `team_manifest.yaml` は run 生成 artifact であり、Terra の恒久正本にはしない。role/profile は canonical source と materializer から生成する。 | runtime owners; `tools/agent_tools/model_profile_registry.py` |
+| TERRA-08 | `CODEX_SUBAGENTS.md` の退役 `branch_worktree_guard.py` owner 参照は現行 `hook_safety.py` route に置換する。 | hook safety owner; `tools/agent_tools/hook_safety.py` |
+| TERRA-09 | Terra を各 workflow family の conditional candidate として宣言するため、宣言 topology の現在値は direct frontier `21` と nested reservation `6` の `27` とする。従来の `20 + 6 = 26` 投影はこの successor amendment で置換する。 | `agents/task_catalog.yaml` capacity derivation、`.codex/config.toml` loader/readback、runtime alignment |
+
+Terra の型契約は `agents/model_profiles.toml` の既存の role/profile projection を
+再利用する。新しい runtime class、coordinator API、write-capable implementation
+path、または恒久 manifest schema は追加しない。最終 validation は
+`tools/agent_tools/model_profile_registry.py` の canonical materializer、generated-view
+readback、`tools/agent_tools/check_agent_runtime_alignment.py` の runtime alignment、
+Markdown formatter/check の targeted route とする。

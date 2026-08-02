@@ -8,7 +8,7 @@
     "downstream implementation ../tests/agent_tools/test_task_start_and_close.py validates generated run artifacts",
     "@dependency-end"
   ],
-  "version": 18,
+  "version": 19,
   "team": {
     "id": "repo_permanent_team",
     "report_root": "reports/agents",
@@ -732,6 +732,30 @@
       }
     },
     {
+      "id": "terra",
+      "codex_agents": [
+        "terra"
+      ],
+      "activation": "conditional_cross_owner_evidence",
+      "owns": [
+        "cross_owner_integration",
+        "context_reconstruction",
+        "adversarial_contradiction_validation",
+        "owner_closure_handback",
+        "unresolved_escalation_to_sol"
+      ],
+      "required_outputs": [
+        "change_review.md"
+      ],
+      "write_policy": {
+        "mode": "read_only",
+        "allowed_artifacts": [
+          "change_review"
+        ],
+        "notes": "Terra is a conditional read-only cross-cutting specialist candidate. It returns an owner closure, context capsule, and accepted/rejected/escalated handback to the Sol parent; it does not coordinate, implement, become a general worker, or activate without evidence."
+      }
+    },
+    {
       "id": "docs_workflow_steward",
       "codex_agents": [
         "docs_workflow_steward"
@@ -899,6 +923,11 @@
       "from": "manager",
       "to": "project_reviewer",
       "gate": "repo-wide or comprehensive integration review is required and intake package is approved"
+    },
+    {
+      "from": "terra",
+      "to": "manager",
+      "gate": "cross-owner evidence is reconstructed, owner closure and context capsule are recorded, and the handback is accepted, rejected, or escalated; unresolved findings return to the Sol parent"
     },
     {
       "from": "project_reviewer",
@@ -1315,6 +1344,30 @@
     },
     {
       "roles": [
+        "terra"
+      ],
+      "mode": "assessment_view",
+      "share_only": [
+        "intent_brief.md",
+        "management_review.md",
+        "schedule.md",
+        "schedule_review.md",
+        "design_brief.md",
+        "design_review.md",
+        "document_flow_review.md",
+        "change_review.md",
+        "final_review.md",
+        "verification.txt"
+      ],
+      "do_not_share": [
+        "hidden_chain_of_thought",
+        "private_debugging_notes",
+        "unselected_raw_history",
+        "unrelated_paths"
+      ]
+    },
+    {
+      "roles": [
         "docs_workflow_steward"
       ],
       "mode": "isolated",
@@ -1599,6 +1652,10 @@
       "when": "task is comprehensive, repo-wide, workflow-heavy, has integration risk across code, docs, tools, and runtime, creates a pull request, completes a skill execution, initiates a release, or enters scheduled review"
     },
     {
+      "role": "terra",
+      "when": "multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation is evidenced"
+    },
+    {
       "role": "docs_workflow_steward",
       "when": "task touches workflow docs, agent canon, adapters, entrypoints, or large reader-facing documentation"
     },
@@ -1689,8 +1746,12 @@
       "abstract_design_frame": {
         "entry_id": "abstract-design-frame",
         "responsibility_id": "active-design-packet",
-        "clause_refs": ["CANON-ADF"],
-        "owner_refs": ["role:designer"],
+        "clause_refs": [
+          "CANON-ADF"
+        ],
+        "owner_refs": [
+          "role:designer"
+        ],
         "source_refs": [
           "repo:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate",
           "repo:templates/agents/design_brief.md#section:abstract-design-frame"
@@ -1698,14 +1759,23 @@
         "dependency_refs": [
           "header:upstream:design:repo:templates/agents/design_brief.md->repo:documents/design/dependency-manifest-design.md"
         ],
-        "output_refs": ["artifact:design_brief.md"],
-        "reviewer_refs": ["role:design_reviewer", "role:document_flow_reviewer"]
+        "output_refs": [
+          "artifact:design_brief.md"
+        ],
+        "reviewer_refs": [
+          "role:design_reviewer",
+          "role:document_flow_reviewer"
+        ]
       },
       "implementation_source_packet": {
         "entry_id": "implementation-source-packet",
         "responsibility_id": "active-design-packet",
-        "clause_refs": ["CANON-SOURCE-PACKET"],
-        "owner_refs": ["role:designer"],
+        "clause_refs": [
+          "CANON-SOURCE-PACKET"
+        ],
+        "owner_refs": [
+          "role:designer"
+        ],
         "source_refs": [
           "repo:templates/agents/design_brief.md#section:implementation-source-packet",
           "repo:agents/workflows/implementation-waterfall-workflow.md#section:active-design-packet"
@@ -1714,14 +1784,22 @@
           "entry:abstract-design-frame",
           "header:upstream:design:repo:templates/agents/design_brief.md->repo:documents/design/dependency-manifest-design.md"
         ],
-        "output_refs": ["artifact:design_brief.md"],
-        "reviewer_refs": ["role:design_reviewer"]
+        "output_refs": [
+          "artifact:design_brief.md"
+        ],
+        "reviewer_refs": [
+          "role:design_reviewer"
+        ]
       },
       "design_side_effect_map": {
         "entry_id": "design-side-effect-map",
         "responsibility_id": "active-design-packet",
-        "clause_refs": ["CANON-SIDE-EFFECT"],
-        "owner_refs": ["role:designer"],
+        "clause_refs": [
+          "CANON-SIDE-EFFECT"
+        ],
+        "owner_refs": [
+          "role:designer"
+        ],
         "source_refs": [
           "repo:templates/agents/design_brief.md#section:design-side-effect-map",
           "repo:agents/workflows/implementation-waterfall-workflow.md#section:active-design-packet"
@@ -1730,14 +1808,23 @@
           "entry:abstract-design-frame",
           "header:upstream:design:repo:templates/agents/design_brief.md->repo:documents/design/dependency-manifest-design.md"
         ],
-        "output_refs": ["artifact:design_brief.md"],
-        "reviewer_refs": ["role:design_reviewer", "role:document_flow_reviewer"]
+        "output_refs": [
+          "artifact:design_brief.md"
+        ],
+        "reviewer_refs": [
+          "role:design_reviewer",
+          "role:document_flow_reviewer"
+        ]
       },
       "design_to_implementation_trace": {
         "entry_id": "design-to-implementation-trace",
         "responsibility_id": "active-design-packet",
-        "clause_refs": ["CANON-TRACE"],
-        "owner_refs": ["role:designer"],
+        "clause_refs": [
+          "CANON-TRACE"
+        ],
+        "owner_refs": [
+          "role:designer"
+        ],
         "source_refs": [
           "repo:templates/agents/design_brief.md#section:design-to-implementation-trace",
           "repo:agents/canonical/CODEX_WORKFLOW.md#section:5.-implementation"
@@ -1752,7 +1839,10 @@
           "artifact:design_review.md",
           "artifact:document_flow_review.md"
         ],
-        "reviewer_refs": ["role:design_reviewer", "role:document_flow_reviewer"]
+        "reviewer_refs": [
+          "role:design_reviewer",
+          "role:document_flow_reviewer"
+        ]
       }
     },
     "change_review": "change_review.md",
@@ -1905,7 +1995,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as cpp_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "change_reviewer+cpp_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/21",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/22",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2041,7 +2131,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as docs_workflow_steward with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "infra_steward+docs_workflow_steward",
-      "role_contract_ref": "agents/agents_config.json#/specialist_roles/9+agents/agents_config.json#/specialist_roles/18",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/9+agents/agents_config.json#/specialist_roles/19",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2551,7 +2641,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as prompt_config_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "prompt_config_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/specialist_roles/19",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/20",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2585,7 +2675,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not add validation outside that route. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route.",
       "logical_role_id": "change_reviewer+python_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/20",
+      "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/21",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2619,7 +2709,7 @@
       "model_reasoning_effort": "high",
       "developer_instructions": "You are acting as report_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
       "logical_role_id": "report_reviewer",
-      "role_contract_ref": "agents/agents_config.json#/specialist_roles/22",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/23",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2823,7 +2913,7 @@
       "model_reasoning_effort": "medium",
       "developer_instructions": "You are acting as skill_evaluator with skill_evaluator policy. Evaluate policy conformance with explicit evidence and typed outputs.",
       "logical_role_id": "skill_evaluator",
-      "role_contract_ref": "agents/agents_config.json#/specialist_roles/23",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/24",
       "profile_id": "mini_skill_evaluator_medium",
       "capsule_schema_id": "prompt_capsule_v1",
       "capabilities": [
@@ -2879,6 +2969,42 @@
       "checkpoint_policy": "nonblocking_observation_only",
       "continuation_policy": "same_spark_after_one_repaired_structural_gap",
       "projection_digest": "59a128eed6867f3d30a2216ddd5839f7754fa0a82838480f8e29e1ba5750e89f"
+    },
+    "terra": {
+      "name": "terra",
+      "description": "Conditional read-only cross-cutting specialist for owner closure, context reconstruction, and adversarial contradiction validation.",
+      "nickname_candidates": [
+        "terra"
+      ],
+      "sandbox_mode": "read-only",
+      "approval_policy": "never",
+      "model": "gpt-5.6-terra",
+      "model_reasoning_effort": "high",
+      "developer_instructions": "You are acting as terra with terra_cross_cutting cross-cutting review capacity. Operate only as a conditional read-only cross-cutting specialist. Activate on multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation. Treat user-provided alternatives and alternatives already present in findings as admissible adversarial-comparison input. Return owner closure, context capsule, and accepted/rejected/escalated handback; send unresolved findings to Sol. Do not invent unrequested alternatives, adopt an architecture, coordinate, implement as a general worker, mutate repository state, create PRs, or make final integration decisions.",
+      "logical_role_id": "terra",
+      "role_contract_ref": "agents/agents_config.json#/specialist_roles/18",
+      "profile_id": "terra_cross_cutting_read_only",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "cross_owner_integration",
+        "context_reconstruction",
+        "adversarial_contradiction_validation"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths",
+        "write_scope"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "d9316e9aa1a118056f400c9f8981ed0d9d1142a1f3f166c8d282d7b5773bd6cf"
     },
     "test_designer": {
       "name": "test_designer",
@@ -3689,6 +3815,31 @@
       "projection_digest": "59a128eed6867f3d30a2216ddd5839f7754fa0a82838480f8e29e1ba5750e89f"
     },
     {
+      "id": "terra",
+      "profile_id": "terra_cross_cutting_read_only",
+      "capsule_schema_id": "prompt_capsule_v1",
+      "capabilities": [
+        "cross_owner_integration",
+        "context_reconstruction",
+        "adversarial_contradiction_validation"
+      ],
+      "allowed_context": [
+        "objective",
+        "context",
+        "request_clause_ids",
+        "owner_gate",
+        "evidence"
+      ],
+      "forbidden_context": [
+        "unrelated_paths",
+        "write_scope"
+      ],
+      "return_schema_id": "review_result_v1",
+      "checkpoint_policy": "parent_owned_review_gate",
+      "continuation_policy": "same_packet_when_suitable",
+      "projection_digest": "d9316e9aa1a118056f400c9f8981ed0d9d1142a1f3f166c8d282d7b5773bd6cf"
+    },
+    {
       "id": "test_designer",
       "profile_id": "luna_reasoning_high",
       "capsule_schema_id": "prompt_capsule_v1",
@@ -3740,7 +3891,7 @@
     "schema_id": "generated_role_profile_projection_v1",
     "materializer": "tools/agent_tools/model_profile_registry.py",
     "registry_ref": "agents/model_profiles.toml",
-    "role_count": 34,
-    "projection_digest": "01685d8f72c2aabbb5a8fefd7f108fe20e62316f4ef0f2bcee017c51139c80ca"
+    "role_count": 35,
+    "projection_digest": "879d3abc1ac0fc391b9133625d662979f2ebaeef4265ac91da8cd582205b3bea"
   }
 }

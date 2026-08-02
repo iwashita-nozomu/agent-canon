@@ -6,6 +6,7 @@
 # downstream implementation ../tools/agent_tools/model_profile_registry.py loads and materializes this registry
 # downstream implementation ../tools/agent_tools/check_agent_runtime_alignment.py validates generated views
 # downstream implementation ../.codex/agents/spark_worker.toml projects the Spark runtime role
+# downstream implementation ../.codex/agents/terra.toml projects the Terra runtime role
 # @dependency-end
 
 schema_id = "model_profile_registry_v1"
@@ -46,6 +47,7 @@ ship_reviewer = "luna_ship_xhigh"
 skill_evaluator = "mini_skill_evaluator_medium"
 spark_worker = "spark_implementation_low"
 test_designer = "luna_reasoning_high"
+terra = "terra_cross_cutting_read_only"
 worker = "luna_implementation_xhigh"
 
 [role_sandbox_bindings]
@@ -82,6 +84,7 @@ ship_reviewer = "read-only"
 skill_evaluator = "read-only"
 spark_worker = "workspace-write"
 test_designer = "read-only"
+terra = "read-only"
 worker = "workspace-write"
 
 [role_instruction_templates]
@@ -198,6 +201,34 @@ close_tool_target_binding = "terminal_agent_id"
 [[model_profiles.role_instructions]]
 id = "luna_impl"
 text = "Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop."
+priority = 1
+
+[[model_profiles]]
+id = "terra_cross_cutting_read_only"
+model_alias = "terra_cross_cutting"
+model = "gpt-5.6-terra"
+reasoning_effort = "high"
+owner = "terra"
+capabilities = ["cross_owner_integration", "context_reconstruction", "adversarial_contradiction_validation"]
+allowed_context = ["objective", "context", "request_clause_ids", "owner_gate", "evidence"]
+forbidden_context = ["unrelated_paths", "write_scope"]
+return_schema_id = "review_result_v1"
+checkpoint_policy = "parent_owned_review_gate"
+continuation_policy = "same_packet_when_suitable"
+projection_digest = "computed_sha256_v1"
+role_template = "You are acting as {role_id} with {model_alias} cross-cutting review capacity. {base_prompt}"
+prompt_capsule_schema_id = "prompt_capsule_v1"
+prompt_capsule_template = "TERRA_CROSS_OWNER::[{model_alias}]\nRole: {role_id}\nContext:\n{context_block}\nObjective:\n{objective}\n"
+prompt_capsule_required_context = ["objective", "context"]
+close_skill_id = "subagent-bootstrap"
+close_tool_id = "close_agent"
+close_tool_argument_schema_id = "close_agent_args_v1"
+close_tool_failure_schema_id = "close_agent_failure_v1"
+close_tool_target_binding = "terminal_agent_id"
+
+[[model_profiles.role_instructions]]
+id = "terra_cross_owner"
+text = "Operate only as a conditional read-only cross-cutting specialist. Activate on multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation. Treat user-provided alternatives and alternatives already present in findings as admissible adversarial-comparison input. Return owner closure, context capsule, and accepted/rejected/escalated handback; send unresolved findings to Sol. Do not invent unrequested alternatives, adopt an architecture, coordinate, implement as a general worker, mutate repository state, create PRs, or make final integration decisions."
 priority = 1
 
 [[model_profiles]]
