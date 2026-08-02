@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import sqlite3
 import subprocess
 import sys
@@ -122,11 +123,31 @@ def write_graph_result(
     edges: tuple[tuple[str, str], ...],
     diagnostics: tuple[tuple[str, str, str], ...],
 ) -> Path:
-    """Write the minimal persisted graph consumed by acceptance classification."""
+    """Write one result bound to canonical persisted integration metadata."""
     graph_dir = root / ".agent-canon" / "knowledge-graph"
     graph_dir.mkdir(parents=True)
     database = graph_dir / "graph.sqlite"
+    snapshot_head = git(root, "rev-parse", "HEAD")
+    input_fingerprint = "1" * 64
+    graph_fingerprint = "2" * 64
+    integration_record = {
+        "schema": "agent-canon.graph.integration.v1",
+        "root": str(root.resolve()),
+        "db_path": str(database.resolve()),
+        "schema_version": "fixture",
+        "profile": "default",
+        "source_snapshot_profile": "parent",
+        "snapshot_head": snapshot_head,
+        "input_fingerprint": input_fingerprint,
+        "graph_fingerprint": graph_fingerprint,
+        "contract_fingerprint": "fixture",
+        "producer_artifacts": [],
+        "runtime_evidence": None,
+        "verified": True,
+        "verification_code": "source-facts-readback-v1",
+    }
     with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT)")
         connection.execute(
             "CREATE TABLE nodes(id TEXT, layer TEXT, payload_json TEXT)"
         )
@@ -152,14 +173,30 @@ def write_graph_result(
                 "INSERT INTO diagnostics VALUES('source', ?, ?, ?)",
                 (code, message, target_node),
             )
+        for key, value in (
+            ("integration_record", json.dumps(integration_record)),
+            ("snapshot_head", snapshot_head),
+            ("input_fingerprint", input_fingerprint),
+            ("graph_fingerprint", graph_fingerprint),
+        ):
+            connection.execute("INSERT INTO metadata VALUES(?, ?)", (key, value))
     result = graph_dir / "graph-build.json"
     result.write_text(
         json.dumps(
             {
                 "schema": "agent-canon.graph.build.v1",
+                "command": "build",
                 "status": "incomplete",
+                "graph_status": "incomplete",
                 "exit_code": 1,
-                "db_path": str(database),
+                "root": str(root.resolve()),
+                "profile": "default",
+                "db_path": str(database.resolve()),
+                "input_fingerprint": input_fingerprint,
+                "graph_fingerprint": graph_fingerprint,
+                "integration_record": integration_record,
+                "publication": "published",
+                "durability": "durable",
             }
         ),
         encoding="utf-8",
@@ -357,6 +394,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 graph_result,
                 {"AGENT_CANON_PR_BASE_REF": base},
             )
+            head = git(root, "rev-parse", "HEAD")
 
         self.assertEqual(acceptance.status, "pass")
         self.assertEqual(
@@ -364,9 +402,60 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             "unrelated_baseline_incompleteness_reported",
         )
         self.assertEqual(acceptance.report["blocking_diagnostics"], [])
+        graph_identity = acceptance.report["graph_identity"]
+        self.assertEqual(graph_identity["snapshot_head"], head)
+        self.assertEqual(graph_identity["publication"], "published")
+        self.assertEqual(
+            graph_identity["db_path"],
+            str(root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"),
+        )
         baseline = acceptance.report["baseline_diagnostics"]
         self.assertEqual(len(baseline), 1)
         self.assertEqual(baseline[0]["source_path"], "legacy.py")
+
+    def test_concurrent_database_replacement_is_typed_failure(self) -> None:
+        """Replacing the canonical DB after open cannot reach classification."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {"legacy.py": "legacy\n"})
+            graph_result = write_graph_result(
+                root,
+                ("changed.py", "legacy.py"),
+                (),
+                (("target-unresolved", "legacy.py:4:missing.md", "legacy.py"),),
+            )
+            database = root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
+            real_identity = selector.regular_file_identity
+            database_reads = 0
+
+            def replace_after_open(
+                path: Path,
+                unavailable_reason: str,
+                invalid_reason: str,
+            ) -> object:
+                nonlocal database_reads
+                if path == database:
+                    database_reads += 1
+                    if database_reads == 2:
+                        replacement = database.with_name("replacement.sqlite")
+                        replacement.write_bytes(database.read_bytes())
+                        os.replace(replacement, database)
+                return real_identity(path, unavailable_reason, invalid_reason)
+
+            with patch.object(
+                selector,
+                "regular_file_identity",
+                side_effect=replace_after_open,
+            ):
+                with self.assertRaises(selector.SelectorFailure) as raised:
+                    selector.evaluate_built_graph(
+                        root,
+                        graph_result,
+                        {"AGENT_CANON_PR_BASE_REF": base},
+                    )
+
+        self.assertEqual(raised.exception.reason, "graph_identity_replaced")
+        self.assertIn("artifact=graph_database", raised.exception.evidence)
 
     def test_reachable_unresolved_blocks_changed_responsibility(self) -> None:
         """A diagnostic reached through a dependency edge remains a blocker."""

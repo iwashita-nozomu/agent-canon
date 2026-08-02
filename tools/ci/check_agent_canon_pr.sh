@@ -126,25 +126,25 @@ run_shared_surface_check() {
 run_agent_canon() {
   if [ -x "${CANON_TOOLS_ROOT}/bin/agent-canon" ]; then
     "${CANON_TOOLS_ROOT}/bin/agent-canon" "$@"
-    return 0
+    return $?
   fi
   if [ -x "${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" ]; then
     "${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" "$@"
-    return 0
+    return $?
   fi
   if [ -x "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon" ]; then
     "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon" "$@"
-    return 0
+    return $?
   fi
   if [ -x "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon" ]; then
     "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon" "$@"
-    return 0
+    return $?
   fi
   if command -v cargo >/dev/null 2>&1 \
     && [ -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ]; then
     CARGO_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR}" \
       cargo run --quiet --manifest-path "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" -- "$@"
-    return 0
+    return $?
   fi
   echo "AGENT_CANON_CLI_BLOCKER=agent_canon_cli_unavailable" >&2
   echo "AGENT_CANON_CLI_REASON=agent-canon CLI binary/shim missing and cargo route unavailable" >&2
