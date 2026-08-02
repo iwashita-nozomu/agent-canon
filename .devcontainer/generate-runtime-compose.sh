@@ -78,8 +78,12 @@ runtime = data.get("runtime", {})
 runtime_shell = runtime.get("shell", "/bin/bash")
 if not isinstance(runtime_shell, str) or re.fullmatch(r"/[A-Za-z0-9._/-]+", runtime_shell) is None:
     raise SystemExit("runtime.shell must be one absolute executable path")
+dependency_profile = runtime.get("dependency_profile", "full")
+if not isinstance(dependency_profile, str) or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", dependency_profile) is None:
+    raise SystemExit("runtime.dependency_profile must be a non-empty profile name")
 print(f"dockerfile={pack['dockerfile']}")
 print(f"runtime_shell={runtime_shell}")
+print(f"dependency_profile={dependency_profile}")
 print(f"workdir={runtime.get('workdir', '/workspace')}")
 print(f"workspace_mount={runtime.get('workspace_mount', '/workspace')}")
 for mount in runtime.get("mounts", []):
@@ -95,6 +99,7 @@ PY
   compose_mode="repo-docker-pack"
   dockerfile=""
   runtime_shell="/bin/bash"
+  dependency_profile="full"
   workdir="/workspace"
   workspace_mount="/workspace"
   pack_mounts=()
@@ -103,6 +108,7 @@ PY
     case "$pack_value" in
       dockerfile=*) dockerfile="${pack_value#dockerfile=}" ;;
       runtime_shell=*) runtime_shell="${pack_value#runtime_shell=}" ;;
+      dependency_profile=*) dependency_profile="${pack_value#dependency_profile=}" ;;
       workdir=*) workdir="${pack_value#workdir=}" ;;
       workspace_mount=*) workspace_mount="${pack_value#workspace_mount=}" ;;
       mount=*) pack_mounts+=("${pack_value#mount=}") ;;
@@ -113,6 +119,7 @@ else
   compose_mode="agent-canon-source-only"
   dockerfile=""
   runtime_shell="/bin/bash"
+  dependency_profile="full"
   workdir="/workspace"
   workspace_mount="/workspace"
   pack_mounts=()
@@ -270,6 +277,7 @@ environment_lines=(
   "      DEVCONTAINER_GPU_REQUEST: \"${gpu_request}\""
   "      AGENT_CANON_SECRET_MOUNT: \"${secret_target}\""
   "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
+  "      AGENT_CANON_DEPENDENCY_PROFILE: \"${dependency_profile}\""
   '      AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"'
   '      AGENT_CANON_WORKSPACE_ROOT: "/workspace"'
   "      AGENT_CANON_REPOSITORY_ROOT: \"${container_repo_root}\""

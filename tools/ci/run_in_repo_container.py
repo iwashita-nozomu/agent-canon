@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import argparse
-import shlex
 import subprocess
 import sys
 
@@ -18,8 +17,7 @@ from container_runtime import (
     apply_pack_overrides,
     build_build_command,
     build_run_command,
-    build_shell_invocation,
-    join_shell_lines,
+    build_workspace_setup_command,
     load_or_default_pack,
     print_label_and_command,
     resolve_builder,
@@ -74,8 +72,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--container-workspace",
         help=(
-            "Container mount point for the host workspace. "
-            "Default: pack runtime value"
+            "Container mount point for the host workspace. Default: pack runtime value"
         ),
     )
     parser.add_argument("--workdir", help="Container working directory override.")
@@ -151,30 +148,6 @@ def normalize_command(command: list[str], shell_session: bool) -> list[str]:
     return normalized
 
 
-def workspace_setup_command(
-    command: list[str],
-    *,
-    shell: str,
-    container_workspace: str,
-    skip_setup: bool,
-) -> list[str]:
-    """Return a command that runs workspace setup before the requested command."""
-    if skip_setup:
-        return command
-
-    installer = f"{container_workspace.rstrip('/')}/docker/install_python_dependencies.sh"
-    lines = [
-        "set -euo pipefail",
-        (
-            f"if [ -f {shlex.quote(installer)} ]; then "
-            f"bash {shlex.quote(installer)} {shlex.quote(container_workspace)}; "
-            "fi"
-        ),
-        f"exec {shlex.join(command)}",
-    ]
-    return build_shell_invocation(shell, join_shell_lines(lines))
-
-
 def main() -> int:
     """Run the CLI."""
     try:
@@ -192,10 +165,11 @@ def main() -> int:
         container_workspace = args.container_workspace or pack.runtime.workspace_mount
         shell = args.shell or pack.runtime.shell
         run_payload = command if command else [shell]
-        run_payload = workspace_setup_command(
+        run_payload = build_workspace_setup_command(
             run_payload,
             shell=shell,
             container_workspace=container_workspace,
+            dependency_profile=pack.runtime.dependency_profile,
             skip_setup=args.skip_workspace_setup,
         )
 

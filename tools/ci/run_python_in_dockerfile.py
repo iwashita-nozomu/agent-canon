@@ -19,6 +19,7 @@ from container_runtime import (
     apply_pack_overrides,
     build_build_command,
     build_run_command,
+    build_workspace_setup_command,
     load_or_default_pack,
     load_toml,
     print_label_and_command,
@@ -41,7 +42,9 @@ class PythonExecutionRule:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the CLI parser."""
-    parser = argparse.ArgumentParser(description="Run one Python file inside the repo Docker runtime.")
+    parser = argparse.ArgumentParser(
+        description="Run one Python file inside the repo Docker runtime."
+    )
     parser.add_argument("dockerfile", help="Dockerfile path used for rule resolution.")
     parser.add_argument("python_file", help="Python file to run inside the container.")
     parser.add_argument(
@@ -56,9 +59,15 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("auto", "docker", "podman"),
         help="Container builder to use. Default: auto",
     )
-    parser.add_argument("--skip-build", action="store_true", help="Skip the build step.")
-    parser.add_argument("--keep-image", action="store_true", help="Keep the built image.")
-    parser.add_argument("--print-only", action="store_true", help="Print commands without executing.")
+    parser.add_argument(
+        "--skip-build", action="store_true", help="Skip the build step."
+    )
+    parser.add_argument(
+        "--keep-image", action="store_true", help="Keep the built image."
+    )
+    parser.add_argument(
+        "--print-only", action="store_true", help="Print commands without executing."
+    )
     parser.add_argument(
         "--env",
         action="append",
@@ -86,25 +95,39 @@ def load_rules(path_like: str) -> tuple[str, list[PythonExecutionRule]]:
     data = load_toml(path_like)
     defaults = data.get("defaults", {})
     if not isinstance(defaults, dict):
-        raise ValueError("docker/python-execution-rules.toml: [defaults] must be a table")
+        raise ValueError(
+            "docker/python-execution-rules.toml: [defaults] must be a table"
+        )
     default_pack = defaults.get("default_pack", "docker/packs/default.toml")
     if not isinstance(default_pack, str):
-        raise ValueError("docker/python-execution-rules.toml: [defaults].default_pack must be a string")
+        raise ValueError(
+            "docker/python-execution-rules.toml: [defaults].default_pack must be a string"
+        )
 
     raw_rules = data.get("rule", [])
     if not isinstance(raw_rules, list):
-        raise ValueError("docker/python-execution-rules.toml: [[rule]] entries must form a list")
+        raise ValueError(
+            "docker/python-execution-rules.toml: [[rule]] entries must form a list"
+        )
 
     rules: list[PythonExecutionRule] = []
     for index, raw_rule in enumerate(raw_rules, start=1):
         if not isinstance(raw_rule, dict):
-            raise ValueError(f"docker/python-execution-rules.toml: rule #{index} must be a table")
+            raise ValueError(
+                f"docker/python-execution-rules.toml: rule #{index} must be a table"
+            )
         match_roots = raw_rule.get("match_roots", [])
-        if not isinstance(match_roots, list) or not all(isinstance(item, str) for item in match_roots):
-            raise ValueError(f"docker/python-execution-rules.toml: rule #{index} match_roots must be strings")
+        if not isinstance(match_roots, list) or not all(
+            isinstance(item, str) for item in match_roots
+        ):
+            raise ValueError(
+                f"docker/python-execution-rules.toml: rule #{index} match_roots must be strings"
+            )
         workdir = raw_rule.get("workdir")
         if workdir is not None and not isinstance(workdir, str):
-            raise ValueError(f"docker/python-execution-rules.toml: rule #{index} workdir must be a string")
+            raise ValueError(
+                f"docker/python-execution-rules.toml: rule #{index} workdir must be a string"
+            )
         rules.append(
             PythonExecutionRule(
                 name=str(raw_rule.get("name", f"rule-{index}")),
@@ -138,7 +161,9 @@ def resolve_rule(
 
 def cleanup_image(builder: str, image_tag: str) -> None:
     """Remove one image quietly."""
-    subprocess.run([builder, "image", "rm", "-f", image_tag], check=False, capture_output=True)
+    subprocess.run(
+        [builder, "image", "rm", "-f", image_tag], check=False, capture_output=True
+    )
 
 
 def main() -> int:
@@ -150,15 +175,27 @@ def main() -> int:
             raise SystemExit(f"Python file not found: {python_file}")
 
         _, rules = load_rules(args.rules)
-        resolved_rule = resolve_rule(dockerfile=args.dockerfile, python_file=python_file, rules=rules)
-        pack_path = args.pack or (resolved_rule.pack if resolved_rule is not None else "docker/packs/default.toml")
-        python_bin = resolved_rule.python_bin if resolved_rule is not None else "python3"
+        resolved_rule = resolve_rule(
+            dockerfile=args.dockerfile, python_file=python_file, rules=rules
+        )
+        pack_path = args.pack or (
+            resolved_rule.pack
+            if resolved_rule is not None
+            else "docker/packs/default.toml"
+        )
+        python_bin = (
+            resolved_rule.python_bin if resolved_rule is not None else "python3"
+        )
         workdir = resolved_rule.workdir if resolved_rule is not None else None
 
-        pack = apply_pack_overrides(load_or_default_pack(pack_path), dockerfile=args.dockerfile)
+        pack = apply_pack_overrides(
+            load_or_default_pack(pack_path), dockerfile=args.dockerfile
+        )
         builder = resolve_builder(args.builder, print_only=args.print_only)
         relative_python = python_file.relative_to(workspace_path(".")).as_posix()
-        container_python = f"{pack.runtime.workspace_mount.rstrip('/')}/{relative_python}"
+        container_python = (
+            f"{pack.runtime.workspace_mount.rstrip('/')}/{relative_python}"
+        )
 
         python_args = list(args.python_args)
         if python_args and python_args[0] == "--":
@@ -169,7 +206,12 @@ def main() -> int:
             builder,
             pack,
             workspace_root=workspace_path("."),
-            command=[python_bin, container_python, *python_args],
+            command=build_workspace_setup_command(
+                [python_bin, container_python, *python_args],
+                shell="/bin/bash",
+                container_workspace=pack.runtime.workspace_mount,
+                dependency_profile=pack.runtime.dependency_profile,
+            ),
             env=tuple(args.env),
             mounts=tuple(args.mount),
             workdir=workdir,
