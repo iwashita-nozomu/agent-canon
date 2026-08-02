@@ -94,21 +94,36 @@ attach_submodule_main_to_staged_pin() {
   echo "FRESH_CLONE_SUBMODULE_STATUS=clean"
 }
 
+resolve_clone_tools_root_or_fail() {
+  local repo_root="$1"
+  local resolved=""
+  local diagnostics=""
+
+  if ! diagnostics="$(agent_canon_source_tools_root "${repo_root}" 2>&1)"; then
+    echo "fresh_clone_tools_root=missing"
+    echo "fresh_clone_tools_root_reason=agent_canon_source_tools_root_failed"
+    printf '%s\n' "${diagnostics}"
+    exit 1
+  fi
+  resolved="${diagnostics}"
+  printf '%s' "${resolved}"
+}
+
 git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
 git config --global --add safe.directory "${CLONE_DIR}"
 overlay_current_tree
 cd "${CLONE_DIR}"
-CLONE_TOOLS_ROOT="$(agent_canon_source_tools_root "${CLONE_DIR}")"
-if [ -z "${CLONE_TOOLS_ROOT}" ]; then
-  echo "fresh_clone_tools_root=missing"
-  echo "fresh_clone_tools_root_reason=agent_canon_source_tools_root_failed"
-  exit 1
-fi
 if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1; then
   rm -rf vendor/agent-canon
-  git -c protocol.file.allow=always submodule update --init --recursive vendor/agent-canon
+  if ! submodule_init_output="$(git -c protocol.file.allow=always submodule update --init --recursive vendor/agent-canon 2>&1)"; then
+    echo "fresh_clone_submodule_init=failed"
+    echo "fresh_clone_submodule_init_reason=submodule_update_failed"
+    printf '%s\n' "${submodule_init_output}"
+    exit 1
+  fi
   attach_submodule_main_to_staged_pin "vendor/agent-canon"
 fi
+CLONE_TOOLS_ROOT="$(resolve_clone_tools_root_or_fail "${CLONE_DIR}")"
 if [[ -n "$(git status --short)" ]]; then
   git config user.name "Fresh Clone Check"
   git config user.email "fresh-clone-check@example.invalid"

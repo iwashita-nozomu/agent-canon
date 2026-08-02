@@ -230,7 +230,34 @@ if [ -n "${AGENT_CANON_CLI_CMD:-}" ]; then
   echo "AGENT_CANON_CLI_PATH=${AGENT_CANON_CLI_CMD}"
 fi
 
-export PYTHONPATH="${WORKSPACE_ROOT}/python:${PYTHONPATH:-}"
+add_pythonpath() {
+  local path="${1}"
+  [ -z "${path}" ] && return
+  case ":${RUN_ALL_CHECKS_PYTHONPATH}:" in
+    *":${path}:"*)
+      ;;
+    *)
+      if [ -z "${RUN_ALL_CHECKS_PYTHONPATH}" ]; then
+        RUN_ALL_CHECKS_PYTHONPATH="${path}"
+      else
+        RUN_ALL_CHECKS_PYTHONPATH="${path}:${RUN_ALL_CHECKS_PYTHONPATH}"
+      fi
+      ;;
+  esac
+}
+
+RUN_ALL_CHECKS_PYTHONPATH=""
+add_pythonpath "${AGENT_CANON_SOURCE_ROOT}"
+add_pythonpath "${AGENT_CANON_SOURCE_ROOT}/tools"
+add_pythonpath "${AGENT_CANON_SOURCE_ROOT}/tools/agent_tools"
+add_pythonpath "${WORKSPACE_ROOT}/python"
+if [ -n "${PYTHONPATH:-}" ]; then
+  IFS=':' read -r -a existing_pythonpath <<< "${PYTHONPATH}"
+  for entry in "${existing_pythonpath[@]}"; do
+    add_pythonpath "${entry}"
+  done
+fi
+export PYTHONPATH="${RUN_ALL_CHECKS_PYTHONPATH}"
 export JAX_PLATFORMS="${JAX_PLATFORMS:-}"
 export CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-}"
 export NVIDIA_VISIBLE_DEVICES="${NVIDIA_VISIBLE_DEVICES:-}"
