@@ -19,6 +19,7 @@ downstream implementation ../../tools/ci/run_all_checks.sh consumes the owner/ro
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
 downstream implementation ../../tests/tools/test_agent_canon_pr_graph_selector.py verifies parent gate selection from canonical profiles, surfaces, and diff evidence
+downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py verifies real parent gate orchestration for incomplete graph acceptance
 downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs owns the sole complete-file manifest parser and source snapshot
 downstream implementation ../../rust/agent-canon/src/graph.rs owns canonical graph materialization and queries
 downstream implementation ../../rust/agent-canon/src/structured_analysis.rs owns the shared graph storage schema
