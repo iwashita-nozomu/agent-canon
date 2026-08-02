@@ -26,10 +26,10 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 from typing import cast
 
-try:
-    import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # Python < 3.11 compatibility.
-    import tomli as tomllib  # type: ignore[no-redef]
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 from eval_manifest_paths import (
     eval_manifest_path,
@@ -38,8 +38,6 @@ from eval_manifest_paths import (
 )
 from runtime_log_paths import agent_canon_root, eval_results_dir
 from workflow_monitor import MonitoringEntries, append_monitoring
-
-UTC = timezone.utc  # noqa: UP017
 
 DEFAULT_RESULTS_FAMILY = "skill-workflow-prompt"
 REPORT_STATUS_LINE_LIMIT = 13
@@ -758,7 +756,7 @@ def build_eval_run_metadata(
     root: Path,
 ) -> EvalRunMetadata:
     """Build metadata with a unique, filename-safe eval run id."""
-    now = datetime.now(UTC)
+    now = datetime.now(timezone.utc)
     created_at = now.isoformat()
     timestamp = now.strftime("%Y%m%dT%H%M%S%fZ")
     clean_skills = tuple(skill.strip() for skill in used_skills if skill.strip())

@@ -16,8 +16,6 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 
-UTC = timezone.utc  # noqa: UP017
-
 VISUALIZE_NOTEBOOK_NAME = "visualize.ipynb"
 EXECUTED_NOTEBOOK_NAME = "visualize_executed.ipynb"
 DEFAULT_RUN_NAME_PREFIX = "run"
@@ -25,7 +23,7 @@ DEFAULT_RUN_NAME_PREFIX = "run"
 
 def compact_timestamp() -> str:
     """Create a compact UTC value for managed run names."""
-    return datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
 
 
 def resolve_run_dir() -> Path:

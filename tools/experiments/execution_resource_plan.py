@@ -56,8 +56,6 @@ try:
 except ImportError:  # pragma: no cover - this owner is Unix/container-only.
     fcntl = None  # type: ignore[assignment]
 
-UTC = timezone.utc  # noqa: UP017
-
 PLAN_SCHEMA_VERSION = "execution-resource-plan/v1"
 ENVIRONMENT_CERTIFICATE_SCHEMA_VERSION = "environment-certificate/v1"
 COMPLETION_COVERAGE_INPUT_SCHEMA_VERSION = "completion-coverage/v2"
@@ -1858,7 +1856,7 @@ def _source_file_record_payload(
 
 
 def utc_now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def _canonical_json(value: object) -> str:

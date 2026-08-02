@@ -46,8 +46,6 @@ except ImportError:  # pragma: no cover - direct CLI execution
         GraphResponse,
     )
 
-UTC = timezone.utc  # noqa: UP017
-
 SCHEMA_VERSION = 1
 DEFAULT_PROFILE = "writing"
 PROFILES = ("writing", "logic", "experiment", "report", "academic", "paper", "all")
@@ -475,7 +473,7 @@ def emit_command_stats(args: argparse.Namespace, status_key: str, fields: dict[s
 
 def utc_now() -> str:
     """Return a stable UTC timestamp."""
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def graph_db_path(args: argparse.Namespace, inputs: Sequence[Path]) -> Path:

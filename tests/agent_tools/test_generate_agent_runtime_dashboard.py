@@ -17,8 +17,6 @@ import unittest
 from datetime import datetime, timezone
 from pathlib import Path
 
-UTC = timezone.utc  # noqa: UP017
-
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_runtime_dashboard.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
@@ -1143,7 +1141,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
         """Write mixed old and recent evidence for recent-mode assertions."""
         hook_dir = mounted_log_archive_root(root) / "hook-runs" / repo_log_key(root) / "test-container"
         hook_dir.mkdir(parents=True)
-        recent_timestamp = datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        recent_timestamp = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
         (hook_dir / "skill_usage.jsonl").write_text(
             json.dumps(
                 {

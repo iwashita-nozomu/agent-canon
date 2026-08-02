@@ -43,8 +43,6 @@ from update_lifecycle_contract import (
     validate_source_main_rebind_receipt,
 )
 
-UTC = timezone.utc  # noqa: UP017
-
 MAX_ERROR_CHARS = 4000
 REMOTE_SCP_RE = re.compile(r"^[^@]+@[^:]+:(?P<slug>[^/]+/[^/]+?)(?:\.git)?/?$")
 GITHUB_PUBLICATION_PACKET_SCHEMA = "agent-canon.github-publication-packet.v1"
@@ -1100,7 +1098,7 @@ def build_pull_request_lifecycle(
         if external_binding is None
         else cast(str, external_binding["snapshot_id"])
     )
-    observed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    observed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     evidence_seed = {
         "transaction_id": transaction_id,
         "snapshot_id": snapshot_id,
