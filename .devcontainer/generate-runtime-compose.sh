@@ -315,6 +315,8 @@ if [ "$gpu_mode" = "enabled" ]; then
   )
 fi
 
+mkdir -p "$(dirname "$compose_output")"
+
 {
   printf 'name: %s\n' "$compose_project_name"
   printf 'services:\n'
