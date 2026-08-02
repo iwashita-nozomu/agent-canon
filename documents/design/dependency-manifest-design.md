@@ -14,6 +14,8 @@ downstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extr
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design claims against manifest evidence
 downstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders dependency graph review artifacts
 downstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py selects parent strict graph gating from this canonical dependency surface manifest
+downstream implementation ../../tools/ci/check_agent_canon_pr.sh executes selected full or changed-responsibility graph acceptance
+downstream implementation ../../tools/ci/run_all_checks.sh consumes the owner/root/PID/status-bound graph receipt
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
 downstream implementation ../../tests/tools/test_agent_canon_pr_graph_selector.py verifies parent gate selection from canonical profiles, surfaces, and diff evidence
@@ -121,6 +123,26 @@ into a blocker. Standalone AgentCanon source PRs retain the strict source graph
 gate. This separation keeps manifest migration debt visible without making
 unrelated parent pin-only changes satisfy a repository-wide completeness
 baseline.
+
+When the gate is selected, graph construction still covers the complete parent
+repository. A complete graph produces the existing `prepared` receipt and
+retains the full strict review. If construction publishes an incomplete graph,
+the gate classifies every persisted diagnostic against the exact validated PR
+diff and the graph's dependency/surface edges. Changed paths are responsibility
+seeds, reachability is traversed in both directions, and diagnostics declared by
+the resulting closure remain blockers. A changed target that makes an unchanged
+declaration unresolved is also a blocker. Invalid `manifest-grammar` in a
+changed declaration therefore cannot be hidden by baseline state.
+
+A diagnostic outside that closure is accepted only when its declaring source
+identity is unchanged from the validated base. Each accepted diagnostic is
+written to the changed-responsibility report with its code, message, source,
+target, and classification; it is not reduced to a baseline count. If source
+identity cannot be confirmed, the gate fails closed. This accepted incomplete
+state produces a `scoped` receipt. Its quick-CI consumer does not claim that the
+graph is fresh and does not run graph-query consumers. An explicit parent graph
+migration owns the full graph, so every diagnostic remains in scope. Standalone
+AgentCanon source PRs also retain full completeness.
 
 The selector reads dependency surfaces from this document's downstream
 manifest instead of maintaining a second path list. The manifest therefore
@@ -663,12 +685,13 @@ Phase 4: enable CI fail gate for changed files.
 Full-repo missing-header scan remains report-only until the repository is migrated.
 この repository では full-repo migration、touched dependency-manifest change、または
 canonical profile owner が graph-required と宣言する validation profile のときだけ
-strict baseline を
-`bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` で
-有効化します。pin-only parent changes are represented by the skipped receipt
-and do not inherit `target-unresolved` or `manifest-grammar` diagnostics from
-the parent root as unrelated blockers. Goal-driven cleanup or shared-surface
-migration closeout repeats the strict baseline and records stable
+graph gate を起動します。full-repo migration と standalone source は
+`bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` の strict
+baseline を維持します。parent PR の incomplete graph は changed responsibility
+closure を gate し、base と同一で非到達な `target-unresolved` や
+`manifest-grammar` は個別 evidence として残します。pin-only parent changes は
+skipped receipt で表現します。Goal-driven cleanup or shared-surface migration
+closeout repeats the strict baseline and records stable
 `DEPENDENCY_HEADER_SCAN_MISSING=0` and `REPO_DEPENDENCY_REVIEW=pass` evidence.
 
 Phase 5: remove legacy `Dependency Files:` wording from remaining docs after all checkable files use dependency manifest blocks.

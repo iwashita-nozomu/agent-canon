@@ -4,11 +4,12 @@
 # responsibility Checks agent canon pr CI readiness.
 # upstream design ../../tools/README.md shared automation index
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md shared canon PR workflow
+# upstream design ../../documents/design/dependency-manifest-design.md changed-responsibility graph acceptance contract
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone AgentCanon PR checklist
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
 # upstream design ../../templates/documents/github/pull-request/agent_canon.md canonical template-side AgentCanon PR checklist
 # upstream implementation ../agent_tools/run_repo_dependency_review.sh strict dependency review
-# upstream implementation ./agent_canon_pr_graph_selector.py selects parent graph gating from canonical profiles, dependency surfaces, and trusted diff evidence
+# upstream implementation ./agent_canon_pr_graph_selector.py selects and evaluates parent graph gating from trusted diff and persisted graph evidence
 # upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py skill/workflow prompt parity eval
 # upstream implementation ../agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
 # upstream implementation ../agent_tools/generated_artifact_guard.py rejects regenerated report leftovers before PR check pass
@@ -152,6 +153,7 @@ run_agent_canon() {
 
 PR_GATE_DEPENDENCY_GRAPH_REASON=""
 PR_GATE_DEPENDENCY_GRAPH_EVIDENCE=""
+PR_GATE_DEPENDENCY_GRAPH_BASE_SHA=""
 agentcanon_pr_dependency_graph_required() {
   local base_fetch_output=""
   local base_fetch_rc=0
@@ -204,8 +206,15 @@ agentcanon_pr_dependency_graph_required() {
   selector_status="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH" {print $2}' <<<"${selector_output}")"
   PR_GATE_DEPENDENCY_GRAPH_REASON="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON" {sub(/^[^=]*=/, ""); print}' <<<"${selector_output}")"
   PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE" {sub(/^[^=]*=/, ""); print}' <<<"${selector_output}")"
+  PR_GATE_DEPENDENCY_GRAPH_BASE_SHA="$(awk -v RS=';' -F= '$1 == "base" {print $2}' <<<"${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE}")"
   case "${selector_rc}:${selector_status}" in
-    0:required) return 0 ;;
+    0:required)
+      if [[ ! "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+        echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail reason=selected_base_missing" >&2
+        return 2
+      fi
+      return 0
+      ;;
     10:skipped) return 1 ;;
     *)
       echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail rc=${selector_rc} status=${selector_status:-missing}" >&2
@@ -417,7 +426,7 @@ write_pr_gate_receipt() {
     return 1
   fi
   case "${dependency_graph_status}" in
-    prepared|skipped) ;;
+    prepared|scoped|skipped) ;;
     *)
       echo "Invalid PR gate dependency graph status: ${dependency_graph_status}" >&2
       return 1
@@ -606,19 +615,66 @@ echo "6️⃣  dependency graph completeness"
 PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped
 PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=0
 if agentcanon_pr_dependency_graph_required; then
-  # This graph build is the producer for the strict dependency review and the
-  # prepared graph consumers in the subsequent quick CI invocation.
-  run_agent_canon graph build --root . --profile default --format json
-  if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
-    python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py"
+  # This graph build produces either a full strict review or scoped diagnostic
+  # evidence for the subsequent quick CI receipt consumer.
+  mkdir -p "${PR_DEPENDENCY_REVIEW_DIR}"
+  graph_build_result="${PR_DEPENDENCY_REVIEW_DIR}/graph-build.json"
+  if run_agent_canon graph build --root . --profile default --format json >"${graph_build_result}"; then
+    graph_build_rc=0
+  else
+    graph_build_rc=$?
   fi
-  bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/render_dependency_manifest_graph.py" \
-    --root . \
-    --scope full \
-    --markdown-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.md" \
-    --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
-  PR_GATE_DEPENDENCY_GRAPH_STATUS=prepared
+  cat "${graph_build_result}"
+  if [[ "${graph_build_rc}" -eq 0 ]]; then
+    if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
+      python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py"
+    fi
+    bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
+    python3 "${CANON_TOOLS_ROOT}/agent_tools/render_dependency_manifest_graph.py" \
+      --root . \
+      --scope full \
+      --markdown-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.md" \
+      --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
+    PR_GATE_DEPENDENCY_GRAPH_STATUS=prepared
+  elif [[ "${graph_build_rc}" -eq 1 && "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
+    graph_acceptance_output=""
+    graph_acceptance_rc=0
+    graph_acceptance_args=(
+      --root "${WORKSPACE_ROOT}"
+      --source-root "${AGENT_CANON_SOURCE_ROOT}"
+      --evaluate-built-graph
+      --graph-result "${graph_build_result}"
+      --report-out "${PR_DEPENDENCY_REVIEW_DIR}/changed-responsibility-acceptance.json"
+    )
+    if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+      graph_acceptance_args+=(--trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}")
+    fi
+    if graph_acceptance_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
+      "${graph_acceptance_args[@]}")"; then
+      graph_acceptance_rc=0
+    else
+      graph_acceptance_rc=$?
+    fi
+    printf '%s\n' "${graph_acceptance_output}"
+    graph_acceptance_status="$(awk -F= '$1 == "AGENT_CANON_PR_GRAPH_ACCEPTANCE" {print $2}' <<<"${graph_acceptance_output}")"
+    graph_acceptance_reason="$(awk -F= '$1 == "AGENT_CANON_PR_GRAPH_ACCEPTANCE_REASON" {sub(/^[^=]*=/, ""); print}' <<<"${graph_acceptance_output}")"
+    graph_acceptance_evidence="$(awk -F= '$1 == "AGENT_CANON_PR_GRAPH_ACCEPTANCE_EVIDENCE" {sub(/^[^=]*=/, ""); print}' <<<"${graph_acceptance_output}")"
+    if [[ -f "${PR_DEPENDENCY_REVIEW_DIR}/changed-responsibility-acceptance.json" ]]; then
+      cat "${PR_DEPENDENCY_REVIEW_DIR}/changed-responsibility-acceptance.json"
+    fi
+    if [[ "${graph_acceptance_rc}:${graph_acceptance_status}" != "0:pass" ]]; then
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=changed_responsibility_failed"
+      if [[ "${graph_acceptance_rc}" -eq 0 ]]; then
+        exit 2
+      fi
+      exit "${graph_acceptance_rc}"
+    fi
+    PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE};graph_acceptance_reason=${graph_acceptance_reason};${graph_acceptance_evidence}"
+    PR_GATE_DEPENDENCY_GRAPH_STATUS=scoped
+  else
+    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=graph_build_failed rc=${graph_build_rc}"
+    exit "${graph_build_rc}"
+  fi
 else
   PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=$?
   if [[ "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}" -ne 1 ]]; then
