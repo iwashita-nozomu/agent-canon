@@ -620,11 +620,10 @@ def collect_shell_executable_commands(path: Path) -> tuple[str, ...]:
     continuation_lines: list[str] = []
     current = ""
     for raw_line in raw_lines:
-        without_newline = raw_line.rstrip()
-        if without_newline.endswith("\\"):
-            current += (" " if current else "") + without_newline[:-1].rstrip()
+        if raw_line.endswith("\\"):
+            current += (" " if current else "") + raw_line[:-1]
             continue
-        full_line = current + (" " if current else "") + without_newline
+        full_line = current + (" " if current else "") + raw_line
         current = ""
         continuation_lines.append(full_line)
     if current:
