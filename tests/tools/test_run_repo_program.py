@@ -34,6 +34,8 @@ SCRIPT = SOURCE_ROOT / "tools" / "ci" / "run_repo_program.py"
 RUN_CONTAINER_SCRIPT = SOURCE_ROOT / "tools" / "ci" / "run_in_repo_container.py"
 RUN_PYTHON_SCRIPT = SOURCE_ROOT / "tools" / "ci" / "run_python_in_dockerfile.py"
 RUN_PACK_SCRIPT = SOURCE_ROOT / "tools" / "ci" / "run_container_pack.py"
+GENERIC_PYTHON_FIXTURE = "tools/agent-canon/__init__.py"
+GENERIC_SHELL_FIXTURE = "tools/agent-canon/ci/check_docker_build.sh"
 
 
 def run_cli(*args: str) -> subprocess.CompletedProcess[str]:
@@ -91,21 +93,21 @@ def write_pack(tmp_path: Path, *, dependency_profile: str, gpus: str | None) -> 
 
 def test_print_only_python_file_uses_python_runner_and_env_check() -> None:
     """Python files should resolve to python3 and include env-check by default."""
-    result = run_cli("--print-only", "python/experiment_runner/__init__.py")
+    result = run_cli("--print-only", GENERIC_PYTHON_FIXTURE)
 
     assert result.returncode == 0, result.stderr
     assert "env-check:" in result.stdout
     assert "docker/install_python_dependencies.sh" in result.stdout
     assert "--profile full" in result.stdout
     assert "-e AGENT_CANON_DEPENDENCY_PROFILE=full" in result.stdout
-    assert "python3 /workspace/python/experiment_runner/__init__.py" in result.stdout
+    assert f"python3 /workspace/{GENERIC_PYTHON_FIXTURE}" in result.stdout
 
 
 def test_print_only_shell_script_uses_bash() -> None:
     """Shell scripts should resolve through bash."""
     result = run_cli(
         "--print-only",
-        "docker/install_python_dependencies.sh",
+        GENERIC_SHELL_FIXTURE,
         "--",
         "--pack",
         "docker/packs/default.toml",
@@ -113,8 +115,9 @@ def test_print_only_shell_script_uses_bash() -> None:
 
     assert result.returncode == 0, result.stderr
     assert (
-        "/bin/bash /workspace/docker/install_python_dependencies.sh "
-        "--pack docker/packs/default.toml" in result.stdout
+        f"/bin/bash /workspace/{GENERIC_SHELL_FIXTURE} "
+        "--pack docker/packs/default.toml"
+        in result.stdout
     )
 
 
@@ -171,7 +174,7 @@ def test_gpu_profile_reaches_every_runtime_entrypoint(tmp_path: Path) -> None:
             RUN_PYTHON_SCRIPT,
             (
                 "docker/Dockerfile",
-                "python/experiment_runner/__init__.py",
+                GENERIC_PYTHON_FIXTURE,
                 "--pack",
                 str(pack),
                 "--print-only",

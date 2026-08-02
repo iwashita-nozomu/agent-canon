@@ -115,7 +115,8 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help=(
             "Skip the workspace-mounted setup step. By default, the runner "
-            "runs docker/install_python_dependencies.sh when present."
+            "runs docker/install_python_dependencies.sh with the pack dependency "
+            "profile when present."
         ),
     )
     parser.add_argument(
