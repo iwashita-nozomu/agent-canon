@@ -425,7 +425,7 @@ findings for resilient test planning.
 1. すべての pending TODO が `completed` または `deferred` になったら `python3 tools/agent_tools/agent_canon_update_todos.py acknowledge` で `.agent-canon/update-state.toml` の `tasks_applied_through` を現在 pin へ進めます。
 1. `make agent-canon-update` は `make agent-canon-latest` と同じ high-level latest route の互換 alias です。
 1. root view が drift した場合だけ `bash tools/sync_agent_canon.sh link-root` を使います。
-1. 派生 repo 側の shared canon 差分を upstream に戻す場合は、`workspace/<topic>/agent-canon/` の managed source clone から AgentCanon PR を使います。親 repo の `vendor/agent-canon/` は clean pin projection のままです。
+1. 派生 repo 側の shared canon 差分を upstream に戻す場合は、intended named `vendor/agent-canon/` branch を source owner とし、branch / ahead / diverged / dirty state を evidence として collision-safe merge / review を続けます。vendor checkout が別 topic/branch に占有されている場合、または全 local uncommitted / ignored materialized paths と HEAD から planned result tree への exact update write set の衝突を保存できない場合だけ、`workspace/<topic>/agent-canon/` の managed source clone から AgentCanon PR を使います。parent pin/root projection は source publication 後に行います。
 
 `sync_agent_canon.sh` は低レベル実装です。
 日常の update 導線では `pull` や `push` を直接選ばず、Make target または `update_agent_canon.sh plan/latest` から入ります。
@@ -987,7 +987,7 @@ For OOP readability, keep the mechanical report as the source of truth and use `
 - template 利用者:
   - root `tools/` から使います
 - shared canon 保守者:
-- `documents/rule/dependency-module-changes.md` を読み、必要な shared tool sourceは topic workspace branch cloneで編集します。`vendor/agent-canon/tools/` は clean pin projectionです。
+- `documents/rule/dependency-module-changes.md` を読み、intended named `vendor/agent-canon/tools/` branch を source owner として shared tool source を編集します。別 topic/branch の vendor 占有または materialization collision がある場合だけ topic workspace branch clone を使い、parent pin/root projection は source publication 後に行います。
 
 ## 関連文書
 

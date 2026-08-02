@@ -31,8 +31,8 @@ downstream design ../canonical/CODEX_WORKFLOW.md routes diverged canon workflows
 
 ## 固定ルール
 
-- shared canon の source 正本は workspace-root の独立 branch clone です。root symlink view や `vendor/agent-canon` を直接直して解決した扱いにしません。
-- 派生 repo の shared canon source 差分は、`dependency-module-change` の owner-evidence と `--branch` で workspace-root clone に移してから commit します。
+- shared canon の source owner は intended named `vendor/agent-canon/` branch です。branch / ahead / diverged / dirty state は evidence として保持し、collision-safe merge / review flow を続けます。
+- `workspace/<topic>/agent-canon` の managed source clone は、vendor checkout が別 topic/branch に占有されている場合、または全 local uncommitted / ignored materialized paths を HEAD から planned result tree への exact update write set と共存させられない場合だけ使います。
 - intended named `vendor/agent-canon/` source branch の branch / ahead / diverged / dirty state は evidence として保持します。全 local uncommitted / ignored materialized paths と `HEAD` から planned result tree への exact update write set の unpreservable collision、または unresolved merge conflict だけを block します。
 - intended named source branch は parent source topology の source owner として扱い、non-colliding state は normal merge / review flow を続けます。requested topic が current branch と異なる場合だけ独立 clone route を使い、parent pin projection は clean `main` のみを受け取ります。
 - shared canon main に取り込んだあとは、派生 repo 側で `make agent-canon-ensure-latest` を再実行し、submodule worktree HEAD と parent gitlink が shared canon main と同じ commit になるまで閉じません。
@@ -85,7 +85,7 @@ accidental drift は
 ## Stage 2. AgentCanon Branch へ渡す
 
 shared-canon candidate がある場合は、派生 repo から直接 shared canon main を更新しません。
-まず `documents/rule/dependency-module-changes.md` に従って topic workspace branch cloneへsourceを移し、そこでGitHub PRを作ります。parentの vendor checkoutにmerge、stash、保存、再開する経路はありません。
+intended named vendor branch で collision-safe merge / review を行い、そこから GitHub PR を作ります。vendor checkout が別 topic/branch に占有されている場合、または materialization collision を保存できない場合だけ、`documents/rule/dependency-module-changes.md` に従って topic workspace branch clone へ移して PR を作ります。
 
 ```bash
 python3 tools/agent_tools/dependency_module_change.py --root . prepare \
