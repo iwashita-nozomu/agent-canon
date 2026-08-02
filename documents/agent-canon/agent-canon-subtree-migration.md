@@ -251,9 +251,9 @@ unsafe な AgentCanon update surface で stale が見つかった場合は、作
 ### 7.4.1 local submodule branch の main 追従
 
 親 repo の tree diff だけで AgentCanon 差分を判断しません。source の
-current branch は topic workspace の managed clone で明示し、GitHub main を
-取り込んでから PR にします。`vendor/agent-canon/` は clean pin の readback
-対象であり、source branch ではありません。
+current branch は intended named `vendor/agent-canon/` branch で明示し、GitHub main を
+取り込んでから PR にします。`vendor/agent-canon/` が別 topic/branch に
+占有されている場合のみ、workspace-root 管理 clone へ移して PR ルートへ進みます。
 
 Invoke protected `merge-main-into-current` on the intended named source branch
 after current-task user approval and with all four inline Git authority/reason
@@ -299,10 +299,7 @@ Project-local remotes are not a user-facing AgentCanon update path. Existing
 repos must migrate `.gitmodules` back to the canonical GitHub URL before normal
 AgentCanon PR work. New AgentCanon changes go through GitHub branches and PRs,
 with the standalone source-branch merge route used before push. A branch created
-from a derived repo must first be materialized as the workspace-root source clone;
-An intended named vendor branch remains the source owner under the canonical
-update-materialization predicate; a differing requested topic is materialized as
-the workspace-root source clone before its AgentCanon PR.
+from a derived repo must follow the intended named vendor branch source-owner route. A differing requested topic is materialized as workspace-root clone only before its AgentCanon PR.
 
 ## 8. 移行フェーズ
 
