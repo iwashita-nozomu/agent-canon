@@ -100,8 +100,8 @@ resolve_clone_tools_root_or_fail() {
   local diagnostics=""
 
   if ! diagnostics="$(agent_canon_source_tools_root "${repo_root}" 2> >(cat >&2))"; then
-    echo "fresh_clone_tools_root=missing"
-    echo "fresh_clone_tools_root_reason=agent_canon_source_tools_root_failed"
+    echo "fresh_clone_tools_root=missing" >&2
+    echo "fresh_clone_tools_root_reason=agent_canon_source_tools_root_failed" >&2
     printf '%s\n' "${diagnostics}" >&2
     exit 1
   fi
