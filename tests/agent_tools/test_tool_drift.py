@@ -316,7 +316,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.write_agent_canon_pr_contract(root)
             script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
-                "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing\n",
+                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"\n',
                 "",
             )
             script.write_text(text, encoding="utf-8")
@@ -338,7 +338,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.write_agent_canon_pr_contract(root)
             script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
-                "python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir ${PR_AGENT_EVAL_LOG_DIR}\n",
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"\n',
                 "",
             )
             script.write_text(text, encoding="utf-8")
@@ -382,16 +382,16 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.write_agent_canon_pr_contract(root)
             script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
-                "python3 tools/agent_tools/generated_artifact_guard.py\n",
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"\n',
                 "",
             )
             script.write_text(text, encoding="utf-8")
 
-            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
+            result = self.run_checker(root, "--contract", "generated_artifact_guard")
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "missing-required-text:agent_canon_pr_check:"
+                "missing-required-text:generated_artifact_guard:"
                 "tools/ci/check_agent_canon_pr.sh:"
                 "missing-generated-artifact-pr-guard",
                 result.stdout,
@@ -748,6 +748,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream design ../../agents/workflows/agent-canon-pr-workflow.md workflow",
                     "# upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone template",
                     "# upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template checklist",
+                    "# upstream design ../../templates/documents/github/pull-request/agent_canon.md template checklist",
                     "# upstream implementation ../agent_tools/run_repo_dependency_review.sh dependency review",
                     "# upstream implementation ../agent_tools/run_accumulated_agent_evals.py accumulated evals",
                     "# upstream implementation ../agent_tools/generated_artifact_guard.py generated artifact guard",
@@ -757,11 +758,11 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream implementation ./check_github_workflows.py github checks",
                     "# upstream implementation ./run_all_checks.sh quick ci",
                     "# @dependency-end",
-                    "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
+                    'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
                     'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \\',
-                    "python3 tools/agent_tools/run_accumulated_agent_evals.py --run-id agent-canon-pr-gate --log-dir ${PR_AGENT_EVAL_LOG_DIR}",
-                    "python3 tools/agent_tools/generated_artifact_guard.py",
-                    "python3 tools/agent_tools/check_agent_runtime_alignment.py",
+                    'python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"',
+                    'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
+                    'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"',
                     "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",
                     "SHARED_SURFACE_STATUS=not_applicable_standalone_source",
                     "",
@@ -772,6 +773,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "agents/workflows/agent-canon-pr-workflow.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+            "templates/documents/github/pull-request/agent_canon.md",
             "tools/agent_tools/run_repo_dependency_review.sh",
             "tools/agent_tools/run_accumulated_agent_evals.py",
             "tools/agent_tools/generated_artifact_guard.py",

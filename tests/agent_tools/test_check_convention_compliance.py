@@ -531,7 +531,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "check_github_workflows.py container_config.py check_runtime_profile_inventory.py\n"
     ),
     "tools/ci/check_agent_canon_pr.sh": (
-        "python3 tools/agent_tools/check_convention_compliance.py\n"
+        'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py" --root "${WORKSPACE_ROOT}" --format json\n'
         "python3 tools/ci/check_github_workflows.py\n"
     ),
     "rust/agent-canon/src/docs.rs": "runtime profile inventory\n",

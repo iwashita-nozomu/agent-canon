@@ -263,7 +263,7 @@ CONTRACTS = (
         text_checks=(
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                "python3 tools/agent_tools/generated_artifact_guard.py",
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
                 "missing-generated-artifact-pr-guard",
             ),
         ),
@@ -287,28 +287,23 @@ CONTRACTS = (
         text_checks=(
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                "run_repo_dependency_review.sh --fail-missing",
+                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing',
                 "missing-strict-dependency-review",
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                "check_agent_runtime_alignment.py",
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"',
                 "missing-agent-runtime-alignment-check",
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                "run_accumulated_agent_evals.py --run-id agent-canon-pr-gate",
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate',
                 "missing-accumulated-agent-eval-producer",
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
                 'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}"',
                 "missing-agent-canon-pr-hook-archive-env",
-            ),
-            TextCheck(
-                "tools/ci/check_agent_canon_pr.sh",
-                "python3 tools/agent_tools/generated_artifact_guard.py",
-                "missing-generated-artifact-pr-guard",
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
