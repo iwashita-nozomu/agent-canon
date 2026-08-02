@@ -42,7 +42,13 @@ PY
   exit 0
 fi
 
-plan_output="$(bash "${CANON_TOOLS_ROOT}/update_agent_canon.sh" plan || true)"
+if ! plan_output="$(bash "${CANON_TOOLS_ROOT}/update_agent_canon.sh" plan 2>&1)"; then
+  echo "AGENT_CANON_LATEST=fail"
+  echo "AGENT_CANON_LATEST_REASON=plan_execution_failed"
+  echo "AGENT_CANON_LATEST_ROUTE=plan_failure"
+  printf '%s\n' "$plan_output" >&2
+  exit 1
+fi
 printf '%s\n' "$plan_output"
 
 route="$(printf '%s\n' "$plan_output" | awk -F= '/^agent_canon_plan_route=/{print $2}')"
@@ -130,11 +136,12 @@ ensure_submodule_latest_integrity() {
   echo "AGENT_CANON_LATEST_SUBMODULE_PIN_REMOTE_REACHABLE=yes"
 }
 
+if [[ "${prefix_mode:-}" == "submodule" ]]; then
+  ensure_submodule_latest_integrity "${route:-unknown}"
+fi
+
 case "$route" in
   already_current_tree|already_current_split|already_current_submodule)
-    if [[ "${prefix_mode:-}" == "submodule" ]]; then
-      ensure_submodule_latest_integrity "$route"
-    fi
     echo "AGENT_CANON_LATEST=pass"
     echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
     emit_submodule_worktree_evidence
@@ -148,7 +155,6 @@ case "$route" in
     echo "AgentCanon parent pin is a clean pushed branch head ahead of remote main; treating latest as deferred to the AgentCanon PR workflow." >&2
     ;;
   local_contains_remote)
-    ensure_submodule_latest_integrity "$route"
     echo "AGENT_CANON_LATEST=pass"
     echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
     echo "AGENT_CANON_LATEST_PARENT_PIN_PENDING=yes"
@@ -160,7 +166,6 @@ case "$route" in
     ;;
   *)
     if [[ "${prefix_mode:-}" == "submodule" && "${submodule_worktree_clean}" == "yes" ]]; then
-      ensure_submodule_latest_integrity "$route"
       echo "AGENT_CANON_LATEST=pass"
       echo "AGENT_CANON_LATEST_ROUTE=${route:-unknown}"
       emit_submodule_worktree_evidence

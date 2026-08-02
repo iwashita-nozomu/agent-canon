@@ -2654,7 +2654,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertIn("AGENT_CANON_LATEST_ROUTE=deferred_branch_pr", latest_check.stdout)
 
     def test_latest_defers_clean_pushed_agentcanon_branch_when_parent_pin_is_stale(self) -> None:
-        """A clean pushed AgentCanon branch checkout should not block on a stale parent gitlink."""
+        """A deferred AgentCanon branch context still fails when parent gitlink is stale."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
@@ -2772,9 +2772,12 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertNotIn("local_submodule_worktree_differs_from_parent_pin", ensure_latest.stdout)
             self.assertEqual(latest.returncode, 0, latest.stdout + latest.stderr)
             self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=deferred_branch_pr", latest.stdout)
-            self.assertEqual(latest_check.returncode, 0, latest_check.stdout + latest_check.stderr)
-            self.assertIn("AGENT_CANON_LATEST=pass", latest_check.stdout)
-            self.assertIn("AGENT_CANON_LATEST_ROUTE=deferred_branch_pr", latest_check.stdout)
+            self.assertNotEqual(latest_check.returncode, 0)
+            self.assertIn("AGENT_CANON_LATEST=fail", latest_check.stdout)
+            self.assertIn(
+                "AGENT_CANON_LATEST_REASON=submodule-gitlink-worktree-mismatch",
+                latest_check.stdout,
+            )
 
     def test_apply_updates_submodule_pin_with_untracked_root_file(self) -> None:
         """Apply should update the gitlink without requiring unrelated root cleanup."""
