@@ -44,10 +44,11 @@ prefix. The trailers must remain readable by `git interpret-trailers --parse`.
 The parent repository has two distinct AgentCanon states. Parent pin/root
 projection is ready only when `vendor/agent-canon` is clean on named `main` and
 its worktree `HEAD` equals the staged index gitlink. Source editing is owned by
-a clean named topic branch in the current `vendor/agent-canon` checkout; `main`
-is only the topic-creation starting point. A managed workspace clone is a
-fallback only when another topic already occupies the parent vendor with dirty
-state.
+a named topic branch in the current `vendor/agent-canon` checkout; `main` is
+only the topic-creation starting point. The intended topic branch may carry
+committed differences and collision-free uncommitted paths during source update
+materialization. A managed workspace clone is a fallback only when another
+topic already occupies the parent vendor with dirty state.
 
 The complete parent-state, requested-topic, and dirty-fallback decision is owned
 by [`documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table`](../rule/dependency-module-changes.md#agentcanon-parent-state-decision-table).
@@ -56,10 +57,38 @@ owner or use `AGENT_CANON_TOPIC_SLUG` when an explicit requested topic is needed
 
 For any dependency source edit, apply
 `documents/rule/dependency-module-changes.md`: default route uses the current
-`vendor/agent-canon` checkout for direct source work when it is a clean named
-topic branch; route to the managed topic workspace clone only when another
-active topic makes that checkout dirty, publish there, and then project a clean
-vendor pin.
+`vendor/agent-canon` checkout for direct source work when it is the intended
+named topic branch; route to the managed topic workspace clone only when another
+active topic owns that checkout, publish there, and then project a clean vendor
+pin.
+
+## Update Materialization Acceptance
+
+The local-state block predicate for `plan`, `latest`, `apply`, and
+`merge-main-into-current` is exactly:
+
+```text
+block := unresolved_merge_conflict
+      or unpreservable_materialization_collision(
+           local_uncommitted_paths intersect exact_update_write_set
+         )
+```
+
+`exact_update_write_set` is empty when the current commit already contains the
+remote commit. For a fast-forward it is the path set changed from current to
+remote. For diverged history it is the remote-side path set changed from the
+merge base to remote. Equal paths and file/directory prefix collisions are
+unpreservable. Working-tree, index, and untracked paths all contribute to
+`local_uncommitted_paths`.
+
+A named branch, `ahead` or `diverged` history, parent/worktree pin difference,
+and dirty worktree or update-surface status are state evidence, not blockers.
+The updater leaves non-colliding uncommitted paths in place and uses the normal
+Git merge for committed branch differences. A merge that produces unresolved
+conflicts then satisfies the first block term. This route has no clean-tree
+hard requirement, dirty-path count baseline, stash/reset transaction, or
+compatibility materialization route. Parent pin/root projection eligibility
+remains the separate clean-`main` contract after source publication.
 
 ## Owner Namespace
 
@@ -154,11 +183,10 @@ identity and ordering only; they do not rerun the owned check.
 
 | Entry | Responsibility |
 | --- | --- |
-| `tools/update_agent_canon.sh plan` | optional read-only projection only when its result can change the owner/structure decision; never a required preflight |
-| `tools/update_agent_canon.sh latest` | standalone source-main rebind; in a parent, clean named topic source-owner merge route first, then accepted-frontier projection after publication |
-| `tools/update_agent_canon.sh apply` | strict clean source rebind on parent vendor topic branch or accepted parent projection |
-| `tools/update_agent_canon.sh merge-main-into-current` | clean rebind on current source branch in parent vendor or standalone |
-| `tools/update_agent_canon.sh merge-main-into-current-preserve-dirty` | standalone source-mode preserve-dirty rebind; parent mode classifies dirty state and stops or uses the dependency fallback only for another topic's dirty vendor occupancy |
+| `tools/update_agent_canon.sh plan` | read-only route and local-state evidence, including the update materialization predicate and exact collision result |
+| `tools/update_agent_canon.sh latest` | standalone source-main rebind; in a parent, collision-safe named topic merge or accepted-frontier projection after publication |
+| `tools/update_agent_canon.sh apply` | apply the accepted projection while preserving non-colliding local paths in place |
+| `tools/update_agent_canon.sh merge-main-into-current` | merge remote main into the current named source branch under the update materialization predicate |
 | `tools/ci/check_agent_canon_pr.sh` | consume G1, run the one source PR gate, then invoke the G2 owner |
 | `tools/ci/check_agent_canon_pr.py` | materialize/replay G2 from the ordered passing generated-completeness checks |
 | `tools/ci/check_agent_canon_latest.sh` | consume G4-G5 without a second source-main check |
@@ -187,6 +215,10 @@ registry during the template smoke check.
 - Duplicate or reordered `#388/#389/current` evidence: refuse frontier
   acceptance.
 - Parent projection before accepted frontier: fail closed.
+- Local uncommitted path colliding with the exact update write set: preserve the
+  checkout and refuse materialization with the colliding path.
+- Existing or newly produced unresolved merge conflict: preserve the merge state
+  for explicit resolution and refuse further materialization.
 - Remote readback mismatch: no cleanup; retry the same identity only when the
   failure is typed transient.
 - Link-root/check coverage is explicitly limited to the current parent checkoutの
