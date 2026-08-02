@@ -112,6 +112,21 @@ class FileIdentity:
 
 
 @dataclass(frozen=True)
+class GraphIntegrationIdentity:
+    """Strictly typed identity fields from one graph integration record."""
+
+    schema: str
+    root: str
+    db_path: str
+    profile: str
+    source_snapshot_profile: str
+    snapshot_head: str
+    input_fingerprint: str
+    graph_fingerprint: str
+    verified: bool
+
+
+@dataclass(frozen=True)
 class GraphBuildIdentity:
     """One command result bound to its canonical persisted graph identity."""
 
@@ -125,7 +140,8 @@ class GraphBuildIdentity:
     input_fingerprint: str
     graph_fingerprint: str
     publication: str
-    integration_record: Mapping[str, object]
+    durability: str
+    integration_identity: GraphIntegrationIdentity
 
     def report(self) -> dict[str, str]:
         """Return the identity fields preserved in the scoped receipt."""
@@ -136,6 +152,7 @@ class GraphBuildIdentity:
             "input_fingerprint": self.input_fingerprint,
             "graph_fingerprint": self.graph_fingerprint,
             "publication": self.publication,
+            "durability": self.durability,
             "db_path": str(self.database),
         }
 
@@ -709,8 +726,18 @@ def required_identity_string(
     pattern: re.Pattern[str] | None = None,
 ) -> str:
     """Read one required canonical identity scalar."""
-    value = payload.get(field)
-    if not isinstance(value, str) or not value:
+    if field not in payload:
+        raise SelectorFailure(
+            "graph_identity_missing",
+            f"owner={owner};field={field}",
+        )
+    value = payload[field]
+    if type(value) is not str:
+        raise SelectorFailure(
+            "graph_identity_invalid",
+            f"owner={owner};field={field};expected_type=string",
+        )
+    if not value:
         raise SelectorFailure(
             "graph_identity_missing",
             f"owner={owner};field={field}",
@@ -721,6 +748,96 @@ def required_identity_string(
             f"owner={owner};field={field}",
         )
     return value
+
+
+def validate_integration_identity(
+    payload: object,
+    owner: str,
+) -> GraphIntegrationIdentity:
+    """Validate one integration record without coercion or record equality."""
+    if type(payload) is not dict:
+        raise SelectorFailure(
+            "graph_identity_invalid",
+            f"owner={owner};field=integration_record;expected_type=object",
+        )
+    record = cast(dict[str, object], payload)
+    schema = required_identity_string(record, "schema", owner)
+    root = required_identity_string(record, "root", owner)
+    db_path = required_identity_string(record, "db_path", owner)
+    profile = required_identity_string(record, "profile", owner)
+    source_snapshot_profile = required_identity_string(
+        record,
+        "source_snapshot_profile",
+        owner,
+    )
+    snapshot_head = required_identity_string(
+        record,
+        "snapshot_head",
+        owner,
+        HEX_SHA_RE,
+    )
+    input_fingerprint = required_identity_string(
+        record,
+        "input_fingerprint",
+        owner,
+        HEX_FINGERPRINT_RE,
+    )
+    graph_fingerprint = required_identity_string(
+        record,
+        "graph_fingerprint",
+        owner,
+        HEX_FINGERPRINT_RE,
+    )
+    if "verified" not in record:
+        raise SelectorFailure(
+            "graph_identity_missing",
+            f"owner={owner};field=verified",
+        )
+    if record["verified"] is not True:
+        raise SelectorFailure(
+            "graph_identity_invalid",
+            f"owner={owner};field=verified;expected_type=bool_true",
+        )
+    if schema != "agent-canon.graph.integration.v1" or source_snapshot_profile != "parent":
+        raise SelectorFailure(
+            "graph_identity_invalid",
+            f"owner={owner};field=schema,source_snapshot_profile",
+        )
+    return GraphIntegrationIdentity(
+        schema,
+        root,
+        db_path,
+        profile,
+        source_snapshot_profile,
+        snapshot_head,
+        input_fingerprint,
+        graph_fingerprint,
+        True,
+    )
+
+
+def integration_identity_mismatches(
+    result: GraphIntegrationIdentity,
+    persisted: GraphIntegrationIdentity,
+) -> tuple[str, ...]:
+    """Compare validated integration fields individually and without coercion."""
+    mismatches: list[str] = []
+    for field in (
+        "schema",
+        "root",
+        "db_path",
+        "profile",
+        "source_snapshot_profile",
+        "snapshot_head",
+        "input_fingerprint",
+        "graph_fingerprint",
+        "verified",
+    ):
+        result_value = getattr(result, field)
+        persisted_value = getattr(persisted, field)
+        if type(result_value) is not type(persisted_value) or result_value != persisted_value:
+            mismatches.append(field)
+    return tuple(mismatches)
 
 
 def graph_build_identity(root: Path, graph_result_path: Path) -> GraphBuildIdentity:
@@ -738,55 +855,52 @@ def graph_build_identity(root: Path, graph_result_path: Path) -> GraphBuildIdent
             f"path={graph_result_path}",
         ) from None
     assert_file_identity(graph_result_path, result_file_identity, "graph_build_result")
-    if not isinstance(payload, dict):
+    if type(payload) is not dict:
         raise SelectorFailure("graph_build_result_invalid", "detail=not_object")
     result = cast(dict[str, object], payload)
+    schema = required_identity_string(result, "schema", "graph_build_result")
+    command = required_identity_string(result, "command", "graph_build_result")
+    status_value = required_identity_string(result, "status", "graph_build_result")
+    graph_status = required_identity_string(
+        result,
+        "graph_status",
+        "graph_build_result",
+    )
+    if "exit_code" not in result or type(result["exit_code"]) is not int:
+        raise SelectorFailure(
+            "graph_identity_invalid",
+            "owner=graph_build_result;field=exit_code;expected_type=integer",
+        )
     if (
-        result.get("schema") != "agent-canon.graph.build.v1"
-        or result.get("command") != "build"
-        or result.get("status") != "incomplete"
-        or result.get("graph_status") != "incomplete"
-        or result.get("exit_code") != 1
+        schema != "agent-canon.graph.build.v1"
+        or command != "build"
+        or status_value != "incomplete"
+        or graph_status != "incomplete"
+        or result["exit_code"] != 1
     ):
         raise SelectorFailure(
             "graph_build_result_invalid",
             "detail=expected_incomplete_build",
         )
-    raw_integration = result.get("integration_record")
-    if not isinstance(raw_integration, dict):
+    if "integration_record" not in result:
         raise SelectorFailure(
             "graph_identity_missing",
             "owner=graph_build_result;field=integration_record",
         )
-    integration = cast(dict[str, object], raw_integration)
-    if (
-        integration.get("schema") != "agent-canon.graph.integration.v1"
-        or integration.get("source_snapshot_profile") != "parent"
-        or integration.get("verified") is not True
-    ):
-        raise SelectorFailure(
-            "graph_identity_invalid",
-            "owner=integration_record;field=schema,source_snapshot_profile,verified",
-        )
+    integration = validate_integration_identity(
+        result["integration_record"],
+        "graph_build_result.integration_record",
+    )
 
     canonical_root = root.resolve(strict=True)
     expected_database = canonical_root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
     result_root = required_identity_string(result, "root", "graph_build_result")
-    record_root = required_identity_string(integration, "root", "integration_record")
     result_profile = required_identity_string(result, "profile", "graph_build_result")
-    record_profile = required_identity_string(integration, "profile", "integration_record")
     result_database = required_identity_string(result, "db_path", "graph_build_result")
-    record_database = required_identity_string(integration, "db_path", "integration_record")
     result_input = required_identity_string(
         result,
         "input_fingerprint",
         "graph_build_result",
-        HEX_FINGERPRINT_RE,
-    )
-    record_input = required_identity_string(
-        integration,
-        "input_fingerprint",
-        "integration_record",
         HEX_FINGERPRINT_RE,
     )
     result_graph = required_identity_string(
@@ -795,34 +909,27 @@ def graph_build_identity(root: Path, graph_result_path: Path) -> GraphBuildIdent
         "graph_build_result",
         HEX_FINGERPRINT_RE,
     )
-    record_graph = required_identity_string(
-        integration,
-        "graph_fingerprint",
-        "integration_record",
-        HEX_FINGERPRINT_RE,
-    )
-    snapshot_head = required_identity_string(
-        integration,
-        "snapshot_head",
-        "integration_record",
-        HEX_SHA_RE,
-    ).lower()
     publication = required_identity_string(
         result,
         "publication",
         "graph_build_result",
     )
+    durability = required_identity_string(
+        result,
+        "durability",
+        "graph_build_result",
+    )
     if (
         result_root != str(canonical_root)
-        or record_root != result_root
+        or integration.root != result_root
         or result_profile != GRAPH_PROFILE
-        or record_profile != result_profile
+        or integration.profile != result_profile
         or result_database != str(expected_database)
-        or record_database != result_database
-        or result_input != record_input
-        or result_graph != record_graph
+        or integration.db_path != result_database
+        or result_input != integration.input_fingerprint
+        or result_graph != integration.graph_fingerprint
         or publication != "published"
-        or result.get("durability") != "durable"
+        or durability != "durable"
     ):
         raise SelectorFailure(
             "graph_identity_mismatch",
@@ -853,10 +960,11 @@ def graph_build_identity(root: Path, graph_result_path: Path) -> GraphBuildIdent
         database_file_identity,
         result_root,
         result_profile,
-        snapshot_head,
+        integration.snapshot_head,
         result_input,
         result_graph,
         publication,
+        durability,
         integration,
     )
 
@@ -882,7 +990,10 @@ def read_bound_graph_acceptance_facts(
                 "('integration_record','snapshot_head','input_fingerprint','graph_fingerprint')"
             ).fetchall(),
         )
-        metadata = {key: value for key, value in metadata_rows}
+        metadata = cast(
+            dict[str, object],
+            {key: value for key, value in metadata_rows},
+        )
         required_keys = {
             "integration_record",
             "snapshot_head",
@@ -895,31 +1006,56 @@ def read_bound_graph_acceptance_facts(
                 "graph_identity_missing",
                 f"owner=graph_database_metadata;fields={','.join(missing) or 'duplicate'}",
             )
-        raw_persisted: object = json.loads(metadata["integration_record"])
-        if not isinstance(raw_persisted, dict):
-            raise SelectorFailure(
-                "graph_identity_invalid",
-                "owner=graph_database_metadata;field=integration_record",
-            )
-        persisted = cast(dict[str, object], raw_persisted)
-        if persisted != build.integration_record:
+        integration_json = required_identity_string(
+            metadata,
+            "integration_record",
+            "graph_database_metadata",
+        )
+        persisted = validate_integration_identity(
+            json.loads(integration_json),
+            "graph_database_metadata.integration_record",
+        )
+        mismatches = integration_identity_mismatches(
+            build.integration_identity,
+            persisted,
+        )
+        if mismatches:
             raise SelectorFailure(
                 "graph_identity_mismatch",
-                "owners=graph_build_result,graph_database_metadata;field=integration_record",
+                "owners=graph_build_result,graph_database_metadata;"
+                f"fields={','.join(mismatches)}",
             )
+        metadata_snapshot_head = required_identity_string(
+            metadata,
+            "snapshot_head",
+            "graph_database_metadata",
+            HEX_SHA_RE,
+        )
+        metadata_input_fingerprint = required_identity_string(
+            metadata,
+            "input_fingerprint",
+            "graph_database_metadata",
+            HEX_FINGERPRINT_RE,
+        )
+        metadata_graph_fingerprint = required_identity_string(
+            metadata,
+            "graph_fingerprint",
+            "graph_database_metadata",
+            HEX_FINGERPRINT_RE,
+        )
         if (
-            metadata["snapshot_head"].lower() != build.snapshot_head
-            or metadata["input_fingerprint"] != build.input_fingerprint
-            or metadata["graph_fingerprint"] != build.graph_fingerprint
+            metadata_snapshot_head != build.snapshot_head
+            or metadata_input_fingerprint != build.input_fingerprint
+            or metadata_graph_fingerprint != build.graph_fingerprint
         ):
             raise SelectorFailure(
                 "graph_identity_mismatch",
                 "owners=integration_record,graph_database_metadata;fields=snapshot_head,input_fingerprint,graph_fingerprint",
             )
-        if build.snapshot_head != expected_head.lower():
+        if build.snapshot_head != expected_head:
             raise SelectorFailure(
                 "graph_snapshot_head_stale",
-                f"snapshot_head={build.snapshot_head};expected_head={expected_head.lower()}",
+                f"snapshot_head={build.snapshot_head};expected_head={expected_head}",
             )
 
         node_rows = cast(

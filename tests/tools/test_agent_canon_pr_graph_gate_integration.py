@@ -157,6 +157,15 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "verified": True,
                 "verification_code": "source-facts-readback-v1",
             }
+            persisted_record = dict(integration_record)
+            if scenario == "persisted_verified_int":
+                persisted_record["verified"] = 1
+            elif scenario == "persisted_fingerprint_int":
+                persisted_record["input_fingerprint"] = 1
+            elif scenario == "persisted_path_int":
+                persisted_record["db_path"] = 1
+            elif scenario == "persisted_profile_int":
+                persisted_record["profile"] = 1
             with sqlite3.connect(database) as connection:
                 connection.execute("CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT)")
                 connection.execute("CREATE TABLE nodes(id TEXT, layer TEXT, payload_json TEXT)")
@@ -181,7 +190,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                     (f"{source_path}:4:missing.md", f"node:source:{source_path}"),
                 )
                 for key, value in (
-                    ("integration_record", json.dumps(integration_record)),
+                    ("integration_record", json.dumps(persisted_record)),
                     ("snapshot_head", snapshot_head),
                     ("input_fingerprint", input_fingerprint),
                     ("graph_fingerprint", graph_fingerprint),
@@ -367,6 +376,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
         valid_identity = json.loads(report.read_text(encoding="utf-8"))["graph_identity"]
         self.assertEqual(valid_identity["publication"], "published")
+        self.assertEqual(valid_identity["durability"], "durable")
         self.assertEqual(valid_identity["profile"], "default")
 
         reachable, reachable_state = self.run_pr_check("reachable")
@@ -396,6 +406,10 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             "missing_identity": "graph_identity_missing",
             "stale_fingerprint": "graph_identity_mismatch",
             "stale_head": "graph_snapshot_head_stale",
+            "persisted_verified_int": "graph_identity_invalid",
+            "persisted_fingerprint_int": "graph_identity_invalid",
+            "persisted_path_int": "graph_identity_invalid",
+            "persisted_profile_int": "graph_identity_invalid",
         }
         for scenario, reason in scenarios.items():
             with self.subTest(scenario=scenario):
