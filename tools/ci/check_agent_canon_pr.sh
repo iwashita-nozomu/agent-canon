@@ -93,11 +93,16 @@ run_direct_agent_checks() {
   else
     echo "SHARED_SURFACE_DRIFT=not_applicable_standalone_source"
   fi
+  run_convention_compliance_gate
   python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"
   AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
     python3 "${CANON_TOOLS_ROOT}/agent_tools/evaluate_codex_agent_roles.py" --accumulate
   AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
     python3 "${CANON_TOOLS_ROOT}/agent_tools/evaluate_skill_workflow_prompts.py" --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate
+}
+
+run_convention_compliance_gate() {
+  python3 ${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py --root ${WORKSPACE_ROOT} --format json
 }
 
 run_shared_surface_status() {
@@ -412,7 +417,7 @@ run_standalone_static_gate_ci() {
     python3 "${CANON_TOOLS_ROOT}/agent_tools/eval_accumulation_check.py"
   python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"
   python3 "${CANON_TOOLS_ROOT}/agent_tools/smoke_test_research_perspective_pack.py"
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py"
+  run_convention_compliance_gate
   python3 "${CANON_TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check
   python3 "${CANON_TOOLS_ROOT}/ci/check_github_workflows.py"
   python3 "${CANON_TOOLS_ROOT}/ci/container_config.py"
