@@ -2,9 +2,32 @@
   "schema": "agent-canon.gpu-admission-r5.ordered-integration-interface.v1",
   "source_packet_sha256": "23294f2606214157ed04e822128e29ece07ffd9f52223962199c87d3c0ce8d0d",
   "managed_run_executable": "experiment-runner-admitted",
-  "managed_run_version": "experiment-runner-admitted/v1",
   "request_schema": "agentcanon-managed-run/v1",
   "result_schema": "agentcanon-managed-run-result/v1",
+  "request_fields": [
+    "schema",
+    "run_id",
+    "task",
+    "cases",
+    "environment",
+    "capacity",
+    "resource_estimate",
+    "selected_gpu_ids",
+    "fingerprint"
+  ],
+  "result_fields": [
+    "schema",
+    "request_fingerprint",
+    "run_id",
+    "worker_pid",
+    "worker_pids",
+    "lifecycle",
+    "quiescence",
+    "exit",
+    "exit_code",
+    "error",
+    "completions"
+  ],
   "route": [
     "SourceFreezeOwner.freeze",
     "RuntimeIdentityReader.read",

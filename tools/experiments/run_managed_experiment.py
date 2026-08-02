@@ -102,7 +102,6 @@ STDERR_LOG_NAME = "stderr.log"
 MANAGED_RUN_EXECUTABLE = "experiment-runner-admitted"
 MANAGED_RUN_REQUEST_SCHEMA = "agentcanon-managed-run/v1"
 MANAGED_RUN_RESULT_SCHEMA = "agentcanon-managed-run-result/v1"
-MANAGED_RUN_CLI_VERSION = "experiment-runner-admitted/v1"
 MANAGED_RUN_REQUEST_FILENAME = "managed-run-request.json"
 MANAGED_RUN_RESULT_FILENAME = "managed-run-result.json"
 MANAGED_RUN_RECEIPT_FILENAME = "managed-run-receipt.json"
@@ -263,7 +262,7 @@ class ManagedRunExecutionResult:
 
 @dataclass(frozen=True)
 class ManagedRunLifecycleEvidence:
-    """Generic lifecycle evidence returned by the admitted-run CLI."""
+    """Provider lifecycle evidence returned by the admitted-run CLI."""
 
     run_id: str
     terminal_event_id: str
@@ -278,7 +277,12 @@ class ManagedRunLifecycleEvidence:
     child_process_ids: tuple[int, ...]
     process_group_ids: tuple[int, ...]
     direct_children_quiescent: bool
-    descendant_quiescence: Literal["PROVEN", "UNPROVEN"]
+    descendant_quiescence: Literal["proved", "no_child", "unproven"]
+    cleanup_failures: tuple[str, ...]
+    terminal_coverage_complete: bool
+    requested_case_coverage_complete: bool
+    quiescence_complete: bool
+    completion_coverage_complete: bool
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -296,7 +300,26 @@ class ManagedRunLifecycleEvidence:
             "process_group_ids": self.process_group_ids,
             "direct_children_quiescent": self.direct_children_quiescent,
             "descendant_quiescence": self.descendant_quiescence,
+            "cleanup_failures": self.cleanup_failures,
+            "terminal_coverage_complete": self.terminal_coverage_complete,
+            "requested_case_coverage_complete": self.requested_case_coverage_complete,
+            "quiescence_complete": self.quiescence_complete,
+            "completion_coverage_complete": self.completion_coverage_complete,
         }
+
+
+def _lifecycle_quiescence_is_proven(
+    lifecycle: ManagedRunLifecycleEvidence | None,
+) -> bool:
+    """Return the provider-backed lock-release predicate without defaults."""
+    return bool(
+        lifecycle is not None
+        and lifecycle.quiescence_complete
+        and lifecycle.direct_children_quiescent
+        and lifecycle.descendant_quiescence in {"proved", "no_child"}
+        and not lifecycle.cleanup_failures
+        and lifecycle.completion_coverage_complete
+    )
 
 
 def build_admitted_environment(
@@ -461,6 +484,21 @@ class RunGpuAdmissionContext(AbstractContextManager[GpuRunRequest]):
         return False
 
 
+def _provider_gpu_ids(selected_uuids: tuple[str, ...]) -> tuple[int, ...]:
+    """Map only provider-compatible logical IDs; never truncate opaque UUIDs."""
+    if any(not value.isdecimal() for value in selected_uuids):
+        raise TypedPreflightFailure(
+            "admitted_runner_provider_gpu_uuid_incompatible",
+            "the approved provider schema accepts integer GPU IDs, not full UUIDs",
+            selected_uuids=selected_uuids,
+            provider_field="selected_gpu_ids",
+            required_provider_change=(
+                "accept opaque physical/MIG UUIDs in selected_gpu_ids and gpu_devices"
+            ),
+        )
+    return tuple(int(value) for value in selected_uuids)
+
+
 def _build_managed_run_request(
     context: RunContext,
     request: GpuRunRequest,
@@ -516,35 +554,67 @@ def _build_managed_run_request(
     request_path = context.paths.result_dir / "runtime" / MANAGED_RUN_REQUEST_FILENAME
     result_path = context.paths.result_dir / "runtime" / MANAGED_RUN_RESULT_FILENAME
     lifecycle_path = context.paths.result_dir / "runtime" / MANAGED_RUN_LIFECYCLE_FILENAME
+    selected_uuids = tuple(plan.gpu_allocation.selected_ids)
+    selected_gpu_ids = _provider_gpu_ids(selected_uuids)
     payload: dict[str, object] = {
-        "schema_version": MANAGED_RUN_REQUEST_SCHEMA,
+        "schema": MANAGED_RUN_REQUEST_SCHEMA,
         "run_id": context.identity.run_name,
-        "module_spec": {
+        "task": {
             "module": f"experiments.{context.identity.topic}.run",
             "callable": "main",
-            "argv": command[2:],
-            "entrypoint_relative_path": expected_relative,
         },
-        "source_snapshot_root": str(context.paths.result_dir / "source_snapshot"),
+        "cases": [
+            {
+                "argv": command[2:],
+                "entrypoint_relative_path": expected_relative,
+            }
+        ],
         "environment": dict(admitted_environment.exact_env_map),
-        "working_directory": str(context.paths.result_dir / "source_snapshot"),
-        "output_directory": str(context.paths.result_dir),
         "capacity": {
-            "cpu_set": request.cpu_requested_set,
+            "max_workers": 1,
+            "host_memory_bytes": request.host_memory_bytes,
+            "gpu_devices": [
+                {
+                    "gpu_id": gpu_id,
+                    "memory_bytes": plan.gpu_allocation.memory_bytes.get(uuid, 0),
+                    "max_slots": 1,
+                }
+                for uuid, gpu_id in zip(selected_uuids, selected_gpu_ids)
+            ],
+        },
+        "resource_estimate": {
             "host_memory_bytes": request.host_memory_bytes,
             "gpu_count": request.gpu_requested_count,
             "gpu_memory_bytes": request.gpu_requested_memory_bytes,
-            "selected_uuids": plan.gpu_allocation.selected_ids,
+            "gpu_slots": 1,
         },
-        "admission_fingerprint": admitted_environment.admission_fingerprint,
-        "plan_fingerprint": plan.plan_fingerprint,
-        "source_paths": source_paths,
-        "lifecycle_artifact_path": str(lifecycle_path),
+        "selected_gpu_ids": selected_gpu_ids,
+        "metadata": {
+            "agentcanon_admission_fingerprint": admitted_environment.admission_fingerprint,
+            "agentcanon_plan_fingerprint": plan.plan_fingerprint,
+            "agentcanon_source_paths": source_paths,
+            "agentcanon_source_snapshot_root": str(
+                context.paths.result_dir / "source_snapshot"
+            ),
+            "agentcanon_working_directory": str(
+                context.paths.result_dir / "source_snapshot"
+            ),
+            "agentcanon_output_directory": str(context.paths.result_dir),
+            "agentcanon_lifecycle_artifact_path": str(
+                context.paths.result_dir
+                / "runtime"
+                / MANAGED_RUN_LIFECYCLE_FILENAME
+            ),
+            "agentcanon_selected_uuids": selected_uuids,
+        },
     }
-    payload["request_fingerprint"] = hashlib.sha256(
-        json.dumps(payload, sort_keys=True, default=str, separators=(",", ":")).encode(
-            "utf-8"
-        )
+    payload["fingerprint"] = hashlib.sha256(
+        json.dumps(
+            payload,
+            ensure_ascii=True,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
     ).hexdigest()
     request_path.parent.mkdir(parents=True, exist_ok=True)
     request_path.write_text(
@@ -571,32 +641,6 @@ def _resolve_admitted_runner() -> str:
     return resolved
 
 
-def _read_admitted_runner_version(executable: str) -> str:
-    try:
-        completed = subprocess.run(
-            [executable, "--version"],
-            shell=False,
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        raise TypedPreflightFailure(
-            "admitted_runner_cli_version_unavailable",
-            "experiment-runner-admitted CLI version could not be read",
-        ) from exc
-    version = completed.stdout.strip() or completed.stderr.strip()
-    if completed.returncode != 0 or version != MANAGED_RUN_CLI_VERSION:
-        raise TypedPreflightFailure(
-            "admitted_runner_cli_version_mismatch",
-            "experiment-runner-admitted CLI version is not the reviewed version",
-            expected_version=MANAGED_RUN_CLI_VERSION,
-            observed_version=version,
-        )
-    return version
-
-
 def _validate_admitted_result(
     result_path: Path,
     request_payload: Mapping[str, object],
@@ -614,74 +658,192 @@ def _validate_admitted_result(
             "admitted_runner_result_corrupt",
             "experiment-runner-admitted result artifact must be a JSON object",
         )
-    if result.get("schema_version") != MANAGED_RUN_RESULT_SCHEMA:
+    if result.get("schema") != MANAGED_RUN_RESULT_SCHEMA:
         raise TypedPreflightFailure(
             "admitted_runner_result_schema_mismatch",
             "experiment-runner-admitted result schema is not the reviewed version",
-            observed_schema=result.get("schema_version"),
+            observed_schema=result.get("schema"),
         )
-    if result.get("request_fingerprint") != request_payload.get("request_fingerprint"):
+    request_fingerprint = request_payload.get("fingerprint")
+    if result.get("request_fingerprint") != request_fingerprint:
         raise TypedPreflightFailure(
             "admitted_runner_result_fingerprint_mismatch",
             "result does not reference the request fingerprint",
         )
-    if result.get("admission_fingerprint") != request_payload.get(
-        "admission_fingerprint"
-    ):
-        raise TypedPreflightFailure(
-            "admitted_runner_result_fingerprint_mismatch",
-            "result does not reference the composite admission fingerprint",
-        )
-    result_content = dict(result)
-    supplied_result_fingerprint = result_content.pop("result_fingerprint", None)
-    computed_result_fingerprint = hashlib.sha256(
-        json.dumps(
-            result_content,
-            sort_keys=True,
-            default=str,
-            separators=(",", ":"),
-        ).encode("utf-8")
-    ).hexdigest()
-    if supplied_result_fingerprint != computed_result_fingerprint:
-        raise TypedPreflightFailure(
-            "admitted_runner_result_fingerprint_mismatch",
-            "result content fingerprint is invalid",
-        )
-    worker = result.get("worker")
-    lifecycle = result.get("lifecycle")
-    exit_record = result.get("exit")
-    if not isinstance(worker, Mapping) or not isinstance(lifecycle, Mapping) or not isinstance(exit_record, Mapping):
+    if result.get("run_id") != request_payload.get("run_id"):
         raise TypedPreflightFailure(
             "admitted_runner_result_corrupt",
-            "result must contain worker, lifecycle, and exit objects",
+            "result does not reference the request run identity",
         )
-    worker_pid = worker.get("pid")
-    descendants = worker.get("descendants")
-    if (
-        isinstance(worker_pid, bool)
-        or not isinstance(worker_pid, int)
-        or worker_pid <= 0
-        or not isinstance(descendants, list)
-        or worker.get("quiescence") != "PROVEN"
-    ):
+    status = result.get("status")
+    if status not in {"ok", "failed", "rejected"}:
         raise TypedPreflightFailure(
-            "admitted_runner_descendant_quiescence_unproven",
-            "result does not prove worker PID, descendants, and quiescence",
+            "admitted_runner_result_corrupt",
+            "result status is not part of the provider schema",
+            observed_status=status,
         )
-    child_ids: list[int] = [cast(int, worker_pid)]
-    for item in descendants:
+    worker_pids_raw = result.get("worker_pids")
+    if not isinstance(worker_pids_raw, list):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "result worker_pids must be an array",
+        )
+    worker_pids = tuple(worker_pids_raw)
+    if any(
+        isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0
+        for pid in worker_pids
+    ) or len(set(worker_pids)) != len(worker_pids):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "result worker_pids must contain unique positive process IDs",
+        )
+    worker_pid = result.get("worker_pid")
+    if worker_pids:
         if (
-            not isinstance(item, Mapping)
-            or isinstance(item.get("pid"), bool)
-            or not isinstance(item.get("pid"), int)
-            or not isinstance(item.get("starttime"), str)
-            or not item["starttime"]
+            isinstance(worker_pid, bool)
+            or not isinstance(worker_pid, int)
+            or worker_pid != worker_pids[0]
         ):
             raise TypedPreflightFailure(
                 "admitted_runner_result_corrupt",
-                "result descendant identity is malformed",
+                "result worker_pid must be the first provider worker PID",
             )
-        child_ids.append(cast(int, item["pid"]))
+    elif worker_pid is not None:
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "result worker_pid must be null when worker_pids is empty",
+        )
+    lifecycle = result.get("lifecycle")
+    quiescence = result.get("quiescence")
+    exit_record = result.get("exit")
+    completions = result.get("completions")
+    if not isinstance(lifecycle, Mapping) or not isinstance(quiescence, Mapping) or not isinstance(exit_record, Mapping):
+        raise TypedPreflightFailure(
+            "admitted_runner_descendant_quiescence_unproven",
+            "result must contain provider lifecycle and quiescence objects",
+        )
+
+    def required_int(mapping: Mapping[str, object], name: str) -> int:
+        value = mapping.get(name)
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise TypedPreflightFailure(
+                "admitted_runner_result_corrupt",
+                f"provider lifecycle field {name} is invalid",
+            )
+        return value
+
+    def required_bool(mapping: Mapping[str, object], name: str) -> bool:
+        value = mapping.get(name)
+        if not isinstance(value, bool):
+            raise TypedPreflightFailure(
+                "admitted_runner_result_corrupt",
+                f"provider lifecycle field {name} is invalid",
+            )
+        return value
+
+    def required_pid_sequence(mapping: Mapping[str, object], name: str) -> tuple[int, ...]:
+        value = mapping.get(name)
+        if not isinstance(value, list):
+            raise TypedPreflightFailure(
+                "admitted_runner_result_corrupt",
+                f"provider lifecycle field {name} is invalid",
+            )
+        pids = tuple(value)
+        if any(
+            isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0
+            for pid in pids
+        ) or len(set(pids)) != len(pids):
+            raise TypedPreflightFailure(
+                "admitted_runner_result_corrupt",
+                f"provider lifecycle field {name} contains invalid process IDs",
+            )
+        return pids
+
+    lifecycle_run_id = lifecycle.get("run_id")
+    terminal_event_id = lifecycle.get("terminal_event_id")
+    terminal_status = lifecycle.get("terminal_status")
+    descendant_status = lifecycle.get("descendant_quiescence")
+    lifecycle_child_pids = required_pid_sequence(lifecycle, "child_process_ids")
+    lifecycle_group_pids = required_pid_sequence(lifecycle, "process_group_ids")
+    if (
+        lifecycle_run_id != request_payload.get("run_id")
+        or not isinstance(terminal_event_id, str)
+        or not terminal_event_id
+        or terminal_status not in {"finished", "failed", "interrupted"}
+        or descendant_status not in {"proved", "no_child", "unproven"}
+        or tuple(worker_pids) != lifecycle_child_pids
+    ):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "provider lifecycle identity or status fields are invalid",
+        )
+    cleanup_failures_raw = lifecycle.get("cleanup_failures")
+    if not isinstance(cleanup_failures_raw, list) or any(
+        not isinstance(item, str) or not item for item in cleanup_failures_raw
+    ):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "provider lifecycle cleanup_failures must be an array of strings",
+        )
+    cleanup_failures = tuple(cleanup_failures_raw)
+    direct_children_quiescent = required_bool(quiescence, "direct_children_quiescent")
+    result_descendant_status = quiescence.get("descendant_quiescence")
+    quiescence_cleanup_failures = quiescence.get("cleanup_failures")
+    if (
+        result.get("descendant_quiescence") != descendant_status
+        or result_descendant_status != descendant_status
+        or not isinstance(quiescence_cleanup_failures, list)
+        or tuple(quiescence_cleanup_failures) != cleanup_failures
+    ):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "provider result and lifecycle quiescence statuses disagree",
+        )
+    quiescence_complete = required_bool(quiescence, "complete")
+    lifecycle_quiescence_complete = required_bool(lifecycle, "quiescence_complete")
+    terminal_coverage_complete = required_bool(lifecycle, "terminal_coverage_complete")
+    requested_case_coverage_complete = required_bool(
+        lifecycle,
+        "requested_case_coverage_complete",
+    )
+    completion_coverage_complete = required_bool(
+        lifecycle,
+        "completion_coverage_complete",
+    )
+    scheduler_completed = required_bool(lifecycle, "scheduler_completed")
+    if not isinstance(completions, list):
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "provider result completions must be an array",
+        )
+    admitted_case_count = required_int(lifecycle, "admitted_case_count")
+    if len(completions) != admitted_case_count:
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "provider completion count does not match admitted case count",
+        )
+    if not (
+        quiescence_complete
+        and lifecycle_quiescence_complete
+        and direct_children_quiescent
+        and descendant_status in {"proved", "no_child"}
+        and not cleanup_failures
+        and terminal_coverage_complete
+        and requested_case_coverage_complete
+        and completion_coverage_complete
+        and scheduler_completed
+    ):
+        raise TypedPreflightFailure(
+            "admitted_runner_descendant_quiescence_unproven",
+            "provider terminal result does not prove complete quiescence and completion coverage",
+            quiescence_complete=quiescence_complete,
+            lifecycle_quiescence_complete=lifecycle_quiescence_complete,
+            direct_children_quiescent=direct_children_quiescent,
+            descendant_quiescence=descendant_status,
+            terminal_coverage_complete=terminal_coverage_complete,
+            requested_case_coverage_complete=requested_case_coverage_complete,
+            completion_coverage_complete=completion_coverage_complete,
+        )
     exit_code = exit_record.get("code")
     error = exit_record.get("error")
     if (
@@ -695,46 +857,49 @@ def _validate_admitted_result(
             process_returncode=process_returncode,
             result_exit_code=exit_code,
         )
+    if result.get("exit_code") != exit_code or result.get("error") != error:
+        raise TypedPreflightFailure(
+            "admitted_runner_result_corrupt",
+            "provider result exit projection disagrees with its exit record",
+        )
+    if (status == "ok") != (exit_code == 0):
+        raise TypedPreflightFailure(
+            "admitted_runner_exit_mismatch",
+            "provider result status disagrees with its exit code",
+        )
     if exit_code != 0 and error in (None, ""):
         raise TypedPreflightFailure(
             "admitted_runner_error_missing",
             "nonzero admitted-runner exit requires typed error evidence",
         )
 
-    def int_field(mapping: Mapping[str, object], name: str, default: int) -> int:
-        value = mapping.get(name, default)
-        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-            raise TypedPreflightFailure(
-                "admitted_runner_result_corrupt",
-                f"result lifecycle field {name} is invalid",
-            )
-        return value
-
     lifecycle_evidence = ManagedRunLifecycleEvidence(
-        run_id=str(request_payload["run_id"]),
-        terminal_event_id=str(lifecycle.get("terminal_event_id", "")),
-        observed_at_ns=int_field(lifecycle, "observed_at_ns", time.time_ns()),
-        terminal_status=str(lifecycle.get("terminal_status", "finished")),
-        total_case_count_at_start=int_field(lifecycle, "total_case_count_at_start", 1),
-        completion_count_before=int_field(lifecycle, "completion_count_before", 0),
-        completion_count_after=int_field(lifecycle, "completion_count_after", 1),
-        scheduler_completed=lifecycle.get("scheduler_completed") is True,
-        admitted_case_count=int_field(lifecycle, "admitted_case_count", 1),
-        terminal_notification_count=int_field(lifecycle, "terminal_notification_count", 1),
-        child_process_ids=tuple(child_ids),
-        process_group_ids=tuple(
-            item
-            for item in lifecycle.get("process_group_ids", ())
-            if isinstance(item, int) and not isinstance(item, bool)
+        run_id=str(lifecycle_run_id),
+        terminal_event_id=cast(str, terminal_event_id),
+        observed_at_ns=required_int(lifecycle, "observed_at_ns"),
+        terminal_status=cast(str, terminal_status),
+        total_case_count_at_start=required_int(lifecycle, "total_case_count_at_start"),
+        completion_count_before=required_int(lifecycle, "completion_count_before"),
+        completion_count_after=required_int(lifecycle, "completion_count_after"),
+        scheduler_completed=scheduler_completed,
+        admitted_case_count=admitted_case_count,
+        terminal_notification_count=required_int(
+            lifecycle,
+            "terminal_notification_count",
         ),
-        direct_children_quiescent=True,
-        descendant_quiescence="PROVEN",
+        child_process_ids=lifecycle_child_pids,
+        process_group_ids=lifecycle_group_pids,
+        direct_children_quiescent=direct_children_quiescent,
+        descendant_quiescence=cast(
+            Literal["proved", "no_child", "unproven"],
+            descendant_status,
+        ),
+        cleanup_failures=cleanup_failures,
+        terminal_coverage_complete=terminal_coverage_complete,
+        requested_case_coverage_complete=requested_case_coverage_complete,
+        quiescence_complete=lifecycle_quiescence_complete,
+        completion_coverage_complete=completion_coverage_complete,
     )
-    if not lifecycle_evidence.terminal_event_id:
-        raise TypedPreflightFailure(
-            "admitted_runner_result_corrupt",
-            "result lifecycle terminal event is missing",
-        )
     execution = ManagedRunExecutionResult(
         status="ok" if exit_code == 0 else "failed",
         raw_exit_code=exit_code,
@@ -767,7 +932,6 @@ def _run_admitted_runner(
 ) -> tuple[ManagedRunExecutionResult, ManagedRunLifecycleEvidence, Mapping[str, object]]:
     """Invoke the fixed shell-free admitted-runner handshake."""
     executable = _resolve_admitted_runner()
-    version = _read_admitted_runner_version(executable)
     argv = [executable, "--request", str(request_path), "--result", str(result_path)]
     try:
         with context.paths.stdout_log_path.open("ab") as stdout, context.paths.stderr_log_path.open("ab") as stderr:
@@ -801,10 +965,16 @@ def _run_admitted_runner(
         "schema_version": "agentcanon-managed-run-receipt/v1",
         "executable": MANAGED_RUN_EXECUTABLE,
         "resolved_executable": executable,
-        "version": version,
         "argv": argv,
-        "request_fingerprint": request_payload["request_fingerprint"],
-        "result_fingerprint": result["result_fingerprint"],
+        "request_fingerprint": request_payload["fingerprint"],
+        "result_content_fingerprint": hashlib.sha256(
+            json.dumps(
+                result,
+                ensure_ascii=True,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest(),
         "process_returncode": process_returncode,
         "worker_pid": lifecycle.child_process_ids[0] if lifecycle.child_process_ids else None,
     }
@@ -2251,7 +2421,9 @@ def execute_managed_run(
                 reservation_transaction = GpuReservationTransaction(request.lock_root)
 
                 def release_reservation() -> None:
-                    if runner_invoked and runner_lifecycle is None:
+                    if runner_invoked and not _lifecycle_quiescence_is_proven(
+                        runner_lifecycle
+                    ):
                         raise TypedPreflightFailure(
                             "gpu_reservation_release_blocked",
                             "GPU reservation remains held until admitted-runner descendant quiescence is proven",
@@ -2635,19 +2807,18 @@ def execute_managed_run(
     )
     if runner_invoked:
         lifecycle = runner_lifecycle
+        lifecycle_quiescent = _lifecycle_quiescence_is_proven(lifecycle)
         coverage_descendants = DescendantRetentionEvidence(
             child_process_ids=(lifecycle.child_process_ids if lifecycle is not None else ()),
             process_group_ids=(lifecycle.process_group_ids if lifecycle is not None else ()),
-            descendant_quiescence="PROVEN" if lifecycle is not None else "UNPROVEN",
+            descendant_quiescence="PROVEN" if lifecycle_quiescent else "UNPROVEN",
             retained_gpu_process_uuids=(),
-            release_blocked=lifecycle is None,
+            release_blocked=not lifecycle_quiescent,
             fingerprint=_r5_evidence_fingerprint(
                 {
                     "runner_lifecycle": repr(lifecycle),
-                    "descendant_quiescence": (
-                        "PROVEN" if lifecycle is not None else "UNPROVEN"
-                    ),
-                    "release_blocked": lifecycle is None,
+                    "descendant_quiescence": "PROVEN" if lifecycle_quiescent else "UNPROVEN",
+                    "release_blocked": not lifecycle_quiescent,
                 }
             ),
         )

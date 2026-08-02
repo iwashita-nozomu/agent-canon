@@ -71,9 +71,10 @@ S0
 ```
 
 plan freeze 前に selected visibility を生成しません。reservation lock は外部 CLI の
-worker と descendants の quiescence が result で `PROVEN` になるまで保持します。CLI が
-存在しない、version が異なる、result が壊れている、request/result fingerprint が不一致、
-または quiescence が証明できない場合は typed fail です。
+worker と descendants の quiescence、terminal result、completion coverage が provider
+result で成立するまで保持します。CLI が存在しない、result schema が異なる、result が壊れて
+いる、request fingerprint が不一致、または quiescence/completion coverage が証明できない
+場合は typed fail です。
 
 ## 固定 CLI handshake
 
@@ -82,32 +83,38 @@ worker と descendants の quiescence が result で `PROVEN` になるまで保
 ```text
 executable = experiment-runner-admitted
 argv       = [experiment-runner-admitted, --request, <path>, --result, <path>]
-version    = experiment-runner-admitted/v1
-request    = agentcanon-managed-run/v1
-result     = agentcanon-managed-run-result/v1
+request    = agentcanon-managed-run/v1 (provider field: schema)
+result     = agentcanon-managed-run-result/v1 (provider field: schema)
 ```
 
-CLI identity、version、argv、request fingerprint は receipt に束縛します。request は
-現在の TaskProtocol から次の必須 field を JSON artifact として持ちます。
+CLI identity、argv、request fingerprint は receipt に束縛します。別の `--version`
+ToolCall は行いません。request は provider の approved v1 wire field と、request
+fingerprint に含まれる AgentCanon metadata extension から構成します。
 
 | field | 内容 |
 | --- | --- |
-| `schema_version` | `agentcanon-managed-run/v1` |
+| `schema` | `agentcanon-managed-run/v1` |
 | `run_id` | managed context の run identity |
-| `module_spec` | `module`、`callable`、`argv`、`entrypoint_relative_path`。parent process は module を import しない |
-| `source_snapshot_root` | source freeze 後の snapshot path |
+| `task` | `module` と `callable`。parent process は module を import しない |
+| `cases` | provider task に渡す case。argv と canonical entrypoint は各 case に保持 |
 | `environment` | admitted 後の exact environment |
-| `working_directory` / `output_directory` | worker の作業場所と artifact 出力場所 |
-| `capacity` | `cpu_set`、host/GPU memory、GPU count、pre-admitted selected UUID |
-| `admission_fingerprint` / `plan_fingerprint` | lock-bound composite と frozen plan の参照 |
-| `source_paths` | exact registry closure を含む snapshot membership |
-| `lifecycle_artifact_path` | terminal lifecycle の保存先 |
-| `request_fingerprint` | 上記 request 内容 hash |
+| `capacity` | provider の `max_workers`、host memory、`gpu_devices` |
+| `resource_estimate` | host memory、GPU count、GPU memory、GPU slots |
+| `selected_gpu_ids` | provider v1 の selected device field |
+| `fingerprint` | provider canonical request 内容 hash。metadata の admission composite を含む |
+| `metadata` | AgentCanon の admission/plan/source/lifecycle references。provider v1 の拡張 field |
 
-result は `schema_version`、request/admission/result fingerprint、worker PID、各 descendant
-の PID/starttime、quiescence、lifecycle terminal event、exit code/error を持ちます。
-AgentCanon は schema/version/fingerprint、exit と CLI return code、worker/descendant
-identity、quiescence、lifecycle artifact を検証してから terminal/closeout を生成します。
+result は `schema`、`request_fingerprint`、`run_id`、`worker_pid`/`worker_pids`、provider
+`lifecycle`、`quiescence`、`exit`/`exit_code`/`error`、`completions` を持ちます。lifecycle
+の `quiescence_complete`、`completion_coverage_complete`、`direct_children_quiescent`、
+`descendant_quiescence`、cleanup failure、worker/process-group IDs を実値で検証します。
+result に AgentCanon 独自の `admission_fingerprint` や `result_fingerprint` は要求しません。
+
+provider v1 は GPU ID を非負整数に固定し、task callable を `(case, context)` に固定します。
+AgentCanon の full physical/MIG UUID と topic `main(argv)` を意味を失わずに表現するには、
+provider 側に (a) opaque UUID device ID、(b) main/argv または同等 adapter task の最小 wire
+拡張が必要です。consumer は UUID を整数へ縮退せず、現 provider では typed
+`admitted_runner_provider_gpu_uuid_incompatible` として停止します。
 
 ## 検証と成果物
 

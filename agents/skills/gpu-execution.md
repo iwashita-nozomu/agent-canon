@@ -63,20 +63,29 @@ AgentCanon は shell なしで次を起動します。
 
 ```text
 experiment-runner-admitted --request <path> --result <path>
-request schema: agentcanon-managed-run/v1
-result schema:  agentcanon-managed-run-result/v1
-version:       experiment-runner-admitted/v1
+request field: schema = agentcanon-managed-run/v1
+result field:  schema = agentcanon-managed-run-result/v1
 ```
 
-request は module/callable spec、exact environment、working/output paths、pre-admitted
-explicit capacity、source snapshot、admission/plan fingerprint、lifecycle artifact path、
-request fingerprint を含みます。parent process は topic/backend module を import しません。
-receipt は CLI identity/version/argv/request fingerprint を束縛します。
+AgentCanon は shell なしで単一 invocation を起動します。別の `--version` ToolCall は
+ありません。request は provider v1 の `task`、`cases`、exact `environment`、`capacity`、
+`resource_estimate`、`selected_gpu_ids`、`fingerprint` を使います。module/callable は task
+へ、argv と snapshot/output/lifecycle references と admission/plan fingerprint は
+`metadata` extension へ写像します。parent process は topic/backend module を import しません。
+receipt は CLI identity/argv/request fingerprint を束縛します。
 
-result は schema/version、request/admission/result fingerprint、worker PID、descendant
-PID/starttime、quiescence、lifecycle terminal event、exit/error を検証します。worker と
-descendants が quiescent になるまで GPU reservation lock を release しません。CLI 不在、
-version 不一致、壊れた result、fingerprint 不一致、quiescence 不明は typed failure です。
+result は provider v1 の schema、request fingerprint、worker PID 列、lifecycle、quiescence、
+completion coverage、exit/error を検証します。`quiescence.complete`、
+`lifecycle.quiescence_complete`、`direct_children_quiescent`、`completion_coverage_complete`、
+cleanup failure、worker/process-group IDs を hardcode せず実値で検証します。worker と
+descendants が quiescent になり、terminal result と completion coverage が成立するまで
+GPU reservation lock を release しません。CLI 不在、schema 不一致、壊れた result、request
+fingerprint 不一致、quiescence/completion coverage 不明は typed failure です。
+
+provider v1 の `selected_gpu_ids` と `capacity.gpu_devices` は整数専用です。full physical/MIG
+UUID を整数へ縮退せず、GPU run は typed incompatibility で停止します。provider task の
+`(case, context)` と AgentCanon topic `main(argv)` の境界も、provider 側の最小 adapter 拡張
+なしには consumer 側で偽装しません。
 
 ## Environment
 
@@ -96,9 +105,10 @@ compatibility route はありません。
 
 ## Validation と blocker
 
-owner tests は ambiguous join、proc race/reuse、UNKNOWN closure、lock-bound composite、
-pre-freeze env 禁止、no signal/kill、pstree absent/proc complete の7 behavior と、fake
-CLI protocol、schema/version/result fail-closed、import/PYTHONPATH absence を実行します。
+owner tests は既存7 behavior と、provider wire schema、request/result mismatch、single
+invocation、実値 quiescence/completion coverage、lock release order、import/PYTHONPATH
+absence を実行します。fake CLI は provider approved schema と同じ field を返し、旧 consumer
+専用 schema では通しません。
 
 実機 GPU が必要な claim は `nvidia-smi` と allocation/backend evidence で検証します。
 GPU が利用不可なら `gpu_validation_blocker=<reason>`、実行できなかった claim、stderr または

@@ -428,7 +428,12 @@ def test_r5_runner_lifecycle_fingerprint_uses_protocol_projection() -> None:
         child_process_ids=(),
         process_group_ids=(),
         direct_children_quiescent=True,
-        descendant_quiescence="PROVEN",
+        descendant_quiescence="no_child",
+        cleanup_failures=(),
+        terminal_coverage_complete=True,
+        requested_case_coverage_complete=True,
+        quiescence_complete=True,
+        completion_coverage_complete=True,
     )
     outcome = ManagedGpuOutcomeReducer().reduce_terminal(
         run_id="r5-lifecycle",
@@ -450,26 +455,36 @@ def test_r5_runner_lifecycle_fingerprint_uses_protocol_projection() -> None:
 
 
 def test_r5_admitted_runner_fake_cli_protocol(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """The managed owner invokes a fake admitted CLI with no Python runner import."""
+    """The managed owner invokes the approved provider wire protocol exactly once."""
     from tools.experiments.run_managed_experiment import _run_admitted_runner
 
     fake = tmp_path / "experiment-runner-admitted"
     fake.write_text(
         "#!/usr/bin/env python3\n"
-        "import hashlib, json, os, sys\n"
-        "if sys.argv[1:] == ['--version']:\n"
-        "    print('experiment-runner-admitted/v1')\n"
-        "    raise SystemExit(0)\n"
+        "import json, os, sys\n"
         "request_path = sys.argv[sys.argv.index('--request') + 1]\n"
         "result_path = sys.argv[sys.argv.index('--result') + 1]\n"
         "request = json.loads(open(request_path, encoding='utf-8').read())\n"
-        "result = {'schema_version': 'agentcanon-managed-run-result/v1',\n"
-        " 'request_fingerprint': request['request_fingerprint'],\n"
-        " 'admission_fingerprint': request['admission_fingerprint'],\n"
-        " 'worker': {'pid': os.getpid(), 'descendants': [], 'quiescence': 'PROVEN'},\n"
-        " 'lifecycle': {'terminal_event_id': 'terminal-1', 'scheduler_completed': True},\n"
-        " 'exit': {'code': 0, 'error': None}}\n"
-        "result['result_fingerprint'] = hashlib.sha256(json.dumps(result, sort_keys=True, separators=(',', ':')).encode()).hexdigest()\n"
+        "pid = os.getpid()\n"
+        "lifecycle = {'run_id': request['run_id'], 'terminal_event_id': 'terminal-1',\n"
+        " 'observed_at_ns': 1, 'terminal_status': 'finished',\n"
+        " 'total_case_count_at_start': 1, 'completion_count_before': 0,\n"
+        " 'completion_count_after': 1, 'completion_delta': 1,\n"
+        " 'scheduler_completed': True, 'admitted_case_count': 1,\n"
+        " 'terminal_notification_count': 1, 'child_process_ids': [pid],\n"
+        " 'process_group_ids': [pid], 'direct_children_quiescent': True,\n"
+        " 'descendant_quiescence': 'proved', 'cleanup_failures': [],\n"
+        " 'terminal_coverage_complete': True,\n"
+        " 'requested_case_coverage_complete': True, 'quiescence_complete': True,\n"
+        " 'completion_coverage_complete': True}\n"
+        "result = {'schema': 'agentcanon-managed-run-result/v1',\n"
+        " 'request_fingerprint': request['fingerprint'], 'run_id': request['run_id'],\n"
+        " 'status': 'ok', 'worker_pid': pid, 'worker_pids': [pid],\n"
+        " 'lifecycle': lifecycle, 'descendant_quiescence': 'proved',\n"
+        " 'quiescence': {'direct_children_quiescent': True,\n"
+        " 'descendant_quiescence': 'proved', 'complete': True, 'cleanup_failures': []},\n"
+        " 'exit': {'code': 0, 'error': None}, 'exit_code': 0, 'error': None,\n"
+        " 'completions': [{'case': {}, 'result': {'status': 'ok'}}]}\n"
         "open(result_path, 'w', encoding='utf-8').write(json.dumps(result))\n",
         encoding="utf-8",
     )
@@ -489,8 +504,19 @@ def test_r5_admitted_runner_fake_cli_protocol(tmp_path: Path, monkeypatch: pytes
         json.dumps(
             {
                 "run_id": "run-1",
-                "request_fingerprint": "a" * 64,
-                "admission_fingerprint": "b" * 64,
+                "schema": "agentcanon-managed-run/v1",
+                "fingerprint": "a" * 64,
+                "task": {"module": "experiments.demo_topic.run", "callable": "main"},
+                "cases": [{}],
+                "capacity": {"max_workers": 1, "host_memory_bytes": 0, "gpu_devices": []},
+                "resource_estimate": {
+                    "host_memory_bytes": 0,
+                    "gpu_count": 0,
+                    "gpu_memory_bytes": 0,
+                    "gpu_slots": 1,
+                },
+                "selected_gpu_ids": [],
+                "environment": {},
             }
         ),
         encoding="utf-8",
@@ -502,21 +528,174 @@ def test_r5_admitted_runner_fake_cli_protocol(tmp_path: Path, monkeypatch: pytes
         lifecycle_path=tmp_path / "lifecycle.json",
         request_payload={
             "run_id": "run-1",
-            "request_fingerprint": "a" * 64,
-            "admission_fingerprint": "b" * 64,
+            "schema": "agentcanon-managed-run/v1",
+            "fingerprint": "a" * 64,
         },
         environment={"PATH": os.environ["PATH"]},
     )
     assert execution.raw_exit_code == 0
-    assert lifecycle.descendant_quiescence == "PROVEN"
+    assert lifecycle.descendant_quiescence == "proved"
     assert result["request_fingerprint"] == "a" * 64
     assert (result_dir / "runtime" / "managed-run-receipt.json").is_file()
+
+
+def test_r5_provider_request_wire_fields_and_uuid_guard() -> None:
+    """The request uses provider names and never fabricates integer UUIDs."""
+    from tools.experiments.run_managed_experiment import _provider_gpu_ids
+
+    source = SCRIPT.read_text(encoding="utf-8")
+    request_builder = source[
+        source.index("def _build_managed_run_request") : source.index("def _resolve_admitted_runner")
+    ]
+    assert '"schema": MANAGED_RUN_REQUEST_SCHEMA' in request_builder
+    assert '"task":' in request_builder
+    assert '"resource_estimate":' in request_builder
+    assert '"selected_gpu_ids":' in request_builder
+    assert '"fingerprint"]' in request_builder
+    assert '"module_spec":' not in request_builder
+    assert '"schema_version": MANAGED_RUN_REQUEST_SCHEMA' not in request_builder
+    with pytest.raises(Exception) as raised:
+        _provider_gpu_ids(("GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",))
+    assert getattr(raised.value, "code", None) == "admitted_runner_provider_gpu_uuid_incompatible"
+
+
+def _valid_provider_result(request_fingerprint: str) -> dict[str, object]:
+    """Build one provider-approved result projection for mismatch tests."""
+    lifecycle = {
+        "run_id": "run-mismatch",
+        "terminal_event_id": "terminal-1",
+        "observed_at_ns": 1,
+        "terminal_status": "finished",
+        "total_case_count_at_start": 1,
+        "completion_count_before": 0,
+        "completion_count_after": 1,
+        "completion_delta": 1,
+        "scheduler_completed": True,
+        "admitted_case_count": 1,
+        "terminal_notification_count": 1,
+        "child_process_ids": [101],
+        "process_group_ids": [101],
+        "direct_children_quiescent": True,
+        "descendant_quiescence": "proved",
+        "cleanup_failures": [],
+        "terminal_coverage_complete": True,
+        "requested_case_coverage_complete": True,
+        "quiescence_complete": True,
+        "completion_coverage_complete": True,
+    }
+    return {
+        "schema": "agentcanon-managed-run-result/v1",
+        "request_fingerprint": request_fingerprint,
+        "run_id": "run-mismatch",
+        "status": "ok",
+        "worker_pid": 101,
+        "worker_pids": [101],
+        "lifecycle": lifecycle,
+        "descendant_quiescence": "proved",
+        "quiescence": {
+            "direct_children_quiescent": True,
+            "descendant_quiescence": "proved",
+            "complete": True,
+            "cleanup_failures": [],
+        },
+        "exit": {"code": 0, "error": None},
+        "exit_code": 0,
+        "error": None,
+        "completions": [{"case": {}, "result": {"status": "ok"}}],
+    }
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_code"),
+    (
+        ("schema", "admitted_runner_result_schema_mismatch"),
+        ("request_fingerprint", "admitted_runner_result_fingerprint_mismatch"),
+        ("quiescence", "admitted_runner_descendant_quiescence_unproven"),
+        ("exit", "admitted_runner_exit_mismatch"),
+    ),
+)
+def test_r5_provider_result_mismatches_fail_closed(
+    tmp_path: Path,
+    mutation: str,
+    expected_code: str,
+) -> None:
+    """Provider schema, fingerprint, quiescence, and exit mismatches are typed failures."""
+    from tools.experiments.run_managed_experiment import _validate_admitted_result
+
+    request_fingerprint = "a" * 64
+    result = _valid_provider_result(request_fingerprint)
+    if mutation == "schema":
+        result["schema"] = "wrong/v1"
+    elif mutation == "request_fingerprint":
+        result["request_fingerprint"] = "b" * 64
+    elif mutation == "quiescence":
+        quiescence = result["quiescence"]
+        assert isinstance(quiescence, dict)
+        quiescence["complete"] = False
+    else:
+        exit_record = result["exit"]
+        assert isinstance(exit_record, dict)
+        exit_record["code"] = 1
+        result["exit_code"] = 1
+    result_path = tmp_path / "provider-result.json"
+    result_path.write_text(json.dumps(result), encoding="utf-8")
+    with pytest.raises(Exception) as raised:
+        _validate_admitted_result(
+            result_path,
+            {"schema": "agentcanon-managed-run/v1", "run_id": "run-mismatch", "fingerprint": request_fingerprint},
+            0,
+        )
+    assert getattr(raised.value, "code", None) == expected_code
+
+
+def test_r5_provider_quiescence_and_completion_cover_lock_release() -> None:
+    """Lock release requires provider quiescence and completion coverage evidence."""
+    from dataclasses import replace
+
+    from tools.experiments.run_managed_experiment import (
+        ManagedRunLifecycleEvidence,
+        _lifecycle_quiescence_is_proven,
+    )
+
+    lifecycle = ManagedRunLifecycleEvidence(
+        run_id="r5-release",
+        terminal_event_id="terminal-1",
+        observed_at_ns=1,
+        terminal_status="finished",
+        total_case_count_at_start=1,
+        completion_count_before=0,
+        completion_count_after=1,
+        scheduler_completed=True,
+        admitted_case_count=1,
+        terminal_notification_count=1,
+        child_process_ids=(101,),
+        process_group_ids=(101,),
+        direct_children_quiescent=True,
+        descendant_quiescence="proved",
+        cleanup_failures=(),
+        terminal_coverage_complete=True,
+        requested_case_coverage_complete=True,
+        quiescence_complete=True,
+        completion_coverage_complete=True,
+    )
+    assert _lifecycle_quiescence_is_proven(lifecycle)
+    assert not _lifecycle_quiescence_is_proven(
+        replace(lifecycle, completion_coverage_complete=False)
+    )
+    assert not _lifecycle_quiescence_is_proven(
+        replace(lifecycle, direct_children_quiescent=False)
+    )
 
 
 def test_r5_runner_lifecycle_capture_is_shell_free_and_import_free() -> None:
     """The composition root uses shell-free subprocess and has no local runner fallback."""
     source = SCRIPT.read_text(encoding="utf-8")
+    admitted_runner_section = source[
+        source.index("def _resolve_admitted_runner") : source.index("def repo_root_from_script")
+    ]
     assert "shell=False" in source
+    assert "--version" not in admitted_runner_section
+    assert "_read_admitted_runner_version" not in admitted_runner_section
     assert "from experiment_runner import" not in source
     assert "PYTHONPATH" not in source
     assert "runpy" not in source
