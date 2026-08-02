@@ -81,6 +81,32 @@ the returned typed evidence, and reports unsupported tokens or parent
 contradictions. It does not parse dependency headers or open evidence files as
 a second fact authority.
 
+## Parent PR Gate Selection Contract
+
+Dependency-manifest completeness is a conditional parent-repository PR gate,
+not an unconditional prerequisite for publishing an AgentCanon gitlink. Every
+parent pin publication still requires the gitlink to resolve to a reachable
+commit, the staged gitlink to equal the checked-out `vendor/agent-canon` HEAD,
+and the changed shared/root projection to pass its existing materialization
+check. An actual materialization collision remains a blocker. A local parent
+branch being ahead, behind, diverged, or dirty is preserved as repository state
+and is not a failure predicate on its own.
+
+The parent strict graph-completeness gate is selected only when at least one of
+these conditions is true:
+
+- the caller declares a parent graph migration;
+- the change touches a dependency manifest/header or graph-migration surface;
+- the selected runtime validation profile explicitly requires dependency graph
+  completeness.
+
+When none of these conditions holds, the PR gate emits a typed skipped receipt
+and its quick-CI consumer does not rebuild the parent graph or promote
+repository-wide missing-header diagnostics into a blocker. Standalone
+AgentCanon source PRs retain the strict source graph gate. This separation
+keeps manifest migration debt visible without making unrelated parent pin-only
+changes satisfy a repository-wide completeness baseline.
+
 ## Manifest Block
 
 各 file の先頭付近に、共通 marker を含む dependency manifest block を置きます。
@@ -562,7 +588,10 @@ Responsibilities:
 - automatically write `dependency_graph.tsv` when `--report-dir` is set
 - accept `--search-hits-file` and write `dependency_edit_scope.txt` when `--report-dir` is set
 
-Template repos expose `make dependency-review-surfaces` to run strict review against both the parent root view and `vendor/agent-canon` source tree.
+Template repos expose `make dependency-review-surfaces` to run an explicit
+strict review against both the parent root view and `vendor/agent-canon` source
+tree. The AgentCanon parent PR gate invokes this wrapper only when its
+migration, touched-manifest, or selected-profile condition is active.
 
 ## Migration Plan
 
@@ -587,8 +616,14 @@ Each touched file must be converted from `Dependency Files:` to `@dependency-sta
 
 Phase 4: enable CI fail gate for changed files.
 Full-repo missing-header scan remains report-only until the repository is migrated.
-この repository では full-repo migration 後の strict baseline を `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` で固定します。
-goal-driven cleanup や shared surface migration の closeout では、この strict baseline を繰り返し実行して `DEPENDENCY_HEADER_SCAN_MISSING=0` と `REPO_DEPENDENCY_REVIEW=pass` が安定することを evidence にします。
+この repository では full-repo migration、touched dependency-manifest change、または
+graph-required validation profile のときだけ strict baseline を
+`bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` で
+有効化します。pin-only parent changes are represented by the skipped receipt
+and do not inherit `target-unresolved` or `manifest-grammar` diagnostics from
+the parent root as unrelated blockers. Goal-driven cleanup or shared-surface
+migration closeout repeats the strict baseline and records stable
+`DEPENDENCY_HEADER_SCAN_MISSING=0` and `REPO_DEPENDENCY_REVIEW=pass` evidence.
 
 Phase 5: remove legacy `Dependency Files:` wording from remaining docs after all checkable files use dependency manifest blocks.
 

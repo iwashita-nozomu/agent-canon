@@ -153,7 +153,12 @@ Impact notes:
 - [ ] `bash tools/agent-canon/sync_agent_canon.sh link-root`
 - [ ] `bash tools/agent-canon/sync_agent_canon.sh check`
 - [ ] `make agent-canon-pr-check`
-- [ ] `bash tools/agent-canon/agent_tools/run_repo_dependency_review.sh --fail-missing`
+- [ ] Parent gate dependency graph receipt is `prepared` when parent graph
+  migration, a touched dependency manifest, or the selected validation profile
+  requires strict completeness; otherwise it is `skipped`.
+- [ ] `bash tools/agent-canon/agent_tools/run_repo_dependency_review.sh
+  --fail-missing` was run when the parent gate selector required strict graph
+  completeness.
 - [ ] `python3 tools/agent-canon/agent_tools/check_agent_runtime_alignment.py`
 - [ ] `python3 tools/agent-canon/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml`
 - [ ] `python3 tools/agent-canon/agent_tools/check_convention_compliance.py`

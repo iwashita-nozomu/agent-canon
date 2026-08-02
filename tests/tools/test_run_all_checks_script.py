@@ -78,6 +78,40 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertNotIn(legacy_flag, pr_text)
         self.assertNotIn(legacy_profile, pr_text)
 
+    def test_pr_gate_receipt_accepts_prepared_or_skipped_dependency_graph(self) -> None:
+        """Parent PRs may skip graph completeness when its profile does not require it."""
+        ci_text = SCRIPT.read_text(encoding="utf-8")
+        pr_text = PR_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn('PR_GATE_DEPENDENCY_GRAPH_STATUS="not_applicable"', ci_text)
+        self.assertIn('strict_dependency_status}" != "prepared"', ci_text)
+        self.assertIn('strict_dependency_status}" != "skipped"', ci_text)
+        self.assertIn(
+            "PR_GATE_DEPENDENCY_GRAPH_STATUS=\"${strict_dependency_status}\"",
+            ci_text,
+        )
+        self.assertIn("PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped", pr_text)
+        self.assertIn("parent_graph_completeness_not_selected", pr_text)
+        self.assertIn(
+            'write_pr_gate_receipt "${PR_GATE_DEPENDENCY_GRAPH_STATUS}"',
+            pr_text,
+        )
+        self.assertIn(
+            "parent PR graph completeness not required",
+            ci_text,
+        )
+
+    def test_pr_gate_keeps_gitlink_and_projection_integrity_checks(self) -> None:
+        """Graph completeness is optional, but publication/projection integrity remains required."""
+        pr_text = PR_SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("agentcanon_pr_branch_integrity", pr_text)
+        self.assertIn("submodule-gitlink-worktree-mismatch", pr_text)
+        self.assertIn("submodule-pinned-commit-unreachable-from-configured-remote", pr_text)
+        self.assertIn("run_shared_surface_check", pr_text)
+        self.assertIn("AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required", pr_text)
+        self.assertNotIn("blocked_dirty_agentcanon_branch", pr_text)
+
     def test_python_quality_checks_are_shared(self) -> None:
         """Run-all and pre-review should use the same Python quality runner."""
         ci_text = SCRIPT.read_text(encoding="utf-8")

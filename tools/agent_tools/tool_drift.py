@@ -313,6 +313,21 @@ CONTRACTS = (
                 "not_applicable_standalone_source",
                 "missing-standalone-shared-surface-skip",
             ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "agentcanon_pr_dependency_graph_required()",
+                "missing-dependency-graph-requirement-selector",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "if agentcanon_pr_dependency_graph_required; then",
+                "missing-conditional-dependency-graph-gate",
+            ),
+            TextCheck(
+                "tools/ci/check_agent_canon_pr.sh",
+                "PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped",
+                "missing-optional-dependency-graph-receipt-status",
+            ),
         ),
         command_checks=(
             CommandCheck(

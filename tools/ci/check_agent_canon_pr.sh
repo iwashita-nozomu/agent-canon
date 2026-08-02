@@ -149,6 +149,110 @@ run_agent_canon() {
   return 127
 }
 
+agentcanon_pr_diff_base_ref() {
+  local candidate=""
+  if [[ -n "${AGENT_CANON_PR_BASE_REF:-}" ]] \
+    && git rev-parse --verify "${AGENT_CANON_PR_BASE_REF}^{commit}" >/dev/null 2>&1; then
+    printf '%s\n' "${AGENT_CANON_PR_BASE_REF}"
+    return 0
+  fi
+  if [[ -n "${GITHUB_BASE_REF:-}" ]] \
+    && git rev-parse --verify "origin/${GITHUB_BASE_REF}^{commit}" >/dev/null 2>&1; then
+    printf '%s\n' "origin/${GITHUB_BASE_REF}"
+    return 0
+  fi
+  for candidate in origin/main HEAD^; do
+    if git rev-parse --verify "${candidate}^{commit}" >/dev/null 2>&1; then
+      printf '%s\n' "${candidate}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+agentcanon_pr_changed_paths() {
+  local base_ref=""
+  base_ref="$(agentcanon_pr_diff_base_ref 2>/dev/null || true)"
+  if [[ -z "${base_ref}" ]]; then
+    return 0
+  fi
+  git diff --name-only "${base_ref}...HEAD" -- 2>/dev/null || true
+}
+
+agentcanon_pr_dependency_manifest_touched() {
+  local base_ref=""
+  local diff_text=""
+  base_ref="$(agentcanon_pr_diff_base_ref 2>/dev/null || true)"
+  if [[ -z "${base_ref}" ]]; then
+    return 1
+  fi
+  diff_text="$(git diff --unified=0 --no-ext-diff "${base_ref}...HEAD" \
+    -- . ':(exclude)vendor/agent-canon' 2>/dev/null || true)"
+  grep -Eq '^[+-][^+-].*@dependency-(start|end)|^[+-][^+-][[:space:]#*/-]*(contract|responsibility|upstream|downstream)[[:space:]]' \
+    <<<"${diff_text}"
+}
+
+agentcanon_pr_graph_migration_surface_touched() {
+  local path=""
+  while IFS= read -r path; do
+    case "${path}" in
+      documents/design/dependency-manifest-design.md|\
+      documents/structured-analysis/dependency-header-analysis.md|\
+      rust/agent-canon/src/dependency_manifest.rs|\
+      rust/agent-canon/src/graph.rs|\
+      tools/agent_tools/check_dependency_*.sh|\
+      tools/agent_tools/run_repo_dependency_review.sh)
+        return 0
+        ;;
+    esac
+  done < <(agentcanon_pr_changed_paths)
+  return 1
+}
+
+agentcanon_pr_selected_profile_requires_graph() {
+  local profile=""
+  local selected_profiles="${AGENT_CANON_PR_VALIDATION_PROFILES:-${AGENT_CANON_PR_VALIDATION_PROFILE:-}}"
+  selected_profiles="${selected_profiles//,/ }"
+  for profile in ${selected_profiles}; do
+    case "${profile}" in
+      agentcanon-shared-surface|full-confidence-candidate|dependency-graph|\
+      strict-dependency|parent-graph-migration)
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+agentcanon_pr_dependency_graph_required() {
+  local reasons=()
+  local parent_graph_migration="${AGENT_CANON_PR_PARENT_GRAPH_MIGRATION:-no}"
+
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
+    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=required reason=standalone_source"
+    return 0
+  fi
+  if [[ "${parent_graph_migration}" == "1" \
+    || "${parent_graph_migration}" == "true" \
+    || "${parent_graph_migration}" == "yes" ]]; then
+    reasons+=(parent_graph_migration)
+  fi
+  if agentcanon_pr_graph_migration_surface_touched; then
+    reasons+=(migration_surface_touched)
+  elif agentcanon_pr_dependency_manifest_touched; then
+    reasons+=(dependency_manifest_touched)
+  fi
+  if agentcanon_pr_selected_profile_requires_graph; then
+    reasons+=(selected_profile)
+  fi
+  if ((${#reasons[@]} > 0)); then
+    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=required reasons=$(IFS=,; echo "${reasons[*]}")"
+    return 0
+  fi
+  echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=skipped reason=parent_graph_completeness_not_selected"
+  return 1
+}
+
 agentcanon_pr_branch_dirty() {
   local submodule_dirty=""
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
@@ -233,9 +337,8 @@ agentcanon_pr_update_precondition() {
     return 0
   fi
   if [[ -n "${REMOTE_URL:-}" && -n "${REMOTE_URL#<unset>}" ]] && agentcanon_pr_branch_dirty; then
-    echo "AGENT_CANON_PR_UPDATE_GATE=blocked_dirty_agentcanon_branch"
-    echo "AGENT_CANON_PR_UPDATE_NEXT=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_agent-canon-pr-check"
-    return 2
+    echo "AGENT_CANON_PR_UPDATE_STATE=dirty_agentcanon_worktree_preserved"
+    echo "AGENT_CANON_PR_UPDATE_NEXT=run_make_agent-canon-ensure-latest_with_dirty_worktree_preserved"
   fi
   submodule_head="$(git -C vendor/agent-canon rev-parse HEAD 2>/dev/null || true)"
   parent_pin="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
@@ -345,16 +448,24 @@ run_pr_quick_ci() {
 
 write_pr_gate_receipt() {
   local root_identity=""
+  local dependency_graph_status="${1:-}"
   if ! root_identity="$(realpath -e "${WORKSPACE_ROOT}")"; then
     echo "Unable to record PR gate root identity" >&2
     return 1
   fi
+  case "${dependency_graph_status}" in
+    prepared|skipped) ;;
+    *)
+      echo "Invalid PR gate dependency graph status: ${dependency_graph_status}" >&2
+      return 1
+      ;;
+  esac
   {
     printf 'owner=check_agent_canon_pr.sh\n'
     printf 'root_identity=%s\n' "${root_identity}"
     printf 'parent_pid=%s\n' "$$"
-    printf 'strict_dependency=prepared\n'
-    printf 'graph=prepared\n'
+    printf 'strict_dependency=%s\n' "${dependency_graph_status}"
+    printf 'graph=%s\n' "${dependency_graph_status}"
   } >"${PR_GATE_RECEIPT}"
 }
 
@@ -521,20 +632,26 @@ echo "5️⃣  agent runtime checks"
 run_pr_agent_checks
 echo ""
 
-echo "6️⃣  strict dependency review"
-# This graph build is the producer for the strict dependency review and the
-# prepared graph consumers in the subsequent quick CI invocation.
-	run_agent_canon graph build --root . --profile default --format json
-if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py"
+echo "6️⃣  dependency graph completeness"
+PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped
+if agentcanon_pr_dependency_graph_required; then
+  # This graph build is the producer for the strict dependency review and the
+  # prepared graph consumers in the subsequent quick CI invocation.
+  run_agent_canon graph build --root . --profile default --format json
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
+    python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py"
+  fi
+  bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/render_dependency_manifest_graph.py" \
+    --root . \
+    --scope full \
+    --markdown-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.md" \
+    --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
+  PR_GATE_DEPENDENCY_GRAPH_STATUS=prepared
+else
+  echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required"
 fi
-bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
-	python3 "${CANON_TOOLS_ROOT}/agent_tools/render_dependency_manifest_graph.py" \
-  --root . \
-  --scope full \
-  --markdown-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.md" \
-  --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
-write_pr_gate_receipt
+write_pr_gate_receipt "${PR_GATE_DEPENDENCY_GRAPH_STATUS}"
 echo ""
 
 echo "7️⃣  documentation checks"

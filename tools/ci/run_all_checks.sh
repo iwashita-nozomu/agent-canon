@@ -108,6 +108,7 @@ SKIP_DOCS=0
 SKIP_GITHUB_WORKFLOWS=0
 PR_GATE_RECEIPT=""
 PR_GATE_RECEIPT_VALID=0
+PR_GATE_DEPENDENCY_GRAPH_STATUS="not_applicable"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick)
@@ -143,6 +144,8 @@ done
 
 validate_pr_gate_receipt() {
   local root_identity=""
+  local strict_dependency_status=""
+  local graph_status=""
   if [[ ! -f "${PR_GATE_RECEIPT}" ]]; then
     echo "Invalid PR gate receipt: missing file" >&2
     return 1
@@ -154,14 +157,21 @@ validate_pr_gate_receipt() {
   for marker in \
     "owner=check_agent_canon_pr.sh" \
     "root_identity=${root_identity}" \
-    "parent_pid=${PPID}" \
-    "strict_dependency=prepared" \
-    "graph=prepared"; do
+    "parent_pid=${PPID}"; do
     if ! grep -Fqx -- "${marker}" "${PR_GATE_RECEIPT}"; then
       echo "Invalid PR gate receipt: missing marker ${marker%%=*}" >&2
       return 1
     fi
   done
+  strict_dependency_status="$(awk -F= '$1 == "strict_dependency" {print $2}' "${PR_GATE_RECEIPT}")"
+  graph_status="$(awk -F= '$1 == "graph" {print $2}' "${PR_GATE_RECEIPT}")"
+  if [[ "${strict_dependency_status}" != "prepared" && "${strict_dependency_status}" != "skipped" ]] \
+    || [[ "${graph_status}" != "prepared" && "${graph_status}" != "skipped" ]] \
+    || [[ "${strict_dependency_status}" != "${graph_status}" ]]; then
+    echo "Invalid PR gate receipt: dependency graph status mismatch" >&2
+    return 1
+  fi
+  PR_GATE_DEPENDENCY_GRAPH_STATUS="${strict_dependency_status}"
   return 0
 }
 
@@ -170,7 +180,7 @@ if [[ -n "${PR_GATE_RECEIPT}" ]]; then
     exit 1
   fi
   PR_GATE_RECEIPT_VALID=1
-  echo "PR_GATE_RECEIPT=accepted"
+  echo "PR_GATE_RECEIPT=accepted dependency_graph=${PR_GATE_DEPENDENCY_GRAPH_STATUS}"
 fi
 
 resolve_agent_canon_cli() {
@@ -297,8 +307,12 @@ fi
 echo "0️⃣  agent/runtime sync checks を実行中..."
 CANON_GRAPH_READY=0
 if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
-  echo "✅ canonical graph build consumed from validated PR gate receipt"
-  CANON_GRAPH_READY=1
+  if [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "prepared" ]]; then
+    echo "✅ canonical graph build consumed from validated PR gate receipt"
+    CANON_GRAPH_READY=1
+  else
+    echo "⏭️ canonical graph build skipped: parent PR graph completeness not required"
+  fi
 elif run_agent_canon graph build --root "$WORKSPACE_ROOT" --profile default --format json; then
   CANON_GRAPH_READY=1
 else
@@ -311,8 +325,11 @@ else
   echo "❌ research perspective pack smoke test 失敗"
   EXIT_CODE=1
 fi
-if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
+if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ] \
+  && [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "prepared" ]]; then
   echo "DEPENDENCY_HEADER_CHECKS=skip reason=validated_strict_pr_gate_receipt"
+elif [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
+  echo "DEPENDENCY_HEADER_CHECKS=skip reason=parent_pr_graph_completeness_not_required"
 elif [ "$CANON_GRAPH_READY" -eq 1 ]; then
   if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_dependency_headers.py" --changed 2>&1; then
     echo "✅ dependency header checks 成功"
@@ -412,6 +429,9 @@ if [ "$CANON_GRAPH_READY" -eq 1 ]; then
     echo "❌ tool/convention drift checks 失敗"
     EXIT_CODE=1
   fi
+elif [ "$PR_GATE_RECEIPT_VALID" -eq 1 ] \
+  && [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "skipped" ]]; then
+  echo "⏭️ tool/convention drift checks skipped: parent PR graph completeness not required"
 else
   echo "⏭️ tool/convention drift checks skipped: canonical graph build failed"
 fi
