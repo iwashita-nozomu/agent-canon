@@ -179,6 +179,14 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             'selector_args+=(--trusted-base-sha "${trusted_base_sha}")',
             entrypoint,
         )
+        self.assertIn(
+            'graph_acceptance_args+=(--trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}")',
+            entrypoint,
+        )
+        self.assertIn(
+            'if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then\n      graph_acceptance_args+=',
+            entrypoint,
+        )
 
     def test_pin_only_diff_is_skipped_with_reason_and_evidence(self) -> None:
         """A pin-only parent diff does not select strict parent graph completeness."""

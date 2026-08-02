@@ -639,13 +639,18 @@ if agentcanon_pr_dependency_graph_required; then
   elif [[ "${graph_build_rc}" -eq 1 && "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
     graph_acceptance_output=""
     graph_acceptance_rc=0
+    graph_acceptance_args=(
+      --root "${WORKSPACE_ROOT}"
+      --source-root "${AGENT_CANON_SOURCE_ROOT}"
+      --evaluate-built-graph
+      --graph-result "${graph_build_result}"
+      --report-out "${PR_DEPENDENCY_REVIEW_DIR}/changed-responsibility-acceptance.json"
+    )
+    if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+      graph_acceptance_args+=(--trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}")
+    fi
     if graph_acceptance_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
-      --root "${WORKSPACE_ROOT}" \
-      --source-root "${AGENT_CANON_SOURCE_ROOT}" \
-      --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" \
-      --evaluate-built-graph \
-      --graph-result "${graph_build_result}" \
-      --report-out "${PR_DEPENDENCY_REVIEW_DIR}/changed-responsibility-acceptance.json")"; then
+      "${graph_acceptance_args[@]}")"; then
       graph_acceptance_rc=0
     else
       graph_acceptance_rc=$?
