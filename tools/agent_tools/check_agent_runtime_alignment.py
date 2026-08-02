@@ -129,7 +129,7 @@ INTERNAL_ROUTINE_ROOT = ROOT / "agents" / "internal-routines"
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
 EXPECTED_MODEL_CONTEXT_WINDOW = 1_000_000
 EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT = 4096
-EXPECTED_MAX_THREADS = 26
+EXPECTED_MAX_THREADS = 27
 EXPECTED_MAX_DEPTH = 2
 EXPECTED_JOB_MAX_RUNTIME_SECONDS = 3600
 MIN_DYNAMIC_SPAWN_BUDGET = 4
@@ -632,7 +632,10 @@ def validate_generated_role_views() -> None:
         for view in model_profile_registry.generate_role_views(registry, root=ROOT)
     }
     ensure(set(configs) == set(agent_views) == set(bindings), "generated role-view sets must be identical")
-    ensure(len(configs) == 34, "generated role-view projection must contain 34 views")
+    ensure(
+        len(configs) == len(registry.role_profile_bindings),
+        "generated role-view projection must contain every canonical role view",
+    )
     ensure("sol_parent_high" in registry_ids, "registry must retain sol_parent_high")
     ensure(raw.get("team", {}).get("parent_profile_id", "sol_parent_high") == "sol_parent_high", "team parent profile must be Sol")
     for role_id, config_view in sorted(configs.items()):
@@ -1143,10 +1146,10 @@ def validate_task_catalog_references() -> None:
         f"T12 candidate specialists must remain the five catalog candidates, got {t12_specialists}",
     )
     derivation = declared_team_capacity_derivation(catalog)
-    ensure(derivation.requested_max_threads() == 26, "declared topology must derive max_threads=26")
+    ensure(derivation.requested_max_threads() == 27, "declared topology must derive max_threads=27")
     peak = derivation.peak_family
     ensure(peak.workflow_family_id == "research_driven_change", "research_driven_change must be the peak family")
-    ensure(peak.direct_frontier_count == 20, "declared direct frontier must be 20")
+    ensure(peak.direct_frontier_count == 21, "declared direct frontier must be 21")
     ensure(peak.nested_reservation_count == 6, "declared nested reservations must be 6")
     topology_violations = workflow_topology_policy_violations(catalog)
     ensure(

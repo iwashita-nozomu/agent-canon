@@ -39,7 +39,7 @@ downstream design ./hooks/hook_dispatcher.py RETIRED_HOOK_ROUTES assigns former 
 - 共通入口は `AGENTS.md`
 - workflow と skill の正本は `agents/`
 - Codex-specific routing は `agents/canonical/CODEX_WORKFLOW.md` と `agents/canonical/CODEX_SUBAGENTS.md`
-- `.codex/config.toml` の `[agents].max_threads = 26` は direct frontier `20` と nested reservation `6` から生成した requested/configured readback です。platform-effective / current-available capacity は別入力であり、26 を runtime の普遍的な cap とは扱いません
+- `.codex/config.toml` の `[agents].max_threads = 27` は direct frontier `21` と nested reservation `6` から生成した requested/configured readback です。platform-effective / current-available capacity は別入力であり、27 を runtime の普遍的な cap とは扱いません
 - `[agents]` は上限と timeout の設定であり、上位 runtime / developer instruction が要求する explicit subagent authorization を上書きしません。明示許可が無い session では fan-out plan と handoff packet を作り、実際の spawn は許可後に行います
 - plan mode や permissions のような mode は session 単位です。official Codex CLI では `/plan`、`/model`、`/permissions` を使います
 - runtime が `/agent` を提供する場合は inventory 確認に使い、使えない場合は `.codex/agents/*.toml` を直接見ます
@@ -70,7 +70,7 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 
 - `.codex/config.toml` の `max_threads` は、宣言 topology の生成値を
   loader/readback した `configured_max_threads` です。現在の生成値は
-  `20 + 6 = 26` であり、普遍的な ceiling ではありません。
+  `21 + 6 = 27` であり、普遍的な ceiling ではありません。
 - requested / configured / platform-effective / workflow-demand /
   write-cap / nested-reserved / available は [capacity handshake owner](../agents/canonical/CODEX_SUBAGENTS.md#capacity-and-lifecycle)
   の型付き projection に従います。effective は予約後の既知制約の最小値で、
@@ -175,6 +175,7 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 - `ship_reviewer`
 - `spark_worker`
 - `test_designer`
+- `terra`
 - `worker`
 
 ## Smoke Test

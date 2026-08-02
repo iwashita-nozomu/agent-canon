@@ -316,8 +316,8 @@ def evaluate_generated_role_projection(
         catalog = load_task_catalog(load_team_config(root / "agents" / "agents_config.json"), root=root)
         derivation = declared_team_capacity_derivation(catalog)
         peak = derivation.peak_family
-        if derivation.requested_max_threads() != 26 or peak.workflow_family_id != "research_driven_change" or peak.direct_frontier_count != 20 or peak.nested_reservation_count != 6:
-            findings.append(Finding("capacity-attribution", "role_topology_defaults", "declared-20-plus-6-does-not-derive-26"))
+        if derivation.requested_max_threads() != 27 or peak.workflow_family_id != "research_driven_change" or peak.direct_frontier_count != 21 or peak.nested_reservation_count != 6:
+            findings.append(Finding("capacity-attribution", "role_topology_defaults", "declared-21-plus-6-does-not-derive-27"))
         for family in catalog.workflow_families:
             request = family.get("capacity_request")
             if not isinstance(request, dict) or request.get("topology_source") != "role_topology" or request.get("write_scope_source") != "team_manifest.run.write_scopes":

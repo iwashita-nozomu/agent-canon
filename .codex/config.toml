@@ -285,9 +285,13 @@ path = "../.agents/skills/skill-cleanup/SKILL.md"
 enabled = true
 
 [agents]
-max_threads = 26
+max_threads = 27
 max_depth = 2
 job_max_runtime_seconds = 3600
+
+[agents.terra]
+description = "Conditional read-only cross-cutting specialist for owner closure, context reconstruction, and adversarial contradiction validation."
+config_file = "agents/terra.toml"
 
 [agents.artifact_reviewer]
 description = "Read-only reviewer for code, scripts, raw results, environment capture, and artifact-readiness."

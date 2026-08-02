@@ -84,7 +84,7 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
 - runtime の同時 spawn は `.codex/config.toml` の `max_threads` 以内に収め、role が多い task は wave に分ける
 - subagent depth は `.codex/config.toml` の `agents.max_depth = 2` を正本にし、parent wave と child-subagent wave を active spawn budget 内で管理する
 - 追加の subagent wave を立てるときは、parent または delegated stage owner が owner、input packet、expected output、write scope を明示する
-- writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と PreToolUse `branch_worktree_guard.py` に従います。
+- writer collision は current checkout 内の先行 / 後続 wave と validation rerun で解きます。branch/worktree 作成は `agents/canonical/CODEX_WORKFLOW.md` の Branch Reuse Default と PreToolUse `hook_safety.py` route に従います。
 - subagent handoff の input packet は role ごとに owned scope を固定し、route seed と調査結果から展開した対象 path list、context artifacts、allowed / forbidden paths を渡します。
 - reviewer には対象 path list、checker summary、structured dashboard / drilldown、該当 canon 節を先に渡します。
 - fresh subagent は必要な launch ごとに `agents/COMMUNICATION_PROTOCOL.md`
@@ -119,8 +119,8 @@ handoff-ready state へ進め、owner handoff と dependency-order readback を�
   変える場合だけ追加します。DSV policy の意味論は
   `agents/skills/agent-orchestration.md#Decision Sufficiency Packet` だけが所有します。
 - `.codex/config.toml` の `max_threads` は capacity topology の生成値を
-  loader/readback した configured value です。現在は direct frontier `20` と
-  nested reservation `6` から生成された `26` で、universal hard ceiling では
+  loader/readback した configured value です。現在は direct frontier `21` と
+  nested reservation `6` から生成された `27` で、universal hard ceiling では
   ありません。
 - `.codex/config.toml` の `[agents].max_depth` は `2` を正本にし、one bounded child-subagent layer を許可します
 - cap は同時実行数の上限として扱います
@@ -560,6 +560,7 @@ Activation Conditions:
 | Permanent Team Role | Codex Subagent / Parent Role |
 | ------------------- | ---------------------------- |
 | `manager` | parent + `requirements_organizer` |
+| `terra` | conditional read-only cross-cutting specialist; `terra` profile only |
 | `manager_reviewer` | `manager_reviewer` |
 | `designer` | `detailed_designer` |
 | `design_reviewer` | `detailed_design_reviewer` |
@@ -637,6 +638,8 @@ Activation Conditions:
   - `tools/oop/*/readability.py` の機械 report を読み、判定値を変えずに reader-facing な文書化、false positive 候補、優先度整理を行う
 - `worker`
   - bounded な実装変更を切り出し、approved design と local precedent の naming に従う。commit/push を含む実装・統合境界の実行は可能だが、PR create/merge/close、admin override、base integration 判断、最終統合評価は parent が保持する。
+- `terra`
+  - multi-owner dependency closure、context reconstruction、adversarial contradiction validation を担当する常設 read-only specialist。owner closure と context capsule を確認し、accepted / rejected / escalated の handback を Sol parent に返す。実装、coordinator、general worker、PR 操作、manifest の恒久正本化は担当しない。
 - `spark_worker`
   - Abstract Design Frame と approved design packet で完全に切れる低リスク実装、docs sync、test sync、mechanical cleanup を低遅延に処理する。実装・commit/push は可だが、PR create/merge/close、admin override、base integration 判断、最終統合評価は parent が保持する。
 - `docs_workflow_steward`
@@ -740,6 +743,8 @@ runtime は再生成後に restart し、readback で反映を確認します。
 - coding / implementation / patch / doc-edit work を求める repo-changing task では、read-only / review wave は write-capable handoff の準備です。実装可能な handoff scope が dependency expansion から出た後は `worker` を既定として起動または schedule し、`spark_worker` は explicit parent-packet selection が記録された場合だけ使います。completion route は write-capable handoff、integration、review、validation で構成します。parent-direct は explicit exception rationale と validation evidence がある場合だけ completion route にできます。
 - `spark_worker` を選択できる実装は、Abstract Design Frame から導かれた差し替え可能な単位で、stable public interface、stable dependencies、fixed specification、既存 test / docs の局所更新で閉じるものです。この eligibility evidence に加えて typed parent-packet selection が必要です。
 - cross-module 整合、API shape、命名 / 責務境界、依存再構成、安全性、性能、conflict resolution のいずれかが入った時点で `worker` または設計 review へ戻します
+- Terra は常設登録された conditional read-only cross-cutting specialist です。multi-owner dependency closure、compaction・long-run・incomplete handoff の context reconstruction、または複数案・finding の contradiction validation の evidence がある場合だけ active にし、coordinator や general worker としては使いません。capability は `cross_owner_integration`、`context_reconstruction`、`adversarial_contradiction_validation` に限定します。
+- Terra の handback は owner closure、context capsule、`accepted`・`rejected`・`escalated` のいずれかを含め、unresolved は Sol parent へ返します。descendant close と reservation release は既存 lifecycle receipt を消費し、`team_manifest.yaml` は run 生成 artifact のまま恒久正本にしません。
 - `document_flow_reviewer` は README / workflow / guide / design doc / paper、新用語、公開 API、reader-facing docs があるときに起動します。code-only owner-bounded change では省略できます
 - change-review decision が active のときは `diff_triage_reviewer` を既定 executable とします。`python_reviewer` / `cpp_reviewer` は changed-path evidence、parent packet evidence、または明示 review-pack activation で追加し、`reviewer` は broad diff / cross-surface / clause coverage に上げる場合だけ使います
 

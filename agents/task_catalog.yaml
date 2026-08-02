@@ -78,6 +78,8 @@ role_topology_defaults: &standard_role_topology
       - fair_data_reviewer
       - ml_science_reviewer
       - scientific_computing_reviewer
+    cross_cutting:
+      - terra
     skill_evaluation:
       - skill_evaluator
   same_role_parallel_instances:
@@ -136,6 +138,11 @@ role_topology_defaults: &standard_role_topology
         - project_reviewer
         - docs_workflow_steward
         - prompt_config_reviewer
+    - id: cross_owner_integration
+      stage_class: reviewer
+      activation: conditional_cross_owner_evidence
+      role_ids:
+        - terra
     - id: design
       stage_class: producer
       role_ids:
@@ -221,6 +228,7 @@ workflow_families:
         - python_reviewer
         - cpp_reviewer
         - docs_workflow_steward
+        - terra
     tasks:
       - T1
       - T2
@@ -270,6 +278,7 @@ workflow_families:
         - test_designer
         - python_reviewer
         - cpp_reviewer
+        - terra
     tasks:
       - T3
 
@@ -333,6 +342,7 @@ workflow_families:
         - artifact_reviewer
         - fair_data_reviewer
         - ml_science_reviewer
+        - terra
     tasks:
       - T4
       - T5
@@ -385,6 +395,7 @@ workflow_families:
         - docs_workflow_steward
         - python_reviewer
         - cpp_reviewer
+        - terra
     tasks:
       - T6
       - T7
@@ -435,6 +446,7 @@ workflow_families:
         - test_designer
         - python_reviewer
         - cpp_reviewer
+        - terra
     tasks:
       - T8
 
@@ -492,6 +504,7 @@ workflow_families:
         - python_reviewer
         - cpp_reviewer
         - report_reviewer
+        - terra
     tasks:
       - T11
       - T12
@@ -550,6 +563,7 @@ workflow_families:
         - artifact_reviewer
         - fair_data_reviewer
         - ml_science_reviewer
+        - terra
     tasks:
       - T13
 
