@@ -15,16 +15,17 @@ from __future__ import annotations
 import argparse
 import hashlib
 import re
+import sys
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 
-try:
-    import tomllib  # pyright: ignore[reportMissingImports]
-except ModuleNotFoundError:  # Python < 3.11 compatibility.
-    import tomli as tomllib  # type: ignore[no-redef]
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
 from runtime_log_paths import agent_canon_root, eval_results_dir
@@ -288,7 +289,7 @@ def evaluate(root: Path, manifest: Path) -> ReportQualityBundle:
 
 def run_id_for(manifest: Path, results: tuple[QualityChecklistResult, ...]) -> str:
     """Return a unique report quality eval run id."""
-    timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
+    timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
     digest_source = "\n".join(
         [
             manifest.as_posix(),

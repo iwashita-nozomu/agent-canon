@@ -28,7 +28,7 @@ import json
 import re
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -703,7 +703,7 @@ def dispatch_current_candidate_review(
         "proposed_from_review_state": "dispatch_pending",
         "proposed_to_review_state": "dispatched",
         "event_order_index": _required_event_order_index(frame) + 1,
-        "observed_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "observed_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "resume_event_body_sha256": "",
     }
     event["resume_event_body_sha256"] = canonical_body_sha256(
