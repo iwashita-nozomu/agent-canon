@@ -15,8 +15,12 @@
 from __future__ import annotations
 
 import os
+import json
 import subprocess
 import sys
+from types import SimpleNamespace
+
+import pytest
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -31,10 +35,13 @@ from tests.tools.resource_plan_test_evidence import (
 
 from tools.experiments.execution_resource_plan import (
     GPUDevice,
+    LockReadback,
     ProcessIdentity,
     ResourceObservation,
     ResourceRequest,
+    RuntimeIdentityReceipt,
     UUIDReservationStore,
+    build_lock_bound_admission_receipt,
     managed_run_adapter_integration_contract,
     plan_gpu_allocation,
 )
@@ -271,7 +278,7 @@ def make_observation(
 
 
 def test_managed_public_route_has_one_canonical_admission_owner() -> None:
-    """The managed entrypoint exposes the fixed owner graph and no legacy route."""
+    """The managed entrypoint exposes the fixed owner graph and CLI handshake."""
     source = SCRIPT.read_text(encoding="utf-8")
     assert "execute_managed_run" in source
     assert "NvidiaSMIResourceProbe.discover" in source
@@ -287,9 +294,12 @@ def test_managed_public_route_has_one_canonical_admission_owner() -> None:
     assert "ExperimentRunner" + "PreLaunchAdapter" not in source
     assert "execute_with_" + "experiment_runner" not in source
     assert "RunGpuAdmissionContext" in source
-    assert "StandardFullResourceScheduler.from_worker" in source
-    assert "StandardRunner(" in source
-    assert "scheduler=scheduler" in source
+    assert "experiment-runner-admitted" in source
+    assert "subprocess.Popen" in source
+    assert "shell=False" in source
+    assert "build_lock_bound_admission_receipt" in source
+    assert "StandardFullResourceScheduler.from_worker" not in source
+    assert "StandardRunner(" not in source
     assert "Canonical" + "ExperimentRunnerBinding" not in source
     assert "_W1" + "UUIDScheduler" not in source
     assert "materialized.plan" not in source
@@ -298,226 +308,218 @@ def test_managed_public_route_has_one_canonical_admission_owner() -> None:
     assert "experiment_runner_binding_required" not in source
 
 
+def _runtime_identity() -> RuntimeIdentityReceipt:
+    return RuntimeIdentityReceipt(
+        schema_version="runtime-identity/v1",
+        runtime_route="MANAGED_CONTAINER",
+        namespace_inode=4026531836,
+        uid=1000,
+        gid=1000,
+        supplementary_gids=(1000,),
+        umask=0o007,
+        bind_source_dev=1,
+        bind_source_ino=2,
+        bind_target_dev=1,
+        bind_target_ino=3,
+        provision_fingerprint="a" * 64,
+        readback_fingerprint="b" * 64,
+        receipt_fingerprint="c" * 64,
+    )
+
+
+def _valid_environment_plan(uuid: str) -> SimpleNamespace:
+    lock = LockReadback(
+        runtime_root="/var/lib/agent-canon/runtime",
+        filesystem_type="ext4",
+        device=7,
+        inode=11,
+        selected=(),
+        fingerprint="1" * 64,
+    )
+    receipt = build_lock_bound_admission_receipt(
+        candidate_uuids=(uuid,),
+        occupied_uuids=(),
+        reserved_uuids=(),
+        selected_uuids=(uuid,),
+        inventory_fingerprint="2" * 64,
+        occupancy_fingerprint="3" * 64,
+        reservation_fingerprint="4" * 64,
+        runtime_identity_fingerprint="5" * 64,
+        lock_readback=lock,
+    )
+    return SimpleNamespace(
+        gpu_allocation=SimpleNamespace(
+            selected_ids=(uuid,),
+            admission_fingerprint=receipt.admission_fingerprint,
+        ),
+        resources={"gpu": {"admission_fingerprint": receipt.admission_fingerprint}},
+        execution={"env": {"RUN_MODE": "managed"}},
+    )
+
+
 def test_r5_admitted_environment_and_context_are_composition_only() -> None:
-    """The composition surface freezes UUID env and only orders context state."""
-    runner_root = (
-        Path(__file__).resolve().parents[2].parent
-        / "experiment_runner-w1-r4-lifecycle-design"
-        / "python"
+    """Composition uses a valid lock-bound composite and materializes UUIDs post-freeze."""
+    from tools.experiments.run_managed_experiment import (
+        RunGpuAdmissionContext,
+        build_admitted_environment,
     )
-    environment = dict(os.environ)
-    environment["PYTHONPATH"] = os.pathsep.join(
-        [str(runner_root), str(Path(__file__).resolve().parents[2])]
+
+    uuid = "GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    plan = _valid_environment_plan(uuid)
+    env = build_admitted_environment(
+        plan,
+        _runtime_identity(),
+        admission_fingerprint=plan.gpu_allocation.admission_fingerprint,
     )
-    check = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            (
-                "from types import SimpleNamespace\n"
-                "from tools.experiments.execution_resource_plan import (\n"
-                "    GpuRunRequest, RuntimeIdentityReceipt,\n"
-                ")\n"
-                "from tools.experiments.run_managed_experiment import (\n"
-                "    RunGpuAdmissionContext, build_admitted_environment,\n"
-                ")\n"
-                "uuid = 'GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'\n"
-                "plan = SimpleNamespace(\n"
-                "    gpu_allocation=SimpleNamespace(selected_ids=(uuid,)),\n"
-                "    execution={'env': {'CUDA_VISIBLE_DEVICES': uuid, 'NVIDIA_VISIBLE_DEVICES': uuid}},\n"
-                ")\n"
-                "identity = RuntimeIdentityReceipt(\n"
-                "    schema_version='runtime-identity/v1', runtime_route='MANAGED_CONTAINER',\n"
-                "    namespace_inode=4026531836, uid=1000, gid=1000, supplementary_gids=(1000,),\n"
-                "    umask=0o007, bind_source_dev=1, bind_source_ino=2, bind_target_dev=1,\n"
-                "    bind_target_ino=3, provision_fingerprint='a' * 64,\n"
-                "    readback_fingerprint='b' * 64, receipt_fingerprint='c' * 64,\n"
-                ")\n"
-                "env = build_admitted_environment(plan, identity)\n"
-                "assert dict(env.exact_env_map)['CUDA_VISIBLE_DEVICES'] == uuid\n"
-                "request = GpuRunRequest(\n"
-                "    gpu_count=1, minimum_memory_bytes_per_unit=0, max_workers=1,\n"
-                "    host_memory_bytes=0, cuda_runtime_library_path=None, environment={},\n"
-                "    source_root='/tmp', runtime_route='MANAGED_CONTAINER', source_paths=(),\n"
-                "    planned_chunk_ids=('test',),\n"
-                ")\n"
-                "ctx = RunGpuAdmissionContext.create(request)\n"
-                "assert ctx.state == 'CREATED'\n"
-                "with ctx:\n"
-                "    assert ctx.state == 'ACTIVE'\n"
-                "assert ctx.state == 'CLOSED'\n"
-            ),
-        ],
-        env=environment,
-        text=True,
-        capture_output=True,
-        check=False,
+    assert dict(env.exact_env_map)["CUDA_VISIBLE_DEVICES"] == uuid
+    assert env.admission_fingerprint
+    request = ResourceRequest(
+        owner_id="worker",
+        parent_id="parent",
+        context_id="context",
+        maximum_timeout_seconds=60,
+        argv=("python3", "experiments/demo_topic/run.py"),
+        cwd=Path("/workspace"),
+        environment={},
+        integration_contract=managed_run_adapter_integration_contract(),
+        requested_chunks=("test",),
     )
-    assert check.returncode == 0, check.stderr
+    context = RunGpuAdmissionContext.create(request)
+    with context:
+        assert context.state == "ACTIVE"
+    assert context.state == "CLOSED"
 
 
-def test_r5_runner_lifecycle_fingerprint_uses_ff97_typed_projection() -> None:
-    """The terminal reducer fingerprints the pinned lifecycle `.to_dict()` value."""
-    runner_root = (
-        Path(__file__).resolve().parents[2].parent
-        / "experiment_runner-w1-r4-lifecycle-design"
-        / "python"
+def test_r5_admitted_environment_missing_composite_fails_closed() -> None:
+    """The post-freeze environment refuses an unbound GPU allocation."""
+    from tools.experiments.run_managed_experiment import build_admitted_environment
+    uuid = "GPU-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    plan = SimpleNamespace(
+        gpu_allocation=SimpleNamespace(selected_ids=(uuid,), admission_fingerprint=None),
+        resources={"gpu": {"admission_fingerprint": None}},
+        execution={"env": {}},
     )
-    environment = dict(os.environ)
-    environment["PYTHONPATH"] = os.pathsep.join(
-        [str(runner_root), str(Path(__file__).resolve().parents[2])]
-    )
-    check = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            (
-                "import hashlib, json\n"
-                "from experiment_runner import (\n"
-                "    DescendantQuiescenceStatus, RunnerLifecycleEvidence,\n"
-                ")\n"
-                "from tools.experiments.execution_resource_plan import ManagedGpuOutcomeReducer\n"
-                "lifecycle = RunnerLifecycleEvidence(\n"
-                "    run_id='r5-lifecycle', terminal_event_id='terminal-1',\n"
-                "    observed_at_ns=1, terminal_status='finished',\n"
-                "    total_case_count_at_start=1, completion_count_before=0,\n"
-                "    completion_count_after=1, scheduler_completed=True,\n"
-                "    admitted_case_count=1, terminal_notification_count=1,\n"
-                "    child_process_ids=(), process_group_ids=(),\n"
-                "    direct_children_quiescent=True,\n"
-                "    descendant_quiescence=DescendantQuiescenceStatus.NO_CHILD,\n"
-                ")\n"
-                "outcome = ManagedGpuOutcomeReducer().reduce_terminal(\n"
-                "    run_id='r5-lifecycle', planned_chunk_ids=('chunk-1',),\n"
-                "    admission=None, source_freeze=None, runtime_identity=None,\n"
-                "    runner_lifecycle=lifecycle, primary_failure=None,\n"
-                "    secondary_failures=(), release_disposition=(),\n"
-                "    context_state='closed', exit_code=0,\n"
-                ")\n"
-                "expected = hashlib.sha256(json.dumps(\n"
-                "    lifecycle.to_dict(), sort_keys=True, separators=(',', ':'),\n"
-                "    ensure_ascii=True, allow_nan=False,\n"
-                ").encode('utf-8')).hexdigest()\n"
-                "assert outcome.runner_lifecycle_fingerprint == expected\n"
-            ),
-        ],
-        env=environment,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    assert check.returncode == 0, check.stderr
+    with pytest.raises(Exception) as raised:
+        build_admitted_environment(
+            plan,
+            _runtime_identity(),
+            admission_fingerprint="",
+        )
+    assert getattr(raised.value, "code", None) == "admission_fingerprint_missing"
 
 
-def test_r5_runner_lifecycle_capture_is_finally_bound_for_interruptions() -> None:
-    """The composition root captures lifecycle in `finally` and preserves a primary."""
+def test_r5_runner_lifecycle_fingerprint_uses_protocol_projection() -> None:
+    """The terminal reducer fingerprints the admitted CLI lifecycle projection."""
+    import hashlib
+    from tools.experiments.execution_resource_plan import ManagedGpuOutcomeReducer
+    from tools.experiments.run_managed_experiment import ManagedRunLifecycleEvidence
+
+    lifecycle = ManagedRunLifecycleEvidence(
+        run_id="r5-lifecycle",
+        terminal_event_id="terminal-1",
+        observed_at_ns=1,
+        terminal_status="finished",
+        total_case_count_at_start=1,
+        completion_count_before=0,
+        completion_count_after=1,
+        scheduler_completed=True,
+        admitted_case_count=1,
+        terminal_notification_count=1,
+        child_process_ids=(),
+        process_group_ids=(),
+        direct_children_quiescent=True,
+        descendant_quiescence="PROVEN",
+    )
+    outcome = ManagedGpuOutcomeReducer().reduce_terminal(
+        run_id="r5-lifecycle",
+        planned_chunk_ids=("chunk-1",),
+        admission=None,
+        source_freeze=None,
+        runtime_identity=None,
+        runner_lifecycle=lifecycle,
+        primary_failure=None,
+        secondary_failures=(),
+        release_disposition=(),
+        context_state="closed",
+        exit_code=0,
+    )
+    expected = hashlib.sha256(
+        json.dumps(lifecycle.to_dict(), sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    assert outcome.runner_lifecycle_fingerprint == expected
+
+
+def test_r5_admitted_runner_fake_cli_protocol(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The managed owner invokes a fake admitted CLI with no Python runner import."""
+    from tools.experiments.run_managed_experiment import _run_admitted_runner
+
+    fake = tmp_path / "experiment-runner-admitted"
+    fake.write_text(
+        "#!/usr/bin/env python3\n"
+        "import hashlib, json, os, sys\n"
+        "if sys.argv[1:] == ['--version']:\n"
+        "    print('experiment-runner-admitted/v1')\n"
+        "    raise SystemExit(0)\n"
+        "request_path = sys.argv[sys.argv.index('--request') + 1]\n"
+        "result_path = sys.argv[sys.argv.index('--result') + 1]\n"
+        "request = json.loads(open(request_path, encoding='utf-8').read())\n"
+        "result = {'schema_version': 'agentcanon-managed-run-result/v1',\n"
+        " 'request_fingerprint': request['request_fingerprint'],\n"
+        " 'admission_fingerprint': request['admission_fingerprint'],\n"
+        " 'worker': {'pid': os.getpid(), 'descendants': [], 'quiescence': 'PROVEN'},\n"
+        " 'lifecycle': {'terminal_event_id': 'terminal-1', 'scheduler_completed': True},\n"
+        " 'exit': {'code': 0, 'error': None}}\n"
+        "result['result_fingerprint'] = hashlib.sha256(json.dumps(result, sort_keys=True, separators=(',', ':')).encode()).hexdigest()\n"
+        "open(result_path, 'w', encoding='utf-8').write(json.dumps(result))\n",
+        encoding="utf-8",
+    )
+    fake.chmod(0o755)
+    result_dir = tmp_path / "run"
+    snapshot = result_dir / "source_snapshot"
+    snapshot.mkdir(parents=True)
+    paths = SimpleNamespace(
+        result_dir=result_dir,
+        stdout_log_path=result_dir / "stdout.log",
+        stderr_log_path=result_dir / "stderr.log",
+    )
+    context = SimpleNamespace(paths=paths)
+    monkeypatch.setenv("AGENT_CANON_EXPERIMENT_RUNNER_ADMITTED", str(fake))
+    request_path = tmp_path / "request.json"
+    request_path.write_text(
+        json.dumps(
+            {
+                "run_id": "run-1",
+                "request_fingerprint": "a" * 64,
+                "admission_fingerprint": "b" * 64,
+            }
+        ),
+        encoding="utf-8",
+    )
+    execution, lifecycle, result = _run_admitted_runner(
+        context=context,
+        request_path=request_path,
+        result_path=tmp_path / "result.json",
+        lifecycle_path=tmp_path / "lifecycle.json",
+        request_payload={
+            "run_id": "run-1",
+            "request_fingerprint": "a" * 64,
+            "admission_fingerprint": "b" * 64,
+        },
+        environment={"PATH": os.environ["PATH"]},
+    )
+    assert execution.raw_exit_code == 0
+    assert lifecycle.descendant_quiescence == "PROVEN"
+    assert result["request_fingerprint"] == "a" * 64
+    assert (result_dir / "runtime" / "managed-run-receipt.json").is_file()
+
+
+def test_r5_runner_lifecycle_capture_is_shell_free_and_import_free() -> None:
+    """The composition root uses shell-free subprocess and has no local runner fallback."""
     source = SCRIPT.read_text(encoding="utf-8")
-    launch_contract = "\n".join(
-        [
-            "            try:",
-            "                runner.run(worker)",
-            "            except BaseException as exc:",
-            "                runner_exception = exc",
-            "            finally:",
-            "                runner_lifecycle = _capture_runner_lifecycle(runner)",
-        ]
-    )
-    missing_evidence_contract = "\n".join(
-        [
-            "                if runner_exception is None:",
-            "                    raise missing_lifecycle",
-            "                lifecycle_failure = _normalize_failure(",
-            "                    missing_lifecycle,",
-            "                    \"runner_lifecycle\",",
-            "                )",
-            "            if runner_exception is not None:",
-            "                raise runner_exception",
-        ]
-    )
-    assert launch_contract in source
-    assert missing_evidence_contract in source
-
-
-def test_normal_cli_binds_frozen_topic_to_ff97_lifecycle() -> None:
-    """The canonical adapter runs snapshot bytes and records ff97 lifecycle evidence."""
-    runner_root = (
-        Path(__file__).resolve().parents[2].parent
-        / "experiment_runner-w1-r4-lifecycle-design"
-        / "python"
-    )
-    environment = dict(os.environ)
-    environment["PYTHONPATH"] = os.pathsep.join(
-        [str(runner_root), str(Path(__file__).resolve().parents[2])]
-    )
-    check = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            (
-                "import tempfile\n"
-                "from pathlib import Path\n"
-                "from experiment_runner import (\n"
-                "    FullResourceCapacity, StandardFullResourceScheduler,\n"
-                "    StandardRunner, StandardWorker, apply_environment_variables,\n"
-                ")\n"
-                "from tools.experiments.run_managed_experiment import (\n"
-                "    _ManagedTopicCase, _build_admitted_context,\n"
-                "    _capture_runner_lifecycle, _run_topic_case,\n"
-                "    _runner_owned_estimate,\n"
-                ")\n"
-                "with tempfile.TemporaryDirectory() as raw:\n"
-                "    root = Path(raw)\n"
-                "    live = root / 'live' / 'experiments' / 'topic' / 'run.py'\n"
-                "    frozen_root = root / 'result' / 'source_snapshot'\n"
-                "    frozen = frozen_root / 'experiments' / 'topic' / 'run.py'\n"
-                "    output = root / 'observed.txt'\n"
-                "    live.parent.mkdir(parents=True)\n"
-                "    frozen.parent.mkdir(parents=True)\n"
-                "    source = (\n"
-                "        'import os\\nfrom pathlib import Path\\n'\n"
-                "        'def main():\\n'\n"
-                '        \'    Path(os.environ[\\"R5_FROZEN_RESULT\\"]).write_text(\\"frozen\\", encoding=\\"utf-8\\")\\n\'\n'
-                "        '    return 0\\n'\n"
-                "    )\n"
-                "    live.write_text(source, encoding='utf-8')\n"
-                "    frozen.write_bytes(live.read_bytes())\n"
-                "    live.write_text(source.replace('frozen', 'mutated-live'), encoding='utf-8')\n"
-                "    case = _ManagedTopicCase(\n"
-                "        entrypoint_relative_path='experiments/topic/run.py',\n"
-                "        argv=(str(frozen),), snapshot_root=str(frozen_root),\n"
-                "        environment_variables=(('R5_FROZEN_RESULT', str(output)),),\n"
-                "    )\n"
-                "    worker = StandardWorker(\n"
-                "        task=_run_topic_case, resource_estimator=_runner_owned_estimate,\n"
-                "        initializer=apply_environment_variables,\n"
-                "    )\n"
-                "    scheduler = StandardFullResourceScheduler.from_worker(\n"
-                "        cases=[case], worker=worker, context_builder=_build_admitted_context,\n"
-                "        skip_controller=None, disable_gpu_preallocation=True,\n"
-                "        gpu_environment_config=None,\n"
-                "        resource_capacity=FullResourceCapacity(\n"
-                "            max_workers=1, host_memory_bytes=0, gpu_devices=(),\n"
-                "        ),\n"
-                "    )\n"
-                "    runner = StandardRunner(scheduler=scheduler, monitor=None, on_case_finished=None)\n"
-                "    assert runner.run(worker) is None\n"
-                "    lifecycle = _capture_runner_lifecycle(runner)\n"
-                "    assert lifecycle is not None and lifecycle.scheduler_completed\n"
-                "    assert scheduler.completions[0].result.raw_exit_code == 0\n"
-                "    assert output.read_text(encoding='utf-8') == 'frozen'\n"
-            ),
-        ],
-        env=environment,
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    assert check.returncode == 0, check.stderr
-    source = SCRIPT.read_text(encoding="utf-8")
-    assert "return run_cli(parse_args())" in source
-    assert "execution_result = execute_managed_run(" in source
-    assert "experiment_runner_binding_required" not in source
-    assert "topic_callable" not in source
+    assert "shell=False" in source
+    assert "from experiment_runner import" not in source
+    assert "PYTHONPATH" not in source
+    assert "runpy" not in source
 
 
 def test_public_alternate_gpu_routes_are_typed_or_managed() -> None:

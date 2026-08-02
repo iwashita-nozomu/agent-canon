@@ -1,78 +1,126 @@
-# AgentCanon GPU admission R5 source-packet identity
+# AgentCanon GPU admission R5 source packet
 
 <!--
 @dependency-start
 contract design
-responsibility Records the fixed GPU admission R5 source-packet identity and implementation boundary.
-downstream design ../design/experiment_runner.md generic ExperimentRunner reader projection
-upstream design ../runtime/runtime-profiles-and-check-matrix.md validation failure taxonomy and repair route
+responsibility Records the reviewed GPU admission and managed-run handshake.
+upstream design ../runtime/runtime-profiles-and-check-matrix.md validation routing
+downstream implementation ../../tools/experiments/execution_resource_plan.py admission owner
+downstream implementation ../../tools/experiments/run_managed_experiment.py managed-run composition root
 @dependency-end
 -->
 
-The authoritative packet is the read-only file
-`/mnt/l/workspace/agent-canon-devcontainer-runtime-boundary/reports/agents/w1-tool-env-routing-20260716/candidate_universe_contract_amendment_r5.md`
-with SHA-256
-`23294f2606214157ed04e822128e29ece07ffd9f52223962199c87d3c0ce8d0d`.
-The detailed design review `detailed_design_review_r5_u18.md` and document flow
-review `document_flow_review_r5_u18.md` are both `APPROVE`.
+## 目的と境界
 
-The implementation owner is exact U-18 design-to-implementation/source
-authority. The responsibility graph is checked by invariant, state transition,
-owner, independent change reason, and observable effect; line count and file
-length are not split criteria. A type co-locates operations only when shared
-atomic consistency requires one owner transition. The graph explicitly rejects
-Context/Adapter/Store/Owner absorption of discovery, reservation, freeze,
-environment materialization, launch, completion, or cleanup.
+この packet は、review で `APPROVE` された GPU/MIG admission と managed-run
+handshake の実装正本です。AgentCanon の managed-run 実装は親の
+`ExperimentRunner`、Dockerfile、topic の Python module に import 依存しません。
+generic runner lifecycle は外部 CLI が所有し、AgentCanon は request/result artifact、
+admission、検証、terminal evidence、closeout の境界だけを所有します。
 
-The composition root orders source freeze, runtime identity, strict NVIDIA
-inventory, process occupancy, atomic UUID reservation, immutable plan,
-environment materialization, fixed ff97 generic runner, lifecycle capture,
-reverse release, terminal outcome, exactly-once coverage, and PostToolUse
-projection. Each owner invariant has one canonical production gate and one
-targeted oracle; broad CI/test is regression or packaging evidence only.
+hooks/resource projection の public schema はこの packet の変更対象ではありません。
+`pstree` は capability detection と bounded diagnostic に限り、proc が完全なら
+`pstree` 不在でも admission を継続します。
 
-The R5 route has no CPU, integer-index, UUID-prefix, direct-launch, or
-compatibility fallback.
+## GPU/MIG の証拠と状態
 
-## Reviewer responsibility graph
+- XML の topology/process hierarchy が physical UUID と MIG UUID の唯一の binding authority です。
+- `query-compute-apps` は XML PID へ一意に join できた場合だけ memory/name の補助です。
+  join が ambiguous または unavailable でも、XML が完全な unit を UNKNOWN へ落としません。
+- 各 caller allocation unit は `BUSY`、`UNKNOWN`、`FREE` のいずれかです。`FREE` だけを
+  eligible とし、`UNKNOWN` は選択しません。
+- MIG の unknown は MIG と physical parent を、physical の unknown は physical と
+  descendants を UNKNOWN に閉じます。XML binding が不明なら caller allocation 全体を
+  UNKNOWN にします。
+- physical holder は physical と全 descendants を、MIG holder は MIG と physical parent
+  を占有として扱います。integer index、UUID prefix、CPU fallback は admission route にありません。
 
-The graph below is the source-review handoff. Each row is one cohesive owner,
-not a line-count split. Operations that must share one atomic consistency
-boundary remain together, especially candidate flock acquisition, fd-bound
-readback, busy-candidate continuation, and total rollback in
-`GpuReservationTransaction`.
+## process ancestry
 
-| Owner | Invariant or state transition | Independent change reason and effect | Must not absorb | Canonical targeted gate |
-| --- | --- | --- | --- | --- |
-| `NvidiaInventoryProbe` | Exact driver/list/XML evidence becomes one complete physical/MIG topology. | NVIDIA grammar or topology changes; emits immutable opaque-UUID inventory. | Occupancy, locks, freeze, environment, launch | `test_nvidia_fixture_list_reject_*` and `test_nvidia_fixture_xml_reject_conflicting_join` |
-| `GpuProcessOccupancyProbe` | A physical holder excludes all of its MIG children, and a MIG holder excludes its parent and leaf. Ambiguity fails closed. | PID, namespace, or process-visibility changes; emits occupied full UUIDs. | Discovery parsing, reservation, lifecycle | `test_gpu_process_occupancy_*` |
-| `GpuReservationTransaction` | Each candidate is opened, flocked, reread, accepted, or rolled back as one transaction; a busy candidate alone continues. | Kernel, flock, tamper, or rollback behavior changes; emits one reservation receipt. | Discovery, source freeze, environment, launch | `test_gpu_reservation_*` |
-| `SourceFreezeOwner` | Source membership, fd identity, bytes, snapshot, and exit revalidation are one fd-bound transition. | Source-layout or race policy changes; emits `SourceFreezeReceipt`. | GPU discovery/reservation, environment, lifecycle | `test_source_freeze_*` and `test_source_path_set_fails_closed_when_exact_registry_is_missing` |
-| Runtime receipt functions and `RuntimeIdentityReader` | Exact root artifacts are atomically published, parsed once from no-follow fds, and joined only after namespace/UID/GID/groups/umask/bind identity matches. | Runtime namespace or receipt schema changes; emits `RuntimeIdentityReceipt`. | GPU policy, source freeze, launch, completion | `test_runtime_identity` |
-| `build_admitted_environment` | The frozen selected full UUID set becomes the exact environment before runner construction. | Environment-key policy changes; emits immutable `AdmittedEnvironment`. | Discovery, reservation, launch, completion | `test_r5_admitted_environment_and_context_are_composition_only` |
-| Frozen topic adapter (`_ManagedTopicCase`, bind, and task functions) | The selected canonical `experiments/<topic>/run.py` and argv execute only from snapshot bytes. | Topic entrypoint contract changes; emits one generic `ExecutionResult`. | Admission, source copying, environment policy, lifecycle serialization | `test_normal_cli_binds_frozen_topic_to_ff97_lifecycle` |
-| ff97 `StandardRunner` and scheduler | Exactly one generic `run(worker)` call returns `None`; scheduler completions and lifecycle evidence remain generic-owner state. | Generic lifecycle changes; emits scheduler completion and typed lifecycle evidence. | Admission policy, terminal projection, GPU cleanup | `test_r5_runner_lifecycle_capture_is_finally_bound_for_interruptions` |
-| `ManagedGpuOutcomeReducer` | Every terminal route normalizes once into one total outcome and complete fingerprint preimage. | Terminal taxonomy or fingerprint changes; emits `ManagedGpuOutcome`. | Completion persistence, Hook dispatch | `test_r5_terminal_coverage_projection_is_exact_and_hook_validated` |
-| `CompletionCoverageAdapter` | Planned chunks and typed absences are persisted exactly once. | Completion schema or persistence changes; emits one coverage record. | Outcome classification, Hook validation | The same terminal-to-coverage chain gate above; no broad duplicate |
-| `PostToolUseProjectionReducer` | The total outcome/coverage pair becomes the canonical projection bytes. | Projection schema changes; emits the nine-key projection. | Admission, lifecycle, Hook validation | The same terminal-to-projection chain gate above; dispatcher/guard tests validate transport only |
-| `RunGpuAdmissionContext` | Composition order and reverse-total release are the only state it owns. | Collaborator wiring or release order changes; emits no semantic admission value. | Discovery, reservation, freeze, environment materialization, launch, completion semantics, cleanup policy | `test_r5_admitted_environment_and_context_are_composition_only` |
-| Dispatcher and projection guard | Dispatcher normalizes and orders child input; the guard validates only the reducer-produced bytes. | Hook transport/schema validation changes; emits only validated child stdout. | Projection production, admission, launch, completion | `test_execution_resource_plan_projection_guard_dispatch` and `test_post_tool_projection_dispatch` |
+admission の process root は `(pid, starttime, pid namespace, cgroup)` です。holder と
+ancestor は `/proc/<pid>/stat` の starttime、`stat` と `status` の PPid 一致、namespace、
+cgroup を検証します。cycle、bounded depth、read race、PID reuse、namespace/cgroup の
+不一致は typed fail-closed です。admission probe は signal/kill を送信しません。
 
-`UUIDReservationStore` remains isolated from the managed R5 route. The
-production NVIDIA probe receives no legacy store, and the legacy planner fails
-typed instead of becoming a compatibility fallback. The frozen topic adapter
-does not freeze source itself, and the runtime receipt reader does not publish
-or repair identity state.
+## fingerprint と順序
 
-The composition root is therefore ordering-only:
+snapshot fingerprint は snapshot 内容 hash、freshness は event ID です。同一内容の
+新しい観測を fingerprint 差だけで stale としません。
+
+lock-held observation (`S_lock`)、reservation receipt、lock の device/inode、selected
+UUID を結合して composite admission fingerprint を作ります。この composite は
+`GPUAllocation`、plan freeze、`build_admitted_environment`、task context、result、
+terminal/closeout evidence で同一値を参照します。terminal evidence の追記は admission
+composite 自体を変更しません。
+
+実行順序は次の固定 sequence です。
 
 ```text
-freeze -> identity -> discovery -> occupancy -> reservation -> plan
-       -> environment -> one ff97 run -> outcome -> completion -> projection
-       -> reverse release
+S0
+ -> candidate
+ -> UUID lock
+ -> lock-held fresh S_lock
+ -> XML/process validation
+ -> composite admission fingerprint
+ -> plan freeze
+ -> admitted environment
+ -> CUDA/NVIDIA visibility
+ -> experiment-runner-admitted
+ -> terminal evidence
+ -> lock release
 ```
 
-`RunGpuAdmissionContext` may register collaborator release callbacks and record
-its own one-shot composition state. It may not recompute a collaborator
-invariant, retain a second semantic receipt, or choose a fallback. This is the
-`composition-root-only` review condition.
+plan freeze 前に selected visibility を生成しません。reservation lock は外部 CLI の
+worker と descendants の quiescence が result で `PROVEN` になるまで保持します。CLI が
+存在しない、version が異なる、result が壊れている、request/result fingerprint が不一致、
+または quiescence が証明できない場合は typed fail です。
+
+## 固定 CLI handshake
+
+実行は shell なしの `subprocess` で次を起動します。
+
+```text
+executable = experiment-runner-admitted
+argv       = [experiment-runner-admitted, --request, <path>, --result, <path>]
+version    = experiment-runner-admitted/v1
+request    = agentcanon-managed-run/v1
+result     = agentcanon-managed-run-result/v1
+```
+
+CLI identity、version、argv、request fingerprint は receipt に束縛します。request は
+現在の TaskProtocol から次の必須 field を JSON artifact として持ちます。
+
+| field | 内容 |
+| --- | --- |
+| `schema_version` | `agentcanon-managed-run/v1` |
+| `run_id` | managed context の run identity |
+| `module_spec` | `module`、`callable`、`argv`、`entrypoint_relative_path`。parent process は module を import しない |
+| `source_snapshot_root` | source freeze 後の snapshot path |
+| `environment` | admitted 後の exact environment |
+| `working_directory` / `output_directory` | worker の作業場所と artifact 出力場所 |
+| `capacity` | `cpu_set`、host/GPU memory、GPU count、pre-admitted selected UUID |
+| `admission_fingerprint` / `plan_fingerprint` | lock-bound composite と frozen plan の参照 |
+| `source_paths` | exact registry closure を含む snapshot membership |
+| `lifecycle_artifact_path` | terminal lifecycle の保存先 |
+| `request_fingerprint` | 上記 request 内容 hash |
+
+result は `schema_version`、request/admission/result fingerprint、worker PID、各 descendant
+の PID/starttime、quiescence、lifecycle terminal event、exit code/error を持ちます。
+AgentCanon は schema/version/fingerprint、exit と CLI return code、worker/descendant
+identity、quiescence、lifecycle artifact を検証してから terminal/closeout を生成します。
+
+## 検証と成果物
+
+owner tests は次の7 behavior を固定します。
+
+1. ambiguous XML/PID join の fail-closed。
+2. proc race/PID reuse の fail-closed。
+3. MIG/physical UNKNOWN closure。
+4. lock-bound composite fingerprint の各構成要素。
+5. plan freeze 前の CUDA/NVIDIA visibility 禁止。
+6. admission probe の signal/kill 禁止。
+7. `pstree` 不在かつ proc 完全な ancestry の継続。
+
+fake CLI protocol test は固定 local ExperimentRunner clone や `PYTHONPATH` fallback を
+使いません。実機 GPU がない場合、static/owner test pass は実機 GPU pass ではなく、
+`gpu_validation_blocker=<reason>` として closeout に残します。

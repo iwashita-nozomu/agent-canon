@@ -55,6 +55,7 @@ from tools.experiments.execution_resource_plan import (
     PlanState,
     ProcessIdentity,
     ProcessOccupancyEvidence,
+    ProcAncestryProbe,
     ResourceRequest,
     ResourceObservation,
     SourceFreezeOwner,
@@ -62,6 +63,7 @@ from tools.experiments.execution_resource_plan import (
     UUIDReservationStore,
     UuidVisibilityEvidence,
     build_source_path_set,
+    build_lock_bound_admission_receipt,
     freeze_resource_plan,
     materialize_environment,
     parse_nvidia_driver_version,
@@ -182,19 +184,11 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 Path(__file__).resolve().parents[2]
                 / ".codex"
                 / "hooks"
-                / "execution_resource_plan_projection_guard.py"
+                / "hook_dispatcher.py"
             )
             hook_input = json.dumps(
                 {
-                    "hook_event_name": "PostToolUse",
-                    "schema_version": "agent-canon-post-tool-use-input/v1",
-                    "tool_input_fingerprint": hashlib.sha256(
-                        json.dumps(
-                            {"command": "managed-run"},
-                            sort_keys=True,
-                            separators=(",", ":"),
-                        ).encode("utf-8")
-                    ).hexdigest(),
+                    "hookEventName": "PostToolUse",
                     "tool_name": "Bash",
                     "tool_input": {"command": "managed-run"},
                     "tool_response": {
@@ -205,11 +199,17 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 }
             )
             hook_result = subprocess.run(
-                [sys.executable, str(hook)],
+                [sys.executable, str(hook), "PostToolUse"],
                 input=hook_input,
                 text=True,
                 capture_output=True,
                 check=False,
+                env={
+                    **os.environ,
+                    "AGENT_CANON_HOOK_SOURCE_ROOT": str(
+                        Path(__file__).resolve().parents[2]
+                    ),
+                },
             )
             self.assertEqual(hook_result.returncode, 0, hook_result.stderr)
             with self.assertRaises(CompletionCoverageFailure):
@@ -295,8 +295,7 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             release_blocked=False,
             fingerprint="d" * 64,
         )
-        base = RunGpuAdmissionReceipt(
-            schema_version="gpu-admission/v1",
+        base = build_lock_bound_admission_receipt(
             candidate_uuids=(mig_uuid,),
             occupied_uuids=(),
             reserved_uuids=(),
@@ -305,73 +304,57 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
             occupancy_fingerprint="f" * 64,
             reservation_fingerprint="0" * 64,
             runtime_identity_fingerprint="1" * 64,
-            plan_fingerprint="2" * 64,
-            admission_fingerprint="",
             lock_readback=lock_readback,
-            effective_environment={"CUDA_VISIBLE_DEVICES": mig_uuid},
             actual_gpu_processes=(occupancy,),
             concurrent_run_evidence=concurrent,
             mig_evidence=mig,
             container_visible_uuid_mapping=visibility,
             os_safe_lock_placement=placement,
+        )
+        base = replace(
+            base,
+            plan_fingerprint="2" * 64,
+            effective_environment={"CUDA_VISIBLE_DEVICES": mig_uuid},
             descendant_retention_evidence=descendants,
         )
-        variants = {
-            "lock": replace(
-                base,
-                lock_readback=replace(lock_readback, fingerprint="e" * 64),
-                admission_fingerprint="",
-            ),
-            "environment": replace(
-                base,
-                effective_environment={"CUDA_VISIBLE_DEVICES": physical_uuid},
-                admission_fingerprint="",
-            ),
-            "process": replace(
-                base,
-                actual_gpu_processes=(
-                    replace(occupancy, evidence_fingerprint="f" * 64),
-                ),
-                admission_fingerprint="",
-            ),
-            "concurrent": replace(
-                base,
-                concurrent_run_evidence=replace(concurrent, final_event_id="S-final-2"),
-                admission_fingerprint="",
-            ),
-            "mig": replace(
-                base,
-                mig_evidence=replace(mig, selected_physical_uuids=(physical_uuid,)),
-                admission_fingerprint="",
-            ),
-            "visibility": replace(
-                base,
-                container_visible_uuid_mapping=replace(
-                    visibility,
-                    namespace_id="pid:[4026531837]",
-                ),
-                admission_fingerprint="",
-            ),
-            "placement": replace(
-                base,
-                os_safe_lock_placement=replace(placement, inode=14),
-                admission_fingerprint="",
-            ),
-            "descendant": replace(
-                base,
-                descendant_retention_evidence=replace(
-                    descendants,
-                    retained_gpu_process_uuids=(mig_uuid,),
-                ),
-                admission_fingerprint="",
-            ),
-        }
-        for owner, variant in variants.items():
+        lock_variant = replace(
+            base,
+            lock_readback=replace(lock_readback, device=8),
+            admission_fingerprint="",
+        )
+        reservation_variant = replace(
+            base,
+            reservation_fingerprint="9" * 64,
+            admission_fingerprint="",
+        )
+        selected_variant = replace(
+            base,
+            selected_uuids=(physical_uuid,),
+            admission_fingerprint="",
+        )
+        snapshot_variant = replace(
+            base,
+            occupancy_fingerprint="a" * 64,
+            admission_fingerprint="",
+        )
+        for owner, variant in {
+            "lock": lock_variant,
+            "reservation": reservation_variant,
+            "selected": selected_variant,
+            "snapshot": snapshot_variant,
+        }.items():
             with self.subTest(owner=owner):
-                self.assertNotEqual(
-                    base.admission_fingerprint,
-                    variant.admission_fingerprint,
-                )
+                self.assertNotEqual(base.admission_fingerprint, variant.admission_fingerprint)
+        terminal_variant = replace(
+            base,
+            effective_environment={"CUDA_VISIBLE_DEVICES": physical_uuid},
+            descendant_retention_evidence=replace(
+                descendants,
+                retained_gpu_process_uuids=(mig_uuid,),
+            ),
+            admission_fingerprint="",
+        )
+        self.assertEqual(base.admission_fingerprint, terminal_variant.admission_fingerprint)
         assert base.effective_environment is not None
         with self.assertRaises(TypeError):
             base.effective_environment["CUDA_VISIBLE_DEVICES"] = physical_uuid  # type: ignore[index]
@@ -577,6 +560,23 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
         finally:
             os.close(evidence.fd)
 
+    def test_r5_ambiguous_xml_gpu_join_fails_closed(self) -> None:
+        """An ambiguous topology join cannot become a usable GPU unit."""
+        inventory, disposition, descriptors = self._fixture_nvidia_inventory()
+        try:
+            ambiguous = replace(inventory, joins=inventory.joins + inventory.joins[:1])
+            with self.assertRaises(TypedPreflightFailure) as raised:
+                GpuProcessOccupancyProbe(
+                    inventory=ambiguous,
+                    namespace_inode=4026531836,
+                    processes=(),
+                    process_inventory_disposition=disposition,
+                ).observe()
+            self.assertEqual(raised.exception.code, "gpu_process_topology_unproven")
+        finally:
+            for descriptor in descriptors:
+                os.close(descriptor.fd)
+
     def test_gpu_process_occupancy_closes_physical_to_full_mig_scope(self) -> None:
         """Any physical holder conservatively occupies its physical and MIG units."""
         inventory, disposition, descriptors = self._fixture_nvidia_inventory()
@@ -711,6 +711,99 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
         finally:
             for descriptor in descriptors:
                 os.close(descriptor.fd)
+
+    def test_r5_proc_starttime_reuse_fails_closed(self) -> None:
+        """One PID observed with two start identities is treated as a reuse race."""
+        inventory, disposition, descriptors = self._fixture_nvidia_inventory()
+        try:
+            with self.assertRaises(TypedPreflightFailure) as raised:
+                GpuProcessOccupancyProbe(
+                    inventory=inventory,
+                    namespace_inode=4026531836,
+                    processes=(
+                        self._fixture_process(inventory.mig_uuids[0], 129),
+                        replace(
+                            self._fixture_process(inventory.mig_uuids[0], 129),
+                            process_start_identity="reused-start-129",
+                        ),
+                    ),
+                    process_inventory_disposition=disposition,
+                ).observe()
+            self.assertEqual(raised.exception.code, "gpu_process_identity_ambiguous")
+        finally:
+            for descriptor in descriptors:
+                os.close(descriptor.fd)
+
+    def test_r5_unknown_unit_closure_keeps_mig_parent_boundary(self) -> None:
+        """MIG and physical UNKNOWN states conservatively close their topology unit."""
+        inventory, disposition, descriptors = self._fixture_nvidia_inventory()
+        try:
+            physical_uuid = inventory.physical_uuids[0]
+            mig_uuid = inventory.mig_uuids[0]
+            for unknown_uuid in (mig_uuid, physical_uuid):
+                with self.subTest(unknown_uuid=unknown_uuid):
+                    evidence = GpuProcessOccupancyProbe(
+                        inventory=inventory,
+                        namespace_inode=4026531836,
+                        processes=(),
+                        process_inventory_disposition=disposition,
+                        unknown_gpu_ids=(unknown_uuid,),
+                    ).observe()
+                    self.assertEqual(
+                        set(evidence.unknown_uuids),
+                        {physical_uuid, mig_uuid},
+                    )
+                    self.assertEqual(
+                        evidence.unit_states[physical_uuid],
+                        "UNKNOWN",
+                    )
+                    self.assertEqual(evidence.unit_states[mig_uuid], "UNKNOWN")
+        finally:
+            for descriptor in descriptors:
+                os.close(descriptor.fd)
+
+    def test_r5_admission_probe_has_no_signal_or_kill_path(self) -> None:
+        """Admission ancestry code is observational and cannot signal a process."""
+        source = (
+            Path(__file__).resolve().parents[2]
+            / "tools"
+            / "experiments"
+            / "execution_resource_plan.py"
+        ).read_text(encoding="utf-8")
+        for forbidden in ("os.kill(", "os.killpg(", "signal.SIG", "[\"kill\""):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, source)
+
+    def test_r5_pstree_absent_does_not_block_complete_proc_ancestry(self) -> None:
+        """A complete proc chain remains authoritative when pstree is unavailable."""
+        def write_proc_record(root: Path, pid: int, parent_pid: int, starttime: str) -> None:
+            process_dir = root / str(pid)
+            (process_dir / "ns").mkdir(parents=True)
+            (process_dir / "ns" / "pid").symlink_to("pid:[4026531836]")
+            stat_tail = ["S", str(parent_pid), *(["0"] * 18)]
+            stat_tail[19] = starttime
+            (process_dir / "stat").write_text(
+                f"{pid} (worker) {' '.join(stat_tail)}\n",
+                encoding="utf-8",
+            )
+            (process_dir / "status").write_text(
+                f"Name:\tworker\nPPid:\t{parent_pid}\n",
+                encoding="utf-8",
+            )
+            (process_dir / "cgroup").write_text(
+                "0::/agent-canon.slice\n",
+                encoding="utf-8",
+            )
+
+        with tempfile.TemporaryDirectory() as temporary:
+            proc_root = Path(temporary)
+            write_proc_record(proc_root, 123, 2, "start-123")
+            write_proc_record(proc_root, 2, 1, "start-2")
+            write_proc_record(proc_root, 1, 0, "start-1")
+            with patch("tools.experiments.execution_resource_plan.shutil.which", return_value=None):
+                evidence = ProcAncestryProbe(proc_root=proc_root).observe(123)
+            self.assertFalse(evidence.pstree_available)
+            self.assertEqual(tuple(item.pid for item in evidence.chain), (123, 2))
 
     def test_gpu_reservation_busy_candidate_continues_and_releases_once(self) -> None:
         """A busy candidate closes locally and does not block the next candidate."""
@@ -1065,9 +1158,32 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
                 "S_lock",
             )
             self.assertNotEqual(
-                allocation.lock_readback["initial_observation"]["fingerprint"],
-                allocation.lock_readback["final_observation"]["fingerprint"],
+                allocation.lock_readback["initial_observation"]["event_id"],
+                allocation.lock_readback["final_observation"]["event_id"],
             )
+
+    def test_r5_pre_freeze_gpu_visibility_is_rejected(self) -> None:
+        """CUDA/NVIDIA visibility is materialized only after the frozen plan."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            request = self.make_request(root)
+            discovered = discover_test_resources(
+                request,
+                request.resource_probe,
+                cpu_available_set=request.discovered_cpu_available_set,
+                gpu_devices=request.discovered_gpu_devices,
+                container_id=request.discovered_container_id,
+                structure_tool=request.discovered_structure_tool,
+                tool_availability=request.discovered_tool_availability,
+            )
+            allocation = plan_gpu_allocation(request, discovered)
+            pre_freeze_request = replace(
+                request,
+                environment={"CUDA_VISIBLE_DEVICES": "GPU-0001"},
+            )
+            with self.assertRaises(TypedPreflightFailure) as raised:
+                freeze_resource_plan(pre_freeze_request, discovered, allocation)
+            self.assertEqual(raised.exception.code, "gpu_visibility_before_plan_freeze")
 
     def test_wrong_gpu_provenance_fails_before_planning(self) -> None:
         """A GPU request cannot enter the planner without caller/scheduler provenance."""
