@@ -301,6 +301,7 @@ def _make_parent_with_legacy_projection(tmp_root: Path) -> Path:
         "Makefile",
         "responsibility-scope.toml",
         "validation",
+        "tools/validation",
         "AGENTS.md",
         "ROOT_AGENTS.md",
         ".codex",
