@@ -410,62 +410,64 @@ class CheckToolConventionDriftTest(unittest.TestCase):
 
     def test_pr_check_command_backslash_space_tab_is_not_a_continuation(self) -> None:
         """Malformed backslash continuation after command lines is rejected for all gate checks."""
+        continuation_suffixes = (" \\ \n", " \\\t\n")
         gates = [
             (
                 "agent_canon_pr_check",
                 'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
                 "missing-strict-dependency-review",
+                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing',
+                '--cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
             ),
             (
                 "agent_canon_pr_check",
                 'python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"',
                 "missing-accumulated-agent-eval-producer",
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate',
+                '--log-dir "${PR_AGENT_EVAL_LOG_DIR}"',
             ),
             (
                 "generated_artifact_guard",
                 'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
                 "missing-generated-artifact-pr-guard",
+                'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py"',
+                '--root "${WORKSPACE_ROOT}"',
             ),
         ]
-        for contract, canonical_command, detail in gates:
-            with self.subTest(contract=contract, detail=detail):
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    root = Path(tmp_dir)
-                    self.write_agent_canon_pr_contract(root)
-                    script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
-                    malformed = (
-                        canonical_command.replace(
-                            ' --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
-                            ' --fail-missing \\ \n'
-                            '  --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
+        for (
+            contract,
+            canonical_command,
+            detail,
+            command_prefix,
+            command_tail,
+        ) in gates:
+            for suffix_name, suffix in (
+                ("space", continuation_suffixes[0]),
+                ("tab", continuation_suffixes[1]),
+            ):
+                with self.subTest(contract=contract, detail=detail, suffix=suffix_name):
+                    with tempfile.TemporaryDirectory() as tmp_dir:
+                        root = Path(tmp_dir)
+                        self.write_agent_canon_pr_contract(root)
+                        script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+                        malformed = (
+                            script.read_text(encoding="utf-8")
+                            .replace(
+                                canonical_command,
+                                command_prefix + suffix + f"  {command_tail}",
+                            )
                         )
-                        .replace(
-                            ' --log-dir "${PR_AGENT_EVAL_LOG_DIR}"',
-                            ' --run-id agent-canon-pr-gate \\ \n'
-                            '  --log-dir "${PR_AGENT_EVAL_LOG_DIR}"',
-                        )
-                        .replace(
-                            ' --root "${WORKSPACE_ROOT}"',
-                            ' --root "${WORKSPACE_ROOT}" \\ \n'
-                            "  --invalid-continuation",
-                        )
-                    )
-                    script.write_text(
-                        script.read_text(encoding="utf-8").replace(
-                            canonical_command, malformed
-                        ),
-                        encoding="utf-8",
-                    )
+                        script.write_text(malformed, encoding="utf-8")
 
-                    result = self.run_checker(root, "--contract", contract)
+                        result = self.run_checker(root, "--contract", contract)
 
-                    self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-                    self.assertIn(
-                        f"missing-required-command:{contract}:"
-                        "tools/ci/check_agent_canon_pr.sh:"
-                        f"{detail}",
-                        result.stdout,
-                    )
+                        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                        self.assertIn(
+                            f"missing-required-command:{contract}:"
+                            "tools/ci/check_agent_canon_pr.sh:"
+                            f"{detail}",
+                            result.stdout,
+                        )
 
     def test_pr_check_strict_dependency_review_command_passes(self) -> None:
         """Canonical dependency-review command passes command extraction."""
