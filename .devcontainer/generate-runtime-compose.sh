@@ -127,12 +127,22 @@ else
 fi
 
 parent_layout=false
+parent_environment_enabled=false
 parent_environment_source="${repo_root}/.devcontainer/parent-environment.sh"
+parent_environment_manifest="${repo_root}/.devcontainer/parent-environment.toml"
 if [ -d "${repo_root}/vendor/agent-canon" ]; then
   parent_layout=true
-  if [ ! -f "$parent_environment_source" ] || [ -L "$parent_environment_source" ]; then
-    printf 'devcontainer parent environment source must be a regular file: %s\n' "$parent_environment_source" >&2
-    exit 1
+  if [ -e "$parent_environment_source" ] || [ -L "$parent_environment_source" ] \
+    || [ -e "$parent_environment_manifest" ] || [ -L "$parent_environment_manifest" ]; then
+    if [ ! -f "$parent_environment_source" ]; then
+      printf 'devcontainer parent environment source does not resolve to a file: %s\n' "$parent_environment_source" >&2
+      exit 1
+    fi
+    if [ ! -f "$parent_environment_manifest" ]; then
+      printf 'devcontainer parent environment manifest does not resolve to a file: %s\n' "$parent_environment_manifest" >&2
+      exit 1
+    fi
+    parent_environment_enabled=true
   fi
 fi
 
@@ -159,6 +169,8 @@ if [ "$parent_layout" = true ]; then
     '        target: "/etc/project-template/zsh/.zshrc"'
     "        read_only: true"
   )
+fi
+if [ "$parent_environment_enabled" = true ]; then
   parent_environment_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$parent_environment_source")"
   volume_lines+=(
     "      - type: bind"

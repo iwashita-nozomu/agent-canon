@@ -153,9 +153,17 @@ run_agent_canon() {
 PR_GATE_DEPENDENCY_GRAPH_REASON=""
 PR_GATE_DEPENDENCY_GRAPH_EVIDENCE=""
 agentcanon_pr_dependency_graph_required() {
+  local base_fetch_output=""
+  local base_fetch_rc=0
+  local base_fetch_status=""
+  local trusted_base_sha=""
   local selector_output=""
   local selector_rc=0
   local selector_status=""
+  local selector_args=(
+    --root "${WORKSPACE_ROOT}"
+    --source-root "${AGENT_CANON_SOURCE_ROOT}"
+  )
 
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
     echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=required reason=standalone_source"
@@ -163,9 +171,31 @@ agentcanon_pr_dependency_graph_required() {
     PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="source_root=${AGENT_CANON_SOURCE_ROOT}"
     return 0
   fi
+  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    if base_fetch_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
+      --root "${WORKSPACE_ROOT}" \
+      --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+      --prepare-ci-base)"; then
+      base_fetch_rc=0
+    else
+      base_fetch_rc=$?
+    fi
+    printf '%s\n' "${base_fetch_output}"
+    base_fetch_status="$(awk -F= '$1 == "AGENT_CANON_PR_BASE_FETCH" {print $2}' <<<"${base_fetch_output}")"
+    trusted_base_sha="$(awk -F= '$1 == "AGENT_CANON_PR_TRUSTED_BASE_SHA" {print $2}' <<<"${base_fetch_output}")"
+    if [[ "${base_fetch_rc}:${base_fetch_status}" != "0:pass" || -z "${trusted_base_sha}" ]]; then
+      PR_GATE_DEPENDENCY_GRAPH_REASON="$(awk -F= '$1 == "AGENT_CANON_PR_BASE_FETCH_REASON" {sub(/^[^=]*=/, ""); print}' <<<"${base_fetch_output}")"
+      PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="$(awk -F= '$1 == "AGENT_CANON_PR_BASE_FETCH_EVIDENCE" {sub(/^[^=]*=/, ""); print}' <<<"${base_fetch_output}")"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=fail"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON=${PR_GATE_DEPENDENCY_GRAPH_REASON:-pr_base_fetch_failed}"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE=${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE:-base_fetch_status_missing}"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail rc=${base_fetch_rc} status=${base_fetch_status:-missing}" >&2
+      return 2
+    fi
+    selector_args+=(--trusted-base-sha "${trusted_base_sha}")
+  fi
   if selector_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
-    --root "${WORKSPACE_ROOT}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}")"; then
+    "${selector_args[@]}")"; then
     selector_rc=0
   else
     selector_rc=$?

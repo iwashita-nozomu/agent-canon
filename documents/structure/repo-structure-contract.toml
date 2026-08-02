@@ -356,12 +356,12 @@ path = ".devcontainer"
 kind = "any"
 category = "shared_runtime_view"
 
-[[profile.required]]
+[[profile.optional]]
 path = ".devcontainer/parent-environment.sh"
 kind = "file"
 category = "parent_environment"
 
-[[profile.required]]
+[[profile.optional]]
 path = ".devcontainer/parent-environment.toml"
 kind = "file"
 category = "parent_environment"

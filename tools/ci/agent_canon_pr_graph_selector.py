@@ -33,6 +33,7 @@ MANIFEST_CHANGE_RE = re.compile(
     re.MULTILINE,
 )
 HEX_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+FULL_HISTORY_DEEPEN = "2147483647"
 
 
 class SelectorFailure(RuntimeError):
@@ -81,6 +82,15 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="AgentCanon source root containing canonical owner manifests.",
     )
+    parser.add_argument(
+        "--prepare-ci-base",
+        action="store_true",
+        help="Fetch the trusted GitHub PR base into a shallow checkout.",
+    )
+    parser.add_argument(
+        "--trusted-base-sha",
+        help="Trusted base SHA prepared by the GitHub PR entrypoint.",
+    )
     return parser
 
 
@@ -91,8 +101,17 @@ def emit(status: str, reason: str, evidence: str) -> None:
     print(f"AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE={evidence}")
 
 
+def emit_base(status: str, reason: str, evidence: str, base_sha: str = "") -> None:
+    """Emit one line-safe trusted-base preparation result."""
+    print(f"AGENT_CANON_PR_BASE_FETCH={status}")
+    print(f"AGENT_CANON_PR_BASE_FETCH_REASON={reason}")
+    print(f"AGENT_CANON_PR_BASE_FETCH_EVIDENCE={evidence}")
+    if base_sha:
+        print(f"AGENT_CANON_PR_TRUSTED_BASE_SHA={base_sha}")
+
+
 def run_git(root: Path, args: Sequence[str]) -> subprocess.CompletedProcess[str]:
-    """Run one non-mutating Git command."""
+    """Run one selector or explicit trusted-base preparation Git command."""
     return subprocess.run(
         ["git", *args],
         cwd=root,
@@ -119,46 +138,78 @@ def git_output(
     return result.stdout
 
 
-def trusted_base_ref(environment: Mapping[str, str]) -> tuple[str, str]:
-    """Resolve a CI event base or an explicit validated local/test override."""
+def github_event_base(environment: Mapping[str, str]) -> tuple[str, str]:
+    """Resolve the trusted base SHA from one GitHub pull request event."""
     override = environment.get("AGENT_CANON_PR_BASE_REF", "").strip()
+    if override:
+        raise SelectorFailure(
+            "ci_base_override_forbidden",
+            "source=AGENT_CANON_PR_BASE_REF",
+        )
+    if environment.get("GITHUB_ACTIONS", "").lower() != "true":
+        raise SelectorFailure(
+            "trusted_pr_base_unavailable",
+            "source=GITHUB_ACTIONS",
+        )
+    if environment.get("GITHUB_EVENT_NAME") not in {
+        "pull_request",
+        "pull_request_target",
+    }:
+        raise SelectorFailure(
+            "trusted_pr_base_unavailable",
+            "source=GITHUB_EVENT_NAME",
+        )
+    event_path = environment.get("GITHUB_EVENT_PATH", "").strip()
+    if not event_path:
+        raise SelectorFailure(
+            "trusted_pr_base_unavailable",
+            "source=GITHUB_EVENT_PATH",
+        )
+    try:
+        payload: object = json.loads(Path(event_path).read_text(encoding="utf-8"))
+        pull_request = cast(dict[str, object], payload)["pull_request"]
+        base = cast(dict[str, object], pull_request)["base"]
+        base_sha = cast(dict[str, object], base)["sha"]
+    except (OSError, ValueError, KeyError, TypeError):
+        raise SelectorFailure(
+            "trusted_pr_base_invalid",
+            f"event_path_sha256={hashlib.sha256(event_path.encode()).hexdigest()}",
+        ) from None
+    if not isinstance(base_sha, str) or not HEX_SHA_RE.fullmatch(base_sha):
+        raise SelectorFailure(
+            "trusted_pr_base_invalid",
+            "field=pull_request.base.sha",
+        )
+    return base_sha.lower(), "github_event_pull_request_base_sha"
+
+
+def trusted_base_ref(
+    environment: Mapping[str, str],
+    trusted_base_sha: str | None = None,
+) -> tuple[str, str]:
+    """Resolve a prepared CI base or an explicit validated local/test override."""
     github_actions = environment.get("GITHUB_ACTIONS", "").lower() == "true"
     if github_actions:
-        if override:
+        event_base, source = github_event_base(environment)
+        prepared = (trusted_base_sha or "").strip()
+        if not HEX_SHA_RE.fullmatch(prepared):
             raise SelectorFailure(
-                "ci_base_override_forbidden",
-                "source=AGENT_CANON_PR_BASE_REF",
+                "trusted_pr_base_argument_invalid",
+                "argument=trusted_base_sha",
             )
-        if environment.get("GITHUB_EVENT_NAME") not in {
-            "pull_request",
-            "pull_request_target",
-        }:
+        if prepared.lower() != event_base:
             raise SelectorFailure(
-                "trusted_pr_base_unavailable",
-                "source=GITHUB_EVENT_NAME",
+                "trusted_pr_base_argument_mismatch",
+                f"source={source}",
             )
-        event_path = environment.get("GITHUB_EVENT_PATH", "").strip()
-        if not event_path:
-            raise SelectorFailure(
-                "trusted_pr_base_unavailable",
-                "source=GITHUB_EVENT_PATH",
-            )
-        try:
-            payload: object = json.loads(Path(event_path).read_text(encoding="utf-8"))
-            pull_request = cast(dict[str, object], payload)["pull_request"]
-            base = cast(dict[str, object], pull_request)["base"]
-            base_sha = cast(dict[str, object], base)["sha"]
-        except (OSError, ValueError, KeyError, TypeError):
-            raise SelectorFailure(
-                "trusted_pr_base_invalid",
-                f"event_path_sha256={hashlib.sha256(event_path.encode()).hexdigest()}",
-            ) from None
-        if not isinstance(base_sha, str) or not HEX_SHA_RE.fullmatch(base_sha):
-            raise SelectorFailure(
-                "trusted_pr_base_invalid",
-                "field=pull_request.base.sha",
-            )
-        return base_sha.lower(), "github_event_pull_request_base_sha"
+        return event_base, source
+
+    if trusted_base_sha is not None:
+        raise SelectorFailure(
+            "local_trusted_base_argument_forbidden",
+            "argument=trusted_base_sha",
+        )
+    override = environment.get("AGENT_CANON_PR_BASE_REF", "").strip()
 
     if not override:
         raise SelectorFailure(
@@ -177,9 +228,50 @@ def trusted_base_ref(environment: Mapping[str, str]) -> tuple[str, str]:
     return override, "explicit_local_base_override"
 
 
-def load_diff(root: Path, environment: Mapping[str, str]) -> DiffEvidence:
+def prepare_ci_base(root: Path, environment: Mapping[str, str]) -> tuple[str, str]:
+    """Fetch the trusted PR base and enough history for fail-closed comparison."""
+    base_sha, source = github_event_base(environment)
+    head_sha = git_output(root, ["rev-parse", "HEAD"], "pr_head_unresolved").strip()
+    if base_sha == head_sha:
+        raise SelectorFailure(
+            "pr_base_equals_head",
+            f"base={base_sha};source={source}",
+        )
+    shallow = git_output(
+        root,
+        ["rev-parse", "--is-shallow-repository"],
+        "pr_checkout_depth_unresolved",
+    ).strip()
+    if shallow not in {"true", "false"}:
+        raise SelectorFailure(
+            "pr_checkout_depth_invalid",
+            f"value_sha256={hashlib.sha256(shallow.encode()).hexdigest()}",
+        )
+    fetch_args = ["fetch", "--no-tags", "--no-recurse-submodules"]
+    if shallow == "true":
+        fetch_args.extend(("--deepen", FULL_HISTORY_DEEPEN))
+    fetch_args.extend(("origin", base_sha))
+    git_output(root, fetch_args, "pr_base_fetch_failed")
+    resolved = git_output(
+        root,
+        ["rev-parse", "--verify", "--end-of-options", f"{base_sha}^{{commit}}"],
+        "pr_base_unresolved",
+    ).strip()
+    if resolved.lower() != base_sha:
+        raise SelectorFailure(
+            "pr_base_fetch_identity_mismatch",
+            f"source={source}",
+        )
+    return base_sha, source
+
+
+def load_diff(
+    root: Path,
+    environment: Mapping[str, str],
+    trusted_base_sha: str | None = None,
+) -> DiffEvidence:
     """Validate the selected base and load exact changed-path and patch evidence."""
-    base_ref, base_source = trusted_base_ref(environment)
+    base_ref, base_source = trusted_base_ref(environment, trusted_base_sha)
     base_sha = git_output(
         root,
         ["rev-parse", "--verify", "--end-of-options", f"{base_ref}^{{commit}}"],
@@ -392,9 +484,10 @@ def select(
     root: Path,
     source_root: Path,
     environment: Mapping[str, str],
+    trusted_base_sha: str | None = None,
 ) -> Selection:
     """Return the strict graph selection for one parent PR."""
-    diff = load_diff(root, environment)
+    diff = load_diff(root, environment, trusted_base_sha)
     surfaces = dependency_surface_paths(source_root)
     profiles = load_profiles(source_root, environment)
     touched_surfaces = tuple(path for path in diff.changed_paths if path in surfaces)
@@ -435,11 +528,20 @@ def select(
 def main() -> int:
     """Run the selector and emit a typed result."""
     args = build_parser().parse_args()
+    if args.prepare_ci_base:
+        try:
+            base_sha, source = prepare_ci_base(Path(args.root).resolve(), os.environ)
+        except SelectorFailure as error:
+            emit_base("fail", error.reason, error.evidence)
+            return EXIT_FAILURE
+        emit_base("pass", "trusted_pr_base_fetched", f"source={source}", base_sha)
+        return EXIT_REQUIRED
     try:
         selection = select(
             Path(args.root).resolve(),
             Path(args.source_root).resolve(),
             os.environ,
+            args.trusted_base_sha,
         )
     except SelectorFailure as error:
         emit("fail", error.reason, error.evidence)

@@ -4,6 +4,7 @@
 # contract test
 # responsibility Verifies canonical profile/surface selection, trusted diff bases, and typed selector failures.
 # upstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py selects parent strict graph gating
+# upstream implementation ../../tools/ci/check_agent_canon_pr.sh prepares and passes the trusted GitHub base
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json owns canonical validation profile IDs and graph requirements
 # upstream design ../../documents/design/dependency-manifest-design.md owns canonical dependency surfaces
 # @dependency-end
@@ -21,6 +22,7 @@ from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SELECTOR_PATH = PROJECT_ROOT / "tools" / "ci" / "agent_canon_pr_graph_selector.py"
+CHECKER_PATH = PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_pr.sh"
 SPEC = importlib.util.spec_from_file_location("agent_canon_pr_graph_selector", SELECTOR_PATH)
 assert SPEC is not None and SPEC.loader is not None
 selector = importlib.util.module_from_spec(SPEC)
@@ -58,8 +60,54 @@ def commit_change(root: Path, relative: str) -> str:
     return base
 
 
+def shallow_pr_checkout(root: Path) -> tuple[Path, Path, str]:
+    """Create a depth-one PR checkout, event payload, and missing base SHA."""
+    source = root / "source"
+    source.mkdir()
+    base = commit_change(source, "vendor/agent-canon")
+    remote = root / "remote.git"
+    subprocess.run(
+        ["git", "clone", "--bare", str(source), str(remote)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    checkout = root / "checkout"
+    subprocess.run(
+        [
+            "git",
+            "clone",
+            "--depth",
+            "1",
+            "--branch",
+            "main",
+            remote.as_uri(),
+            str(checkout),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    event = root / "event.json"
+    event.write_text(
+        json.dumps({"pull_request": {"base": {"sha": base}}}),
+        encoding="utf-8",
+    )
+    return checkout, event, base
+
+
 class AgentCanonPrGraphSelectorTest(unittest.TestCase):
     """Exercise required, skipped, and typed failure states."""
+
+    def test_pr_entrypoint_prepares_and_passes_trusted_base(self) -> None:
+        """The parent gate wires shallow preparation to the exact selector argument."""
+        entrypoint = CHECKER_PATH.read_text(encoding="utf-8")
+
+        self.assertIn("--prepare-ci-base", entrypoint)
+        self.assertIn(
+            'selector_args+=(--trusted-base-sha "${trusted_base_sha}")',
+            entrypoint,
+        )
 
     def test_pin_only_diff_is_skipped_with_reason_and_evidence(self) -> None:
         """A pin-only parent diff does not select strict parent graph completeness."""
@@ -269,8 +317,39 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
 
         self.assertEqual(raised.exception.reason, "pr_changed_paths_diff_failed")
 
-    def test_ci_uses_pull_request_base_sha_from_event(self) -> None:
-        """CI ignores branch-name heuristics and consumes the trusted PR event base."""
+    def test_ci_prepares_shallow_pull_request_base_and_passes_exact_argument(self) -> None:
+        """CI deepens a depth-one checkout and binds selection to the event base."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            checkout, event, base = shallow_pr_checkout(root)
+            environment = {
+                "GITHUB_ACTIONS": "true",
+                "GITHUB_EVENT_NAME": "pull_request",
+                "GITHUB_EVENT_PATH": str(event),
+            }
+            unresolved = subprocess.run(
+                ["git", "rev-parse", "--verify", f"{base}^{{commit}}"],
+                cwd=checkout,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(unresolved.returncode, 0)
+
+            prepared, source = selector.prepare_ci_base(checkout, environment)
+
+            diff = selector.load_diff(
+                checkout,
+                environment,
+                prepared,
+            )
+
+        self.assertEqual(diff.base_sha, base)
+        self.assertEqual(source, "github_event_pull_request_base_sha")
+        self.assertEqual(diff.base_source, "github_event_pull_request_base_sha")
+
+    def test_ci_rejects_missing_or_mismatched_trusted_base_argument(self) -> None:
+        """Normal CI selection cannot invent or replace the prepared event base."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             base = commit_change(root, "vendor/agent-canon")
@@ -279,18 +358,37 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 json.dumps({"pull_request": {"base": {"sha": base}}}),
                 encoding="utf-8",
             )
+            environment = {
+                "GITHUB_ACTIONS": "true",
+                "GITHUB_EVENT_NAME": "pull_request",
+                "GITHUB_EVENT_PATH": str(event),
+            }
 
-            diff = selector.load_diff(
-                root,
-                {
-                    "GITHUB_ACTIONS": "true",
-                    "GITHUB_EVENT_NAME": "pull_request",
-                    "GITHUB_EVENT_PATH": str(event),
-                },
-            )
+            with self.assertRaises(selector.SelectorFailure) as missing:
+                selector.load_diff(root, environment)
+            with self.assertRaises(selector.SelectorFailure) as mismatch:
+                selector.load_diff(root, environment, "0" * 40)
 
-        self.assertEqual(diff.base_sha, base)
-        self.assertEqual(diff.base_source, "github_event_pull_request_base_sha")
+        self.assertEqual(missing.exception.reason, "trusted_pr_base_argument_invalid")
+        self.assertEqual(mismatch.exception.reason, "trusted_pr_base_argument_mismatch")
+
+    def test_ci_rejects_base_override_before_fetch(self) -> None:
+        """CI accepts only its event base and never an environment override."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            _checkout, event, base = shallow_pr_checkout(root)
+            with self.assertRaises(selector.SelectorFailure) as raised:
+                selector.prepare_ci_base(
+                    _checkout,
+                    {
+                        "GITHUB_ACTIONS": "true",
+                        "GITHUB_EVENT_NAME": "pull_request",
+                        "GITHUB_EVENT_PATH": str(event),
+                        "AGENT_CANON_PR_BASE_REF": base,
+                    },
+                )
+
+        self.assertEqual(raised.exception.reason, "ci_base_override_forbidden")
 
 
 if __name__ == "__main__":

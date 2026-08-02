@@ -26,10 +26,10 @@ downstream design parent-dependency-manifest-followup.md declares the parent man
 - `.devcontainer/devcontainer.json` は
   `vendor/agent-canon/.devcontainer/devcontainer.json` への symlink。
 - 親固有の処理がある場合は `.devcontainer/post-create-parent.sh` に置く。
-- `.devcontainer/parent-environment.sh` は親の環境値を定義する regular file。
-  初期状態では空でもよい。
-- `.devcontainer/parent-environment.toml` は `variables` 配列だけを持つ regular
-  file。配列順が環境 export の順序を定義する。
+- 親環境を使う場合は `.devcontainer/parent-environment.sh` と
+  `.devcontainer/parent-environment.toml` を一組で置く。どちらも regular file
+  または実在 file へ解決できる symlink とし、片側だけの配置と broken symlink
+  は受理しない。両方が無い親では親環境 mount を生成しない。
 - AgentCanon の共有スクリプトを親 `.devcontainer/` にコピーしたり、wrapper を
   追加したりしない。
 
@@ -38,7 +38,8 @@ downstream design parent-dependency-manifest-followup.md declares the parent man
 
 ## 親環境の値と名前
 
-`parent-environment.sh` が親環境の値と定義の唯一の source です。validator は
+親環境の組を配置した場合、`parent-environment.sh` が親環境の値と定義の唯一の
+source です。validator は symlink 自体の file type ではなく解決先の実在性を確認し、
 このファイルを shell として実行せず、空行・コメントと `export NAME=value` 形式の
 行だけを静的に読みます。`parent-environment.toml` は次の形で ordered variable
 names だけを持ちます。
@@ -66,7 +67,8 @@ symlink 先の `devcontainer.json` は、親レポのルートから AgentCanon 
 - post-attach:
   `vendor/agent-canon/.devcontainer/post-attach.sh`
 
-親環境を使うときは、generator が次を read-only bind mount します。
+親環境の両 source が実在 file に解決できるときだけ、generator が次を read-only
+bind mount します。
 
 - `.devcontainer/parent-environment.sh` ->
   `/etc/project-template/parent-environment.sh`

@@ -206,10 +206,15 @@ parent graph or promote dependency-header completeness into a blocker. A
 standalone AgentCanon source checkout retains the strict source graph gate.
 
 GitHub Actions resolves the comparison base from
-`pull_request.base.sha` in its trusted event payload. Local and test callers
-provide `AGENT_CANON_PR_BASE_REF` explicitly. A base equal to `HEAD`, an
-unresolvable or history-unreachable base, and either failed diff command produce
-a typed selector failure; no fallback base or empty-diff success is inferred.
+`pull_request.base.sha` in its trusted event payload. Before normal selection,
+`check_agent_canon_pr.sh` invokes `--prepare-ci-base`, fetches the exact event SHA
+and connected history even from a depth-one checkout, then supplies the emitted
+SHA as `--trusted-base-sha`. The selector requires that argument to equal the
+event SHA and rejects CI `AGENT_CANON_PR_BASE_REF` overrides. Local and test
+callers provide `AGENT_CANON_PR_BASE_REF` explicitly and cannot use the trusted
+CI argument. A base equal to `HEAD`, an unresolvable or history-unreachable base,
+and failed fetch or diff commands produce a typed selector failure; no fallback
+base or empty-diff success is inferred.
 
 ### One-Judgment-Owner Check Handoff
 

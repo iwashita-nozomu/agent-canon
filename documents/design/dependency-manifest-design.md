@@ -130,10 +130,15 @@ selector itself. Strict graph validation remains the semantic authority after
 selection; the bootstrap read only decides whether that authority is required.
 
 CI comparison uses the pull request base SHA from the trusted GitHub event.
-Local and fixture execution supplies an explicit `AGENT_CANON_PR_BASE_REF`.
-Equal-to-HEAD, unresolved, history-unreachable, or failed diff states are typed
-selector failures. They do not become an empty change set. Unknown profile IDs
-and malformed canonical profile/surface owners fail by the same rule.
+The PR entrypoint first runs the selector's `--prepare-ci-base` mode, fetches that
+exact commit while deepening a shallow checkout to connected history, and passes
+the emitted SHA back through `--trusted-base-sha`. Normal selection accepts the
+argument only when it exactly matches the event SHA; CI
+`AGENT_CANON_PR_BASE_REF` overrides and local trusted-base arguments are typed
+failures. Local and fixture selection supplies an explicit
+`AGENT_CANON_PR_BASE_REF`. Equal-to-HEAD, unresolved, history-unreachable, fetch,
+or diff failures do not become an empty change set. Unknown profile IDs and
+malformed canonical profile/surface owners fail by the same rule.
 
 The receipt's owner/root/PID/status binding and required skipped
 reason/evidence are sufficient for the checker-to-quick-CI handoff. A
