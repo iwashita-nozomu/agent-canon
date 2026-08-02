@@ -10,7 +10,6 @@
 from __future__ import annotations
 
 import argparse
-import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -21,6 +20,7 @@ from container_runtime import (
     build_build_command,
     build_run_command,
     build_shell_invocation,
+    build_workspace_setup_command,
     join_shell_lines,
     load_or_default_pack,
     print_label_and_command,
@@ -64,16 +64,24 @@ def build_parser() -> argparse.ArgumentParser:
         choices=("auto", "docker", "podman"),
         help="Container builder to use. Default: auto",
     )
-    parser.add_argument("--skip-build", action="store_true", help="Skip the build step.")
-    parser.add_argument("--keep-image", action="store_true", help="Keep the built image.")
-    parser.add_argument("--print-only", action="store_true", help="Print commands without executing.")
+    parser.add_argument(
+        "--skip-build", action="store_true", help="Skip the build step."
+    )
+    parser.add_argument(
+        "--keep-image", action="store_true", help="Keep the built image."
+    )
+    parser.add_argument(
+        "--print-only", action="store_true", help="Print commands without executing."
+    )
     parser.add_argument(
         "--skip-env-check",
         action="store_true",
         help="Skip the preflight environment check inside the container.",
     )
     parser.add_argument("--workdir", help="Container workdir override.")
-    parser.add_argument("--shell", help="Shell used for shell-script execution. Default: /bin/bash")
+    parser.add_argument(
+        "--shell", help="Shell used for shell-script execution. Default: /bin/bash"
+    )
     parser.add_argument(
         "--env",
         action="append",
@@ -88,7 +96,9 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="SRC:DST[:MODE]",
         help="Additional bind mount for docker run. Repeatable.",
     )
-    parser.add_argument("program", help="Python file, shell script, workspace binary, or command.")
+    parser.add_argument(
+        "program", help="Python file, shell script, workspace binary, or command."
+    )
     parser.add_argument(
         "program_args",
         nargs=argparse.REMAINDER,
@@ -99,7 +109,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def cleanup_image(builder: str, image_tag: str) -> None:
     """Remove one image quietly."""
-    subprocess.run([builder, "image", "rm", "-f", image_tag], check=False, capture_output=True)
+    subprocess.run(
+        [builder, "image", "rm", "-f", image_tag], check=False, capture_output=True
+    )
 
 
 def normalize_program_args(program_args: list[str]) -> list[str]:
@@ -142,10 +154,16 @@ def resolve_program(
                 rules=rules,
             )
             pack_path = pack_override or (
-                resolved_rule.pack if resolved_rule is not None else "docker/packs/default.toml"
+                resolved_rule.pack
+                if resolved_rule is not None
+                else "docker/packs/default.toml"
             )
-            python_bin = resolved_rule.python_bin if resolved_rule is not None else "python3"
-            workdir = workdir_override or (resolved_rule.workdir if resolved_rule is not None else None)
+            python_bin = (
+                resolved_rule.python_bin if resolved_rule is not None else "python3"
+            )
+            workdir = workdir_override or (
+                resolved_rule.workdir if resolved_rule is not None else None
+            )
             return ProgramResolution(
                 pack_path=pack_path,
                 command=[python_bin, container_program, *normalized_args],
@@ -188,21 +206,6 @@ def build_env_check_command() -> list[str]:
     return build_shell_invocation("/bin/bash", script)
 
 
-def workspace_setup_command(command: list[str], *, container_workspace: str) -> list[str]:
-    """Return a command that runs workspace setup before the requested command."""
-    installer = f"{container_workspace.rstrip('/')}/docker/install_python_dependencies.sh"
-    lines = [
-        "set -euo pipefail",
-        (
-            f"if [ -f {shlex.quote(installer)} ]; then "
-            f"bash {shlex.quote(installer)} {shlex.quote(container_workspace)}; "
-            "fi"
-        ),
-        f"exec {shlex.join(command)}",
-    ]
-    return build_shell_invocation("/bin/bash", join_shell_lines(lines))
-
-
 def main() -> int:
     """Run the CLI."""
     try:
@@ -231,9 +234,11 @@ def main() -> int:
                 builder,
                 pack,
                 workspace_root=workspace_path("."),
-                command=workspace_setup_command(
+                command=build_workspace_setup_command(
                     build_env_check_command(),
+                    shell="/bin/bash",
                     container_workspace=container_workspace,
+                    dependency_profile=pack.runtime.dependency_profile,
                 ),
                 env=tuple(args.env),
                 mounts=tuple(args.mount),
@@ -244,9 +249,11 @@ def main() -> int:
             builder,
             pack,
             workspace_root=workspace_path("."),
-            command=workspace_setup_command(
+            command=build_workspace_setup_command(
                 resolution.command,
+                shell="/bin/bash",
                 container_workspace=container_workspace,
+                dependency_profile=pack.runtime.dependency_profile,
             ),
             env=tuple(args.env),
             mounts=tuple(args.mount),

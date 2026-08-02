@@ -69,6 +69,8 @@ PARENT_ENVIRONMENT_SCRIPT = ".devcontainer/parent-environment.sh"
 PARENT_ENVIRONMENT_MANIFEST = ".devcontainer/parent-environment.toml"
 ENVIRONMENT_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 RUNTIME_SHELL_RE = re.compile(r"/[A-Za-z0-9._/-]+\Z")
+DEPENDENCY_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+DEFAULT_DEPENDENCY_PROFILE = "full"
 
 
 @dataclass(frozen=True)
@@ -98,6 +100,7 @@ class PackConfig:
     workdir: str
     workspace_mount: str
     platform: str | None
+    dependency_profile: str
 
 
 @dataclass(frozen=True)
@@ -250,6 +253,7 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
     workdir = runtime.get("workdir", "/workspace")
     workspace_mount = runtime.get("workspace_mount", "/workspace")
     shell = runtime.get("shell", "/bin/bash")
+    dependency_profile = runtime.get("dependency_profile", DEFAULT_DEPENDENCY_PROFILE)
     if not isinstance(shell, str) or RUNTIME_SHELL_RE.fullmatch(shell) is None:
         findings.append(
             Finding(
@@ -271,6 +275,18 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             )
         )
         workspace_mount = ""
+    if (
+        not isinstance(dependency_profile, str)
+        or DEPENDENCY_PROFILE_RE.fullmatch(dependency_profile) is None
+    ):
+        findings.append(
+            Finding(
+                "invalid_manifest",
+                source,
+                "runtime.dependency_profile-must-be-profile-name",
+            )
+        )
+        dependency_profile = DEFAULT_DEPENDENCY_PROFILE
 
     validate_repo_path(root, source, "dockerfile", dockerfile, findings)
     validate_repo_path(root, source, "context", context, findings)
@@ -288,6 +304,7 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             workdir=workdir,
             workspace_mount=workspace_mount,
             platform=platform,
+            dependency_profile=dependency_profile,
         ),
         [],
     )
@@ -730,6 +747,9 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                 )
             )
     required_environment = {
+        "AGENT_CANON_DEPENDENCY_PROFILE": (
+            pack.dependency_profile if pack is not None else DEFAULT_DEPENDENCY_PROFILE
+        ),
         "AGENT_CANON_WORKSPACE_ROOT": "/workspace",
         "AGENT_CANON_REPOSITORY_ROOT": repo_target,
     }
@@ -1128,7 +1148,8 @@ def render_text(report: ValidationReport) -> None:
             "CONTAINER_CONFIG_PACK="
             f"{pack.name}\tpath={pack.path}\tdockerfile={pack.dockerfile}\t"
             f"context={pack.context}\tworkdir={pack.workdir}\t"
-            f"workspace_mount={pack.workspace_mount}\tplatform={pack.platform}"
+            f"workspace_mount={pack.workspace_mount}\tplatform={pack.platform}\t"
+            f"dependency_profile={pack.dependency_profile}"
         )
     print(
         f"CONTAINER_CONFIG_CHECKED={','.join(report.checked) if report.checked else 'none'}"

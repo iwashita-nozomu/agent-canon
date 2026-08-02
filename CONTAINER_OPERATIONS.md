@@ -126,6 +126,20 @@ workspace Python packages. It runs after the shared dependency plan and before
 AgentCanon build/cache/projection. The parent-owned post-create command remains
 the final lifecycle action.
 
+The repo-local runtime pack owns `runtime.dependency_profile` as a first-class
+field. `full` is the default when the field is omitted. Shared pack smoke,
+repo-container, repo-program, Dockerfile Python, nested Codex, and devcontainer
+entrypoints pass that profile to the same mounted-workspace installer. The
+generated devcontainer environment carries it as
+`AGENT_CANON_DEPENDENCY_PROFILE`; post-create consumes that value and does not
+select a second dependency policy.
+
+The internal installer invocation contract is
+`docker/install_python_dependencies.sh <workspace> --profile <profile>`.
+AgentCanon-tracked runtime consumers always materialize `--profile`; the
+one-argument invocation is not a compatibility interface. This is an internal
+runtime-surface breaking migration, not an external public API transition.
+
 ## Dockerfile Rules
 
 Keep the project `Dockerfile` focused on the project runtime.
@@ -297,7 +311,8 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 Repository Python dependencies are mounted-workspace state, not Docker image
 state.
 
-- Use `docker/install_python_dependencies.sh` after the workspace is mounted.
+- Invoke `docker/install_python_dependencies.sh <workspace> --profile <profile>`
+  after the workspace is mounted.
 - `post-create.sh` may call the repository-local installer when present.
 - Host runtime does not create a repository-local virtual environment.
 - Container runtime may create `.venv` only through the canonical policy tool:
