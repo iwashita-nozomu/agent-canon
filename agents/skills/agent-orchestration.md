@@ -266,10 +266,11 @@ second call order or related-skill list.
 Vendor-first is the default for one nonparallel source stream. It is not a
 prohibition on explicitly requested parallel independent work. A parent may
 select `workspace/<topic-slug>/<module-basename>` fresh clones from latest
-`origin/main` when the remaining DAG contains substantial replaceable
+`origin/main` only when the current vendor checkout is occupied by a different
+active topic or branch and the remaining DAG contains substantial replaceable
 responsibility units with disjoint write scopes, explicit dependency and merge
-order, independent validation routes, and distinct reviewer ownership. The
-typed lifecycle route is
+order, independent validation routes, and distinct reviewer ownership. Parallel
+eligibility alone never triggers clone preparation. The typed lifecycle route is
 `dependency_module_change.py prepare --placement workspace`; its exact topic,
 module, branch, owner evidence, computed clone path, and source identity are
 part of the handoff evidence. Fresh mode always creates the requested branch

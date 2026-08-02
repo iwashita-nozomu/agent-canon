@@ -368,6 +368,23 @@ plan_value() {
 
 emit_agentcanon_conflict_workflow_route() {
   local reason="$1"
+  local current_checkout_block="no"
+
+  case "$reason" in
+    *route=submodule_materialization_collision*|*route=submodule_merge_conflict*|*route=unresolved_submodule_merge_conflict*|*materialization_collision*|*merge_conflict*)
+      current_checkout_block="yes"
+      ;;
+  esac
+
+  if [ "$current_checkout_block" = "yes" ]; then
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=blocked_current_checkout"
+    echo "AGENT_CANON_LATEST_BLOCK_SCOPE=current_checkout"
+    echo "AGENT_CANON_LATEST_BLOCK_REASON=$reason"
+    echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
+    echo "NEXT_ACTION=resolve_agentcanon_materialization_collision_or_merge_conflict_in_current_checkout_then_rerun_latest"
+    return
+  fi
+
   echo "AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_required"
   echo "AGENT_CANON_LATEST_BLOCK_REASON=$reason"
   echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
@@ -963,8 +980,14 @@ cmd_latest() {
   bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
   if [ "$latest_rc" -ne 0 ]; then
     cat "$latest_log"
+    if grep -q '^agent_canon_materialization_collision=yes$' "$latest_log"; then
+      emit_agentcanon_conflict_workflow_route "route=submodule_materialization_collision;ensure_latest_failed=$latest_rc"
+    elif grep -q '^agent_canon_materialization_merge_conflict=yes$' "$latest_log"; then
+      emit_agentcanon_conflict_workflow_route "route=submodule_merge_conflict;ensure_latest_failed=$latest_rc"
+    else
+      emit_agentcanon_conflict_workflow_route "ensure_latest_failed=$latest_rc;route=${route:-unknown}"
+    fi
     rm -f "$latest_log"
-    emit_agentcanon_conflict_workflow_route "ensure_latest_failed=$latest_rc;route=${route:-unknown}"
     return "$latest_rc"
   fi
   cat "$latest_log"
@@ -1136,7 +1159,7 @@ cmd_merge_main_into_current() {
   fi
 
   merge_log="$(mktemp)"
-  if git -C "$AGENT_CANON_DIR" merge --no-edit "$remote_sha" >"$merge_log" 2>&1; then
+  if git -C "$AGENT_CANON_DIR" merge --no-autostash --no-edit "$remote_sha" >"$merge_log" 2>&1; then
     post_head="$(git -C "$AGENT_CANON_DIR" rev-parse HEAD)"
     if git -C "$AGENT_CANON_DIR" merge-base --is-ancestor "$pre_head" "$remote_sha"; then
       result="fast_forwarded"

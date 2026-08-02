@@ -315,7 +315,7 @@ materialize_submodule_remote_branch() {
   fi
 
   merge_log="$(mktemp)"
-  if git -C "$ROOT_DIR/$PREFIX" merge --no-edit "origin/$remote_branch" >"$merge_log" 2>&1; then
+  if git -C "$ROOT_DIR/$PREFIX" merge --no-autostash --no-edit "origin/$remote_branch" >"$merge_log" 2>&1; then
     cat "$merge_log"
     rm -f "$merge_log"
     echo "agent_canon_materialization_result=merged_remote"
