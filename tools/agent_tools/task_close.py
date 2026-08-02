@@ -76,6 +76,27 @@ DOCUMENT_SPLIT_DECISION_PREFIXES = (
 )
 DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
+AGENT_CANON_PARENT_SYNC_RELEVANT_PREFIXES = (
+    "AGENTS.md",
+    "ROOT_AGENTS.md",
+    "README.md",
+    "documents/SHARED_RUNTIME_SURFACES.md",
+    "documents/runtime/SHARED_RUNTIME_SURFACES.md",
+    "documents/runtime/shared-runtime-surfaces.toml",
+    "documents/shared-runtime-surfaces.toml",
+    "documents/runtime/runtime-profiles-and-check-matrix.md",
+    "templates/agents/closeout_gate.md",
+    "templates/documents/github/pull-request/agent_canon.md",
+    "tools/sync_agent_canon.sh",
+    "tools/agent-canon/sync_agent_canon.sh",
+    "tools/agent_tools/update_agent_canon.sh",
+    ".github/AGENTS.md",
+    ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+    ".gitmodules",
+    ".agents/",
+    ".codex/",
+    "agents/",
+)
 
 
 def _resolve_report_root(report_root: str | None, workspace_root: Path) -> Path:
@@ -511,6 +532,53 @@ def changed_markdown_paths(workspace: Path) -> tuple[str, ...]:
                 continue
             paths.add(path)
     return tuple(sorted(paths))
+
+
+def changed_file_paths(workspace: Path) -> tuple[str, ...]:
+    """Return tracked and untracked non-report file paths changed in the checkout."""
+    commands = (
+        ("git", "diff", "--name-only"),
+        ("git", "diff", "--cached", "--name-only"),
+        ("git", "ls-files", "--others", "--exclude-standard"),
+    )
+    paths: set[str] = set()
+    for command in commands:
+        result = subprocess.run(
+            list(command),
+            cwd=workspace,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            continue
+        for line in result.stdout.splitlines():
+            path = line.strip()
+            if not path:
+                continue
+            if path.startswith("reports/") or path.startswith(".agent-canon/log-archive/"):
+                continue
+            paths.add(path)
+    return tuple(sorted(paths))
+
+
+def _path_in_prefix_list(path: str, prefixes: tuple[str, ...]) -> bool:
+    return any(path == prefix or path.startswith(f"{prefix}/") for prefix in prefixes)
+
+
+def agent_canon_parent_sync_gate_required(
+    changed_paths: Sequence[str],
+    *,
+    closeout_agent_canon_status: str | None = None,
+) -> bool:
+    """Return whether this run requires a parent shared-canon root sync gate."""
+    if closeout_agent_canon_status and closeout_agent_canon_status != "pass":
+        return True
+    normalized = {Path(item).as_posix() for item in changed_paths}
+    return any(
+        _path_in_prefix_list(path, AGENT_CANON_PARENT_SYNC_RELEVANT_PREFIXES)
+        for path in normalized
+    )
 
 
 def parse_document_structure_paths(value: str) -> set[str]:
@@ -1088,6 +1156,13 @@ def main() -> int:
     )
     active_diff_ref = current_diff_ref(workspace)
     changed_markdown = changed_markdown_paths(workspace)
+    changed_all = changed_file_paths(workspace)
+    requires_canon_parent_sync = agent_canon_parent_sync_gate_required(
+        changed_all,
+        closeout_agent_canon_status=agent_canon_latest.get(
+            "agent_canon_latest_status", ""
+        ),
+    )
     (
         document_structure_paths_ready,
         document_split_decision_route_ready,
@@ -1156,21 +1231,34 @@ def main() -> int:
             "repo_wide_static_analysis_complete"
         )
         in STATIC_ANALYSIS_COMPLETE_STATUSES,
-        "agent_canon_latest_complete": closeout.get("agent_canon_latest_complete") == "yes",
-        "agent_canon_latest_command": agent_canon_latest.get(
-            "agent_canon_latest_command", ""
-        )
-        not in {"", "missing", "none"},
-        "agent_canon_latest_status": agent_canon_latest.get("agent_canon_latest_status", "")
-        == "pass",
+        "agent_canon_latest_complete": closeout.get("agent_canon_latest_complete") == "yes"
+        if requires_canon_parent_sync
+        else closeout.get("agent_canon_latest_complete") in {"yes", "not_applicable"},
+        "agent_canon_latest_command": (
+            agent_canon_latest.get("agent_canon_latest_command", "")
+            not in {"", "missing", "none"}
+            if requires_canon_parent_sync
+            else True
+        ),
+        "agent_canon_latest_status": (
+            agent_canon_latest.get("agent_canon_latest_status", "") == "pass"
+            if requires_canon_parent_sync
+            else True
+        ),
         "agent_canon_submodule_status": agent_canon_latest.get(
             "agent_canon_submodule_status", ""
         )
-        not in {"", "missing", "none"},
+        not in {"", "missing", "none"}
+        if requires_canon_parent_sync
+        else True,
         "agent_canon_source_head": agent_canon_latest.get("agent_canon_source_head", "")
-        not in {"", "missing", "none"},
+        not in {"", "missing", "none"}
+        if requires_canon_parent_sync
+        else True,
         "agent_canon_parent_pin": agent_canon_latest.get("agent_canon_parent_pin", "")
-        not in {"", "missing", "none"},
+        not in {"", "missing", "none"}
+        if requires_canon_parent_sync
+        else True,
         "mapping_error_sets_empty": (
             closeout.get(
                 "mapping_error_sets_empty",
@@ -1257,7 +1345,7 @@ def main() -> int:
         "mechanical_loop_canon_sync_status": mechanical_loop.get(
             "mechanical_loop_canon_sync_status"
         )
-        in {"complete", "not_applicable"},
+        in ({"complete", "not_applicable"} if requires_canon_parent_sync else {"not_applicable"}),
         "mechanical_loop_follow_up_status": mechanical_loop.get(
             "mechanical_loop_follow_up_status"
         )
