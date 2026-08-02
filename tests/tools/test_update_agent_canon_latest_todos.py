@@ -11,17 +11,15 @@
 
 from __future__ import annotations
 
-import os
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 from tests.tools.test_update_agent_canon import (
-    AGENT_CANON_IS_SUBMODULE,
     SubmoduleUpdateAgentCanonTest,
+    authorized_test_env,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -92,19 +90,16 @@ def test_latest_consumes_g4_g5_receipts_without_rechecking_source(tmp_path: Path
     assert "agent_canon_plan_route=" not in result.stdout
 
 
-@pytest.mark.skipif(
-    not AGENT_CANON_IS_SUBMODULE,
-    reason="submodule wrapper tests only apply when vendor/agent-canon is a submodule",
-)
 def test_latest_reports_pending_update_todos_without_failing(tmp_path: Path) -> None:
     """Pending parent-repo update TODOs route work without failing latest."""
     fixture = SubmoduleUpdateAgentCanonTest(
         methodName="test_ensure_latest_reports_already_current_submodule"
     )
-    bare_repo, _work_dir = fixture.make_agent_canon_remote(tmp_path)
+    bare_repo, source = fixture.make_agent_canon_remote(tmp_path)
     repo = fixture.make_superproject(tmp_path, bare_repo)
+    fixture.materialize_parent_projection_frontier(repo, source)
     todo_tool = repo / "tools" / "agent_tools" / "agent_canon_update_todos.py"
-    todo_tool.parent.mkdir(parents=True)
+    todo_tool.parent.mkdir(parents=True, exist_ok=True)
     todo_tool.write_text(
         "\n".join(
             [
@@ -128,7 +123,7 @@ def test_latest_reports_pending_update_todos_without_failing(tmp_path: Path) -> 
     latest = subprocess.run(
         ["bash", "tools/update_agent_canon.sh", "latest"],
         cwd=repo,
-        env=os.environ.copy(),
+        env=authorized_test_env(),
         check=False,
         capture_output=True,
         text=True,
@@ -140,3 +135,20 @@ def test_latest_reports_pending_update_todos_without_failing(tmp_path: Path) -> 
     assert "AGENT_CANON_LATEST_TOOL_RESULT=updated_with_pending_todos" in latest.stdout
     assert "NEXT_ACTION=apply_agent_canon_update_todos_then_rerun_latest" in latest.stdout
     assert "unexpected acknowledge" not in latest.stdout
+
+    frontier = json.loads(
+        (
+            repo
+            / ".agent-canon"
+            / "update-lifecycle"
+            / "projection-queue"
+            / "frontier.accepted.json"
+        ).read_text(encoding="utf-8")
+    )
+    marker = json.loads(
+        (
+            repo / ".agent-canon" / "update-lifecycle" / "state" / "current-transaction"
+        ).read_text(encoding="utf-8")
+    )
+    assert frontier["frontier_state"] == "accepted"
+    assert marker["frontier_id"] == frontier["frontier_id"]

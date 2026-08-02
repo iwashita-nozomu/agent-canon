@@ -22,7 +22,7 @@ import json
 import re
 import subprocess
 import sys
-from collections.abc import Sequence
+from collections.abc import Iterable, Sequence
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -44,6 +44,10 @@ if __package__:
     from .workspace_scope import resolve_report_root
 else:
     from workspace_scope import resolve_report_root
+if __package__:
+    from . import surface_manifest
+else:
+    from tools.agent_tools import surface_manifest
 from report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
     COMPLETION_COVERAGE_TAXONOMY_REFS,
@@ -76,6 +80,7 @@ DOCUMENT_SPLIT_DECISION_PREFIXES = (
 )
 DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
+AGENT_CANON_PREFIX = "vendor/agent-canon"
 
 
 def _resolve_report_root(report_root: str | None, workspace_root: Path) -> Path:
@@ -511,6 +516,285 @@ def changed_markdown_paths(workspace: Path) -> tuple[str, ...]:
                 continue
             paths.add(path)
     return tuple(sorted(paths))
+
+
+def changed_file_paths(workspace: Path) -> tuple[str, ...]:
+    """Return tracked and untracked non-report file paths changed in the checkout."""
+    commands = (
+        ("git", "diff", "--name-only"),
+        ("git", "diff", "--cached", "--name-only"),
+        ("git", "ls-files", "--others", "--exclude-standard"),
+    )
+    paths: set[str] = set()
+    for command in commands:
+        result = subprocess.run(
+            list(command),
+            cwd=workspace,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            continue
+        for line in result.stdout.splitlines():
+            path = line.strip()
+            if not path:
+                continue
+            if path.startswith("reports/") or path.startswith(".agent-canon/log-archive/"):
+                continue
+            paths.add(path)
+    return tuple(sorted(paths))
+
+
+def _normalize_path(raw_path: str) -> str:
+    """Normalize one path for manifest/closeout comparison."""
+    return Path(raw_path).as_posix()
+
+
+def _path_in_prefix(path: str, prefixes: Iterable[str]) -> bool:
+    for prefix in prefixes:
+        if path == prefix or path.startswith(f"{prefix}/"):
+            return True
+    return False
+
+
+def agent_canon_parent_sync_manifest_prefixes(
+    workspace: Path,
+    prefix: str = AGENT_CANON_PREFIX,
+) -> tuple[str, ...]:
+    """Read current AgentCanon surface manifest and return prefix-triggered sync paths."""
+    entries = ()
+    try:
+        manifest = surface_manifest.load_manifest(
+            workspace,
+            prefix,
+            surface_manifest.DEFAULT_MANIFEST,
+        )
+        entries = manifest.entries
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return tuple()
+    trigger_paths: set[str] = set()
+    for entry in entries:
+        if entry.mode in {"copy", "regular"}:
+            trigger_paths.add(_normalize_path(entry.path))
+            source = entry.source_or_default()
+            if source:
+                trigger_paths.add(_normalize_path(source))
+    return tuple(sorted(trigger_paths))
+
+
+def agent_canon_parent_sync_manifest_exact_paths(
+    workspace: Path,
+    prefix: str = AGENT_CANON_PREFIX,
+) -> tuple[str, ...]:
+    """Read current manifest and return symlink-link parent paths that must be changed exactly."""
+    entries = ()
+    try:
+        manifest = surface_manifest.load_manifest(
+            workspace,
+            prefix,
+            surface_manifest.DEFAULT_MANIFEST,
+        )
+        entries = manifest.entries
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return tuple()
+    exact_paths: set[str] = set()
+    for entry in entries:
+        if entry.mode == "symlink":
+            exact_paths.add(_normalize_path(entry.path))
+    return tuple(sorted(exact_paths))
+
+
+def agent_canon_parent_sync_symlink_source_paths(
+    workspace: Path,
+    prefix: str = AGENT_CANON_PREFIX,
+) -> tuple[str, ...]:
+    """Return symlink source roots from manifest; changes under these do not require link-root."""
+    try:
+        manifest = surface_manifest.load_manifest(
+            workspace,
+            prefix,
+            surface_manifest.DEFAULT_MANIFEST,
+        )
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return tuple()
+    sources: set[str] = set()
+    for entry in manifest.entries:
+        if entry.mode != "symlink":
+            continue
+        source = entry.source_or_default()
+        if source:
+            normalized = _normalize_path(source)
+            sources.add(normalized)
+            source_parent = Path(normalized).as_posix()
+            if source_parent and source_parent != ".":
+                parent = Path(source_parent).parent
+                while parent.as_posix() != ".":
+                    sources.add(parent.as_posix())
+                    parent = parent.parent
+    return tuple(sorted(sources))
+
+
+def _gitlink_commit_resolvable(workspace: Path) -> str | None:
+    """Return commit object for the committed vendor/agent-canon gitlink."""
+    if not (workspace / AGENT_CANON_PREFIX).is_dir():
+        return None
+    result = subprocess.run(
+        ["git", "ls-tree", "HEAD", AGENT_CANON_PREFIX],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return None
+    fields = result.stdout.strip().split()
+    if len(fields) < 3 or fields[0] != "160000" or fields[1] != "commit":
+        return None
+    commit = fields[2]
+    if not commit:
+        return None
+    exists = subprocess.run(
+        ["git", "cat-file", "-e", f"{commit}^{{commit}}"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return commit if exists.returncode == 0 else None
+
+
+def _parse_gitlink_ref_updates(lines: tuple[str, ...]) -> tuple[str | None, str | None]:
+    """Parse `git diff --raw` lines for AgentCanon gitlink target path updates."""
+
+    def _as_hash(raw_hash: str) -> str | None:
+        return None if raw_hash in {"0" * 40, ""} else raw_hash
+
+    for raw in lines:
+        metadata, separator, paths = raw.partition("\t")
+        if not separator:
+            continue
+        fields = metadata.split()
+        if len(fields) < 4:
+            continue
+        if not fields[0].startswith(":"):
+            continue
+        mode_old = fields[0].lstrip(":")
+        mode_new = fields[1]
+        if mode_old != "160000" or mode_new != "160000":
+            continue
+        old_hash = _as_hash(fields[2])
+        new_hash = _as_hash(fields[3])
+        status = fields[4] if len(fields) > 4 else "M"
+
+        path_fields = paths.split("\t")
+        if not path_fields or not path_fields[0]:
+            continue
+        old_path = _normalize_path(path_fields[0])
+        new_path = _normalize_path(path_fields[-1])
+
+        if status.startswith(("R", "C")) and len(path_fields) >= 2:
+            old_path = _normalize_path(path_fields[0])
+            new_path = _normalize_path(path_fields[1])
+        else:
+            new_path = old_path
+
+        if status.startswith("R"):
+            if old_path == AGENT_CANON_PREFIX and new_path != AGENT_CANON_PREFIX:
+                continue
+            if new_path == AGENT_CANON_PREFIX and old_path != AGENT_CANON_PREFIX:
+                return old_hash, new_hash
+            continue
+
+        if new_path == AGENT_CANON_PREFIX:
+            return old_hash, new_hash
+    return None, None
+
+
+def _gitlink_update_candidates(workspace: Path) -> tuple[str | None, str | None]:
+    """Read staged and unstaged gitlink hash transitions for vendor/agent-canon."""
+    outputs: list[str] = []
+    for args in (
+        ("git", "diff", "--raw", "--cached", "HEAD", "--", AGENT_CANON_PREFIX),
+        ("git", "diff", "--raw", "HEAD", "--", AGENT_CANON_PREFIX),
+    ):
+        result = subprocess.run(
+            list(args),
+            cwd=workspace,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            continue
+        outputs.extend(result.stdout.splitlines())
+    return _parse_gitlink_ref_updates(tuple(outputs))
+
+
+def _sync_control_paths(workspace: Path, prefix: str = AGENT_CANON_PREFIX) -> tuple[str, ...]:
+    """Return manifest entries that are explicitly marked as sync-control."""
+    try:
+        manifest = surface_manifest.load_manifest(
+            workspace,
+            prefix,
+            surface_manifest.DEFAULT_MANIFEST,
+        )
+    except (FileNotFoundError, OSError, ValueError, TypeError):
+        return tuple()
+    return tuple(
+        sorted(
+            _normalize_path(entry.path)
+            for entry in manifest.entries
+            if entry.sync_control
+        )
+    )
+
+
+def _gitlink_target_commit_resolvable(workspace: Path) -> str | None:
+    """Return the targeted gitlink commit object only when vendor/agent-canon is changed."""
+    old_hash, new_hash = _gitlink_update_candidates(workspace)
+    if new_hash is None:
+        return None
+    result = subprocess.run(
+        ["git", "cat-file", "-e", f"{new_hash}^{{commit}}"],
+        cwd=workspace,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return new_hash if result.returncode == 0 else None
+
+
+def _sync_gate_manifest_prefixes(workspace: Path) -> tuple[str, ...]:
+    """Return copy/regular materialization prefixes."""
+    return agent_canon_parent_sync_manifest_prefixes(workspace)
+
+
+def agent_canon_parent_sync_gate_required(
+    changed_paths: Sequence[str],
+    *,
+    workspace: Path | None = None,
+) -> bool:
+    """Return whether this run requires a parent shared-canon root sync gate."""
+    resolved_workspace = workspace or Path.cwd()
+    normalized = {_normalize_path(item) for item in changed_paths}
+    sync_targets = set(_sync_gate_manifest_prefixes(resolved_workspace))
+    sync_control_targets = set(_sync_control_paths(resolved_workspace))
+    exact_root_symlink_paths = set(agent_canon_parent_sync_manifest_exact_paths(resolved_workspace))
+    symlink_sources = set(
+        agent_canon_parent_sync_symlink_source_paths(resolved_workspace)
+    )
+
+    for path in normalized:
+        if path in sync_control_targets:
+            return True
+        if path in exact_root_symlink_paths:
+            return True
+        if _path_in_prefix(path, symlink_sources):
+            continue
+        if _path_in_prefix(path, sync_targets):
+            return True
+    return False
 
 
 def parse_document_structure_paths(value: str) -> set[str]:
@@ -1088,6 +1372,14 @@ def main() -> int:
     )
     active_diff_ref = current_diff_ref(workspace)
     changed_markdown = changed_markdown_paths(workspace)
+    changed_all = changed_file_paths(workspace)
+    requires_canon_parent_sync = agent_canon_parent_sync_gate_required(
+        changed_all,
+        workspace=workspace,
+    )
+    parent_gitlink_commit = _gitlink_target_commit_resolvable(workspace)
+    _, changed_gitlink_target = _gitlink_update_candidates(workspace)
+    requires_parent_gitlink_integrity = changed_gitlink_target is not None
     (
         document_structure_paths_ready,
         document_split_decision_route_ready,
@@ -1156,21 +1448,37 @@ def main() -> int:
             "repo_wide_static_analysis_complete"
         )
         in STATIC_ANALYSIS_COMPLETE_STATUSES,
-        "agent_canon_latest_complete": closeout.get("agent_canon_latest_complete") == "yes",
-        "agent_canon_latest_command": agent_canon_latest.get(
-            "agent_canon_latest_command", ""
-        )
-        not in {"", "missing", "none"},
-        "agent_canon_latest_status": agent_canon_latest.get("agent_canon_latest_status", "")
-        == "pass",
+        "agent_canon_latest_complete": closeout.get("agent_canon_latest_complete") == "yes"
+        if requires_canon_parent_sync
+        else closeout.get("agent_canon_latest_complete") in {"yes", "not_applicable"},
+        "agent_canon_latest_command": (
+            agent_canon_latest.get("agent_canon_latest_command", "")
+            not in {"", "missing", "none"}
+            if requires_canon_parent_sync
+            else True
+        ),
+        "agent_canon_latest_status": (
+            agent_canon_latest.get("agent_canon_latest_status", "") == "pass"
+            if requires_canon_parent_sync
+            else True
+        ),
         "agent_canon_submodule_status": agent_canon_latest.get(
             "agent_canon_submodule_status", ""
         )
-        not in {"", "missing", "none"},
+        not in {"", "missing", "none"}
+        if requires_canon_parent_sync
+        else True,
         "agent_canon_source_head": agent_canon_latest.get("agent_canon_source_head", "")
-        not in {"", "missing", "none"},
+        not in {"", "missing", "none"}
+        if requires_canon_parent_sync
+        else True,
         "agent_canon_parent_pin": agent_canon_latest.get("agent_canon_parent_pin", "")
-        not in {"", "missing", "none"},
+        not in {"", "missing", "none"}
+        if requires_canon_parent_sync
+        else True,
+        "agent_canon_parent_gitlink_commit": (
+            parent_gitlink_commit is not None if requires_parent_gitlink_integrity else True
+        ),
         "mapping_error_sets_empty": (
             closeout.get(
                 "mapping_error_sets_empty",
@@ -1257,7 +1565,7 @@ def main() -> int:
         "mechanical_loop_canon_sync_status": mechanical_loop.get(
             "mechanical_loop_canon_sync_status"
         )
-        in {"complete", "not_applicable"},
+        in ({"complete", "not_applicable"} if requires_canon_parent_sync else {"not_applicable"}),
         "mechanical_loop_follow_up_status": mechanical_loop.get(
             "mechanical_loop_follow_up_status"
         )

@@ -8,8 +8,8 @@
 
 from __future__ import annotations
 
-import os
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -91,6 +91,7 @@ from update_lifecycle_contract import (  # noqa: E402
     pull_request_branch_table,
     validate_dependency_frontier_transition,
 )
+
 OVERLAY_EXCLUDED_NAMES = {".git", ".pytest_cache", ".ruff_cache", "reports"}
 SUBMODULE_GITFILE = Path("vendor") / "agent-canon" / ".git"
 COMMIT_REQUEST_EVIDENCE = "evidence:" + ("0" * 64)
@@ -2334,7 +2335,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
     def test_latest_check_reports_clean_submodule_worktree_at_remote_with_stale_parent_pin(
         self,
     ) -> None:
-        """Latest gate should report a stale parent gitlink without mutating the index."""
+        """A stale parent gitlink is a hard blocker unless update is applied."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, work_dir = self.make_agent_canon_remote(root)
@@ -2361,22 +2362,9 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             )
 
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("AGENT_CANON_LATEST=pass", result.stdout)
-            self.assertIn("AGENT_CANON_LATEST_ROUTE=submodule_update", result.stdout)
-            self.assertIn(
-                "AGENT_CANON_LATEST_SUBMODULE_WORKTREE_REMOTE_MATCH=yes",
-                result.stdout,
-            )
-            self.assertIn("AGENT_CANON_LATEST_PARENT_PIN_PENDING=yes", result.stdout)
-            self.assertIn(
-                "AGENT_CANON_LATEST_AUTO_REPAIR=skipped_read_only_check",
-                result.stdout,
-            )
-            self.assertIn(
-                "AGENT_CANON_LATEST_NEXT_ACTION=run_make_agent-canon-ensure-latest_then_commit_updated_submodule_pin",
-                result.stdout,
-            )
+            self.assertNotEqual(result.returncode, 0, result.stderr)
+            self.assertIn("AGENT_CANON_LATEST=fail", result.stdout)
+            self.assertIn("AGENT_CANON_LATEST_REASON=submodule-gitlink-worktree-mismatch", result.stdout)
             staged = subprocess.run(
                 ["git", "diff", "--cached", "--name-only", "--", "vendor/agent-canon"],
                 cwd=repo,
@@ -2386,8 +2374,8 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             )
             self.assertEqual(staged.stdout.strip(), "")
 
-    def test_latest_check_fails_local_ahead_submodule_pin_as_pr_required(self) -> None:
-        """A parent pin ahead of shared canon main is AgentCanon PR work, not latest."""
+    def test_latest_check_accepts_non_main_reachable_submodule_pin(self) -> None:
+        """A clean reachable non-main branch pin can remain PR work and still pass latest CI."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
@@ -2414,6 +2402,16 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 cwd=submodule,
                 check=True,
             )
+            subprocess.run(
+                [
+                    "git",
+                    "push",
+                    "origin",
+                    "HEAD:refs/heads/agent-canon-local-ahead",
+                ],
+                cwd=submodule,
+                check=True,
+            )
             subprocess.run(["git", "add", "vendor/agent-canon"], cwd=repo, check=True)
             subprocess.run(["git", "commit", "-m", "pin local proposal"], cwd=repo, check=True)
 
@@ -2425,14 +2423,110 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             )
 
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("AGENT_CANON_LATEST=pass", result.stdout)
+            self.assertRegex(result.stdout, r"AGENT_CANON_LATEST_ROUTE=(local_contains_remote|deferred_branch_pr)")
+
+    def test_latest_check_fails_when_parent_pin_worktree_mismatch(self) -> None:
+        """A submodule pin mismatch is an actionable blocker until ensure-latest is run."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            (repo / "tools" / "ci").mkdir()
+            shutil.copy2(
+                AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh",
+                repo / "tools" / "ci" / "check_agent_canon_latest.sh",
+            )
+            submodule = repo / "vendor" / "agent-canon"
+            (submodule / "proposal-marker.txt").write_text("proposal\n", encoding="utf-8")
+            subprocess.run(["git", "add", "proposal-marker.txt"], cwd=submodule, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Submodule Test",
+                    "-c",
+                    "user.email=submodule-test@example.invalid",
+                    "commit",
+                    "-m",
+                    "proposal marker",
+                ],
+                cwd=submodule,
+                check=True,
+            )
+            original_parent_pin = subprocess.run(
+                ["git", "rev-parse", "HEAD:vendor/agent-canon"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            subprocess.run(["git", "add", "vendor/agent-canon"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "pin-stale"], cwd=repo, check=True)
+            # Leave the submodule one commit ahead, so gitlink no longer matches.
+            subprocess.run(["git", "switch", "-"], cwd=submodule, check=True)
+            subprocess.run(["git", "checkout", original_parent_pin[:7]], cwd=submodule, check=True)
+
+            result = subprocess.run(
+                ["bash", "tools/ci/check_agent_canon_latest.sh"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("AGENT_CANON_LATEST=fail", result.stdout)
-            self.assertIn("AGENT_CANON_LATEST_ROUTE=local_contains_remote", result.stdout)
+            self.assertIn("AGENT_CANON_LATEST_REASON=submodule-gitlink-worktree-mismatch", result.stdout)
+            self.assertIn("AGENT_CANON_LATEST_NEXT_ACTION=run_make_agent-canon-ensure-latest_then_commit_updated_submodule_pin_with_request_evidence", result.stdout)
+
+    def test_latest_check_fails_when_pinned_commit_unreachable_from_configured_remote(self) -> None:
+        """A reachable local pin is required for ordinary latest CI; unreachable pins block CI."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            (repo / "tools" / "ci").mkdir()
+            shutil.copy2(
+                AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh",
+                repo / "tools" / "ci" / "check_agent_canon_latest.sh",
+            )
+            submodule = repo / "vendor" / "agent-canon"
+            (submodule / "pinless-marker.txt").write_text("proposed\n", encoding="utf-8")
+            subprocess.run(["git", "add", "pinless-marker.txt"], cwd=submodule, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Submodule Test",
+                    "-c",
+                    "user.email=submodule-test@example.invalid",
+                    "commit",
+                    "-m",
+                    "pinless marker",
+                ],
+                cwd=submodule,
+                check=True,
+            )
+            subprocess.run(["git", "add", "vendor/agent-canon"], cwd=repo, check=True)
+            subprocess.run(["git", "commit", "-m", "pin to unpushed commit"], cwd=repo, check=True)
+
+            result = subprocess.run(
+                ["bash", "tools/ci/check_agent_canon_latest.sh"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("AGENT_CANON_LATEST=fail", result.stdout)
             self.assertIn(
-                "AGENT_CANON_LATEST_MERGE_COMMAND=bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty",
+                "AGENT_CANON_LATEST_REASON=submodule-pinned-commit-unreachable-from-configured-remote",
                 result.stdout,
             )
-            self.assertIn("AgentCanon branch and PR", result.stderr)
+            self.assertIn("AGENT_CANON_LATEST_NEXT_ACTION=run_make_agent-canon-ensure-latest_then_commit_updated_submodule_pin_with_request_evidence", result.stdout)
 
     def test_latest_defers_clean_pushed_agentcanon_branch_pin(self) -> None:
         """A clean pushed AgentCanon branch head is deferred to the AgentCanon PR."""
@@ -2560,7 +2654,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertIn("AGENT_CANON_LATEST_ROUTE=deferred_branch_pr", latest_check.stdout)
 
     def test_latest_defers_clean_pushed_agentcanon_branch_when_parent_pin_is_stale(self) -> None:
-        """A clean pushed AgentCanon branch checkout should not block on a stale parent gitlink."""
+        """A deferred AgentCanon branch context still fails when parent gitlink is stale."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
@@ -2678,9 +2772,12 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertNotIn("local_submodule_worktree_differs_from_parent_pin", ensure_latest.stdout)
             self.assertEqual(latest.returncode, 0, latest.stdout + latest.stderr)
             self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=deferred_branch_pr", latest.stdout)
-            self.assertEqual(latest_check.returncode, 0, latest_check.stdout + latest_check.stderr)
-            self.assertIn("AGENT_CANON_LATEST=pass", latest_check.stdout)
-            self.assertIn("AGENT_CANON_LATEST_ROUTE=deferred_branch_pr", latest_check.stdout)
+            self.assertNotEqual(latest_check.returncode, 0)
+            self.assertIn("AGENT_CANON_LATEST=fail", latest_check.stdout)
+            self.assertIn(
+                "AGENT_CANON_LATEST_REASON=submodule-gitlink-worktree-mismatch",
+                latest_check.stdout,
+            )
 
     def test_apply_updates_submodule_pin_with_untracked_root_file(self) -> None:
         """Apply should update the gitlink without requiring unrelated root cleanup."""

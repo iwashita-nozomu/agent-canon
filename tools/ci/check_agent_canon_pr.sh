@@ -129,14 +129,98 @@ agentcanon_pr_branch_pending() {
     return 1
   fi
   if [[ "${submodule_head}" != "${parent_pin}" ]]; then
+    return 1
+  fi
+
+  remote_main="$(git ls-remote --exit-code "${REMOTE_URL}" refs/heads/main 2>/dev/null | awk '{print $1}')"
+  if [[ -z "${remote_main}" ]]; then
+    return 1
+  fi
+  [[ "${parent_pin}" != "${remote_main}" ]]
+}
+
+agentcanon_pr_submodule_remote_reachable() {
+  local remote_url="$1"
+  local pin_ref="$2"
+  if [[ -z "${remote_url}" || -z "${pin_ref}" ]]; then
+    return 1
+  fi
+  if ! git -C vendor/agent-canon cat-file -e "${pin_ref}^{commit}" >/dev/null 2>&1; then
+    git -C vendor/agent-canon fetch --no-write-fetch-head "${remote_url}" "${pin_ref}" >/dev/null 2>&1 || return 1
+  fi
+  git -C vendor/agent-canon cat-file -e "${pin_ref}^{commit}" >/dev/null 2>&1
+}
+
+agentcanon_pr_branch_integrity() {
+  local submodule_head=""
+  local parent_pin=""
+  local remote_url="${REMOTE_URL}"
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
     return 0
   fi
-  git -C vendor/agent-canon fetch origin main >/dev/null 2>&1 || true
-  remote_main="$(git -C vendor/agent-canon rev-parse origin/main 2>/dev/null || true)"
-  if [[ -z "${remote_main}" || "${parent_pin}" != "${remote_main}" ]]; then
+  submodule_head="$(git -C vendor/agent-canon rev-parse HEAD 2>/dev/null || true)"
+  parent_pin="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
+  if [[ -z "${submodule_head}" || -z "${parent_pin}" ]]; then
+    echo "AGENT_CANON_PR_LATEST_GATE=blocked_agentcanon_submodule_state"
+    echo "AGENT_CANON_PR_LATEST_NEXT=repair_submodule_state_and_rerun_agent-canon-pr-check"
+    return 3
+  fi
+  if [[ "${submodule_head}" != "${parent_pin}" ]]; then
+    echo "AGENT_CANON_PR_LATEST_GATE=blocked_submodule_gitlink_mismatch"
+    echo "AGENT_CANON_PR_LATEST_REASON=submodule-gitlink-worktree-mismatch"
+    echo "AGENT_CANON_PR_LATEST_NEXT=run_make_agent-canon-ensure-latest_then_commit_updated_submodule_pin_with_request_evidence"
+    return 4
+  fi
+  if ! agentcanon_pr_submodule_remote_reachable "${remote_url}" "${parent_pin}"; then
+    echo "AGENT_CANON_PR_LATEST_GATE=blocked_submodule_pin_unreachable"
+    echo "AGENT_CANON_PR_LATEST_REASON=submodule-pinned-commit-unreachable-from-configured-remote"
+    echo "AGENT_CANON_PR_LATEST_NEXT=run_agent_canon_update_or_update_agent-canon-remote_reference"
+    return 5
+  fi
+  return 0
+}
+
+agentcanon_pr_update_precondition() {
+  local submodule_head=""
+  local parent_pin=""
+  local remote_url="${REMOTE_URL}"
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
     return 0
   fi
-  return 1
+  if [[ -n "${REMOTE_URL:-}" && -n "${REMOTE_URL#<unset>}" ]] && agentcanon_pr_branch_dirty; then
+    echo "AGENT_CANON_PR_UPDATE_GATE=blocked_dirty_agentcanon_branch"
+    echo "AGENT_CANON_PR_UPDATE_NEXT=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_agent-canon-pr-check"
+    return 2
+  fi
+  submodule_head="$(git -C vendor/agent-canon rev-parse HEAD 2>/dev/null || true)"
+  parent_pin="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
+  if [[ -z "${submodule_head}" || -z "${parent_pin}" ]]; then
+    echo "AGENT_CANON_PR_UPDATE_GATE=blocked_agentcanon_submodule_state"
+    echo "AGENT_CANON_PR_UPDATE_NEXT=repair_submodule_state_and_rerun_agent-canon-pr-check"
+    return 3
+  fi
+  if [[ "${submodule_head}" != "${parent_pin}" ]]; then
+    echo "AGENT_CANON_PR_UPDATE_GATE=blocked_submodule_gitlink_mismatch"
+    echo "AGENT_CANON_PR_UPDATE_REASON=submodule-gitlink-worktree-mismatch"
+    echo "AGENT_CANON_PR_UPDATE_NEXT=run_make_agent-canon-ensure-latest_then_commit_updated_submodule_pin_with_request_evidence"
+    return 4
+  fi
+  if ! agentcanon_pr_submodule_remote_reachable "${remote_url}" "${parent_pin}"; then
+    echo "AGENT_CANON_PR_UPDATE_GATE=blocked_submodule_pin_unreachable"
+    echo "AGENT_CANON_PR_UPDATE_REASON=submodule-pinned-commit-unreachable-from-configured-remote"
+    echo "AGENT_CANON_PR_UPDATE_NEXT=run_agent_canon_update_or_update_agent-canon-remote_reference"
+    return 5
+  fi
+  return 0
+}
+
+run_pr_integrity_check() {
+  local rc=0
+  set +e
+  agentcanon_pr_branch_integrity
+  rc=$?
+  set -e
+  return $rc
 }
 
 run_pr_agent_checks() {
@@ -144,10 +228,17 @@ run_pr_agent_checks() {
     run_standalone_static_gate_ci
     return
   fi
-  if agentcanon_pr_branch_dirty; then
-    echo "AGENT_CANON_PR_LATEST_GATE=blocked_dirty_agentcanon_branch"
-    echo "AGENT_CANON_PR_LATEST_NEXT=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_agent-canon-pr-check"
+  local integrity_rc=0
+  run_pr_integrity_check
+  integrity_rc=$?
+  if [[ "$integrity_rc" -ne 0 ]]; then
+    echo "AGENT_CANON_PR_LATEST_GATE=${AGENT_CANON_PR_LATEST_GATE:-blocked_submodule_integrity}"
+    echo "AGENT_CANON_PR_LATEST_NEXT=${AGENT_CANON_PR_LATEST_NEXT:-repair_submodule_state_and_rerun_agent-canon-pr-check}"
     return 1
+  fi
+  if agentcanon_pr_branch_dirty; then
+    echo "AGENT_CANON_PR_LATEST_DIRTY_AGENTCANON_WORKTREE=yes"
+    echo "AGENT_CANON_PR_LATEST_NEXT=run_make_agent-canon-ensure-latest_with_dirty_worktree_preserved"
   fi
   if agentcanon_pr_branch_pending; then
     echo "AGENT_CANON_PR_LATEST_GATE=deferred_branch_pr"
@@ -168,21 +259,43 @@ run_pr_quick_ci() {
     echo "AGENT_CANON_PR_QUICK_CI=consumed_standalone_static_gate_receipt"
     return
   fi
-  if agentcanon_pr_branch_dirty; then
-    echo "AGENT_CANON_PR_CI_LATEST_GATE=blocked_dirty_agentcanon_branch"
-    echo "AGENT_CANON_PR_CI_NEXT=commit_agentcanon_artifacts_or_explicitly_stash_non_artifact_changes_then_rerun_agent-canon-pr-check"
+  local integrity_rc=0
+  local quick_ci_rc=0
+  local latest_ci_gate="pass"
+  local latest_ci_next="run_all_checks"
+  AGENT_CANON_PR_LATEST_GATE=""
+  AGENT_CANON_PR_LATEST_NEXT=""
+  run_pr_integrity_check
+  integrity_rc=$?
+  if [[ "$integrity_rc" -ne 0 ]]; then
+    echo "AGENT_CANON_PR_CI_LATEST_GATE=${AGENT_CANON_PR_LATEST_GATE:-blocked_submodule_integrity}"
+    echo "AGENT_CANON_PR_CI_LATEST_NEXT=${AGENT_CANON_PR_LATEST_NEXT:-repair_submodule_integrity_and_rerun_agent-canon-pr-check}"
     return 1
   fi
   if agentcanon_pr_branch_pending; then
-    echo "AGENT_CANON_PR_CI_LATEST_GATE=deferred_branch_pr"
+    latest_ci_gate="deferred_branch_pr"
+    latest_ci_next="run_all_checks_or_merge_agent-canon-PR"
     echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
+    set +e
     AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
       bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
-    return
+    quick_ci_rc=$?
+    set -e
+    echo "AGENT_CANON_PR_CI_LATEST_GATE=${latest_ci_gate}"
+    echo "AGENT_CANON_PR_CI_LATEST_NEXT=${latest_ci_next}"
+    echo "AGENT_CANON_PR_CI_EXIT=${quick_ci_rc}"
+    return "$quick_ci_rc"
   fi
   echo "AGENT_CANON_PR_CI_COMMAND=bash tools/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
+  set +e
   AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
     bash tools/ci/run_all_checks.sh "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
+  quick_ci_rc=$?
+  set -e
+  echo "AGENT_CANON_PR_CI_LATEST_GATE=${latest_ci_gate}"
+  echo "AGENT_CANON_PR_CI_LATEST_NEXT=${latest_ci_next}"
+  echo "AGENT_CANON_PR_CI_EXIT=${quick_ci_rc}"
+  return "$quick_ci_rc"
 }
 
 write_pr_gate_receipt() {

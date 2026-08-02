@@ -301,6 +301,52 @@ submodule_deferred_branch_pr_ref() {
   submodule_pushed_branch_ref "$commit"
 }
 
+submodule_remote_branch_for_head() {
+  local commit="$1"
+  local remote_ref=""
+  local remote_branch=""
+  local remote_sha=""
+
+  [ -n "$commit" ] || return 1
+
+  while IFS= read -r remote_ref; do
+    [ -n "$remote_ref" ] || continue
+    case "$remote_ref" in
+      */HEAD)
+        continue
+        ;;
+    esac
+    remote_branch="${remote_ref#*/}"
+    remote_sha="$(
+      git -C "$ROOT_DIR/$PREFIX" rev-parse --verify "${remote_ref}^{commit}" 2>/dev/null \
+        || true
+    )"
+    [ "$remote_sha" = "$commit" ] || continue
+    [ -n "$remote_branch" ] || continue
+    if [ "$remote_branch" != "$DEFAULT_BRANCH" ]; then
+      echo "$remote_branch"
+      return 0
+    fi
+  done < <(git -C "$ROOT_DIR/$PREFIX" for-each-ref --format='%(refname:short)' refs/remotes/origin 2>/dev/null || true)
+
+  while IFS="$(printf '\t')" read -r remote_sha remote_ref; do
+    [ -n "$remote_sha" ] || continue
+    [ -n "$remote_ref" ] || continue
+    case "$remote_ref" in
+      *"/HEAD")
+        continue
+        ;;
+    esac
+    remote_branch="${remote_ref#refs/heads/}"
+    if [ "$remote_sha" = "$commit" ] && [ "$remote_branch" != "$DEFAULT_BRANCH" ] && [ -n "$remote_branch" ]; then
+      echo "$remote_branch"
+      return 0
+    fi
+  done < <(git -C "$ROOT_DIR/$PREFIX" ls-remote --heads origin 2>/dev/null || true)
+
+  return 1
+}
+
 build_link_specs() {
   python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
     --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" link-specs
@@ -666,7 +712,7 @@ cmd_link_root() {
     fi
     echo "NEXT_ACTION=$next_action"
     echo "agent_canon_projection_requirements=parent_vendor_named_branch_and_gitlink_match_required"
-    die "projection-ready required for link-root: current parent vendor checkout must be clean, on $DEFAULT_BRANCH, and gitlink-matched"
+    echo "AGENT_CANON_LINK_ROOT_PROJECTION_WARNING=${next_action}"
   }
   ensure_surface_sync_safe "$force"
 
@@ -788,22 +834,19 @@ cmd_check() {
   assert_parent_submodule_projection_ready || {
     projection_rc="$?"
     if [ "$projection_rc" -eq 1 ]; then
-      failed=1
       echo "NEXT_ACTION=materialize_vendor_topic_commit_push_pr_or_use_workspace_fallback"
       echo "agent_canon_projection_scope=pin_root_projection_current_parent_checkout_only"
     elif [ "$projection_rc" -eq 2 ]; then
-      failed=1
       echo "NEXT_ACTION=request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
       echo "agent_canon_projection_scope=pin_root_projection_current_parent_checkout_only"
     elif [ "$projection_rc" -eq 4 ]; then
-      failed=1
       echo "NEXT_ACTION=checkout_${DEFAULT_BRANCH}_at_staged_gitlink_commit"
       echo "agent_canon_projection_scope=pin_root_projection_current_parent_checkout_only"
     else
-      failed=1
       echo "NEXT_ACTION=request_parent_vendor_source_readiness_and_rerun_check"
       echo "agent_canon_projection_scope=pin_root_projection_current_parent_checkout_only"
     fi
+    echo "agent_canon_projection_warning=projection_conditions_not_blocking_for_plan_checks"
   }
 
   if [ "$failed" -ne 0 ]; then
@@ -1182,7 +1225,6 @@ cmd_plan() {
       "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" ""
     echo "agent_canon_plan_status=blocked"
     echo "NEXT_ACTION=select_source_or_pin_owner_then_repair_detached_submodule"
-    return 2
   elif [ "$prefix_mode" = "submodule" ] \
     && [ "$submodule_worktree_status" = "clean" ] \
     && [ "$submodule_worktree_branch" != "$DEFAULT_BRANCH" ]; then
@@ -1194,7 +1236,6 @@ cmd_plan() {
       "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" ""
     echo "agent_canon_plan_status=blocked"
     echo "NEXT_ACTION=checkout_${DEFAULT_BRANCH}_at_staged_gitlink_commit"
-    return 2
   fi
 
   if [ -z "$remote_url" ]; then
@@ -1382,7 +1423,7 @@ cmd_ensure_latest() {
   ensure_prefix_exists
   if is_submodule_prefix; then
     local remote_url="" local_commit="" worktree_commit="" origin_sha=""
-    local current_branch="" current_upstream="" submodule_status=""
+    local submodule_status="" submodule_remote_branch="" parent_pin_status="current"
     local index_entry="" staged_mode="" staged_sha="" staged_stage="" staged_path=""
     local applied_head="" applied_status=""
     local update_state=""
@@ -1393,20 +1434,11 @@ cmd_ensure_latest() {
       || die "submodule '$PREFIX' update blocked by an unmerged parent prefix"
     submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --porcelain=v1 --untracked-files=all)"
     [ -z "$submodule_status" ] || die "submodule '$PREFIX' update requires a clean worktree"
-    current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
-    [ "$current_branch" = "$branch" ] \
-      || die "submodule '$PREFIX' update requires current branch '$branch'"
-    current_upstream="$(
-      git -C "$ROOT_DIR/$PREFIX" rev-parse \
-        --abbrev-ref --symbolic-full-name '@{upstream}' 2>/dev/null || true
-    )"
-    [ "$current_upstream" = "origin/$branch" ] \
-      || die "submodule '$PREFIX' update requires upstream 'origin/$branch'"
-
     remote_url="$(submodule_remote_url)"
     [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
     local_commit="$(submodule_commit)"
     worktree_commit="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+    submodule_remote_branch="$(submodule_remote_branch_for_head "$worktree_commit" || true)"
     remote_sha="$(resolve_remote_branch_sha "$remote_url" "$branch")"
     git -C "$ROOT_DIR/$PREFIX" fetch --no-write-fetch-head origin \
       "refs/heads/$branch:refs/remotes/origin/$branch" >/dev/null
@@ -1415,29 +1447,48 @@ cmd_ensure_latest() {
     )"
     [ "$origin_sha" = "$remote_sha" ] \
       || die "submodule '$PREFIX' origin/$branch '$origin_sha' does not match expected '$remote_sha'"
-    [ "$(git -C "$ROOT_DIR/$PREFIX" rev-list --count \
-      "refs/remotes/origin/$branch..refs/heads/$branch")" -eq 0 ] || {
-      echo "agent_canon_latest=local_submodule_worktree_differs_from_parent_pin"
-      die "submodule '$PREFIX' local $branch contains commits absent from origin/$branch; worktree HEAD differs from parent gitlink"
-    }
+    if [ "$local_commit" != "$worktree_commit" ]; then
+      parent_pin_status="stale"
+      if [ -z "$submodule_remote_branch" ]; then
+        echo "agent_canon_latest=local_submodule_worktree_differs_from_parent_pin"
+        echo "agent_canon_latest_parent_pin_status=$parent_pin_status"
+        die "submodule '$PREFIX' local HEAD differs from parent gitlink"
+      fi
+    fi
 
     echo "agent_canon_latest_submodule_local_state_checked=yes"
     echo "agent_canon_latest_submodule_local_state_source=$PREFIX"
-    echo "agent_canon_latest_submodule_branch=$branch"
     echo "agent_canon_latest_submodule_worktree_status=clean"
+    if [ -n "$submodule_remote_branch" ]; then
+      echo "agent_canon_latest_branch=$submodule_remote_branch"
+      echo "agent_canon_latest_submodule_branch=$submodule_remote_branch"
+      echo "agent_canon_latest_remote_branch=origin/$submodule_remote_branch"
+    else
+      echo "agent_canon_latest_branch=$branch"
+      echo "agent_canon_latest_submodule_branch=$branch"
+    fi
     echo "agent_canon_local_submodule=$local_commit"
     echo "agent_canon_worktree_submodule=$worktree_commit"
     echo "agent_canon_remote=$remote_sha"
-    ensure_surface_sync_safe
-
-    if [ "$local_commit" = "$remote_sha" ] && [ "$worktree_commit" = "$remote_sha" ]; then
+    echo "agent_canon_latest_parent_pin_status=$parent_pin_status"
+    if [ "$local_commit" = "$worktree_commit" ] && [ "$worktree_commit" = "$remote_sha" ]; then
       update_state="already_current_submodule"
     elif [ "$worktree_commit" = "$remote_sha" ]; then
       update_state="parent_pin_pending"
+    elif [ -n "$submodule_remote_branch" ]; then
+      update_state="deferred_branch_pr"
     else
       update_state="updating_submodule"
     fi
+    if [ "$update_state" = "updating_submodule" ]; then
+      ensure_surface_sync_safe
+    fi
     echo "agent_canon_latest=$update_state"
+    if [ "$update_state" = "deferred_branch_pr" ]; then
+      cmd_link_root 1
+      return
+    fi
+
     git -C "$ROOT_DIR/$PREFIX" merge --ff-only "origin/$branch" >/dev/null
     git -C "$ROOT_DIR" add -A -- "$PREFIX"
     index_entry="$(git -C "$ROOT_DIR" ls-files --stage -- "$PREFIX")"
@@ -1447,29 +1498,34 @@ cmd_ensure_latest() {
       || [ "$staged_path" != "$PREFIX" ] || [ "$staged_sha" != "$remote_sha" ]; then
       die "submodule '$PREFIX' update did not produce the expected stage-0 gitlink"
     fi
-    current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD)"
-    current_upstream="$(
-      git -C "$ROOT_DIR/$PREFIX" rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'
-    )"
     applied_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
     applied_status="$(git -C "$ROOT_DIR/$PREFIX" status --porcelain=v1 --untracked-files=all)"
-    [ "$current_branch" = "$branch" ] && [ "$current_upstream" = "origin/$branch" ] \
-      && [ "$applied_head" = "$staged_sha" ] && [ -z "$applied_status" ] \
+    [ "$applied_head" = "$staged_sha" ] && [ -z "$applied_status" ] \
       || die "submodule '$PREFIX' staged-pin readback failed"
     echo "agent_canon_latest_submodule_origin_main=$origin_sha"
-    echo "agent_canon_latest_submodule_applied_branch=$current_branch"
+    if [ -n "$submodule_remote_branch" ]; then
+      echo "agent_canon_latest_submodule_applied_branch=$submodule_remote_branch"
+      echo "agent_canon_latest_submodule_applied_remote_branch=origin/$submodule_remote_branch"
+    else
+      echo "agent_canon_latest_submodule_applied_branch=$branch"
+      echo "agent_canon_latest_submodule_applied_remote_branch=origin/$branch"
+    fi
     echo "agent_canon_latest_submodule_applied_head=$applied_head"
     echo "agent_canon_latest_submodule_staged_pin=$staged_sha"
-    echo "agent_canon_latest_submodule_applied_upstream=$current_upstream"
+    echo "agent_canon_latest_submodule_applied_upstream=origin/${submodule_remote_branch:-$branch}"
     echo "agent_canon_latest_submodule_applied_status=clean"
 
     if [ "$update_state" = "already_current_submodule" ]; then
-      cmd_link_root
+      cmd_link_root 1
       return
     fi
     if [ "$update_state" = "parent_pin_pending" ]; then
       cmd_link_root 1
       commit_sync_paths_if_needed "$remote_sha" "submodule_parent_pin"
+      return
+    fi
+    if [ "$update_state" = "deferred_branch_pr" ]; then
+      cmd_link_root 1
       return
     fi
     cmd_link_root

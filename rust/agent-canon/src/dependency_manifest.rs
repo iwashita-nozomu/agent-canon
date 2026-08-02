@@ -172,6 +172,7 @@ struct SurfaceManifestEntry {
     surface_class: String,
     local_override_allowed: bool,
     optional: bool,
+    sync_control: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -434,6 +435,7 @@ fn load_surface_manifest_snapshot(root: &Path) -> Result<SurfaceManifestSnapshot
                 "owner",
                 "path",
                 "source",
+                "sync_control",
             ],
             &owner,
         )?;
@@ -468,6 +470,7 @@ fn load_surface_manifest_snapshot(root: &Path) -> Result<SurfaceManifestSnapshot
             surface_class,
             local_override_allowed: required_json_bool(entry, "local_override_allowed", &owner)?,
             optional: required_json_bool(entry, "optional", &owner)?,
+            sync_control: required_json_bool(entry, "sync_control", &owner)?,
         });
     }
     Ok(SurfaceManifestSnapshot {
