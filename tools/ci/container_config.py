@@ -763,12 +763,24 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                     )
                 )
         service_user = service.get("user")
-        if not isinstance(service_user, str) or re.fullmatch(r"[1-9][0-9]*:[0-9]+", service_user) is None:
+        if not isinstance(service_user, str) or re.fullmatch(r"[1-9][0-9]*:[1-9][0-9]*", service_user) is None:
             findings.append(
                 Finding(
                     "dependency_contract_violation",
                     relative,
-                    "default-user-must-be-non-root-uid-gid",
+                    "default-user-must-have-positive-uid-gid",
+                )
+            )
+        group_add = as_sequence(service.get("group_add"))
+        if group_add is None or not group_add or any(
+            not isinstance(value, str) or re.fullmatch(r"[1-9][0-9]*", value) is None
+            for value in group_add
+        ):
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "runtime-group-must-have-positive-gid",
                 )
             )
         build = as_mapping(service.get("build"))
@@ -778,28 +790,26 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                 Finding(
                     "dependency_contract_violation",
                     relative,
-                    "build-args-required:PROJECT_USER,PROJECT_UID,PROJECT_GID",
+                    "build-args-required:PROJECT_UID,PROJECT_GID",
                 )
             )
         else:
-            expected_args = {"PROJECT_USER": "project"}
-            for name, expected in expected_args.items():
-                if build_args.get(name) != expected:
-                    findings.append(
-                        Finding(
-                            "inconsistency",
-                            relative,
-                            f"build-arg-{name}-expected:{expected}",
-                        )
+            if "PROJECT_USER" in build_args:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "build-arg-PROJECT_USER-forbidden-canonical-project",
                     )
+                )
             for name in ("PROJECT_UID", "PROJECT_GID"):
                 value = build_args.get(name)
-                if not isinstance(value, str) or re.fullmatch(r"[0-9]+", value) is None:
+                if not isinstance(value, str) or re.fullmatch(r"[1-9][0-9]*", value) is None:
                     findings.append(
                         Finding(
                             "dependency_contract_violation",
                             relative,
-                            f"build-arg-{name}-must-be-numeric",
+                            f"build-arg-{name}-must-be-positive-integer",
                         )
                     )
             if (

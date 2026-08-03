@@ -33,17 +33,20 @@ if [ "$(basename "$workspace_parent")" != "workspace" ]; then
 fi
 repo_basename="$(basename "$repo_root")"
 container_repo_root="/workspace/${repo_basename}"
-project_user="${PROJECT_USER:-project}"
+if [[ "${PROJECT_USER+x}" = "x" ]]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_USER_OVERRIDE_FORBIDDEN:canonical=project:received=%s\n' "$PROJECT_USER" >&2
+  exit 1
+fi
+project_user="project"
 project_uid="${PROJECT_UID:-$(id -u)}"
 project_gid="${PROJECT_GID:-$(id -g)}"
-case "$project_user" in
-  ''|*[!A-Za-z0-9_-]*)
-    printf 'devcontainer PROJECT_USER must be a portable user name: %s\n' "$project_user" >&2
-    exit 1
-    ;;
-esac
-if [[ ! "$project_uid" =~ ^[0-9]+$ || ! "$project_gid" =~ ^[0-9]+$ || "$project_uid" = "0" ]]; then
-  printf 'devcontainer PROJECT_UID must be a non-zero numeric UID and PROJECT_GID must be numeric: %s:%s\n' "$project_uid" "$project_gid" >&2
+runtime_gid="${AGENT_CANON_RUNTIME_GID:-$project_gid}"
+if [[ ! "$project_uid" =~ ^[1-9][0-9]*$ || ! "$project_gid" =~ ^[1-9][0-9]*$ ]]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_MUST_BE_POSITIVE_DECIMAL:uid=%s:gid=%s\n' "$project_uid" "$project_gid" >&2
+  exit 1
+fi
+if [[ ! "$runtime_gid" =~ ^[1-9][0-9]*$ ]]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=RUNTIME_GID_MUST_BE_POSITIVE_DECIMAL:gid=%s\n' "$runtime_gid" >&2
   exit 1
 fi
 project_home="/home/${project_user}"
@@ -340,13 +343,12 @@ mkdir -p "$(dirname "$compose_output")"
   printf '  workspace:\n'
   printf '    user: "%s:%s"\n' "$project_uid" "$project_gid"
   printf '    group_add:\n'
-  printf '      - "${AGENT_CANON_RUNTIME_GID:-%s}"\n' "$project_gid"
+  printf '      - "%s"\n' "$runtime_gid"
   if [ "$compose_mode" = "repo-docker-pack" ]; then
     printf '    build:\n'
     printf '      context: ..\n'
     printf '      dockerfile: %s\n' "$dockerfile"
     printf '      args:\n'
-    printf '        PROJECT_USER: "%s"\n' "$project_user"
     printf '        PROJECT_UID: "%s"\n' "$project_uid"
     printf '        PROJECT_GID: "%s"\n' "$project_gid"
   else
