@@ -1075,6 +1075,7 @@ def merge_records(manifests: Sequence[LoadedManifest]) -> tuple[DependencyRecord
                 "method",
                 "version",
                 "source",
+                "platform",
                 "verification",
                 "failure_policy",
                 "key_fingerprint",

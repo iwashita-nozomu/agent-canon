@@ -812,6 +812,42 @@ class DependencyModelTests(unittest.TestCase):
         with self.assertRaisesRegex(DependencyError, "no compatibility fallback"):
             build_plan((loaded_manifest(Path("platform.toml"), (parsed,)),))
 
+    def test_duplicate_merge_preserves_platform_owner(self) -> None:
+        """Parent-first duplicate merging cannot erase the platform pin."""
+        parent = parse_record(
+            record(
+                "shared-tool",
+                method="apt-package",
+                source="ubuntu:22.04",
+                version="1.0-1",
+            ),
+            path=Path("parent.toml"),
+            index=0,
+        )
+        vendor = parse_record(
+            record(
+                "shared-tool",
+                method="apt-package",
+                source="ubuntu:22.04",
+                version="1.0-1",
+                platform="linux/amd64",
+            ),
+            path=Path("vendor.toml"),
+            index=0,
+        )
+
+        plan = build_plan(
+            (
+                loaded_manifest(
+                    Path("parent.toml"),
+                    (parent,),
+                    role=ManifestRole.PARENT_OVERLAY,
+                ),
+                loaded_manifest(Path("vendor.toml"), (vendor,)),
+            )
+        )
+        self.assertEqual(plan.records[0].platform, "linux/amd64")
+
     def test_empty_parent_overlay_merges_with_nonempty_vendor_manifest(self) -> None:
         """Allow an empty parent overlay when the canonical vendor is non-empty."""
         with tempfile.TemporaryDirectory() as temporary:

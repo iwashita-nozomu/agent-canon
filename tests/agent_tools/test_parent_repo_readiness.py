@@ -157,7 +157,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             )
             config = json.loads(devcontainer_json.read_text(encoding="utf-8"))
             assert config["initializeCommand"].startswith(
-                "bash vendor/agent-canon/.devcontainer/bootstrap-shared-runtime.sh"
+                "AGENT_CANON_DEVCONTAINER_REPO_ROOT=."
             )
             assert config["postCreateCommand"].startswith(
                 "bash vendor/agent-canon/.devcontainer/post-create.sh"
@@ -402,7 +402,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             ".devcontainer/devcontainer.json": "\n".join(
                 [
                     "{",
-                    '  "initializeCommand": "bash vendor/agent-canon/.devcontainer/bootstrap-shared-runtime.sh && AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",',
+                    '  "initializeCommand": "AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",',
                     '  "postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace/${localWorkspaceFolderBasename} && bash .devcontainer/post-create-parent.sh /workspace/${localWorkspaceFolderBasename}",',
                     '  "postAttachCommand": "bash vendor/agent-canon/.devcontainer/post-attach.sh",',
                     '  "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",',

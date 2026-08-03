@@ -51,7 +51,7 @@ def test_print_only_runs_shared_post_create_before_codex() -> None:
 
 
 def test_runtime_identity(tmp_path: Path) -> None:
-    """Nested Codex reaches the exact finalize/readback identity path before launch."""
+    """Nested Codex keeps runtime state container-local unless explicitly managed."""
     pack = tmp_path / "pack.toml"
     pack.write_text(
         "\n".join(
@@ -143,6 +143,7 @@ def test_runtime_identity(tmp_path: Path) -> None:
     assert "/root/.codex" not in result.stdout
     assert "umask 0007" in post_create
     assert '"$devcontainer_dir/finalize-shared-runtime.sh"' in post_create
+    assert "SHARED_RUNTIME_FINALIZE=skipped route=CONTAINER_LOCAL" in post_create
     assert 'dependency_profile="${AGENT_CANON_DEPENDENCY_PROFILE:-full}"' in post_create
     assert '--profile "$dependency_profile"' in post_create
     assert 'echo "codex-state: ${codex_state_status}"' in post_attach
@@ -155,7 +156,9 @@ def test_runtime_identity(tmp_path: Path) -> None:
     assert "read_shared_runtime_provision" in finalize
     assert "write_runtime_receipt_atomic" in bootstrap
     assert "write_runtime_receipt_atomic" in finalize
-    assert "/var/lib/agent-canon/runtime/shared-runtime-provision.json" in compose
+    assert "optional_mount_enabled shared-runtime" in compose
+    assert 'AGENT_CANON_OPTIONAL_MOUNTS' in compose
+    assert 'runtime_route="CONTAINER_LOCAL"' in compose
     assert (
         "/var/lib/agent-canon/runtime/shared-runtime-provision.json"
         in environment_manifest

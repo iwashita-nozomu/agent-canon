@@ -334,7 +334,7 @@ if [ "$parent_layout" = true ]; then
     "${environment_lines[@]}"
   )
 fi
-if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
+if optional_mount_enabled ssh-agent && [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
   environment_lines+=('      SSH_AUTH_SOCK: "/ssh-agent"')
 fi
 if [ "$gpu_mode" = "enabled" ]; then

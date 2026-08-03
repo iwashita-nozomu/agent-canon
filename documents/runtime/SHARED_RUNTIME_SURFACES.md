@@ -214,11 +214,11 @@ The devcontainer consumes repo-local `docker/Dockerfile`,
 not make `docker/` AgentCanon-owned.
 
 GPU admission runtime identity scripts (`bootstrap-shared-runtime.sh`,
-`finalize-shared-runtime.sh`, `post-attach.sh`) remain in AgentCanon source and are
-invoked from the linked config by their direct `vendor/agent-canon/.devcontainer/`
-paths. The exact
-receipt paths and parser/writer ownership are defined by
-`documents/experiments/gpu-admission-r5-source-packet.md` and
+`finalize-shared-runtime.sh`, `post-attach.sh`) remain in AgentCanon source for the
+explicit `shared-runtime` optional profile. The linked config default uses the
+container-local runtime route and does not call host bootstrap or require a host
+receipt. The exact receipt paths and parser/writer ownership for the explicit managed
+route are defined by `documents/experiments/gpu-admission-r5-source-packet.md` and
 `agent-canon-environment.toml`.
 
 `parent-hook` must not replace AgentCanon shared stages. The linked config runs
