@@ -18,14 +18,15 @@ import json
 import re
 import subprocess
 from collections.abc import Iterable, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 from agent_canon_source_root import SourceRootFailure, resolve_agent_canon_source_root
 
 UNIT_ROOT: Final = Path("documents/parent-repository-audit/audit-unit")
 SCHEMA: Final = "agent_canon.parent_repository_audit.v1"
+AuditStatus = Literal["pass", "failed", "blocked"]
 REQUIRED_SECTIONS: Final = (
     "Owner Responsibility",
     "Invariant",
@@ -45,11 +46,11 @@ LEGACY_ID_RE: Final = re.compile(r"\bPRA-M[0-9]{2}\b|\bPRA-[CX][0-9]{3}\b")
 class AuditFailure(ValueError):
     """One typed audit enumeration or validation failure."""
 
-    def __init__(self, code: str, detail: str, *, status: str = "failed") -> None:
+    def __init__(self, code: str, detail: str, *, status: AuditStatus = "failed") -> None:
         """Initialize one stable machine-readable failure."""
         self.code = code
         self.detail = detail
-        self.status = status
+        self.status: AuditStatus = status
         super().__init__(f"{code}:{detail}")
 
 
@@ -62,6 +63,57 @@ class AuditUnit:
     scope_patterns: tuple[str, ...]
     surfaces: tuple[str, ...]
     legacy_ids: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class AuditPayload:
+    """Own the audit result fields and their text/JSON projections."""
+
+    status: AuditStatus
+    failure_code: str | None = None
+    failure_detail: str | None = None
+    source_root: str | None = None
+    parent_root: str | None = None
+    unit_paths: tuple[str, ...] | None = None
+    unit_records: tuple[AuditUnit, ...] | None = None
+    scope_paths: tuple[str, ...] | None = None
+    tracked_path_count: int | None = None
+    uncovered_paths: tuple[str, ...] | None = None
+    overlap_paths: tuple[tuple[str, tuple[str, ...]], ...] | None = None
+    uncovered_path_count: int | None = None
+    overlap_path_count: int | None = None
+
+    def to_json_dict(self) -> dict[str, object]:
+        """Convert the owned result into the stable JSON packet shape."""
+        payload: dict[str, object] = {
+            "schema": SCHEMA,
+            "status": self.status,
+        }
+        optional_values: tuple[tuple[str, object | None], ...] = (
+            ("failure_code", self.failure_code),
+            ("failure_detail", self.failure_detail),
+            ("source_root", self.source_root),
+            ("parent_root", self.parent_root),
+            ("tracked_path_count", self.tracked_path_count),
+            ("uncovered_path_count", self.uncovered_path_count),
+            ("overlap_path_count", self.overlap_path_count),
+        )
+        for key, value in optional_values:
+            if value is not None:
+                payload[key] = value
+        if self.unit_paths is not None:
+            payload["unit_paths"] = list(self.unit_paths)
+        if self.unit_records is not None:
+            payload["unit_records"] = [asdict(unit) for unit in self.unit_records]
+        if self.scope_paths is not None:
+            payload["scope_paths"] = list(self.scope_paths)
+        if self.uncovered_paths is not None:
+            payload["uncovered_paths"] = list(self.uncovered_paths)
+        if self.overlap_paths is not None:
+            payload["overlap_paths"] = {
+                path: list(unit_ids) for path, unit_ids in self.overlap_paths
+            }
+        return payload
 
 
 def _section_text(text: str, heading: str) -> str:
@@ -253,60 +305,64 @@ def _select_units(units: Sequence[AuditUnit], scope_paths: Sequence[str], scopes
     return tuple(unit for unit in units if unit.unit_id in selected_ids)
 
 
-def _payload_text(payload: dict[str, object]) -> str:
+def _payload_text(payload: AuditPayload) -> str:
     """Render a stable text packet for shell and skill readback."""
     lines = [
-        f"PARENT_REPOSITORY_AUDIT_SCHEMA={payload['schema']}",
-        f"PARENT_REPOSITORY_AUDIT_STATUS={payload['status']}",
+        f"PARENT_REPOSITORY_AUDIT_SCHEMA={SCHEMA}",
+        f"PARENT_REPOSITORY_AUDIT_STATUS={payload.status}",
     ]
-    for key in ("failure_code", "source_root", "parent_root", "tracked_path_count", "uncovered_path_count", "overlap_path_count"):
-        if key in payload:
-            lines.append(f"PARENT_REPOSITORY_AUDIT_{key.upper()}={payload[key]}")
-    for path in payload.get("unit_paths", []):
+    optional_values: tuple[tuple[str, object | None], ...] = (
+        ("failure_code", payload.failure_code),
+        ("source_root", payload.source_root),
+        ("parent_root", payload.parent_root),
+        ("tracked_path_count", payload.tracked_path_count),
+        ("uncovered_path_count", payload.uncovered_path_count),
+        ("overlap_path_count", payload.overlap_path_count),
+    )
+    for key, value in optional_values:
+        if value is not None:
+            lines.append(f"PARENT_REPOSITORY_AUDIT_{key.upper()}={value}")
+    for path in payload.unit_paths or ():
         lines.append(f"PARENT_REPOSITORY_AUDIT_UNIT={path}")
-    for path in payload.get("uncovered_paths", []):
+    for path in payload.uncovered_paths or ():
         lines.append(f"PARENT_REPOSITORY_AUDIT_UNCOVERED={path}")
     return "\n".join(lines)
 
 
-def _render(payload: dict[str, object], output_format: str) -> None:
+def _render(payload: AuditPayload, output_format: str) -> None:
     """Write one typed text or JSON packet."""
     if output_format == "json":
-        print(json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True))
+        print(json.dumps(payload.to_json_dict(), ensure_ascii=False, indent=2, sort_keys=True))
     else:
         print(_payload_text(payload))
 
 
-def _base_payload(source_root: Path, parent_root: Path, units: Sequence[AuditUnit]) -> dict[str, object]:
+def _base_payload(source_root: Path, parent_root: Path, units: Sequence[AuditUnit]) -> AuditPayload:
     """Build common packet fields."""
-    return {
-        "schema": SCHEMA,
-        "source_root": str(source_root),
-        "parent_root": str(parent_root),
-        "unit_paths": [unit.path for unit in units],
-        "unit_records": [asdict(unit) for unit in units],
-    }
+    return AuditPayload(
+        status="pass",
+        source_root=str(source_root),
+        parent_root=str(parent_root),
+        unit_paths=tuple(unit.path for unit in units),
+        unit_records=tuple(units),
+    )
 
 
-def _run_list(args: argparse.Namespace) -> dict[str, object]:
+def _run_list(args: argparse.Namespace) -> AuditPayload:
     """Enumerate selected units without auditing their parent tree."""
     source_root, units = _resolution_and_units()
     parent_root = Path(args.root).expanduser().resolve()
     tracked = _tracked_paths(parent_root)
     scope_paths = _scope_paths(parent_root, tracked, args.scope)
     selected = _select_units(units, scope_paths, bool(args.scope))
-    payload = _base_payload(source_root, parent_root, selected)
-    payload.update(
-        {
-            "status": "pass",
-            "scope_paths": list(scope_paths),
-            "tracked_path_count": len(tracked),
-        }
+    return replace(
+        _base_payload(source_root, parent_root, selected),
+        scope_paths=tuple(scope_paths),
+        tracked_path_count=len(tracked),
     )
-    return payload
 
 
-def _run_check(args: argparse.Namespace) -> dict[str, object]:
+def _run_check(args: argparse.Namespace) -> AuditPayload:
     """Validate unit contracts and tracked-tree coverage."""
     source_root, units = _resolution_and_units()
     parent_root = Path(args.root).expanduser().resolve()
@@ -318,21 +374,21 @@ def _run_check(args: argparse.Namespace) -> dict[str, object]:
     overlaps = {
         path: list(values) for path, values in matches.items() if len(values) > 1
     }
-    payload = _base_payload(source_root, parent_root, selected)
-    payload.update(
-        {
-            "status": "failed" if uncovered else "pass",
-            "scope_paths": list(scope_paths),
-            "tracked_path_count": len(scope_paths),
-            "uncovered_paths": list(uncovered),
-            "overlap_paths": overlaps,
-            "uncovered_path_count": len(uncovered),
-            "overlap_path_count": len(overlaps),
-        }
+    return replace(
+        _base_payload(source_root, parent_root, selected),
+        status="failed" if uncovered else "pass",
+        scope_paths=tuple(scope_paths),
+        tracked_path_count=len(scope_paths),
+        uncovered_paths=tuple(uncovered),
+        overlap_paths=tuple(
+            (path, tuple(unit_ids)) for path, unit_ids in overlaps.items()
+        ),
+        uncovered_path_count=len(uncovered),
+        overlap_path_count=len(overlaps),
+        failure_code=(
+            "parent_repository_audit_uncovered_tracked_path" if uncovered else None
+        ),
     )
-    if uncovered:
-        payload["failure_code"] = "parent_repository_audit_uncovered_tracked_path"
-    return payload
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -358,25 +414,23 @@ def main(argv: Sequence[str] | None = None) -> int:
     try:
         payload = _run_list(args) if args.command == "list" else _run_check(args)
     except SourceRootFailure as exc:
-        payload = {
-            "schema": SCHEMA,
-            "status": "blocked",
-            "failure_code": exc.code,
-            "failure_detail": exc.detail,
-        }
+        payload = AuditPayload(
+            status="blocked",
+            failure_code=exc.code,
+            failure_detail=exc.detail,
+        )
         _render(payload, args.format)
         return 2
     except AuditFailure as exc:
-        payload = {
-            "schema": SCHEMA,
-            "status": exc.status,
-            "failure_code": exc.code,
-            "failure_detail": exc.detail,
-        }
+        payload = AuditPayload(
+            status=exc.status,
+            failure_code=exc.code,
+            failure_detail=exc.detail,
+        )
         _render(payload, args.format)
         return 2 if exc.status == "blocked" else 1
     _render(payload, args.format)
-    return 0 if payload["status"] == "pass" else 1
+    return 0 if payload.status == "pass" else 1
 
 
 if __name__ == "__main__":

@@ -2,7 +2,7 @@
 name: parent-repository-audit
 description: "Use when auditing an AgentCanon-consuming parent repository across structure, ownership, environment, dependencies, code and types, OOP, tests, docs and design trace, CI/hooks/skills, templates, or Git/PR lifecycle, with owner-routed repair and finding closure."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"abea7a2ffe9ff9a18234e32a72d16242aa399a86cc1f6b869edfc750cb44e892"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"cc9230bb0ccf6cfb06d62299ba66c6c9d68bd21e8ff2e1c1a780b89429ccd809"} -->
 
 <!--
 @dependency-start

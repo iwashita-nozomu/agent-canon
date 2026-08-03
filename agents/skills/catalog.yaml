@@ -1446,11 +1446,6 @@ skill_families:
         phase: repo_changing_audit
         activation: explicit_capability
         exclusive: true
-      triggers:
-        - ["親レポ", "監査"]
-        - ["parent repository", "audit"]
-        - ["repository", "audit", "repair"]
-        - ["監査", "finding", "修正"]
   - id: dependency-analysis
     visualization_owner: code-visualization
     visualization_role: adapter
