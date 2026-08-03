@@ -9,9 +9,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -127,6 +129,57 @@ def git_global_safe_directory_snapshot() -> tuple[int, tuple[str, ...]]:
         if line.strip()
     )
     return result.returncode, lines
+
+
+def git_config_sentinel_state(path: Path) -> tuple[bytes, str]:
+    """Capture bytes and hash for an explicit global config sentinel."""
+    payload = path.read_bytes() if path.exists() else b""
+    return payload, hashlib.sha256(payload).hexdigest()
+
+
+def run_fresh_clone_check(
+    check_script: str,
+    root: Path,
+    env: dict[str, str],
+    signal_name: str | None = None,
+    ready_path: Path | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run fresh-clone check once, optionally signaling the process once."""
+    if signal_name is None:
+        return subprocess.run(
+            ["bash", check_script],
+            cwd=str(root),
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+
+    if ready_path is None:
+        raise ValueError("ready_path is required when signaling")
+    wrapper = ready_path.parent / "run_check_with_ready.sh"
+    wrapper.write_text(
+        "#!/usr/bin/env bash\n"
+        'touch "$1"\n'
+        'exec bash "$2"\n',
+        encoding="utf-8",
+    )
+    os.chmod(wrapper, 0o755)
+
+    process = subprocess.Popen(
+        ["bash", str(wrapper), str(ready_path), check_script],
+        cwd=str(root),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+    )
+    start = time.time()
+    while not ready_path.exists() and time.time() - start < 5:
+        time.sleep(0.02)
+    process.send_signal({"INT": signal.SIGINT, "TERM": signal.SIGTERM, "HUP": signal.SIGHUP}[signal_name])
+    stdout, stderr = process.communicate(timeout=120)
+    return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
 
 
 class CommitProvenanceStaticContractTest(unittest.TestCase):
@@ -245,112 +298,111 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
         self.assertNotIn("AGENT_CANON_LATEST_DEPENDENCY_ROUTE=", blocked_emission)
 
     def test_fresh_clone_cleanup_contract_with_success_failure_signal(self) -> None:
-        """Fresh-clone check keeps temporary Git state scoped and residue-free."""
-        script = AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_fresh_clone.sh"
-        root = REPO_ROOT / "workspace" / "fresh-clone-git-isolation" / "agent-canon"
-        if REPO_ROOT != root:
-            # For local smoke runs, allow running directly from vendored script path.
-            root = AGENT_CANON_SOURCE_ROOT
-        check_script = root / "tools" / "ci" / "check_fresh_clone.sh"
-        self.assertTrue(check_script.exists(), check_script)
-        check_script = str(check_script)
-
-        baseline_rc, baseline_lines = git_global_safe_directory_snapshot()
-
+        """Fresh-clone contract enforces scoped temp lifecycle across paths and signals."""
         with tempfile.TemporaryDirectory(prefix="fc-contract-") as sandbox:
             temp_root = Path(sandbox)
-            # success path
-            tmpdir = str(temp_root / "success")
-            Path(tmpdir).mkdir()
-            env = os.environ.copy()
-            env["TMPDIR"] = tmpdir
-            result = subprocess.run(
-                ["bash", "-c", check_script],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-                env=env,
+            fixture_root = next(
+                (
+                    candidate
+                    for candidate in (REPO_ROOT, *REPO_ROOT.parents)
+                    if (candidate / "vendor" / "agent-canon").exists()
+                ),
+                REPO_ROOT,
             )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertTrue(
-                "FRESH_CLONE_PARENT_PROJECTION=enabled" in result.stdout
-                or "FRESH_CLONE_PARENT_PROJECTION=not-applicable" in result.stdout
-            )
-            self.assertIn("FRESH_CLONE_ACCEPTANCE=pass", result.stdout)
-
-            # forced failure path: break rsync availability to hit natural overlay guard
-            broken_bin = temp_root / "bin-rsync-fail"
-            broken_bin.mkdir()
-            (broken_bin / "rsync").write_text(
-                "#!/usr/bin/env bash\n"
-                "echo \"fresh_clone_overlay=fail\" >&2\n"
-                "exit 1\n",
-                encoding="utf-8",
-            )
-            os.chmod(broken_bin / "rsync", 0o755)
-            fail_env = os.environ.copy()
-            fail_env["TMPDIR"] = str(temp_root / "failure")
-            Path(fail_env["TMPDIR"]).mkdir()
-            fail_env["PATH"] = f"{broken_bin}:{fail_env['PATH']}"
-            fail_result = subprocess.run(
-                ["bash", "-c", check_script],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-                env=fail_env,
-            )
-            self.assertNotEqual(fail_result.returncode, 0)
-            self.assertIn("fresh_clone_overlay=fail", fail_result.stderr)
-
-            # signal path: wrap first git invocation to delay and terminate by SIGTERM
-            delay_bin = temp_root / "bin-git-delay"
-            delay_bin.mkdir()
-            real_git = subprocess.run(
-                ["bash", "-lc", "command -v git"],
+            script_root = Path(temp_root / "check-source")
+            subprocess.run(
+                ["git", "clone", "--no-local", str(fixture_root), str(script_root)],
                 check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
-            (delay_bin / "git").write_text(
-                "#!/usr/bin/env bash\n"
-                "if [ -z \"${FRESH_CLONE_TERMINATE_HOOK-}\" ]; then\n"
-                "  export FRESH_CLONE_TERMINATE_HOOK=1\n"
-                "  sleep 5\n"
-                "fi\n"
-                f"exec {real_git} \"$@\"\n",
-                encoding="utf-8",
             )
-            os.chmod(delay_bin / "git", 0o755)
-            signal_env = os.environ.copy()
-            signal_env["TMPDIR"] = str(temp_root / "signal")
-            Path(signal_env["TMPDIR"]).mkdir()
-            signal_env["PATH"] = f"{delay_bin}:{signal_env['PATH']}"
-            process = subprocess.Popen(
-                ["bash", "-c", check_script],
-                cwd=root,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-                env=signal_env,
+            (script_root / "tools" / "ci").mkdir(parents=True, exist_ok=True)
+            (script_root / "tools" / "lib").mkdir(parents=True, exist_ok=True)
+            shutil.copy2(
+                AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_fresh_clone.sh",
+                script_root / "tools" / "ci" / "check_fresh_clone.sh",
             )
-            time.sleep(1)
-            process.send_signal(15)
-            _, _ = process.communicate(timeout=30)
-            self.assertIn(process.returncode, (-15, 143))
+            shutil.copy2(
+                AGENT_CANON_SOURCE_ROOT / "tools" / "lib" / "repo_paths.sh",
+                script_root / "tools" / "lib" / "repo_paths.sh",
+            )
 
-            self.assertEqual(
-                git_global_safe_directory_snapshot(),
-                (baseline_rc, tuple(baseline_lines)),
-            )
-            self.assertFalse(
-                any(
-                    child.name.startswith("template-fresh-clone-")
-                    for child in temp_root.iterdir()
-                    if child.is_dir()
-                )
-            )
+            check_script = script_root / "tools" / "ci" / "check_fresh_clone.sh"
+            self.assertTrue(check_script.exists(), check_script)
+            check_script = str(check_script)
+            script_contents = Path(check_script).read_text(encoding="utf-8")
+            self.assertIn("trap cleanup EXIT", script_contents)
+            self.assertIn("trap 'cleanup_on_signal INT 130' INT", script_contents)
+            self.assertIn("trap 'cleanup_on_signal TERM 143' TERM", script_contents)
+            self.assertIn("trap 'cleanup_on_signal HUP 129' HUP", script_contents)
+
+            test_contracts = [
+                {
+                    "name": "success",
+                    "signal": None,
+                    "expected_rc": 0,
+                    "expect_parent_projection": True,
+                },
+                {
+                    "name": "forced-failure",
+                    "signal": None,
+                    "expected_rc": 1,
+                    "expect_error": "fresh_clone_overlay=fail",
+                },
+                {
+                    "name": "sigterm",
+                    "signal": "TERM",
+                    "expected_rc": 143,
+                    "dynamic_signal": True,
+                },
+            ]
+
+            for test_case in test_contracts:
+                with self.subTest(test_case["name"]):
+                    case_root = temp_root / test_case["name"]
+                    home_root = case_root / "home"
+                    tmpdir = case_root / "tmp"
+                    home_root.mkdir(parents=True)
+                    tmpdir.mkdir()
+                    sentinel = home_root / ".agent-canon-gitconfig-sentinel"
+                    sentinel.write_bytes(b"")
+                    env = os.environ.copy()
+                    env["HOME"] = str(home_root)
+                    env["GIT_CONFIG_GLOBAL"] = str(sentinel)
+                    env["TMPDIR"] = str(tmpdir)
+
+                    if test_case["name"] == "forced-failure":
+                        bin_root = case_root / "bin"
+                        bin_root.mkdir()
+                        (bin_root / "rsync").write_text(
+                            "#!/usr/bin/env bash\n"
+                            "echo \"fresh_clone_overlay=fail\" >&2\n"
+                            "exit 1\n",
+                            encoding="utf-8",
+                        )
+                        os.chmod(bin_root / "rsync", 0o755)
+                        env["PATH"] = f"{bin_root}:{env['PATH']}"
+
+                    baseline = git_config_sentinel_state(sentinel)
+                    result = run_fresh_clone_check(
+                        check_script,
+                        script_root,
+                        env=env,
+                        signal_name=test_case.get("signal"),
+                        ready_path=(case_root / "ready") if test_case.get("dynamic_signal") else None,
+                    )
+                    self.assertEqual(result.returncode, test_case["expected_rc"], result.stderr)
+                    if test_case.get("expect_parent_projection", False):
+                        self.assertIn("FRESH_CLONE_PARENT_PROJECTION=enabled", result.stdout)
+                        self.assertIn("FRESH_CLONE_ACCEPTANCE=pass", result.stdout)
+                    if "expect_error" in test_case:
+                        self.assertIn(test_case["expect_error"], result.stderr)
+                    self.assertEqual(git_config_sentinel_state(sentinel), baseline)
+                    self.assertFalse(
+                        any(
+                            child.name.startswith("template-fresh-clone-")
+                            for child in tmpdir.iterdir()
+                            if child.is_dir()
+                        )
+                    )
 
 
 class UpdateMaterializationPredicateTest(unittest.TestCase):

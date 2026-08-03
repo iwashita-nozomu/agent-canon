@@ -22,12 +22,18 @@ CLONE_DIR="${TOPIC_ROOT}/agent-canon"
 CLONE_TOOLS_ROOT=""
 GIT_TEMP_CONFIG="${TMP_DIR}/safe.directory.gitconfig"
 ORIGINAL_GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL-}"
+FRESH_CLONE_CLEANUP_DONE=0
+
 add_safe_directory_to_config() {
   local repo_dir="$1"
   git config --file "${GIT_TEMP_CONFIG}" --add safe.directory "${repo_dir}" >/dev/null
 }
 
 cleanup() {
+  if [ "${FRESH_CLONE_CLEANUP_DONE}" -eq 1 ]; then
+    return 0
+  fi
+  FRESH_CLONE_CLEANUP_DONE=1
   if [ -n "${ORIGINAL_GIT_CONFIG_GLOBAL-}" ]; then
     export GIT_CONFIG_GLOBAL="${ORIGINAL_GIT_CONFIG_GLOBAL}"
   else
@@ -35,7 +41,23 @@ cleanup() {
   fi
   rm -rf "${TMP_DIR}"
 }
-trap cleanup EXIT INT TERM HUP
+
+cleanup_on_signal() {
+  local signal_name="$1"
+  local exit_code="$2"
+  cleanup
+  case "${signal_name}" in
+    "INT") exit 130 ;;
+    "TERM") exit 143 ;;
+    "HUP") exit 129 ;;
+    *) exit "${exit_code}" ;;
+  esac
+}
+
+trap cleanup EXIT
+trap 'cleanup_on_signal INT 130' INT
+trap 'cleanup_on_signal TERM 143' TERM
+trap 'cleanup_on_signal HUP 129' HUP
 
 touch "${GIT_TEMP_CONFIG}"
 export GIT_CONFIG_GLOBAL="${GIT_TEMP_CONFIG}"
