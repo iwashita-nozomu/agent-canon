@@ -35,7 +35,7 @@ cleanup() {
   fi
   rm -rf "${TMP_DIR}"
 }
-trap cleanup EXIT
+trap cleanup EXIT INT TERM HUP
 
 touch "${GIT_TEMP_CONFIG}"
 export GIT_CONFIG_GLOBAL="${GIT_TEMP_CONFIG}"
@@ -211,6 +211,7 @@ if [ "$parent_projection_mode" = false ]; then
   echo "FRESH_CLONE_ACCEPTANCE=pass"
   exit 0
 fi
+echo "FRESH_CLONE_PARENT_PROJECTION=enabled"
 
 bash "${CLONE_TOOLS_ROOT}/sync_agent_canon.sh" check
 AGENT_CANON_TEST_REMOTE="${TMP_DIR}/agent-canon-upstream.git"
