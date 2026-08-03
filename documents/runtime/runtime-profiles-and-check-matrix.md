@@ -67,11 +67,7 @@ requirement. The shared gate does not invoke or block on pydocstyle; active
 profile validation owners remain authoritative for their selected checks.
 An unavailable pydocstyle tool or its diagnostics fail only the explicit
 review command.
-AgentCanon development prompt and accumulated eval producers are standalone
-AgentCanon static-gates responsibilities. A template or derived shared gate
-does not invoke them and does not apply their diagnostics to parent-owned
-documents; its owner remains AgentCanon pin/projection/header/graph/workflow and
-skill-command validation.
+AgentCanon development prompt and accumulated eval producers belong to the standalone static-gates owner; derived shared gates do not invoke them or apply their diagnostics to parent-owned documents.
 
 ## Validation Failure Response
 
@@ -115,7 +111,7 @@ Intent preservation routes:
 | --- | --- |
 | Markdown docs only | `tools/bin/agent-canon docs check`; changed-file dependency header checks |
 | Python code/tests | targeted `pytest`; `python3 -m pyright`; `python3 -m ruff check ...` |
-| AgentCanon docs/workflows/skills/tools/hooks | `make agent-canon-pr-check`; shared-surface sync; workflow/PR checks; strict dependency review as the dependency-header/graph judgment owner; standalone-source tool_drift coverage once; docs check; generated-artifact guard; standalone-source prompt/accumulated evals remain in the existing static-gates owner; derived shared gates exclude those eval producers and parent-owned diagnostics; standalone shared gates add no repository-wide project-quality job; derived parent workflows expose the canonical project-quality owner marker and `make ci` command; job names are not an authority; no repository-wide project-quality runner is added to the shared gate |
+| AgentCanon docs/workflows/skills/tools/hooks | `make agent-canon-pr-check`; shared-surface sync; workflow/PR checks; strict dependency review as the dependency-header/graph judgment owner; standalone-source tool_drift coverage once; docs check; generated-artifact guard; standalone-source prompt/accumulated evals remain in the existing static-gates owner; derived shared gates exclude AgentCanon development prompt/accumulated eval producers and parent-owned diagnostics; standalone shared gates remain the existing static-gates owner and add no repository-wide project-quality job; derived parent workflows expose the canonical project-quality owner marker and `make ci` command; job names are not an authority; no repository-wide project-quality runner is added to the shared gate |
 | Root shared views or submodule pin | `bash tools/sync_agent_canon.sh check`; `git submodule status vendor/agent-canon` evidence |
 | Docker/devcontainer/runtime pack | `bash tools/docker_dependency_validator.sh`; `make docker-build-check` when build behavior changes |
 | GitHub workflow/PR | `python3 tools/ci/check_github_workflows.py`; relevant GitHub Actions evidence when available |
