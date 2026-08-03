@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import stat
 import subprocess
@@ -40,6 +41,89 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             source_root=command_root,
             layout="standalone",
             canon_root=command_root,
+        )
+
+    def _write_post_create_fixture(
+        self, root: Path, *, derived: bool
+    ) -> tuple[Path, Path]:
+        """Create a minimal standalone or vendored resolver lifecycle fixture."""
+        parent = root / "parent"
+        source = (
+            parent / "vendor" / "agent-canon" if derived else root / "agent-canon"
+        )
+        workspace = parent if derived else source
+        (source / "agents" / "skills").mkdir(parents=True)
+        (source / "tools" / "agent_tools").mkdir(parents=True)
+        (source / "agents" / "skills" / "catalog.yaml").write_text(
+            "skills: []\n", encoding="utf-8"
+        )
+        resolver_source = (
+            PROJECT_ROOT / "tools" / "agent_tools" / "agent_canon_source_root.py"
+        )
+        shutil.copy2(
+            resolver_source,
+            source / "tools" / "agent_tools" / resolver_source.name,
+        )
+        devcontainer = source / ".devcontainer"
+        devcontainer.mkdir(parents=True)
+        entrypoint_source = PROJECT_ROOT / ".devcontainer" / "post-create-entrypoint.sh"
+        shutil.copy2(entrypoint_source, devcontainer / entrypoint_source.name)
+        (devcontainer / entrypoint_source.name).chmod(0o755)
+        (devcontainer / "post-create.sh").write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "printf 'shared\\n' >> \"$1/order.log\"\n"
+            "exit \"${SHARED_STATUS:-0}\"\n",
+            encoding="utf-8",
+        )
+        (devcontainer / "post-create.sh").chmod(0o755)
+        if derived:
+            (parent / ".git").mkdir(parents=True)
+            (source / ".git").write_text(
+                "gitdir: ../../.git/modules/vendor/agent-canon\n",
+                encoding="utf-8",
+            )
+            parent_devcontainer = parent / ".devcontainer"
+            parent_devcontainer.mkdir(parents=True)
+            (parent_devcontainer / "post-create-parent.sh").write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "printf 'parent\\n' >> \"$1/order.log\"\n"
+                "exit \"${PARENT_STATUS:-0}\"\n",
+                encoding="utf-8",
+            )
+            (parent_devcontainer / "post-create-parent.sh").chmod(0o755)
+        else:
+            (source / ".git").mkdir()
+        return source, workspace
+
+    def _run_post_create_fixture(
+        self,
+        source: Path,
+        workspace: Path,
+        *,
+        shared_status: int = 0,
+        parent_status: int = 0,
+    ) -> subprocess.CompletedProcess[str]:
+        """Run the tracked post-create entrypoint through the public resolver."""
+        resolver = source / "tools" / "agent_tools" / "agent_canon_source_root.py"
+        return subprocess.run(
+            [
+                sys.executable,
+                str(resolver),
+                "exec",
+                ".devcontainer/post-create-entrypoint.sh",
+                str(workspace),
+            ],
+            cwd=source,
+            env={
+                **os.environ,
+                "SHARED_STATUS": str(shared_status),
+                "PARENT_STATUS": str(parent_status),
+            },
+            check=False,
+            capture_output=True,
+            text=True,
         )
 
     def test_exec_parser_accepts_command(self) -> None:
@@ -104,6 +188,49 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             parser = build_parser().parse_args(["exec", "tools/agent_tool.sh", "fail"])
             result = run(parser, resolver=lambda _: self._mock_resolution(root))
             self.assertEqual(result, 1)
+
+    def test_post_create_entrypoint_runs_shared_then_derived_hook(self) -> None:
+        """Standalone and derived layouts invoke the real entrypoint through resolver."""
+        for derived in (False, True):
+            with self.subTest(derived=derived):
+                with tempfile.TemporaryDirectory() as workspace:
+                    source, selected_workspace = self._write_post_create_fixture(
+                        Path(workspace), derived=derived
+                    )
+                    result = self._run_post_create_fixture(source, selected_workspace)
+
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    expected = "shared\nparent\n" if derived else "shared\n"
+                    self.assertEqual(
+                        (selected_workspace / "order.log").read_text(encoding="utf-8"),
+                        expected,
+                    )
+
+    def test_post_create_entrypoint_propagates_stage_status(self) -> None:
+        """A failed shared or derived stage returns its exact status to the resolver."""
+        cases = ((17, 0, 17, "shared\n"), (0, 23, 23, "shared\nparent\n"))
+        for shared_status, parent_status, expected_status, expected_order in cases:
+            with self.subTest(shared_status=shared_status, parent_status=parent_status):
+                with tempfile.TemporaryDirectory() as workspace:
+                    source, selected_workspace = self._write_post_create_fixture(
+                        Path(workspace), derived=True
+                    )
+                    result = self._run_post_create_fixture(
+                        source,
+                        selected_workspace,
+                        shared_status=shared_status,
+                        parent_status=parent_status,
+                    )
+
+                    self.assertEqual(
+                        result.returncode,
+                        expected_status,
+                        result.stdout + result.stderr,
+                    )
+                    self.assertEqual(
+                        (selected_workspace / "order.log").read_text(encoding="utf-8"),
+                        expected_order,
+                    )
 
     def test_exec_command_enforces_resolved_source_root(self) -> None:
         """Reject commands resolving outside the source-root contract."""

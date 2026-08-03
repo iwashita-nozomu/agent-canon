@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
 import sys
@@ -399,7 +400,7 @@ def shared_devcontainer_dir(root: Path) -> Path:
 
 
 def validate_post_create(root: Path) -> list[Finding]:
-    """Require the shared post-create source at its owning path."""
+    """Require executable shared-first post-create sources at their owner paths."""
     shared_dir = shared_devcontainer_dir(root)
     findings: list[Finding] = []
     for name in ("post-create.sh", "post-create-entrypoint.sh"):
@@ -407,6 +408,27 @@ def validate_post_create(root: Path) -> list[Finding]:
         relative = f"{path.relative_to(root)}"
         if not path.is_file():
             findings.append(Finding("missing_file", relative, "missing"))
+        elif not (path.stat().st_mode & 0o111):
+            findings.append(
+                Finding("dependency_contract_violation", relative, "not-executable")
+            )
+    entrypoint = shared_dir / "post-create-entrypoint.sh"
+    if entrypoint.is_file():
+        text = entrypoint.read_text(encoding="utf-8")
+        required_markers = (
+            'bash "$entrypoint_dir/post-create.sh" "$workspace"',
+            'parent_hook="$workspace/.devcontainer/post-create-parent.sh"',
+            'bash "$parent_hook" "$workspace"',
+        )
+        for marker in required_markers:
+            if marker not in text:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        str(entrypoint.relative_to(root)),
+                        f"resolver-entrypoint-missing:{marker}",
+                    )
+                )
     return findings
 
 

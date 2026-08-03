@@ -24,6 +24,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "container_config.py"
 GENERATOR = PROJECT_ROOT / ".devcontainer" / "generate-runtime-compose.sh"
 DOCKERFILE = PROJECT_ROOT / ".devcontainer" / "Dockerfile"
+POST_CREATE_ENTRYPOINT = PROJECT_ROOT / ".devcontainer" / "post-create-entrypoint.sh"
 
 
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
@@ -72,7 +73,13 @@ def write_devcontainer(root: Path) -> None:
         + "\n",
     )
     for name in ("post-create.sh", "post-create-entrypoint.sh", "post-attach.sh"):
-        write_file(root, f".devcontainer/{name}", "#!/usr/bin/env bash\n")
+        content = (
+            POST_CREATE_ENTRYPOINT.read_text(encoding="utf-8")
+            if name == "post-create-entrypoint.sh"
+            else "#!/usr/bin/env bash\n"
+        )
+        write_file(root, f".devcontainer/{name}", content)
+        (root / ".devcontainer" / name).chmod(0o755)
     write_file(
         root, ".devcontainer/generate-runtime-compose.sh", "#!/usr/bin/env bash\n"
     )
@@ -915,6 +922,38 @@ def test_generator_rejects_pack_override_of_runtime_route(tmp_path: Path) -> Non
     assert (
         "runtime.env cannot override reserved key: AGENT_CANON_RUNTIME_ROUTE"
         in result.stderr
+    )
+
+
+def test_container_config_requires_executable_resolver_entrypoint(tmp_path: Path) -> None:
+    """The public post-create resolver must remain executable in a fresh checkout."""
+    repo = write_topic_fixture(tmp_path)
+    entrypoint = repo / ".devcontainer/post-create-entrypoint.sh"
+    entrypoint.chmod(0o644)
+    module = load_container_config_module()
+
+    findings = module.validate_post_create(repo)
+
+    assert any(
+        finding.detail == "not-executable"
+        and finding.path.endswith("post-create-entrypoint.sh")
+        for finding in findings
+    )
+
+
+def test_container_config_requires_resolver_entrypoint_contract(tmp_path: Path) -> None:
+    """The executable entrypoint must dispatch shared setup before parent setup."""
+    repo = write_topic_fixture(tmp_path)
+    entrypoint = repo / ".devcontainer/post-create-entrypoint.sh"
+    entrypoint.write_text("#!/usr/bin/env bash\n", encoding="utf-8")
+    entrypoint.chmod(0o755)
+    module = load_container_config_module()
+
+    findings = module.validate_post_create(repo)
+
+    assert any(
+        finding.detail.startswith("resolver-entrypoint-missing:")
+        for finding in findings
     )
 
 

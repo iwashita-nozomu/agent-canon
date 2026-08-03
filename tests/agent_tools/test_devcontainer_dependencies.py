@@ -924,14 +924,20 @@ class DependencyModelTests(unittest.TestCase):
                 root,
                 "jupyterlab\nnotebook\nipykernel\npydeps\nsnakeviz\npyyaml\n",
             )
-            entrypoint = root / "vendor/agent-canon/.devcontainer/post-create-entrypoint.sh"
+            vendor_root = root / "vendor/agent-canon"
+            vendor_root.unlink()
+            vendor_root.mkdir(parents=True)
+            entrypoint = vendor_root / ".devcontainer/post-create-entrypoint.sh"
+            entrypoint.parent.mkdir(parents=True)
             entrypoint.write_text("#!/bin/sh\n", encoding="utf-8")
-            report = model.validate()
+            findings: list[Any] = []
+            checked: list[str] = []
+            model._check_parent_devcontainer(findings, checked)
 
         self.assertTrue(
             any(
                 finding.detail.startswith("missing-parent-hook-dispatch:")
-                for finding in report.findings
+                for finding in findings
             )
         )
 
