@@ -47,6 +47,7 @@ def test_print_only_runs_shared_post_create_before_codex() -> None:
     assert "--user" not in result.stdout
     assert "/root/.codex" not in result.stdout
     assert "codex-state" not in result.stdout
+    assert 'export AGENT_CANON_CODEX_SESSION_ROOT="${AGENT_CANON_CODEX_SESSION_ROOT:-$HOME/.codex/sessions}"' in result.stdout
     assert "exec codex" in result.stdout
 
 
