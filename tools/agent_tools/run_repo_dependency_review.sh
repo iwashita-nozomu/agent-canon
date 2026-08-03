@@ -150,6 +150,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 ROOT_DIR="$(realpath -m "$ROOT_DIR")"
+SCRIPT_TOOLS_ROOT="$(dirname "$(realpath -m "$script_dir")")"
 cd "$ROOT_DIR"
 
 if [[ "$HEADER_SCAN_ONLY" -eq 1 && ( -z "$CHANGED_PATH_PACKET" || -z "$TRUSTED_BASE_SHA" ) ]]; then
@@ -157,12 +158,29 @@ if [[ "$HEADER_SCAN_ONLY" -eq 1 && ( -z "$CHANGED_PATH_PACKET" || -z "$TRUSTED_B
   exit 2
 fi
 
+SCRIPT_TOOLS_ROOT="$(realpath -m "$SCRIPT_TOOLS_ROOT")"
+
 if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
   CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")" || {
     echo "canonical AgentCanon source tools root is unavailable for root: $ROOT_DIR" >&2
     exit 1
   }
+  CANON_TOOLS_ROOT="$(realpath -m "$CANON_TOOLS_ROOT")"
+  SCAN_DEPENDENCY_HEADERS="${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh"
+  CHECK_DEPENDENCY_HEADER_FORMAT="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh"
+  CHECK_DEPENDENCY_GRAPH="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_graph.sh"
+  CHECK_DESIGN_DOC_CLAIMS_TOOL="${CANON_TOOLS_ROOT}/agent_tools/check_design_doc_claims.py"
   GRAPH_CLI="${CANON_TOOLS_ROOT}/bin/agent-canon"
+  WORKFLOW_MONITOR="${CANON_TOOLS_ROOT}/agent_tools/workflow_monitor.py"
+else
+  SCAN_DEPENDENCY_HEADERS="${SCRIPT_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh"
+  CHECK_DEPENDENCY_HEADER_FORMAT="${SCRIPT_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh"
+  WORKFLOW_MONITOR="${SCRIPT_TOOLS_ROOT}/agent_tools/workflow_monitor.py"
+  CHECK_DEPENDENCY_GRAPH="${SCRIPT_TOOLS_ROOT}/agent_tools/check_dependency_graph.sh"
+  CHECK_DESIGN_DOC_CLAIMS_TOOL="${SCRIPT_TOOLS_ROOT}/agent_tools/check_design_doc_claims.py"
+fi
+
+if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
   if [[ ! -x "$GRAPH_CLI" ]]; then
     echo "canonical graph executable is missing for root: $ROOT_DIR" >&2
     exit 1
@@ -267,8 +285,8 @@ mapfile -t checkable_paths < <(
 
 echo "REPO_DEPENDENCY_REVIEW_PATHS=${#checkable_paths[@]}"
 
-scan_args=(tools/agent_tools/scan_dependency_headers.sh)
-format_args=(tools/agent_tools/check_dependency_header_format.sh)
+scan_args=("$SCAN_DEPENDENCY_HEADERS")
+format_args=("$CHECK_DEPENDENCY_HEADER_FORMAT")
 if [[ -n "$CHANGED_PATH_PACKET" ]]; then
   scan_args+=(--changed-path-packet "$CHANGED_PATH_PACKET")
   scan_args+=(--trusted-base-sha "$TRUSTED_BASE_SHA")
@@ -297,7 +315,7 @@ bash "${format_args[@]}" "${checkable_paths[@]}"
 if [[ "$HEADER_SCAN_ONLY" -eq 1 ]]; then
   echo "REPO_DEPENDENCY_REVIEW=pass"
   if [[ -n "$REPORT_DIR" ]]; then
-    python3 tools/agent_tools/workflow_monitor.py \
+    python3 "$WORKFLOW_MONITOR" \
       --report-dir "$REPORT_DIR" \
       --signal "repo_dependency_review=pass header_scan_only=yes paths=${#checkable_paths[@]} fail_missing=${FAIL_MISSING} changed_path_packet=${CHANGED_PATH_PACKET:-none}" \
       --intervention "run_repo_dependency_review.sh recorded header scan pass"
@@ -312,7 +330,7 @@ if [[ -z "$GRAPH_TSV_OUTPUT" && -n "$REPORT_DIR" ]]; then
   GRAPH_TSV_OUTPUT="$REPORT_DIR/dependency_graph.tsv"
 fi
 
-graph_args=(tools/agent_tools/check_dependency_graph.sh)
+graph_args=("$CHECK_DEPENDENCY_GRAPH")
 if [[ "$CHECK_BIDIRECTIONAL" -eq 1 ]]; then
   graph_args+=(--check-bidirectional)
 fi
@@ -328,7 +346,7 @@ fi
 bash "${graph_args[@]}" "${checkable_paths[@]}"
 
 if [[ "$LIST_CHANGED_DEPENDENCIES" -eq 1 ]]; then
-  related_args=(tools/agent_tools/check_dependency_graph.sh --list-related --focus-changed)
+  related_args=("$CHECK_DEPENDENCY_GRAPH" --list-related --focus-changed)
   if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
     related_args+=(--cycle-report-only)
   fi
@@ -339,7 +357,7 @@ if [[ "$LIST_CHANGED_DEPENDENCIES" -eq 1 ]]; then
 fi
 
 if [[ "$CHECK_DESIGN_DOC_CLAIMS" -eq 1 ]]; then
-  design_claim_args=(tools/agent_tools/check_design_doc_claims.py --root "$ROOT_DIR")
+  design_claim_args=("$CHECK_DESIGN_DOC_CLAIMS_TOOL" --root "$ROOT_DIR")
   if [[ ${#DESIGN_DOC_CLAIM_PATHS[@]} -gt 0 ]]; then
     design_claim_args+=("${DESIGN_DOC_CLAIM_PATHS[@]}")
   else
@@ -349,7 +367,7 @@ if [[ "$CHECK_DESIGN_DOC_CLAIMS" -eq 1 ]]; then
 fi
 
 if [[ -n "$SEARCH_HITS_FILE" ]]; then
-  edit_scope_args=(tools/agent_tools/check_dependency_graph.sh --search-hits-file "$SEARCH_HITS_FILE")
+  edit_scope_args=("$CHECK_DEPENDENCY_GRAPH" --search-hits-file "$SEARCH_HITS_FILE")
   if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
     edit_scope_args+=(--cycle-report-only)
   fi
@@ -362,7 +380,7 @@ if [[ -n "$SEARCH_HITS_FILE" ]]; then
     bash "${edit_scope_args[@]}" "${checkable_paths[@]}"
   fi
 elif [[ -n "$REPORT_DIR" ]]; then
-  edit_scope_args=(tools/agent_tools/check_dependency_graph.sh --edit-scope-changed)
+  edit_scope_args=("$CHECK_DEPENDENCY_GRAPH" --edit-scope-changed)
   if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
     edit_scope_args+=(--cycle-report-only)
   fi
@@ -375,7 +393,7 @@ fi
 echo "REPO_DEPENDENCY_REVIEW=pass"
 
 if [[ -n "$REPORT_DIR" ]]; then
-  python3 tools/agent_tools/workflow_monitor.py \
+  python3 "$WORKFLOW_MONITOR" \
     --report-dir "$REPORT_DIR" \
     --signal "repo_dependency_review=pass paths=${#checkable_paths[@]} check_bidirectional=${CHECK_BIDIRECTIONAL} fail_missing=${FAIL_MISSING} changed_path_packet=${CHANGED_PATH_PACKET:-none}" \
     --intervention "run_repo_dependency_review.sh recorded dependency review pass"
