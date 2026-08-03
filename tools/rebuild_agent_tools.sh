@@ -35,7 +35,28 @@ agent_canon_source_root() {
 
 source_commit() {
   local source_root="$1"
-  git -C "$source_root" rev-parse HEAD 2>/dev/null || printf '%s\n' "unknown"
+  local source_sha
+  local vendor_root
+  local provider_sha
+
+  if ! source_sha="$(git -C "$source_root" rev-parse --verify HEAD 2>/dev/null)"; then
+    echo "AgentCanon source-root identity is unavailable: $source_root" >&2
+    return 1
+  fi
+  vendor_root="$ROOT_DIR/$PREFIX"
+  if [ -d "$vendor_root" ] && [ "$(cd "$vendor_root" && pwd -P)" = "$(cd "$source_root" && pwd -P)" ]; then
+    if ! provider_sha="$(git -C "$ROOT_DIR" rev-parse --verify "HEAD:$PREFIX" 2>/dev/null)"; then
+      echo "AgentCanon parent gitlink identity is unavailable: $PREFIX" >&2
+      return 1
+    fi
+    if [ "$provider_sha" != "$source_sha" ]; then
+      echo "AgentCanon provider identity mismatch: $provider_sha!=$source_sha" >&2
+      return 1
+    fi
+    printf '%s\n' "$provider_sha"
+    return
+  fi
+  printf '%s\n' "$source_sha"
 }
 
 installed_commit() {

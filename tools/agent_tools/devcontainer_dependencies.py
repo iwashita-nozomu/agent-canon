@@ -76,6 +76,7 @@ FAILURE_POLICIES = frozenset({"fail", "warn"})
 HEX_RE = re.compile(r"^[0-9a-fA-F]+$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40}$")
+ACTIVE_SOURCE_IDENTITY = "active-source"
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 APT_PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
 NPM_PACKAGE_RE = re.compile(r"^(?:@[a-z0-9._~-]+/[a-z0-9._~-]+|[a-z0-9._~-]+)$")
@@ -284,6 +285,7 @@ class DependencyRecord:
     destination: str | None = None
     repo: str | None = None
     commit: str | None = None
+    source_identity: str | None = None
     locked: bool | None = None
     browser: str | None = None
     browser_cache_path: str | None = None
@@ -761,7 +763,12 @@ def _validate_method_fields(
         },
         Method.RUST_TOOLCHAIN: {"components"},
         Method.LEAN_TOOLCHAIN: set(),
-        Method.CARGO_SOURCE_BUILD: {"repo", "commit", "locked"},
+        Method.CARGO_SOURCE_BUILD: {
+            "repo",
+            "commit",
+            "source_identity",
+            "locked",
+        },
         Method.BROWSER_INSTALL: {"browser", "browser_cache_path"},
     }
     unsupported = sorted(set(raw) - common - method_fields[record.method])
@@ -850,8 +857,11 @@ def _validate_method_values(record: DependencyRecord) -> None:
             )
         assert record.repo is not None
         _validate_https_url(record.repo, f"{record.id}.repo")
-        assert record.commit is not None
-        if COMMIT_RE.fullmatch(record.commit) is None:
+        if record.source_identity is not None and record.source_identity != ACTIVE_SOURCE_IDENTITY:
+            raise DependencyError(
+                f"{record.id}.source_identity must be {ACTIVE_SOURCE_IDENTITY!r}"
+            )
+        if record.commit is not None and COMMIT_RE.fullmatch(record.commit) is None:
             raise DependencyError(f"{record.id}.commit must be a full 40-hex commit")
     elif record.method is Method.BROWSER_INSTALL:
         if record.browser not in {"chromium", "firefox", "webkit"}:
@@ -908,6 +918,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         "destination",
         "repo",
         "commit",
+        "source_identity",
         "locked",
         "browser",
         "browser_cache_path",
@@ -979,6 +990,9 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         ),
         repo=_optional_string(raw.get("repo"), f"{record_id}.repo"),
         commit=_optional_string(raw.get("commit"), f"{record_id}.commit"),
+        source_identity=_optional_string(
+            raw.get("source_identity"), f"{record_id}.source_identity"
+        ),
         locked=raw.get("locked") if "locked" in raw else None,
         browser=_optional_string(raw.get("browser"), f"{record_id}.browser"),
         browser_cache_path=_optional_string(
@@ -1018,11 +1032,15 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
             )
         _validate_url(record.source, f"{record.id}.source")
     if record.method is Method.CARGO_SOURCE_BUILD:
-        if record.repo is None or record.commit is None or record.locked is not True:
+        if (
+            record.repo is None
+            or record.locked is not True
+            or (record.commit is None) == (record.source_identity is None)
+        ):
             raise DependencyError(
-                f"{record.id}: cargo-source-build requires repo, exact commit, and locked=true"
+                f"{record.id}: cargo-source-build requires repo, exactly one of commit or source_identity, and locked=true"
             )
-        if COMMIT_RE.fullmatch(record.commit) is None:
+        if record.commit is not None and COMMIT_RE.fullmatch(record.commit) is None:
             raise DependencyError(f"{record.id}.commit must be a full 40-hex commit")
     if record.method is Method.BROWSER_INSTALL and (
         record.browser is None or record.browser_cache_path is None
@@ -1825,7 +1843,11 @@ class Installer:
             repair = receipt.exists()
             if receipt_matches:
                 try:
-                    self.verify(record, workspace=workspace)
+                    self.verify(
+                        record,
+                        workspace=workspace,
+                        expected_source_identity=self._receipt_source_identity(receipt),
+                    )
                 except Exception:
                     receipt.unlink(missing_ok=True)
                     repair = True
@@ -1836,8 +1858,8 @@ class Installer:
                 receipt.unlink(missing_ok=True)
             try:
                 self.install_record(record, workspace=workspace, repair=repair)
-                self.verify(record, workspace=workspace)
-                self._write_receipt(receipt, plan, record)
+                source_identity = self.verify(record, workspace=workspace)
+                self._write_receipt(receipt, plan, record, source_identity)
             except Exception as exc:
                 receipt.unlink(missing_ok=True)
                 unavailable.add(record.id)
@@ -1865,11 +1887,28 @@ class Installer:
             and payload.get("plan_fingerprint") == plan.fingerprint
             and payload.get("record_fingerprint") == record.fingerprint()
             and payload.get("verification") == record.verification.payload()
+            and (
+                record.method is not Method.CARGO_SOURCE_BUILD
+                or isinstance(payload.get("source_identity"), str)
+            )
         )
 
     @staticmethod
+    def _receipt_source_identity(path: Path) -> str | None:
+        """Read the selected source identity recorded with a Cargo receipt."""
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError, json.JSONDecodeError):
+            return None
+        value = payload.get("source_identity")
+        return value if isinstance(value, str) else None
+
+    @staticmethod
     def _write_receipt(
-        path: Path, plan: DependencyPlan, record: DependencyRecord
+        path: Path,
+        plan: DependencyPlan,
+        record: DependencyRecord,
+        source_identity: str | None = None,
     ) -> None:
         payload = {
             "schema": "agent-canon.devcontainer-dependency-receipt",
@@ -1878,6 +1917,7 @@ class Installer:
             "record_fingerprint": record.fingerprint(),
             "plan_fingerprint": plan.fingerprint,
             "verification": record.verification.payload(),
+            "source_identity": source_identity,
         }
         path.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
@@ -2113,17 +2153,7 @@ class Installer:
             )
         elif method is Method.CARGO_SOURCE_BUILD:
             source = self._cargo_source(record, workspace)
-            assert record.commit is not None
-            observed_commit = self.runner.run(
-                ["git", "-C", str(source), "log", "-1", "--format=%H", "--", "."],
-                cwd=workspace,
-                capture_output=True,
-            ).stdout.strip()
-            if observed_commit and observed_commit != record.commit:
-                raise DependencyError(
-                    f"{record.id}: cargo source commit mismatch "
-                    f"{observed_commit}!={record.commit}"
-                )
+            self._cargo_source_identity(record, workspace, source=source)
             self._run(
                 [
                     "cargo",
@@ -2164,8 +2194,25 @@ class Installer:
         else:  # pragma: no cover - Method is a closed enum.
             raise DependencyError(f"unsupported installation method: {method}")
 
-    def verify(self, record: DependencyRecord, *, workspace: Path) -> None:
+    def verify(
+        self,
+        record: DependencyRecord,
+        *,
+        workspace: Path,
+        expected_source_identity: str | None = None,
+    ) -> str | None:
         """Dispatch the record's typed owner-specific live verifier."""
+        source_identity = None
+        if record.method is Method.CARGO_SOURCE_BUILD:
+            source_identity = self._cargo_source_identity(record, workspace)
+            if (
+                expected_source_identity is not None
+                and source_identity != expected_source_identity
+            ):
+                raise DependencyError(
+                    f"{record.id}: binary source identity mismatch "
+                    f"{source_identity}!={expected_source_identity}"
+                )
         verifiers = {
             VerificationKind.APT_PACKAGE: self._verify_apt_package,
             VerificationKind.APT_REPOSITORY: self._verify_apt_repository,
@@ -2183,6 +2230,7 @@ class Installer:
                 f"unsupported verification kind: {record.verification.kind}"
             )
         verifier(record, workspace=workspace)
+        return source_identity
 
     def _capture(
         self,
@@ -2442,23 +2490,116 @@ class Installer:
             raise DependencyError(f"{record.id}: cargo source is missing: {source}")
         return source
 
+    def _git_commit(
+        self,
+        repository: Path,
+        revision: str,
+        *,
+        workspace: Path,
+        record_id: str,
+        label: str,
+    ) -> str:
+        """Read one full Git commit identity and fail closed on missing output."""
+        try:
+            result = self.runner.run(
+                ["git", "-C", str(repository), "rev-parse", "--verify", revision],
+                cwd=workspace,
+                capture_output=True,
+            )
+        except (OSError, subprocess.CalledProcessError) as exc:
+            raise DependencyError(
+                f"{record_id}: cannot read {label} identity from {repository}: {exc}"
+            ) from exc
+        value = result.stdout.strip()
+        if COMMIT_RE.fullmatch(value) is None:
+            raise DependencyError(
+                f"{record_id}: {label} identity is not a full commit: {value!r}"
+            )
+        return value.lower()
+
+    def _cargo_source_identity(
+        self,
+        record: DependencyRecord,
+        workspace: Path,
+        *,
+        source: Path | None = None,
+    ) -> str:
+        """Resolve the Cargo provider identity selected by the record.
+
+        The active-source selector derives its identity from the checked-out
+        source. In a derived repository, the committed parent gitlink is the
+        provider identity and must equal that source-root identity. No clean
+        tree or unselected source copy is part of this contract.
+        """
+        resolved_source = source or self._cargo_source(record, workspace)
+        if record.source_identity == ACTIVE_SOURCE_IDENTITY:
+            source_commit = self._git_commit(
+                resolved_source,
+                "HEAD",
+                workspace=workspace,
+                record_id=record.id,
+                label="source-root",
+            )
+            workspace_root = workspace.resolve()
+            vendor_root = (workspace_root / "vendor" / "agent-canon").resolve()
+            if vendor_root.is_dir() and (
+                resolved_source == vendor_root or vendor_root in resolved_source.parents
+            ):
+                provider_commit = self._git_commit(
+                    workspace_root,
+                    "HEAD:vendor/agent-canon",
+                    workspace=workspace,
+                    record_id=record.id,
+                    label="parent gitlink",
+                )
+                if provider_commit != source_commit:
+                    raise DependencyError(
+                        f"{record.id}: provider identity mismatch "
+                        f"{provider_commit}!={source_commit}"
+                    )
+                return provider_commit
+            return source_commit
+
+        assert record.commit is not None
+        try:
+            result = self.runner.run(
+                [
+                    "git",
+                    "-C",
+                    str(resolved_source),
+                    "rev-parse",
+                    "--verify",
+                    "HEAD",
+                ],
+                cwd=workspace,
+                capture_output=True,
+            )
+        except (OSError, subprocess.CalledProcessError) as exc:
+            raise DependencyError(
+                f"{record.id}: cannot read cargo source commit from {resolved_source}: {exc}"
+            ) from exc
+        observed_commit = result.stdout.strip()
+        if observed_commit:
+            if COMMIT_RE.fullmatch(observed_commit) is None:
+                raise DependencyError(
+                    f"{record.id}: cargo source identity is not a full commit: "
+                    f"{observed_commit!r}"
+                )
+            if observed_commit.lower() != record.commit.lower():
+                raise DependencyError(
+                    f"{record.id}: cargo source commit mismatch "
+                    f"{observed_commit}!={record.commit}"
+                )
+            return observed_commit.lower()
+        return record.commit.lower()
+
     def _verify_cargo_binary(
         self, record: DependencyRecord, *, workspace: Path
     ) -> None:
         spec = record.verification
         assert spec.path is not None and spec.output_contains is not None
         source = self._cargo_source(record, workspace)
-        assert record.commit is not None
-        observed_commit = self.runner.run(
-            ["git", "-C", str(source), "log", "-1", "--format=%H", "--", "."],
-            cwd=workspace,
-            capture_output=True,
-        ).stdout.strip()
-        if observed_commit and observed_commit != record.commit:
-            raise DependencyError(
-                f"{record.id}: cargo source commit mismatch "
-                f"{observed_commit}!={record.commit}"
-            )
+        self._cargo_source_identity(record, workspace, source=source)
         binary = (source / spec.path).resolve()
         if os.path.commonpath((str(source), str(binary))) != str(source):
             raise DependencyError(f"{record.id}: cargo binary escapes source")

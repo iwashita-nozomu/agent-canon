@@ -5,6 +5,7 @@
 # upstream design ../CONTAINER_OPERATIONS.md container image versus mounted developer/agent tooling boundary
 # upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
 # upstream design ../documents/design/devcontainer/parent-dependency-manifest-followup.md parent manifest merge and post-create order
+# upstream design ../documents/design/rust-agent-tool-migration.md selected CLI provenance format
 # upstream implementation bootstrap-dependencies.sh establishes the fixed base capability set
 # upstream implementation ../tools/agent_tools/devcontainer_dependencies.py validates and executes records
 # downstream implementation ../rust/agent-canon/src/structured_analysis.rs builds the AgentCanon cache
@@ -122,10 +123,30 @@ agent_canon_source_root() {
   fi
 }
 
+agent_canon_source_identity() {
+  local canon_root="$1"
+  local source_sha
+  local provider_sha
+  local vendor_root="$workspace/vendor/agent-canon"
+  source_sha="$(git -C "$canon_root" rev-parse --verify HEAD)"
+  if [ -d "$vendor_root" ] && [ "$(cd "$canon_root" && pwd -P)" = "$(cd "$vendor_root" && pwd -P)" ]; then
+    provider_sha="$(git -C "$workspace" rev-parse --verify HEAD:vendor/agent-canon)"
+    if [ "$provider_sha" != "$source_sha" ]; then
+      echo "AgentCanon provider identity mismatch: $provider_sha!=$source_sha" >&2
+      return 1
+    fi
+    printf '%s\n' "$provider_sha"
+    return
+  fi
+  printf '%s\n' "$source_sha"
+}
+
 publish_agent_canon_cli() {
   local canon_root
   local binary
+  local source_sha
   canon_root="$(agent_canon_source_root)"
+  source_sha="$(agent_canon_source_identity "$canon_root")"
   binary="$canon_root/rust/agent-canon/target/release/agent-canon"
   [ -x "$binary" ] || {
     echo "AgentCanon cargo-source-build did not produce $binary" >&2
@@ -133,6 +154,10 @@ publish_agent_canon_cli() {
   }
   install -d -m 755 "$tools_home/agent-canon/bin" "$tools_home/bin"
   install -m 755 "$binary" "$tools_home/agent-canon/bin/agent-canon"
+  {
+    printf 'agent_canon_source_root=%s\n' "$canon_root"
+    printf 'agent_canon_source_commit=%s\n' "$source_sha"
+  } >"$tools_home/agent-canon/.build-state"
   ln -sfn "$tools_home/agent-canon/bin/agent-canon" "$tools_home/bin/agent-canon"
   if [ "$(id -u)" -eq 0 ]; then
     ln -sfn "$tools_home/bin/agent-canon" /usr/local/bin/agent-canon
