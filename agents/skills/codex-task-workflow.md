@@ -55,6 +55,9 @@ DIC の closure readback 後に worker handoff を開始します。traversal po
 ## Purpose
 
 Codex が会話コンテキストに依存せず、毎回同じ順序で task を進めるための標準フローです。
+`repository-topic` 専用 clone が含まれる場合は、`documents/rule/repository-topic-clone.md`
+を先に読み、clone 形状は同ファイルで固定し、共有責務の gitlink/pin/projection は
+`documents/rule/dependency-module-changes.md` に戻します。
 
 ## Use When
 

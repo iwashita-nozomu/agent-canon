@@ -91,7 +91,7 @@ intended named vendor branch で collision-safe merge / review を行い、そ�
 python3 tools/agent_tools/dependency_module_change.py --root . prepare \
   --topic <topic> --module vendor/agent-canon --branch <source-branch> \
   --owner-evidence <owner-evidence>
-git -C <CONTINUE_PATH> push origin HEAD
+git -C <SOURCE_CLONE> push origin HEAD
 ```
 
 通常のmutating routeでは、canonical workflow packetのdigestを明示して
@@ -102,7 +102,7 @@ AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent
   make agent-canon-ensure-latest
 ```
 
-`prepare` が返す `CONTINUE_PATH` の source clone で commit し、そこから
+`prepare` が返す `SOURCE_CLONE` で commit し、そこから
 pushします。parent repo の root view や gitlink 変更だけを commit しても
 AgentCanon PR には乗りません。source clone の HEAD、status、target branch を
 evidence に残します。

@@ -22,6 +22,7 @@
 # upstream design ../../evidence/agent-evals/skill_workflow_prompt_eval.toml prompt eval gate
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared surface manifest
+# upstream implementation ./agent_canon_source_root.py resolves canonical parent adapter targets
 # upstream design ../../documents/codex/codex-configuration-reference.md Codex hook severity policy
 # upstream design ../../documents/conventions/coding-conventions-house-style.md implementation ownership guardrail
 # upstream design ../../notes/guardrails/engineering_avoidances.md recurring implementation avoidances
@@ -727,10 +728,15 @@ SURFACE_MANIFEST_MARKERS = (
     '".codex/hooks.json"',
     '"tests/agent_tools/test_check_convention_compliance.py"',
 )
-SURFACE_SYNC_MARKERS = (
+SOURCE_SURFACE_SYNC_MARKERS = (
     "surface_manifest.py",
     "build_regular_specs",
     "regular_path",
+)
+ROOT_SYNC_ADAPTER_MARKERS = (
+    "vendor/agent-canon/tools:tools",
+    "python3 -m agent_tools.agent_canon_source_root exec",
+    'tools/sync_agent_canon.sh "$@"',
 )
 HOOK_GUARDRAIL_POLICY_MARKERS = {
     ".codex/hooks/hook_dispatcher.py": (
@@ -1070,6 +1076,18 @@ def check_tool_gates(root: Path) -> list[Finding]:
             continue
         for reference in references:
             reference_path = readable_path(root, reference)
+            if (
+                gate_name == "surface_manifest"
+                and reference == "tools/sync_agent_canon.sh"
+                and (
+                    vendored_sync := root
+                    / "vendor"
+                    / "agent-canon"
+                    / "tools"
+                    / "sync_agent_canon.sh"
+                ).is_file()
+            ):
+                reference_path = vendored_sync
             if reference_path is None:
                 findings.append(
                     Finding("tool_gate", reference, f"{gate_name}:missing-reference")
@@ -1475,16 +1493,35 @@ def check_surface_manifest_wiring(root: Path) -> list[Finding]:
                     f"missing-marker:{marker}",
                 )
             )
-    sync_text = readable_files.get("tools/sync_agent_canon.sh", "")
-    for marker in SURFACE_SYNC_MARKERS:
-        if marker not in sync_text:
+    root_sync = root / "tools" / "sync_agent_canon.sh"
+    vendored_sync = root / "vendor" / "agent-canon" / "tools" / "sync_agent_canon.sh"
+    source_sync = vendored_sync if vendored_sync.is_file() else root_sync
+    source_sync_text = (
+        source_sync.read_text(encoding="utf-8") if source_sync.is_file() else ""
+    )
+    source_display = source_sync.relative_to(root).as_posix()
+    for marker in SOURCE_SURFACE_SYNC_MARKERS:
+        if marker not in source_sync_text:
             findings.append(
                 Finding(
                     "surface_manifest",
-                    "tools/sync_agent_canon.sh",
+                    source_display,
                     f"missing-marker:{marker}",
                 )
             )
+    if vendored_sync.is_file():
+        adapter_text = (
+            root_sync.read_text(encoding="utf-8") if root_sync.is_file() else ""
+        )
+        for marker in ROOT_SYNC_ADAPTER_MARKERS:
+            if marker not in adapter_text:
+                findings.append(
+                    Finding(
+                        "surface_manifest",
+                        "tools/sync_agent_canon.sh",
+                        f"missing-root-source-adapter-marker:{marker}",
+                    )
+                )
     return findings
 
 

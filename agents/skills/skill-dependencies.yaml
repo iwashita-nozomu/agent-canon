@@ -62,6 +62,7 @@ skill_dependencies:
     - issue-finding-report
     - agent-log-analysis
     - runtime-log-repair
+    - repository-topic-clone
     - dependency-module-change
     - agent-learning
   start-repository:
@@ -302,6 +303,7 @@ skill_dependencies:
     responsibility_group: lifecycle
     required_prerequisites: []
     routing_candidates:
+    - repository-topic-clone
     - dependency-module-change
     - pr-processing
     - agent-update-branch
@@ -313,10 +315,26 @@ skill_dependencies:
     - pr-processing
     - agent-update-branch
     - structure-refactor
-  dependency-module-change:
+  repository-topic-clone:
     responsibility_group: lifecycle
     required_prerequisites: []
     routing_candidates:
+    - dependency-module-change
+    - agent-canon-update
+    - pr-processing
+    - task-routing
+    successors:
+    - dependency-module-change
+    order_constraints: []
+    parallel_independent:
+    - task-routing
+    - pr-processing
+  dependency-module-change:
+    responsibility_group: lifecycle
+    required_prerequisites:
+    - repository-topic-clone
+    routing_candidates:
+    - repository-topic-clone
     - agent-canon-update
     - dependency-analysis
     - structure-refactor
@@ -339,6 +357,7 @@ skill_dependencies:
     successors: []
     order_constraints: []
     parallel_independent:
+    - repository-topic-clone
     - change-review
     - result-artifact-writeout
     - agent-canon-update

@@ -52,6 +52,9 @@ runtime feedback では、prompt routing の結果を入口にし、観測 evide
   skill / tool routing の入口と後続候補を機械的に確認したい。
 - `template_agent_canon_tool_skillization_500_candidates.md` 系の提案を実装へ落とす。
 - workflow 本文を読む前に、変更 surface と risk に合う check や runtime profile を機械的に決めたい。
+- repository-topic clone など specialized clone 経路を選ぶ前に、最初の route 選定で
+  `agent-orchestration` / dependency route だけを候補化し、後続で `repository-topic-clone`
+  か `dependency-module-change` を固定する。
 
 ## Standard Command
 

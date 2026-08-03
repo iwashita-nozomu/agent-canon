@@ -83,6 +83,15 @@ Standalone source では `tools/sync_agent_canon.sh` が
 長い固定一覧を別に持ちません。manifest と本文が不一致なら、manifest を先に
 更新してから reader-facing policy を追従します。
 
+template / derived parent の root `tools/sync_agent_canon.sh` は、
+`agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` へ束縛する
+parent-owned adapter です。full sync の内部関数や `surface_manifest.py` の root
+copy を所有せず、`tools/agent-canon` view または `vendor/agent-canon/tools` の
+canonical source を実行します。convention gate は adapter の module、target、
+source-root Python path を検証し、full-copy 内部 marker は canonical source 側で
+検証します。過去の root full copy は update transition の migration evidence で
+あり、現行 adapter contract の実装ではありません。
+
 ### sync_control と full-sync trigger の責務
 
 `shared-runtime-surfaces.toml` の `sync_control=true` は、共有 Runtime を
@@ -134,9 +143,9 @@ standalone AgentCanon source resolves them from its source-root
 children are the four individual AgentCanon symlink surfaces. Work-area
 composition follows the canonical filesystem/lifecycle and VS Code workspace
 boundary in [`contracts/github-first-module-and-devcontainer-policy.md`](../contracts/github-first-module-and-devcontainer-policy.md):
-use `PARENT_ROOT`, `SOURCE_CLONE`, and `CONTINUE_PATH` within the Git-ignored
-`workspace/<topic-slug>/` clone lifecycle. This document owns the shared `.vscode/`
-surface, not dependency clone composition.
+use the generic lifecycle's `SOURCE_CLONE` under the Git-ignored
+`workspace/<topic-slug>/<repository>/` boundary. This document owns the shared
+`.vscode/` surface, not dependency clone composition.
 These paths are installed capability. The active profile and required checks
 are selected by `documents/runtime/runtime-profiles-and-check-matrix.md`.
 
@@ -231,7 +240,8 @@ owns the real directory container; AgentCanon owns the individual
 `c_cpp_properties.json`, `extensions.json`, `settings.json`, and `tasks.json`
 symlink surfaces. The dependency source work area follows the canonical
 filesystem/lifecycle and VS Code workspace boundary and uses the paths returned
-by `dependency_module_change.py prepare`; it is not a shared surface source.
+by `repository_topic_clone.py prepare`; dependency-module policy decorates that
+clone after prepare and does not own the shared surface source.
 Do not store personal editor state, host-specific include paths, workspace-local
 secrets, or product-specific commands in the shared `.vscode/` view. Put
 project-specific editor guidance in repo-local docs or project-owned scripts

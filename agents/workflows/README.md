@@ -176,7 +176,7 @@ derived repo から shared canon だけ更新するときは、必要に応じ�
 python3 tools/agent_tools/dependency_module_change.py --root . prepare \
   --topic <topic> --module vendor/agent-canon --branch <source-branch> \
   --owner-evidence <owner-evidence>
-git -C <CONTINUE_PATH> push origin HEAD
+git -C <SOURCE_CLONE> push origin HEAD
 ```
 
 ## Convention Compliance Gate

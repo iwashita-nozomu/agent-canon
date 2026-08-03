@@ -1,0 +1,820 @@
+#!/usr/bin/env python3
+# @dependency-start
+# contract tool
+# responsibility Implements repository-topic clone lifecycle with strict cleanup and evidence checks.
+# upstream design ../../documents/rule/repository-topic-clone.md
+# downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py validates repository-topic clone lifecycle.
+# @dependency-end
+"""Manage repository-topic clones with explicit receipts and strict cleanup gates."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import re
+import shutil
+import subprocess
+import sys
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Protocol, cast, runtime_checkable
+
+MARKER_PREFIX = "repository-topic-clone"
+TOPIC_RE = re.compile(r"[^A-Za-z0-9]+")
+
+
+class RepositoryTopicCloneError(RuntimeError):
+    """Raised when repository-topic clone lifecycle requirements cannot be satisfied."""
+
+
+class GitCommandError(RepositoryTopicCloneError):
+    """Raised when a required git command fails."""
+
+    def __init__(self, repo: Path, args: Sequence[str], stderr: str) -> None:
+        """Build command-specific error string."""
+        super().__init__(
+            f"git -C {repo} {' '.join(args)}: {stderr.strip() or 'command failed'}"
+        )
+
+
+def _run_git(repo: Path, args: Sequence[str]) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(repo), *args], check=False, capture_output=True, text=True
+    )
+    if result.returncode != 0:
+        raise GitCommandError(repo, args, result.stderr)
+    return result.stdout
+
+
+def _run_git_bool(repo: Path, args: Sequence[str]) -> bool:
+    return (
+        subprocess.run(
+            ["git", "-C", str(repo), *args], check=False, capture_output=True, text=True
+        ).returncode
+        == 0
+    )
+
+
+@dataclass(frozen=True)
+class RepositoryTopicCloneRequest:
+    """Normalized request for one repository-topic lifecycle operation."""
+
+    url: str
+    repository: str
+    workspace_root: Path
+    topic: str
+    branch: str
+    owner_evidence: Path
+
+
+@dataclass(frozen=True)
+class PrepareReceipt:
+    """Receipt returned by a successful prepare."""
+
+    request: RepositoryTopicCloneRequest
+    clone: Path
+    branch: str
+    candidate_sha: str
+    candidate_tree: str
+
+
+@dataclass(frozen=True)
+class MergeMainReceipt:
+    """Receipt returned by merge_main."""
+
+    request: RepositoryTopicCloneRequest
+    clone: Path
+    candidate_sha: str
+    candidate_tree: str
+    merged_sha: str
+    merged_tree: str
+    origin_main_sha: str
+
+
+@dataclass(frozen=True)
+class CleanupProof:
+    """Proof that cleanup preflight passed and deletion action was executed."""
+
+    request: RepositoryTopicCloneRequest
+    clone: Path
+    removed: bool
+    evidence: str
+
+
+@runtime_checkable
+class RepositoryPolicyCallback(Protocol):
+    """Optional post-operation callback hook."""
+
+    def apply(
+        self, *, operation: str, request: RepositoryTopicCloneRequest, receipt: object
+    ) -> None:
+        """Apply a callback after prepare/merge."""
+
+
+@dataclass(frozen=True)
+class CloneState:
+    """Observed lifecycle state for one clone."""
+
+    path: Path
+    state: str
+
+
+def _load_publication_contract():
+    """Import the canonical publication transition validators lazily."""
+    root = Path(__file__).parent
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    module = __import__(
+        "update_lifecycle_contract",
+        fromlist=[
+            "validate_candidate_cas_pr_transition",
+            "validate_publication_readback_transition",
+        ],
+    )
+    return module
+
+
+def topic_slug(value: str) -> str:
+    """Return the canonical workspace slug for one topic."""
+    value = value.strip()
+    if not value:
+        raise RepositoryTopicCloneError("topic must be non-empty")
+    result = TOPIC_RE.sub("-", value).strip("-").lower()
+    if not result:
+        raise RepositoryTopicCloneError(f"topic has no usable slug: {value!r}")
+    return result
+
+
+def _normalise_url(value: str) -> str:
+    normalized = value.strip().rstrip("/")
+    return normalized[:-4] if normalized.endswith(".git") else normalized
+
+
+def _repository_name(value: str) -> str:
+    """Require one safe repository directory component."""
+    if (
+        not value
+        or value in {".", ".."}
+        or value != Path(value).name
+        or any(character in value for character in "/\\\r\n\x00")
+    ):
+        raise RepositoryTopicCloneError(
+            f"repository must be one safe path component: {value!r}"
+        )
+    return value
+
+
+def _normalise_branch(value: str) -> str:
+    if value != value.strip() or any(character in value for character in "\r\n\x00"):
+        raise RepositoryTopicCloneError(
+            f"branch must be an exact named branch: {value!r}"
+        )
+    result = subprocess.run(
+        ["git", "check-ref-format", "--branch", value],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        raise RepositoryTopicCloneError(
+            f"branch is not a valid named branch: {value!r}"
+        )
+    return value
+
+
+def _require_evidence(evidence: Path | str, root: Path) -> Path:
+    path = Path(evidence)
+    if not path.is_absolute():
+        path = root / path
+    if not path.is_file() or path.stat().st_size == 0:
+        raise RepositoryTopicCloneError(
+            f"owner evidence must be a non-empty file: {path}"
+        )
+    return path
+
+
+def _evidence_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _topic_root(workspace_root: Path, topic: str, *, create: bool) -> Path:
+    _reject_symlink_components(workspace_root.absolute(), "workspace root")
+    workspace_dir = workspace_root / "workspace"
+    if workspace_dir.is_symlink():
+        raise RepositoryTopicCloneError(
+            f"workspace directory must not be a symlink: {workspace_dir}"
+        )
+    _reject_symlink_components(workspace_dir.absolute(), "workspace directory")
+    root = workspace_dir / topic_slug(topic)
+    if root.exists():
+        if root.is_symlink():
+            raise RepositoryTopicCloneError(
+                f"topic workspace must not be a symlink: {root}"
+            )
+        if not root.is_dir():
+            raise RepositoryTopicCloneError(
+                f"topic workspace path is not a directory: {root}"
+            )
+    elif create:
+        root.mkdir(parents=True, exist_ok=True)
+    else:
+        raise RepositoryTopicCloneError(f"topic workspace is absent: {root}")
+    return root
+
+
+def _reject_symlink_components(path: Path, label: str) -> None:
+    """Reject every existing symlink component in a lifecycle path."""
+    absolute = path.absolute()
+    current = Path(absolute.anchor)
+    for component in absolute.parts[1:]:
+        current /= component
+        if current.is_symlink():
+            raise RepositoryTopicCloneError(
+                f"{label} contains symlinked path component: {current}"
+            )
+
+
+def _safe_under(root: Path, candidate: Path, label: str) -> Path:
+    root_absolute = root.absolute()
+    candidate_absolute = candidate.absolute()
+    _reject_symlink_components(root_absolute, "containment root")
+    _reject_symlink_components(candidate_absolute, label)
+    if (
+        candidate_absolute != root_absolute
+        and root_absolute not in candidate_absolute.parents
+    ):
+        raise RepositoryTopicCloneError(
+            f"{label} is outside containment root {root_absolute}: {candidate_absolute}"
+        )
+    resolved_root = root_absolute.resolve(strict=False)
+    resolved_candidate = candidate_absolute.resolve(strict=False)
+    if (
+        resolved_candidate != resolved_root
+        and resolved_root not in resolved_candidate.parents
+    ):
+        raise RepositoryTopicCloneError(
+            f"{label} escapes containment root {resolved_root}: {resolved_candidate}"
+        )
+    return candidate_absolute
+
+
+def computed_clone_path(
+    request: RepositoryTopicCloneRequest, *, create_topic: bool = False
+) -> Path:
+    """Return the sole lifecycle-owned clone path for a request."""
+    _repository_name(request.repository)
+    workspace = _topic_root(request.workspace_root, request.topic, create=create_topic)
+    return _safe_under(workspace, workspace / request.repository, "topic clone path")
+
+
+def projected_clone_path(
+    workspace_root: Path | str, topic: str, repository: str
+) -> Path:
+    """Compute a clone path without creating or requiring its topic directory."""
+    root = Path(workspace_root)
+    _reject_symlink_components(root.absolute(), "workspace root")
+    workspace = root / "workspace"
+    if workspace.is_symlink():
+        raise RepositoryTopicCloneError(
+            f"workspace directory must not be a symlink: {workspace}"
+        )
+    _reject_symlink_components(workspace.absolute(), "workspace directory")
+    topic_root = workspace / topic_slug(topic)
+    return _safe_under(
+        topic_root,
+        topic_root / _repository_name(repository),
+        "topic clone path",
+    )
+
+
+def _remote_url(path: Path) -> str:
+    return _run_git(path, ["config", "--get", "remote.origin.url"]).strip()
+
+
+def _marker(path: Path, field: str) -> str:
+    try:
+        return _run_git(
+            path, ["config", "--local", "--get", f"{MARKER_PREFIX}.{field}"]
+        ).strip()
+    except GitCommandError:
+        return ""
+
+
+def _set_marker(
+    path: Path,
+    request: RepositoryTopicCloneRequest,
+    owner_sha: str,
+    branch: str,
+) -> None:
+    for field, value in {
+        "repository": request.repository,
+        "topic": topic_slug(request.topic),
+        "branch": branch,
+        "url": _normalise_url(request.url),
+        "owner-evidence-sha256": owner_sha,
+    }.items():
+        _run_git(path, ["config", "--local", f"{MARKER_PREFIX}.{field}", value])
+
+
+def _inspect(
+    path: Path, request: RepositoryTopicCloneRequest, *, owner_sha: str
+) -> CloneState:
+    if not path.exists():
+        return CloneState(path, "absent")
+    if not path.is_dir() or not _run_git_bool(
+        path, ["rev-parse", "--is-inside-work-tree"]
+    ):
+        return CloneState(path, "not-git")
+    if (path / ".git" / "MERGE_HEAD").exists() or (
+        path / ".git" / "MERGE_MSG"
+    ).exists():
+        return CloneState(path, "merge-conflict-preserve")
+    if _run_git(path, ["status", "--porcelain=v1", "--untracked-files=all"]).strip():
+        return CloneState(path, "dirty-worktree-index-or-untracked")
+    try:
+        remote = _normalise_url(_remote_url(path))
+    except GitCommandError:
+        return CloneState(path, "missing-remote")
+    if remote != _normalise_url(request.url):
+        return CloneState(path, "url-mismatch")
+    if _marker(path, "repository") != request.repository:
+        return CloneState(path, "repository-mismatch")
+    if _marker(path, "topic") != topic_slug(request.topic):
+        return CloneState(path, "topic-mismatch")
+    if _marker(path, "owner-evidence-sha256") != owner_sha:
+        return CloneState(path, "owner-evidence-mismatch")
+    try:
+        actual_branch = _run_git(
+            path, ["symbolic-ref", "--quiet", "--short", "HEAD"]
+        ).strip()
+    except GitCommandError:
+        return CloneState(path, "detached")
+    marker_branch = _marker(path, "branch")
+    if marker_branch and marker_branch != actual_branch:
+        return CloneState(path, "actual-branch-mismatch")
+    if actual_branch != request.branch:
+        return CloneState(path, "branch-mismatch")
+    return CloneState(path, "ready")
+
+
+def _remote_branch_exists(remote: str, branch: str) -> bool:
+    result = subprocess.run(
+        ["git", "ls-remote", "--exit-code", "--heads", remote, f"refs/heads/{branch}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode not in (0, 2):
+        raise RepositoryTopicCloneError(
+            f"cannot inspect remote branch {branch!r} on {_normalise_url(remote)}: "
+            f"{result.stderr.strip() or 'git ls-remote failed'}"
+        )
+    return result.returncode == 0
+
+
+def _has_local_branch(path: Path, branch: str) -> bool:
+    return _run_git_bool(
+        path, ["show-ref", "--verify", "--quiet", f"refs/heads/{branch}"]
+    )
+
+
+def _upstream(path: Path, branch: str) -> str:
+    """Return the configured upstream ref, or an empty string."""
+    result = subprocess.run(
+        ["git", "-C", str(path), "rev-parse", "--abbrev-ref", f"{branch}@{{upstream}}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
+def _ensure_branch(path: Path, remote: str, branch: str) -> str:
+    """Select the exact branch and return its verified source identity."""
+    _run_git(path, ["fetch", "origin", "main"])
+    remote_exists = _remote_branch_exists(remote, branch)
+    if _has_local_branch(path, branch):
+        _run_git(path, ["checkout", branch])
+        upstream = _upstream(path, branch)
+        if remote_exists:
+            _run_git(path, ["fetch", "origin", branch])
+            if upstream and upstream != f"origin/{branch}":
+                raise RepositoryTopicCloneError(
+                    f"prepare collision: branch-upstream-mismatch ({upstream})"
+                )
+            if not upstream:
+                _run_git(
+                    path, ["branch", "--set-upstream-to", f"origin/{branch}", branch]
+                )
+            return f"origin/{branch}"
+        if upstream and upstream != "origin/main":
+            raise RepositoryTopicCloneError(
+                f"prepare collision: branch-upstream-mismatch ({upstream})"
+            )
+        return f"local:{_run_git(path, ['rev-parse', branch]).strip()}"
+    if remote_exists:
+        _run_git(path, ["fetch", "origin", branch])
+        _run_git(path, ["checkout", "--track", "-b", branch, f"origin/{branch}"])
+        return f"origin/{branch}"
+    base_sha = _run_git(path, ["rev-parse", "origin/main"]).strip()
+    _run_git(path, ["checkout", "-b", branch, base_sha])
+    return f"origin/main@{base_sha}"
+
+
+def request(
+    url: str,
+    repository: str,
+    workspace_root: Path | str,
+    topic: str,
+    branch: str,
+    owner_evidence: Path | str,
+    *,
+    policy: RepositoryPolicyCallback | None = None,
+) -> PrepareReceipt:
+    """Prepare a topic clone and return a typed receipt."""
+    request_state = RepositoryTopicCloneRequest(
+        url=str(url),
+        repository=_repository_name(repository),
+        workspace_root=Path(workspace_root),
+        topic=topic,
+        branch=_normalise_branch(branch),
+        owner_evidence=_require_evidence(owner_evidence, Path(workspace_root)),
+    )
+    owner_sha = _evidence_sha256(request_state.owner_evidence)
+    clone = computed_clone_path(request_state, create_topic=True)
+    state = _inspect(clone, request_state, owner_sha=owner_sha)
+    if state.state in {
+        "absent",
+        "ready",
+        "actual-branch-mismatch",
+        "branch-mismatch",
+    }:
+        if state.state != "absent":
+            branch_source = _ensure_branch(
+                clone, request_state.url, request_state.branch
+            )
+        else:
+            _run_git(
+                request_state.workspace_root, ["clone", request_state.url, str(clone)]
+            )
+            branch_source = _ensure_branch(
+                clone, request_state.url, request_state.branch
+            )
+    elif state.state in {
+        "dirty-worktree-index-or-untracked",
+        "merge-conflict-preserve",
+        "detached",
+        "not-git",
+        "missing-remote",
+        "url-mismatch",
+        "repository-mismatch",
+        "topic-mismatch",
+        "owner-evidence-mismatch",
+    }:
+        raise RepositoryTopicCloneError(f"prepare collision: {state.state}")
+    else:
+        raise RepositoryTopicCloneError(f"prepare rejected: {state.state}")
+
+    branch_name = _run_git(
+        clone, ["symbolic-ref", "--quiet", "--short", "HEAD"]
+    ).strip()
+    _set_marker(clone, request_state, owner_sha=owner_sha, branch=branch_name)
+    _run_git(
+        clone, ["config", "--local", f"{MARKER_PREFIX}.branch-source", branch_source]
+    )
+    final_state = _inspect(clone, request_state, owner_sha=owner_sha)
+    if final_state.state != "ready":
+        raise RepositoryTopicCloneError(
+            f"prepared clone not ready: {final_state.state}"
+        )
+
+    candidate_sha = _run_git(clone, ["rev-parse", branch_name]).strip()
+    candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
+    _set_marker(clone, request_state, owner_sha=owner_sha, branch=branch_name)
+    receipt = PrepareReceipt(
+        request=request_state,
+        clone=clone,
+        branch=branch_name,
+        candidate_sha=candidate_sha,
+        candidate_tree=candidate_tree,
+    )
+    if policy is not None:
+        policy.apply(operation="prepare", request=request_state, receipt=receipt)
+    return receipt
+
+
+def merge_main(
+    request_state: RepositoryTopicCloneRequest,
+    *,
+    policy: RepositoryPolicyCallback | None = None,
+) -> MergeMainReceipt:
+    """Fetch and merge origin/main with --no-edit and strict ancestor proof."""
+    prepared = request(
+        request_state.url,
+        request_state.repository,
+        request_state.workspace_root,
+        request_state.topic,
+        request_state.branch,
+        request_state.owner_evidence,
+        policy=None,
+    )
+    clone = prepared.clone
+    _run_git(clone, ["fetch", "origin", "main"])
+    candidate_sha = _run_git(clone, ["rev-parse", "HEAD"]).strip()
+    candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
+    origin_main_sha = _run_git(clone, ["rev-parse", "origin/main"]).strip()
+    try:
+        _run_git(clone, ["merge", "--no-edit", "origin/main"])
+    except GitCommandError as exc:
+        if (clone / ".git" / "MERGE_HEAD").exists():
+            raise RepositoryTopicCloneError(
+                "merge-conflict-preserve: normal origin/main merge requires intentional resolution"
+            ) from exc
+        raise
+    merged_sha = _run_git(clone, ["rev-parse", "HEAD"]).strip()
+    merged_tree = _run_git(clone, ["rev-parse", f"{merged_sha}^{{tree}}"]).strip()
+    _run_git(clone, ["merge-base", "--is-ancestor", candidate_sha, merged_sha])
+    _run_git(clone, ["merge-base", "--is-ancestor", origin_main_sha, merged_sha])
+    receipt = MergeMainReceipt(
+        request=request_state,
+        clone=clone,
+        candidate_sha=candidate_sha,
+        candidate_tree=candidate_tree,
+        merged_sha=merged_sha,
+        merged_tree=merged_tree,
+        origin_main_sha=origin_main_sha,
+    )
+    if policy is not None:
+        policy.apply(operation="merge_main", request=request_state, receipt=receipt)
+    return receipt
+
+
+def _read_json_artifact(path: Path | str, label: str) -> object:
+    """Read one JSON artifact with a typed lifecycle error."""
+    try:
+        return json.loads(Path(path).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RepositoryTopicCloneError(f"{label} malformed: {exc}") from exc
+
+
+def verify_publication(
+    request_state: RepositoryTopicCloneRequest,
+    *,
+    candidate_cas: Path | str,
+    pr_lifecycle: Path | str,
+    publication_readback: Path | str | None = None,
+) -> Mapping[str, object]:
+    """Validate canonical PR-head or merged-publication lifecycle evidence."""
+    contract = _load_publication_contract()
+    cas = _read_json_artifact(candidate_cas, "candidate CAS receipt")
+    lifecycle = _read_json_artifact(pr_lifecycle, "PR lifecycle receipt")
+    try:
+        if publication_readback is None:
+            checked_lifecycle = contract.validate_candidate_cas_pr_transition(
+                cas, lifecycle
+            )
+            checked_readback: Mapping[str, object] | None = None
+        else:
+            checked_readback = contract.validate_publication_readback_transition(
+                cas,
+                lifecycle,
+                _read_json_artifact(
+                    publication_readback, "publication readback receipt"
+                ),
+            )
+            checked_lifecycle = contract.validate_candidate_cas_pr_transition(
+                cas, lifecycle
+            )
+    except (TypeError, ValueError) as exc:
+        raise RepositoryTopicCloneError(
+            f"publication lifecycle evidence invalid: {exc}"
+        ) from exc
+
+    state = checked_lifecycle.get("state")
+    if state not in {
+        "draft",
+        "ready",
+        "changes_requested",
+        "external_review",
+        "merged",
+    }:
+        raise RepositoryTopicCloneError(
+            f"publication lifecycle state does not prove a PR head: {state!r}"
+        )
+    if state == "merged" and checked_readback is None:
+        raise RepositoryTopicCloneError(
+            "publication lifecycle merged state requires publication readback"
+        )
+    if state != "merged" and checked_readback is not None:
+        raise RepositoryTopicCloneError(
+            "publication readback requires merged lifecycle state"
+        )
+    expected_head_ref = f"refs/heads/{request_state.branch}"
+    remote = cast(Mapping[str, object], checked_lifecycle["remote_identity"])
+    base = cast(Mapping[str, object], checked_lifecycle["base_identity"])
+    head = cast(Mapping[str, object], checked_lifecycle["head_identity"])
+    if (
+        remote.get("remote_name") != "origin"
+        or remote.get("repo_name") != request_state.repository
+        or remote.get("ref") != expected_head_ref
+        or head.get("repo_name") != request_state.repository
+        or head.get("ref") != expected_head_ref
+        or base.get("ref") != "refs/heads/main"
+    ):
+        raise RepositoryTopicCloneError(
+            "publication lifecycle repository/branch identity mismatch"
+        )
+    return {
+        "candidate_cas": cast(Mapping[str, object], cas),
+        "pr_lifecycle": checked_lifecycle,
+        "publication_readback": checked_readback,
+    }
+
+
+def cleanup(
+    request_state: RepositoryTopicCloneRequest,
+    *,
+    expected_clone: Path | str,
+    candidate_cas: Path | str | None = None,
+    pr_lifecycle: Path | str | None = None,
+    publication_readback: Path | str | None = None,
+    apply: bool,
+) -> CleanupProof:
+    """Validate evidence and remove the prepared clone if authorized."""
+    if candidate_cas is None or pr_lifecycle is None:
+        raise RepositoryTopicCloneError(
+            "cleanup hold: canonical candidate CAS and PR lifecycle evidence required"
+        )
+    topic_root = _topic_root(
+        request_state.workspace_root, request_state.topic, create=False
+    )
+    clone = _safe_under(topic_root, Path(expected_clone), "expected clone")
+    owner_sha = _evidence_sha256(
+        _require_evidence(request_state.owner_evidence, request_state.workspace_root)
+    )
+    state = _inspect(clone, request_state, owner_sha=owner_sha)
+    if state.state != "ready":
+        raise RepositoryTopicCloneError(f"cleanup hold: {state.state}")
+
+    _run_git(clone, ["fetch", "origin", "main"])
+    branch = _run_git(clone, ["symbolic-ref", "--quiet", "--short", "HEAD"]).strip()
+    if branch != request_state.branch:
+        raise RepositoryTopicCloneError(f"cleanup hold: branch-mismatch ({branch})")
+
+    candidate_sha = _run_git(clone, ["rev-parse", "HEAD"]).strip()
+    candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
+    origin_main_sha = _run_git(clone, ["rev-parse", "origin/main"]).strip()
+
+    evidence = verify_publication(
+        request_state,
+        candidate_cas=candidate_cas,
+        pr_lifecycle=pr_lifecycle,
+        publication_readback=publication_readback,
+    )
+    lifecycle = cast(Mapping[str, object], evidence["pr_lifecycle"])
+    head = cast(Mapping[str, object], lifecycle["head_identity"])
+    if (
+        head.get("commit_sha") != candidate_sha
+        or head.get("tree_sha") != candidate_tree
+    ):
+        raise RepositoryTopicCloneError(
+            "cleanup hold: local candidate identity mismatch"
+        )
+
+    if publication_readback is None:
+        _run_git(clone, ["fetch", "origin", request_state.branch])
+        remote_head = _run_git(
+            clone, ["rev-parse", f"refs/remotes/origin/{request_state.branch}"]
+        ).strip()
+        if remote_head != candidate_sha:
+            raise RepositoryTopicCloneError("cleanup hold: remote PR head mismatch")
+        evidence_kind = "publication-head"
+    else:
+        readback = cast(Mapping[str, object], evidence["publication_readback"])
+        pr_identity = cast(Mapping[str, object], readback["pr_identity"])
+        merge_sha = cast(str, pr_identity["merge_commit_sha"])
+        merge_tree = cast(str, pr_identity["merge_tree_sha"])
+        observed_merge_tree = _run_git(
+            clone, ["rev-parse", f"{merge_sha}^{{tree}}"]
+        ).strip()
+        if observed_merge_tree != merge_tree:
+            raise RepositoryTopicCloneError("cleanup hold: merged tree mismatch")
+        _run_git(clone, ["merge-base", "--is-ancestor", merge_sha, origin_main_sha])
+        post_merge_base = cast(str, pr_identity["post_merge_base_ref_sha"])
+        _run_git(
+            clone, ["merge-base", "--is-ancestor", post_merge_base, origin_main_sha]
+        )
+        evidence_kind = "integrated-publication"
+
+    if not apply:
+        return CleanupProof(
+            request=request_state, clone=clone, removed=False, evidence=evidence_kind
+        )
+
+    shutil.rmtree(clone)
+    if topic_root.exists() and not any(topic_root.iterdir()):
+        topic_root.rmdir()
+    return CleanupProof(
+        request=request_state, clone=clone, removed=True, evidence=evidence_kind
+    )
+
+
+def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    commands = parser.add_subparsers(dest="command", required=True)
+
+    prepare = commands.add_parser("prepare")
+    prepare.add_argument("--url", required=True)
+    prepare.add_argument("--repo-name", required=True)
+    prepare.add_argument("--workspace-root", required=True)
+    prepare.add_argument("--topic", required=True)
+    prepare.add_argument("--branch", required=True)
+    prepare.add_argument("--owner-evidence", required=True)
+
+    merge = commands.add_parser("merge-main")
+    merge.add_argument("--url", required=True)
+    merge.add_argument("--repo-name", required=True)
+    merge.add_argument("--workspace-root", required=True)
+    merge.add_argument("--topic", required=True)
+    merge.add_argument("--branch", required=True)
+    merge.add_argument("--owner-evidence", required=True)
+
+    clean = commands.add_parser("cleanup")
+    clean.add_argument("--url", required=True)
+    clean.add_argument("--repo-name", required=True)
+    clean.add_argument("--workspace-root", required=True)
+    clean.add_argument("--topic", required=True)
+    clean.add_argument("--branch", required=True)
+    clean.add_argument("--owner-evidence", required=True)
+    clean.add_argument("--expected-clone", required=True)
+    clean.add_argument("--candidate-cas", required=True)
+    clean.add_argument("--pr-lifecycle", required=True)
+    clean.add_argument("--publication-readback")
+    clean.add_argument("--apply", action="store_true")
+
+    return parser.parse_args(argv)
+
+
+def main(argv: list[str] | None = None) -> None:
+    """CLI entrypoint for repository-topic clone lifecycle operations."""
+    args = _parse_args(argv)
+    request_state = RepositoryTopicCloneRequest(
+        url=args.url,
+        repository=args.repo_name,
+        workspace_root=Path(args.workspace_root),
+        topic=args.topic,
+        branch=_normalise_branch(args.branch),
+        owner_evidence=_require_evidence(
+            args.owner_evidence, Path(args.workspace_root)
+        ),
+    )
+    try:
+        if args.command == "prepare":
+            receipt = request(
+                args.url,
+                args.repo_name,
+                args.workspace_root,
+                args.topic,
+                args.branch,
+                args.owner_evidence,
+            )
+            print("REQUEST_STATE=ready")
+            print(f"REQUEST_REPO={receipt.request.repository}")
+            print(f"REQUEST_TOPIC={topic_slug(receipt.request.topic)}")
+            print(f"REQUEST_BRANCH={receipt.branch}")
+            print(f"REQUEST_CLONE={receipt.clone}")
+            print(f"REQUEST_CANDIDATE_SHA={receipt.candidate_sha}")
+            print(f"REQUEST_CANDIDATE_TREE={receipt.candidate_tree}")
+        elif args.command == "merge-main":
+            receipt = merge_main(request_state)
+            print("MERGE_STATUS=done")
+            print(f"MERGE_CLONE={receipt.clone}")
+            print(f"MERGE_CANDIDATE_SHA={receipt.candidate_sha}")
+            print(f"MERGE_CANDIDATE_TREE={receipt.candidate_tree}")
+            print(f"MERGE_INTEGRATED_SHA={receipt.merged_sha}")
+            print(f"MERGE_INTEGRATED_TREE={receipt.merged_tree}")
+            print(f"MERGE_ORIGIN_MAIN_SHA={receipt.origin_main_sha}")
+        else:
+            proof = cleanup(
+                request_state,
+                expected_clone=Path(args.expected_clone),
+                candidate_cas=args.candidate_cas,
+                pr_lifecycle=args.pr_lifecycle,
+                publication_readback=args.publication_readback,
+                apply=args.apply,
+            )
+            action = "removed" if args.apply else "would-remove"
+            print(f"CLEANUP={proof.clone}:{action}")
+    except RepositoryTopicCloneError as exc:
+        print(f"REPOSITORY_TOPIC_CLONE_ERROR={exc}", file=sys.stderr)
+        raise SystemExit(1)
+
+
+if __name__ == "__main__":
+    main()
