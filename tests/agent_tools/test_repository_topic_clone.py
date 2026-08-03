@@ -5,7 +5,7 @@
 # contract test
 # responsibility Verifies repository-topic clone prepare, merge-main, and cleanup gates.
 # upstream design ../../documents/rule/repository-topic-clone.md repository-topic clone lifecycle contract
-# downstream implementation ../../tools/agent_tools/repository_topic_clone.py
+# downstream implementation ../../tools/agent_tools/repository_topic_clone.py owns lifecycle behavior exercised by this test
 # downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this test header
 # @dependency-end
 

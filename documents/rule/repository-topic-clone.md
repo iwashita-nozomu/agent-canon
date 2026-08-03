@@ -1,6 +1,6 @@
 <!--
 @dependency-start
-contract rule
+contract policy
 responsibility Defines the repository-topic clone lifecycle contract for generic topic/workspace clones.
 upstream design ../design/dependency-manifest-design.md repository-topic clone intent
 upstream design ../../agents/skills/repository-topic-clone.md operator-facing route

@@ -2,7 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Implements repository-topic clone lifecycle with strict cleanup and evidence checks.
-# upstream design ../../documents/rule/repository-topic-clone.md
+# upstream design ../../documents/rule/repository-topic-clone.md defines generic clone and cleanup behavior
 # downstream implementation ../../tests/agent_tools/test_repository_topic_clone.py validates repository-topic clone lifecycle.
 # @dependency-end
 """Manage repository-topic clones with explicit receipts and strict cleanup gates."""
