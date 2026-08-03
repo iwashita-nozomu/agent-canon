@@ -403,10 +403,21 @@ readback. Every other stale reason, typed-unavailable status, persisted readback
 corruption, runtime receipt or evidence failure, producer mismatch, incomplete
 or invalid status, build failure, and non-fresh readback fails closed without
 admitting a build. The producer continues to own its existing lock, staging,
-atomic rename, and durability readback. The standalone runtime dashboard
-workflow is the single periodic maintenance owner and invokes this same
-admission predicate only for its scheduled event; its cron value remains owned
-only by that workflow.
+atomic rename, and durability readback.
+
+The standalone runtime dashboard workflow is the periodic producer authority,
+not an ordinary graph consumer. Only its scheduled event invokes the
+source-root-resolved canonical Graph CLI to run one direct `graph build`; pull
+request, push, and manual-dispatch events skip that step. A fresh checkout with
+no ignored graph database therefore starts from the producer rather than from
+consumer status. The Graph CLI emits build exit `0` only with `status=fresh`;
+that result is required before the workflow runs `graph status` readback.
+Build failure and published incomplete status fail before readback. The
+read-only status command must then return exit `0` and fresh while revalidating
+the persisted publication, snapshot HEAD,
+source/content/input fingerprints, and producer identity. The scheduled build
+uses the producer's existing lock, staging, atomic rename, and durability
+contract. Its cron value remains owned only by that workflow.
 
 source snapshot の候補 path は、解決先の内容ではなく候補 path 自体の
 filesystem object を読む。`dependency_manifest.rs` の単一 source-path
