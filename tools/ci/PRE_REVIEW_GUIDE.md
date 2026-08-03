@@ -57,6 +57,15 @@ The PR quick chain intentionally runs pytest and pyright while skipping Ruff;
 the explicit full Python quality command adds Ruff. Neither shared path invokes
 pydocstyle.
 
+For `check_agent_canon_pr.sh`, standalone and derived AgentCanon gates run
+shared AgentCanon surfaces only. A derived parent emits
+`AGENT_CANON_PR_PROJECT_QUALITY=delegated` with owner `parent_ci`; its workflow
+must expose that owner marker and canonical `make ci` command, regardless of
+job name. Project tests, type checks, and lint remain in that selected parent
+CI route. Standalone AgentCanon keeps its existing `static-gates` shared owner
+and adds no repository-wide project-quality job. The shared gate does not
+invoke `run_all_checks.sh`.
+
 Explicit Docstring review for selected Python targets:
 
     tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>

@@ -34,27 +34,34 @@ class RunAllChecksScriptTest(unittest.TestCase):
             '${AGENT_CANON_SOURCE_ROOT}/.agent-canon/log-archive}"'
         )
         mkdir_marker = 'mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"'
-        eval_default_marker = 'AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${AGENT_CANON_CI_EVAL_LOG_DIR}"'
-        state_default_marker = (
-            'AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${WORKSPACE_ROOT}/.state/agent-eval-runs/run-all-checks"'
+        eval_default_marker = (
+            'AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${AGENT_CANON_CI_EVAL_LOG_DIR}"'
         )
-        producer_marker = 'tools/agent_tools/run_accumulated_agent_evals.py "${accumulated_eval_args[@]}"'
-        checker_marker = "tools/agent_tools/eval_accumulation_check.py"
-        command_env_marker = 'AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"'
+        state_default_marker = 'AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${WORKSPACE_ROOT}/.state/agent-eval-runs/run-all-checks"'
+        producer_marker = (
+            'run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}"'
+        )
+        checker_marker = 'eval_accumulation_check.py" 2>&1; then'
+        command_env_marker = (
+            'AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"'
+        )
 
         self.assertIn(archive_marker, text)
         self.assertIn(mkdir_marker, text)
         self.assertIn(eval_default_marker, text)
         self.assertIn(state_default_marker, text)
         self.assertIn(command_env_marker, text)
-        self.assertIn('--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"', text)
+        self.assertIn(
+            '--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"',
+            text,
+        )
         self.assertLess(text.index(archive_marker), text.index(producer_marker))
         self.assertLess(text.index(mkdir_marker), text.index(producer_marker))
         self.assertLess(text.index(producer_marker), text.index(checker_marker))
         self.assertNotIn("export AGENT_CANON_HOOK_ARCHIVE_DIR", text)
 
-    def test_pr_gate_reuses_quick_ci_without_repeating_parent_gates(self) -> None:
-        """The PR gate should not rerun AgentCanon checks it already executed directly."""
+    def test_pr_gate_only_keeps_shared_surface_ownership(self) -> None:
+        """The PR gate emits ownership evidence without running run_all_checks."""
         ci_text = SCRIPT.read_text(encoding="utf-8")
         pr_text = PR_SCRIPT.read_text(encoding="utf-8")
 
@@ -65,10 +72,11 @@ class RunAllChecksScriptTest(unittest.TestCase):
             "GITHUB_WORKFLOW_CHECKS=skip reason=already_checked_by_parent_gate",
             ci_text,
         )
-        self.assertIn(
-            "PR_QUICK_CI_ARGS=(--quick --skip-docs --skip-github-workflows)",
-            pr_text,
-        )
+        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", pr_text)
+        self.assertIn('local owner="parent_ci"', pr_text)
+        self.assertIn('owner="agentcanon_project_ci"', pr_text)
+        self.assertNotIn('bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh"', pr_text)
+        self.assertNotIn("PR_QUICK_CI_ARGS=", pr_text)
 
     def test_pr_gate_has_no_legacy_profile(self) -> None:
         """The PR gate must keep one explicit full maintenance/source route."""
@@ -89,7 +97,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertIn('strict_dependency_status}" != "prepared"', ci_text)
         self.assertIn('strict_dependency_status}" != "skipped"', ci_text)
         self.assertIn(
-            "PR_GATE_DEPENDENCY_GRAPH_STATUS=\"${strict_dependency_status}\"",
+            'PR_GATE_DEPENDENCY_GRAPH_STATUS="${strict_dependency_status}"',
             ci_text,
         )
         self.assertIn("PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped", pr_text)
@@ -114,7 +122,9 @@ class RunAllChecksScriptTest(unittest.TestCase):
 
         self.assertIn("agentcanon_pr_branch_integrity", pr_text)
         self.assertIn("submodule-gitlink-worktree-mismatch", pr_text)
-        self.assertIn("submodule-pinned-commit-unreachable-from-configured-remote", pr_text)
+        self.assertIn(
+            "submodule-pinned-commit-unreachable-from-configured-remote", pr_text
+        )
         self.assertIn("run_shared_surface_check", pr_text)
         self.assertIn("AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required", pr_text)
         self.assertNotIn("blocked_dirty_agentcanon_branch", pr_text)
@@ -136,16 +146,16 @@ class RunAllChecksScriptTest(unittest.TestCase):
         pre_review_text = PRE_REVIEW_SCRIPT.read_text(encoding="utf-8")
         quality_text = PYTHON_QUALITY_SCRIPT.read_text(encoding="utf-8")
 
-        self.assertIn("tools/ci/run_python_quality_checks.sh", ci_text)
+        self.assertIn('bash "${CANON_CI_ROOT}/run_python_quality_checks.sh"', ci_text)
         self.assertIn("tools/ci/run_python_quality_checks.sh", pre_review_text)
         self.assertIn(
             "python_quality_runner=tools/ci/run_python_quality_checks.sh",
             pre_review_text,
         )
-        self.assertIn('python_quality_args+=(--quick)', ci_text)
+        self.assertIn("python_quality_args+=(--quick)", ci_text)
         self.assertIn("PYTHON_QUALITY_CHECKS=pass", quality_text)
-        self.assertIn("PYTHON_SOURCE_PATHS+=(\"$candidate_path\")", quality_text)
-        self.assertIn("PYTHON_TEST_PATHS+=(\"$candidate_path\")", quality_text)
+        self.assertIn('PYTHON_SOURCE_PATHS+=("$candidate_path")', quality_text)
+        self.assertIn('PYTHON_TEST_PATHS+=("$candidate_path")', quality_text)
         self.assertIn("find tests", quality_text)
         self.assertIn("-type f", quality_text)
         self.assertNotIn("-prune", quality_text)
