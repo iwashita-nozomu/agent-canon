@@ -90,8 +90,8 @@ runtime_umask = "0007"
 local_flock_filesystems = ["btrfs", "ext4", "xfs"]
 provision_receipt = "/var/lib/agent-canon/runtime/shared-runtime-provision.json"
 readback_receipt = "/var/lib/agent-canon/runtime/shared-runtime-readback.json"
-compose_user = "${LOCAL_UID}:${LOCAL_GID}"
-compose_group_add = "${AGENT_CANON_RUNTIME_GID}"
+compose_user = "PROJECT_UID:PROJECT_GID (materialized host UID/GID)"
+compose_group_add = "AGENT_CANON_RUNTIME_GID or PROJECT_GID"
 compose_bind_source = "/var/lib/agent-canon/runtime"
 compose_bind_target = "/var/lib/agent-canon/runtime"
 

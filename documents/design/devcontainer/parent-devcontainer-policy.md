@@ -67,27 +67,29 @@ symlink 先の `devcontainer.json` は、親レポのルートから AgentCanon 
 - post-attach:
   `vendor/agent-canon/.devcontainer/post-attach.sh`
 
-親環境の両 source が実在 file に解決できるときだけ、generator が次を read-only
-bind mount します。
+親環境の両 source が実在 file に解決できるとき、generator は parent environment を
+read-only bind mount します。host zshrc は regular file の場合だけ追加します。
 
 - `.devcontainer/parent-environment.sh` ->
   `/etc/project-template/parent-environment.sh`
 - host の configured source expression `${HOME}/.zshrc` ->
-  `/etc/project-template/zsh/.zshrc`
+  `/home/<project-user>/.zshrc`（host fileが存在する場合だけ）
 
-validator は生成 Compose の host zshrc mount が bind type、source expression、target、
-read-only を満たすことを静的に確認し、fresh clone / CI runner の現在の host file を
-probe しません。実行時は host の `${HOME}/.zshrc` が regular file であることを
-runtime premise とし、欠落・directory・symlink を別の guessed path で補いません。image-owned
-`/etc/project-template/zsh/.zshenv` は後続の親 image 側でこの read-only mounted
-parent script を source します。
+validator は、zshrcが生成された場合に限り、Composeのmountがbind type、source
+expression、non-root target、read-onlyを満たすことを静的に確認する。fresh clone / CI
+runnerの現在のhost fileはprobeしない。実行時は `${HOME}/.zshrc` がregular fileの
+場合だけnon-root homeへ投影し、欠落・directory・symlinkの場合はmountを省略する。
+省略はfailureではない。image-owned startup fileはmountの有無にかかわらず
+`/etc/project-template/parent-environment.sh`をsourceし、zshのdefault startupを
+完了する。
 
 generator は既存の `pack.runtime.shell` を process boundary として使います。親の
 default pack は zsh を選び、明示的な bash pack と smoke shell は bash のままです。
 zsh とその descendants は zsh startup を通じて parent variables を受け取ります。
 Compose が parent variables の値を再定義することはなく、関連する Compose-owned
-environment は `HOME`、`ZDOTDIR`、`SHELL` だけです。mapped UID/GID の `HOME` は
-zsh startup より前に generator が用意する tmpfs（または同等の直接機構）です。
+environment は `HOME`、`ZDOTDIR`、`SHELL`、`AGENT_CANON_CONTAINER_USER` です。
+`HOME` は dedicated non-root userの `/home/project` であり、zsh startupはoptional
+host zshrcの有無にかかわらずimage-owned startup fileから開始します。
 standalone AgentCanon source layout では host `~/.zshrc`、parent environment mount、
 `HOME`、`ZDOTDIR`、tmpfs を要求せず、pack-derived command だけを生成します。
 

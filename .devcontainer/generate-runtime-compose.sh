@@ -33,6 +33,23 @@ if [ "$(basename "$workspace_parent")" != "workspace" ]; then
 fi
 repo_basename="$(basename "$repo_root")"
 container_repo_root="/workspace/${repo_basename}"
+if [[ "${PROJECT_USER+x}" = "x" ]]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_USER_OVERRIDE_FORBIDDEN:canonical=project:received=%s\n' "$PROJECT_USER" >&2
+  exit 1
+fi
+project_user="project"
+project_uid="${PROJECT_UID:-$(id -u)}"
+project_gid="${PROJECT_GID:-$(id -g)}"
+runtime_gid="${AGENT_CANON_RUNTIME_GID:-$project_gid}"
+if [[ ! "$project_uid" =~ ^[1-9][0-9]*$ || ! "$project_gid" =~ ^[1-9][0-9]*$ ]]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_MUST_BE_POSITIVE_DECIMAL:uid=%s:gid=%s\n' "$project_uid" "$project_gid" >&2
+  exit 1
+fi
+if [[ ! "$runtime_gid" =~ ^[1-9][0-9]*$ ]]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=RUNTIME_GID_MUST_BE_POSITIVE_DECIMAL:gid=%s\n' "$runtime_gid" >&2
+  exit 1
+fi
+project_home="/home/${project_user}"
 pack="${repo_root}/docker/packs/default.toml"
 compose_output_raw="${AGENT_CANON_DOCKER_COMPOSE_OUTPUT:-.devcontainer/docker-compose.generated.yml}"
 if [ "${compose_output_raw#/}" = "$compose_output_raw" ]; then
@@ -163,12 +180,14 @@ volume_lines+=(
   "        target: /var/lib/agent-canon/runtime"
 )
 if [ "$parent_layout" = true ]; then
-  volume_lines+=(
-    "      - type: bind"
-    '        source: "${HOME}/.zshrc"'
-    '        target: "/etc/project-template/zsh/.zshrc"'
-    "        read_only: true"
-  )
+  if [ -f "${HOME}/.zshrc" ] && [ ! -L "${HOME}/.zshrc" ]; then
+    volume_lines+=(
+      "      - type: bind"
+      '        source: "${HOME}/.zshrc"'
+      "        target: \"${project_home}/.zshrc\""
+      "        read_only: true"
+    )
+  fi
 fi
 if [ "$parent_environment_enabled" = true ]; then
   parent_environment_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$parent_environment_source")"
@@ -221,10 +240,10 @@ if [ -n "${AGENT_CANON_SECRET_DIR:-}" ] && [ "$secret_mode" != "invalid" ]; then
   fi
 fi
 if [ -d "${HOME}/.config/gh" ]; then
-  volume_lines+=("      - ${HOME}/.config/gh:/root/.config/gh")
+  volume_lines+=("      - ${HOME}/.config/gh:${project_home}/.config/gh:ro")
 fi
 if [ -d "${HOME}/.ssh" ]; then
-  volume_lines+=("      - ${HOME}/.ssh:/root/.ssh:ro")
+  volume_lines+=("      - ${HOME}/.ssh:${project_home}/.ssh:ro")
 fi
 if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
   volume_lines+=("      - ${SSH_AUTH_SOCK}:/ssh-agent")
@@ -299,9 +318,10 @@ environment_lines=(
 )
 if [ "$parent_layout" = true ]; then
   environment_lines=(
-    '      HOME: "/tmp/project-template-home"'
-    '      ZDOTDIR: "/etc/project-template/zsh"'
+    "      HOME: \"${project_home}\""
+    "      ZDOTDIR: \"${project_home}\""
     "      SHELL: \"${runtime_shell}\""
+    "      AGENT_CANON_CONTAINER_USER: \"${project_user}\""
     "${environment_lines[@]}"
   )
 fi
@@ -321,21 +341,20 @@ mkdir -p "$(dirname "$compose_output")"
   printf 'name: %s\n' "$compose_project_name"
   printf 'services:\n'
   printf '  workspace:\n'
-  printf '    user: "${LOCAL_UID}:${LOCAL_GID}"\n'
+  printf '    user: "%s:%s"\n' "$project_uid" "$project_gid"
   printf '    group_add:\n'
-  printf '      - "${AGENT_CANON_RUNTIME_GID}"\n'
+  printf '      - "%s"\n' "$runtime_gid"
   if [ "$compose_mode" = "repo-docker-pack" ]; then
     printf '    build:\n'
     printf '      context: ..\n'
     printf '      dockerfile: %s\n' "$dockerfile"
+    printf '      args:\n'
+    printf '        PROJECT_UID: "%s"\n' "$project_uid"
+    printf '        PROJECT_GID: "%s"\n' "$project_gid"
   else
     printf '    image: mcr.microsoft.com/devcontainers/base:ubuntu-22.04\n'
   fi
   printf '    working_dir: %s\n' "$container_repo_root"
-  if [ "$parent_layout" = true ]; then
-    printf '    tmpfs:\n'
-    printf '      - /tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700\n'
-  fi
   printf '    volumes:\n'
   printf '%s\n' "${volume_lines[@]}"
   printf '    command: %s -lc "sleep infinity"\n' "$runtime_shell"

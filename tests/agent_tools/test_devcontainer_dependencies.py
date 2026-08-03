@@ -775,7 +775,7 @@ class DependencyModelTests(unittest.TestCase):
 
         self.assertEqual(pyyaml.package, "pyyaml")
         self.assertEqual(pyyaml.method.value, "pip-user")
-        self.assertEqual(pyyaml.version, "6.0.2")
+        self.assertEqual(pyyaml.version, "6.0.3")
         self.assertEqual(pyyaml.deps, ("python3-pip",))
         self.assertEqual(pyyaml.verification.executable, "python3")
         self.assertTrue(
@@ -1184,6 +1184,7 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn('NODE_NPM_VERSION="10.9.2"', bootstrap)
         self.assertIn("tomllib", bootstrap)
         self.assertIn("tomli", bootstrap)
+        self.assertIn('"$devcontainer_dir/bootstrap-dependencies.sh" --install-language-runtime', post_create)
         self.assertNotIn("NODE_VERSION:-", bootstrap)
         self.assertNotIn("npm install -g", post_create)
         self.assertNotIn("install_github_cli", post_create)

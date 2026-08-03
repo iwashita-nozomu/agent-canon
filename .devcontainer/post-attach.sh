@@ -86,12 +86,12 @@ if command -v codex >/dev/null 2>&1 && codex login status >/dev/null 2>&1; then
 fi
 
 gh_config_status="not-mounted"
-if [ -d /root/.config/gh ] || [ -d "${HOME:-/root}/.config/gh" ]; then
+if [ -d "${HOME:-}/.config/gh" ]; then
   gh_config_status="mounted"
 fi
 
 ssh_dir_status="not-mounted"
-if [ -d /root/.ssh ] || [ -d "${HOME:-/root}/.ssh" ]; then
+if [ -d "${HOME:-}/.ssh" ]; then
   ssh_dir_status="mounted"
 fi
 
@@ -140,6 +140,25 @@ check_dependency_module_runtime() {
 }
 
 check_dependency_module_runtime
+
+if [ -n "${AGENT_CANON_CONTAINER_USER:-}" ]; then
+  [ "$(id -u)" -ne 0 ] || {
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=default-user-is-root" >&2
+    exit 1
+  }
+  [ "$(id -un)" = "$AGENT_CANON_CONTAINER_USER" ] || {
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-user-name-mismatch:${AGENT_CANON_CONTAINER_USER}:$(id -un)" >&2
+    exit 1
+  }
+  [ "${HOME:-}" = "/home/${AGENT_CANON_CONTAINER_USER}" ] || {
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-home-mismatch:${HOME:-}" >&2
+    exit 1
+  }
+  [ "$(stat -c '%u' "$HOME")" = "$(id -u)" ] || {
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-home-ownership-mismatch:${HOME}" >&2
+    exit 1
+  }
+fi
 
 echo
 echo "----------------------------------------"
