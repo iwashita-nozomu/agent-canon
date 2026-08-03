@@ -63,6 +63,9 @@ upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership
 - `docker version` か `podman version` が通ること
 - Docker を使う場合、現在の shell から daemon socket に到達できること
 - host で `make docker-build-check` を実行できることを推奨します
+- default devcontainer は host `sudo`、`agent-canon-runtime` system group、または
+  `/var/lib/agent-canon/runtime` の事前作成を要求しません。これらは GPU admission
+  opt-in profile が選択された場合だけの将来 contract です。
 
 補足:
 
@@ -84,8 +87,10 @@ VS Code を使う場合の既定は次です。
 
 dev container は `.devcontainer/` を使います。起動時に generated compose を作り、
 
-- GPU があれば `gpus: all`
-- GPU がなければ CPU-only
+- default profile は host GPU/NVIDIA runtime を probe せず、
+  `DEVCONTAINER_GPU_MODE=disabled` を設定し、`DEVCONTAINER_GPU_REQUEST` と
+  `gpus: all` を生成しない
+- GPU を必要とする実験の明示 opt-in profile は Issue [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) で追跡する。既定境界の authority は AgentCanon の linked design/implementation とする
 - `~/.config/gh`、`~/.ssh` があれば bind mount
 - `SSH_AUTH_SOCK` が有効なら agent socket を forward
 - `AGENT_CANON_SECRET_DIR` が既存 directory を指すときだけ、既定では
@@ -101,8 +106,11 @@ GPU は必須ではありません。
 - CPU-only host:
   - 既定でサポートします
 - NVIDIA GPU host:
-  - `nvidia-smi` が使えることを推奨します
-  - dev container は GPU を検出したときだけ `gpus: all` を追加します
+  - `nvidia-smi` は GPU 実験を明示的に選択する場合だけ確認します。default generator は probe しません
+  - default dev container は GPU を検出しても `gpus: all` を追加せず、`DEVCONTAINER_GPU_MODE=disabled` を出力します
+  - shared lock、runtime receipt、host runtime group、GPU scheduler は default の
+    host requirement ではありません。実験 scheduler/managed experiment 自体を削除
+    する変更ではなく、opt-in profile の設計を #521 で追跡します。
 
 GPU が無いこと自体を failure 条件にしません。
 

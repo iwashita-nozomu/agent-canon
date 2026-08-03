@@ -1046,7 +1046,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (root / "docker" / "Dockerfile").write_text(
-                "RUN apt-get update && apt-get install -y rsync openssh-client graphviz python3.11-venv\n",
+                "RUN apt-get update && apt-get install -y rsync openssh-client graphviz python3-venv\n",
                 encoding="utf-8",
             )
             (root / "docker" / "install_python_dependencies.sh").write_text(

@@ -334,7 +334,7 @@ def main() -> int:
             mounts.append(f"{host_ssh_dir}:/tmp/host-ssh-dir:ro")
 
         host_ssh_auth_sock = os.environ.get("SSH_AUTH_SOCK", "")
-        if forward_ssh_auth_sock and host_ssh_auth_sock:
+        if forward_ssh_auth_sock and host_ssh_auth_sock and Path(host_ssh_auth_sock).is_socket():
             mounts.append(f"{host_ssh_auth_sock}:/tmp/host-ssh-agent.sock")
             envs.append("SSH_AUTH_SOCK=/tmp/host-ssh-agent.sock")
 

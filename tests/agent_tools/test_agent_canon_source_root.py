@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import json
+import os
 import shutil
 import stat
 import subprocess
@@ -19,6 +21,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
+PUBLIC_RESOLVER = "tools/agent-canon/agent_tools/agent_canon_source_root.py"
 sys.path.insert(0, str(TOOLS_ROOT))
 
 from agent_canon_source_root import (  # noqa: E402
@@ -42,6 +45,118 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             canon_root=command_root,
         )
 
+    def _write_post_create_fixture(
+        self, root: Path, *, derived: bool
+    ) -> tuple[Path, Path, Path]:
+        """Create a minimal standalone or vendored resolver lifecycle fixture."""
+        parent = root / "parent"
+        source = (
+            parent / "vendor" / "agent-canon" if derived else root / "agent-canon"
+        )
+        workspace = parent if derived else source
+        (source / "agents" / "skills").mkdir(parents=True)
+        (source / "tools" / "agent_tools").mkdir(parents=True)
+        (source / "agents" / "skills" / "catalog.yaml").write_text(
+            "skills: []\n", encoding="utf-8"
+        )
+        resolver_source = (
+            PROJECT_ROOT / "tools" / "agent_tools" / "agent_canon_source_root.py"
+        )
+        shutil.copy2(
+            resolver_source,
+            source / "tools" / "agent_tools" / resolver_source.name,
+        )
+        devcontainer = source / ".devcontainer"
+        devcontainer.mkdir(parents=True)
+        shutil.copy2(
+            PROJECT_ROOT / ".devcontainer" / "devcontainer.json",
+            devcontainer / "devcontainer.json",
+        )
+        entrypoint_source = PROJECT_ROOT / ".devcontainer" / "post-create-entrypoint.sh"
+        shutil.copy2(entrypoint_source, devcontainer / entrypoint_source.name)
+        (devcontainer / entrypoint_source.name).chmod(0o755)
+        (devcontainer / "post-create.sh").write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "printf 'shared\\n' >> \"$1/order.log\"\n"
+            "exit \"${SHARED_STATUS:-0}\"\n",
+            encoding="utf-8",
+        )
+        (devcontainer / "post-create.sh").chmod(0o755)
+        (devcontainer / "generate-runtime-compose.sh").write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "printf 'initialize\\n' >> \"${AGENT_CANON_TEST_LOG}\"\n",
+            encoding="utf-8",
+        )
+        (devcontainer / "generate-runtime-compose.sh").chmod(0o755)
+        (devcontainer / "post-attach.sh").write_text(
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            "printf 'attach\\n' >> \"${AGENT_CANON_TEST_LOG}\"\n",
+            encoding="utf-8",
+        )
+        (devcontainer / "post-attach.sh").chmod(0o755)
+        if derived:
+            (parent / ".git").mkdir(parents=True)
+            (source / ".git").write_text(
+                "gitdir: ../../.git/modules/vendor/agent-canon\n",
+                encoding="utf-8",
+            )
+            parent_devcontainer = parent / ".devcontainer"
+            parent_devcontainer.mkdir(parents=True)
+            (parent_devcontainer / "post-create-parent.sh").write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "printf 'parent\\n' >> \"$1/order.log\"\n"
+                "exit \"${PARENT_STATUS:-0}\"\n",
+                encoding="utf-8",
+            )
+            (parent_devcontainer / "post-create-parent.sh").chmod(0o755)
+            (parent_devcontainer / "devcontainer.json").symlink_to(
+                "../vendor/agent-canon/.devcontainer/devcontainer.json"
+            )
+            (parent / "tools").mkdir(parents=True)
+            (parent / "tools" / "agent-canon").symlink_to(
+                "../vendor/agent-canon/tools", target_is_directory=True
+            )
+            command_root = parent
+        else:
+            (source / ".git").mkdir()
+            (source / "tools" / "agent-canon").symlink_to(
+                ".", target_is_directory=True
+            )
+            command_root = source
+        return source, workspace, command_root
+
+    def _run_post_create_fixture(
+        self,
+        workspace: Path,
+        command_root: Path,
+        *,
+        shared_status: int = 0,
+        parent_status: int = 0,
+    ) -> subprocess.CompletedProcess[str]:
+        """Run the tracked post-create entrypoint through the public resolver."""
+        return subprocess.run(
+            [
+                sys.executable,
+                PUBLIC_RESOLVER,
+                "exec",
+                ".devcontainer/post-create-entrypoint.sh",
+                str(workspace),
+            ],
+            cwd=command_root,
+            env={
+                **os.environ,
+                "SHARED_STATUS": str(shared_status),
+                "PARENT_STATUS": str(parent_status),
+            },
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
     def test_exec_parser_accepts_command(self) -> None:
         """Accept the exec mode with an AgentCanon entrypoint and arguments."""
         parser = build_parser()
@@ -54,25 +169,42 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         """Run the public sync check in an isolated standalone source clone."""
         with tempfile.TemporaryDirectory() as workspace:
             clone = Path(workspace) / "agent-canon"
+            copy_ignore = shutil.ignore_patterns(
+                ".git",
+                ".agent-canon",
+                "__pycache__",
+                ".pytest_cache",
+                ".ruff_cache",
+            )
+
+            def ignore_standalone_public_view(
+                directory: str, names: list[str]
+            ) -> set[str]:
+                """Avoid following the source self-view while copying the fixture."""
+                ignored = set(copy_ignore(directory, names))
+                if Path(directory).resolve() == (PROJECT_ROOT / "tools").resolve():
+                    ignored.add("agent-canon")
+                return ignored
+
             shutil.copytree(
                 PROJECT_ROOT,
                 clone,
                 symlinks=True,
-                ignore=shutil.ignore_patterns(
-                    ".git",
-                    ".agent-canon",
-                    "__pycache__",
-                    ".pytest_cache",
-                    ".ruff_cache",
-                ),
+                ignore=ignore_standalone_public_view,
             )
             subprocess.run(["git", "init", "-q"], cwd=clone, check=True)
+            (clone / "tools" / "agent-canon").symlink_to(
+                ".", target_is_directory=True
+            )
+            public_view = clone / "tools" / "agent-canon"
+            self.assertTrue(public_view.is_symlink())
+            self.assertEqual(os.readlink(public_view), ".")
             script = clone / "tools" / "sync_agent_canon.sh"
             self.assertEqual(script.stat().st_mode & stat.S_IXUSR, stat.S_IXUSR)
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(clone / "tools" / "agent_tools" / "agent_canon_source_root.py"),
+                    PUBLIC_RESOLVER,
                     "exec",
                     "tools/sync_agent_canon.sh",
                     "check",
@@ -104,6 +236,109 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             parser = build_parser().parse_args(["exec", "tools/agent_tool.sh", "fail"])
             result = run(parser, resolver=lambda _: self._mock_resolution(root))
             self.assertEqual(result, 1)
+
+    def test_post_create_entrypoint_runs_shared_then_derived_hook(self) -> None:
+        """Standalone and derived layouts invoke the real entrypoint through resolver."""
+        for derived in (False, True):
+            with self.subTest(derived=derived):
+                with tempfile.TemporaryDirectory() as workspace:
+                    source, selected_workspace, command_root = self._write_post_create_fixture(
+                        Path(workspace), derived=derived
+                    )
+                    result = self._run_post_create_fixture(
+                        selected_workspace, command_root
+                    )
+
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    expected = "shared\nparent\n" if derived else "shared\n"
+                    self.assertEqual(
+                        (selected_workspace / "order.log").read_text(encoding="utf-8"),
+                        expected,
+                    )
+
+    def test_post_create_entrypoint_propagates_stage_status(self) -> None:
+        """A failed shared or derived stage returns its exact status to the resolver."""
+        cases = ((17, 0, 17, "shared\n"), (0, 23, 23, "shared\nparent\n"))
+        for shared_status, parent_status, expected_status, expected_order in cases:
+            with self.subTest(shared_status=shared_status, parent_status=parent_status):
+                with tempfile.TemporaryDirectory() as workspace:
+                    source, selected_workspace, command_root = self._write_post_create_fixture(
+                        Path(workspace), derived=True
+                    )
+                    result = self._run_post_create_fixture(
+                        selected_workspace,
+                        command_root,
+                        shared_status=shared_status,
+                        parent_status=parent_status,
+                    )
+
+                    self.assertEqual(
+                        result.returncode,
+                        expected_status,
+                        result.stdout + result.stderr,
+                    )
+                    self.assertEqual(
+                        (selected_workspace / "order.log").read_text(encoding="utf-8"),
+                        expected_order,
+                    )
+
+    def test_devcontainer_json_commands_use_public_view(self) -> None:
+        """Run all lifecycle commands from the standalone and derived public view."""
+        for derived in (False, True):
+            with self.subTest(derived=derived):
+                with tempfile.TemporaryDirectory() as workspace:
+                    root = Path(workspace)
+                    source, selected_workspace, command_root = (
+                        self._write_post_create_fixture(root, derived=derived)
+                    )
+                    public_view = command_root / "tools" / "agent-canon"
+                    self.assertTrue(public_view.is_symlink())
+                    self.assertEqual(
+                        (command_root / ".devcontainer" / "devcontainer.json")
+                        .resolve(),
+                        (source / ".devcontainer" / "devcontainer.json").resolve(),
+                    )
+                    config = json.loads(
+                        (command_root / ".devcontainer" / "devcontainer.json")
+                        .read_text(encoding="utf-8")
+                    )
+                    test_log = root / "devcontainer-command.log"
+                    environment = {
+                        **os.environ,
+                        "AGENT_CANON_TEST_LOG": str(test_log),
+                    }
+                    for key in (
+                        "initializeCommand",
+                        "postCreateCommand",
+                        "postAttachCommand",
+                    ):
+                        command = str(config[key]).replace(
+                            "/workspace/${localWorkspaceFolderBasename}",
+                            str(selected_workspace),
+                        )
+                        self.assertIn(PUBLIC_RESOLVER, command)
+                        result = subprocess.run(
+                            ["bash", "-lc", command],
+                            cwd=command_root,
+                            env=environment,
+                            check=False,
+                            capture_output=True,
+                            text=True,
+                        )
+                        self.assertEqual(
+                            result.returncode,
+                            0,
+                            result.stdout + result.stderr,
+                        )
+                    self.assertEqual(
+                        test_log.read_text(encoding="utf-8"),
+                        "initialize\nattach\n",
+                    )
+                    expected = "shared\nparent\n" if derived else "shared\n"
+                    self.assertEqual(
+                        (selected_workspace / "order.log").read_text(encoding="utf-8"),
+                        expected,
+                    )
 
     def test_exec_command_enforces_resolved_source_root(self) -> None:
         """Reject commands resolving outside the source-root contract."""

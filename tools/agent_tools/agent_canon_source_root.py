@@ -82,6 +82,9 @@ def _run_subcommand(resolution: RootResolution, command: Sequence[str]) -> int:
     env = os.environ.copy()
     env["PYTHONPATH"] = _default_pythonpath(root=resolution.source_root)
     env[SOURCE_PREFIX_ENV] = _source_prefix(resolution)
+    env["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(
+        resolution.current_repository_root
+    )
     process = subprocess.run(
         (str(executable), *command[1:]),
         cwd=resolution.source_root.as_posix(),
