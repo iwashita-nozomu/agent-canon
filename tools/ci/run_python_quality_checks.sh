@@ -3,8 +3,10 @@
 # contract tool
 # responsibility Runs shared Python quality checks for CI and pre-review gates.
 # upstream design ../README.md shared automation index
+# upstream design ../../documents/conventions/DOCSTRING_GUIDE.md changed production Docstring scope and convention owner
 # downstream implementation ./run_all_checks.sh calls this runner for Python checks
 # downstream implementation ./pre_review.sh calls this runner before role write-scope enforcement
+# downstream implementation ../agent_tools/pydocstyle_changed_scope.py validates trusted changed-path Docstring diagnostics
 # @dependency-end
 set -euo pipefail
 
@@ -27,11 +29,28 @@ if [ -z "$PYTHON_BIN" ]; then
 fi
 
 QUICK_MODE=0
+PYDOCSTYLE_ONLY=0
+CHANGED_PATH_PACKET="${PYDOCSTYLE_CHANGED_PATH_PACKET:-}"
+TRUSTED_BASE_SHA="${PYDOCSTYLE_TRUSTED_BASE_SHA:-}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick)
       QUICK_MODE=1
       shift
+      ;;
+    --pydocstyle-only)
+      PYDOCSTYLE_ONLY=1
+      shift
+      ;;
+    --changed-path-packet)
+      [[ $# -ge 2 ]] || { echo "Missing value for --changed-path-packet" >&2; exit 2; }
+      CHANGED_PATH_PACKET="$2"
+      shift 2
+      ;;
+    --trusted-base-sha)
+      [[ $# -ge 2 ]] || { echo "Missing value for --trusted-base-sha" >&2; exit 2; }
+      TRUSTED_BASE_SHA="$2"
+      shift 2
       ;;
     *)
       echo "Unknown option: $1" >&2
@@ -39,6 +58,28 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+run_changed_pydocstyle() {
+  if [[ -z "${CHANGED_PATH_PACKET}" || -z "${TRUSTED_BASE_SHA}" ]]; then
+    echo "PYDOCSTYLE_CHANGED_SCOPE=fail"
+    echo "PYDOCSTYLE_CHANGED_SCOPE_REASON=trusted_changed_path_packet_required"
+    return 2
+  fi
+  local command=(
+    "${PYTHON_BIN}"
+    "${CANON_TOOLS_ROOT}/agent_tools/pydocstyle_changed_scope.py"
+    --root "${WORKSPACE_ROOT}"
+    --changed-path-packet "${CHANGED_PATH_PACKET}"
+    --trusted-base-sha "${TRUSTED_BASE_SHA}"
+    --python-bin "${PYTHON_BIN}"
+  )
+  "${command[@]}"
+}
+
+if [[ "${PYDOCSTYLE_ONLY}" -eq 1 ]]; then
+  run_changed_pydocstyle
+  exit $?
+fi
 
 PYTHON_IMPORT_PATHS=()
 for candidate_path in python "${CANON_TOOLS_ROOT}/agent_tools" "${CANON_TOOLS_ROOT}" .codex/hooks; do
@@ -133,11 +174,20 @@ echo "5️⃣  pydocstyle を実行中... (Docstring チェック)"
 if [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
   echo "PYDOCSTYLE=skip"
   echo "AgentCanon Python source roots are absent in this checkout; skipping pydocstyle"
-elif "$PYTHON_BIN" -m pydocstyle "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
-  echo "✅ pydocstyle 成功"
-else
-  echo "❌ pydocstyle 失敗（詳細: documents/conventions/DOCSTRING_GUIDE.md を参照）"
+elif [[ -n "${CHANGED_PATH_PACKET}" || -n "${TRUSTED_BASE_SHA}" ]]; then
+  if run_changed_pydocstyle; then
+    echo "✅ pydocstyle changed production scope 成功"
+  else
+    echo "❌ pydocstyle changed production scope 失敗"
+    EXIT_CODE=1
+  fi
+elif [[ "${PYDOCSTYLE_REQUIRE_TRUSTED_PACKET:-0}" == "1" ]]; then
+  echo "PYDOCSTYLE_CHANGED_SCOPE=fail"
+  echo "PYDOCSTYLE_CHANGED_SCOPE_REASON=trusted_changed_path_packet_required"
+  echo "❌ pydocstyle changed production scope 失敗"
   EXIT_CODE=1
+else
+  echo "PYDOCSTYLE=skip reason=trusted_changed_path_packet_not_supplied"
 fi
 echo ""
 

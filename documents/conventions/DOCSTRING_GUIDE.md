@@ -286,6 +286,27 @@ surface に応じて semantic clause を読み戻します。catalog capability 
 - 実装 mechanism が存在し、なお未解決の behavior oracle がある場合だけ test design を
   追加する。Docstring prose 自体を test-first の対象にしない。
 
+### PR changed-surface quality gate
+
+PR の pydocstyle は `tools/ci/run_python_quality_checks.sh` が唯一の gate owner です。
+PR entrypoint が作成した trusted changed-path packet と trusted base SHA を同時に受け取り、
+現在の PR で新規または変更された production Python surface だけを head と exact base の双方で
+実行します。`tests/`、fixture、generated artifact、root view、submodule source、deleted path は
+この gate の対象外で、それぞれの owner gate または既存 baseline evidence に戻します。
+
+head の診断は `code + qualified module/class/function` を identity として base と比較します。
+行番号、件数、message の表記は identity に含めません。同じ identity が base にあれば touched
+file 内でも baseline evidence とし、head にだけ存在する診断を blocking とします。packet の
+root、base/head commit/tree、merge-base、changed-path digest、実 diff のいずれかを証明できない
+場合は fail-closed です。ローカル branch の ahead/behind/diverged 状態は、それ自体では failure
+predicate になりません。
+
+AgentCanon の既定 pydocstyle convention は `tools/ci/pydocstyle.toml` で D213 を選択し、
+相反する D212 を無視します。D212 と D213 を同時に要求しません。親 repository に有効な
+pydocstyle / pep257 設定がある場合はその設定を current/base の両方へ適用し、AgentCanon の
+既定 convention を親の全 Python surface へ強制しません。syntax、annotation、signature の
+事実は compiler、pyright、ruff の owner に委譲し、pydocstyle gate で重複検査しません。
+
 ### Performance and non-enforcement evaluation
 
 性能評価は Docstring の行数や clause 数ではなく、次の読者結果で行います。
