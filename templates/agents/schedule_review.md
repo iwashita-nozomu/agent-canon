@@ -1,4 +1,4 @@
-# Schedule Review
+# Schedule Review（schedule レビュー）
 <!--
 @dependency-start
 contract template
@@ -15,28 +15,28 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 {{>reader_map}}
 {{>review_contract}}
 
-## Stage Order Review
+## Stage Order Review（stage 順序レビュー）
 
-<!-- Check stage ordering, dependency realism, and rollback points. -->
+<!-- stage の順序、dependency の現実性、rollback point を確認します。 -->
 
-## Reviewer Separation Review
+## Reviewer Separation Review（reviewer 分離レビュー）
 
-<!-- Check that plan review, detailed design review, and document flow review are assigned to different agents. -->
+<!-- plan review、detailed design review、document flow review が異なる agent に割り当てられているか確認します。 -->
 
-## Subagent Adequacy Review
+## Subagent Adequacy Review（subagent 妥当性レビュー）
 
-<!-- Check that the chosen subagents are appropriate for requirements, research, planning, design, and implementation. Return revise if any Agent Wave Ledger row lacks spawn_budget, allowed_paths, do_not_read, write_scope, review_gate, or closeout evidence path. -->
+<!-- 選択した subagent が requirements、research、planning、design、implementation に適切か確認します。Agent Wave Ledger に spawn_budget、allowed_paths、do_not_read、write_scope、review_gate、closeout evidence path のいずれかがない場合は revise とします。 -->
 
-## Completion Boundary Review
+## Completion Boundary Review（完了境界レビュー）
 
-<!-- Check that the schedule separates task-level completion from chunks, slices, checkpoints, and subpasses. Return revise if user-facing completion can unlock before all active clauses and planned work units are resolved. -->
+<!-- schedule が task-level completion と chunk、slice、checkpoint、subpass を分けるか確認します。active clause と planned work unit の解決前に user-facing completion が unlock される場合は revise とします。 -->
 
-## Risks
+## Risks（リスク）
 
-<!-- Note schedule risks or sequencing issues. -->
+<!-- schedule のリスクと sequencing issue を記録します。 -->
 
-## Revision Loop
+## Revision Loop（改訂ループ）
 
-<!-- Record which stage the planner must revisit, what must change, and what blocks approval. -->
+<!-- planner が戻る stage、変更内容、承認を止める事項を記録します。 -->
 
 {{>decision_approve_revise_escalate}}

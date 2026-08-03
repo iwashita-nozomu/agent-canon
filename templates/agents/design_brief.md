@@ -1,4 +1,4 @@
-# Detailed Design Brief
+# Detailed Design Brief（詳細 design brief）
 <!--
 @dependency-start
 contract template
@@ -13,21 +13,19 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Reader Map
+## Reader Map（読者 map）
 
-This template owns the implementation-facing detailed design packet. Fill the
-goal, abstract design frame, evidence ledger, reuse survey, requirement packet,
-implementation source packet, side-effect map, reader path, clause mapping,
-file-by-file design, trace, naming plan, validation, rollback, and risks before
-handoff. Select detailed design review only when an unresolved responsibility,
-naming, validation, or API-shape claim cannot be judged by the owning review
-gate. The implementation worker uses this as the source packet after the
-selected gate adjudicates it; unresolved gaps return to the owning design route
-rather than local implementation judgment.
+この template は implementation-facing な detailed design packet を所有します。handoff 前に
+goal、abstract design frame、evidence ledger、reuse survey、requirement packet、implementation
+source packet、side-effect map、reader path、clause mapping、file-by-file design、trace、naming
+plan、validation、rollback、risk を埋めます。unresolved responsibility、naming、validation、
+API-shape claim を owning review gate が判定できない場合だけ detailed design review を選択します。
+selected gate の判定後、implementation worker はこれを source packet として使い、unresolved gap
+は local implementation judgment ではなく owning design route に戻します。
 
-## Design Review Handoff
+## Design Review Handoff（design review handoff）
 
-<!-- Record the design artifact path, current revision or section set, design_review.md path only when that gate is active, document_flow_review.md path if applicable, and the selected gate/adjudication state. Do not block implementation merely because a candidate review artifact is absent. -->
+<!-- design artifact path、current revision または section set、gate が active な場合だけ design_review.md path、該当時の document_flow_review.md path、selected gate/adjudication state を記録します。candidate review artifact がないことだけで implementation を block しません。 -->
 
 - Design artifact under review:
 - Required review artifact:
@@ -39,15 +37,15 @@ rather than local implementation judgment.
   - Active-packet source reference:
   - Allocation state:
 
-## Goals
+## Goals（目標）
 
-<!-- Describe the design goal in implementation-facing terms. The goal is to produce the design document that implementation will follow. -->
+<!-- implementation-facing な言葉で design goal を記述します。implementation が従う design document を作ることが目標です。 -->
 
-## Abstract Design Frame
+## Abstract Design Frame（抽象 design frame）
 
-<!-- Before selecting files or patches, describe the abstract responsibility model, concept graph, non-goals, future extension layers, evaluation axes, and relationship to existing canonical surfaces. Implementation slices must be derived from this frame, not selected only from the nearest file, helper, or finding. -->
+<!-- file や patch を選ぶ前に、abstract responsibility model、concept graph、non-goal、future extension layer、evaluation axis、既存 canonical surface との関係を記述します。implementation slice は最寄りの file、helper、finding だけから選ばず、この frame から導出します。 -->
 
-<!-- Packet entry: entry_id=abstract-design-frame. Record responsibility_id plus exact clause_refs, owner_refs, source_refs, dependency_refs, output_refs, and reviewer_refs from the active packet; do not infer them from prose. -->
+<!-- Packet entry: entry_id=abstract-design-frame。active packet の responsibility_id と exact clause_refs、owner_refs、source_refs、dependency_refs、output_refs、reviewer_refs を記録し、prose から推論しません。 -->
 
 - Responsibility model:
 - Concept or layer model:
@@ -56,9 +54,9 @@ rather than local implementation judgment.
 - Evaluation axes:
 - Canonical-surface relationships:
 
-## Algorithm Contract Before Tests
+## Algorithm Contract Before Tests（tests より前の algorithm contract）
 
-<!-- Fix the production mechanism before test expectations. Keep private implementation shape, mock order, and helper names out of the contract unless they are observable. -->
+<!-- test expectation より先に production mechanism を確定します。observable でない限り private implementation shape、mock order、helper name を contract に固定しません。 -->
 
 - public entrypoint and input schema:
 - state transition / recurrence:
@@ -67,7 +65,7 @@ rather than local implementation judgment.
 - typed failure semantics and preserved state:
 - selected implementation mechanism:
 
-## Necessary-And-Sufficient Oracle Boundary
+## Necessary-And-Sufficient Oracle Boundary（必要十分 oracle 境界）
 
 - necessary observations:
 - sufficient observations:
@@ -75,7 +73,7 @@ rather than local implementation judgment.
 - not proven by this oracle:
 - test activation condition or static-only reason:
 
-## Failure Cause And Conflict Intent
+## Failure Cause And Conflict Intent（failure cause と conflict intent）
 
 - cause class: expected / infrastructure / implementation / oracle / unknown:
 - evidence and owner:
@@ -83,7 +81,7 @@ rather than local implementation judgment.
 - conflicting source or contract:
 - escalation / rejection evidence:
 
-## Alternatives And Independent Review
+## Alternatives And Independent Review（代替案と独立レビュー）
 
 | option | mechanism | evidence | cost/risk | status |
 | --- | --- | --- | --- | --- |
@@ -95,75 +93,75 @@ rather than local implementation judgment.
 - independent reviewer:
 - reviewer source snapshot and readback:
 
-## Evidence And Assumption Ledger
+## Evidence And Assumption Ledger（証拠と仮定の ledger）
 
-<!-- Tie design claims to current code, dependency headers, existing docs, and parent documents. Record first-use DSL terms, problem standard forms, normalization rules, and governing parent-doc differences before file-by-file implementation design. For design-doc claim checking, cite code paths, tool paths, dependency-header evidence, or parent documents with stable paths. -->
+<!-- design claim を current code、dependency header、既存 docs、parent document に結び付けます。file-by-file implementation design の前に first-use DSL term、problem standard form、normalization rule、governing parent-doc difference を記録します。design-doc claim check では code path、tool path、dependency-header evidence、parent document を stable path で引用します。 -->
 
 - Evidence sources:
 - Assumptions:
 - Parent-doc alignment:
 - Refactor handoff:
 
-## Existing Code And Docs To Reuse
+## Existing Code And Docs To Reuse（再利用する既存 code/docs）
 
-<!-- List the local modules, helpers, tests, docs, and naming patterns that must be reused or mirrored. -->
+<!-- 再利用または mirror すべき local module、helper、test、doc、naming pattern を列挙します。 -->
 
-## Upstream Requirement Packet
+## Upstream Requirement Packet（upstream 要件 packet）
 
-<!-- List the exact document paths the designer read before writing this design: user_request_contract.md, schedule.md, intent_brief.md, waterfall workflow docs, and other governing docs. Do not rely on chat-only context. -->
+<!-- designer が design を書く前に読んだ exact document path を列挙します。user_request_contract.md、schedule.md、intent_brief.md、waterfall workflow docs、その他の governing docs を含め、chat-only context に依存しません。 -->
 
-## Installed Libraries And Existing Implementation Survey
+## Installed Libraries And Existing Implementation Survey（library と既存実装の調査）
 
-<!-- List the dependency surfaces, installed libraries, existing helpers/modules/tests/docs you inspected before deciding the implementation shape. Record whether each candidate is reused, extended, replaced, or rejected, and why existing libraries or existing implementation are insufficient when you add something new. -->
+<!-- implementation shape を決める前に調べた dependency surface、installed library、既存 helper/module/test/doc を列挙します。各候補を reused、extended、replaced、rejected のどれにしたか、新規追加時に既存 library/implementation で足りない理由を記録します。 -->
 
-## Implementation Source Packet
+## Implementation Source Packet（implementation source packet）
 
-<!-- List every artifact the worker must read before editing: user_request_contract.md, schedule.md, this design brief, design_review.md when active, document_flow_review.md when active, test_plan.md only when post-implementation test design is active, repo docs, dependency surfaces, code paths, tests, and external references if any. Mark each item required or not used. -->
+<!-- worker が edit 前に読む全 artifact を列挙します。user_request_contract.md、schedule.md、この design brief、active 時の design_review.md/document_flow_review.md、post-implementation test design が active な場合だけ test_plan.md、repo docs、dependency surface、code path、test、外部 reference を含めます。各 item を required または not used と記録します。 -->
 
-<!-- For semantic deltas, include the run-local semantic_responsibility_contract.toml instance. It is populated from the reusable template and is read before implementation. -->
+<!-- semantic delta がある場合は run-local semantic_responsibility_contract.toml instance を含めます。reusable template から生成し、implementation 前に読みます。 -->
 
-<!-- Packet entry: entry_id=implementation-source-packet. Preserve the exact active-packet references, selected graph-packet identity, materialization reader, and dependency on entry:abstract-design-frame. -->
+<!-- Packet entry: entry_id=implementation-source-packet。exact active-packet reference、selected graph-packet identity、materialization reader、entry:abstract-design-frame への dependency を保持します。 -->
 
-## Design Side-Effect Map
+## Design Side-Effect Map（design side-effect map）
 
-<!-- For each major design decision, list downstream implementation, document, workflow, prompt/config, validation, dependency-manifest, and user-facing surfaces it affects. Connect each item to the Abstract Design Frame responsibility, request clause ID, reuse precedent, owner stage, review gate, and validation or test-plan item. -->
+<!-- 各 major design decision が影響する downstream implementation、document、workflow、prompt/config、validation、dependency-manifest、user-facing surface を列挙します。各 item を Abstract Design Frame responsibility、request clause ID、reuse precedent、owner stage、review gate、validation または test-plan item に接続します。 -->
 
-<!-- Packet entry: entry_id=design-side-effect-map. Preserve the exact active-packet references and dependency on entry:abstract-design-frame. -->
+<!-- Packet entry: entry_id=design-side-effect-map。exact active-packet reference と entry:abstract-design-frame への dependency を保持します。 -->
 
-## Canonical Tree-Head Plan
+## Canonical Tree-Head Plan（canonical tree head 計画）
 
-<!-- Name the only canonical design-document paths and implementation paths that may remain tracked after this task. List every non-canonical draft, snapshot, backup file, copied implementation, mirrored directory, or parallel design doc that must be deleted or must not be created. State that the durable product state is the current tree head only. -->
+<!-- task 後も tracked に残せる唯一の canonical design-document path と implementation path を記載します。削除または作成禁止の non-canonical draft、snapshot、backup file、copied implementation、mirrored directory、parallel design doc をすべて列挙します。durable product state は current tree head だけだと明記します。 -->
 
-## Patterns And Writing Style To Mirror
+## Patterns And Writing Style To Mirror（mirror する pattern と文体）
 
-<!-- Record the existing coding and documentation style that implementation must follow. -->
+<!-- implementation が従う既存の coding/documentation style を記録します。 -->
 
-## Reader Path And Term Introduction
+## Reader Path And Term Introduction（読者経路と用語導入）
 
-<!-- Record the intended top-down reading order, which terms must be defined before use, and where the reader must reach the key decision points. -->
+<!-- intended top-down reading order、使用前に定義する用語、reader が key decision point に到達する場所を記録します。 -->
 
-## Request Clause Mapping
+## Request Clause Mapping（request clause の対応）
 
-<!-- Record which user-request clause IDs this design satisfies and which clause IDs remain outside this pass. -->
+<!-- この design が満たす user-request clause ID と、この pass の外に残る clause ID を記録します。 -->
 
-## File-By-File Design
+## File-By-File Design（file 単位の design）
 
-<!-- Describe the planned file edits, boundaries, interfaces, and expected diff shape in detail. -->
+<!-- planned file edit、boundary、interface、expected diff shape を詳しく記述します。 -->
 
-## Design-To-Implementation Trace
+## Design-To-Implementation Trace（design から implementation への trace）
 
-<!-- For each planned edit, map design section, user-request clause ID, source/reuse document or code path, test-plan item, and expected validation evidence. The worker must cite this mapping before editing. -->
+<!-- 各 planned edit を design section、user-request clause ID、source/reuse document または code path、test-plan item、expected validation evidence に対応付けます。worker は edit 前にこの mapping を引用します。 -->
 
-<!-- Packet entry: entry_id=design-to-implementation-trace. Preserve dependencies on the other three entries and map every source, generated, and deletion record to one integrated responsibility unit. -->
+<!-- Packet entry: entry_id=design-to-implementation-trace。他の 3 entry への dependency を保持し、すべての source、generated、deletion record を 1 つの integrated responsibility unit に対応付けます。 -->
 
-## Identifier And Naming Plan
+## Identifier And Naming Plan（identifier と naming の計画）
 
-<!-- List every new or renamed variable, function, class, file, CLI flag, config key, and public API surface. For each item, record the chosen name, local precedent, rejected alternatives if relevant, and whether the name is implementation-blocking. -->
+<!-- 新規または rename する variable、function、class、file、CLI flag、config key、public API surface を列挙します。各 item に chosen name、local precedent、該当する rejected alternative、name が implementation-blocking かを記録します。 -->
 
-## Validation And Rollback Plan
+## Validation And Rollback Plan（validation と rollback 計画）
 
-<!-- Describe how the design will be validated and what rollback or alternate route path exists. -->
+<!-- design の validation 方法と rollback または alternate route path を記述します。 -->
 
-## Risks
+## Risks（リスク）
 
-<!-- Capture tradeoffs, known risks, and alternate route options. -->
+<!-- tradeoff、既知の risk、alternate route option を記録します。 -->

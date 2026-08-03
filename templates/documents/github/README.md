@@ -14,7 +14,7 @@ downstream implementation ../../../documents/runtime/shared-runtime-surfaces.tom
 @dependency-end
 -->
 
-# GitHub template sources
+# GitHub template source（GitHub template の正本）
 
 このディレクトリが GitHub template の唯一の canonical owner です。GitHub が認識する
 path と format は、生成された `.github/ISSUE_TEMPLATE/` と
@@ -82,7 +82,7 @@ projection向きを確認します。
   で projection spec を renderし、同じ manifest の `check-doc` と source/target readback を実行する。
 - GitHub YAML parse と Markdown/docs format/check を実行する。
 
-## Required evidence vocabulary
+## Required evidence vocabulary（必要な evidence 用語）
 
 source の変更では、必要な範囲で owner/responsibility と OOP/type boundary、design-to-
 implementation trace、dependency/side-effect map、algorithm contract before tests、

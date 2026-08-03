@@ -15,12 +15,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
-
 
 TOPIC = "template-smoke"
 
@@ -36,7 +36,12 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_checked(command: list[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
+def run_checked(
+    command: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     """Run one non-GPU validation command with strict failure semantics."""
     result = subprocess.run(
         command,
@@ -44,6 +49,7 @@ def run_checked(command: list[str], *, cwd: Path) -> subprocess.CompletedProcess
         check=False,
         capture_output=True,
         text=True,
+        env=env,
     )
     if result.returncode != 0:
         output = "\n".join(part for part in (result.stdout, result.stderr) if part)
@@ -88,13 +94,18 @@ def materialize_parent_fixture(source_root: Path, parent_root: Path) -> None:
 
 
 def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
-    """Validate generated registry identity and topic structure without running it."""
+    """Validate generated registry identity, topic structure, and run artifacts."""
     topic_dir = parent_root / "experiments" / TOPIC
     required_files = (
         topic_dir / "README.md",
         topic_dir / "provenance.toml",
         topic_dir / "run.py",
         topic_dir / "cases.py",
+        topic_dir / "case_model.py",
+        topic_dir / "case_execution.py",
+        topic_dir / "artifact_schema.py",
+        topic_dir / "artifact_io.py",
+        topic_dir / "visualization.py",
         topic_dir / "config.yaml",
         topic_dir / "visualize.ipynb",
         topic_dir / "result" / ".gitkeep",
@@ -114,6 +125,27 @@ def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
         raise RuntimeError("generated notebook has no cells")
     if notebook.get("nbformat") != 4:
         raise RuntimeError("generated notebook must use nbformat 4")
+
+    result_dir = topic_dir / "result" / "template-smoke-run"
+    required_artifacts = (
+        "summary.json",
+        "cases.jsonl",
+        "artifact-manifest.json",
+        "config_snapshot.json",
+        "environment.json",
+        "visualization-status.json",
+    )
+    missing_artifacts = [
+        name for name in required_artifacts if not (result_dir / name).is_file()
+    ]
+    if missing_artifacts:
+        raise RuntimeError(
+            "materialized experiment run is missing artifacts: "
+            + ", ".join(missing_artifacts)
+        )
+    summary = json.loads((result_dir / "summary.json").read_text(encoding="utf-8"))
+    if summary.get("status") != "success" or summary.get("case_count") != 1:
+        raise RuntimeError("materialized experiment run did not produce one successful case")
 
 
 def main() -> int:
@@ -142,6 +174,16 @@ def main() -> int:
             ],
             cwd=source_root,
         )
+        topic_dir = parent_root / "experiments" / TOPIC
+        run_dir = topic_dir / "result" / "template-smoke-run"
+        run_env = dict(os.environ)
+        run_env["EXPERIMENT_RUN_MANIFEST"] = str(parent_root / "manifest.json")
+        run_env["EXPERIMENT_RUN_DIR"] = str(run_dir)
+        run_checked(
+            [sys.executable, str(topic_dir / "run.py")],
+            cwd=source_root,
+            env=run_env,
+        )
         validate_generated_topic(parent_root, registry_path)
         run_checked(
             [
@@ -167,7 +209,7 @@ def main() -> int:
 
     print("EXPERIMENT_TEMPLATE_SMOKE=pass")
     print(f"EXPERIMENT_TEMPLATE_TOPIC=experiments/{TOPIC}")
-    print("EXPERIMENT_TEMPLATE_EXECUTION=not_run")
+    print("EXPERIMENT_TEMPLATE_EXECUTION=pass")
     return 0
 
 

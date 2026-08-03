@@ -1,4 +1,4 @@
-# Document Flow Review
+# Document Flow Review（文書の読者経路レビュー）
 <!--
 @dependency-start
 contract template
@@ -17,28 +17,28 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 {{>findings_area_table}}
 
-## Top-Down Readthrough
+## Top-Down Readthrough（上からの通読）
 
-<!-- Check whether a first reader can follow the document from top to bottom without backtracking. -->
+<!-- 最初の読者が後戻りせず文書を上から下へ読めるか確認します。 -->
 
-## Term And Prerequisite Introduction
+## Term And Prerequisite Introduction（用語と前提の導入）
 
-<!-- Check whether terms, assumptions, and prerequisites from the exact active-packet Implementation Source Packet are introduced before they are used. Record the design artifact path and packet entry ID; chat or schedule prose is not authority. -->
+<!-- exact active-packet の Implementation Source Packet にある用語、仮定、前提が使用前に導入されているか確認します。design artifact path と packet entry ID を記録し、chat や schedule prose を authority にしません。 -->
 
-## Section Order And Reader Path
+## Section Order And Reader Path（節順と読者経路）
 
-<!-- Check whether section order supports the intended reader path and whether key decisions appear before implementation detail. -->
+<!-- 節順が意図した読者経路を支え、主要な判断が implementation detail より前に現れるか確認します。 -->
 
-## Reader-Visible Side Effects
+## Reader-Visible Side Effects（読者可視の副作用）
 
-<!-- Check every reader-facing item in the exact active-packet Design Side-Effect Map: docs, workflows, prompts, CLI/help text, reports, and validation output. Record the packet entry and source reference for each finding. -->
+<!-- exact active-packet の Design Side-Effect Map にある docs、workflow、prompt、CLI/help text、report、validation output を確認します。各指摘に packet entry と source reference を記録します。 -->
 
-## Rewrite Targets
+## Rewrite Targets（書き直し対象）
 
-<!-- Record concrete rewrite points needed to make the document readable in order. -->
+<!-- 文書を順序どおり読めるようにする具体的な書き直し箇所を記録します。 -->
 
-## Revision Loop
+## Revision Loop（改訂ループ）
 
-<!-- Record what the designer must rewrite so the top-down reader path becomes approval-ready. -->
+<!-- 上からの読者経路を承認可能にするため designer が書き直す内容を記録します。 -->
 
 {{>decision_approve_revise_escalate}}

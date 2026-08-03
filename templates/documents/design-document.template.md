@@ -144,8 +144,8 @@ request / caller -> public entrypoint -> owned unit -> collaborator -> external 
 | --- | --- | --- | --- | --- | --- |
 | `<effect>` | `<unit>` | `<condition>` | `<path or none>` | `<typed result>` | `<action>` |
 
-State what is preserved on failure, what is fail-closed, and which caller may retry.
-Do not turn an environment limitation into a silent fallback or a test-only branch.
+failure 時に何を保持し、何を fail-closed にし、どの caller が retry できるかを記述します。
+environment limitation を silent fallback や test-only branch に変換しません。
 
 ### Failure-cause classification
 
@@ -159,7 +159,7 @@ Do not turn an environment limitation into a silent fallback or a test-only bran
 
 ## Options and decision
 
-Compare at least two viable options before selecting one.
+少なくとも 2 つの viable option を比較してから 1 つを選択します。
 
 | option | mechanism | benefits | costs / risks | dependency and effect impact | status |
 | --- | --- | --- | --- | --- | --- |
@@ -182,7 +182,7 @@ Compare at least two viable options before selecting one.
 
 ## Adversarial review
 
-Review the selected design as if trying to break its boundary.
+選択した design の boundary を壊すつもりで review します。
 
 - hidden assumption or missing precondition:
 - wrong owner / helper-sprawl risk:
@@ -202,6 +202,35 @@ Review the selected design as if trying to break its boundary.
 - command to reconstruct the design evidence:
 - command to reconstruct the implementation state:
 - expected clean/dirty and ownership checks:
+
+## Stable Design Clause Registry And Bidirectional Trace
+
+設計判断には安定した clause ID を付け、実装・generated evidence の両方向から同じ clause を
+read back します。ID は行番号ではなく、設計文書の version をまたいで意味を維持する名前にします。
+
+| clause ID | design decision / invariant | owner | acceptance evidence |
+| --- | --- | --- | --- |
+| `DES-001` | `<public contract or state invariant>` | `<owner>` | `<evidence path or command>` |
+| `DES-002` | `<dependency or side-effect boundary>` | `<owner>` | `<evidence path or command>` |
+| `DES-003` | `<failure or oracle rule>` | `<owner>` | `<evidence path or command>` |
+
+### Forward trace: design to implementation and generated evidence
+
+| clause ID | implementation path / section | generated artifact or projection | validation readback |
+| --- | --- | --- | --- |
+| `DES-001` | `<source path:section>` | `<generated path:section or not_applicable>` | `<command / reviewer>` |
+| `DES-002` | `<source path:section>` | `<generated path:section or not_applicable>` | `<command / reviewer>` |
+
+### Reverse trace: implementation evidence to design clause
+
+| evidence ID | implementation / generated evidence | reverse-linked clause ID | owner adjudication |
+| --- | --- | --- | --- |
+| `EVID-001` | `<diff, artifact, output, or projection>` | `DES-001` | `<covered / gap / escalate>` |
+| `EVID-002` | `<diff, artifact, output, or projection>` | `DES-002` | `<covered / gap / escalate>` |
+
+- forward trace completeness: `<every selected clause has implementation and evidence coverage>`
+- reverse trace completeness: `<every changed implementation/evidence item names its design clause>`
+- unmapped evidence and resolution owner: `<not_applicable or explicit owner>`
 
 ## Acceptance and validation
 

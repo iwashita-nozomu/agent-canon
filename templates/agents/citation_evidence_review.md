@@ -1,4 +1,4 @@
-# Citation Evidence Review
+# Citation Evidence Review（引用・証拠レビュー）
 <!--
 @dependency-start
 contract template
@@ -17,20 +17,20 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 {{>findings_area_table}}
 
-## Claim To Citation Trace
+## Claim To Citation Trace（主張から引用への trace）
 
-<!-- Check whether each major claim points to an actual citation, figure, table, derivation, experiment result, or appendix item. -->
+<!-- 各主要主張が実際の引用、図、表、導出、実験結果、付録項目へ接続しているか確認します。 -->
 
-## Citation To Support Match
+## Citation To Support Match（引用と根拠の一致）
 
-<!-- Check whether the cited source/result supports what the sentence says, rather than something weaker, adjacent, or different. -->
+<!-- 引用した source/result が、文の主張より弱い・近いだけ・別の内容ではなく、主張そのものを支えるか確認します。 -->
 
-## Missing Or Weak Support
+## Missing Or Weak Support（不足または弱い根拠）
 
-<!-- Record places where the paper needs a citation, stronger evidence, or more precise wording. -->
+<!-- citation、より強い証拠、または精密な wording が必要な箇所を記録します。 -->
 
-## Rewrite Targets
+## Rewrite Targets（書き直し対象）
 
-<!-- Record concrete rewrite points needed to tighten source-to-claim traceability. -->
+<!-- source から claim への trace を明確にする具体的な書き直し箇所を記録します。 -->
 
 {{>decision_approve_revise_escalate}}

@@ -1,4 +1,4 @@
-# Work Log
+# Work Log（作業ログ）
 <!--
 @dependency-start
 contract template
@@ -15,9 +15,9 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 {{>reader_map}}
 
-## Purpose
+## Purpose（目的）
 
-<!-- Keep a chronological run-local log for meaningful execution steps. This is required even when no worktree action log is active. -->
+<!-- 意味のある execution step を chronological な run-local log として保持します。worktree action log が active でなくても必須です。 -->
 
 - owner / responsibility unit:
 - design-to-implementation trace:
@@ -25,13 +25,13 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - conflict intent and preserved state:
 - failure-cause classification for unexpected actions:
 
-## Entries
+## Entries（記録）
 
-<!-- Append one line per meaningful step with time, kind, request clause IDs, refs, and next action. -->
+<!-- 意味のある step ごとに time、kind、request clause ID、ref、next action を 1 行追加します。 -->
 
-## Wave Event Log
+## Wave Event Log（wave event log）
 
-<!-- Append one row for each subagent wave event. Use the same Wave ID as schedule.md, and record the same Wave Plan Contract fields plus evidence refs and next action. -->
+<!-- subagent wave event ごとに 1 行追加します。schedule.md と同じ Wave ID を使い、Wave Plan Contract の field、evidence ref、next action を記録します。 -->
 
 | Time | Wave ID | Event Kind | Stage | Spawn Authority | Trigger | Budget Before | Budget After | Runtime Max Threads | Runtime Max Depth | Spawned Roles | Skipped Roles / Rationale | Allowed Paths | Do Not Read | Write Scope | Validation Route | Review Gate | Handoff Artifacts | Refs | Next Action |
 | ---- | ------- | ---------- | ----- | --------------- | ------- | ------------- | ------------ | ------------------- | ----------------- | ------------- | ------------------------- | ------------- | ----------- | ----------- | ---------------- | ----------- | ----------------- | ---- | ----------- |

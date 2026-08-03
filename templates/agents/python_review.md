@@ -1,4 +1,4 @@
-# Python Review
+# Python Review（Python レビュー）
 <!--
 @dependency-start
 contract template
@@ -15,11 +15,11 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 {{>reader_map}}
 {{>review_contract}}
 
-## Python Findings
+## Python Findings（Python の指摘）
 
 | File | Finding | Severity | Status |
 | ---- | ------- | -------- | ------ |
 
-## Expected Evidence
+## Expected Evidence（必要な証跡）
 
-<!-- Record pyright, pytest, and ruff status or missing evidence. -->
+<!-- pyright、pytest、ruff の status または不足している証跡を記録します。 -->

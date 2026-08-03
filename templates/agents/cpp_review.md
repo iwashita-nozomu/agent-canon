@@ -1,4 +1,4 @@
-# C++ Review
+# C++ Review（C++ レビュー）
 <!--
 @dependency-start
 contract template
@@ -8,7 +8,7 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 -->
 
 
-## Reader Map
+## Reader Map（読者 map）
 
 この review は C/C++ の責務境界、header/implementation、ownership、build/test entrypoint、
 failure path、single-project experiment/test guidance を確認します。C++ topic 内の local
@@ -26,27 +26,27 @@ project は対象にしますが、template root に top-level CMake を要求�
 
 {{>review_contract}}
 
-## Scope
+## Scope（対象）
 
 - Files reviewed:
 - Public headers or ABI surfaces touched:
 - Build or test entrypoints checked:
 
-## Findings
+## Findings（指摘）
 
-### Fix Now
-
--
-
-### Follow-Up
+### Fix Now（今直す）
 
 -
 
-### Delete-Ok
+### Follow-Up（後続対応）
 
 -
 
-## Native Code Checklist
+### Delete-Ok（削除可）
+
+-
+
+## Native Code Checklist（native code checklist）
 
 - ownership / lifetime / aliasing risks checked:
 - header / implementation consistency checked:
@@ -54,6 +54,6 @@ project は対象にしますが、template root に top-level CMake を要求�
 - build / configure / test evidence checked:
 - docs or developer-command follow-through checked:
 
-## Notes
+## Notes（メモ）
 
 -

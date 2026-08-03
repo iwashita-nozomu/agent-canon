@@ -1,4 +1,4 @@
-# Closeout Gate
+# Closeout Gate（closeout gate）
 
 <!--
 @dependency-start
@@ -14,18 +14,18 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Reader Map
+## Reader Map（読者 map）
 
-- This template owns the closeout evidence ledger that decides when user-facing completion may be unlocked.
-- The top sections record gate status and unlock rules; the evidence sections then cover dependency manifests, static analysis, AgentCanon sync, spec coverage, review integration, document structure, tool warnings, subagent lifecycle, diff-check, tree-head, report placement, evaluation, logs, and final evidence.
-- Verifiers and auditors should start with `## Gate Status` and `## Unlock Rule`, then fill only the evidence sections activated by the current run profile.
-- For chunked reading, keep the status keys as the checklist anchor and open each evidence section only when its corresponding key is still pending.
+- この template は user-facing completion を unlock できる時点を判定する closeout evidence ledger を所有します。
+- 冒頭で gate status と unlock rule を記録し、その後 dependency manifest、static analysis、AgentCanon sync、spec coverage、review integration、document structure、tool warning、subagent lifecycle、diff-check、tree-head、report placement、evaluation、log、最終 evidence を確認します。
+- verifier と auditor は `## Gate Status` と `## Unlock Rule` から読み始め、current run profile が有効にした evidence section だけを埋めます。
+- 分割して読む場合は status key を checklist anchor とし、対応 key が pending の section だけを開きます。
 
 この artifact は、user-facing completion を unlock するための最終 readback を所有します。
 現在の runtime profile が選んだ targeted validation と、選ばなかった full suite/full scan の
 境界を分け、source/projection identity、failure response、cleanup の証拠を先に確認します。
 
-## Gate Status
+## Gate Status（gate status）
 
 - verifier_status: pending
 - auditor_status: pending
@@ -65,13 +65,13 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - clone_materialization_readback: pending
 - unexpected_action_report: none
 
-## Unlock Rule
+## Unlock Rule（unlock rule）
 
 `user_completion_report` を `unlocked` にしてよいのは、少なくとも次を満たしたあとだけです。
 
 - verifier_status: pass
 - auditor_status: resolved
-<!-- Set required_reviews_complete to yes when the selected owning gate is adjudicated; use not_applicable when no review is activated. -->
+<!-- selected owning gate の判定が完了したら required_reviews_complete を yes にし、review が無効なら not_applicable にします。 -->
 - validation_complete: yes
 - request_contract_complete: yes
 - all_planned_chunks_complete: yes
@@ -88,11 +88,11 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - canonical_dispatcher_schema_status: pass
 - validation_failure_response_status: pass
 - review_findings_integrated: yes
-<!-- Set post_fix_full_review_complete to yes when the selected final-contract rerun is complete; use not_applicable when it is not selected. -->
+<!-- selected final-contract rerun が完了したら post_fix_full_review_complete を yes にし、未選択なら not_applicable にします。 -->
 - tool_warnings_resolved: yes
 - mechanical_completion_loop_complete: yes
 - subagents_closed: yes
-<!-- Set diff_check_agent_complete to yes when the diff-check gate is activated and complete; use not_applicable otherwise. -->
+<!-- diff-check gate が有効で完了したら diff_check_agent_complete を yes にし、それ以外は not_applicable にします。 -->
 - canonical_tree_head_complete: yes
 - agent_evaluation_complete: yes
 - runtime_log_archive_synced: yes
@@ -106,9 +106,9 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - clone_materialization_readback: pass / not_applicable
 - unexpected_action_report: none / resolved / handed_to_parent
 
-## Completion Boundary Evidence
+## Completion Boundary Evidence（完了境界 evidence）
 
-<!-- Record why this is the whole user-request completion, not just a chunk, slice, checkpoint, or subpass completion. List all planned work units and active clauses as complete, confirm schedule.md remains the TODO source of truth, confirm no unfinished task / follow-up / validation / commit / push / canon-sync item remains in scope, and explain why closeout stays locked if work_log.md or TODO coverage is incomplete. -->
+<!-- これが chunk、slice、checkpoint、subpass ではなく user request 全体の完了である理由を記録します。planned work unit と active clause をすべて complete とし、schedule.md が TODO の source of truth であること、unfinished task/follow-up/validation/commit/push/canon-sync item が scope に残らないことを確認します。work_log.md または TODO coverage が不完全なら closeout を lock する理由を記録します。 -->
 
 - completion_coverage_artifact: completion_coverage.json
 - completion_coverage_schema: agent-canon.completion-coverage.v1
@@ -120,17 +120,17 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - open_crossing_edges:
 - canonical_gate_basis: G1_CLAUSE_COVERAGE,G2_OWNER_BOUNDARY,G3_STAGE_EVIDENCE,G4_VALIDATION_RESPONSE,G5_DELIVERY_BOUNDARY
 
-## Dependency Manifest Evidence
+## Dependency Manifest Evidence（dependency manifest evidence）
 
-<!-- Confirm that every created or edited human-authored text file has a top-of-file @dependency-start / @dependency-end manifest block, or record the scan-tool classification reason and alternate manifest/design artifact for files that cannot carry such a block. Include output from check_dependency_headers.py, scan_dependency_headers.sh, check_dependency_header_format.sh, and check_dependency_graph.sh when dependency edges changed. During migration, record any pre-existing full-repo graph baseline separately and confirm this change introduced no new old-format header, self reference, reverse-edge gap, kind mismatch, or cycle. -->
+<!-- 作成・編集した human-authored text file がすべて top-of-file の @dependency-start/@dependency-end manifest block を持つことを確認します。持てない file は scan-tool classification reason と代替 manifest/design artifact を記録します。dependency edge が変わった場合は check_dependency_headers.py、scan_dependency_headers.sh、check_dependency_header_format.sh、check_dependency_graph.sh の output を含めます。migration 中は既存 full-repo graph baseline を別記録し、old-format header、self reference、reverse-edge gap、kind mismatch、cycle を新たに導入していないことを確認します。 -->
 
-## Repo-Wide Dependency Tool Evidence
+## Repo-Wide Dependency Tool Evidence（repo-wide dependency tool evidence）
 
-<!-- During checkpoint and final review, run `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` against the full repository. Do not unlock closeout if only changed-file dependency checks were run. Record REPO_DEPENDENCY_REVIEW=pass and the checked path count. If any header is missing or invalid, fix it and rerun before unlock. -->
+<!-- checkpoint と final review では全 repository に `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` を実行します。changed-file dependency check だけなら closeout を unlock しません。REPO_DEPENDENCY_REVIEW=pass と checked path count を記録し、header が missing/invalid なら修正して rerun します。 -->
 
-## Canonical Formatter And Static Evidence
+## Canonical Formatter And Static Evidence（canonical formatter/static evidence）
 
-<!-- Record the one canonical Markdown/math/Mermaid formatter/check route and the selected non-Python static evidence. Duplicate CI, formatter, checker, coverage, mutation, private-helper, and checker-retest routes are not additional W2 gates. -->
+<!-- canonical な Markdown/math/Mermaid formatter/check route 1 つと selected non-Python static evidence を記録します。重複する CI、formatter、checker、coverage、mutation、private-helper、checker-retest route は追加の W2 gate ではありません。 -->
 
 - canonical_format_check_route: tools/bin/agent-canon docs check <changed-markdown-paths>
 - canonical_format_check_status:
@@ -141,9 +141,9 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - formatter/fixer command and post-format readback:
 - targeted-only reason or selected full-suite owner:
 
-## CompletionCoverage And Failure Response Evidence
+## CompletionCoverage And Failure Response Evidence（completion coverage と failure response）
 
-<!-- Record the generated v1 projection, the five explicit mapping error sets, and pointer-only validation-failure responses. The taxonomy text remains owned by the JSON source and its generated Markdown reader. -->
+<!-- generated v1 projection、5 つの明示的 mapping error set、pointer-only validation-failure response を記録します。taxonomy text の owner は JSON source と generated Markdown reader のままです。 -->
 
 - completion_coverage_artifact:
 - completion_coverage_consumer:
@@ -151,9 +151,9 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - validation_failure_taxonomy_owner: documents/runtime/runtime-profiles-and-check-matrix.json
 - validation_failure_taxonomy_reader: documents/runtime/runtime-profiles-and-check-matrix.md
 
-## AgentCanon Latest Evidence
+## AgentCanon Latest Evidence（AgentCanon latest evidence）
 
-<!-- `agent_canon_latest_complete` remains a repository-update evidence field. It is not a second W2 formatter or completion-coverage gate. -->
+<!-- `agent_canon_latest_complete` は repository-update evidence field です。2 つ目の W2 formatter や completion-coverage gate ではありません。 -->
 
 - agent_canon_latest_command:
 - agent_canon_latest_status:
@@ -161,21 +161,21 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - agent_canon_source_head:
 - agent_canon_parent_pin:
 
-## Spec-To-Product Coverage Evidence
+## Spec-To-Product Coverage Evidence（spec から product への coverage evidence）
 
-<!-- For each must-do and completion-evidence clause, record the concrete product behavior, file, doc, test, command, or artifact that satisfies it. Do not unlock completion while any requested spec has no implemented product surface or explicit deferred/rejected clause. -->
+<!-- 各 must-do と completion-evidence clause について、それを満たす具体的な product behavior、file、doc、test、command、artifact を記録します。requested spec に implemented product surface または明示的 deferred/rejected clause がなければ completion を unlock しません。 -->
 
-## Review Finding Integration Evidence
+## Review Finding Integration Evidence（review finding 統合 evidence）
 
-<!-- Record every required review artifact and whether findings were fixed, escalated, or explicitly accepted as follow-up. Do not unlock completion while fix-now findings remain unapplied or unreviewed. -->
+<!-- required review artifact と、finding を fixed、escalated、follow-up として明示的に accepted したかを記録します。fix-now finding が未適用または未 review の間は completion を unlock しません。 -->
 
-## Post-Fix Full Review Evidence
+## Post-Fix Full Review Evidence（修正後 full review evidence）
 
-<!-- If any review-driven fix landed after an earlier review pass, record the refreshed full review artifact paths for the latest diff. If no post-review fixes occurred after the last full review pass, state that explicitly. -->
+<!-- earlier review pass 後に review-driven fix が入った場合は latest diff の refreshed full review artifact path を記録します。last full review pass 後に post-review fix がなければ明記します。 -->
 
-## Document Structure Evidence
+## Document Structure Evidence（文書 structure evidence）
 
-<!-- For changed Markdown source files, classify the document route before closeout and list every changed Markdown source path in `document_structure_paths`. Record `document_split_decision` as `keep:<reason>`, `split:<new-owner-boundary>`, `merge:<target>`, `inline:<target-section>`, `rename:<new-path>`, or `not_applicable:format-only:<reason>`. For substantive document edits, record `document_structure_status: complete`, `structure_planning: complete`, `prose_graph: complete`, and the structure contract artifact. For typo / link / format-only edits, record `document_structure_status: skipped`, `structure_contract: skipped:<reason>`, `md_style_check: pass`, `format_only_reason`, and `document_split_decision: not_applicable:format-only:<reason>`. Generated run-bundle Markdown under reports/ is outside this source-document gate. -->
+<!-- changed Markdown source file は closeout 前に document route を分類し、全 changed Markdown source path を `document_structure_paths` に列挙します。`document_split_decision` は指定された keep/split/merge/inline/rename/not_applicable:format-only の形式で記録します。substantive edit では structure status、structure planning、prose graph、structure contract artifact を complete とし、typo/link/format-only では skipped、理由、`md_style_check: pass` を記録します。reports/ 配下の generated run-bundle Markdown はこの source-document gate の外です。 -->
 
 - document_structure_paths:
 - document_structure_status:
@@ -186,17 +186,17 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - md_style_check:
 - format_only_reason:
 
-## Tool Warning Evidence
+## Tool Warning Evidence（tool warning evidence）
 
-<!-- Confirm that workflow_monitoring.md has a non-pending Tool Warnings ledger. If no warning appeared, record `tool_warning_monitoring_status: none`, `tool_warning_open_items: none`, and the evidence source. If warnings appeared, every warning_id must be resolved, accepted with a reason, or deferred with an issue; fix-now / S0 / S1 warnings must be resolved, not deferred. -->
+<!-- workflow_monitoring.md の Tool Warnings ledger が non-pending か確認します。warning がなければ `tool_warning_monitoring_status: none`、`tool_warning_open_items: none`、evidence source を記録します。warning があれば全 warning_id を resolved、理由付き accepted、issue 付き deferred のいずれかにし、fix-now/S0/S1 は deferred ではなく resolved にします。 -->
 
 - tool_warning_monitoring_status:
 - tool_warning_open_items:
 - tool_warning_resolution_evidence:
 
-## Lifecycle And Cleanup Evidence
+## Lifecycle And Cleanup Evidence（lifecycle と cleanup evidence）
 
-<!-- Record generated projection, temporary clone, run-local artifact, and raw-log cleanup only after remote/source/readback identity is complete. A typed hold condition remains blocked until the owner resolves it. -->
+<!-- remote/source/readback identity が complete になった後だけ generated projection、temporary clone、run-local artifact、raw-log cleanup を記録します。typed hold condition は owner が解消するまで blocked のままです。 -->
 
 - source/remote/materialization identities:
 - generated artifacts retained:
@@ -205,9 +205,9 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - cleanup failure cause and typed hold:
 - parent handoff for any unexpected action:
 
-## Mechanical Completion Loop Evidence
+## Mechanical Completion Loop Evidence（mechanical completion loop evidence）
 
-<!-- Record each finalization loop iteration: planned work units and active clauses inspected, latest diff inspected, validation / dependency / static-analysis evidence checked, diff-check agent decision, fix-now findings applied, and the reason the loop stopped. Do not mark complete until no planned work, review finding, validation failure, dependency failure, static-analysis failure, commit / push item, canon-sync item, or follow-up decision remains in this task scope. -->
+<!-- finalization loop ごとに planned work unit/active clause の確認、latest diff、validation/dependency/static-analysis evidence、diff-check agent decision、fix-now finding の適用、停止理由を記録します。planned work、review finding、validation/dependency/static-analysis failure、commit/push、canon-sync、follow-up decision が scope に残る間は complete にしません。 -->
 
 - mechanical_loop_iterations:
 - mechanical_loop_open_items:
@@ -221,9 +221,9 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - mechanical_loop_canon_sync_status:
 - mechanical_loop_follow_up_status:
 
-## Subagent Lifecycle Evidence
+## Subagent Lifecycle Evidence（subagent lifecycle evidence）
 
-<!-- Record run-local subagent lifecycle evidence before user-facing completion when a subagent or durable lifecycle route was selected. Classify each user input as same_active_task_delta, scope_or_contract_change, or new_task; reuse an active agent when owner, responsibility, context, write authority, and validation route remain compatible, including revised scope. Fresh agents are for independent review, disjoint write authority, incompatible owner/context, or failed context integrity. Durable checkpoints and updated packet paths are needed only for coordination or resumption. Close terminal stage-wave agents as lifecycle cleanup. Timeout, empty status, and absent final response map to termination_action=preserve_running_instance, write_scope=reserved, overlapping_writer=blocked, subagents_closed=no, and lifecycle_gate=pending. `close_agent` authority is runtime status completed, errored, or shutdown, or explicit user cancellation. `reuse_for_new_task` records the evaluated policy; `previous_task_subagent_reuse` records observed continuity, including `none` when no prior instance was reused. This section is intentionally about selected run-local subagents; a repo-changing task with no subagent may use a structured parent handoff, while parent-direct exception evidence remains required when the selected workflow requires it. For dynamic fanout, reconcile each selected schedule.md Agent Wave Ledger row with workflow_monitoring.md Actual Wave Events and terminal run-local agent ids. If `wait_agent` timed out, returned empty status, or a final response was absent at a wave decision point, record the subagent no-return investigation fields and keep the lifecycle gate incomplete until new state evidence or explicit user cancellation resolves the instance. -->
+<!-- subagent または durable lifecycle route を選択した場合、user-facing completion 前に run-local subagent lifecycle evidence を記録します。各 user input を same_active_task_delta、scope_or_contract_change、new_task に分類し、owner、responsibility、context、write authority、validation route が compatible なら revised scope を含めて active agent を reuse します。fresh agent は independent review、disjoint write authority、incompatible owner/context、context integrity failure 用です。durable checkpoint と updated packet path は coordination/resumption に必要な場合だけ作り、terminal stage-wave agent は cleanup として close します。timeout、empty status、absent final response は指定された termination_action/write_scope/overlap/lifecycle gate に記録します。dynamic fanout では schedule.md Agent Wave Ledger と workflow_monitoring.md Actual Wave Events、terminal run-local agent id を reconcile します。wait_agent の timeout/empty status/response 欠落があれば no-return investigation field を記録し、新しい state evidence または明示的 cancellation まで lifecycle gate を incomplete にします。 -->
 
 - fresh_subagents_required:
 - reuse_for_new_task:
@@ -241,9 +241,9 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - open_subagent_instances:
 - close_agent_evidence:
 
-## Diff-Check Agent Evidence
+## Diff-Check Agent Evidence（diff-check agent evidence）
 
-<!-- Record the selected owning review gate (and a read-only diff-check instance only when activated), input packet paths, latest diff range or commit, decision, findings disposition, and rerun evidence after any accepted same-owner fix. Reviewer output is hypothesis input; parent/integration owner adjudicates it. Each accepted finding must cite current snapshot, reachable path, contract, and witness/static proof. Rejected findings must carry reason_code and evidence_ref and do not open a wave or cause rollback. -->
+<!-- selected owning review gate（有効時だけ read-only diff-check instance）、input packet path、latest diff range/commit、decision、finding disposition、accepted same-owner fix 後の rerun evidence を記録します。reviewer output は仮説入力で parent/integration owner が判定します。accepted finding は current snapshot、reachable path、contract、witness/static proof を引用し、rejected finding は reason_code/evidence_ref を持ち wave や rollback を起こしません。 -->
 
 - diff_check_agent_role:
 - diff_check_agent_decision:
@@ -252,13 +252,13 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 
 `diff_check_latest_diff_ref` は現在の tracked diff state を示す ref にします。clean tree では git `HEAD`、dirty tree では `task_close.py` が計算する `HEAD-dirty-<sha256>` 形式です。`diff_check_artifact` は run bundle 内の artifact path にします。その artifact の `## Diff-Check Review` には、少なくとも `diff_check_agent_role`、`diff_check_agent_decision`、`diff_check_latest_diff_ref`、`diff_check_read_only: yes`、`diff_check_independent_agent: yes`、`diff_check_findings_status` を記録します。
 
-## Canonical Tree-Head Evidence
+## Canonical Tree-Head Evidence（canonical tree-head evidence）
 
-<!-- Record the canonical design-document paths and implementation paths left in the tracked tree, and state which non-canonical drafts, copied implementations, snapshots, mirrored directories, or backup files were deleted or confirmed absent. Do not unlock completion while the tree carries more than one durable truth surface. -->
+<!-- tracked tree に残した canonical design-document path と implementation path を記録し、削除または absent を確認した non-canonical draft、copied implementation、snapshot、mirrored directory、backup file を記録します。tree に durable truth surface が複数ある間は completion を unlock しません。 -->
 
-## Report Artifact Placement Evidence
+## Report Artifact Placement Evidence（report artifact placement evidence）
 
-<!-- Before closeout, run task_close.py and let report_artifact_checks.py classify report placement. Also run generated_artifact_guard.py to reject mechanically regenerated roots left in the source tree. Tracked durable reports are allowed only when they are not regenerated tool output. Untracked or ignored report files are allowed only under the current `reports/agents/<run-id>/`; report files in older run bundles are archive/cleanup blockers, and regenerated roots such as `reports/dependency-review/` or `reports/agent-eval-runs/` must be deleted and rerun rather than recovered into another report. -->
+<!-- closeout 前に task_close.py を実行し、report_artifact_checks.py に report placement を分類させます。generated_artifact_guard.py も実行し、source tree に残った mechanically regenerated root を拒否します。tracked durable report は regenerated tool output でない場合だけ許可します。untracked/ignored report は current `reports/agents/<run-id>/` 配下だけを許可し、older run bundle の report は archive/cleanup blocker とします。`reports/dependency-review/` や `reports/agent-eval-runs/` などの regenerated root は別 report へ移さず削除して rerun します。 -->
 
 - report_artifact_placement_status:
 - report_artifact_outside_current_run_bundle:
@@ -266,13 +266,13 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - generated_artifact_guard_blockers:
 - report_artifact_recovery_evidence:
 
-## Agent Evaluation Evidence
+## Agent Evaluation Evidence（agent evaluation evidence）
 
-<!-- Run tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write and record the resulting agent_evaluation.md status, score, feedback actions, and learning capture decision. Do not unlock completion while evaluation_status is not pass or feedback_actions_resolved is not yes. The evaluation must include workflow_monitoring.md evidence for active signals, Behavior Events, interventions, and skill/config/workflow/memory improvement decisions. -->
+<!-- `tools/agent_tools/evaluate_agent_run.py --report-dir <this-run> --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write` を実行し、生成した agent_evaluation.md の status、score、feedback action、learning capture decision を記録します。evaluation_status が pass でない、または feedback_actions_resolved が yes でない間は completion を unlock しません。evaluation は active signal、Behavior Events、intervention、skill/config/workflow/memory improvement decision の workflow_monitoring.md evidence を含めます。 -->
 
-## Runtime Log Archive Evidence
+## Runtime Log Archive Evidence（runtime log archive evidence）
 
-<!-- Archive the active run with `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>`, then `python3 tools/agent_tools/runtime_log_archive_git.py push`, and run `python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain` before user-facing completion. Use broad `sync` only when intentionally collecting accumulated runtime families. Do not unlock closeout while the archive is dirty, on the wrong `logs/<environment-key>-<chat-key>` branch, or contains foreign repo-key dirty paths or committed foreign repo-key trees. Record whether archive/push committed or was a no-op, and include the archive branch and repo key. -->
+<!-- active run を `python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir reports/agents/<run-id>` で archive し、`python3 tools/agent_tools/runtime_log_archive_git.py push`、`python3 tools/agent_tools/runtime_log_archive_git.py check-clean --porcelain` を user-facing completion 前に実行します。蓄積 runtime family を意図的に集める場合だけ broad `sync` を使います。archive が dirty、誤った `logs/<environment-key>-<chat-key>` branch、foreign repo-key の dirty path/commit tree を含む場合は closeout を unlock しません。archive/push が commit したか no-op か、archive branch と repo key を記録します。 -->
 
 - runtime_log_archive_sync_command:
 - runtime_log_archive_sync_status:
@@ -289,6 +289,6 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - runtime_log_archive_commit:
 - runtime_log_archive_push:
 
-## Evidence
+## Evidence（証拠）
 
-<!-- Record the exact verification artifact, review artifacts, commit, branch, and push evidence used to close the run. -->
+<!-- run を閉じるために使った exact verification artifact、review artifact、commit、branch、push evidence を記録します。 -->

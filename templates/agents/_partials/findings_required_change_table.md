@@ -7,7 +7,7 @@ downstream implementation ../../../tools/agent_tools/agent_team.py expands templ
 @dependency-end
 -->
 
-## Findings
+## Findings（指摘）
 
 | Finding | Severity | Required Change | Evidence | Status |
 | ------- | -------- | --------------- | -------- | ------ |

@@ -1,4 +1,4 @@
-# Report Review
+# Report Review（report レビュー）
 <!--
 @dependency-start
 contract template
@@ -15,11 +15,11 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 {{>reader_map}}
 {{>review_contract}}
 
-## Evidence Traceability Findings
+## Evidence Traceability Findings（証拠 traceability の指摘）
 
 | Claim Or Section | Finding | Severity | Status |
 | ---------------- | ------- | -------- | ------ |
 
-## Reader-Facing Rewrite Notes
+## Reader-Facing Rewrite Notes（読者向け書き直しメモ）
 
-<!-- Record structure, overclaim, or missing-evidence rewrite requirements. -->
+<!-- structure、過大主張、不足証拠に関する書き直し要件を記録します。 -->

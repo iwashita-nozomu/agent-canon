@@ -181,6 +181,8 @@ def _render_prompt_entry(value: object, field_name: str) -> str:
 
 TEMPLATE_ROOT = ROOT / "templates" / "agents"
 
+CODE_TEMPLATE_ROOT = ROOT / "templates" / "code"
+
 TEMPLATE_PARTIAL_ROOT = TEMPLATE_ROOT / "_partials"
 
 TEMPLATE_PARTIAL_RE = re.compile(r"\{\{>\s*([A-Za-z0-9_-]+)\s*\}\}")
@@ -905,6 +907,31 @@ def render_template(template_name: str, replacements: dict[str, str]) -> str:
     content = expand_template_partials(content)
     content = apply_template_replacements(content, replacements)
     return content
+
+
+def render_code_template(template_name: str) -> str:
+    """
+    Read one materializable source from templates/code with path containment.
+
+    Args:
+        template_name: English filename relative to the code-template owner.
+
+    Returns:
+        The canonical source bytes decoded as UTF-8 for destination materialization.
+
+    Raises:
+        RuntimeError: If the requested path escapes the code-template owner.
+        FileNotFoundError: If the named code template is not materialized.
+    """
+    template_root = CODE_TEMPLATE_ROOT.resolve()
+    template_path = (CODE_TEMPLATE_ROOT / template_name).resolve()
+    try:
+        template_path.relative_to(template_root)
+    except ValueError as error:
+        raise RuntimeError(f"code template escapes owner: {template_name}") from error
+    if not template_path.is_file():
+        raise FileNotFoundError(f"code template not found: {template_name}")
+    return template_path.read_text(encoding="utf-8")
 
 
 def has_template(artifact_name: str) -> bool:

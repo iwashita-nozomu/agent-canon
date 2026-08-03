@@ -1,4 +1,4 @@
-# Research Review
+# Research Review（調査レビュー）
 <!--
 @dependency-start
 contract template
@@ -15,12 +15,12 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 {{>reader_map}}
 {{>review_contract}}
 
-## Source Quality
+## Source Quality（source の品質）
 
-<!-- Check source quality, relevance, and recency. -->
+<!-- source の品質、関連性、最新性を確認します。 -->
 
-## Gaps
+## Gaps（不足）
 
-<!-- Note unsupported claims, weak evidence, or missing comparisons. -->
+<!-- 根拠のない主張、弱い証拠、比較不足を記録します。 -->
 
 {{>decision_approve_revise_escalate}}

@@ -3,6 +3,7 @@
 # responsibility Tests agent team template rendering behavior.
 # upstream design ../../templates/agents/README.md template partial contract
 # downstream implementation ../../tools/agent_tools/manifest_rendering.py renders templates and partials
+# downstream implementation ../../templates/code/python/docstring_template.py is the materializable code source
 # downstream implementation ../../tools/agent_tools/agent_team.py owns facade orchestration
 # @dependency-end
 
@@ -25,13 +26,27 @@ import capacity_handshake  # noqa: E402
 import task_close  # noqa: E402
 import update_lifecycle_contract  # noqa: E402
 from implementation_dispatch import dispatch_fixed_implementation  # noqa: E402
-from manifest_rendering import render_template, suggested_public_skills  # noqa: E402
+from manifest_rendering import (  # noqa: E402
+    render_code_template,
+    render_template,
+    suggested_public_skills,
+)
 from packets import resolve_active_design_packet_config  # noqa: E402
 from team_config import load_team_config  # noqa: E402
 
 
 class AgentTeamTemplateTest(unittest.TestCase):
     """Verify reusable template partial expansion."""
+
+    def test_code_template_renderer_returns_materializable_python_source(self) -> None:
+        """The code owner exposes a parseable module/class/function source."""
+        rendered = render_code_template("python/docstring_template.py")
+
+        self.assertIn("class ExampleState", rendered)
+        self.assertIn("def build_example_state", rendered)
+        self.assertIn("Args:", rendered)
+        self.assertIn("Ownership:", rendered)
+        self.assertNotIn("return None", rendered)
 
     def test_active_design_packet_normalizer_rejects_unknown_mapping_fields(
         self,
@@ -100,8 +115,8 @@ class AgentTeamTemplateTest(unittest.TestCase):
         )
 
         self.assertNotIn("{{>", rendered)
-        self.assertIn("## Decision", rendered)
-        self.assertIn("<!-- Record approve, revise, or escalate. -->", rendered)
+        self.assertIn("## 判定（Decision）", rendered)
+        self.assertIn("<!-- approve、revise、escalate のいずれかを記録します。 -->", rendered)
         self.assertEqual(rendered.count("@dependency-start"), 1)
 
     def test_research_driven_skill_calls_literature_survey_first(self) -> None:

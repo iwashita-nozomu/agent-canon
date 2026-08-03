@@ -1,4 +1,4 @@
-# Final Review (Selected Escalation)
+# Final Review（最終レビュー・selected escalation）
 <!--
 @dependency-start
 contract template
@@ -16,57 +16,57 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 {{>reader_map}}
 {{>review_contract}}
 
-## Ship Blockers
+## Ship Blockers（出荷を止める指摘）
 
 | Finding | Severity | Status |
 | ------- | -------- | ------ |
 
-## Design Trace Acceptance
+## Design Trace Acceptance（design trace の受入れ）
 
-<!-- This artifact is materialized only when final escalation or a distinct unresolved claim/risk is selected. Confirm that the final diff remains traceable to the Abstract Design Frame, approved design sections, user-request clause IDs, Implementation Source Packet entries, and test-plan items only when test design was activated. -->
+<!-- この artifact は final escalation または独立した unresolved claim/risk が選択された場合だけ materialize します。final diff が Abstract Design Frame、approved design section、user-request clause ID、Implementation Source Packet entry、test design が有効な場合の test-plan item に trace できるか確認します。 -->
 
-## Design Side-Effect Trace Acceptance
+## Design Side-Effect Trace Acceptance（design side-effect trace の受入れ）
 
-<!-- Confirm that implemented side effects match the approved Design Side-Effect Map, including documents, workflows, prompt/config, validation output, dependency manifests, and user-facing surfaces. Record any side-effect item that moved to a later stage, was escalated, or received explicit reviewer acceptance. -->
+<!-- 実装した副作用が approved Design Side-Effect Map と一致するか確認します。documents、workflows、prompt/config、validation output、dependency manifest、user-facing surface を含めます。後段へ移した、escalate した、または reviewer が明示的に受け入れた side-effect item を記録します。 -->
 
-## Planned Work Completion Review
+## Planned Work Completion Review（planned work 完了レビュー）
 
-<!-- Confirm that all planned work units and active clauses are complete, that schedule.md still reflects the full TODO surface, and that work_log.md shows the meaningful execution trail. Return required_change if only a chunk, slice, checkpoint, or subpass is complete. -->
+<!-- planned work unit と active clause がすべて完了し、schedule.md が全 TODO surface を反映し、work_log.md が意味のある実行履歴を示すか確認します。chunk、slice、checkpoint、subpass だけが完了していれば required_change とします。 -->
 
-## Cross-Doc Coverage Review
+## Cross-Doc Coverage Review（文書横断 coverage レビュー）
 
-<!-- Confirm that the task did not stay trapped in one document tree branch and that relevant cross-cutting packet docs were considered before acceptance. Return revise if review policy, guardrails, lifecycle docs, or migration/integration docs that affect this task were ignored. -->
+<!-- task が 1 つの document tree branch に閉じず、受入れ前に関連 cross-cutting packet docs を考慮したか確認します。task に影響する review policy、guardrail、lifecycle docs、migration/integration docs を無視していれば revise とします。 -->
 
-## Spec-To-Product Coverage Review
+## Spec-To-Product Coverage Review（spec から product への coverage レビュー）
 
-<!-- For every must-do and completion-evidence clause, confirm the implemented product surface or artifact that satisfies it. Return revise if any requested spec has no corresponding implementation, doc, test, command, or explicit deferred/rejected clause. -->
+<!-- すべての must-do と completion-evidence clause について、それを満たす実装 surface または artifact を確認します。requested spec に対応する implementation、doc、test、command、または明示的な deferred/rejected clause がなければ revise とします。 -->
 
-## Review Finding Incorporation Review
+## Review Finding Incorporation Review（review finding 反映レビュー）
 
-<!-- Confirm that the selected owning review gate and any explicitly activated specialist findings were reflected in implementation or explicitly escalated. Reviewer output is hypothesis input; accepted findings require current snapshot, reachable path, contract, and witness/static proof. Rejected findings require reason_code/evidence_ref and do not create a repair wave. -->
+<!-- selected owning review gate と明示的に有効化した specialist finding が implementation に反映されたか、または明示的に escalate されたか確認します。reviewer output は仮説入力であり、accepted finding には current snapshot、reachable path、contract、witness/static proof が必要です。rejected finding は reason_code/evidence_ref を持ち、repair wave を作りません。 -->
 
-## Review Rejection Response Review
+## Review Rejection Response Review（reject 応答レビュー）
 
-<!-- Confirm that review rejection, requested-change, revise, and required_change responses preserved the active request clauses and approved design intent. Return revise if the final diff reached green state by rolling back, discarding, or narrowing user-requested behavior without withdrawal, supersession, owner-boundary, unsafe-replacement, or escalation evidence. -->
+<!-- review rejection、requested-change、revise、required_change の応答が active request clause と approved design intent を保持したか確認します。withdrawal、supersession、owner-boundary、unsafe-replacement、escalation evidence なしに rollback、discard、requested behavior の narrowing で green state にした場合は revise とします。 -->
 
-## Semantic Search And Responsibility Evidence
+## Semantic Search And Responsibility Evidence（semantic search と責務証拠）
 
-<!-- Confirm whether review-time semantic-index artifacts were required for this task. If present, record how responsibility-scoped merge candidates, thin-doc candidates, and long-query search hits were accepted, fixed, or rejected. Return revise if relevant semantic candidates were ignored, or if semantic output alone was used as merge/delete authority without dependency and structure evidence. -->
+<!-- この task に review-time semantic-index artifact が必要だったか確認します。存在すれば responsibility-scoped merge candidate、thin-doc candidate、long-query search hit を accepted、fixed、rejected にした根拠を記録します。関連 candidate を無視した場合、または dependency/structure evidence なしに semantic output だけを merge/delete authority にした場合は revise とします。 -->
 
-## Post-Fix Full Review Rerun Review
+## Post-Fix Full Review Rerun Review（修正後 full review rerun）
 
-<!-- Confirm that if an accepted review-driven fix changed behavior, owner/design boundary, correctness, validation, or publication state, the selected owning gate was rerun against the latest diff. Full review reruns are selected only for a final candidate when the touched contract requires them. -->
+<!-- accepted review-driven fix が behavior、owner/design boundary、correctness、validation、publication state を変えた場合、latest diff に対して selected owning gate を rerun したか確認します。full review rerun は touched contract が要求する final candidate に限り選択します。 -->
 
-## Repo-Wide Dependency Review
+## Repo-Wide Dependency Review（repo-wide dependency レビュー）
 
-<!-- Confirm the selected static/targeted validation route after the latest accepted fix. Run the full repository dependency review only when the final candidate contract requires it. -->
+<!-- latest accepted fix 後に selected static/targeted validation route を確認します。full repository dependency review は final candidate contract が要求するときだけ実行します。 -->
 
-## Canonical Tree-Head Acceptance
+## Canonical Tree-Head Acceptance（canonical tree head の受入れ）
 
-<!-- Confirm that the only durable product state left in the tracked tree is the current tree head on canonical paths. Return revise if any non-canonical design document, copied implementation, dated snapshot, backup path, or mirrored tree remains. -->
+<!-- tracked tree に残る durable product state が canonical path の current tree head だけか確認します。non-canonical design document、copied implementation、dated snapshot、backup path、mirrored tree が残れば revise とします。 -->
 
-## Residual Risks
+## Residual Risks（残存リスク）
 
-<!-- Record remaining risk, approval notes, or escalation points. -->
+<!-- 残存リスク、承認メモ、escalation point を記録します。 -->
 
 {{>decision_approve_revise_escalate}}

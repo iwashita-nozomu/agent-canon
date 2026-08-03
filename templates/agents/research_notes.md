@@ -1,4 +1,4 @@
-# Research Notes
+# Research Notes（調査メモ）
 <!--
 @dependency-start
 contract template
@@ -14,14 +14,14 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 {{>reader_map}}
 
-## Questions
+## Questions（問い）
 
-<!-- List the algorithm or external questions being researched. -->
+<!-- 調査中の algorithm または外部に関する問いを列挙します。 -->
 
-## Sources
+## Sources（source）
 
-<!-- Record links, docs, papers, or references consulted. -->
+<!-- 参照した link、docs、paper、reference を記録します。 -->
 
-## Conclusions
+## Conclusions（結論）
 
-<!-- Summarize what must influence the implementation. -->
+<!-- implementation に反映すべき内容を要約します。 -->

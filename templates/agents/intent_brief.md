@@ -1,4 +1,4 @@
-# Intent Brief
+# Intent Brief（意図 brief）
 <!--
 @dependency-start
 contract template
@@ -15,42 +15,42 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 {{>reader_map}}
 
-## User Intent
+## User Intent（user intent）
 
-<!-- Rewrite the user's request in concrete, implementation-facing language. -->
+<!-- user request を具体的な implementation-facing language に書き直します。 -->
 
-## Atomic User Request Clauses
+## Atomic User Request Clauses（atomic request clause）
 
-<!-- Split the user request into clause IDs that will be tracked in user_request_contract.md. -->
+<!-- user request を user_request_contract.md で追跡する clause ID に分割します。 -->
 
-## Must-Not-Do Drift
+## Must-Not-Do Drift（禁止する drift）
 
-<!-- Record forbidden drift, explicit exclusions, and work the user did not ask for. -->
+<!-- forbidden drift、明示的な exclusion、user が依頼していない work を記録します。 -->
 
-## Routing Declaration
+## Routing Declaration（routing 宣言）
 
-<!-- Record workflow=<family>, skills=<...>, review=<...> as they were declared in the first work update. -->
+<!-- 最初の work update で宣言した workflow=<family>、skills=<...>、review=<...> を記録します。 -->
 
-## Acceptance Criteria
+## Acceptance Criteria（受入れ基準）
 
-<!-- List the conditions that must be true for the task to count as done. -->
+<!-- task を done と数えるために成立すべき条件を列挙します。 -->
 
-## Context Sweep Hits
+## Context Sweep Hits（context sweep の hit）
 
-<!-- Record the documents, notes, references, and prior decisions that were found before planning. -->
+<!-- planning 前に見つけた document、note、reference、prior decision を記録します。 -->
 
-## Library Sweep Hits
+## Library Sweep Hits（library sweep の hit）
 
-<!-- Record the code, tests, scripts, and existing APIs that were checked for reuse before new implementation. -->
+<!-- new implementation 前に reuse のため確認した code、test、script、existing API を記録します。 -->
 
-## Existing Code And Docs To Follow
+## Existing Code And Docs To Follow（従う既存 code/docs）
 
-<!-- Capture the local modules, tests, docs, and writing patterns that implementation must mimic or reuse. -->
+<!-- implementation が mimic または reuse する local module、test、doc、writing pattern を記録します。 -->
 
-## Required Stage Agents
+## Required Stage Agents（必要な stage agent）
 
-<!-- Record which agent or subagent will handle requirements, research, execution planning, plan review, detailed design, detailed design review, document flow review, and implementation. -->
+<!-- requirements、research、execution planning、plan review、detailed design、detailed design review、document flow review、implementation を担当する agent/subagent を記録します。 -->
 
-## Ambiguities
+## Ambiguities（曖昧さ）
 
-<!-- Capture unresolved questions, assumptions, and escalation points. -->
+<!-- unresolved question、assumption、escalation point を記録します。 -->

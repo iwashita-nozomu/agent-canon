@@ -1,4 +1,4 @@
-# ML Science Review
+# ML Science Review（ML 科学レビュー）
 <!--
 @dependency-start
 contract template
@@ -17,9 +17,9 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 {{>findings_required_change_table}}
 
-## Focus
+## Focus（確認点）
 
-- Assumptions and scope limits
-- Limitations and uncertainty
-- Reader-facing reporting quality
-- Overclaim and unsupported interpretation
+- 仮定と scope limit
+- 制約と不確実性
+- 読者向け報告の品質
+- 過大主張と根拠のない解釈

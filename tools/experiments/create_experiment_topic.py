@@ -5,7 +5,10 @@
 # upstream design ../README.md shared automation index
 # upstream design ../../templates/documents/experiment/README.template.md canonical topic README template.
 # upstream design ../../templates/documents/experiment/experiment-provenance.template.toml canonical provenance template.
-# downstream implementation ../../templates/experiments/_template/run.py runnable topic scaffold.
+# downstream implementation ../../templates/experiments/_template/run.py runnable topic scaffold and orchestration boundary.
+# downstream implementation ../../templates/experiments/_template/case_model.py reusable case/result models.
+# downstream implementation ../../templates/experiments/_template/artifact_schema.py stable artifact schemas.
+# downstream implementation ../../templates/experiments/_template/artifact_io.py atomic artifact publication.
 # upstream design ../../documents/experiments/experiment-registry.md project experiment registry contract.
 # @dependency-end
 
@@ -167,7 +170,7 @@ def main() -> int:
         print(f"canonical_provenance_template={provenance_template}")
         print(f"topic_dir={topic_dir}")
         print(f"registry_path={registry_path}")
-        print("planned_topic_files=README.md,provenance.toml,run.py,cases.py,config.yaml,visualize.ipynb,result/.gitkeep")
+        print("planned_topic_files=README.md,provenance.toml,run.py,cases.py,case_model.py,case_execution.py,artifact_schema.py,artifact_io.py,visualization.py,config.yaml,visualize.ipynb,result/.gitkeep")
         return 0
 
     if topic_dir.exists():

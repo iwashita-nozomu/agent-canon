@@ -7,7 +7,9 @@ upstream design ../documents/rule/README.md document filename, placement, and la
 upstream design ../documents/conventions/DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse projection traces
 downstream implementation ./agents/README.md reusable agent artifact template source
 downstream implementation ./documents/README.md reader-facing document template source
+downstream implementation ./code/README.md materializable code and Docstring template source
 downstream implementation ./experiments/_template/run.py runnable experiment scaffold source
+downstream implementation ../tools/agent_tools/manifest_rendering.py renders materializable code templates
 downstream implementation ../tools/agent_tools/agent_team.py renders agent templates
 downstream implementation ../tools/experiments/create_experiment_topic.py copies experiment templates
 downstream implementation ../tools/sync_agent_canon.sh retires the parent-root template view and projects GitHub copies
@@ -29,7 +31,7 @@ validation/readback、lifecycle を読みます。
 
 - purpose: adaptable な AgentCanon template source を一つの canonical path で提供する。
 - intended reader: template利用者、実装者、reviewer、親repo integrator、保守者。
-- what this directory contains: agent artifact、reader-facing document、experiment scaffold、GitHub source。
+- what this directory contains: agent artifact、reader-facing document、materializable code、experiment scaffold、GitHub source。
 - canonical source: `templates/`。
 - generated / local surfaces: `.github/` projection、run/result、reports、親repoの view。
 - update owner: 各 source template とその直接 consumer。index/manifest は参照が変わる場合だけ更新する。
@@ -42,6 +44,7 @@ validation/readback、lifecycle を読みます。
 | --- | --- | --- |
 | `templates/agents/` | task-start、run bundle、review、closeout の artifact template | Agent team がこの path を直接 render する |
 | `templates/documents/` | README、design、experiment、host、remote execution、GitHub template source | GitHub surface は manifest 経由で `.github/` へ copy projection する |
+| `templates/code/` | parse-valid module/class/function と Docstring の materializable source | `render_code_template()` または明示 copy で destination owner へ materialize する |
 | `templates/experiments/_template/` | runnable experiment scaffold の frozen source | `create_experiment_topic.py` が新規 `experiments/<topic>/` へ copy する |
 | `templates/agents/_partials/` | reader map、review contract、finding/decision の再利用部品 | top-level agent artifact の render 時だけ展開する |
 
@@ -59,33 +62,35 @@ source-root `templates/documents/github/` から `.github/` へ再生成しま�
 `templates/documents/experiment/experiment-provenance.template.toml` を読み、生成先だけを
 `experiments/<topic>/` に書き込みます。source scaffold、source registry、GPU 実行経路は
 直接変更しません。managed runner の実行入口は常に生成後の
-`experiments/<topic>/run.py` です。
+`experiments/<topic>/run.py` です。`run.py` は orchestration だけを担当し、
+`case_model.py`（case/record 型）、`case_execution.py`（case worker と failure 分類）、
+`artifact_schema.py`（summary/manifest schema）、`artifact_io.py`（atomic serialization）、
+`visualization.py`（optional consumer status）が利用者の replaceable extension point です。
 
 ## Parent follow-up packet
 
 この source change を parent repo に反映するときは、次を同じ parent update packet に記録します。
 
-- in the parent integration commit, run `git rm templates` only after
-  confirming the tracked entry is the former
-  `templates -> vendor/agent-canon/templates` symlink
-- preserve `vendor/agent-canon/templates/` and any parent-owned regular
-  `templates/` directory
-- delete parent `experiments/_template/`
-- delete the parent registry `_template` entry
-- delete parent docs and tests that only exercise the removed scaffold
-- regenerate and check `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` projections
-- pass `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check` from the parent root after the pin/root-view update
+- parent integration commit では、tracked entry が旧 `templates -> vendor/agent-canon/templates`
+  symlink であることを確認してからだけ `git rm templates` を実行する。
+- `vendor/agent-canon/templates/` と parent-owned の通常 `templates/` directory を保持する。
+- parent の `experiments/_template/` を削除する。
+- parent registry の `_template` entry を削除する。
+- 削除した scaffold だけを使う parent docs と tests を削除する。
+- `.github/ISSUE_TEMPLATE/` と `.github/PULL_REQUEST_TEMPLATE/` projection を再生成して確認する。
+- pin/root-view 更新後、parent root で
+  `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check`
+  を pass させる。
 
 Parent `experiments/registry.toml` remains project-owned: only the obsolete `_template` entry is
 removed, and all real topic identities stay intact.
 
 ## Docstring projection
 
-Template Docstrings use the [Docstring Semantic Contract](../documents/conventions/DOCSTRING_GUIDE.md)
-as their semantic owner. Each consumer records only the responsibility region and selected
-semantic delta; it does not require fixed sections or repeat signature, type, namespace, or field
-facts. A design document or generated experiment records the guide reference and its projection
-anchor when that trace is materialized.
+Template Docstring の semantic owner は [Docstring Semantic Contract](../documents/conventions/DOCSTRING_GUIDE.md)
+です。各 consumer は responsibility region と selected semantic delta だけを記録し、固定 section
+や signature、type、namespace、field の事実を繰り返しません。design document または generated
+experiment は、その trace を materialize するとき guide reference と projection anchor を記録します。
 
 `templates/documents/semantic-responsibility-contract.template.toml` は空の instance
 shape を提供します。値を埋めた semantic responsibility contract は run-local artifact

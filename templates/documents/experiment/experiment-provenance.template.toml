@@ -102,7 +102,9 @@ exit_status = "<exit-status>"
 [result]
 path = "<result-path>"
 summary = "<result-path>/summary.json"
+cases = "<result-path>/cases.jsonl"
 manifest = "<result-path>/artifact-manifest.json"
+visualization_status = "<result-path>/visualization-status.json"
 state = "incomplete"
 status = "incomplete"
 accepted_failure = false
@@ -121,6 +123,9 @@ conflict_intent = "<preserved-intent-or-none>"
 [reproducibility]
 readback_command = "<command>"
 required_artifacts = ["summary.json", "artifact-manifest.json"]
+required_case_artifact = "cases.jsonl"
+config_snapshot = "<result-path>/config_snapshot.json"
+environment_snapshot = "<result-path>/environment.json"
 known_nondeterminism = "<none-or-description>"
 retention_owner = "<owner>"
 cleanup_policy = "<policy>"

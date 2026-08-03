@@ -7,18 +7,18 @@ downstream implementation ../../../tools/agent_tools/agent_team.py expands this 
 @dependency-end
 -->
 
-## Review Contract
+## Review Contract（レビュー契約）
 
 レビューは現在の source snapshot、到達可能な input/control path、契約、witness または
 static proof がそろい、owner・実装・validation・publication の判断が変わる finding だけを
 受け付けます。
 
-- owner / responsibility and OOP or type boundary:
+- owner / responsibility と OOP または type boundary:
 - design-to-implementation trace:
-- dependency and side-effect map:
-- algorithm contract before tests:
+- dependency と side-effect map:
+- tests より前の algorithm contract:
 - necessary-and-sufficient oracle/test boundary:
 - failure-cause classification:
-- conflict intent and preserved user/design intent:
-- independent reviewer and evidence readback:
-- rejected finding reason code and evidence reference:
+- conflict intent と保持した user/design intent:
+- independent reviewer と証跡 readback:
+- rejected finding の reason code と evidence reference:

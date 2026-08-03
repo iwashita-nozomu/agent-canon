@@ -7,6 +7,6 @@ downstream implementation ../../../tools/agent_tools/agent_team.py expands templ
 @dependency-end
 -->
 
-## Decision
+## 判定（Decision）
 
-<!-- Record approve, revise, or escalate. -->
+<!-- approve、revise、escalate のいずれかを記録します。 -->

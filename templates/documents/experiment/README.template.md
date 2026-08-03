@@ -74,6 +74,10 @@ experiments/<topic>/
         ├── summary.json
         ├── cases.jsonl
         ├── config_snapshot.json
+        ├── environment.json
+        ├── artifact-manifest.json
+        ├── visualization-status.json
+        ├── failure-evidence.json (failed/blocked 時)
         └── logs/
 ```
 
@@ -222,10 +226,18 @@ python3 tools/experiments/run_managed_experiment.py \
 - runnerが `EXPERIMENT_RUN_DIR`、`EXPERIMENT_RUN_MANIFEST`、config snapshot、command/environment/source
   manifest、stdout/stderr/startup logをmanaged childへ渡し、topic `main()` は引数なしで実行する。
 - topic `run.py` は `result/<run_name>/` を作成し、少なくとも `summary.json`、`cases.jsonl`、
-  topic-specific artifact、必要な `logs/` を書き出す。notebookはmanaged childのrun flowから
-  artifactを読み、formal runの別のentrypointにはしない。
+  `config_snapshot.json`、`environment.json`、`artifact-manifest.json`、
+  `visualization-status.json`、topic-specific artifact、必要な `logs/` を atomic に書き出す。
+  失敗または空 case では `failure-evidence.json` も保存する。notebookはmanaged childのrun
+  flowから artifactを読み、formal runの別のentrypointにはしない。
 - `config.yaml` はchecked-in設定の正本であり、run時の割当・snapshot・command identityは
   runnerのprovenanceへ記録する。
+
+最小 scaffold には `cases.py` の `example` case が一つあり、case record は `case_id`、
+`state`、`result`、`failure_class`、時刻、duration を必ず持ちます。case が空なら run は
+`blocked`、case failure なら `failed` とし、成功 record だけを残して failure を隠しません。
+`EXPERIMENT_RUN_VISUALIZATION=1` を指定しない場合、visualization は
+`visualization-status.json` に `not_requested` と記録され、Jupyter を必須にしません。
 
 ## Implementation Markers
 

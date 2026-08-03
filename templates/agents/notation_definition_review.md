@@ -1,4 +1,4 @@
-# Notation Definition Review
+# Notation Definition Review（記法定義レビュー）
 <!--
 @dependency-start
 contract template
@@ -17,20 +17,20 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 {{>findings_area_table}}
 
-## Symbols, Terms, And Abbreviations
+## Symbols, Terms, And Abbreviations（記号・用語・略語）
 
-<!-- Check whether every symbol, abbreviation, and technical term is defined before use. -->
+<!-- すべての記号、略語、technical term が使用前に定義されているか確認します。 -->
 
-## Units, Domains, Types, And Indices
+## Units, Domains, Types, And Indices（単位・領域・型・添字）
 
-<!-- Check whether quantities carry enough domain/unit/type/index information for the reader. -->
+<!-- 量が読者に必要な domain/unit/type/index 情報を伴っているか確認します。 -->
 
-## Consistency And Overload
+## Consistency And Overload（一貫性と過負荷）
 
-<!-- Check whether the same concept keeps the same notation and whether overloaded or near-colliding notation is avoided. -->
+<!-- 同じ概念が同じ記法を保ち、overload や衝突しそうな記法を避けているか確認します。 -->
 
-## Rewrite Targets
+## Rewrite Targets（書き直し対象）
 
-<!-- Record concrete rewrite points needed to repair definition order and notation discipline. -->
+<!-- 定義順と記法の規律を直す具体的な書き直し箇所を記録します。 -->
 
 {{>decision_approve_revise_escalate}}

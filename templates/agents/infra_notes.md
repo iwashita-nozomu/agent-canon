@@ -1,4 +1,4 @@
-# Infrastructure Notes
+# Infrastructure Notes（infrastructure メモ）
 <!--
 @dependency-start
 contract template
@@ -14,14 +14,14 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 {{>reader_map}}
 
-## Surface Area
+## Surface Area（対象 surface）
 
-<!-- List the CI, Docker, experiment runner, automation, or platform surfaces touched. -->
+<!-- 変更した CI、Docker、experiment runner、automation、platform surface を列挙します。 -->
 
-## Changes
+## Changes（変更）
 
-<!-- Record infra changes, migrations, or expansion tasks. -->
+<!-- infra change、migration、拡張作業を記録します。 -->
 
-## Operational Checks
+## Operational Checks（運用確認）
 
-<!-- Record rollout considerations, compatibility notes, or follow-up infra work. -->
+<!-- rollout の考慮事項、互換性メモ、後続 infra 作業を記録します。 -->

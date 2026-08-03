@@ -1,4 +1,4 @@
-# Logic Gap Review
+# Logic Gap Review（論理 gap レビュー）
 <!--
 @dependency-start
 contract template
@@ -17,20 +17,20 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 {{>findings_area_table}}
 
-## Claim To Evidence Links
+## Claim To Evidence Links（claim から evidence への link）
 
-<!-- Check whether each major claim is supported by the cited evidence, result, derivation, or prior paragraph conclusion. -->
+<!-- 各 major claim が cited evidence、result、derivation、または前段 paragraph の conclusion に支えられるか確認します。 -->
 
-## Hidden Assumptions
+## Hidden Assumptions（隠れた仮定）
 
-<!-- Record assumptions, prerequisites, or scope conditions that the text relies on without making explicit. -->
+<!-- 本文が依存するのに明示されていない assumption、prerequisite、scope condition を記録します。 -->
 
-## Result Vs Interpretation
+## Result Vs Interpretation（result と interpretation の分離）
 
-<!-- Check whether the text clearly separates observations/results from interpretation, speculation, and future work. -->
+<!-- 本文が observation/result と interpretation、speculation、future work を明確に分けるか確認します。 -->
 
-## Rewrite Targets
+## Rewrite Targets（書き直し対象）
 
-<!-- Record concrete rewrite points needed to close logical jumps. -->
+<!-- logical jump を閉じるための具体的な書き直し箇所を記録します。 -->
 
 {{>decision_approve_revise_escalate}}

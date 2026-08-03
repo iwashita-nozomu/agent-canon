@@ -15,13 +15,13 @@ upstream design ../../../../.github/AGENTS.md GitHub subtree instructions
 @dependency-end
 -->
 
-<!-- Canonical source: templates/documents/github/pull-request/agent_canon.md. Generated projections target .github/PULL_REQUEST_TEMPLATE/agent_canon.md; edit this source only. -->
+<!-- canonical source は templates/documents/github/pull-request/agent_canon.md です。generated projection は .github/PULL_REQUEST_TEMPLATE/agent_canon.md を対象とするため、この source だけを編集します。 -->
 
 ## Reader Map
 
-- This template owns the PR checklist for AgentCanon changes made through a template or derived repository.
-- Use `PR Essence`, `Summary`, and `Scope` to state the change route; use the branch, authority, automation, plan, orchestration, issue, validation, integration, sync, mirror, and risk sections for required evidence.
-- Read it when preparing or reviewing a template-side PR that changes shared canon surfaces or updates an AgentCanon pin/root view.
+- この template は、template または derived repository を通じた AgentCanon change の PR checklist を所有します。
+- `PR Essence`、`Summary`、`Scope` で change route を示し、branch、authority、automation、plan、orchestration、issue、validation、integration、sync、mirror、risk section に必要な evidence を記録します。
+- shared canon surface の変更、または AgentCanon pin/root view の更新を行う template-side PR を作成・review するときに読みます。
 
 ## PR Essence
 

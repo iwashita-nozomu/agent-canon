@@ -1,4 +1,4 @@
-# Experiment Log
+# Experiment Log（実験ログ）
 <!--
 @dependency-start
 contract template
@@ -15,38 +15,38 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 {{>reader_map}}
 
-## Question
+## Question（問い）
 
-<!-- What empirical question is this run answering? -->
+<!-- この run が答える empirical question は何か。 -->
 
-## Comparison Target
+## Comparison Target（比較対象）
 
-<!-- Baseline, main implementation, and any external reference. -->
+<!-- baseline、main implementation、外部 reference を記録します。 -->
 
-## Protocol
+## Protocol（protocol）
 
-<!-- Command, case range, hardware, timeout, seeds, fairness notes. -->
+<!-- command、case range、hardware、timeout、seed、fairness note を記録します。 -->
 
-## Result Summary
+## Result Summary（結果要約）
 
-<!-- Key measurements, failures, and whether the run completed. -->
+<!-- 主要な測定値、failure、run が完了したかを記録します。 -->
 
-## Quantitative Summary
+## Quantitative Summary（定量要約）
 
-<!-- Case count, success rate, representative metrics, variability, baseline deltas. -->
+<!-- case count、success rate、代表 metric、変動性、baseline との差分を記録します。 -->
 
-## Comparison Table
+## Comparison Table（比較表）
 
-<!-- Same-case comparison against baseline/main/reference. -->
+<!-- 同じ case に対する baseline/main/reference の比較を記録します。 -->
 
-## Interpretation
+## Interpretation（解釈）
 
-<!-- What the current evidence suggests, without overclaiming. -->
+<!-- 過大主張を避け、現在の証拠が示す内容を記録します。 -->
 
-## Critical Review Notes
+## Critical Review Notes（批判的レビューのメモ）
 
-<!-- What this run still does not justify, missing evidence, and overclaim risk. -->
+<!-- この run だけでは正当化できないこと、不足証拠、過大主張リスクを記録します。 -->
 
-## Run Reflection
+## Run Reflection（run の振り返り）
 
-<!-- Which commit, run directory, and execution context this run belongs to, and what must be reflected next. -->
+<!-- この run が属する commit、run directory、execution context と、次に反映すべき内容を記録します。 -->
