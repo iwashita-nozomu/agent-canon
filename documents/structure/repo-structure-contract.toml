@@ -291,7 +291,6 @@ allowed_top_level = [
   "QUICK_START.md",
   "README.md",
   "agents",
-  "templates",
   "cpp",
   "docker",
   "documents",
@@ -338,11 +337,6 @@ category = "shared_runtime_view"
 
 [[profile.required]]
 path = "agents"
-kind = "any"
-category = "shared_runtime_view"
-
-[[profile.required]]
-path = "templates"
 kind = "any"
 category = "shared_runtime_view"
 

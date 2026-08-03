@@ -36,7 +36,7 @@ failure routes, and the legacy compatibility appendix for non-submodule repos.
 | --- | --- | --- | --- |
 | `vendor/agent-canon/` | AgentCanon Git submodule checkout and parent gitlink | AgentCanon | `git submodule status vendor/agent-canon` and `git rev-parse HEAD:vendor/agent-canon` |
 | `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, `tools/` | root runtime view of AgentCanon | AgentCanon | `bash tools/sync_agent_canon.sh check` |
-| `templates/` | managed symlink to centralized AgentCanon template source | AgentCanon | `bash tools/sync_agent_canon.sh check` |
+| `vendor/agent-canon/templates/` | centralized AgentCanon template source with no parent-root symlink view | AgentCanon | manifest `link-specs` and consumer path readback |
 | `.github/AGENTS.md` | GitHub agent root view | AgentCanon | `bash tools/sync_agent_canon.sh check` |
 | `.github/workflows/agent-coordination.yml`, `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`, `.github/scripts/checkout_agent_canon_submodule.sh` | regular root copies forced by GitHub path constraints | AgentCanon source, root copy | `bash tools/sync_agent_canon.sh check` |
 | `documents/runtime/SHARED_RUNTIME_SURFACES.md`, `documents/runtime/shared-runtime-surfaces.toml` | shared surface policy and machine manifest | AgentCanon | `python3 tools/agent_tools/check_convention_compliance.py` |
@@ -135,15 +135,18 @@ was prepared in standalone AgentCanon or in the submodule worktree, this parent
 root follow-up is still mandatory after the source PR is integrated or while
 preparing the parent pin/root-view PR.
 
-For the centralized template source update, the parent follow-up packet must also
-record the exact structural cleanup: materialize
-`templates -> vendor/agent-canon/templates`, delete parent `experiments/_template/`,
-remove only the `_template` entry from the project-owned
-`experiments/registry.toml`, remove docs/tests that only exercise that scaffold,
-and regenerate the GitHub Issue/PR copies from
-`vendor/agent-canon/templates/documents/github/`. Do not delete other experiment
-topics or mutate the AgentCanon source registry (the source tree has no project
-registry).
+For a centralized template source update, the parent follow-up packet must also
+record the exact structural cleanup. If the parent still tracks the former
+`templates -> vendor/agent-canon/templates` symlink, the parent integration
+commit runs `git rm templates` after confirming that exact tracked symlink
+identity. A parent-owned regular `templates/` directory remains unchanged.
+The same packet preserves `vendor/agent-canon/templates/`, deletes parent
+`experiments/_template/`, removes only the `_template` entry from the
+project-owned `experiments/registry.toml`, removes docs/tests that only
+exercise that scaffold, and regenerates the GitHub Issue/PR copies from
+`vendor/agent-canon/templates/documents/github/`. Do not delete other
+experiment topics or mutate the AgentCanon source registry (the source tree has
+no project registry).
 
 1. Generate and apply AgentCanon update TODOs before unrelated repo work.
 

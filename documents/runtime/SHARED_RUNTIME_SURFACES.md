@@ -33,13 +33,19 @@ handshake, and closeout owners; they are not independent policy sources.
 ## Reader Map
 
 Use this document to answer who owns each shared runtime surface exposed from
-`vendor/agent-canon/` into a template or derived repository root. The centralized
-template source is exposed as the managed root symlink
-`templates -> vendor/agent-canon/templates`. Start with
-Owner Classes and Manifest Contract, then read the symlink, active-contract,
-durable-state, GitHub copy, documents, evidence, memory, notes, and tests
-sections for path-specific ownership. Editing Rule and Validation close the
-workflow for changes to shared surfaces.
+`vendor/agent-canon/` into a template or derived repository root. Reusable
+template sources remain under `vendor/agent-canon/templates/`; the parent root
+does not expose a `templates` symlink view. Start with Owner Classes and
+Manifest Contract, then read the symlink, active-contract, durable-state,
+GitHub copy, documents, evidence, memory, notes, and tests sections for
+path-specific ownership. Editing Rule and Validation close the workflow for
+changes to shared surfaces.
+
+Root `templates/` is not a shared-surface path after this migration. A
+template or derived repository may own a regular `templates/` directory;
+`link-root` and `check` leave that parent content unchanged. They also do
+not remove the formerly tracked shared symlink; the parent integration confirms
+its exact mode and target before running `git rm templates`.
 
 ## Owner Classes
 
@@ -114,6 +120,10 @@ AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent
 Core runtime surfaces include `AGENTS.md`, `agents/`, `.agents/`,
 `.codex/config.toml`, `.codex/README.md`, `.codex/agents/`,
 `.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, and `tools/`.
+Reusable AgentCanon templates are not part of this root-link set. Parent
+consumers resolve them through `vendor/agent-canon/templates/`, while the
+standalone AgentCanon source resolves them from its source-root
+`templates/` directory.
 `.vscode/` is a parent-owned regular container whose
 `c_cpp_properties.json`, `extensions.json`, `settings.json`, and `tasks.json`
 children are the four individual AgentCanon symlink surfaces. Work-area
@@ -250,11 +260,13 @@ are reviewed and committed as template or derived-repo content.
 derived repo roots. If a legacy symlink or copy remains at such a path,
 `bash tools/sync_agent_canon.sh check` reports it and `link-root` removes it.
 
-AgentCanon may provide generic templates under `templates/documents/`, such as
-`server_host_inventory.template.md`, `server_runtime_layout.template.toml`,
+AgentCanon may provide generic templates under the standalone source path
+`templates/documents/`, such as `server_host_inventory.template.md`,
+`server_runtime_layout.template.toml`,
 `remote_execution_repo.template.toml`, and
-`remote_execution_target.template.toml`. Those are shared policy/template
-inputs; they are not the derived repo's active contract.
+`remote_execution_target.template.toml`. A parent resolves the same inputs
+under `vendor/agent-canon/templates/documents/`; they are not the derived
+repo's active contract.
 
 ## Project-Owned Durable State And Content
 
