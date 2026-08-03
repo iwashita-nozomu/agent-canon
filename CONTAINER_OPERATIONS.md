@@ -146,7 +146,6 @@ The internal installer invocation contract is
 AgentCanon-tracked runtime consumers always materialize `--profile`; the
 one-argument invocation is not a compatibility interface. This is an internal
 runtime-surface breaking migration, not an external public API transition.
-
 ## Dockerfile Rules
 
 Keep the project `Dockerfile` focused on the project runtime.
