@@ -47,7 +47,7 @@ AgentCanon は GitHub submodule を正本とし、初期化時に project-local 
 派生 repo から `agent-canon` だけ更新したいときは次を使います。
 
 ```bash
-bash tools/update_agent_canon.sh plan
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/update_agent_canon.sh plan
 ```
 
 If the plan requires mutation, request current-task user approval before

@@ -21,7 +21,6 @@ from pathlib import Path
 from types import ModuleType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SYNC = PROJECT_ROOT / "tools" / "sync_agent_canon.sh"
 ROOT_RESOLUTION = PROJECT_ROOT / "tools" / "agent_tools" / "agent_canon_source_root.py"
 
 
@@ -81,11 +80,6 @@ class SurfaceMigrationTest(unittest.TestCase):
         parent.mkdir()
         self.git(parent, "init")
         self.configure_git(parent)
-        (parent / "tools").mkdir()
-        shutil.copy2(SYNC, parent / "tools" / "sync_agent_canon.sh")
-        shutil.copytree(PROJECT_ROOT / "tools" / "lib", parent / "tools" / "lib")
-        os.chmod(parent / "tools" / "sync_agent_canon.sh", 0o755)
-
         self.git(
             parent,
             "-c",
@@ -98,14 +92,18 @@ class SurfaceMigrationTest(unittest.TestCase):
             "vendor/agent-canon",
         )
         self.git(parent / "vendor" / "agent-canon", "checkout", "-B", "main")
-        self.git(parent, "add", ".gitmodules", "tools", "vendor/agent-canon")
+        self.git(parent, "add", ".gitmodules", "vendor/agent-canon")
         self.git(parent, "commit", "-m", "fixture parent submodule")
         return parent
 
     def run_sync(self, root: Path, *commands: str) -> subprocess.CompletedProcess[str]:
         """Run one sync command in the fixture root."""
         return subprocess.run(
-            ["bash", str(root / "tools" / "sync_agent_canon.sh"), *commands],
+            [
+                "bash",
+                str(root / "vendor" / "agent-canon" / "tools" / "sync_agent_canon.sh"),
+                *commands,
+            ],
             cwd=root,
             check=False,
             capture_output=True,
@@ -141,6 +139,10 @@ class SurfaceMigrationTest(unittest.TestCase):
         parent_templates.mkdir()
         template_sentinel = parent_templates / "parent-owned.txt"
         template_sentinel.write_text("keep parent templates\n", encoding="utf-8")
+        parent_tools = root / "tools"
+        parent_tools.mkdir()
+        tools_sentinel = parent_tools / "parent-local-tool.sh"
+        tools_sentinel.write_text("keep parent tools\n", encoding="utf-8")
 
         devcontainer = root / ".devcontainer"
         devcontainer.mkdir()
@@ -168,6 +170,13 @@ class SurfaceMigrationTest(unittest.TestCase):
             template_sentinel.read_text(encoding="utf-8"),
             "keep parent templates\n",
         )
+        self.assertEqual(
+            tools_sentinel.read_text(encoding="utf-8"),
+            "keep parent tools\n",
+        )
+        self.assertFalse((root / "tools" / "sync_agent_canon.sh").exists())
+        self.assertFalse((root / "tools" / "agent_tools").exists())
+        self.assertTrue((root / "tools" / "agent-canon").is_symlink())
         self.assertTrue(
             (
                 root
@@ -242,6 +251,10 @@ class SurfaceMigrationTest(unittest.TestCase):
         self.assertEqual(
             template_sentinel.read_text(encoding="utf-8"),
             "keep parent templates\n",
+        )
+        self.assertEqual(
+            tools_sentinel.read_text(encoding="utf-8"),
+            "keep parent tools\n",
         )
 
     def test_removed_legacy_surface_preserves_unknown_mirror(self) -> None:

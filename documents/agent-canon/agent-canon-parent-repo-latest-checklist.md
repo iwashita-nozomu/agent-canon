@@ -35,11 +35,12 @@ failure routes, and the legacy compatibility appendix for non-submodule repos.
 | Path | Expected State | Owner | Check |
 | --- | --- | --- | --- |
 | `vendor/agent-canon/` | AgentCanon Git submodule checkout and parent gitlink | AgentCanon | `git submodule status vendor/agent-canon` and `git rev-parse HEAD:vendor/agent-canon` |
-| `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, `tools/` | root runtime view of AgentCanon | AgentCanon | `bash tools/sync_agent_canon.sh check` |
+| `AGENTS.md`, `agents/`, `.agents/`, `.codex/` | root runtime view of AgentCanon | AgentCanon | source-root resolver `check` |
+| `tools/` | parent-owned regular container; shared tooling is only `tools/agent-canon/` | parent / AgentCanon | source-root resolver `check` |
 | `vendor/agent-canon/templates/` | centralized AgentCanon template source with no parent-root symlink view | AgentCanon | manifest `link-specs` and consumer path readback |
-| `.github/AGENTS.md` | GitHub agent root view | AgentCanon | `bash tools/sync_agent_canon.sh check` |
-| `.github/workflows/agent-coordination.yml`, `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`, `.github/scripts/checkout_agent_canon_submodule.sh` | regular root copies forced by GitHub path constraints | AgentCanon source, root copy | `bash tools/sync_agent_canon.sh check` |
-| `documents/runtime/SHARED_RUNTIME_SURFACES.md`, `documents/runtime/shared-runtime-surfaces.toml` | shared surface policy and machine manifest | AgentCanon | `python3 tools/agent_tools/check_convention_compliance.py` |
+| `.github/AGENTS.md` | GitHub agent root view | AgentCanon | source-root resolver `check` |
+| `.github/workflows/agent-coordination.yml`, `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`, `.github/scripts/checkout_agent_canon_submodule.sh` | regular root copies forced by GitHub path constraints | AgentCanon source, root copy | source-root resolver `check` |
+| `documents/runtime/SHARED_RUNTIME_SURFACES.md`, `documents/runtime/shared-runtime-surfaces.toml` | shared surface policy and machine manifest | AgentCanon | source-root resolver `check-convention` |
 | `.agent-canon/update-state.toml` | parent-local AgentCanon update TODO boundary | parent repo | `python3 tools/agent_tools/agent_canon_update_todos.py status` |
 | `documents/README.md`, template bootstrap / host / server contract docs | parent repo active contracts | template or derived repo | regular file, not root symlink |
 | `goal.md`, project notes, experiments, reports | repo-local durable state and generated evidence | parent repo | must not be restored from AgentCanon |
@@ -122,8 +123,8 @@ and standalone source mode retains its own source-branch merge route.
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 ```
 
 Record this as `agentcanon_structure_followup=required` for every AgentCanon
@@ -379,7 +380,7 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 - `blocked_shared_canon_workflow`: do not hide shared-canon edits in a parent-only diff; commit the AgentCanon branch, merge main into it, and open an AgentCanon PR.
 - `skipped_source_canon`: running inside standalone AgentCanon; update parent repos after AgentCanon changes are committed.
 - `missing checklist`: restore or update `vendor/agent-canon/`, then rerun
-  `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root`.
+  `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root`.
 - missing `agentcanon_structure_followup=pass`: keep the AgentCanon source, pin,
   root-view, shared root-copy, or parent root sync PR open. Run the root-view
   commands from the parent root, then run the parent readiness / structure
@@ -387,8 +388,8 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 ```
 
 ## Legacy Compatibility Appendix

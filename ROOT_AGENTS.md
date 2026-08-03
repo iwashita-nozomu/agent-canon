@@ -319,11 +319,11 @@ proof obligation, or replacement unit together even when the chunk is long.
 | design-to-implementation correspondence | `vendor/agent-canon/agents/internal-routines/design-implementation-correspondence.md`; `vendor/agent-canon/documents/design/*.md` | `check_design_doc_claims.py`; design/review readback |
 | implementation flow graph and source packet | run bundle design packet; `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`; `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` | design review; dependency review |
 | search, read scope, and reuse survey | semantic-index, deterministic `search.py` / `search_index.py`, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
-| repo structure and root views | `vendor/agent-canon/documents/structure/repo-structure-contract.toml`; `responsibility-scope.toml`; `documents/runtime/shared-runtime-surfaces.toml` | structure/scope/import tools; `sync_agent_canon.sh` |
+| repo structure and root views | `vendor/agent-canon/documents/structure/repo-structure-contract.toml`; `responsibility-scope.toml`; `vendor/agent-canon/documents/runtime/shared-runtime-surfaces.toml` | structure/scope/import tools; `vendor/agent-canon/tools/sync_agent_canon.sh` |
 | shared-checkout Git mutation and branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/tools/agent_tools/hook_safety.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation route | `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md` | profile-selected validation |
 | report and closeout structure | `task_close.py`; `report_artifact_checks.py`; run bundle `closeout_gate.md` | profile-selected closeout gate |
-| shared AgentCanon update | `vendor/agent-canon/tools/update_agent_canon.sh`; `tools/sync_agent_canon.sh`; AgentCanon PR workflow | submodule pin and PR evidence |
+| shared AgentCanon update | `vendor/agent-canon/tools/update_agent_canon.sh`; `vendor/agent-canon/tools/sync_agent_canon.sh`; AgentCanon PR workflow | submodule pin and PR evidence |
 
 This map is a routing index, not a checklist. Stage rules, skill selection, role
 behavior, validation matrices, and closeout gates are updated in their owner

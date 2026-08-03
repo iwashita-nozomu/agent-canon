@@ -29,7 +29,7 @@ The normal route is:
 1. Update template or derived repos by advancing the `vendor/agent-canon`
    submodule pin.
 1. Repair root views with the request-evidence-authorized
-   `bash tools/sync_agent_canon.sh link-root` route.
+   source-root resolver `link-root` route.
 
 Local Git remotes must not define the normal distribution path for
 self-authored reusable modules.
@@ -173,8 +173,8 @@ also run:
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 make agent-canon-pr-check
 make ci
 ```

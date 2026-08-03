@@ -357,7 +357,7 @@ The runtime discovery adapter delegates these required operating clauses to this
      review unit, or it has a scope table plus the split/group decision for
      every slice.
 1. For AgentCanon source PRs, merge source first, then update parent repos with
-   `make agent-canon-ensure-latest`, `bash tools/sync_agent_canon.sh link-root`,
+   `make agent-canon-ensure-latest`, source-root resolver `link-root`,
    diff intake / repair, and the parent PR gate. Parent projection occurs once
    after source publication readback; do not rerun source correctness or engineer
    ancestry to retain internal commit ids.
