@@ -2680,6 +2680,34 @@ class CapabilityRouteTest(unittest.TestCase):
         self.assertIsNone(payload["visualization_tool_call"])
         self.assertIsNone(payload["visualization_rejection"])
 
+    def test_parent_repository_audit_requires_explicit_capability(self) -> None:
+        """Audit keywords remain inert until the capability is explicit."""
+        prompt_result = self.run_route(
+            "--prompt", "repository audit repair", "--format", "json"
+        )
+        self.assertEqual(
+            prompt_result.returncode, 0, prompt_result.stdout + prompt_result.stderr
+        )
+        prompt_payload = json.loads(prompt_result.stdout)
+        self.assertNotIn("parent-repository-audit", prompt_payload["matched_skills"])
+        self.assertNotIn("parent-repository-audit", prompt_payload["active_skills"])
+
+        capability_result = self.run_route(
+            "--capability", "parent_repository_audit", "--format", "json"
+        )
+        self.assertEqual(
+            capability_result.returncode,
+            0,
+            capability_result.stdout + capability_result.stderr,
+        )
+        capability_payload = json.loads(capability_result.stdout)
+        self.assertEqual(
+            capability_payload["matches"][0]["activation"], "explicit_capability"
+        )
+        self.assertIn(
+            "parent-repository-audit", capability_payload["active_skills"]
+        )
+
     def test_capability_route_selects_dependency_visualization_owner(self) -> None:
         """Visualization capability maps to canonical code-visualization ownership."""
         result = self.run_route(
