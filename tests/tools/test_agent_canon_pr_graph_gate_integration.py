@@ -238,7 +238,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             elif scenario == "stale_fingerprint":
                 result["input_fingerprint"] = "3" * 64
             print(json.dumps(result))
-            raise SystemExit(1 if has_diagnostic else 0)
+            raise SystemExit(
+                2 if scenario == "hard_failure" else 1 if has_diagnostic else 0
+            )
             """,
         )
         write_executable(
@@ -551,6 +553,16 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertIn('"status": "fresh"', result.stdout)
         self.assertNotIn(
             "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required", result.stdout
+        )
+
+    def test_real_pr_check_runs_header_scan_before_hard_graph_failure(self) -> None:
+        """Trusted changed paths reach header scanning even when graph build fails hard."""
+        result, _ = self.run_pr_check("hard_failure")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("HEADER_SCAN_REVIEW_CALLED", result.stdout)
+        self.assertIn(
+            "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=graph_build_failed rc=2",
+            result.stdout,
         )
 
     def test_real_pr_check_rejects_missing_or_stale_graph_identity(self) -> None:

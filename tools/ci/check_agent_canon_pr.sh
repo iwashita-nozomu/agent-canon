@@ -713,6 +713,12 @@ if agentcanon_pr_dependency_graph_required; then
     PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE};graph_acceptance_reason=${graph_acceptance_reason};${graph_acceptance_evidence}"
     PR_GATE_DEPENDENCY_GRAPH_STATUS=scoped
   else
+    bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" \
+      --header-scan-only \
+      --fail-missing \
+      --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
+      --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" \
+      --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
     echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=graph_build_failed rc=${graph_build_rc}"
     exit "${graph_build_rc}"
   fi
