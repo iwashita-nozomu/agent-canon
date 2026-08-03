@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import select
 import shutil
 import signal
 import subprocess
@@ -142,7 +143,6 @@ def run_fresh_clone_check(
     root: Path,
     env: dict[str, str],
     signal_name: str | None = None,
-    ready_path: Path | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run fresh-clone check once, optionally signaling the process once."""
     if signal_name is None:
@@ -155,31 +155,35 @@ def run_fresh_clone_check(
             env=env,
         )
 
-    if ready_path is None:
-        raise ValueError("ready_path is required when signaling")
-    wrapper = ready_path.parent / "run_check_with_ready.sh"
-    wrapper.write_text(
-        "#!/usr/bin/env bash\n"
-        'touch "$1"\n'
-        'exec bash "$2"\n',
-        encoding="utf-8",
-    )
-    os.chmod(wrapper, 0o755)
-
     process = subprocess.Popen(
-        ["bash", str(wrapper), str(ready_path), check_script],
+        ["bash", check_script],
         cwd=str(root),
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         text=True,
         env=env,
+        start_new_session=True,
     )
+    stdout_prefix: list[str] = []
     start = time.time()
-    while not ready_path.exists() and time.time() - start < 5:
-        time.sleep(0.02)
-    process.send_signal({"INT": signal.SIGINT, "TERM": signal.SIGTERM, "HUP": signal.SIGHUP}[signal_name])
+    while time.time() - start < 5 and process.poll() is None:
+        readable, _, _ = select.select([process.stdout], [], [], 0.02)
+        if not readable:
+            continue
+        line = process.stdout.readline()
+        if not line:
+            break
+        stdout_prefix.append(line)
+        if line.startswith("fresh-clone source:"):
+            break
+    os.killpg(process.pid, {"INT": signal.SIGINT, "TERM": signal.SIGTERM, "HUP": signal.SIGHUP}[signal_name])
     stdout, stderr = process.communicate(timeout=120)
-    return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
+    return subprocess.CompletedProcess(
+        process.args,
+        process.returncode,
+        "".join(stdout_prefix) + stdout,
+        stderr,
+    )
 
 
 class CommitProvenanceStaticContractTest(unittest.TestCase):
@@ -309,10 +313,97 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                 ),
                 REPO_ROOT,
             )
+            submodule_remote = temp_root / "agent-canon-upstream.git"
+            subprocess.run(
+                ["git", "clone", "--bare", str(AGENT_CANON_SOURCE_ROOT), str(submodule_remote)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            source_head = subprocess.run(
+                ["git", "-C", str(AGENT_CANON_SOURCE_ROOT), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            subprocess.run(
+                ["git", "--git-dir", str(submodule_remote), "update-ref", "refs/heads/main", source_head],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "--git-dir", str(submodule_remote), "symbolic-ref", "HEAD", "refs/heads/main"],
+                check=True,
+            )
             script_root = Path(temp_root / "check-source")
             subprocess.run(
                 ["git", "clone", "--no-local", str(fixture_root), str(script_root)],
                 check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(script_root), "config", "user.name", "Fresh Clone Fixture"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(script_root), "config", "user.email", "fresh-clone@example.invalid"],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root),
+                    "config",
+                    "-f",
+                    ".gitmodules",
+                    "submodule.vendor/agent-canon.url",
+                    str(submodule_remote),
+                ],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root),
+                    "update-index",
+                    "--add",
+                    "--cacheinfo",
+                    f"160000,{source_head},vendor/agent-canon",
+                ],
+                check=True,
+            )
+            (script_root / "Makefile").write_text(
+                ".PHONY: agent-checks\nagent-checks:\n\t@:\n",
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "-C", str(script_root), "add", ".gitmodules", "Makefile"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(script_root), "commit", "-m", "fixture parent projection"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root),
+                    "-c",
+                    "protocol.file.allow=always",
+                    "submodule",
+                    "update",
+                    "--init",
+                    "--recursive",
+                    "vendor/agent-canon",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
             )
             (script_root / "tools" / "ci").mkdir(parents=True, exist_ok=True)
             (script_root / "tools" / "lib").mkdir(parents=True, exist_ok=True)
@@ -324,6 +415,23 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                 AGENT_CANON_SOURCE_ROOT / "tools" / "lib" / "repo_paths.sh",
                 script_root / "tools" / "lib" / "repo_paths.sh",
             )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root),
+                    "add",
+                    "tools/ci/check_fresh_clone.sh",
+                    "tools/lib/repo_paths.sh",
+                ],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(script_root), "commit", "-m", "fixture fresh clone checker"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
 
             check_script = script_root / "tools" / "ci" / "check_fresh_clone.sh"
             self.assertTrue(check_script.exists(), check_script)
@@ -333,6 +441,9 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
             self.assertIn("trap 'cleanup_on_signal INT 130' INT", script_contents)
             self.assertIn("trap 'cleanup_on_signal TERM 143' TERM", script_contents)
             self.assertIn("trap 'cleanup_on_signal HUP 129' HUP", script_contents)
+            self.assertIn('"INT") exit 130', script_contents)
+            self.assertIn('"TERM") exit 143', script_contents)
+            self.assertIn('"HUP") exit 129', script_contents)
 
             test_contracts = [
                 {
@@ -368,6 +479,14 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                     env["HOME"] = str(home_root)
                     env["GIT_CONFIG_GLOBAL"] = str(sentinel)
                     env["TMPDIR"] = str(tmpdir)
+                    cargo_path = shutil.which("cargo", path=env.get("PATH"))
+                    if cargo_path:
+                        cargo_dir = Path(cargo_path).resolve().parent
+                        env["PATH"] = os.pathsep.join(
+                            entry
+                            for entry in env["PATH"].split(os.pathsep)
+                            if Path(entry or ".").resolve() != cargo_dir
+                        )
 
                     if test_case["name"] == "forced-failure":
                         bin_root = case_root / "bin"
@@ -387,7 +506,6 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                         script_root,
                         env=env,
                         signal_name=test_case.get("signal"),
-                        ready_path=(case_root / "ready") if test_case.get("dynamic_signal") else None,
                     )
                     self.assertEqual(result.returncode, test_case["expected_rc"], result.stderr)
                     if test_case.get("expect_parent_projection", False):
