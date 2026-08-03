@@ -8,9 +8,10 @@
 // @dependency-end
 
 use crate::dependency_manifest::{
-    capture_snapshot, diagnostic_category, probe_snapshot_identity, snapshot_completeness,
-    write_snapshot_jsonl, DependencyDeclaration, ManifestSnapshot, SnapshotRequest, SourceIdentity,
-    SourceSpan, SurfaceRelation,
+    capture_snapshot, current_producer_identity, diagnostic_category, probe_snapshot_identity,
+    snapshot_completeness, validate_persisted_producer_identity, validate_producer_identity,
+    write_snapshot_jsonl, DependencyDeclaration, ManifestSnapshot, ProducerIdentity,
+    SnapshotRequest, SourceIdentity, SourceSpan, SurfaceRelation,
 };
 use crate::structured_analysis::{initialize_graph_schema, validate_graph_connection};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
@@ -82,6 +83,7 @@ struct InputFingerprintProbe {
     source_head_oid: String,
     dirty_fingerprint: String,
     profile: String,
+    producer_identity: Option<ProducerIdentity>,
     reason: Option<String>,
 }
 
@@ -96,6 +98,7 @@ struct PersistedInputIdentity {
     source_head_oid: String,
     dirty_fingerprint: String,
     profile: String,
+    producer_identity: Option<ProducerIdentity>,
 }
 
 #[derive(Debug, Clone)]
@@ -125,6 +128,7 @@ struct GraphIntegrationRecord {
     snapshot_head: String,
     input_fingerprint: String,
     graph_fingerprint: String,
+    producer_identity: Option<ProducerIdentity>,
     contract_fingerprint: String,
     producer_artifacts: Vec<ProducerArtifact>,
     runtime_evidence: Value,
@@ -134,7 +138,7 @@ struct GraphIntegrationRecord {
 
 impl GraphIntegrationRecord {
     fn json(&self) -> Value {
-        json!({"schema":"agent-canon.graph.integration.v1","root":self.root,"db_path":self.db_path,"schema_version":GRAPH_SCHEMA_VERSION,"profile":self.profile,"source_snapshot_profile":self.source_snapshot_profile,"snapshot_head":self.snapshot_head,"input_fingerprint":self.input_fingerprint,"graph_fingerprint":self.graph_fingerprint,"contract_fingerprint":self.contract_fingerprint,"producer_artifacts":self.producer_artifacts.iter().map(ProducerArtifact::json).collect::<Vec<_>>(),"runtime_evidence":self.runtime_evidence.clone(),"verified":self.verified,"verification_code":self.verification_code})
+        json!({"schema":"agent-canon.graph.integration.v1","root":self.root,"db_path":self.db_path,"schema_version":GRAPH_SCHEMA_VERSION,"profile":self.profile,"source_snapshot_profile":self.source_snapshot_profile,"snapshot_head":self.snapshot_head,"input_fingerprint":self.input_fingerprint,"graph_fingerprint":self.graph_fingerprint,"contract_fingerprint":self.contract_fingerprint,"producer_identity":self.producer_identity,"producer_artifacts":self.producer_artifacts.iter().map(ProducerArtifact::json).collect::<Vec<_>>(),"runtime_evidence":self.runtime_evidence.clone(),"verified":self.verified,"verification_code":self.verification_code})
     }
 }
 
@@ -166,6 +170,9 @@ struct GraphArgs {
     root: PathBuf,
     profile: String,
     format: String,
+    surface_manifest_producer: Option<PathBuf>,
+    surface_manifest: Option<PathBuf>,
+    producer_identity: Option<ProducerIdentity>,
     path: Option<String>,
     all: bool,
     relation: String,
@@ -186,6 +193,7 @@ struct BuildMaterial {
     producer_artifacts: Vec<ProducerArtifact>,
     input_fingerprint: String,
     graph_fingerprint: String,
+    producer_identity: Option<ProducerIdentity>,
 }
 
 struct GraphStaging {
@@ -1834,9 +1842,18 @@ fn graph_input_fingerprint(
     dirty_fingerprint: &str,
     runtime_fingerprint: Option<&str>,
     profile: &str,
+    producer_identity: Option<&ProducerIdentity>,
 ) -> String {
     let runtime_fingerprint = runtime_fingerprint.unwrap_or("absent");
-    sha256(format!("{source_fingerprint}\0{source_head}\0{dirty_fingerprint}\0{runtime_fingerprint}\0{profile}").as_bytes())
+    let producer_identity = producer_identity
+        .map(ProducerIdentity::fingerprint_material)
+        .unwrap_or_else(|| "absent".to_string());
+    sha256(
+        format!(
+            "{source_fingerprint}\0{source_head}\0{dirty_fingerprint}\0{runtime_fingerprint}\0{profile}\0{producer_identity}"
+        )
+        .as_bytes(),
+    )
 }
 
 fn source_node(snapshot: &ManifestSnapshot, identity: &SourceIdentity) -> Value {
@@ -1897,9 +1914,13 @@ fn graph_fingerprint(
     nodes: &[Value],
     facts: &[Value],
     runtime: Option<&RuntimeEvidenceSnapshot>,
+    producer_identity: Option<&ProducerIdentity>,
 ) -> String {
     let runtime = runtime.map(runtime_evidence_json).unwrap_or(Value::Null);
-    let value = json!({"nodes":nodes,"facts":facts,"runtime":runtime});
+    let producer_identity = producer_identity
+        .map(|identity| serde_json::to_value(identity).unwrap_or(Value::Null))
+        .unwrap_or(Value::Null);
+    let value = json!({"nodes":nodes,"facts":facts,"runtime":runtime,"producer_identity":producer_identity});
     sha256(serde_json::to_string(&value).unwrap_or_default().as_bytes())
 }
 
@@ -1910,20 +1931,75 @@ fn capture_runtime_dashboard(snapshot: Option<&RuntimeEvidenceSnapshot>) -> Vec<
         .collect()
 }
 
-fn collect_build_material(root: &Path, profile: &str) -> Result<BuildMaterial, GraphError> {
-    collect_build_material_with_mode(root, profile, false)
+fn collect_build_material(
+    root: &Path,
+    profile: &str,
+    surface_manifest_producer: Option<&Path>,
+    surface_manifest: Option<&Path>,
+    producer_identity: Option<&ProducerIdentity>,
+) -> Result<BuildMaterial, GraphError> {
+    let (producer, identity) =
+        resolve_graph_producer(root, surface_manifest_producer, producer_identity)?;
+    collect_build_material_with_mode(
+        root,
+        profile,
+        false,
+        Some(&producer),
+        surface_manifest,
+        Some(&identity),
+    )
+}
+
+fn resolve_graph_producer(
+    root: &Path,
+    producer: Option<&Path>,
+    identity: Option<&ProducerIdentity>,
+) -> Result<(PathBuf, ProducerIdentity), GraphError> {
+    match (producer, identity) {
+        (None, None) => {
+            let identity = current_producer_identity(root)
+                .map_err(|error| GraphError::Validation(error.to_string()))?;
+            Ok((PathBuf::from(&identity.producer_path), identity))
+        }
+        (Some(producer), Some(identity)) => {
+            validate_producer_identity(identity, Some(producer))
+                .map_err(|error| GraphError::Validation(error.to_string()))?;
+            Ok((producer.to_path_buf(), identity.clone()))
+        }
+        _ => Err(GraphError::Validation(
+            "explicit surface manifest producer and identity must be paired".to_string(),
+        )),
+    }
 }
 
 fn collect_build_material_with_mode(
     root: &Path,
     profile: &str,
     _probe: bool,
+    surface_manifest_producer: Option<&Path>,
+    surface_manifest: Option<&Path>,
+    producer_identity: Option<&ProducerIdentity>,
 ) -> Result<BuildMaterial, GraphError> {
     let runtime_evidence = load_optional_runtime_evidence_snapshot(root)?;
+    let producer_identity = producer_identity.cloned();
+    if producer_identity.is_some() != surface_manifest_producer.is_some() {
+        return Err(GraphError::Validation(
+            "explicit surface manifest producer and identity must be paired".to_string(),
+        ));
+    }
+    if let (Some(identity), Some(producer)) =
+        (producer_identity.as_ref(), surface_manifest_producer)
+    {
+        validate_producer_identity(identity, Some(producer))
+            .map_err(|error| GraphError::Validation(error.to_string()))?;
+    }
     let snapshot_request = SnapshotRequest {
         root: root.to_path_buf(),
         profile: "parent".to_string(),
         output_jsonl: root.join(".agent-canon/knowledge-graph/source_snapshot.jsonl"),
+        surface_manifest_producer: surface_manifest_producer.map(Path::to_path_buf),
+        surface_manifest: surface_manifest.map(Path::to_path_buf),
+        producer_identity: producer_identity.clone(),
     };
     let snapshot = capture_snapshot(&snapshot_request)
         .map_err(|error| GraphError::Validation(error.to_string()))?;
@@ -1958,8 +2034,14 @@ fn collect_build_material_with_mode(
         &snapshot.header.git_status_hash,
         runtime_fp.as_deref(),
         profile,
+        producer_identity.as_ref(),
     );
-    let graph_fingerprint = graph_fingerprint(&nodes, &facts, runtime_evidence.as_ref());
+    let graph_fingerprint = graph_fingerprint(
+        &nodes,
+        &facts,
+        runtime_evidence.as_ref(),
+        producer_identity.as_ref(),
+    );
     let producer_artifacts = capture_runtime_dashboard(runtime_evidence.as_ref());
     Ok(BuildMaterial {
         root: root.to_path_buf(),
@@ -1972,6 +2054,7 @@ fn collect_build_material_with_mode(
         producer_artifacts,
         input_fingerprint,
         graph_fingerprint,
+        producer_identity,
     })
 }
 
@@ -2239,6 +2322,7 @@ fn build_graph_staging(
         snapshot_head: material.snapshot.header.git_head.clone(),
         input_fingerprint: material.input_fingerprint.clone(),
         graph_fingerprint: material.graph_fingerprint.clone(),
+        producer_identity: material.producer_identity.clone(),
         contract_fingerprint: GRAPH_SCHEMA_VERSION.to_string(),
         producer_artifacts: material.producer_artifacts.clone(),
         runtime_evidence: runtime_json.clone(),
@@ -2330,6 +2414,12 @@ fn build_graph_staging(
         .map_err(|error| GraphError::Io(error.to_string()))?;
     connection
         .execute(
+            "INSERT INTO metadata(key,value) VALUES('producer_identity',?1)",
+            params![serde_json::to_string(&material.producer_identity).unwrap_or_default()],
+        )
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    connection
+        .execute(
             "INSERT INTO metadata(key,value) VALUES('producer_artifacts',?1)",
             params![producer_json],
         )
@@ -2374,6 +2464,8 @@ fn materialize_graph_store(material: &BuildMaterial) -> Result<GraphIntegrationR
         || !runtime_metadata_match
         || metadata(&readback, "input_fingerprint")? != material.input_fingerprint
         || metadata(&readback, "graph_fingerprint")? != material.graph_fingerprint
+        || metadata(&readback, "producer_identity")?
+            != serde_json::to_string(&material.producer_identity).unwrap_or_default()
         || metadata(&readback, "snapshot_head")? != material.snapshot.header.git_head
         || metadata(&readback, "dirty_fingerprint")? != material.snapshot.header.git_status_hash
         || metadata(&readback, "source_fingerprint")? != material.snapshot.header.source_fingerprint
@@ -2390,6 +2482,9 @@ fn parse_args(args: &[String]) -> Result<GraphArgs, GraphError> {
         root: PathBuf::from("."),
         profile: "default".to_string(),
         format: "text".to_string(),
+        surface_manifest_producer: None,
+        surface_manifest: None,
+        producer_identity: None,
         path: None,
         all: false,
         relation: "dependency".to_string(),
@@ -2410,6 +2505,18 @@ fn parse_args(args: &[String]) -> Result<GraphArgs, GraphError> {
             "--root" => result.root = PathBuf::from(value(&mut index)?),
             "--profile" => result.profile = value(&mut index)?,
             "--format" => result.format = value(&mut index)?,
+            "--surface-manifest-producer" => {
+                result.surface_manifest_producer = Some(PathBuf::from(value(&mut index)?))
+            }
+            "--surface-manifest" => {
+                result.surface_manifest = Some(PathBuf::from(value(&mut index)?))
+            }
+            "--surface-manifest-producer-identity" => {
+                let raw = value(&mut index)?;
+                result.producer_identity = Some(serde_json::from_str(&raw).map_err(|error| {
+                    GraphError::Usage(format!("invalid producer identity: {error}"))
+                })?);
+            }
             "--path" => result.path = Some(value(&mut index)?),
             "--all" => result.all = true,
             "--relation" => result.relation = value(&mut index)?,
@@ -2422,7 +2529,7 @@ fn parse_args(args: &[String]) -> Result<GraphArgs, GraphError> {
             "--token" => result.token = Some(value(&mut index)?),
             "--help" | "-h" => {
                 return Err(GraphError::Usage(
-                    "graph <build|status|query|context> [--root PATH] [--format json]".to_string(),
+                    "graph <build|status|query|context> [--root PATH] [--format json] [--surface-manifest-producer PATH] [--surface-manifest PATH] [--surface-manifest-producer-identity JSON]".to_string(),
                 ))
             }
             unknown => return Err(GraphError::Usage(format!("unknown graph option {unknown}"))),
@@ -2482,6 +2589,28 @@ fn persisted_input_identity(
 ) -> Result<PersistedInputIdentity, GraphError> {
     let mismatch =
         |detail: &str| runtime_boundary("persisted_readback_mismatch", detail.to_string());
+    let producer_identity = match integration.get("producer_identity") {
+        Some(Value::Null) | None => None,
+        Some(value) => {
+            let identity = serde_json::from_value::<ProducerIdentity>(value.clone())
+                .map_err(|_| mismatch("persisted producer identity is invalid"))?;
+            validate_persisted_producer_identity(&identity)
+                .map_err(|_| mismatch("persisted producer identity is invalid"))?;
+            Some(identity)
+        }
+    };
+    let metadata_producer_identity = match values.get("producer_identity") {
+        Some(value) => Some(
+            serde_json::from_str::<Option<ProducerIdentity>>(value)
+                .map_err(|_| mismatch("persisted producer identity metadata is invalid"))?,
+        ),
+        None => None,
+    };
+    if metadata_producer_identity.as_ref() != Some(&producer_identity)
+        && (metadata_producer_identity.is_some() || producer_identity.is_some())
+    {
+        return Err(mismatch("persisted producer identity disagrees"));
+    }
     let required = |key: &str| {
         values
             .get(key)
@@ -2532,6 +2661,7 @@ fn persisted_input_identity(
             source_head_oid,
             dirty_fingerprint,
             profile,
+            producer_identity,
         });
     }
     let materialization_text = required("runtime_event_materialization")?;
@@ -2778,14 +2908,27 @@ fn persisted_input_identity(
         source_head_oid,
         dirty_fingerprint,
         profile,
+        producer_identity,
     })
 }
 
 fn probe_input_fingerprint(
     root: &Path,
     profile: &str,
+    producer_identity: Option<&ProducerIdentity>,
+    producer: Option<&Path>,
+    manifest: Option<&Path>,
 ) -> Result<InputFingerprintProbe, GraphError> {
-    let source = probe_snapshot_identity(root, "parent")
+    if producer_identity.is_some() != producer.is_some() {
+        return Err(GraphError::Validation(
+            "explicit surface manifest producer and identity must be paired".to_string(),
+        ));
+    }
+    if let (Some(identity), Some(producer)) = (producer_identity, producer) {
+        validate_producer_identity(identity, Some(producer))
+            .map_err(|error| GraphError::Validation(error.to_string()))?;
+    }
+    let source = probe_snapshot_identity(root, "parent", producer, manifest)
         .map_err(|error| GraphError::Validation(error.to_string()))?;
     let base = InputFingerprintProbe {
         runtime_evidence_present: false,
@@ -2797,6 +2940,7 @@ fn probe_input_fingerprint(
         source_head_oid: source.git_head,
         dirty_fingerprint: source.git_status_hash,
         profile: profile.to_string(),
+        producer_identity: producer_identity.cloned(),
         reason: None,
     };
     match load_optional_runtime_evidence_snapshot(root) {
@@ -2810,6 +2954,7 @@ fn probe_input_fingerprint(
                     &base.dirty_fingerprint,
                     Some(&runtime_fingerprint),
                     profile,
+                    producer_identity,
                 )),
                 artifact_sha256: Some(runtime.artifact_sha256),
                 receipt_sha256: Some(runtime.receipt_sha256),
@@ -2824,6 +2969,7 @@ fn probe_input_fingerprint(
                 &base.dirty_fingerprint,
                 None,
                 profile,
+                producer_identity,
             )),
             ..base
         }),
@@ -2845,6 +2991,35 @@ fn read_graph_status(args: &GraphArgs) -> Result<Value, GraphError> {
         .root
         .canonicalize()
         .map_err(|error| GraphError::Io(error.to_string()))?;
+    let current_identity = current_producer_identity(&root)
+        .map_err(|error| GraphError::Validation(error.to_string()))?;
+    if args
+        .producer_identity
+        .as_ref()
+        .is_some_and(|identity| identity != &current_identity)
+    {
+        return Err(GraphError::Validation(
+            "graph status producer identity is not current-root bound".to_string(),
+        ));
+    }
+    if args
+        .surface_manifest_producer
+        .as_ref()
+        .is_some_and(|producer| {
+            fs::canonicalize(producer)
+                .map(|path| path.to_string_lossy() != current_identity.producer_path)
+                .unwrap_or(true)
+        })
+    {
+        return Err(GraphError::Validation(
+            "graph status producer path is not current-root bound".to_string(),
+        ));
+    }
+    if args.surface_manifest.is_some() {
+        return Err(GraphError::Validation(
+            "graph status does not accept a surface manifest override".to_string(),
+        ));
+    }
     let connection = open_db(&root)?;
     let keys = [
         "integration_record",
@@ -2859,6 +3034,7 @@ fn read_graph_status(args: &GraphArgs) -> Result<Value, GraphError> {
         "snapshot_head",
         "dirty_fingerprint",
         "graph_fingerprint",
+        "producer_identity",
     ];
     let mut values = BTreeMap::new();
     for key in keys {
@@ -2875,11 +3051,19 @@ fn read_graph_status(args: &GraphArgs) -> Result<Value, GraphError> {
     let persisted_result = persisted_input_identity(&values, &integration);
     let persisted_mismatch = persisted_result.is_err();
     let persisted = persisted_result.unwrap_or_default();
-    let probe = probe_input_fingerprint(&root, &args.profile)?;
+    let probe = probe_input_fingerprint(
+        &root,
+        &args.profile,
+        Some(&current_identity),
+        Some(Path::new(&current_identity.producer_path)),
+        None,
+    )?;
     let probe_reason = if persisted_mismatch {
         Some("persisted_readback_mismatch".to_string())
     } else if probe.runtime_evidence_present != persisted.runtime_evidence_present {
         Some("runtime_evidence_changed".to_string())
+    } else if probe.producer_identity != persisted.producer_identity {
+        Some("producer_identity_changed".to_string())
     } else if matches!(
         probe.reason.as_deref(),
         Some("runtime_receipt_invalid" | "runtime_receipt_missing" | "runtime_receipt_uncertain")
@@ -3039,7 +3223,13 @@ fn build_graph_with_failure(args: &GraphArgs) -> Result<Value, GraphError> {
         .root
         .canonicalize()
         .map_err(|error| GraphError::Io(error.to_string()))?;
-    let material = collect_build_material(&root, &args.profile)?;
+    let material = collect_build_material(
+        &root,
+        &args.profile,
+        args.surface_manifest_producer.as_deref(),
+        args.surface_manifest.as_deref(),
+        args.producer_identity.as_ref(),
+    )?;
     let integration = materialize_graph_store(&material)?;
     let (unresolved_count, ambiguous_count, uncovered_count) =
         snapshot_completeness(&material.snapshot);
@@ -3055,7 +3245,7 @@ fn build_graph_with_failure(args: &GraphArgs) -> Result<Value, GraphError> {
             .collect::<Vec<_>>()
     };
     Ok(
-        json!({"schema":"agent-canon.graph.build.v1","command":"build","status":status,"graph_status":status,"profile":args.profile,"root":root,"db_path":integration.db_path,"input_fingerprint":integration.input_fingerprint,"graph_fingerprint":integration.graph_fingerprint,"unresolved_count":unresolved_count,"ambiguous_count":ambiguous_count,"uncovered_count":uncovered_count,"unresolved":diagnostic_values("unresolved"),"ambiguous":diagnostic_values("ambiguous"),"uncovered":diagnostic_values("uncovered"),"producer_artifacts":integration.producer_artifacts.iter().map(ProducerArtifact::json).collect::<Vec<_>>(),"integration_record":integration.json(),"publication":"published","durability":"durable","exit_code":if complete {0} else {1}}),
+        json!({"schema":"agent-canon.graph.build.v1","command":"build","status":status,"graph_status":status,"profile":args.profile,"root":root,"db_path":integration.db_path,"input_fingerprint":integration.input_fingerprint,"graph_fingerprint":integration.graph_fingerprint,"producer_identity":integration.producer_identity,"unresolved_count":unresolved_count,"ambiguous_count":ambiguous_count,"uncovered_count":uncovered_count,"unresolved":diagnostic_values("unresolved"),"ambiguous":diagnostic_values("ambiguous"),"uncovered":diagnostic_values("uncovered"),"producer_artifacts":integration.producer_artifacts.iter().map(ProducerArtifact::json).collect::<Vec<_>>(),"integration_record":integration.json(),"publication":"published","durability":"durable","exit_code":if complete {0} else {1}}),
     )
 }
 
@@ -3447,10 +3637,14 @@ mod tests {
     }
 
     fn graph_args(root: &Path) -> GraphArgs {
+        let producer_identity = current_producer_identity(root).expect("fixture producer identity");
         GraphArgs {
             root: root.to_path_buf(),
             profile: "default".to_string(),
             format: "json".to_string(),
+            surface_manifest_producer: Some(PathBuf::from(&producer_identity.producer_path)),
+            surface_manifest: None,
+            producer_identity: Some(producer_identity),
             path: Some("src/target.txt".to_string()),
             all: false,
             relation: "all".to_string(),
@@ -3465,7 +3659,8 @@ mod tests {
         let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
         let fixture = graph_fixture();
         let root = fixture.root.canonicalize().expect("canonical fixture root");
-        let material = collect_build_material(&root, "default").expect("build material");
+        let material =
+            collect_build_material(&root, "default", None, None, None).expect("build material");
         let operation_id = graph_operation_id(&material);
         let staging = GraphStaging::create(&operation_id).expect("exclusive local staging");
         let host_temp = std::env::temp_dir()
@@ -3624,7 +3819,7 @@ mod tests {
         drop(statement);
         drop(connection);
 
-        let probe = probe_input_fingerprint(&fixture.root, &args.profile)
+        let probe = probe_input_fingerprint(&fixture.root, &args.profile, None, None, None)
             .expect("component-complete probe");
         assert!(probe.reason.is_none());
         assert_eq!(
@@ -3723,6 +3918,122 @@ mod tests {
         let status = read_graph_status(&args).expect("runtime-present status");
         assert_eq!(status["status"], "stale");
         assert_eq!(status["probe_reason"], "runtime_evidence_changed");
+    }
+
+    #[test]
+    fn producer_identity_is_bound_into_graph_fingerprint() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        let first =
+            build_graph_with_failure(&graph_args(&fixture.root)).expect("first graph build");
+        OpenOptions::new()
+            .append(true)
+            .open(fixture.root.join("tools/agent_tools/surface_manifest.py"))
+            .expect("producer for mutation")
+            .write_all(b"\n# producer semantic mutation\n")
+            .expect("mutate producer");
+        let second =
+            build_graph_with_failure(&graph_args(&fixture.root)).expect("second graph build");
+        assert_ne!(first["graph_fingerprint"], second["graph_fingerprint"]);
+        assert_ne!(first["input_fingerprint"], second["input_fingerprint"]);
+    }
+
+    #[test]
+    fn canonical_status_query_rederive_current_identity_and_reject_legacy_db() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        build_graph_with_failure(&graph_args(&fixture.root)).expect("identity graph build");
+        let mut canonical_args = graph_args(&fixture.root);
+        canonical_args.surface_manifest_producer = None;
+        canonical_args.producer_identity = None;
+        let status = read_graph_status(&canonical_args).expect("canonical status");
+        assert_eq!(status["status"], "fresh");
+        assert_eq!(
+            query_graph(&canonical_args).expect("canonical query")["status"],
+            "fresh"
+        );
+
+        OpenOptions::new()
+            .append(true)
+            .open(fixture.root.join("tools/agent_tools/surface_manifest.py"))
+            .expect("producer for mutation")
+            .write_all(b"\n# producer status mutation\n")
+            .expect("mutate producer");
+        let stale = read_graph_status(&canonical_args).expect("modified producer status");
+        assert_eq!(stale["status"], "stale");
+        assert_eq!(stale["probe_reason"], "producer_identity_changed");
+
+        let legacy = graph_fixture();
+        build_graph_with_failure(&graph_args(&legacy.root)).expect("legacy setup build");
+        let db = legacy
+            .root
+            .join(".agent-canon/knowledge-graph/graph.sqlite");
+        let connection = Connection::open(&db).expect("legacy database");
+        let integration_text: String = connection
+            .query_row(
+                "SELECT value FROM metadata WHERE key='integration_record'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("integration record");
+        let mut integration: Value =
+            serde_json::from_str(&integration_text).expect("integration JSON");
+        integration
+            .as_object_mut()
+            .expect("integration object")
+            .remove("producer_identity");
+        connection
+            .execute(
+                "UPDATE metadata SET value=?1 WHERE key='integration_record'",
+                params![serde_json::to_string(&integration).expect("legacy integration")],
+            )
+            .expect("remove legacy integration identity");
+        connection
+            .execute(
+                "UPDATE metadata SET value='null' WHERE key='producer_identity'",
+                [],
+            )
+            .expect("remove legacy metadata identity");
+        drop(connection);
+        let mut legacy_args = graph_args(&legacy.root);
+        legacy_args.surface_manifest_producer = None;
+        legacy_args.producer_identity = None;
+        let legacy_status = read_graph_status(&legacy_args).expect("legacy status");
+        assert_eq!(legacy_status["status"], "stale");
+        assert_eq!(legacy_status["probe_reason"], "producer_identity_changed");
+    }
+
+    #[test]
+    fn canonical_cli_default_build_status_query_binds_current_identity() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        let root = fixture.root.canonicalize().expect("canonical fixture root");
+        let cli_args = |command: &str| {
+            vec![
+                command.to_string(),
+                "--root".to_string(),
+                root.to_string_lossy().into_owned(),
+                "--format".to_string(),
+                "json".to_string(),
+            ]
+        };
+
+        assert_eq!(run(&cli_args("build")), 0);
+        assert_eq!(run(&cli_args("status")), 0);
+        let mut query_args = cli_args("query");
+        query_args.push("--all".to_string());
+        assert_eq!(run(&query_args), 0);
+
+        let connection = Connection::open(root.join(".agent-canon/knowledge-graph/graph.sqlite"))
+            .expect("published graph database");
+        let stored_identity =
+            metadata(&connection, "producer_identity").expect("identity metadata");
+        let stored_identity =
+            serde_json::from_str::<ProducerIdentity>(&stored_identity).expect("stored identity");
+        assert_eq!(
+            stored_identity,
+            current_producer_identity(&root).expect("current producer identity")
+        );
     }
 
     #[test]

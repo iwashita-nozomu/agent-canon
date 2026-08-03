@@ -619,7 +619,23 @@ if agentcanon_pr_dependency_graph_required; then
   # evidence for the subsequent quick CI receipt consumer.
   mkdir -p "${PR_DEPENDENCY_REVIEW_DIR}"
   graph_build_result="${PR_DEPENDENCY_REVIEW_DIR}/graph-build.json"
-  if run_agent_canon graph build --root . --profile default --format json >"${graph_build_result}"; then
+  graph_producer_identity=""
+  if ! graph_producer_identity="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --producer-identity)"; then
+    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=producer_identity_failed"
+    exit 2
+  fi
+  graph_build_args=(
+    graph build
+    --root .
+    --profile default
+    --format json
+    --surface-manifest-producer "${AGENT_CANON_SOURCE_ROOT}/tools/agent_tools/surface_manifest.py"
+    --surface-manifest-producer-identity "${graph_producer_identity}"
+  )
+  if run_agent_canon "${graph_build_args[@]}" >"${graph_build_result}"; then
     graph_build_rc=0
   else
     graph_build_rc=$?

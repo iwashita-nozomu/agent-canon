@@ -267,6 +267,16 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             exit 99
             """,
         )
+        (source / "tools" / "agent_tools" / "surface_manifest.py").write_text(
+            "# current producer fixture\n",
+            encoding="utf-8",
+        )
+        manifest = source / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+        manifest.parent.mkdir(parents=True, exist_ok=True)
+        manifest.write_text(
+            'version = 1\nprefix = "vendor/agent-canon"\n',
+            encoding="utf-8",
+        )
         generic_python = "raise SystemExit(0)\n"
         for relative in (
             "tools/agent_tools/check_convention_compliance.py",

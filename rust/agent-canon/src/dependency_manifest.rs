@@ -18,6 +18,27 @@ use std::process::Command;
 
 pub const SNAPSHOT_SCHEMA_VERSION: &str = "source_snapshot.v1";
 const SURFACE_MANIFEST_SNAPSHOT_SCHEMA: &str = "agent-canon.surface-manifest.v1";
+const DEFAULT_SURFACE_MANIFEST: &str = "documents/runtime/shared-runtime-surfaces.toml";
+pub(crate) const PRODUCER_IDENTITY_VERSION: &str = "agent-canon.surface-manifest-producer.v1";
+pub(crate) const PRODUCER_IDENTITY_CONTRACT: &str = "agent-canon.surface-manifest.v1";
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProducerIdentity {
+    pub source_root: String,
+    pub producer_path: String,
+    pub version: String,
+    pub contract: String,
+    pub producer_sha256: String,
+    pub manifest_path: String,
+    pub manifest_sha256: String,
+}
+
+impl ProducerIdentity {
+    pub(crate) fn fingerprint_material(&self) -> String {
+        serde_json::to_string(self).unwrap_or_default()
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SourceSpan {
@@ -154,6 +175,9 @@ pub(crate) struct SnapshotRequest {
     pub root: PathBuf,
     pub profile: String,
     pub output_jsonl: PathBuf,
+    pub surface_manifest_producer: Option<PathBuf>,
+    pub surface_manifest: Option<PathBuf>,
+    pub producer_identity: Option<ProducerIdentity>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -270,6 +294,128 @@ fn hash_bytes(bytes: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
+fn validate_producer_identity_inner(
+    identity: &ProducerIdentity,
+    producer: Option<&Path>,
+    verify_content: bool,
+) -> Result<(), ManifestError> {
+    if identity.version != PRODUCER_IDENTITY_VERSION
+        || identity.contract != PRODUCER_IDENTITY_CONTRACT
+    {
+        return Err(ManifestError::SurfaceManifest(
+            "producer identity version or contract is invalid".to_string(),
+        ));
+    }
+    let source_root = fs::canonicalize(&identity.source_root)
+        .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
+    if source_root.to_string_lossy() != identity.source_root || !source_root.is_dir() {
+        return Err(ManifestError::SurfaceManifest(
+            "producer identity source root is not canonical".to_string(),
+        ));
+    }
+    let canonical_file = |value: &str, field: &str| -> Result<PathBuf, ManifestError> {
+        let path = fs::canonicalize(value)
+            .map_err(|error| ManifestError::SurfaceManifest(format!("{field}: {error}")))?;
+        if path.to_string_lossy() != value
+            || !fs::symlink_metadata(&path)
+                .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?
+                .file_type()
+                .is_file()
+        {
+            return Err(ManifestError::SurfaceManifest(format!(
+                "producer identity {field} is not canonical regular file"
+            )));
+        }
+        if path.strip_prefix(&source_root).is_err() {
+            return Err(ManifestError::SurfaceManifest(format!(
+                "producer identity {field} escapes source root"
+            )));
+        }
+        Ok(path)
+    };
+    let producer_path = canonical_file(&identity.producer_path, "producer_path")?;
+    let manifest_path = canonical_file(&identity.manifest_path, "manifest_path")?;
+    if producer.is_some()
+        && producer.map(|path| {
+            fs::canonicalize(path)
+                .map(|canonical| canonical == producer_path)
+                .unwrap_or(false)
+        }) != Some(true)
+    {
+        return Err(ManifestError::SurfaceManifest(
+            "producer identity does not bind the executing producer".to_string(),
+        ));
+    }
+    if verify_content {
+        let producer_sha256 = hash_bytes(
+            &fs::read(&producer_path)
+                .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?,
+        );
+        let manifest_sha256 = hash_bytes(
+            &fs::read(&manifest_path)
+                .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?,
+        );
+        if identity.producer_sha256 != producer_sha256
+            || identity.manifest_sha256 != manifest_sha256
+        {
+            return Err(ManifestError::SurfaceManifest(
+                "producer identity content hash mismatch".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_producer_identity(
+    identity: &ProducerIdentity,
+    producer: Option<&Path>,
+) -> Result<(), ManifestError> {
+    validate_producer_identity_inner(identity, producer, true)
+}
+
+pub(crate) fn validate_persisted_producer_identity(
+    identity: &ProducerIdentity,
+) -> Result<(), ManifestError> {
+    validate_producer_identity_inner(identity, None, false)
+}
+
+pub(crate) fn current_producer_identity(root: &Path) -> Result<ProducerIdentity, ManifestError> {
+    let root = fs::canonicalize(root).map_err(|error| ManifestError::Io(error.to_string()))?;
+    let vendored_root = root.join("vendor/agent-canon");
+    let source_root = if vendored_root
+        .join("tools/agent_tools/surface_manifest.py")
+        .is_file()
+    {
+        vendored_root
+    } else {
+        root.clone()
+    };
+    let source_root = fs::canonicalize(&source_root)
+        .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
+    let producer_path = fs::canonicalize(source_root.join("tools/agent_tools/surface_manifest.py"))
+        .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
+    let manifest_path =
+        fs::canonicalize(source_root.join("documents/runtime/shared-runtime-surfaces.toml"))
+            .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
+    let identity = ProducerIdentity {
+        source_root: source_root.to_string_lossy().into_owned(),
+        producer_path: producer_path.to_string_lossy().into_owned(),
+        version: PRODUCER_IDENTITY_VERSION.to_string(),
+        contract: PRODUCER_IDENTITY_CONTRACT.to_string(),
+        producer_sha256: hash_bytes(
+            &fs::read(&producer_path)
+                .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?,
+        ),
+        manifest_path: manifest_path.to_string_lossy().into_owned(),
+        manifest_sha256: hash_bytes(
+            &fs::read(&manifest_path)
+                .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?,
+        ),
+    };
+    validate_producer_identity(&identity, Some(&producer_path))?;
+    Ok(identity)
+}
+
 fn hash_text(value: &str) -> String {
     hash_bytes(value.as_bytes())
 }
@@ -360,7 +506,26 @@ fn require_exact_json_keys(
     Ok(())
 }
 
-fn surface_manifest_script(root: &Path) -> Result<(PathBuf, bool), ManifestError> {
+fn surface_manifest_script(
+    root: &Path,
+    producer: Option<&Path>,
+) -> Result<(PathBuf, bool), ManifestError> {
+    if let Some(producer) = producer {
+        let metadata = fs::metadata(producer).map_err(|error| {
+            ManifestError::SurfaceManifest(format!(
+                "surface_manifest_snapshot: producer unavailable: {error}"
+            ))
+        })?;
+        if !metadata.is_file() {
+            return Err(ManifestError::SurfaceManifest(
+                "surface_manifest_snapshot: producer is not a regular file".to_string(),
+            ));
+        }
+        return Ok((
+            producer.to_path_buf(),
+            root.join("vendor/agent-canon").is_dir(),
+        ));
+    }
     let parent_script = root.join("vendor/agent-canon/tools/agent_tools/surface_manifest.py");
     if parent_script.is_file() {
         return Ok((parent_script, true));
@@ -374,8 +539,12 @@ fn surface_manifest_script(root: &Path) -> Result<(PathBuf, bool), ManifestError
     ))
 }
 
-fn load_surface_manifest_snapshot(root: &Path) -> Result<SurfaceManifestSnapshot, ManifestError> {
-    let (script, requires_parent_gitlink) = surface_manifest_script(root)?;
+fn load_surface_manifest_snapshot(
+    root: &Path,
+    producer: Option<&Path>,
+    manifest: Option<&Path>,
+) -> Result<SurfaceManifestSnapshot, ManifestError> {
+    let (script, requires_parent_gitlink) = surface_manifest_script(root, producer)?;
     let output = Command::new("python3")
         .arg(script)
         .args([
@@ -388,7 +557,14 @@ fn load_surface_manifest_snapshot(root: &Path) -> Result<SurfaceManifestSnapshot
             "--prefix",
             "vendor/agent-canon",
             "--manifest",
-            "documents/runtime/shared-runtime-surfaces.toml",
+            manifest
+                .unwrap_or_else(|| Path::new(DEFAULT_SURFACE_MANIFEST))
+                .to_str()
+                .ok_or_else(|| {
+                    ManifestError::SurfaceManifest(
+                        "surface_manifest_snapshot: manifest is not UTF-8".to_string(),
+                    )
+                })?,
             "normalized-snapshot",
         ])
         .output()
@@ -1308,9 +1484,11 @@ fn snapshot_capture_hash(
 pub(crate) fn probe_snapshot_identity(
     root: &Path,
     profile: &str,
+    producer: Option<&Path>,
+    manifest: Option<&Path>,
 ) -> Result<SnapshotProbe, ManifestError> {
     let root = fs::canonicalize(root).map_err(|error| ManifestError::Io(error.to_string()))?;
-    let surface_manifest = load_surface_manifest_snapshot(&root)?;
+    let surface_manifest = load_surface_manifest_snapshot(&root, producer, manifest)?;
     let head = git_text(&root, &["rev-parse", "--verify", "HEAD"])?;
     let authority = gitlink_authority(&root, &surface_manifest)?;
     let candidates = source_candidates(&root, &surface_manifest, &head, authority.as_ref())?;
@@ -1343,7 +1521,18 @@ pub(crate) fn capture_snapshot(
             root.display()
         )));
     }
-    let surface_manifest = load_surface_manifest_snapshot(&root)?;
+    if let Some(identity) = request.producer_identity.as_ref() {
+        validate_producer_identity(identity, request.surface_manifest_producer.as_deref())?;
+    } else if request.surface_manifest_producer.is_some() {
+        return Err(ManifestError::SurfaceManifest(
+            "explicit surface manifest producer requires producer identity".to_string(),
+        ));
+    }
+    let surface_manifest = load_surface_manifest_snapshot(
+        &root,
+        request.surface_manifest_producer.as_deref(),
+        request.surface_manifest.as_deref(),
+    )?;
     let git_head = git_text(&root, &["rev-parse", "--verify", "HEAD"])?;
     let authority = gitlink_authority(&root, &surface_manifest)?;
     let candidates = source_candidates(&root, &surface_manifest, &git_head, authority.as_ref())?;
