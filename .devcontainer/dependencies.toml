@@ -339,7 +339,7 @@ method = "cargo-source-build"
 version = "0.1.0"
 source = "rust/agent-canon"
 repo = "https://github.com/iwashita-nozomu/agent-canon.git"
-commit = "bf329228968d3d556c378c8a17e4f58d02e03d82"
+commit = "434635f891c68c1f587d62010fb559412da96f51"
 locked = true
 verification = { kind = "cargo-binary", path = "target/release/agent-canon", args = ["--version"], output_contains = "agent-canon 0.1.0" }
 deps = ["cargo"]
