@@ -83,6 +83,7 @@ SEMVER_RE = re.compile(
     r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
 )
 VERSION_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.+:~_-]*$")
+PLATFORM_RE = re.compile(r"^linux/(?:amd64|arm64)$")
 SAFE_MEMBER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 TRAVERSAL_RE = re.compile(r"(?:^|[/\\])\.\.(?:[/\\]|$)")
 SHELL_EXECUTABLES = frozenset(
@@ -197,6 +198,7 @@ class DependencyRecord:
     deps: tuple[str, ...]
     provides: tuple[str, ...]
     failure_policy: str
+    platform: str | None = None
     key_fingerprint: str | None = None
     key_url: str | None = None
     checksum: str | None = None
@@ -663,6 +665,7 @@ def _validate_method_fields(
         "method",
         "version",
         "source",
+        "platform",
         "verification",
         "deps",
         "provides",
@@ -697,6 +700,10 @@ def _validate_method_fields(
 
 def _validate_method_values(record: DependencyRecord) -> None:
     """Validate all method-owned values before any executor argv is built."""
+    if record.platform is not None and PLATFORM_RE.fullmatch(record.platform) is None:
+        raise DependencyError(
+            f"{record.id}.platform must be one of linux/amd64 or linux/arm64"
+        )
     _validate_package(record)
     if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}:
         if VERSION_TOKEN_RE.fullmatch(record.version) is None:
@@ -811,6 +818,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         "method",
         "version",
         "source",
+        "platform",
         "verification",
         "deps",
         "provides",
@@ -869,6 +877,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         method=Method(method_value),
         version=_string(raw["version"], f"{record_id}.version"),
         source=_string(raw["source"], f"{record_id}.source"),
+        platform=_optional_string(raw.get("platform"), f"{record_id}.platform"),
         verification=_parse_verification(
             raw["verification"], record_id=record_id, method=Method(method_value)
         ),
@@ -1134,6 +1143,21 @@ def build_plan(
     records = merge_records(manifests)
     if not records:
         raise DependencyError("merged dependency plan must contain at least one record")
+    machine = platform.machine().lower()
+    machine_alias = {
+        "x86_64": "amd64",
+        "amd64": "amd64",
+        "aarch64": "arm64",
+        "arm64": "arm64",
+    }
+    runtime_platform = f"linux/{machine_alias.get(machine, machine)}"
+    for record in records:
+        if record.platform is not None and record.platform != runtime_platform:
+            raise DependencyError(
+                f"dependency record {record.id} requires {record.platform}, "
+                f"but runtime platform is {runtime_platform}; "
+                "no compatibility fallback is defined"
+            )
     by_id = {record.id: record for record in records}
     providers: dict[str, list[str]] = {}
     for record in records:

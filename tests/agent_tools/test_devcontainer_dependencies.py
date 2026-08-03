@@ -782,6 +782,36 @@ class DependencyModelTests(unittest.TestCase):
             any("yaml.__version__" in arg for arg in pyyaml.verification.args)
         )
 
+    def test_canonical_apt_records_are_jammy_amd64_owned(self) -> None:
+        """The shared apt tool records target the canonical Ubuntu 22.04 base."""
+        plan = load_plan(ROOT, ROOT)
+        apt_records = [
+            item for item in plan.records if item.method.value == "apt-package"
+        ]
+
+        self.assertTrue(apt_records)
+        self.assertTrue(
+            all(item.platform == "linux/amd64" for item in apt_records)
+        )
+        self.assertTrue(all(item.source == "ubuntu:22.04" for item in apt_records))
+        self.assertFalse(any(item.source == "ubuntu:24.04" for item in apt_records))
+
+    def test_platform_mismatch_fails_without_compatibility_fallback(self) -> None:
+        """A platform-owned record fails closed instead of selecting another base."""
+        parsed = parse_record(
+            record(
+                "arm-only",
+                method="apt-package",
+                source="ubuntu:22.04",
+                platform="linux/arm64",
+            ),
+            path=Path("platform.toml"),
+            index=0,
+        )
+
+        with self.assertRaisesRegex(DependencyError, "no compatibility fallback"):
+            build_plan((loaded_manifest(Path("platform.toml"), (parsed,)),))
+
     def test_empty_parent_overlay_merges_with_nonempty_vendor_manifest(self) -> None:
         """Allow an empty parent overlay when the canonical vendor is non-empty."""
         with tempfile.TemporaryDirectory() as temporary:

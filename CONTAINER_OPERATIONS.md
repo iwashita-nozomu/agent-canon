@@ -266,16 +266,15 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - Nested Codex uses container-local state under the selected workspace runtime
   home. The runner may forward `OPENAI_API_KEY` and `OPENAI_BASE_URL` explicitly;
   it never mounts or seeds host Codex state.
-- GPU admission runtime identity uses exactly
+- GPU admission runtime identity may use exactly
   `/var/lib/agent-canon/runtime/shared-runtime-provision.json` and
-  `/var/lib/agent-canon/runtime/shared-runtime-readback.json`. Bootstrap runs
-  before Compose generation and publishes the host receipt; generated Compose
-  preserves the same UID/GID, supplementary runtime group, bind source/target,
-  and provision path. Post-create establishes `umask 0007` before finalize;
-  finalize validates the provision receipt and publishes readback. Post-attach
-  is observational only. Receipt parsing and atomic publication are owned by
-  `tools/experiments/execution_resource_plan.py`; scripts do not carry a second
-  JSON parser or writer and do not repair failed identity.
+  `/var/lib/agent-canon/runtime/shared-runtime-readback.json` when an explicit
+  `shared-runtime` optional profile is selected. The default `CONTAINER_LOCAL`
+  route does not run host bootstrap, supplementary runtime-group wiring, or a
+  host-state receipt. Post-create establishes `umask 0007`; container-local
+  runtime setup is sufficient for successful create and tool availability.
+  Receipt parsing and atomic publication remain owned by
+  `tools/experiments/execution_resource_plan.py` for the explicit managed route.
 - Mount behavior belongs in `.devcontainer/devcontainer.json`.
 - Shared devcontainer names must be repository-specific. Do not use a fixed
   `name` or Compose project name that makes every template-derived repository
@@ -291,16 +290,19 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   runtime are both visible, or when `DEVCONTAINER_GPU_REQUEST=enabled` can be
   satisfied. Missing GPU access must not fail container creation in the default
   path; it should be reported in the generated status and post-attach banner.
-- Host authentication must stay host-local. The container may reuse mounted
-  credentials, but the Docker image must not bake user tokens or auth state.
+- Host authentication must stay host-local. The default devcontainer does not
+  mount credentials, config files, SSH agents, or Codex state. Such mounts are
+  available only through an explicit optional profile; the Docker image never
+  bakes user tokens or auth state.
 - `safe.directory` setup must be dynamic for `/workspace` and
   `/workspace/vendor/<name>`.
-- `/mnt/git` is compatibility-only. Configure it only when the host path exists.
+- `/mnt/git` is compatibility-only and opt-in through the `host-git` optional
+  profile. The default path does not inspect or mount it.
 - A private host directory for confidential local Git repositories or other
-  operator-local material may be mounted only through
-  `AGENT_CANON_SECRET_DIR`. The shared generator must skip the mount when the
-  variable is unset or the path is absent, must not print the host path, and must
-  use `AGENT_CANON_SECRET_MOUNT` for the container target
+  operator-local material may be mounted only through the explicit
+  `host-secrets` optional profile plus `AGENT_CANON_SECRET_DIR`. The shared
+  generator skips it by default and when the path is absent, must not print the
+  host path, and must use `AGENT_CANON_SECRET_MOUNT` for the container target
   (`/mnt/agent-canon-secrets` by default). Use
   `AGENT_CANON_SECRET_DIR_MODE=rw` only when the container must update local
   Git remotes; otherwise keep the default read-only mode.

@@ -40,13 +40,8 @@ fi
 project_user="project"
 project_uid="${PROJECT_UID:-$(id -u)}"
 project_gid="${PROJECT_GID:-$(id -g)}"
-runtime_gid="${AGENT_CANON_RUNTIME_GID:-$project_gid}"
 if [[ ! "$project_uid" =~ ^[1-9][0-9]*$ || ! "$project_gid" =~ ^[1-9][0-9]*$ ]]; then
   printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_MUST_BE_POSITIVE_DECIMAL:uid=%s:gid=%s\n' "$project_uid" "$project_gid" >&2
-  exit 1
-fi
-if [[ ! "$runtime_gid" =~ ^[1-9][0-9]*$ ]]; then
-  printf 'DEVCONTAINER_IDENTITY_ERROR=RUNTIME_GID_MUST_BE_POSITIVE_DECIMAL:gid=%s\n' "$runtime_gid" >&2
   exit 1
 fi
 project_home="/home/${project_user}"
@@ -144,24 +139,42 @@ else
 fi
 
 parent_layout=false
-parent_environment_enabled=false
-parent_environment_source="${repo_root}/.devcontainer/parent-environment.sh"
-parent_environment_manifest="${repo_root}/.devcontainer/parent-environment.toml"
 if [ -d "${repo_root}/vendor/agent-canon" ]; then
   parent_layout=true
-  if [ -e "$parent_environment_source" ] || [ -L "$parent_environment_source" ] \
-    || [ -e "$parent_environment_manifest" ] || [ -L "$parent_environment_manifest" ]; then
-    if [ ! -f "$parent_environment_source" ]; then
-      printf 'devcontainer parent environment source does not resolve to a file: %s\n' "$parent_environment_source" >&2
-      exit 1
-    fi
-    if [ ! -f "$parent_environment_manifest" ]; then
-      printf 'devcontainer parent environment manifest does not resolve to a file: %s\n' "$parent_environment_manifest" >&2
-      exit 1
-    fi
-    parent_environment_enabled=true
-  fi
 fi
+
+optional_mounts=""
+optional_mounts_raw="${AGENT_CANON_OPTIONAL_MOUNTS:-}"
+declare -A optional_mount_seen=()
+if [ -n "$optional_mounts_raw" ]; then
+  IFS=',' read -r -a optional_mount_values <<< "$optional_mounts_raw"
+  for optional_mount in "${optional_mount_values[@]}"; do
+    case "$optional_mount" in
+      host-git|host-secrets|host-credentials|ssh-agent|docker-host|shared-runtime) ;;
+      *)
+        printf 'devcontainer optional mount profile is unsupported: %s\n' "$optional_mount" >&2
+        exit 1
+        ;;
+    esac
+    if [ -n "${optional_mount_seen[$optional_mount]:-}" ]; then
+      printf 'devcontainer optional mount profile is duplicated: %s\n' "$optional_mount" >&2
+      exit 1
+    fi
+    optional_mount_seen["$optional_mount"]=1
+    if [ -n "$optional_mounts" ]; then
+      optional_mounts+=","
+    fi
+    optional_mounts+="$optional_mount"
+  done
+fi
+runtime_route="CONTAINER_LOCAL"
+optional_mount_enabled() {
+  local requested="$1"
+  case ",${optional_mounts}," in
+    *,"${requested}",*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 if [[ "$runtime_shell" != /* || "$runtime_shell" == *[!A-Za-z0-9._/-]* ]]; then
   printf 'devcontainer runtime.shell must be one absolute executable path: %s\n' "$runtime_shell" >&2
@@ -174,11 +187,6 @@ volume_lines=(
   "        source: ${workspace_root_yaml}"
   '        target: "/workspace"'
 )
-volume_lines+=(
-  "      - type: bind"
-  "        source: /var/lib/agent-canon/runtime"
-  "        target: /var/lib/agent-canon/runtime"
-)
 if [ "$parent_layout" = true ]; then
   if [ -f "${HOME}/.zshrc" ] && [ ! -L "${HOME}/.zshrc" ]; then
     volume_lines+=(
@@ -189,15 +197,6 @@ if [ "$parent_layout" = true ]; then
     )
   fi
 fi
-if [ "$parent_environment_enabled" = true ]; then
-  parent_environment_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$parent_environment_source")"
-  volume_lines+=(
-    "      - type: bind"
-    "        source: ${parent_environment_source_yaml}"
-    '        target: "/etc/project-template/parent-environment.sh"'
-    "        read_only: true"
-  )
-fi
 for pack_mount in "${pack_mounts[@]}"; do
   case "$pack_mount" in
     *:/workspace|*:/workspace:*)
@@ -207,10 +206,10 @@ for pack_mount in "${pack_mounts[@]}"; do
   esac
   volume_lines+=("      - ${pack_mount}")
 done
-if [ -d /mnt/git ]; then
+if optional_mount_enabled host-git && [ -d /mnt/git ]; then
   volume_lines+=("      - /mnt/git:/mnt/git")
 fi
-secret_mount_status="disabled"
+secret_mount_status="disabled-by-default"
 secret_target="${AGENT_CANON_SECRET_MOUNT:-/mnt/agent-canon-secrets}"
 secret_mode="${AGENT_CANON_SECRET_DIR_MODE:-ro}"
 secret_read_only="true"
@@ -222,7 +221,7 @@ case "$secret_mode" in
     secret_mode="invalid"
     ;;
 esac
-if [ -n "${AGENT_CANON_SECRET_DIR:-}" ] && [ "$secret_mode" != "invalid" ]; then
+if optional_mount_enabled host-secrets && [ -n "${AGENT_CANON_SECRET_DIR:-}" ] && [ "$secret_mode" != "invalid" ]; then
   if [ ! -d "${AGENT_CANON_SECRET_DIR}" ]; then
     printf 'devcontainer secret mount skipped: AGENT_CANON_SECRET_DIR is not an existing directory\n' >&2
   elif [[ "$secret_target" != /* ]]; then
@@ -239,14 +238,26 @@ if [ -n "${AGENT_CANON_SECRET_DIR:-}" ] && [ "$secret_mode" != "invalid" ]; then
     secret_mount_status="enabled"
   fi
 fi
-if [ -d "${HOME}/.config/gh" ]; then
+if optional_mount_enabled host-credentials && [ -d "${HOME}/.config/gh" ]; then
   volume_lines+=("      - ${HOME}/.config/gh:${project_home}/.config/gh:ro")
 fi
-if [ -d "${HOME}/.ssh" ]; then
+if optional_mount_enabled host-credentials && [ -d "${HOME}/.ssh" ]; then
   volume_lines+=("      - ${HOME}/.ssh:${project_home}/.ssh:ro")
 fi
-if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
+if optional_mount_enabled ssh-agent && [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
   volume_lines+=("      - ${SSH_AUTH_SOCK}:/ssh-agent")
+fi
+if optional_mount_enabled docker-host && [ -S /var/run/docker.sock ]; then
+  volume_lines+=("      - /var/run/docker.sock:/var/run/docker.sock")
+fi
+if optional_mount_enabled shared-runtime; then
+  shared_runtime_host="${AGENT_CANON_SHARED_RUNTIME_HOST:-}"
+  if [ -z "$shared_runtime_host" ] || [ ! -d "$shared_runtime_host" ]; then
+    printf 'devcontainer optional shared-runtime mount requires an existing AGENT_CANON_SHARED_RUNTIME_HOST directory\n' >&2
+    exit 1
+  fi
+  volume_lines+=("      - ${shared_runtime_host}:/var/lib/agent-canon/runtime")
+  runtime_route="MANAGED_CONTAINER"
 fi
 
 host_gpu_visible() {
@@ -308,18 +319,16 @@ environment_lines=(
   "      DEVCONTAINER_GPU_REQUEST: \"${gpu_request}\""
   "      AGENT_CANON_SECRET_MOUNT: \"${secret_target}\""
   "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
+  "      AGENT_CANON_OPTIONAL_MOUNTS: \"${optional_mounts}\""
   "      AGENT_CANON_DEPENDENCY_PROFILE: \"${dependency_profile}\""
-  '      AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"'
+  "      AGENT_CANON_RUNTIME_ROUTE: \"${runtime_route}\""
   '      AGENT_CANON_WORKSPACE_ROOT: "/workspace"'
   "      AGENT_CANON_REPOSITORY_ROOT: \"${container_repo_root}\""
-  '      AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"'
-  '      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"'
   "${pack_environment_lines[@]}"
 )
 if [ "$parent_layout" = true ]; then
   environment_lines=(
     "      HOME: \"${project_home}\""
-    "      ZDOTDIR: \"${project_home}\""
     "      SHELL: \"${runtime_shell}\""
     "      AGENT_CANON_CONTAINER_USER: \"${project_user}\""
     "${environment_lines[@]}"
@@ -342,8 +351,6 @@ mkdir -p "$(dirname "$compose_output")"
   printf 'services:\n'
   printf '  workspace:\n'
   printf '    user: "%s:%s"\n' "$project_uid" "$project_gid"
-  printf '    group_add:\n'
-  printf '      - "%s"\n' "$runtime_gid"
   if [ "$compose_mode" = "repo-docker-pack" ]; then
     printf '    build:\n'
     printf '      context: ..\n'
@@ -368,4 +375,4 @@ mkdir -p "$(dirname "$compose_output")"
 } > "$compose_output"
 
 
-printf 'devcontainer runtime generated: name=%s gpu=%s mode=%s network=auto secret_mount=%s pack=%s\n' "$compose_project_name" "$gpu_mode" "$compose_mode" "$secret_mount_status" "$pack"
+printf 'devcontainer runtime generated: name=%s gpu=%s mode=%s network=auto optional_mounts=%s secret_mount=%s pack=%s\n' "$compose_project_name" "$gpu_mode" "$compose_mode" "$optional_mounts" "$secret_mount_status" "$pack"

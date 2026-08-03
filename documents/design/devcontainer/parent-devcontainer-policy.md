@@ -11,7 +11,7 @@ downstream implementation ../../../tools/agent_tools/devcontainer_dependencies.p
 downstream implementation ../../../tools/sync_agent_canon.sh materializes AgentCanon root views
 downstream implementation ../../../tools/agent_tools/parent_repo_readiness.py checks the minimum parent structure
 downstream implementation ../../../tools/ci/container_config.py validates parent environment names without shell execution
-downstream implementation ../../../.devcontainer/generate-runtime-compose.sh mounts parent environment sources and host zshrc
+downstream implementation ../../../.devcontainer/generate-runtime-compose.sh inventories optional host mounts and projects host zshrc
 downstream design parent-dependency-manifest-followup.md declares the parent manifest, pin, and ordering follow-up
 @dependency-end
 -->
@@ -26,40 +26,22 @@ downstream design parent-dependency-manifest-followup.md declares the parent man
 - `.devcontainer/devcontainer.json` は
   `vendor/agent-canon/.devcontainer/devcontainer.json` への symlink。
 - 親固有の処理がある場合は `.devcontainer/post-create-parent.sh` に置く。
-- 親環境を使う場合は `.devcontainer/parent-environment.sh` と
-  `.devcontainer/parent-environment.toml` を一組で置く。どちらも regular file
-  または実在 file へ解決できる symlink とし、片側だけの配置と broken symlink
-  は受理しない。両方が無い親では親環境 mount を生成しない。
+- `.devcontainer/parent-environment.sh` と
+  `.devcontainer/parent-environment.toml` は legacy evidence として残っていてもよい
+  が、devcontainer create、shell startup、runtime/tool availability の入力にしない。
+  parent固有のruntime値は Docker `ENV`、devcontainer `containerEnv`、明示 bootstrap
+  または workspace source へ移す。
 - AgentCanon の共有スクリプトを親 `.devcontainer/` にコピーしたり、wrapper を
   追加したりしない。
 
 この最低限以外の親レポ固有ディレクトリやファイルを禁止しない。構造検査は
 この所有境界と symlink の健全性だけを確認し、親レポの拡張余地を奪わない。
 
-## 親環境の値と名前
-
-親環境の組を配置した場合、`parent-environment.sh` が親環境の値と定義の唯一の
-source です。validator は symlink 自体の file type ではなく解決先の実在性を確認し、
-このファイルを shell として実行せず、空行・コメントと `export NAME=value` 形式の
-行だけを静的に読みます。`parent-environment.toml` は次の形で ordered variable
-names だけを持ちます。
-
-```toml
-variables = ["PROJECT_TOKEN", "PROJECT_REGION"]
-```
-
-validator は export name と TOML の `variables` を順序付きで完全一致させます。
-許可されない shell 行、重複名、未知の TOML key、name の不正、順序差は failure
-です。構造検査でファイルが存在しても、値の定義、Compose の意味、image の zsh
-startup、host premise の十分条件を証明したことにはなりません。
-
 ## 直接参照
 
 symlink 先の `devcontainer.json` は、親レポのルートから AgentCanon の実体を
 直接呼び出す。
 
-- bootstrap:
-  `vendor/agent-canon/.devcontainer/bootstrap-shared-runtime.sh`
 - Compose generator:
   `vendor/agent-canon/.devcontainer/generate-runtime-compose.sh`
 - post-create:
@@ -67,31 +49,55 @@ symlink 先の `devcontainer.json` は、親レポのルートから AgentCanon 
 - post-attach:
   `vendor/agent-canon/.devcontainer/post-attach.sh`
 
-親環境の両 source が実在 file に解決できるとき、generator は parent environment を
-read-only bind mount します。host zshrc は regular file の場合だけ追加します。
+generator は host file bind を inventory し、defaultでは `/workspace` の repository
+mount と GPU device/driver runtime passthrough だけを使用します。host `${HOME}/.zshrc`
+は regular file の場合だけ `/home/project/.zshrc` へ read-only projection する唯一の
+optional user-customization mountです。欠落・directory・symlinkの場合は mount を省略し、
+image-owned empty/default `.zshrc` で同じ機能を提供します。
 
-- `.devcontainer/parent-environment.sh` ->
-  `/etc/project-template/parent-environment.sh`
-- host の configured source expression `${HOME}/.zshrc` ->
-  `/home/<project-user>/.zshrc`（host fileが存在する場合だけ）
+host credentials/config、`parent-environment.sh`、`~/.codex`、previous container
+state、Docker socket、SSH agent、private secret、`/mnt/git` は default mount では
+ありません。必要な場合だけ `AGENT_CANON_OPTIONAL_MOUNTS` の明示 profile で有効化
+できます。Docker-in-Docker/host daemon は `docker-host` profile に限定し、successful
+create と declared tool availability の前提にしません。
 
-validator は、zshrcが生成された場合に限り、Composeのmountがbind type、source
-expression、non-root target、read-onlyを満たすことを静的に確認する。fresh clone / CI
-runnerの現在のhost fileはprobeしない。実行時は `${HOME}/.zshrc` がregular fileの
-場合だけnon-root homeへ投影し、欠落・directory・symlinkの場合はmountを省略する。
-省略はfailureではない。image-owned startup fileはmountの有無にかかわらず
-`/etc/project-template/parent-environment.sh`をsourceし、zshのdefault startupを
-完了する。
+validator は generated Compose の全 volume target をこの inventory と照合する。
+fresh clone / CI runnerの現在のhost fileはprobeしない。runtime state は
+`CONTAINER_LOCAL` を default とし、host runtime projection は明示 profileだけで
+`MANAGED_CONTAINER` にする。
+
+## Ubuntu platform-owned apt records
+
+AgentCanon の apt records は親の canonical base `Ubuntu 22.04 linux/amd64` に固定する。
+公式 package metadata は [Ubuntu Jammy archive](https://archive.ubuntu.com/ubuntu/dists/jammy/)
+と [Ubuntu Jammy package index](https://packages.ubuntu.com/jammy/) を使い、各 apt record
+の `platform = "linux/amd64"` と `source = "ubuntu:22.04"` が package version の
+owner です。現在の固定値は manifest の record readbackで次のとおりです。
+
+| records | version |
+| --- | --- |
+| `texlive-latex-*`, `texlive-fonts-recommended`, `texlive-pictures`, `texlive-xetex`, `texlive-extra-utils` | `2021.20220204-1` |
+| `latexmk` | `1:4.76-1` |
+| `dvisvgm` | `2.13.1-1` |
+| `ghostscript` | `9.55.0~dfsg1-0ubuntu5.13` |
+| `poppler-utils` | `22.02.0-2ubuntu0.13` |
+| `jq` | `1.6-2.1ubuntu3.2` |
+| `tree` | `2.0.2-1` |
+| `clang-format` | `1:14.0-55~exp2` |
+
+`Ubuntu 24.04` record、暗黙のdistribution fallback、platformを跨ぐ再解決は存在
+しない。runtime platformがrecord platformと一致しない場合、typed dependency planは
+install前にfail closedする。
 
 generator は既存の `pack.runtime.shell` を process boundary として使います。親の
 default pack は zsh を選び、明示的な bash pack と smoke shell は bash のままです。
-zsh とその descendants は zsh startup を通じて parent variables を受け取ります。
-Compose が parent variables の値を再定義することはなく、関連する Compose-owned
-environment は `HOME`、`ZDOTDIR`、`SHELL`、`AGENT_CANON_CONTAINER_USER` です。
+zsh とその descendants は image `ENV` と devcontainer `containerEnv` から runtime値を
+受け取ります。zsh startup は parent environment をsourceしません。関連する
+Compose-owned environment は `HOME`、`SHELL`、`AGENT_CANON_CONTAINER_USER` です。
 `HOME` は dedicated non-root userの `/home/project` であり、zsh startupはoptional
 host zshrcの有無にかかわらずimage-owned startup fileから開始します。
 standalone AgentCanon source layout では host `~/.zshrc`、parent environment mount、
-`HOME`、`ZDOTDIR`、tmpfs を要求せず、pack-derived command だけを生成します。
+`HOME`、tmpfs を要求せず、pack-derived command だけを生成します。
 
 Compose の生成先は親レポの `.agent-canon/docker-compose.generated.yml` とする。
 `.agent-canon/` は親レポの実行状態用であり、生成 Compose を追跡対象にしない。

@@ -185,6 +185,18 @@ publish_container_local_runtime() {
   echo "ENVIRONMENT_TOOL_AVAILABILITY=$runtime_root/tool-availability.json"
 }
 
+ensure_container_local_runtime() {
+  if install -d -m 755 "$runtime_root" "$runtime_root/runs" "$runtime_root/logs"; then
+    return 0
+  fi
+  command -v sudo >/dev/null 2>&1 || {
+    echo "post-create cannot provision container-local runtime without sudo: $runtime_root" >&2
+    return 1
+  }
+  sudo install -d -m 755 -o "$(id -u)" -g "$(id -g)" \
+    "$runtime_root" "$runtime_root/runs" "$runtime_root/logs"
+}
+
 "$devcontainer_dir/bootstrap-dependencies.sh" --install-language-runtime
 "$devcontainer_dir/bootstrap-dependencies.sh" --check
 
@@ -217,7 +229,12 @@ else
   echo "repo-local Python dependency installer absent; skipping docker/install_python_dependencies.sh"
 fi
 
-"$devcontainer_dir/finalize-shared-runtime.sh"
+if [ "${AGENT_CANON_RUNTIME_ROUTE:-CONTAINER_LOCAL}" = "MANAGED_CONTAINER" ]; then
+  "$devcontainer_dir/finalize-shared-runtime.sh"
+else
+  ensure_container_local_runtime
+  echo "SHARED_RUNTIME_FINALIZE=skipped route=CONTAINER_LOCAL reason=no-host-state-required"
+fi
 publish_agent_tools_profile
 publish_agent_canon_cli
 build_agent_canon_cache
