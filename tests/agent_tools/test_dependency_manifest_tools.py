@@ -205,6 +205,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "--fail-missing",
                 "--changed-path-packet",
                 str(packet),
+                "--trusted-base-sha",
+                base,
                 root=root,
             )
 
@@ -236,6 +238,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "--fail-missing",
                 "--changed-path-packet",
                 str(packet),
+                "--trusted-base-sha",
+                base,
                 root=root,
             )
 
@@ -269,6 +273,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "--fail-missing",
                 "--changed-path-packet",
                 str(packet),
+                "--trusted-base-sha",
+                base,
                 root=root,
             )
 
@@ -298,6 +304,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "--fail-missing",
                 "--changed-path-packet",
                 str(packet),
+                "--trusted-base-sha",
+                base,
                 root=root,
             )
 
@@ -327,6 +335,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "--fail-missing",
                 "--changed-path-packet",
                 str(packet),
+                "--trusted-base-sha",
+                base,
                 root=root,
             )
 
@@ -338,7 +348,7 @@ class DependencyManifestToolTest(unittest.TestCase):
         """Missing and mismatched trusted path packets cannot widen the scan."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            base, _ = self.changed_header_fixture(
+            base, head = self.changed_header_fixture(
                 root,
                 {"changed.md": self.valid_header("base source")},
                 {"changed.md": self.valid_header("changed source")},
@@ -350,6 +360,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "--fail-missing",
                 "--changed-path-packet",
                 str(root / "missing.json"),
+                "--trusted-base-sha",
+                base,
                 root=root,
             )
             self.assertNotEqual(missing.returncode, 0)
@@ -367,6 +379,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "--fail-missing",
                 "--changed-path-packet",
                 str(wrong),
+                "--trusted-base-sha",
+                base,
                 root=root,
             )
             self.assertNotEqual(mismatched.returncode, 0)
@@ -374,6 +388,59 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "DEPENDENCY_HEADER_SCAN_REASON=changed_path_packet_paths_mismatch",
                 mismatched.stdout,
             )
+
+            packet = root / "packet.json"
+            self.write_changed_path_packet(root, base, packet)
+            substituted = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                head,
+                root=root,
+            )
+            self.assertNotEqual(substituted.returncode, 0)
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_REASON=changed_path_packet_trusted_base_mismatch",
+                substituted.stdout,
+            )
+
+    def test_repo_review_header_scan_only_runs_without_graph_executable(self) -> None:
+        """The trusted header gate is independent from graph-selection readiness."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, _ = self.changed_header_fixture(
+                root,
+                {"changed.md": self.valid_header("base source")},
+                {"changed.md": self.valid_header("changed source")},
+            )
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "run_repo_dependency_review.sh").symlink_to(REPO_REVIEW)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            packet = root / "changed-paths.json"
+            self.write_changed_path_packet(root, base, packet)
+
+            result = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--header-scan-only",
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_SCAN=pass", result.stdout)
+            self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
 
     def test_scan_accepts_large_file_with_manifest_markers_near_top(self) -> None:
         """Early marker matches in large files must not trip pipefail/SIGPIPE."""

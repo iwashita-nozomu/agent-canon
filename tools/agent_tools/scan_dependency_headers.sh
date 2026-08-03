@@ -16,6 +16,7 @@ ALLOW_FRONTMATTER=0
 HEADER_SCAN_LINES="${DEPENDENCY_HEADER_SCAN_LINES:-80}"
 MISSING_PREVIEW_LINES="${DEPENDENCY_MISSING_PREVIEW_LINES:-20}"
 CHANGED_PATH_PACKET=""
+TRUSTED_BASE_SHA=""
 declare -a INPUT_PATHS=()
 declare -a CHANGED_PATHS=()
 declare -a BASELINE_MISSING_PATHS=()
@@ -25,7 +26,7 @@ declare -A CHANGED_PATH_SET=()
 usage() {
   cat <<'EOF'
 Usage:
-  scan_dependency_headers.sh [--root DIR] [--changed] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--changed-path-packet FILE] [paths...]
+  scan_dependency_headers.sh [--root DIR] [--changed] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--changed-path-packet FILE] [--trusted-base-sha SHA] [paths...]
 
 Scans checkable text files for @dependency-start / @dependency-end manifest markers.
 Without --fail-missing this is report-only and exits 0.
@@ -33,6 +34,7 @@ Without --fail-missing this is report-only and exits 0.
 --explain-missing prints a short first-lines preview and owner classification for missing manifests.
 --changed-path-packet validates trusted PR base/head path evidence, reports unchanged missing
 headers as baseline, and makes only changed missing headers blocking under --fail-missing.
+--trusted-base-sha binds the packet to the caller's independently trusted PR base.
 EOF
 }
 
@@ -63,6 +65,11 @@ while [[ $# -gt 0 ]]; do
       CHANGED_PATH_PACKET="$2"
       shift 2
       ;;
+    --trusted-base-sha)
+      [[ $# -ge 2 ]] || { echo "DEPENDENCY_HEADER_SCAN=fail reason=trusted_base_argument_missing"; exit 2; }
+      TRUSTED_BASE_SHA="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -89,6 +96,7 @@ load_changed_path_packet() {
   local packet_head_tree packet_merge_base packet_digest packet_paths actual_paths
   [[ -n "$packet_path" ]] || return 0
   command -v jq >/dev/null 2>&1 || packet_fail "changed_path_packet_jq_missing"
+  [[ "$TRUSTED_BASE_SHA" =~ ^[0-9a-fA-F]{40}$ ]] || packet_fail "trusted_base_argument_missing_or_invalid"
   packet_path="$(realpath -m "$packet_path")"
   [[ -f "$packet_path" && ! -L "$packet_path" ]] || packet_fail "changed_path_packet_missing_or_wrong_type"
   if ! jq -e '
@@ -117,8 +125,11 @@ load_changed_path_packet() {
   packet_digest="$(jq -r '.changed_paths_sha256' "$packet_path")"
   [[ "$packet_schema" == "agent-canon.pr-changed-paths.v1" ]] || packet_fail "changed_path_packet_schema_mismatch"
   [[ "$packet_root" == "$ROOT_DIR" ]] || packet_fail "changed_path_packet_root_mismatch"
+  [[ "$packet_base_sha" == "$TRUSTED_BASE_SHA" ]] || packet_fail "changed_path_packet_trusted_base_mismatch"
 
-  local resolved_base resolved_base_tree resolved_head_tree resolved_merge_base
+  local resolved_trusted_base resolved_base resolved_base_tree resolved_head_tree resolved_merge_base
+  resolved_trusted_base="$(git rev-parse --verify --end-of-options "${TRUSTED_BASE_SHA}^{commit}" 2>/dev/null)" || packet_fail "trusted_base_unresolved"
+  [[ "$resolved_trusted_base" == "$TRUSTED_BASE_SHA" ]] || packet_fail "trusted_base_identity_mismatch"
   resolved_base="$(git rev-parse --verify --end-of-options "${packet_base_sha}^{commit}" 2>/dev/null)" || packet_fail "changed_path_packet_base_unresolved"
   [[ "$resolved_base" == "$packet_base_sha" ]] || packet_fail "changed_path_packet_base_identity_mismatch"
   resolved_base_tree="$(git rev-parse --verify --end-of-options "${packet_base_sha}^{tree}" 2>/dev/null)" || packet_fail "changed_path_packet_base_tree_unresolved"

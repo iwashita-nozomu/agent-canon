@@ -628,11 +628,16 @@ Responsibilities:
 - accept a selector-owned `--changed-path-packet` containing the trusted PR
   base/head, tree, merge-base, exact changed-path set, and path-set digest
 - fail closed when that packet is missing, malformed, stale, or differs from
-  the repository's verified base/head diff
+  the repository's verified base/head diff; the PR gate passes its separately
+  trusted base SHA and the scanner requires an exact packet binding to it
 - under a trusted PR packet, report unchanged missing headers as baseline
   evidence and block only missing headers on changed or newly added paths;
   deleted paths and existing root-view, symlink, and submodule skip rules stay
   owned by this scanner
+- remain independent of graph-selection activation: a valid trusted PR packet
+  is sufficient to run this header gate even when a derived-parent graph is
+  not required; standalone AgentCanon still owns unconditional full graph
+  completeness separately
 
 ### `check_dependency_header_format.sh`
 
@@ -686,6 +691,10 @@ Responsibilities:
 - accept `--changed-path-packet` from the trusted PR graph selector and pass it
   to the canonical header scan; the wrapper does not derive a second local
   branch diff or duplicate changed-path authority
+- support a header-scan-only route that does not require a fresh graph status;
+  the PR gate uses it when derived-parent graph selection is skipped while
+  still requiring the trusted changed-path packet and strict missing-header
+  gate
 
 Template repos expose `make dependency-review-surfaces` to run an explicit
 strict review against both the parent root view and `vendor/agent-canon` source

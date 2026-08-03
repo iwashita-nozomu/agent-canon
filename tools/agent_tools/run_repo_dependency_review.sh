@@ -28,13 +28,15 @@ REPORT_DIR="${AGENT_RUN_REPORT_DIR:-}"
 GRAPH_TSV_OUTPUT=""
 SEARCH_HITS_FILE=""
 CHANGED_PATH_PACKET=""
+TRUSTED_BASE_SHA=""
+HEADER_SCAN_ONLY=0
 CHECK_DESIGN_DOC_CLAIMS=0
 declare -a DESIGN_DOC_CLAIM_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--changed-path-packet FILE] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH] [--check-design-doc-claims] [--design-doc-claim-path PATH]
+  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--changed-path-packet FILE] [--trusted-base-sha SHA] [--header-scan-only] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH] [--check-design-doc-claims] [--design-doc-claim-path PATH]
 
 Runs dependency manifest review against all tracked, checkable text files in the repo.
 This is intended for checkpoint and final review, not just changed-file closeout.
@@ -50,6 +52,9 @@ With --cycle-report-only, dependency cycles stay visible but do not block the
 wrapper. Use this only with a durable graph report artifact.
 With --changed-path-packet, selector-owned trusted base/head path evidence is
 passed to the canonical scan; unchanged missing headers remain baseline evidence.
+With --trusted-base-sha, the packet base is bound to an independent caller authority.
+With --header-scan-only, graph status/query and graph projections are skipped while
+the strict canonical header scan and format check still run.
 With --check-design-doc-claims, changed design documents are compared with
 dependency header evidence and implementation-backed claim tokens. Repeat
 --design-doc-claim-path to check explicit design documents instead of changed
@@ -87,6 +92,15 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || { echo "REPO_DEPENDENCY_REVIEW=fail reason=changed_path_packet_argument_missing"; exit 2; }
       CHANGED_PATH_PACKET="$2"
       shift 2
+      ;;
+    --trusted-base-sha)
+      [[ $# -ge 2 ]] || { echo "REPO_DEPENDENCY_REVIEW=fail reason=trusted_base_argument_missing"; exit 2; }
+      TRUSTED_BASE_SHA="$2"
+      shift 2
+      ;;
+    --header-scan-only)
+      HEADER_SCAN_ONLY=1
+      shift
       ;;
     --list-changed-dependencies)
       LIST_CHANGED_DEPENDENCIES=1
@@ -128,44 +142,51 @@ done
 ROOT_DIR="$(realpath -m "$ROOT_DIR")"
 cd "$ROOT_DIR"
 
-if [[ -d "$ROOT_DIR/vendor/agent-canon" ]]; then
-  GRAPH_CLI="$ROOT_DIR/vendor/agent-canon/tools/bin/agent-canon"
-else
-  GRAPH_CLI="$ROOT_DIR/tools/bin/agent-canon"
-fi
-if [[ ! -x "$GRAPH_CLI" ]]; then
-  echo "canonical graph executable is missing for root: $ROOT_DIR" >&2
-  exit 1
+if [[ "$HEADER_SCAN_ONLY" -eq 1 && ( -z "$CHANGED_PATH_PACKET" || -z "$TRUSTED_BASE_SHA" ) ]]; then
+  echo "REPO_DEPENDENCY_REVIEW=fail reason=header_scan_trusted_packet_required"
+  exit 2
 fi
 
-status_file="$(mktemp)"
-dependency_query_file="$(mktemp)"
-owner_query_file="$(mktemp)"
-trap 'rm -f "$status_file" "$dependency_query_file" "$owner_query_file"' EXIT
+if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
+  if [[ -d "$ROOT_DIR/vendor/agent-canon" ]]; then
+    GRAPH_CLI="$ROOT_DIR/vendor/agent-canon/tools/bin/agent-canon"
+  else
+    GRAPH_CLI="$ROOT_DIR/tools/bin/agent-canon"
+  fi
+  if [[ ! -x "$GRAPH_CLI" ]]; then
+    echo "canonical graph executable is missing for root: $ROOT_DIR" >&2
+    exit 1
+  fi
 
-set +e
-"$GRAPH_CLI" graph status --root "$ROOT_DIR" --profile default --format json >"$status_file"
-status_exit=$?
-set -e
-if [[ "$status_exit" -ne 0 || "$(jq -r '.status // "invalid"' "$status_file" 2>/dev/null)" != "fresh" ]]; then
-  echo "REPO_DEPENDENCY_REVIEW=fail"
-  cat "$status_file"
-  exit 1
-fi
+  status_file="$(mktemp)"
+  dependency_query_file="$(mktemp)"
+  owner_query_file="$(mktemp)"
+  trap 'rm -f "$status_file" "$dependency_query_file" "$owner_query_file"' EXIT
 
-set +e
-"$GRAPH_CLI" graph query --root "$ROOT_DIR" --profile default --format json --all --relation dependency --direction both --depth 0 >"$dependency_query_file"
-dependency_exit=$?
-"$GRAPH_CLI" graph query --root "$ROOT_DIR" --profile default --format json --all --relation owner --direction both --depth 0 >"$owner_query_file"
-owner_exit=$?
-set -e
-if [[ "$dependency_exit" -ne 0 || "$owner_exit" -ne 0 ]] \
-  || [[ "$(jq -r '.status // "invalid"' "$dependency_query_file" 2>/dev/null)" != "fresh" ]] \
-  || [[ "$(jq -r '.status // "invalid"' "$owner_query_file" 2>/dev/null)" != "fresh" ]]; then
-  echo "REPO_DEPENDENCY_REVIEW=fail"
-  cat "$dependency_query_file"
-  cat "$owner_query_file"
-  exit 1
+  set +e
+  "$GRAPH_CLI" graph status --root "$ROOT_DIR" --profile default --format json >"$status_file"
+  status_exit=$?
+  set -e
+  if [[ "$status_exit" -ne 0 || "$(jq -r '.status // "invalid"' "$status_file" 2>/dev/null)" != "fresh" ]]; then
+    echo "REPO_DEPENDENCY_REVIEW=fail"
+    cat "$status_file"
+    exit 1
+  fi
+
+  set +e
+  "$GRAPH_CLI" graph query --root "$ROOT_DIR" --profile default --format json --all --relation dependency --direction both --depth 0 >"$dependency_query_file"
+  dependency_exit=$?
+  "$GRAPH_CLI" graph query --root "$ROOT_DIR" --profile default --format json --all --relation owner --direction both --depth 0 >"$owner_query_file"
+  owner_exit=$?
+  set -e
+  if [[ "$dependency_exit" -ne 0 || "$owner_exit" -ne 0 ]] \
+    || [[ "$(jq -r '.status // "invalid"' "$dependency_query_file" 2>/dev/null)" != "fresh" ]] \
+    || [[ "$(jq -r '.status // "invalid"' "$owner_query_file" 2>/dev/null)" != "fresh" ]]; then
+    echo "REPO_DEPENDENCY_REVIEW=fail"
+    cat "$dependency_query_file"
+    cat "$owner_query_file"
+    exit 1
+  fi
 fi
 
 mapfile -t checkable_paths < <(
@@ -182,6 +203,7 @@ scan_args=(tools/agent_tools/scan_dependency_headers.sh)
 format_args=(tools/agent_tools/check_dependency_header_format.sh)
 if [[ -n "$CHANGED_PATH_PACKET" ]]; then
   scan_args+=(--changed-path-packet "$CHANGED_PATH_PACKET")
+  scan_args+=(--trusted-base-sha "$TRUSTED_BASE_SHA")
 fi
 if [[ "$FAIL_MISSING" -eq 1 ]]; then
   scan_args+=(--fail-missing)
@@ -203,6 +225,17 @@ else
   bash "${scan_args[@]}" "${checkable_paths[@]}"
 fi
 bash "${format_args[@]}" "${checkable_paths[@]}"
+
+if [[ "$HEADER_SCAN_ONLY" -eq 1 ]]; then
+  echo "REPO_DEPENDENCY_REVIEW=pass"
+  if [[ -n "$REPORT_DIR" ]]; then
+    python3 tools/agent_tools/workflow_monitor.py \
+      --report-dir "$REPORT_DIR" \
+      --signal "repo_dependency_review=pass header_scan_only=yes paths=${#checkable_paths[@]} fail_missing=${FAIL_MISSING} changed_path_packet=${CHANGED_PATH_PACKET:-none}" \
+      --intervention "run_repo_dependency_review.sh recorded header scan pass"
+  fi
+  exit 0
+fi
 
 if [[ -n "$REPORT_DIR" ]]; then
   mkdir -p "$REPORT_DIR"

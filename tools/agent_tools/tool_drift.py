@@ -348,7 +348,7 @@ CONTRACTS = (
         command_checks=(
             CommandCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                r'^bash\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/run_repo_dependency_review\.sh"\s+--fail-missing\s+--cycle-report-only\s+--changed-path-packet\s+"\$\{PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET\}"\s+--report-dir\s+"\$\{PR_DEPENDENCY_REVIEW_DIR\}"\s*$',
+                r'^bash\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/run_repo_dependency_review\.sh"\s+--fail-missing\s+--cycle-report-only\s+--changed-path-packet\s+"\$\{PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET\}"\s+--trusted-base-sha\s+"\$\{PR_GATE_DEPENDENCY_GRAPH_BASE_SHA\}"\s+--report-dir\s+"\$\{PR_DEPENDENCY_REVIEW_DIR\}"\s*$',
                 "missing-strict-dependency-review",
             ),
             CommandCheck(

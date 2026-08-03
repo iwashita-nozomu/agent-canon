@@ -394,7 +394,8 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             command = (
                 'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
                 "--fail-missing --cycle-report-only --changed-path-packet "
-                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir '
+                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha '
+                '"${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir '
                 '"${PR_DEPENDENCY_REVIEW_DIR}"'
             )
             script.write_text(
@@ -423,7 +424,8 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             command = (
                 'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
                 "--fail-missing --cycle-report-only --changed-path-packet "
-                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir '
+                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha '
+                '"${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir '
                 '"${PR_DEPENDENCY_REVIEW_DIR}"'
             )
             script.write_text(
@@ -452,7 +454,8 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             command = (
                 'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
                 "--fail-missing --cycle-report-only --changed-path-packet "
-                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir '
+                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha '
+                '"${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir '
                 '"${PR_DEPENDENCY_REVIEW_DIR}"'
             )
             script.write_text(
@@ -476,10 +479,10 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         gates = [
             (
                 "agent_canon_pr_check",
-                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
+                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
                 "missing-strict-dependency-review",
                 'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing',
-                '--cycle-report-only --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
+                '--cycle-report-only --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
             ),
             (
                 "agent_canon_pr_check",
@@ -581,7 +584,8 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             command = (
                 'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
                 "--fail-missing --cycle-report-only --changed-path-packet "
-                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir '
+                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha '
+                '"${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir '
                 '"${PR_DEPENDENCY_REVIEW_DIR}"'
             )
             script.write_text(
@@ -1032,7 +1036,7 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     'python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py"',
                     "PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped",
                     "if agentcanon_pr_dependency_graph_required; then",
-                    '  bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
+                    '  bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
                     "  PR_GATE_DEPENDENCY_GRAPH_STATUS=prepared",
                     "fi",
                     "printf 'selector_reason=%s\\n' \"${PR_GATE_DEPENDENCY_GRAPH_REASON}\"",
