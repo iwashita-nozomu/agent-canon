@@ -428,6 +428,9 @@ Git identities, then publishes an immutable prepared
 outcome spool before a separate hash-linked receipt is published. The command
 returns success only after the latest committed receipt is durability-
 confirmed; uncertain, malformed, colliding, or unconfirmed records block.
+Rollout discovery consumes only the explicit container-local
+`AGENT_CANON_CODEX_SESSION_ROOT` supplied by the runtime owner; host `HOME`,
+`CODEX_HOME`, and `~/.codex/sessions` are not fallback inputs.
 
 `tools/bin/agent-canon graph build` は dependency-manifest snapshot、prepared
 artifact、latest committed receipt を一つの `BuildMaterial` transaction で

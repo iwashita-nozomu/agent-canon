@@ -277,6 +277,7 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     assert compose.count('target: "/workspace"') == 1
     assert str(repo.parent.resolve()) in compose
     assert "/workspace/agent-canon" in compose
+    assert 'AGENT_CANON_CODEX_SESSION_ROOT: "/home/project/.codex/sessions"' in compose
     assert "/etc/project-template/parent-environment.sh" not in compose
     assert "/etc/project-template/zsh/.zshrc" not in compose
     assert "    tmpfs:" not in compose
@@ -502,6 +503,7 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     assert 'ZDOTDIR: "/home/project"' in compose
     assert 'SHELL: "/bin/zsh"' in compose
     assert 'AGENT_CANON_DEPENDENCY_PROFILE: "full"' in compose
+    assert 'AGENT_CANON_CODEX_SESSION_ROOT: "/home/project/.codex/sessions"' in compose
     assert 'user: "1234:2345"' in compose
     assert 'PROJECT_USER:' not in compose
     assert 'PROJECT_UID: "1234"' in compose

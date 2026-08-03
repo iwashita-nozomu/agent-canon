@@ -1805,6 +1805,33 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 (),
             )
 
+    def test_context_discovery_does_not_use_host_codex_session_fallback(self) -> None:
+        """Host Codex state cannot satisfy an omitted runtime-owner root."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
+            host_home = Path(tmp_dir) / "host-home"
+            host_session_root = host_home / ".codex" / "sessions"
+            host_session_root.mkdir(parents=True)
+            (host_session_root / fixture.rollout.name).write_bytes(
+                fixture.rollout.read_bytes()
+            )
+            with patch.dict(
+                os.environ,
+                {
+                    "AGENT_CANON_CODEX_SESSION_ROOT": "",
+                    "CODEX_HOME": str(host_home / ".codex"),
+                    "HOME": str(host_home),
+                },
+                clear=False,
+            ):
+                with self.assertRaises(
+                    runtime_log_archive_git.RuntimeEventMaterializationError
+                ) as raised:
+                    runtime_log_archive_git.discover_rollout_context(
+                        fixture.context_id, fixture.turn_id
+                    )
+            self.assertEqual(raised.exception.code, "context_source_absent")
+
     def test_context_discovery_producer_rejects_invalid_native_evidence_cardinality(
         self,
     ) -> None:

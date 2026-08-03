@@ -77,6 +77,15 @@ and porcelain-v1 status lines. `publication_intent` contains the deterministic
 attempt ID, exact target path, and only `prepared_state=prepared`; it never
 predicts an outcome.
 
+The native rollout source is selected only through the explicit
+`AGENT_CANON_CODEX_SESSION_ROOT` runtime-owner input. The value must resolve to
+one absolute, readable session directory owned by the active container or
+runtime profile; an absent, relative, or unavailable root fails closed as
+`context_source_absent`. The producer never derives a source from host `HOME`,
+`CODEX_HOME`, or `~/.codex/sessions`. The managed devcontainer and nested
+Codex runner provide the container-local value before collection, preserving
+normal log collection without making host files a required input.
+
 Publication is no-replace and source-bound. Post-target evidence is first
 appended as a canonical
 `agent_canon.runtime_event.publication_outcome_observation.v1` file beneath
