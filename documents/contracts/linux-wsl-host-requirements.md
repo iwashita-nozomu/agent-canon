@@ -3,6 +3,9 @@
 contract reference
 responsibility Documents Linux / WSL Host Requirements for this repository.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
+upstream design ../../CONTAINER_OPERATIONS.md canonical container and mount ownership policy
+upstream design ../design/devcontainer/parent-devcontainer-policy.md default and optional profile contract
+upstream design ../design/devcontainer/parent-dependency-manifest-followup.md dependency and source identity contract
 @dependency-end
 -->
 
@@ -72,7 +75,7 @@ upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership
 - `docker` group にユーザーが入っていても、今の shell に group が反映されていない場合があります
 - `getent group docker` に名前があっても `id` に `docker` が無ければ、新しい login shell を開きます
 
-## 6. VS Code Requirement
+## 6. Dev Container / VS Code Requirement
 
 VS Code を使う場合の既定は次です。
 
@@ -86,15 +89,27 @@ VS Code を使う場合の既定は次です。
 正本は AgentCanon-managed root view の `.vscode/extensions.json` です。
 
 dev container は `.devcontainer/` を使います。起動時に generated compose を作り、
+既定 profile は workspace-source-only です。parent environment、host file、host
+credentials、SSH、Docker socket、secret、host runtime state のどれも既定起動の
+前提にしません。これらが host に無い fresh clone / CI runner でも同じ既定 runtime
+を生成します。
 
 - default profile は host GPU/NVIDIA runtime を probe せず、
   `DEVCONTAINER_GPU_MODE=disabled` を設定し、`DEVCONTAINER_GPU_REQUEST` と
   `gpus: all` を生成しない
-- GPU を必要とする実験の明示 opt-in profile は Issue [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) で追跡する。既定境界の authority は AgentCanon の linked design/implementation とする
-- `~/.config/gh`、`~/.ssh` があれば bind mount
-- `SSH_AUTH_SOCK` が有効なら agent socket を forward
-- `AGENT_CANON_SECRET_DIR` が既存 directory を指すときだけ、既定では
-  `/mnt/agent-canon-secrets` へ read-only mount
+- GPU が必要な場合の device / driver runtime passthrough は明示的に選択した
+  optional profile の責務とし、profile が選択されないか host capability が無い場合は
+  CPU-only の既定起動を継続する。profile の実装と validation の正本は
+  [`CONTAINER_OPERATIONS.md`](../../CONTAINER_OPERATIONS.md) と
+  [`parent-devcontainer-policy.md`](../design/devcontainer/parent-devcontainer-policy.md)、
+  follow-up は [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) とする
+- credentials、SSH agent、Docker socket、secret、host git は、それぞれ明示選択した
+  optional profile の対象が存在するときだけ追加する。欠落した host path、socket、
+  directory は mount/forward を行わず、既定 runtime を failure にしない
+- optional profile の名前、target、read-only、fixed secret target の表は
+  [`CONTAINER_OPERATIONS.md`](../../CONTAINER_OPERATIONS.md) と
+  [`parent-devcontainer-policy.md`](../design/devcontainer/parent-devcontainer-policy.md)
+  が所有する。この host contract は同じ表を複製しない
 - subnet / gateway は固定せず、Docker Compose の default network 自動割当に任せる
 
 で動きます。
@@ -108,9 +123,9 @@ GPU は必須ではありません。
 - NVIDIA GPU host:
   - `nvidia-smi` は GPU 実験を明示的に選択する場合だけ確認します。default generator は probe しません
   - default dev container は GPU を検出しても `gpus: all` を追加せず、`DEVCONTAINER_GPU_MODE=disabled` を出力します
-  - shared lock、runtime receipt、host runtime group、GPU scheduler は default の
-    host requirement ではありません。実験 scheduler/managed experiment 自体を削除
-    する変更ではなく、opt-in profile の設計を #521 で追跡します。
+  - device、driver runtime、shared lock、runtime receipt、host runtime group、GPU
+    scheduler は default の host requirement ではありません。これらを使う場合は
+    明示 optional profile が全 capability と absence-safe failure semantics を所有します。
 
 GPU が無いこと自体を failure 条件にしません。
 
@@ -121,8 +136,12 @@ GPU が無いこと自体を failure 条件にしません。
 - container 内の Codex state は container-local です。認証に使う
   `OPENAI_API_KEY` と `OPENAI_BASE_URL` は runner の明示的な環境 forward で渡します。
 - `gh` は host に入っていることを推奨します。container 内の GitHub CLI も AgentCanon-owned `vendor/agent-canon/.devcontainer/post-create.sh` が必要時に導入します
-- 初回 `gh auth login` は host 側で行い、container は mounted `~/.config/gh` を使います
-- `~/.ssh` は read-only mount 前提なので、key 追加や GitHub host key 登録は host 側で行います
+- 初回 `gh auth login`、SSH key、GitHub host key 登録は host 側で行います。container
+  から credentials または SSH を再利用する場合は、明示 optional profile を選択し、
+  対象が存在するときだけ read-only mount または valid socket forward を使います。
+- Docker socket と confidential secrets も既定では渡しません。必要な session だけ
+  owner docs の `docker-host` または `host-secrets` profile を明示し、対象が無い場合は
+  mount を省略します。
 - GitHub canonical remote と AgentCanon submodule を使う前提なので、host から GitHub へ到達できることを確認します
 - confidential local Git remote を dev container から使う場合は、起動前に
   `AGENT_CANON_SECRET_DIR` と、書き込みが必要なときだけ
@@ -137,13 +156,15 @@ python3 --version
 git --version
 make --version
 docker version
-gh auth status
-ssh -T git@github.com
-test -z "${AGENT_CANON_SECRET_DIR:-}" || test -d "$AGENT_CANON_SECRET_DIR"
 git status --short
 make ci-quick
 make docker-build-check
 ```
+
+`gh auth status`、`ssh -T git@github.com`、secret directory、Docker socket、
+`nvidia-smi` の確認は、対応する optional profile を明示選択した session だけで
+行います。profile を選択しない既定確認は host file、credential、socket、GPU の
+存在を要求しません。
 
 WSL2 で Docker Desktop 連携を使う場合の追加確認:
 
@@ -157,7 +178,8 @@ docker context ls
 - workspace は Linux filesystem 側に置く
 - confidential local Git repo や secret material は repo tree に置かず、
   `AGENT_CANON_SECRET_DIR` で明示した host directory に置く
-- `docker` state、Codex state、SSH key は Linux 側に置く
+- `docker` state、Codex state、SSH key は Linux 側に置く。container への mount は
+  owner docs の明示 optional profile に限定する
 - template の canonical docs は host-global install を正本にしない
 
 ## Related
@@ -165,4 +187,6 @@ docker context ls
 - [README.md](../README.md)
 - Template-derived repositories may add root-local `QUICK_START.md` and `docker/README.md`.
 - [server-host-contract.md](server-host-contract.md)
+- [CONTAINER_OPERATIONS.md](../../CONTAINER_OPERATIONS.md)
+- [parent-devcontainer-policy.md](../design/devcontainer/parent-devcontainer-policy.md)
 - [TROUBLESHOOTING.md](../operations/TROUBLESHOOTING.md)

@@ -2507,6 +2507,42 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertEqual(third.returncode, 0, third.stdout + third.stderr)
             self.assertIn("AGENT_CANON_TOOL_REBUILD_RUST=rebuilt", third.stdout)
 
+            source_commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=submodule,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            parent_gitlink = subprocess.run(
+                ["git", "rev-parse", "HEAD:vendor/agent-canon"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(source_commit, parent_gitlink)
+            state = (tools_home / "agent-canon" / ".build-state").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(f"agent_canon_source_commit={parent_gitlink}\n", state)
+
+            (submodule / "provider-drift").write_text("drift\n", encoding="utf-8")
+            subprocess.run(["git", "add", "provider-drift"], cwd=submodule, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "provider drift"], cwd=submodule, check=True
+            )
+            mismatch = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "rebuild-tools"],
+                cwd=repo,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(mismatch.returncode, 0)
+            self.assertIn("provider identity mismatch", mismatch.stderr)
+
     def test_latest_preserves_dirty_submodule_and_merges_remote_main(self) -> None:
         """Latest should preserve dirty shared canon work while merging remote main."""
         with tempfile.TemporaryDirectory() as tmp_dir:
