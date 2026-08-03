@@ -7,6 +7,7 @@
 # upstream implementation ../../tools/agent_tools/devcontainer_dependencies.py typed dependency engine
 # upstream implementation ../../tools/agent_tools/requirements_lock.py canonical requirements lock parser and result/error model
 # downstream implementation ../../.devcontainer/dependencies.toml canonical manifest inventory
+# downstream implementation ../../tools/rebuild_agent_tools.sh installed CLI provenance
 # @dependency-end
 
 from __future__ import annotations
@@ -14,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tarfile
@@ -28,17 +30,17 @@ from unittest import mock
 from tools.agent_tools.devcontainer_dependencies import (
     BASE_CAPABILITIES,
     DependencyError,
+    EnvironmentBoundaryModel,
     Installer,
     LoadedManifest,
     ManifestRole,
     ManifestSource,
+    RuntimeIdentity,
     build_plan,
-    EnvironmentBoundaryModel,
     install_plan,
     load_plan,
     manifest_sources,
     parse_record,
-    RuntimeIdentity,
     safe_extract_tar,
     validate_runtime_identity,
 )
@@ -1249,6 +1251,428 @@ class DependencyModelTests(unittest.TestCase):
                 )
             self.assertFalse((root / "failed-receipts" / "tool.json").exists())
 
+    def test_active_source_identity_uses_standalone_head_and_parent_gitlink(self) -> None:
+        """Active-source verification accepts the selected provider and rejects drift."""
+        active = parse_record(
+            record(
+                "agent-canon-cli",
+                method="cargo-source-build",
+                source="rust/agent-canon",
+                repo="https://example.test/agent-canon.git",
+                source_identity="active-source",
+                locked=True,
+                verification={
+                    "kind": "cargo-binary",
+                    "path": "target/release/agent-canon",
+                    "args": ["--version"],
+                    "output_contains": "agent-canon 0.1.0",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+
+        def init_repository(repository: Path) -> None:
+            subprocess.run(["git", "init", "-b", "main", str(repository)], check=True)
+            subprocess.run(
+                ["git", "config", "user.name", "Active Source Test"],
+                cwd=repository,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "config", "user.email", "active-source@example.invalid"],
+                cwd=repository,
+                check=True,
+            )
+
+        def commit_repository(repository: Path, message: str) -> str:
+            subprocess.run(["git", "add", "-A"], cwd=repository, check=True)
+            subprocess.run(["git", "commit", "-m", message], cwd=repository, check=True)
+            return subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=repository,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+
+        def write_cli_source(repository: Path) -> None:
+            binary = repository / "rust" / "agent-canon" / "target" / "release" / "agent-canon"
+            binary.parent.mkdir(parents=True)
+            binary.write_text(
+                "#!/usr/bin/env sh\nprintf '%s\\n' 'agent-canon 0.1.0'\n",
+                encoding="utf-8",
+            )
+            binary.chmod(0o755)
+            (repository / "rust" / "agent-canon" / "Cargo.toml").write_text(
+                "[package]\nname = 'agent-canon'\nversion = '0.1.0'\nedition = '2021'\n",
+                encoding="utf-8",
+            )
+
+        installer = Installer()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            init_repository(root)
+            write_cli_source(root)
+            standalone_commit = commit_repository(root, "standalone source")
+            self.assertEqual(
+                installer.verify(active, workspace=root), standalone_commit
+            )
+            standalone_resolver_cases = (("standalone-prefix-dot", "."),)
+            for case_name, source_prefix in standalone_resolver_cases:
+                with self.subTest(case=case_name):
+                    resolved = subprocess.run(
+                        [
+                            "bash",
+                            "-c",
+                            "source \"$1\"\n"
+                            "agent_canon_source_identity \"$2\" \"$3\" \"$4\"\n",
+                            "bash",
+                            str(
+                                ROOT
+                                / "tools"
+                                / "lib"
+                                / "agent_canon_source_identity.sh"
+                            ),
+                            str(root),
+                            source_prefix,
+                            str(root),
+                        ],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(
+                        resolved.returncode, 0, resolved.stdout + resolved.stderr
+                    )
+                    self.assertEqual(resolved.stdout.strip(), standalone_commit)
+
+        derived_cases = (
+            ("detached-gitlink-match", "match", None),
+            ("detached-gitlink-mismatch", "mismatch", "provider identity mismatch"),
+            ("missing-git-metadata", "missing", "source-root Git metadata"),
+        )
+        for case_name, case_kind, failure_text in derived_cases:
+            with self.subTest(case=case_name), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                parent = root / "parent"
+                source = parent / "vendor" / "agent-canon"
+                source.mkdir(parents=True)
+                init_repository(source)
+                write_cli_source(source)
+                source_commit = commit_repository(source, "vendor source")
+                init_repository(parent)
+                subprocess.run(
+                    [
+                        "git",
+                        "update-index",
+                        "--add",
+                        "--cacheinfo",
+                        f"160000,{source_commit},vendor/agent-canon",
+                    ],
+                    cwd=parent,
+                    check=True,
+                )
+                parent_commit = commit_repository(parent, "accepted vendor gitlink")
+                self.assertEqual(
+                    subprocess.run(
+                        ["git", "rev-parse", "HEAD:vendor/agent-canon"],
+                        cwd=parent,
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    ).stdout.strip(),
+                    source_commit,
+                )
+                self.assertNotEqual(parent_commit, source_commit)
+
+                if case_kind == "mismatch":
+                    (source / "provider-drift").write_text(
+                        "drift\n", encoding="utf-8"
+                    )
+                    mismatched_source_commit = commit_repository(
+                        source, "provider drift"
+                    )
+                    self.assertNotEqual(source_commit, mismatched_source_commit)
+                    subprocess.run(
+                        ["git", "checkout", "--detach", mismatched_source_commit],
+                        cwd=source,
+                        check=True,
+                        capture_output=True,
+                    )
+                elif case_kind in ("match", "missing"):
+                    subprocess.run(
+                        ["git", "checkout", "--detach", source_commit],
+                        cwd=source,
+                        check=True,
+                        capture_output=True,
+                    )
+                if case_kind == "missing":
+                    shutil.rmtree(source / ".git")
+
+                if failure_text is None:
+                    self.assertEqual(
+                        installer.verify(active, workspace=parent), source_commit
+                    )
+                    with self.assertRaisesRegex(
+                        DependencyError, "binary source identity mismatch"
+                    ):
+                        installer.verify(
+                            active,
+                            workspace=parent,
+                            expected_source_identity="0" * 40,
+                        )
+                else:
+                    with self.assertRaisesRegex(DependencyError, failure_text):
+                        installer.verify(active, workspace=parent)
+
+    def test_active_source_receipt_rejects_build_time_source_change(self) -> None:
+        """A source mutation during Cargo build removes the receipt and fails closed."""
+        active = parse_record(
+            record(
+                "agent-canon-cli",
+                method="cargo-source-build",
+                source="rust/agent-canon",
+                repo="https://example.test/agent-canon.git",
+                source_identity="active-source",
+                locked=True,
+                verification={
+                    "kind": "cargo-binary",
+                    "path": "target/release/agent-canon",
+                    "args": ["--version"],
+                    "output_contains": "agent-canon 0.1.0",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-b", "main", str(root)], check=True)
+            for key, value in (
+                ("user.name", "Active Source Build Test"),
+                ("user.email", "active-source-build@example.invalid"),
+            ):
+                subprocess.run(["git", "config", key, value], cwd=root, check=True)
+            source = root / "rust" / "agent-canon"
+            source.mkdir(parents=True)
+            (source / "Cargo.toml").write_text(
+                "[package]\nname = 'agent-canon'\nversion = '0.1.0'\nedition = '2021'\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "source"], cwd=root, check=True
+            )
+            source_identity = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            receipt = root / "receipt.json"
+            receipt.write_text(
+                json.dumps({"source_identity": source_identity}) + "\n",
+                encoding="utf-8",
+            )
+            (root / "receipt-mutation").write_text("mutation\n", encoding="utf-8")
+            subprocess.run(["git", "add", "receipt-mutation"], cwd=root, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "receipt mutation"], cwd=root, check=True
+            )
+            receipt_check = subprocess.run(
+                [
+                    "bash",
+                    "-c",
+                    "source \"$1\"\n"
+                    "current=\"$(agent_canon_source_identity \"$2\" \"$3\" \"$4\")\"\n"
+                    "agent_canon_receipt_matches_identity \"$5\" \"$current\"\n",
+                    "bash",
+                    str(ROOT / "tools" / "lib" / "agent_canon_source_identity.sh"),
+                    str(root),
+                    "vendor/agent-canon",
+                    str(root),
+                    str(receipt),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(receipt_check.returncode, 0)
+            self.assertIn("receipt source identity mismatch", receipt_check.stderr)
+            fake_bin = root / "fake-bin"
+            fake_bin.mkdir()
+            cargo = fake_bin / "cargo"
+            cargo.write_text(
+                "#!/usr/bin/env bash\n"
+                "manifest=''\n"
+                "while [ \"$#\" -gt 0 ]; do\n"
+                "  if [ \"$1\" = '--manifest-path' ]; then manifest=\"$2\"; shift 2; else shift; fi\n"
+                "done\n"
+                "crate_dir=\"$(dirname \"$manifest\")\"\n"
+                "mkdir -p \"$crate_dir/target/release\"\n"
+                "printf '%s\\n' '#!/usr/bin/env sh' \"printf '%s\\n' 'agent-canon 0.1.0'\" > \"$crate_dir/target/release/agent-canon\"\n"
+                "chmod +x \"$crate_dir/target/release/agent-canon\"\n"
+                "printf '%s\\n' mutation > \"$crate_dir/build-mutation\"\n"
+                "git -C \"$crate_dir\" add build-mutation\n"
+                "git -C \"$crate_dir\" commit -m 'build mutation' >/dev/null\n",
+                encoding="utf-8",
+            )
+            cargo.chmod(0o755)
+            plan = build_plan((loaded_manifest(Path("fixture.toml"), (active,)),))
+            receipts = root / "receipts"
+            environment = dict(os.environ)
+            environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
+            with mock.patch.dict(os.environ, environment, clear=True):
+                with self.assertRaisesRegex(
+                    DependencyError, "source identity changed during build"
+                ):
+                    Installer().install(plan, workspace=root, receipts=receipts)
+            self.assertFalse((receipts / "agent-canon-cli.json").exists())
+
+    def test_rebuild_provenance_uses_parent_gitlink_and_rejects_source_drift(self) -> None:
+        """The installed CLI state records and enforces the selected provider identity."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            parent = root / "parent"
+            source = parent / "vendor" / "agent-canon"
+            source.mkdir(parents=True)
+
+            for repository in (source, parent):
+                subprocess.run(
+                    ["git", "init", "-b", "main", str(repository)], check=True
+                )
+                subprocess.run(
+                    ["git", "config", "user.name", "Provenance Test"],
+                    cwd=repository,
+                    check=True,
+                )
+                subprocess.run(
+                    ["git", "config", "user.email", "provenance@example.invalid"],
+                    cwd=repository,
+                    check=True,
+                )
+            rust_root = source / "rust" / "agent-canon"
+            rust_root.mkdir(parents=True)
+            (rust_root / "Cargo.toml").write_text(
+                "[package]\nname = 'agent-canon'\nversion = '0.1.0'\nedition = '2021'\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "-A"], cwd=source, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "source"], cwd=source, check=True
+            )
+            source_commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=source,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            subprocess.run(
+                [
+                    "git",
+                    "update-index",
+                    "--add",
+                    "--cacheinfo",
+                    f"160000,{source_commit},vendor/agent-canon",
+                ],
+                cwd=parent,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "parent gitlink"], cwd=parent, check=True
+            )
+
+            tools = parent / "tools"
+            tools.mkdir()
+            (tools / "lib").mkdir()
+            shutil.copy2(ROOT / "tools" / "rebuild_agent_tools.sh", tools)
+            shutil.copy2(
+                ROOT / "tools" / "lib" / "agent_canon_source_identity.sh",
+                tools / "lib",
+            )
+            fake_bin = root / "fake-bin"
+            fake_bin.mkdir()
+            cargo = fake_bin / "cargo"
+            cargo.write_text(
+                "#!/usr/bin/env bash\n"
+                "manifest=''\n"
+                "while [ \"$#\" -gt 0 ]; do\n"
+                "  if [ \"$1\" = '--manifest-path' ]; then manifest=\"$2\"; shift 2; else shift; fi\n"
+                "done\n"
+                "crate_dir=\"$(dirname \"$manifest\")\"\n"
+                "mkdir -p \"$crate_dir/target/release\"\n"
+                "printf '%s\\n' '#!/usr/bin/env bash' \"echo 'agent-canon test 0.1.0'\" > \"$crate_dir/target/release/agent-canon\"\n"
+                "chmod +x \"$crate_dir/target/release/agent-canon\"\n"
+                "if [ \"${AGENT_CANON_TEST_MUTATE_SOURCE:-0}\" = \"1\" ]; then\n"
+                "  printf '%s\\n' mutation > \"$crate_dir/build-mutation\"\n"
+                "  git -C \"$crate_dir\" add build-mutation\n"
+                "  git -C \"$crate_dir\" commit -m 'build mutation' >/dev/null\n"
+                "fi\n",
+                encoding="utf-8",
+            )
+            cargo.chmod(0o755)
+            tools_home = root / "tools-home"
+            environment = dict(os.environ)
+            environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
+            environment["AGENT_CANON_TOOLS_HOME"] = str(tools_home)
+            environment["AGENT_CANON_SKIP_USR_LOCAL_LINK"] = "1"
+
+            accepted = subprocess.run(
+                ["bash", str(tools / "rebuild_agent_tools.sh")],
+                cwd=parent,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(accepted.returncode, 0, accepted.stdout + accepted.stderr)
+            state = (tools_home / "agent-canon" / ".build-state").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(f"agent_canon_source_commit={source_commit}\n", state)
+
+            published_binary = tools_home / "agent-canon" / "bin" / "agent-canon"
+            published_binary_before_mutation = published_binary.read_bytes()
+            mutation_environment = dict(environment)
+            mutation_environment["AGENT_CANON_FORCE_TOOL_REBUILD"] = "1"
+            mutation_environment["AGENT_CANON_TEST_MUTATE_SOURCE"] = "1"
+            mutation = subprocess.run(
+                ["bash", str(tools / "rebuild_agent_tools.sh")],
+                cwd=parent,
+                env=mutation_environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(mutation.returncode, 0)
+            self.assertIn("provider identity mismatch", mutation.stderr)
+            self.assertEqual(published_binary.read_bytes(), published_binary_before_mutation)
+            self.assertEqual(
+                (tools_home / "agent-canon" / ".build-state").read_text(
+                    encoding="utf-8"
+                ),
+                state,
+            )
+
+            (source / "provider-drift").write_text("drift\n", encoding="utf-8")
+            subprocess.run(["git", "add", "provider-drift"], cwd=source, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "provider drift"], cwd=source, check=True
+            )
+            rejected = subprocess.run(
+                ["bash", str(tools / "rebuild_agent_tools.sh")],
+                cwd=parent,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn("provider identity mismatch", rejected.stderr)
+
     def test_warn_provider_is_unavailable_to_dependents(self) -> None:
         provider = parse_record(
             record("provider", method="apt-package", failure_policy="warn"),
@@ -1494,6 +1918,9 @@ class DependencyModelTests(unittest.TestCase):
         post_create = (ROOT / ".devcontainer" / "post-create.sh").read_text(
             encoding="utf-8"
         )
+        identity_helper = (
+            ROOT / "tools" / "lib" / "agent_canon_source_identity.sh"
+        ).read_text(encoding="utf-8")
         validator = (ROOT / "tools" / "docker_dependency_validator.sh").read_text(
             encoding="utf-8"
         )
@@ -1523,6 +1950,10 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("PLAYWRIGHT_BROWSERS_PATH", post_create)
         self.assertIn('export CARGO_HOME="$cargo_home"', post_create)
         self.assertIn('export RUSTUP_HOME="$rustup_home"', post_create)
+        self.assertIn("agent_canon_source_identity", post_create)
+        self.assertIn('"HEAD:$source_prefix"', identity_helper)
+        self.assertIn("agent_canon_receipt_matches_identity", post_create)
+        self.assertIn("agent_canon_source_commit", post_create)
         self.assertIn('export ELAN_HOME="$elan_home"', post_create)
         self.assertIn("STRUCTURED_ANALYSIS_BOOTSTRAP=warn", post_create)
         cache_function = post_create.split("build_agent_canon_cache() {", 1)[1].split(

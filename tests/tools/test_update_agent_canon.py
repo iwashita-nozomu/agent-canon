@@ -9,9 +9,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import select
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -111,6 +114,76 @@ def authorized_test_env() -> dict[str, str]:
         }
     )
     return env
+
+
+def git_global_safe_directory_snapshot() -> tuple[int, tuple[str, ...]]:
+    """Capture global safe.directory lines and git exit status."""
+    result = subprocess.run(
+        ["git", "config", "--global", "--get-all", "safe.directory"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    lines = tuple(
+        line.strip()
+        for line in result.stdout.splitlines()
+        if line.strip()
+    )
+    return result.returncode, lines
+
+
+def git_config_sentinel_state(path: Path) -> tuple[bytes, str]:
+    """Capture bytes and hash for an explicit global config sentinel."""
+    payload = path.read_bytes() if path.exists() else b""
+    return payload, hashlib.sha256(payload).hexdigest()
+
+
+def run_fresh_clone_check(
+    check_script: str,
+    root: Path,
+    env: dict[str, str],
+    signal_name: str | None = None,
+) -> subprocess.CompletedProcess[str]:
+    """Run fresh-clone check once, optionally signaling the process once."""
+    if signal_name is None:
+        return subprocess.run(
+            ["bash", check_script],
+            cwd=str(root),
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+
+    process = subprocess.Popen(
+        ["bash", check_script],
+        cwd=str(root),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        env=env,
+        start_new_session=True,
+    )
+    stdout_prefix: list[str] = []
+    start = time.time()
+    while time.time() - start < 5 and process.poll() is None:
+        readable, _, _ = select.select([process.stdout], [], [], 0.02)
+        if not readable:
+            continue
+        line = process.stdout.readline()
+        if not line:
+            break
+        stdout_prefix.append(line)
+        if line.startswith("fresh-clone source:"):
+            break
+    os.killpg(process.pid, {"INT": signal.SIGINT, "TERM": signal.SIGTERM, "HUP": signal.SIGHUP}[signal_name])
+    stdout, stderr = process.communicate(timeout=120)
+    return subprocess.CompletedProcess(
+        process.args,
+        process.returncode,
+        "".join(stdout_prefix) + stdout,
+        stderr,
+    )
 
 
 class CommitProvenanceStaticContractTest(unittest.TestCase):
@@ -227,6 +300,313 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
         self.assertIn("AGENT_CANON_LATEST_BLOCK_SCOPE=current_checkout", emitter)
         self.assertNotIn("NEXT_ACTION=prepare_topic_workspace_source_clone", blocked_emission)
         self.assertNotIn("AGENT_CANON_LATEST_DEPENDENCY_ROUTE=", blocked_emission)
+
+    def test_fresh_clone_cleanup_contract_with_success_failure_signal(self) -> None:
+        """Fresh-clone contract enforces scoped temp lifecycle across paths and signals."""
+        with tempfile.TemporaryDirectory(prefix="fc-contract-") as sandbox:
+            temp_root = Path(sandbox)
+            fixture_root = next(
+                (
+                    candidate
+                    for candidate in (REPO_ROOT, *REPO_ROOT.parents)
+                    if (candidate / "vendor" / "agent-canon").exists()
+                ),
+                REPO_ROOT,
+            )
+            submodule_remote = temp_root / "agent-canon-upstream.git"
+            subprocess.run(
+                ["git", "clone", "--bare", str(AGENT_CANON_SOURCE_ROOT), str(submodule_remote)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            source_head = subprocess.run(
+                ["git", "-C", str(AGENT_CANON_SOURCE_ROOT), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            subprocess.run(
+                ["git", "--git-dir", str(submodule_remote), "update-ref", "refs/heads/main", source_head],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "--git-dir", str(submodule_remote), "symbolic-ref", "HEAD", "refs/heads/main"],
+                check=True,
+            )
+            script_root = Path(temp_root / "check-source")
+            subprocess.run(
+                ["git", "clone", "--no-local", str(fixture_root), str(script_root)],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(script_root), "config", "user.name", "Fresh Clone Fixture"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(script_root), "config", "user.email", "fresh-clone@example.invalid"],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root),
+                    "config",
+                    "-f",
+                    ".gitmodules",
+                    "submodule.vendor/agent-canon.url",
+                    str(submodule_remote),
+                ],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root),
+                    "config",
+                    "-f",
+                    ".gitmodules",
+                    "submodule.vendor/agent-canon.path",
+                    "vendor/agent-canon",
+                ],
+                check=True,
+            )
+            for key, expected in (
+                ("submodule.vendor/agent-canon.path", "vendor/agent-canon"),
+                ("submodule.vendor/agent-canon.url", str(submodule_remote)),
+            ):
+                readback = subprocess.run(
+                    ["git", "-C", str(script_root), "config", "-f", ".gitmodules", "--get", key],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip()
+                self.assertEqual(readback, expected)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root),
+                    "update-index",
+                    "--add",
+                    "--cacheinfo",
+                    f"160000,{source_head},vendor/agent-canon",
+                ],
+                check=True,
+            )
+            (script_root / "Makefile").write_text(
+                ".PHONY: agent-checks\nagent-checks:\n\t@:\n",
+                encoding="utf-8",
+            )
+            subprocess.run(
+                ["git", "-C", str(script_root), "add", ".gitmodules", "Makefile"],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(script_root), "commit", "-m", "fixture parent projection"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root),
+                    "-c",
+                    "protocol.file.allow=always",
+                    "submodule",
+                    "update",
+                    "--init",
+                    "--recursive",
+                    "vendor/agent-canon",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            index_entry = subprocess.run(
+                ["git", "-C", str(script_root), "ls-files", "--stage", "--", "vendor/agent-canon"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip().split()
+            self.assertEqual(index_entry[0], "160000")
+            self.assertEqual(index_entry[1], source_head)
+            initialized_head = subprocess.run(
+                ["git", "-C", str(script_root / "vendor/agent-canon"), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(initialized_head, source_head)
+            initialized_status = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root / "vendor/agent-canon"),
+                    "status",
+                    "--short",
+                    "--untracked-files=all",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(initialized_status, "")
+            (script_root / "tools" / "ci").mkdir(parents=True, exist_ok=True)
+            (script_root / "tools" / "lib").mkdir(parents=True, exist_ok=True)
+            shutil.copy2(
+                AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_fresh_clone.sh",
+                script_root / "tools" / "ci" / "check_fresh_clone.sh",
+            )
+            shutil.copy2(
+                AGENT_CANON_SOURCE_ROOT / "tools" / "lib" / "repo_paths.sh",
+                script_root / "tools" / "lib" / "repo_paths.sh",
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root),
+                    "add",
+                    "tools/ci/check_fresh_clone.sh",
+                    "tools/lib/repo_paths.sh",
+                ],
+                check=True,
+            )
+            staged_diff = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root),
+                    "diff",
+                    "--cached",
+                    "--quiet",
+                    "--",
+                    "tools/ci/check_fresh_clone.sh",
+                    "tools/lib/repo_paths.sh",
+                ],
+                check=False,
+            )
+            self.assertIn(staged_diff.returncode, (0, 1))
+            if staged_diff.returncode == 1:
+                subprocess.run(
+                    [
+                        "git",
+                        "-C",
+                        str(script_root),
+                        "commit",
+                        "-m",
+                        "fixture fresh clone checker",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+
+            check_script = script_root / "tools" / "ci" / "check_fresh_clone.sh"
+            self.assertTrue(check_script.exists(), check_script)
+            check_script = str(check_script)
+            script_contents = Path(check_script).read_text(encoding="utf-8")
+            self.assertIn("trap cleanup EXIT", script_contents)
+            self.assertIn("trap 'cleanup_on_signal INT 130' INT", script_contents)
+            self.assertIn("trap 'cleanup_on_signal TERM 143' TERM", script_contents)
+            self.assertIn("trap 'cleanup_on_signal HUP 129' HUP", script_contents)
+            self.assertIn('"INT") exit 130', script_contents)
+            self.assertIn('"TERM") exit 143', script_contents)
+            self.assertIn('"HUP") exit 129', script_contents)
+
+            test_contracts = [
+                {
+                    "name": "success",
+                    "signal": None,
+                    "expected_rc": 0,
+                    "expect_parent_projection": True,
+                },
+                {
+                    "name": "forced-failure",
+                    "signal": None,
+                    "expected_rc": 1,
+                    "expect_error": "fresh_clone_overlay=fail",
+                },
+                {
+                    "name": "sigterm",
+                    "signal": "TERM",
+                    "expected_rc": 143,
+                    "dynamic_signal": True,
+                },
+            ]
+
+            for test_case in test_contracts:
+                with self.subTest(test_case["name"]):
+                    case_root = temp_root / test_case["name"]
+                    home_root = case_root / "home"
+                    tmpdir = case_root / "tmp"
+                    home_root.mkdir(parents=True)
+                    tmpdir.mkdir()
+                    sentinel = home_root / ".agent-canon-gitconfig-sentinel"
+                    sentinel.write_bytes(
+                        b"[safe]\n"
+                        b"\tdirectory = /existing/safe-directory\n"
+                        b"[user]\n"
+                        b"\tname = Existing Fixture User\n"
+                        b"\temail = existing-fixture@example.invalid\n"
+                        b"[custom]\n"
+                        b"\tsetting = preserve\n"
+                    )
+                    subprocess.run(
+                        ["git", "config", "--file", str(sentinel), "--list"],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                    env = os.environ.copy()
+                    env["HOME"] = str(home_root)
+                    env["GIT_CONFIG_GLOBAL"] = str(sentinel)
+                    env["GIT_CONFIG_NOSYSTEM"] = "1"
+                    env["TMPDIR"] = str(tmpdir)
+
+                    if test_case["name"] == "forced-failure":
+                        bin_root = case_root / "bin"
+                        bin_root.mkdir()
+                        (bin_root / "rsync").write_text(
+                            "#!/usr/bin/env bash\n"
+                            "echo \"fresh_clone_overlay=fail\" >&2\n"
+                            "exit 1\n",
+                            encoding="utf-8",
+                        )
+                        os.chmod(bin_root / "rsync", 0o755)
+                        env["PATH"] = f"{bin_root}:{env['PATH']}"
+
+                    baseline = git_config_sentinel_state(sentinel)
+                    result = run_fresh_clone_check(
+                        check_script,
+                        script_root,
+                        env=env,
+                        signal_name=test_case.get("signal"),
+                    )
+                    self.assertEqual(result.returncode, test_case["expected_rc"], result.stderr)
+                    if test_case.get("expect_parent_projection", False):
+                        self.assertIn("FRESH_CLONE_PARENT_PROJECTION=enabled", result.stdout)
+                        self.assertIn("FRESH_CLONE_ACCEPTANCE=pass", result.stdout)
+                    if "expect_error" in test_case:
+                        self.assertIn(test_case["expect_error"], result.stderr)
+                    sentinel_bytes, sentinel_hash = git_config_sentinel_state(sentinel)
+                    baseline_bytes, baseline_hash = baseline
+                    self.assertEqual(sentinel_bytes, baseline_bytes)
+                    self.assertEqual(sentinel_hash, baseline_hash)
+                    self.assertFalse(
+                        any(
+                            child.name.startswith("template-fresh-clone-")
+                            for child in tmpdir.iterdir()
+                            if child.is_dir()
+                        )
+                    )
 
 
 class UpdateMaterializationPredicateTest(unittest.TestCase):
@@ -2506,6 +2886,42 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertIn("AGENT_CANON_TOOL_REBUILD_RUST=already_current", second.stdout)
             self.assertEqual(third.returncode, 0, third.stdout + third.stderr)
             self.assertIn("AGENT_CANON_TOOL_REBUILD_RUST=rebuilt", third.stdout)
+
+            source_commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=submodule,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            parent_gitlink = subprocess.run(
+                ["git", "rev-parse", "HEAD:vendor/agent-canon"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(source_commit, parent_gitlink)
+            state = (tools_home / "agent-canon" / ".build-state").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn(f"agent_canon_source_commit={parent_gitlink}\n", state)
+
+            (submodule / "provider-drift").write_text("drift\n", encoding="utf-8")
+            subprocess.run(["git", "add", "provider-drift"], cwd=submodule, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "provider drift"], cwd=submodule, check=True
+            )
+            mismatch = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "rebuild-tools"],
+                cwd=repo,
+                env=env,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(mismatch.returncode, 0)
+            self.assertIn("provider identity mismatch", mismatch.stderr)
 
     def test_latest_preserves_dirty_submodule_and_merges_remote_main(self) -> None:
         """Latest should preserve dirty shared canon work while merging remote main."""
