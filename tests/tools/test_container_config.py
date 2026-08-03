@@ -58,20 +58,20 @@ def write_devcontainer(root: Path) -> None:
         json.dumps(
             {
                 "name": "${localWorkspaceFolderBasename}-devcontainer",
-                "initializeCommand": "AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
+                "initializeCommand": "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
                 "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
                 "service": "workspace",
                 "containerUser": "project",
                 "remoteUser": "project",
                 "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-                "postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace/${localWorkspaceFolderBasename} && bash .devcontainer/post-create-parent.sh /workspace/${localWorkspaceFolderBasename}",
-                "postAttachCommand": "bash vendor/agent-canon/.devcontainer/post-attach.sh",
+                "postCreateCommand": "python3 tools/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
+                "postAttachCommand": "python3 tools/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
             },
             indent=2,
         )
         + "\n",
     )
-    for name in ("post-create.sh", "post-attach.sh"):
+    for name in ("post-create.sh", "post-create-entrypoint.sh", "post-attach.sh"):
         write_file(root, f".devcontainer/{name}", "#!/usr/bin/env bash\n")
     write_file(
         root, ".devcontainer/generate-runtime-compose.sh", "#!/usr/bin/env bash\n"
@@ -103,6 +103,8 @@ def write_compose(
         [
             "    environment:",
             "      AGENT_CANON_DEPENDENCY_PROFILE: full",
+            "      AGENT_CANON_RUNTIME_ROUTE: CONTAINER_LOCAL",
+            "      AGENT_CANON_SECRET_MOUNT: /mnt/agent-canon-secrets",
             f"      AGENT_CANON_WORKSPACE_LAYOUT: {'direct-repo' if direct_repo else 'managed-topic'}",
             "      DEVCONTAINER_GPU_MODE: disabled",
             "      AGENT_CANON_WORKSPACE_ROOT: /workspace",
@@ -120,6 +122,7 @@ def write_compose(
             [
                 "services:",
                 "  workspace:",
+                "    platform: linux/amd64",
                 "    build:",
                 "      context: ..",
                 "      dockerfile: docker/Dockerfile",
@@ -479,6 +482,7 @@ def write_parent_generator_fixture(
     *,
     runtime_shell: str = "/bin/zsh",
     dependency_profile: str = "full",
+    runtime_mounts: tuple[str, ...] = (),
     environment_script: str = "",
     environment_variables: tuple[str, ...] = (),
 ) -> Path:
@@ -492,6 +496,9 @@ def write_parent_generator_fixture(
     (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
     write_file(repo, ".devcontainer/parent-environment.sh", environment_script)
     variables = ", ".join(json.dumps(item) for item in environment_variables)
+    runtime_mounts_line = (
+        f"mounts = {json.dumps(list(runtime_mounts))}" if runtime_mounts else ""
+    )
     write_file(
         repo,
         ".devcontainer/parent-environment.toml",
@@ -508,6 +515,7 @@ def write_parent_generator_fixture(
                 'dockerfile = "docker/Dockerfile"',
                 'context = "."',
                 'image_tag = "parent:fixture"',
+                'platform = "linux/amd64"',
                 "",
                 "[smoke]",
                 'shell = "/bin/bash"',
@@ -518,6 +526,7 @@ def write_parent_generator_fixture(
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
                 f'dependency_profile = "{dependency_profile}"',
+                runtime_mounts_line,
                 "",
             ]
         ),
@@ -529,7 +538,7 @@ def write_parent_generator_fixture(
 def test_load_pack_reads_optional_platform_when_present_or_omitted(
     tmp_path: Path,
 ) -> None:
-    """Runtime pack can explicitly set platform or omit it."""
+    """Runtime pack can explicitly set the canonical platform."""
     repo = write_parent_generator_fixture(tmp_path)
     module = load_container_config_module()
     implicit, implicit_findings = module.load_pack(
@@ -537,7 +546,7 @@ def test_load_pack_reads_optional_platform_when_present_or_omitted(
     )
     assert implicit_findings == []
     assert implicit is not None
-    assert implicit.platform is None
+    assert implicit.platform == "linux/amd64"
     assert implicit.dependency_profile == "full"
 
     explicit_pack = repo / "docker/packs/explicit-platform.toml"
@@ -589,6 +598,7 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
             "HOME": str(home),
             "PROJECT_UID": "1234",
             "PROJECT_GID": "2345",
+            "AGENT_CANON_OPTIONAL_MOUNTS": "host-zshrc",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
         check=False,
@@ -600,11 +610,11 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     compose = (repo / ".agent-canon/docker-compose.generated.yml").read_text(
         encoding="utf-8"
     )
-    assert 'target: "/etc/project-template/parent-environment.sh"' in compose
+    assert 'target: "/etc/project-template/parent-environment.sh"' not in compose
     assert 'target: "/home/project/.zshrc"' in compose
-    assert compose.count("read_only: true") >= 2
+    assert compose.count("read_only: true") == 1
     assert 'HOME: "/home/project"' in compose
-    assert 'ZDOTDIR: "/home/project"' in compose
+    assert "ZDOTDIR:" not in compose
     assert 'SHELL: "/bin/zsh"' in compose
     assert 'AGENT_CANON_DEPENDENCY_PROFILE: "full"' in compose
     assert 'user: "1234:2345"' in compose
@@ -650,7 +660,7 @@ def test_parent_generator_disables_unconfigured_parent_environment(
         encoding="utf-8"
     )
     assert 'target: "/etc/project-template/parent-environment.sh"' not in compose
-    assert 'target: "/home/project/.zshrc"' in compose
+    assert 'target: "/home/project/.zshrc"' not in compose
     module = load_container_config_module()
     assert module.validate_parent_environment(repo) == []
 
@@ -693,8 +703,10 @@ def test_parent_environment_symlinks_to_existing_sources_pass(tmp_path: Path) ->
     assert module.validate_parent_environment(repo) == []
 
 
-def test_parent_environment_broken_symlink_fails(tmp_path: Path) -> None:
-    """A declared parent environment view must resolve to an actual source file."""
+def test_parent_environment_broken_symlink_does_not_block_default_generation(
+    tmp_path: Path,
+) -> None:
+    """Legacy parent environment state is not a default generator dependency."""
     repo = write_parent_generator_fixture(tmp_path)
     script = repo / ".devcontainer/parent-environment.sh"
     script.unlink()
@@ -711,8 +723,7 @@ def test_parent_environment_broken_symlink_fails(tmp_path: Path) -> None:
         text=True,
     )
 
-    assert result.returncode == 1
-    assert "parent environment source does not resolve to a file" in result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
     module = load_container_config_module()
     findings = module.validate_parent_environment(repo)
     assert any(finding.detail == "missing-target" for finding in findings)
@@ -880,6 +891,30 @@ def test_generator_rejects_runtime_shell_arguments(tmp_path: Path) -> None:
     )
 
 
+def test_generator_rejects_pack_override_of_runtime_route(tmp_path: Path) -> None:
+    """Pack-owned env cannot override the generated container-local route."""
+    repo = write_parent_generator_fixture(tmp_path)
+    pack = repo / "docker/packs/default.toml"
+    pack.write_text(
+        pack.read_text(encoding="utf-8")
+        + '\nenv = ["AGENT_CANON_RUNTIME_ROUTE=MANAGED_CONTAINER"]\n',
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "PROJECT_UID": "1234", "PROJECT_GID": "2345"},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert (
+        "runtime.env cannot override reserved key: AGENT_CANON_RUNTIME_ROUTE"
+        in result.stderr
+    )
+
+
 def test_parent_generator_omits_absent_host_zshrc_without_probe(
     tmp_path: Path,
 ) -> None:
@@ -910,6 +945,117 @@ def test_parent_generator_omits_absent_host_zshrc_without_probe(
     assert pack_findings == []
     assert pack is not None
     assert module.validate_generated_compose(repo, pack) == []
+
+
+def test_default_generator_omits_all_optional_host_files_and_sockets(
+    tmp_path: Path,
+) -> None:
+    """Default generation is independent of host credentials, sockets, and state."""
+    repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".agent-canon").mkdir()
+    home = tmp_path / "home"
+    (home / ".config" / "gh").mkdir(parents=True)
+    (home / ".ssh").mkdir()
+    write_host_zshrc(home)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "SSH_AUTH_SOCK": "/tmp/not-a-socket",
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".agent-canon/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    volume_section = compose.split("    environment:", 1)[0]
+    for marker in (".zshrc", "/mnt/git", ".config/gh", "/.ssh", "/ssh-agent", "/mnt/agent-canon-secrets"):
+        assert marker not in volume_section
+    assert 'AGENT_CANON_RUNTIME_ROUTE: "CONTAINER_LOCAL"' in compose
+    assert 'AGENT_CANON_SECRET_MOUNT: "/mnt/agent-canon-secrets"' in compose
+
+
+def test_generator_rejects_raw_runtime_mounts_before_compose_output(
+    tmp_path: Path,
+) -> None:
+    """The shared generator rejects pack runtime.mounts before emitting host binds."""
+    repo = write_parent_generator_fixture(
+        tmp_path,
+        runtime_mounts=("/tmp/host:/tmp/host",),
+    )
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "PROJECT_UID": "1234", "PROJECT_GID": "2345"},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "rejects raw runtime.mounts" in result.stderr
+
+
+def test_generator_rejects_custom_secret_target(tmp_path: Path) -> None:
+    """The optional secret profile has one canonical container target."""
+    repo = write_parent_generator_fixture(tmp_path)
+    secret_dir = tmp_path / "secrets"
+    secret_dir.mkdir()
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "AGENT_CANON_OPTIONAL_MOUNTS": "host-secrets",
+            "AGENT_CANON_SECRET_DIR": str(secret_dir),
+            "AGENT_CANON_SECRET_MOUNT": "/custom-secrets",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "secret target is fixed at /mnt/agent-canon-secrets" in result.stderr
+
+
+def test_generated_compose_platform_is_read_back_exactly(tmp_path: Path) -> None:
+    """The runtime platform projection is required to remain linux/amd64."""
+    repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".agent-canon").mkdir()
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "PROJECT_UID": "1234",
+            "PROJECT_GID": "2345",
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose_path = repo / ".agent-canon/docker-compose.generated.yml"
+    compose_path.write_text(
+        compose_path.read_text(encoding="utf-8").replace(
+            "    platform: linux/amd64", "    platform: linux/arm64"
+        ),
+        encoding="utf-8",
+    )
+    module = load_container_config_module()
+    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack_findings == []
+    assert pack is not None
+    assert any(
+        finding.detail == "compose-platform-expected:linux/amd64"
+        for finding in module.validate_generated_compose(repo, pack)
+    )
 
 
 

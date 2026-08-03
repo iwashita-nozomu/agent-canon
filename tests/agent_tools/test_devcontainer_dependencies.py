@@ -34,10 +34,13 @@ from tools.agent_tools.devcontainer_dependencies import (
     ManifestSource,
     build_plan,
     EnvironmentBoundaryModel,
+    install_plan,
     load_plan,
     manifest_sources,
     parse_record,
+    RuntimeIdentity,
     safe_extract_tar,
+    validate_runtime_identity,
 )
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -194,8 +197,8 @@ def write_boundary_fixture(
     write_file(".gitignore", ".venv/\nvenv/\n")
     write_file(
         ".devcontainer/devcontainer.json",
-        '{"postCreateCommand": "vendor/agent-canon/.devcontainer/post-create.sh '
-        'post-create-parent.sh"}\n',
+        '{"postCreateCommand": "python3 tools/agent_tools/agent_canon_source_root.py '
+        'exec .devcontainer/post-create-entrypoint.sh post-create-parent.sh"}\n',
     )
     write_file(".devcontainer/post-create-parent.sh", "#!/bin/sh\n", executable=True)
     write_file(
@@ -913,6 +916,25 @@ class DependencyModelTests(unittest.TestCase):
             [finding.detail for finding in report.findings],
         )
 
+    def test_boundary_requires_entrypoint_parent_hook_dispatch(self) -> None:
+        """The resolver entrypoint, not JSON text, owns the derived parent hook."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            model, _ = write_boundary_fixture(
+                root,
+                "jupyterlab\nnotebook\nipykernel\npydeps\nsnakeviz\npyyaml\n",
+            )
+            entrypoint = root / "vendor/agent-canon/.devcontainer/post-create-entrypoint.sh"
+            entrypoint.write_text("#!/bin/sh\n", encoding="utf-8")
+            report = model.validate()
+
+        self.assertTrue(
+            any(
+                finding.detail.startswith("missing-parent-hook-dispatch:")
+                for finding in report.findings
+            )
+        )
+
     def test_canonical_manifest_owns_pinned_pyyaml_independently(self) -> None:
         """AgentCanon's mounted validators receive their own exact PyYAML record."""
         plan = load_plan(ROOT, ROOT)
@@ -940,6 +962,50 @@ class DependencyModelTests(unittest.TestCase):
         )
         self.assertTrue(all(item.source == "ubuntu:22.04" for item in apt_records))
         self.assertFalse(any(item.source == "ubuntu:24.04" for item in apt_records))
+
+    def test_install_identity_accepts_ubuntu22_amd64(self) -> None:
+        """The canonical install gate accepts only the selected base identity."""
+        parsed = parse_record(
+            record(
+                "jammy-tool",
+                method="apt-package",
+                source="ubuntu:22.04",
+                platform="linux/amd64",
+            ),
+            path=Path("identity.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("identity.toml"), (parsed,)),))
+        identity = RuntimeIdentity("ubuntu", "22.04", "linux/amd64")
+        self.assertEqual(validate_runtime_identity(plan, identity), identity)
+
+    def test_install_identity_rejects_wrong_release_or_arch_before_runner(self) -> None:
+        """Jammy/amd64 identity failures happen before Installer runner calls."""
+        parsed = parse_record(
+            record(
+                "jammy-tool",
+                method="apt-package",
+                source="ubuntu:22.04",
+                platform="linux/amd64",
+            ),
+            path=Path("identity.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("identity.toml"), (parsed,)),))
+        for identity in (
+            RuntimeIdentity("ubuntu", "24.04", "linux/amd64"),
+            RuntimeIdentity("ubuntu", "22.04", "linux/arm64"),
+        ):
+            runner = FakeRunner()
+            with self.assertRaises(DependencyError):
+                install_plan(
+                    plan,
+                    workspace=Path("/tmp/identity-workspace"),
+                    receipts=Path("/tmp/identity-receipts"),
+                    runner=runner,
+                    identity=identity,
+                )
+            self.assertEqual(runner.calls, [])
 
     def test_platform_mismatch_fails_without_compatibility_fallback(self) -> None:
         """A platform-owned record fails closed instead of selecting another base."""
@@ -1460,6 +1526,11 @@ class DependencyModelTests(unittest.TestCase):
         self.assertNotIn("return 1", cache_function)
         self.assertNotIn('"$devcontainer_dir/finalize-shared-runtime.sh"', post_create)
         self.assertIn("ensure_container_local_runtime()", post_create)
+        self.assertIn("validate_runtime_identity", bootstrap)
+        self.assertLess(
+            bootstrap.index("validate_runtime_identity"),
+            bootstrap.index("apt-get update"),
+        )
         self.assertIn("ensure_container_local_runtime\n", post_create)
         bootstrap_index = post_create.rindex(
             '"$devcontainer_dir/bootstrap-dependencies.sh" --check'

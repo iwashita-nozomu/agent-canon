@@ -12,7 +12,7 @@ downstream implementation ../../../tools/sync_agent_canon.sh materializes AgentC
 downstream implementation ../../../tools/agent_tools/parent_repo_readiness.py checks the minimum parent structure
 downstream implementation ../../../tools/ci/container_config.py validates parent environment names without shell execution
 downstream implementation ../../../.devcontainer/devcontainer.json selects the default startup profile
-downstream implementation ../../../.devcontainer/generate-runtime-compose.sh mounts parent environment sources and host zshrc
+downstream implementation ../../../.devcontainer/generate-runtime-compose.sh renders the workspace-only default and typed optional mount profiles
 downstream design parent-dependency-manifest-followup.md declares the parent manifest, pin, and ordering follow-up
 @dependency-end
 -->
@@ -27,10 +27,9 @@ downstream design parent-dependency-manifest-followup.md declares the parent man
 - `.devcontainer/devcontainer.json` は
   `vendor/agent-canon/.devcontainer/devcontainer.json` への symlink。
 - 親固有の処理がある場合は `.devcontainer/post-create-parent.sh` に置く。
-- 親環境を使う場合は `.devcontainer/parent-environment.sh` と
-  `.devcontainer/parent-environment.toml` を一組で置く。どちらも regular file
-  または実在 file へ解決できる symlink とし、片側だけの配置と broken symlink
-  は受理しない。両方が無い親では親環境 mount を生成しない。
+- `.devcontainer/parent-environment.sh` と `.devcontainer/parent-environment.toml`
+  は既定 devcontainer の入力ではない。存在する場合の監査対象にはできるが、
+  bind mount、shell startup、tool availability の前提にしない。
 - AgentCanon の共有スクリプトを親 `.devcontainer/` にコピーしたり、wrapper を
   追加したりしない。
 
@@ -39,7 +38,7 @@ downstream design parent-dependency-manifest-followup.md declares the parent man
 
 ## 親環境の値と名前
 
-親環境の組を配置した場合、`parent-environment.sh` が親環境の値と定義の唯一の
+監査対象として親環境の組を配置した場合、`parent-environment.sh` が親環境の値と定義の唯一の
 source です。validator は symlink 自体の file type ではなく解決先の実在性を確認し、
 このファイルを shell として実行せず、空行・コメントと `export NAME=value` 形式の
 行だけを静的に読みます。`parent-environment.toml` は次の形で ordered variable
@@ -59,34 +58,36 @@ startup、host premise の十分条件を証明したことにはなりません
 symlink 先の `devcontainer.json` は、親レポのルートから AgentCanon の実体を
 直接呼び出す。
 
-- Compose generator:
-  `vendor/agent-canon/.devcontainer/generate-runtime-compose.sh`
-- post-create:
-  `vendor/agent-canon/.devcontainer/post-create.sh`
-- post-attach:
-  `vendor/agent-canon/.devcontainer/post-attach.sh`
+- すべての public entry は source-root resolver 経由で呼ぶ。
+  `python3 tools/agent_tools/agent_canon_source_root.py exec .devcontainer/<entry>`
+  は standalone source root と derived `vendor/agent-canon` root の両方を解決する。
+  `devcontainer.json` は `vendor/agent-canon` の固定 script path を直接参照しない。
 
-親環境の両 source が実在 file に解決できるとき、generator は parent environment を
-read-only bind mount します。host zshrc は regular file の場合だけ追加します。
+default generator は parent environment、host credentials、SSH、Docker socket、
+host runtime state を mount しない。host zshrc は `host-zshrc` optional profile が
+明示され、regular file が存在するときだけ追加する。profile が選択されても欠落時は
+同じ default runtime を生成する。
 
-- `.devcontainer/parent-environment.sh` ->
-  `/etc/project-template/parent-environment.sh`
-- host の configured source expression `${HOME}/.zshrc` ->
-  `/home/<project-user>/.zshrc`（host fileが存在する場合だけ）
+- `host-zshrc`: absolute host `~/.zshrc` -> `/home/project/.zshrc` read-only
+- `host-git`: existing `/mnt/git` -> `/mnt/git`
+- `host-credentials`: existing `~/.config/gh`/`~/.ssh` -> project home read-only
+- `ssh-agent`: valid socket only -> `/ssh-agent`
+- `host-secrets`: existing `AGENT_CANON_SECRET_DIR` -> fixed `/mnt/agent-canon-secrets`
+- `docker-host`: existing Docker socket -> `/var/run/docker.sock`
 
-validator は、zshrcが生成された場合に限り、Composeのmountがbind type、source
-expression、non-root target、read-onlyを満たすことを静的に確認する。fresh clone / CI
-runnerの現在のhost fileはprobeしない。実行時は `${HOME}/.zshrc` がregular fileの
-場合だけnon-root homeへ投影し、欠落・directory・symlinkの場合はmountを省略する。
-省略はfailureではない。image-owned startup fileはmountの有無にかかわらず
-`/etc/project-template/parent-environment.sh`をsourceし、zshのdefault startupを
-完了する。
+validator は profile と target の一致、bind type、read-only、fixed secret target を
+静的に確認する。fresh clone / CI runnerのhost fileは必要条件ではない。
+`ZDOTDIR`、`.zshenv`、`/etc/project-template/zsh`、parent environment source は
+default shell startup に存在しない。user customization は image-ownedまたは
+`/home/project/.zshrc`だけであり、noninteractive command、sudo、post-create は
+`.zshrc`に依存しない。
 
 generator は既存の `pack.runtime.shell` を process boundary として使います。親の
 default pack は zsh を選び、明示的な bash pack と smoke shell は bash のままです。
-zsh とその descendants は zsh startup を通じて parent variables を受け取ります。
-Compose が parent variables の値を再定義することはなく、関連する Compose-owned
-environment は `HOME`、`ZDOTDIR`、`SHELL`、`AGENT_CANON_CONTAINER_USER` です。
+runtime env は image、generated Compose、bootstrap/install の明示経路だけで供給し、
+zsh startup に parent environment の source を隠さない。関連する Compose-owned
+environment は `HOME`、`SHELL`、`AGENT_CANON_CONTAINER_USER`、
+`AGENT_CANON_RUNTIME_ROUTE` です。
 `HOME` は dedicated non-root userの `/home/project` であり、zsh startupはoptional
 host zshrcの有無にかかわらずimage-owned startup fileから開始します。
 standalone AgentCanon source layout では host `~/.zshrc`、parent environment mount、
@@ -148,7 +149,7 @@ absent を正本とする。
 | DEV-DEFAULT-002 | 既定 Compose の shared-runtime `group_add`、bind、provision/readback receipt environment、custom HOME tmpfs、AgentCanon-specific group を生成せず、host UID/GID を canonical build args として親 image に渡す | generator は host の `id -u`/`id -g` を `PROJECT_UID`/`PROJECT_GID` として渡し、user 名 `project` を固定する。公開 caller に override 経路はない。digest-pinned plain `ubuntu:22.04` の親 image は同じ numeric ID の canonical `project` user/group を作り、image の `USER project`、`containerUser: project`、`remoteUser: project` で起動する。container は container-local `/var/lib/agent-canon/runtime` だけを使用し、host の同名 path とは bind/shared しない。host group mutation と host sudo/password prompt は行わない | 生成 Compose/config/image inspection で `PROJECT_UID`/`PROJECT_GID`、`project` passwd/group、`USER project`、`containerUser`/`remoteUser` が canonical values を持ち、`group_add`、host runtime bind、shared receipt env、custom HOME tmpfs、AgentCanon group が absent。bind workspace の成果物 owner が host mapped UID/GID と一致し、container 内 runtime path が作成される |
 | DEV-DEFAULT-003 | 既定 generator は host GPU、`nvidia-smi`、Docker NVIDIA runtime の probing を一切行わず、生成 environment に `DEVCONTAINER_GPU_MODE=disabled` を設定し、`DEVCONTAINER_GPU_REQUEST` は absent とする | GPU の有無に関わらず default container creation は GPU admission から独立し、Compose に GPU request を持たない | generator の command/readback に probing が無く、生成 env が `DEVCONTAINER_GPU_MODE=disabled`、`DEVCONTAINER_GPU_REQUEST` absent、`gpus: all` absent である static inspection と no-GPU launch |
 | DEV-DEFAULT-004 | shared post-create から GPU admission finalize、post-attach から shared-runtime readback dependency を default stage として外し、`project` の container-local sudo で通常の dependency/build stages を実行する | dependency manifest、Python installer、AgentCanon build/cache/projection、parent hook が `project` user の mapped UID/GID と passwordless `sudo -n` で system dependency operation を行える順序だけが既定 lifecycle に残る。host sudo/password prompt は要求しない | post-create/post-attach command readback と targeted lifecycle tests が finalize/readback absent を示し、`getent passwd/group project`、`id -u`/`id -g` が `PROJECT_UID/GID` と一致、`sudo -n true`、fixed bootstrap の `gpg` capability、apt dependency bootstrap が pass |
-| DEV-DEFAULT-005 | `bootstrap-shared-runtime.sh`、`finalize-shared-runtime.sh`、scheduler、managed experiment、receipt parser/writer は source に保持し、既定 profile から非選択にする | 実験機能の wholesale deletion は行わず、明示 opt-in profile の候補として再利用可能な状態を保つ | source files が存在し、default path からの reachability test と Issue [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) が follow-up を指す |
+| DEV-DEFAULT-005 | `bootstrap-shared-runtime.sh`、`finalize-shared-runtime.sh`、scheduler、managed experiment、receipt parser/writer は source に保持し、既定 profile から非選択にする | 実験機能の wholesale deletion は行わず、今回の public mount profile には公開しない。Issue [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) が将来 profile を完成させるまで unreachable source とする | source files が存在し、default path と optional profile parser が shared-runtime を拒否し、Issue #521 が follow-up を指す |
 | DEV-DEFAULT-006 | profile boundary、dependency packet、rollback と検証コマンドを owner docs に固定する | 実装者が host bootstrap を復活させずに default/opt-in の責務を判定できる | 本節の DIC trace、dependency-design packet、`container_config.py`/dependency validator/launch smoke の結果を readback する |
 | DEV-DEFAULT-007 | repository path を `managed-topic` または `direct-repo` layout として判定し、layout に対応する mount/status guard を選択する | managed-topic は従来の workspace root bind と topic marker/status guard を保持し、direct-repo は topic marker/status を要求しない | generated env `AGENT_CANON_WORKSPACE_LAYOUT` が layout 名を示し、post-attach が同じ layout を readback する |
 | DEV-DEFAULT-008 | direct-repo では repository root だけを `/workspace/<basename>` に bind し、`devcontainer up --workspace-folder .` を受理する | sibling repository、親 `~/workspace` 全体、topic marker/status を direct default の前提にしない | generated Compose の bind source が exact repo root 一つで、target/env/readback が direct-repo、topic status guard が未実行で起動が完了する |
@@ -243,8 +244,8 @@ container-local fixed bootstrap、親 manifest、vendor manifest、全体 valida
 topological derived execution、親の
 docker/install_python_dependencies.sh、AgentCanon build/cache/projection の順です。
 host shared-runtime bootstrap と GPU admission finalize は既定順序の外側にあり、
-明示 opt-in profile が選択された場合だけ追加されます。その opt-in profile の
-follow-up は Issue #521 で追跡します。この shared command の完了後に、devcontainer.json
+今回の public lifecycle からは選択できません。将来 profile の完成は Issue #521 で
+追跡します。この shared command の完了後に、devcontainer.json
 の直接参照が親の
 post-create-parent.sh を最後に実行します。詳細な親側 follow-up は
 parent-dependency-manifest-followup.md に従います。

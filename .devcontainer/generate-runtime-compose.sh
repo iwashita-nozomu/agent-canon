@@ -13,7 +13,7 @@
 
 set -euo pipefail
 
-repo_root="${AGENT_CANON_DEVCONTAINER_REPO_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+repo_root="${AGENT_CANON_DEVCONTAINER_REPO_ROOT:-${AGENT_CANON_ACTIVE_REPOSITORY_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}}"
 repo_root="$(cd "$repo_root" && pwd -P)"
 workspace_root="$(cd "${repo_root}/.." && pwd -P)"
 [ -d "$workspace_root" ] || {
@@ -99,9 +99,31 @@ if not isinstance(runtime_shell, str) or re.fullmatch(r"/[A-Za-z0-9._/-]+", runt
 dependency_profile = runtime.get("dependency_profile", "full")
 if not isinstance(dependency_profile, str) or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", dependency_profile) is None:
     raise SystemExit("runtime.dependency_profile must be a non-empty profile name")
+runtime_platform = pack.get("platform", "linux/amd64")
+if runtime_platform != "linux/amd64":
+    raise SystemExit("pack.platform must be linux/amd64")
+reserved_environment = {
+    "DEVCONTAINER_RUNTIME_MODE",
+    "DEVCONTAINER_GPU_MODE",
+    "DEVCONTAINER_GPU_NOTICE",
+    "AGENT_CANON_SECRET_MOUNT",
+    "AGENT_CANON_SECRET_DIR_MODE",
+    "AGENT_CANON_OPTIONAL_MOUNTS",
+    "AGENT_CANON_DEPENDENCY_PROFILE",
+    "AGENT_CANON_RUNTIME_ROUTE",
+    "AGENT_CANON_WORKSPACE_LAYOUT",
+    "AGENT_CANON_WORKSPACE_ROOT",
+    "AGENT_CANON_REPOSITORY_ROOT",
+    "DEPENDENCY_MODULE_CONTAINER_SOURCE",
+    "DEPENDENCY_MODULE_CONTAINER_TARGET",
+    "HOME",
+    "SHELL",
+    "AGENT_CANON_CONTAINER_USER",
+}
 print(f"dockerfile={pack['dockerfile']}")
 print(f"runtime_shell={runtime_shell}")
 print(f"dependency_profile={dependency_profile}")
+print(f"platform={runtime_platform}")
 print(f"workdir={runtime.get('workdir', '/workspace')}")
 print(f"workspace_mount={runtime.get('workspace_mount', '/workspace')}")
 for mount in runtime.get("mounts", []):
@@ -109,6 +131,8 @@ for mount in runtime.get("mounts", []):
 for item in runtime.get("env", []):
     name, separator, value = str(item).partition("=")
     if separator:
+        if name in reserved_environment:
+            raise SystemExit(f"runtime.env cannot override reserved key: {name}")
         print(f"ENV:{name}: {json.dumps(value)}")
 PY
   )"
@@ -118,6 +142,7 @@ PY
   dockerfile=""
   runtime_shell="/bin/bash"
   dependency_profile="full"
+  runtime_platform="linux/amd64"
   workdir="/workspace"
   workspace_mount="/workspace"
   pack_mounts=()
@@ -127,6 +152,7 @@ PY
       dockerfile=*) dockerfile="${pack_value#dockerfile=}" ;;
       runtime_shell=*) runtime_shell="${pack_value#runtime_shell=}" ;;
       dependency_profile=*) dependency_profile="${pack_value#dependency_profile=}" ;;
+      platform=*) runtime_platform="${pack_value#platform=}" ;;
       workdir=*) workdir="${pack_value#workdir=}" ;;
       workspace_mount=*) workspace_mount="${pack_value#workspace_mount=}" ;;
       mount=*) pack_mounts+=("${pack_value#mount=}") ;;
@@ -138,6 +164,7 @@ else
   dockerfile=""
   runtime_shell="/bin/bash"
   dependency_profile="full"
+  runtime_platform="linux/amd64"
   workdir="/workspace"
   workspace_mount="/workspace"
   pack_mounts=()
@@ -145,24 +172,41 @@ else
 fi
 
 parent_layout=false
-parent_environment_enabled=false
-parent_environment_source="${repo_root}/.devcontainer/parent-environment.sh"
-parent_environment_manifest="${repo_root}/.devcontainer/parent-environment.toml"
 if [ -d "${repo_root}/vendor/agent-canon" ]; then
   parent_layout=true
-  if [ -e "$parent_environment_source" ] || [ -L "$parent_environment_source" ] \
-    || [ -e "$parent_environment_manifest" ] || [ -L "$parent_environment_manifest" ]; then
-    if [ ! -f "$parent_environment_source" ]; then
-      printf 'devcontainer parent environment source does not resolve to a file: %s\n' "$parent_environment_source" >&2
-      exit 1
-    fi
-    if [ ! -f "$parent_environment_manifest" ]; then
-      printf 'devcontainer parent environment manifest does not resolve to a file: %s\n' "$parent_environment_manifest" >&2
-      exit 1
-    fi
-    parent_environment_enabled=true
-  fi
 fi
+
+optional_mounts=""
+optional_mounts_raw="${AGENT_CANON_OPTIONAL_MOUNTS:-}"
+declare -A optional_mount_seen=()
+if [ -n "$optional_mounts_raw" ]; then
+  IFS=',' read -r -a optional_mount_values <<< "$optional_mounts_raw"
+  for optional_mount in "${optional_mount_values[@]}"; do
+    case "$optional_mount" in
+      host-zshrc|host-git|host-secrets|host-credentials|ssh-agent|docker-host) ;;
+      *)
+        printf 'devcontainer optional mount profile is unsupported: %s\n' "$optional_mount" >&2
+        exit 1
+        ;;
+    esac
+    if [ -n "${optional_mount_seen[$optional_mount]:-}" ]; then
+      printf 'devcontainer optional mount profile is duplicated: %s\n' "$optional_mount" >&2
+      exit 1
+    fi
+    optional_mount_seen["$optional_mount"]=1
+    if [ -n "$optional_mounts" ]; then
+      optional_mounts+=","
+    fi
+    optional_mounts+="$optional_mount"
+  done
+fi
+optional_mount_enabled() {
+  local requested="$1"
+  case ",${optional_mounts}," in
+    *,"${requested}",*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
 
 if [[ "$runtime_shell" != /* || "$runtime_shell" == *[!A-Za-z0-9._/-]* ]]; then
   printf 'devcontainer runtime.shell must be one absolute executable path: %s\n' "$runtime_shell" >&2
@@ -181,39 +225,34 @@ volume_lines=(
   "        source: ${workspace_mount_source_yaml}"
   "        target: \"${workspace_mount_target}\""
 )
-if [ "$parent_layout" = true ]; then
-  if [ -f "${HOME}/.zshrc" ] && [ ! -L "${HOME}/.zshrc" ]; then
-    volume_lines+=(
-      "      - type: bind"
-      '        source: "${HOME}/.zshrc"'
-      "        target: \"${project_home}/.zshrc\""
-      "        read_only: true"
-    )
-  fi
-fi
-if [ "$parent_environment_enabled" = true ]; then
-  parent_environment_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$parent_environment_source")"
+host_home="${HOME:-}"
+if optional_mount_enabled host-zshrc \
+  && [ -n "$host_home" ] \
+  && [ -f "$host_home/.zshrc" ] \
+  && [ ! -L "$host_home/.zshrc" ]; then
+  zshrc_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$host_home/.zshrc")"
   volume_lines+=(
     "      - type: bind"
-    "        source: ${parent_environment_source_yaml}"
-    '        target: "/etc/project-template/parent-environment.sh"'
+    "        source: ${zshrc_source_yaml}"
+    "        target: \"${project_home}/.zshrc\""
     "        read_only: true"
   )
 fi
 for pack_mount in "${pack_mounts[@]}"; do
-  case "$pack_mount" in
-    *:/workspace|*:/workspace:*)
-      printf 'devcontainer runtime pack duplicates the workspace-root mount: %s\n' "$pack_mount" >&2
-      exit 1
-      ;;
-  esac
-  volume_lines+=("      - ${pack_mount}")
+  printf 'devcontainer shared generator rejects raw runtime.mounts; use an explicit public mount profile: %s\n' "$pack_mount" >&2
+  exit 1
 done
-if [ -d /mnt/git ]; then
+if optional_mount_enabled host-git && [ -d /mnt/git ]; then
   volume_lines+=("      - /mnt/git:/mnt/git")
 fi
 secret_mount_status="disabled"
-secret_target="${AGENT_CANON_SECRET_MOUNT:-/mnt/agent-canon-secrets}"
+canonical_secret_target="/mnt/agent-canon-secrets"
+if [ -n "${AGENT_CANON_SECRET_MOUNT:-}" ] \
+  && [ "${AGENT_CANON_SECRET_MOUNT}" != "$canonical_secret_target" ]; then
+  printf 'devcontainer secret target is fixed at %s; custom targets are rejected\n' "$canonical_secret_target" >&2
+  exit 1
+fi
+secret_target="$canonical_secret_target"
 secret_mode="${AGENT_CANON_SECRET_DIR_MODE:-ro}"
 secret_read_only="true"
 case "$secret_mode" in
@@ -224,7 +263,9 @@ case "$secret_mode" in
     secret_mode="invalid"
     ;;
 esac
-if [ -n "${AGENT_CANON_SECRET_DIR:-}" ] && [ "$secret_mode" != "invalid" ]; then
+if optional_mount_enabled host-secrets \
+  && [ -n "${AGENT_CANON_SECRET_DIR:-}" ] \
+  && [ "$secret_mode" != "invalid" ]; then
   if [ ! -d "${AGENT_CANON_SECRET_DIR}" ]; then
     printf 'devcontainer secret mount skipped: AGENT_CANON_SECRET_DIR is not an existing directory\n' >&2
   elif [[ "$secret_target" != /* ]]; then
@@ -241,14 +282,23 @@ if [ -n "${AGENT_CANON_SECRET_DIR:-}" ] && [ "$secret_mode" != "invalid" ]; then
     secret_mount_status="enabled"
   fi
 fi
-if [ -d "${HOME}/.config/gh" ]; then
-  volume_lines+=("      - ${HOME}/.config/gh:${project_home}/.config/gh:ro")
+if optional_mount_enabled host-credentials \
+  && [ -n "$host_home" ] \
+  && [ -d "$host_home/.config/gh" ]; then
+  volume_lines+=("      - ${host_home}/.config/gh:${project_home}/.config/gh:ro")
 fi
-if [ -d "${HOME}/.ssh" ]; then
-  volume_lines+=("      - ${HOME}/.ssh:${project_home}/.ssh:ro")
+if optional_mount_enabled host-credentials \
+  && [ -n "$host_home" ] \
+  && [ -d "$host_home/.ssh" ]; then
+  volume_lines+=("      - ${host_home}/.ssh:${project_home}/.ssh:ro")
 fi
-if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
+if optional_mount_enabled ssh-agent \
+  && [ -n "${SSH_AUTH_SOCK:-}" ] \
+  && [ -S "${SSH_AUTH_SOCK}" ]; then
   volume_lines+=("      - ${SSH_AUTH_SOCK}:/ssh-agent")
+fi
+if optional_mount_enabled docker-host && [ -S /var/run/docker.sock ]; then
+  volume_lines+=("      - /var/run/docker.sock:/var/run/docker.sock")
 fi
 
 gpu_mode="disabled"
@@ -260,7 +310,9 @@ environment_lines=(
   "      DEVCONTAINER_GPU_NOTICE: \"${gpu_notice}\""
   "      AGENT_CANON_SECRET_MOUNT: \"${secret_target}\""
   "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
+  "      AGENT_CANON_OPTIONAL_MOUNTS: \"${optional_mounts}\""
   "      AGENT_CANON_DEPENDENCY_PROFILE: \"${dependency_profile}\""
+  '      AGENT_CANON_RUNTIME_ROUTE: "CONTAINER_LOCAL"'
   "      AGENT_CANON_WORKSPACE_LAYOUT: \"${workspace_layout}\""
   '      AGENT_CANON_WORKSPACE_ROOT: "/workspace"'
   "      AGENT_CANON_REPOSITORY_ROOT: \"${container_repo_root}\""
@@ -271,13 +323,14 @@ environment_lines=(
 if [ "$parent_layout" = true ]; then
   environment_lines=(
     "      HOME: \"${project_home}\""
-    "      ZDOTDIR: \"${project_home}\""
     "      SHELL: \"${runtime_shell}\""
     "      AGENT_CANON_CONTAINER_USER: \"${project_user}\""
     "${environment_lines[@]}"
   )
 fi
-if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
+if optional_mount_enabled ssh-agent \
+  && [ -n "${SSH_AUTH_SOCK:-}" ] \
+  && [ -S "${SSH_AUTH_SOCK}" ]; then
   environment_lines+=('      SSH_AUTH_SOCK: "/ssh-agent"')
 fi
 mkdir -p "$(dirname "$compose_output")"
@@ -286,6 +339,7 @@ mkdir -p "$(dirname "$compose_output")"
   printf 'name: %s\n' "$compose_project_name"
   printf 'services:\n'
   printf '  workspace:\n'
+  printf '    platform: %s\n' "$runtime_platform"
   printf '    user: "%s:%s"\n' "$project_uid" "$project_gid"
   if [ "$compose_mode" = "repo-docker-pack" ]; then
     printf '    build:\n'

@@ -22,6 +22,22 @@ fail() {
   exit 1
 }
 
+validate_runtime_identity() {
+  local runtime_id
+  local runtime_version
+  local runtime_machine
+  runtime_id="$(awk -F= '$1 == "ID" { gsub(/^"|"$/, "", $2); print $2; exit }' /etc/os-release)"
+  runtime_version="$(awk -F= '$1 == "VERSION_ID" { gsub(/^"|"$/, "", $2); print $2; exit }' /etc/os-release)"
+  case "$(uname -m)" in
+    x86_64|amd64) runtime_machine="amd64" ;;
+    *) runtime_machine="$(uname -m)" ;;
+  esac
+  [ "$runtime_id" = "ubuntu" ] || fail "runtime ID must be ubuntu, got: $runtime_id"
+  [ "$runtime_version" = "22.04" ] || fail "runtime VERSION_ID must be 22.04, got: $runtime_version"
+  [ "$runtime_machine" = "amd64" ] || fail "runtime platform must be linux/amd64, got: linux/$runtime_machine"
+  printf 'DEVCONTAINER_RUNTIME_IDENTITY=pass:ubuntu:%s:linux/%s\n' "$runtime_version" "$runtime_machine"
+}
+
 run_as_root() {
   if [ "$(id -u)" -eq 0 ]; then
     "$@"
@@ -231,6 +247,8 @@ if [ "$#" -gt 0 ]; then
       ;;
   esac
 fi
+
+validate_runtime_identity
 
 case "$mode" in
   check)

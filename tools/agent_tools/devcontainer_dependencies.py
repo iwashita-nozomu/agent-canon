@@ -116,6 +116,78 @@ class DependencyError(ValueError):
     """Base error for schema, merge, plan, and execution failures."""
 
 
+@dataclass(frozen=True)
+class RuntimeIdentity:
+    """Runtime OS and architecture identity required by the canonical installer."""
+
+    os_id: str
+    version_id: str
+    platform: str
+
+
+def read_runtime_identity(
+    os_release: Path = Path("/etc/os-release"),
+    *,
+    machine: str | None = None,
+) -> RuntimeIdentity:
+    """Read the typed Ubuntu/Jammy and Linux platform identity before installs."""
+    values: dict[str, str] = {}
+    try:
+        for raw_line in os_release.read_text(encoding="utf-8").splitlines():
+            name, separator, raw_value = raw_line.partition("=")
+            if separator and name in {"ID", "VERSION_ID"}:
+                values[name] = raw_value.strip().strip('"').strip("'")
+    except OSError as exc:
+        raise DependencyError(f"runtime identity cannot read {os_release}: {exc}") from exc
+    os_id = values.get("ID", "")
+    version_id = values.get("VERSION_ID", "")
+    machine_name = (machine or platform.machine()).lower()
+    machine_alias = {
+        "x86_64": "amd64",
+        "amd64": "amd64",
+        "aarch64": "arm64",
+        "arm64": "arm64",
+    }
+    runtime_platform = f"linux/{machine_alias.get(machine_name, machine_name)}"
+    if not os_id or not version_id or runtime_platform == "linux/":
+        raise DependencyError(
+            f"runtime identity is incomplete: ID={os_id!r} VERSION_ID={version_id!r} "
+            f"platform={runtime_platform!r}"
+        )
+    return RuntimeIdentity(os_id, version_id, runtime_platform)
+
+
+def validate_runtime_identity(
+    plan: DependencyPlan,
+    identity: RuntimeIdentity | None = None,
+) -> RuntimeIdentity:
+    """Fail closed on non-Ubuntu22/amd64 before any installer side effect."""
+    resolved = identity or read_runtime_identity()
+    if resolved.os_id != "ubuntu" or resolved.version_id != "22.04":
+        raise DependencyError(
+            "runtime identity requires Ubuntu 22.04: "
+            f"ID={resolved.os_id} VERSION_ID={resolved.version_id}"
+        )
+    if resolved.platform != "linux/amd64":
+        raise DependencyError(
+            f"runtime identity requires linux/amd64: platform={resolved.platform}"
+        )
+    for record in plan.records:
+        if record.platform is not None and record.platform != resolved.platform:
+            raise DependencyError(
+                f"dependency record {record.id} requires {record.platform}, "
+                f"but runtime platform is {resolved.platform}; no compatibility fallback is defined"
+            )
+        if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY} \
+            and record.source.startswith("ubuntu:") \
+            and record.source != "ubuntu:22.04":
+            raise DependencyError(
+                f"dependency record {record.id} requires canonical source ubuntu:22.04, "
+                f"got {record.source}"
+            )
+    return resolved
+
+
 # StrEnum is unavailable on supported tomli/Python <3.11 runtimes.
 class ManifestRole(str, Enum):  # noqa: UP042
     """Closed set of manifest roles used during source resolution."""
@@ -1557,16 +1629,34 @@ class EnvironmentBoundaryModel:
             )
         else:
             command_text = json.dumps(post_create, sort_keys=True)
-            for required in (
-                "vendor/agent-canon/.devcontainer/post-create.sh",
-                "post-create-parent.sh",
-            ):
-                if required not in command_text:
-                    findings.append(
-                        BoundaryFinding(
-                            "parent", str(config), f"missing-command:{required}"
+            required = (
+                "agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh"
+            )
+            if required not in command_text:
+                findings.append(
+                    BoundaryFinding("parent", str(config), f"missing-command:{required}")
+                )
+            entrypoint = self._require(
+                findings,
+                checked,
+                "vendor/agent-canon/.devcontainer/post-create-entrypoint.sh",
+                "parent",
+                executable=True,
+            )
+            if entrypoint is not None:
+                entrypoint_text = entrypoint.read_text(encoding="utf-8")
+                for required in (
+                    'parent_hook="$workspace/.devcontainer/post-create-parent.sh"',
+                    'bash "$parent_hook" "$workspace"',
+                ):
+                    if required not in entrypoint_text:
+                        findings.append(
+                            BoundaryFinding(
+                                "parent",
+                                str(entrypoint),
+                                f"missing-parent-hook-dispatch:{required}",
+                            )
                         )
-                    )
 
     def validate(self) -> EnvironmentBoundaryReport:
         """Validate typed ownership coverage without running project commands."""
@@ -2545,6 +2635,19 @@ def _cli_plan(args: argparse.Namespace) -> DependencyPlan:
     return load_plan(workspace, vendor_root)
 
 
+def install_plan(
+    plan: DependencyPlan,
+    *,
+    workspace: Path,
+    receipts: Path,
+    runner: CommandRunner | None = None,
+    identity: RuntimeIdentity | None = None,
+) -> tuple[str, ...]:
+    """Validate runtime identity, then begin installation with no earlier side effect."""
+    validate_runtime_identity(plan, identity)
+    return Installer(runner).install(plan, workspace=workspace, receipts=receipts)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the dependency model CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -2599,8 +2702,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                     / ".agent-canon"
                     / "dependency-receipts"
                 )
-                completed = Installer().install(
-                    plan, workspace=Path(args.workspace).resolve(), receipts=receipts
+                completed = install_plan(
+                    plan,
+                    workspace=Path(args.workspace).resolve(),
+                    receipts=receipts,
                 )
                 payload = {
                     "status": "pass",

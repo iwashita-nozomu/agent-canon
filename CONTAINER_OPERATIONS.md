@@ -298,8 +298,8 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   provision/readback receipt、および固定 supplementary group は AgentCanon source
   に保持するが、linked config の default lifecycle からは非選択とする。これらは
   Issue [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) で追跡する
-  明示 opt-in profile の候補であり、既定境界の authority は本 rulebook と linked
-  implementation に置く。experiment scheduler
+  将来 profile の source 候補であり、今回の public optional profile ではない。既定境界の
+  authority は本 rulebook と linked implementation に置く。experiment scheduler
   や managed experiment の wholesale deletion を意味しない。
 - Opt-in profile を実装するまでは、`/var/lib/agent-canon/runtime` の
   `shared-runtime-provision.json` / `shared-runtime-readback.json` を default の
@@ -327,13 +327,14 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   credentials, but the Docker image must not bake user tokens or auth state.
 - `safe.directory` setup must be dynamic for `/workspace` and
   `/workspace/vendor/<name>`.
-- `/mnt/git` is compatibility-only. Configure it only when the host path exists.
+- `/mnt/git` is compatibility-only and is never a default bind. Select the typed
+  `host-git` optional profile only when the host path exists.
 - A private host directory for confidential local Git repositories or other
   operator-local material may be mounted only through
   `AGENT_CANON_SECRET_DIR`. The shared generator must skip the mount when the
-  variable is unset or the path is absent, must not print the host path, and must
-  use `AGENT_CANON_SECRET_MOUNT` for the container target
-  (`/mnt/agent-canon-secrets` by default). Use
+  profile is absent, the variable is unset, or the path is absent, and must use
+  the fixed container target `/mnt/agent-canon-secrets`. Any custom
+  `AGENT_CANON_SECRET_MOUNT` target is rejected. Use
   `AGENT_CANON_SECRET_DIR_MODE=rw` only when the container must update local
   Git remotes; otherwise keep the default read-only mode.
 - Shared post-create logic must tolerate a repository that has no local bare
