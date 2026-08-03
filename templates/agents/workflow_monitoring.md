@@ -40,7 +40,7 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 
 - tool_warnings_status: pending
 
-<!-- non-blocking tool、hook、checker、wrapper、guardrail が warning を出したら、直ちに `workflow_monitor.py --tool-warning "warning_id=<stable-id> source_tool=<tool> severity=<warning|fix-now|s0|s1> status=open message=<short-no-spaces> repair_command=<command-or-doc>"` で記録します。修正後は同じ warning_id を `status=resolved evidence=<path-or-command>` で記録します。normal warning は resolved、durable owner 付き deferred_with_issue、または明示 approval evidence と durable rationale artifact 付き accepted_with_reason で終了し、fix-now/S0/S1 は resolved にします。warning がなければ `workflow_monitor.py --tool-warning-status none` を実行し、closeout で pending を残しません。 -->
+<!-- non-blocking tool、hook、checker、wrapper、guardrail が warning を出したら、直ちに `workflow_monitor.py --tool-warning "warning_id=<stable-id> source_tool=<tool> severity=<warning|fix-now|s0|s1> status=open message=<short-no-spaces> repair_command=<command-or-doc>"` で記録します。修正後は同じ warning_id を `status=resolved evidence=<path-or-command>` で記録し、最終状態を `tool_warning_exit_status` として read back します。normal warning は resolved、durable owner 付き deferred_with_issue、または `explicit_approval_evidence` と durable rationale artifact 付き accepted_with_reason で終了し、fix-now/S0/S1 は resolved にします。warning がなければ `workflow_monitor.py --tool-warning-status none` を実行し、closeout で pending を残しません。 -->
 
 ## Interventions（介入）
 

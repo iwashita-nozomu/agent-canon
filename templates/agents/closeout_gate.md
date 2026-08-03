@@ -175,7 +175,7 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 
 ## Document Structure Evidence（文書 structure evidence）
 
-<!-- changed Markdown source file は closeout 前に document route を分類し、全 changed Markdown source path を `document_structure_paths` に列挙します。`document_split_decision` は指定された keep/split/merge/inline/rename/not_applicable:format-only の形式で記録します。substantive edit では structure status、structure planning、prose graph、structure contract artifact を complete とし、typo/link/format-only では skipped、理由、`md_style_check: pass` を記録します。reports/ 配下の generated run-bundle Markdown はこの source-document gate の外です。 -->
+<!-- changed Markdown source file は closeout 前に document route を分類し、全 changed Markdown source path を `document_structure_paths` に列挙します。`document_split_decision` は `keep:<reason>`、`split:<new-owner-boundary>`、`merge:<target>`、`inline:<target-section>`、`rename:<new-path>`、`not_applicable:format-only:<reason>` の形式で記録します。substantive edit では structure status、structure planning、prose graph、structure contract artifact を complete とし、typo/link/format-only では skipped、理由、`md_style_check: pass` を記録します。reports/ 配下の generated run-bundle Markdown はこの source-document gate の外です。 -->
 
 - document_structure_paths:
 - document_structure_status:

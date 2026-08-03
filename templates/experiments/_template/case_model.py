@@ -6,7 +6,7 @@
 # @dependency-end
 
 """
-Define the replaceable case and record models for a managed experiment.
+managed experiment 用の replaceable case と record model を定義します。
 
 責務は case input の invariant と、cases.jsonl に保存する typed record の schema です。
 実行、artifact I/O、resource admission は別 module が所有します。
@@ -15,6 +15,7 @@ Define the replaceable case and record models for a managed experiment.
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import dataclass
 from typing import Literal
 
@@ -24,24 +25,23 @@ CaseState = Literal["success", "failed", "blocked"]
 @dataclass(frozen=True)
 class CaseSpec:
     """
-    Describe one reproducible case input and its ownership boundary.
+    再現可能な case input 一件と、その ownership boundary を記述します。
 
-    `case_id` is unique within a run. `parameters` is JSON-serializable and
-    carries units or shapes where the domain requires them.
+    `case_id` は run 内で一意です。`parameters` は JSON-serializable で、domain が必要とする
+    unit や shape を保持します。
 
     Args:
-        case_id: Stable identifier used in cases.jsonl and failure evidence.
-        parameters: Domain input mapping, including units and shapes where needed.
+        case_id: cases.jsonl と failure evidence で使う安定した identifier。
+        parameters: 必要な unit と shape を含む domain input mapping。
 
     Raises:
-        ValueError: If the identifier is blank or parameters are not JSON-serializable.
+        ValueError: identifier が空、または parameters が JSON-serializable でない場合。
 
     Side effects:
-        Construction validates local state only; it does not allocate resources
-        or write artifacts.
+        構築は local state だけを検証し、resource allocation や artifact write を行いません。
 
     Ownership:
-        `cases.py` owns instances; this model owns their invariant.
+        instance は `cases.py` が所有し、invariant はこの model が所有します。
     """
 
     case_id: str
@@ -49,14 +49,14 @@ class CaseSpec:
 
     def __post_init__(self) -> None:
         """
-        Enforce the case invariant before a worker receives the case.
+        worker が case を受け取る前に case invariant を強制します。
 
         Raises:
-            ValueError: If the identifier is blank, parameters are not a dict,
-                or the parameters cannot be serialized as JSON.
+            ValueError: identifier が空、parameters が dict でない、または JSON serialize
+                できない場合。
 
         Side effects:
-            Performs validation only and leaves the supplied mapping unchanged.
+            検証だけを行い、渡された mapping は変更しません。
         """
         if not isinstance(self.case_id, str) or not self.case_id.strip():
             raise ValueError("case_id must not be blank")
@@ -71,30 +71,30 @@ class CaseSpec:
 @dataclass(frozen=True)
 class CaseResult:
     """
-    Represent one case execution with a stable JSON-serializable schema.
+    一件の case execution を安定した JSON-serializable schema で表します。
 
-    The invariant is that `success` carries an observation in `result`, while
-    `failed` or `blocked` carries a failure class, message, and evidence name.
+    invariant は `success` が `result` に observation を持ち、`failed` または `blocked` が
+    failure class、message、evidence name を持つことです。
 
     Args:
-        case_id: Stable case identity from the corresponding CaseSpec.
-        state: Terminal case state selected by the execution boundary.
-        result: JSON-compatible observation or preserved input context.
-        failure_class: Stable failure-cause classification or not_applicable.
-        failure_message: Human-readable failure detail, empty on success.
-        failure_evidence: Artifact name or not_applicable.
-        started_at: RFC3339 UTC worker start time.
-        finished_at: RFC3339 UTC worker finish time.
-        duration_seconds: Measured worker duration in seconds.
+        case_id: 対応する CaseSpec からの安定した case identity。
+        state: execution boundary が選択する terminal case state。
+        result: JSON-compatible observation または保持した input context。
+        failure_class: 安定した failure-cause classification または not_applicable。
+        failure_message: 人間向け failure detail。success では空。
+        failure_evidence: artifact name または not_applicable。
+        started_at: RFC3339 UTC worker start time。
+        finished_at: RFC3339 UTC worker finish time。
+        duration_seconds: worker が計測した秒単位の duration。
 
     Raises:
-        ValueError: If a terminal field is blank or duration is negative.
+        ValueError: terminal field が空、または duration が不正な場合。
 
     Side effects:
-        The frozen record performs no file, network, or device side effect.
+        frozen record は file、network、device の side effect を行いません。
 
     Ownership:
-        `case_execution.py` constructs records; `artifact_io.py` serializes them.
+        record は `case_execution.py` が構築し、serialization は `artifact_io.py` が行います。
     """
 
     case_id: str
@@ -109,14 +109,14 @@ class CaseResult:
 
     def __post_init__(self) -> None:
         """
-        Validate the record schema before it can be written to cases.jsonl.
+        cases.jsonl へ書く前に record schema を検証します。
 
         Raises:
-            ValueError: If identity, timestamps, failure classification, or
-                duration violate the record invariant.
+            ValueError: identity、timestamp、failure classification、duration が record
+                invariant に違反する場合。
 
         Side effects:
-            Performs local validation and does not serialize or publish the record.
+            local validation だけを行い、record の serialize/publication は行いません。
         """
         required_text = (
             self.case_id,
@@ -127,20 +127,37 @@ class CaseResult:
         )
         if not all(isinstance(value, str) and value.strip() for value in required_text):
             raise ValueError("case result identity and provenance fields must be non-empty")
+        if self.state not in {"success", "failed", "blocked"}:
+            raise ValueError("case state must be terminal success, failed, or blocked")
         if not isinstance(self.result, dict):
             raise ValueError("case result must contain a dict result payload")
-        if self.duration_seconds < 0:
-            raise ValueError("case duration must not be negative")
+        if not math.isfinite(self.duration_seconds) or self.duration_seconds < 0:
+            raise ValueError("case duration must be finite and non-negative")
+        if self.state == "success":
+            if not self.result:
+                raise ValueError("successful case must publish an observation")
+            if (
+                self.failure_class != "not_applicable"
+                or self.failure_message
+                or self.failure_evidence != "not_applicable"
+            ):
+                raise ValueError("successful case cannot carry failure fields")
+        elif (
+            self.failure_class == "not_applicable"
+            or not self.failure_message.strip()
+            or self.failure_evidence == "not_applicable"
+        ):
+            raise ValueError("failed or blocked case requires failure fields")
 
     def to_dict(self) -> dict[str, object]:
         """
-        Project this record to the line-oriented JSON artifact schema.
+        この record を line-oriented JSON artifact schema へ projection します。
 
         Returns:
-            A mapping containing every field required for independent readback.
+            独立 readback に必要な全 field を含む mapping。
 
         Side effects:
-            Reads the frozen record only; the caller owns serialization and I/O.
+            frozen record だけを読み、serialization と I/O は caller が所有します。
         """
         return {
             "case_id": self.case_id,

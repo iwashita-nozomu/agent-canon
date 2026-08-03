@@ -16,6 +16,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -93,6 +94,41 @@ def materialize_parent_fixture(source_root: Path, parent_root: Path) -> None:
     shutil.copy2(source_root / "tools" / "experiments" / "run_managed_experiment.py", runner_path)
 
 
+def complete_template_fixture(topic_dir: Path) -> None:
+    """テスト専用に required completion provenance を満たす fixture を作ります。"""
+    config_path = topic_dir / "config.yaml"
+    config_text = config_path.read_text(encoding="utf-8")
+    config_path.write_text(
+        config_text.replace("template_complete: false", "template_complete: true", 1),
+        encoding="utf-8",
+    )
+    provenance_path = topic_dir / "provenance.toml"
+    provenance_text = provenance_path.read_text(encoding="utf-8")
+    provenance_text = provenance_text.replace(
+        "template_complete = false", "template_complete = true", 1
+    ).replace('completion_status = "incomplete"', 'completion_status = "complete"', 1)
+    provenance_text = re.sub(r"<[^>]+>", "completed", provenance_text)
+    provenance_path.write_text(provenance_text, encoding="utf-8")
+
+
+def validate_run_state(result_dir: Path, expected_state: str, expected_case_count: int) -> None:
+    """materialized run の state、case 数、completion provenance を検証します。"""
+    summary = json.loads((result_dir / "summary.json").read_text(encoding="utf-8"))
+    if summary.get("status") != expected_state:
+        raise RuntimeError(
+            f"expected run state {expected_state}, got {summary.get('status')}"
+        )
+    if summary.get("case_count") != expected_case_count:
+        raise RuntimeError("materialized experiment run has an unexpected case count")
+    if summary.get("template_complete") != (expected_state == "success"):
+        raise RuntimeError("run state and template completion provenance disagree")
+    if expected_state == "incomplete":
+        if not (result_dir / "failure-evidence.json").is_file():
+            raise RuntimeError("incomplete run must preserve failure evidence")
+        if (result_dir / "cases.jsonl").read_text(encoding="utf-8"):
+            raise RuntimeError("incomplete run must not execute cases")
+
+
 def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
     """Validate generated registry identity, topic structure, and run artifacts."""
     topic_dir = parent_root / "experiments" / TOPIC
@@ -132,6 +168,7 @@ def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
         "cases.jsonl",
         "artifact-manifest.json",
         "config_snapshot.json",
+        "provenance_snapshot.toml",
         "environment.json",
         "visualization-status.json",
     )
@@ -143,9 +180,7 @@ def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
             "materialized experiment run is missing artifacts: "
             + ", ".join(missing_artifacts)
         )
-    summary = json.loads((result_dir / "summary.json").read_text(encoding="utf-8"))
-    if summary.get("status") != "success" or summary.get("case_count") != 1:
-        raise RuntimeError("materialized experiment run did not produce one successful case")
+    validate_run_state(result_dir, "success", 1)
 
 
 def main() -> int:
@@ -175,15 +210,26 @@ def main() -> int:
             cwd=source_root,
         )
         topic_dir = parent_root / "experiments" / TOPIC
-        run_dir = topic_dir / "result" / "template-smoke-run"
+        incomplete_run_dir = topic_dir / "result" / "template-smoke-incomplete"
         run_env = dict(os.environ)
         run_env["EXPERIMENT_RUN_MANIFEST"] = str(parent_root / "manifest.json")
-        run_env["EXPERIMENT_RUN_DIR"] = str(run_dir)
-        run_checked(
+        run_env["EXPERIMENT_RUN_DIR"] = str(incomplete_run_dir)
+        incomplete_result = subprocess.run(
             [sys.executable, str(topic_dir / "run.py")],
             cwd=source_root,
+            check=False,
+            capture_output=True,
+            text=True,
             env=run_env,
         )
+        if incomplete_result.returncode == 0:
+            raise RuntimeError("incomplete template scaffold must not report success")
+        validate_run_state(incomplete_run_dir, "incomplete", 0)
+
+        complete_template_fixture(topic_dir)
+        run_dir = topic_dir / "result" / "template-smoke-run"
+        run_env["EXPERIMENT_RUN_DIR"] = str(run_dir)
+        run_checked([sys.executable, str(topic_dir / "run.py")], cwd=source_root, env=run_env)
         validate_generated_topic(parent_root, registry_path)
         run_checked(
             [

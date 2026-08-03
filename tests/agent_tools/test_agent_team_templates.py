@@ -12,6 +12,8 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import subprocess
 import sys
 import unittest
 from dataclasses import replace
@@ -47,6 +49,29 @@ class AgentTeamTemplateTest(unittest.TestCase):
         self.assertIn("Args:", rendered)
         self.assertIn("Ownership:", rendered)
         self.assertNotIn("return None", rendered)
+
+    def test_code_template_renderer_works_from_repo_root_package_route(self) -> None:
+        """repo root の canonical package invocation が source を読み戻せる。"""
+        environment = dict(os.environ)
+        environment["PYTHONPATH"] = str(PROJECT_ROOT / "tools")
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-c",
+                (
+                    "from agent_tools.code_template_rendering import "
+                    "render_code_template; "
+                    "source = render_code_template('python/docstring_template.py'); "
+                    "assert 'class ExampleState' in source"
+                ),
+            ],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_active_design_packet_normalizer_rejects_unknown_mapping_fields(
         self,

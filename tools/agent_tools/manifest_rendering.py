@@ -6,6 +6,7 @@
 # upstream implementation ./packets.py provides rendering packet inputs.
 # upstream implementation ./workspace_scope.py provides rendering paths.
 # downstream implementation ./agent_team.py facade consumes rendering APIs.
+# downstream implementation ./code_template_rendering.py owns package-safe code source rendering.
 # downstream implementation ./task_start.py consumes rendering APIs.
 # @dependency-end
 """Own AgentTeam manifest, template, and output rendering."""
@@ -910,28 +911,12 @@ def render_template(template_name: str, replacements: dict[str, str]) -> str:
 
 
 def render_code_template(template_name: str) -> str:
-    """
-    Read one materializable source from templates/code with path containment.
-
-    Args:
-        template_name: English filename relative to the code-template owner.
-
-    Returns:
-        The canonical source bytes decoded as UTF-8 for destination materialization.
-
-    Raises:
-        RuntimeError: If the requested path escapes the code-template owner.
-        FileNotFoundError: If the named code template is not materialized.
-    """
-    template_root = CODE_TEMPLATE_ROOT.resolve()
-    template_path = (CODE_TEMPLATE_ROOT / template_name).resolve()
-    try:
-        template_path.relative_to(template_root)
-    except ValueError as error:
-        raise RuntimeError(f"code template escapes owner: {template_name}") from error
-    if not template_path.is_file():
-        raise FileNotFoundError(f"code template not found: {template_name}")
-    return template_path.read_text(encoding="utf-8")
+    """互換 facade から package-safe code-template renderer を呼び出します。"""
+    if __package__:
+        from .code_template_rendering import render_code_template as render_source
+    else:
+        from code_template_rendering import render_code_template as render_source
+    return render_source(template_name)
 
 
 def has_template(artifact_name: str) -> bool:

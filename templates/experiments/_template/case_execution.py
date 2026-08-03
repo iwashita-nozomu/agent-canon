@@ -7,7 +7,7 @@
 # @dependency-end
 
 """
-Execute one case and convert its outcome into a complete typed record.
+case 一件を実行し、その outcome を完全な typed record へ変換します。
 
 責務は case worker の replaceable domain seam、実行時間、failure-cause classification です。
 artifact serialization と run-level acceptance は別 module が所有します。
@@ -25,16 +25,16 @@ from case_model import CaseResult, CaseSpec
 
 def failure_class(error: BaseException) -> str:
     """
-    Classify an exception without hiding its original message.
+    元の message を隠さず exception を分類します。
 
     Args:
-        error: Observed exception from case or visualization execution.
+        error: case または visualization execution で観測した exception。
 
     Returns:
-        One stable failure class consumed by README and provenance readers.
+        README と provenance reader が使う安定した failure class。
 
     Side effects:
-        Performs type inspection only.
+        type inspection だけを行います。
     """
     if isinstance(error, (OSError, TimeoutError, subprocess.SubprocessError)):
         return "infrastructure_environment"
@@ -45,17 +45,17 @@ def failure_class(error: BaseException) -> str:
 
 def registry_failure(error: BaseException, started_at: str) -> CaseResult:
     """
-    Preserve a case-registry import or shape failure as a typed record.
+    case registry の import または shape failure を typed record として保持します。
 
     Args:
-        error: Registry error observed at the orchestration boundary.
-        started_at: Run start timestamp used as the registry record start.
+        error: orchestration boundary で観測した registry error。
+        started_at: registry record の start に使う run start timestamp。
 
     Returns:
-        A failed `case_registry` record with explicit evidence and classification.
+        明示的な evidence と classification を持つ failed `case_registry` record。
 
     Side effects:
-        Constructs an in-memory record only.
+        memory 上の record だけを構築します。
     """
     return CaseResult(
         case_id="case_registry",
@@ -72,26 +72,26 @@ def registry_failure(error: BaseException, started_at: str) -> CaseResult:
 
 def run_case_worker(case: CaseSpec, run_dir_text: str) -> CaseResult:
     """
-    Execute the replaceable domain case worker and return a typed success record.
+    replaceable domain case worker を実行し、typed success record を返します。
 
     Args:
-        case: Case identity and JSON-serializable parameter mapping.
-        run_dir_text: Absolute run directory for topic artifact ownership.
+        case: case identity と JSON-serializable parameter mapping。
+        run_dir_text: topic artifact ownership 用の absolute run directory。
 
     Returns:
-        A concrete numeric observation that users can replace with domain logic.
+        利用者が domain logic に置換できる具体的な numeric observation。
 
     Raises:
-        ValueError: If parameters lack a non-empty numeric values list.
-        TypeError: If parameters cease to be JSON-serializable.
+        ValueError: parameters に空でない numeric values list がない場合。
+        TypeError: parameters が JSON-serializable でなくなった場合。
 
     Side effects:
-        The scaffold has no domain side effect. Adapted workers must record any
-        file, network, device, or mutable-state effect in the result contract.
+        scaffold に domain side effect はありません。適応した worker は file、network、device、
+        mutable-state の effect を result contract に記録します。
 
     Ownership:
-        This function is the intended extension point for one domain algorithm;
-        it does not own run aggregation or artifact publication.
+        この function が一つの domain algorithm の extension point です。run aggregation と
+        artifact publication は所有しません。
     """
     json.dumps(case.parameters, ensure_ascii=False, sort_keys=True)
     raw_values = case.parameters.get("values", [])
@@ -133,17 +133,17 @@ def run_case_worker(case: CaseSpec, run_dir_text: str) -> CaseResult:
 
 def execute_case(case: CaseSpec, run_dir_text: str) -> CaseResult:
     """
-    Execute one case, measure it, and preserve failure semantics.
+    case 一件を実行・計測し、failure semantics を保持します。
 
     Args:
-        case: Validated case specification selected by the registry.
-        run_dir_text: Absolute run directory passed to the domain worker.
+        case: registry が選択した検証済み case specification。
+        run_dir_text: domain worker に渡す absolute run directory。
 
     Returns:
-        A terminal success or failed record with measured duration.
+        計測 duration を持つ terminal success または failed record。
 
     Side effects:
-        Invokes the replaceable worker and preserves no artifact directly.
+        replaceable worker を呼び、artifact は直接保持しません。
     """
     started_at = utc_now()
     start_clock = time.perf_counter()

@@ -6,7 +6,7 @@ upstream design ../../documents/rule/README.md filename, placement, and Japanese
 upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract.
 upstream design ../README.md centralized template index and canonical source boundary.
 downstream implementation ./python/docstring_template.py parse-valid module/class/function example.
-downstream implementation ../../tools/agent_tools/manifest_rendering.py code-template renderer/readback route.
+downstream implementation ../../tools/agent_tools/code_template_rendering.py code-template renderer/readback route.
 @dependency-end
 -->
 
@@ -42,13 +42,15 @@ Docstring の意味契約は日本語で記述します。
    domain-specific な値へ置換し、例示のまま成功扱いにしない。
 1. renderer を使った場合は rendered source と destination の path/sha256 を read back する。
 
-```python
+```bash
+PYTHONPATH=tools python3 - <<'PY'
 from pathlib import Path
 
-from tools.agent_tools.manifest_rendering import render_code_template
+from agent_tools.code_template_rendering import render_code_template
 
 source = render_code_template("python/docstring_template.py")
 Path("python/docstring_template.py").write_text(source, encoding="utf-8")
+PY
 ```
 
 この例の write は destination owner の明示的な materialization route です。template source の

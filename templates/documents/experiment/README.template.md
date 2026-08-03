@@ -25,7 +25,8 @@ managed run → result/failure → interpretation → retention/cleanup の順�
 - intended reader and decision: 実験設計者、実行担当者、reviewer、保守者。
 - what this document contains: plan、複数案、algorithm contract、必要十分 oracle、resource/env/result provenance、failure semantics。
 - canonical source / generated surface: この README と `provenance.toml` が topic source、`result/<run-id>/` は run-local result。
-- owner boundary: orchestration、domain logic、metrics、visualization、artifact I/O の OOP/type 境界を分ける。
+- owner boundary: orchestration、case model/execution、metrics、visualization、artifact schema/I/O の OOP/type 境界を分ける。
+- implementation map: `run.py` は入口、`case_model.py` は CaseSpec/CaseResult、`case_execution.py` は worker/failure、`artifact_schema.py` は schema、`artifact_io.py` は atomic publication/manifest、`visualization.py` は notebook consumer を所有する。
 - required readback: managed command、config snapshot、resource admission、result manifest、docs formatter/readback。
 - lifecycle: result retention、cleanup owner、再構築可能性を closeout 前に確認する。
 
@@ -55,6 +56,11 @@ run/result provenance、失敗結果の受理条件、再現性、artifact reten
 - `provenance.toml`: README と同じ計画、選択、resource、run、result identity を記録する machine-readable provenance。
 - `run.py`: managed runner の child から呼ばれる topic entrypoint。`main()` が run artifact を生成する。
 - `cases.py`: topic の case 定義。
+- `case_model.py`: CaseSpec、CaseResult、terminal state と success/failure cross-field invariant。
+- `case_execution.py`: replaceable case worker、duration、failure-cause classification。
+- `artifact_schema.py`: RunSummary、ArtifactManifest、completion provenance の型境界。
+- `artifact_io.py`: config/provenance snapshot、atomic JSON/JSONL、nested artifact digest readback。
+- `visualization.py`: optional notebook consumer と visualization status artifact。
 - `config.yaml`: checked-in topic設定の正本。
 - `visualize.ipynb`: run artifactを読む可視化 notebook。
 - `result/`: `result/<run_name>/` ごとの run artifact とログ。
@@ -67,6 +73,11 @@ experiments/<topic>/
 ├── provenance.toml
 ├── run.py
 ├── cases.py
+├── case_model.py
+├── case_execution.py
+├── artifact_schema.py
+├── artifact_io.py
+├── visualization.py
 ├── config.yaml
 ├── visualize.ipynb
 └── result/
@@ -74,6 +85,7 @@ experiments/<topic>/
         ├── summary.json
         ├── cases.jsonl
         ├── config_snapshot.json
+        ├── provenance_snapshot.toml
         ├── environment.json
         ├── artifact-manifest.json
         ├── visualization-status.json
@@ -81,7 +93,8 @@ experiments/<topic>/
         └── logs/
 ```
 
-`create_experiment_topic.py` は runnable scaffold を `templates/experiments/_template/` からコピーし、
+`create_experiment_topic.py` は runnable scaffold と責務別の5 moduleを
+`templates/experiments/_template/` からコピーし、
 この canonical template の README と provenance TOML を同じ topicへ配置します。したがって、
 作成された topic の `README.md` だけで、Files、構造、managed実行、artifact、実装位置を
 再構築できます。
@@ -233,7 +246,11 @@ python3 tools/experiments/run_managed_experiment.py \
 - `config.yaml` はchecked-in設定の正本であり、run時の割当・snapshot・command identityは
   runnerのprovenanceへ記録する。
 
-最小 scaffold には `cases.py` の `example` case が一つあり、case record は `case_id`、
+最小 scaffold には `cases.py` の `example` case が一つありますが、`config.yaml` と
+`provenance.toml` は `template_complete=false` / `completion_status="incomplete"` です。
+required fields と completion provenance が満たされるまでは run は `incomplete`、case は実行せず、
+成功結果を名乗りません。materialization smoke はこの incomplete fixture/state を先に検証し、
+completion fixture を埋めた代表 run だけが success になります。case record は `case_id`、
 `state`、`result`、`failure_class`、時刻、duration を必ず持ちます。case が空なら run は
 `blocked`、case failure なら `failed` とし、成功 record だけを残して failure を隠しません。
 `EXPERIMENT_RUN_VISUALIZATION=1` を指定しない場合、visualization は
@@ -243,10 +260,15 @@ python3 tools/experiments/run_managed_experiment.py \
 
 - `run.py` のtop-level importは `from __future__ import annotations` と軽量な定数・標準libraryに限定する。
 - `run.py` の `main()` は引数なしで固定し、`argparse` などのtopic CLIを追加しない。
+- `template_complete=false`、placeholder、または completion provenance 不足を成功へ変える
+  production bypass flag は設けない。
 - JAX、CUDA、NumPy、EQX、Optax、project moduleなどの実験依存importは、`run_experiment()` または
   `run_case_worker()` の内部へ置く。
 - 実験の実装箇所は `run.py`、`cases.py`、`config.yaml`、`visualize.ipynb` の `IMPLEMENT HERE`
   markerで明示する。
+- `run.py` は execution entrypoint/orchestration に限定し、上記5 moduleの責務を重複実装しない。
+- artifact manifest は run directory 内の nested regular file 全件を normalized relative path と
+  SHA-256 で readback する。CaseResult の terminal state invariant を publication 前に通す。
 - GPU visibility、JAX platform、allocator、preallocation、serial worker数はtopic code / checked-in
   configへ埋め込まない。GPU/resource admissionと実行環境はmanaged runnerおよびcaller/schedulerの
   owner boundaryで決め、provenanceへ記録する。

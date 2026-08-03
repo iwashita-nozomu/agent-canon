@@ -7,8 +7,10 @@
 # upstream design ../../templates/documents/experiment/experiment-provenance.template.toml canonical provenance template.
 # downstream implementation ../../templates/experiments/_template/run.py runnable topic scaffold and orchestration boundary.
 # downstream implementation ../../templates/experiments/_template/case_model.py reusable case/result models.
+# downstream implementation ../../templates/experiments/_template/case_execution.py case worker and failure classification.
 # downstream implementation ../../templates/experiments/_template/artifact_schema.py stable artifact schemas.
 # downstream implementation ../../templates/experiments/_template/artifact_io.py atomic artifact publication.
+# downstream implementation ../../templates/experiments/_template/visualization.py visualization consumer status.
 # upstream design ../../documents/experiments/experiment-registry.md project experiment registry contract.
 # @dependency-end
 

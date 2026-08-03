@@ -5,6 +5,9 @@
 # downstream implementation run.py consumes managed run configuration.
 # @dependency-end
 
+# template_complete=false の間は materialized scaffold を明示的な未完了状態に保つ。
+template_complete: false
+
 # IMPLEMENT HERE: 実験の case set または sweep space を定義する。
 cases: {}
 

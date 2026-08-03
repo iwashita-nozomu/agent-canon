@@ -27,6 +27,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from artifact_io import (
+    load_completion_provenance,
     utc_now,
     write_artifact_manifest,
     write_case_records,
@@ -41,13 +42,18 @@ from artifact_schema import (
     RESULT_CASES_NAME,
     RESULT_MANIFEST_NAME,
     RESULT_SUMMARY_NAME,
+    PROVENANCE_SNAPSHOT_NAME,
+    RunState,
     VISUALIZATION_STATUS_NAME,
-    CaseState,
+    CompletionProvenance,
     RunSummary,
 )
 from case_execution import execute_case, registry_failure
 from case_model import CaseResult, CaseSpec
-from visualization import execute_visualization_notebook
+from visualization import (
+    execute_visualization_notebook,
+    write_visualization_not_requested_status,
+)
 
 DEFAULT_RUN_NAME_PREFIX = "run"
 
@@ -126,7 +132,8 @@ def _case_state_counts(records: tuple[CaseResult, ...]) -> tuple[int, int, int]:
 
 def _run_acceptance(
     records: tuple[CaseResult, ...],
-) -> tuple[CaseState, str, str]:
+    completion: CompletionProvenance,
+) -> tuple[RunState, str, str]:
     """
     Derive run status, failure class, and close condition from case records.
 
@@ -139,6 +146,12 @@ def _run_acceptance(
     Side effects:
         Does not write artifacts or mutate records.
     """
+    if not completion.is_complete:
+        return (
+            "incomplete",
+            "expected_contract",
+            "complete config.yaml and provenance.toml required before execution",
+        )
     if not records:
         return "blocked", "expected_contract", "declare at least one case in cases.py"
     failed_records = [record for record in records if record.state == "failed"]
@@ -183,19 +196,21 @@ def run_experiment(run_dir: Path) -> RunSummary:
     run_dir.mkdir(parents=True, exist_ok=True)
     started_at = utc_now()
     template_dir = Path(__file__).resolve().parent
-    write_provenance_snapshots(run_dir, template_dir)
+    completion = load_completion_provenance(template_dir)
+    write_provenance_snapshots(run_dir, template_dir, completion)
     records_list: list[CaseResult] = []
-    try:
-        cases = load_cases()
-    except Exception as error:
-        cases = ()
-        records_list.append(registry_failure(error, started_at))
-    for case in cases:
-        records_list.append(execute_case(case, str(run_dir.resolve())))
+    if completion.is_complete:
+        try:
+            cases = load_cases()
+        except Exception as error:
+            cases = ()
+            records_list.append(registry_failure(error, started_at))
+        for case in cases:
+            records_list.append(execute_case(case, str(run_dir.resolve())))
     records = tuple(records_list)
     write_case_records(run_dir, records)
     success_count, failed_count, blocked_count = _case_state_counts(records)
-    status, failure_class, close_condition = _run_acceptance(records)
+    status, failure_class, close_condition = _run_acceptance(records, completion)
     failure_records = tuple(record for record in records if record.state != "success")
     failure_evidence = "not_applicable"
     if failure_records or not records:
@@ -208,22 +223,25 @@ def run_experiment(run_dir: Path) -> RunSummary:
             close_condition=close_condition,
         )
     visualization_status = "not_requested"
-    try:
-        visualization_status = execute_visualization_notebook(run_dir, template_dir)
-    except Exception as error:
-        visualization_status = "blocked"
-        status = "failed"
-        failure_class = "infrastructure_environment"
-        close_condition = "provide the visualization runtime and rerun the managed command"
-        failure_evidence = FAILURE_EVIDENCE_NAME
-        write_failure_evidence(
-            run_dir,
-            status=status,
-            failure_class=failure_class,
-            records=failure_records,
-            close_condition=close_condition,
-            visualization_error=f"{type(error).__name__}: {error}",
-        )
+    if completion.is_complete:
+        try:
+            visualization_status = execute_visualization_notebook(run_dir, template_dir)
+        except Exception as error:
+            visualization_status = "blocked"
+            status = "failed"
+            failure_class = "infrastructure_environment"
+            close_condition = "provide the visualization runtime and rerun the managed command"
+            failure_evidence = FAILURE_EVIDENCE_NAME
+            write_failure_evidence(
+                run_dir,
+                status=status,
+                failure_class=failure_class,
+                records=failure_records,
+                close_condition=close_condition,
+                visualization_error=f"{type(error).__name__}: {error}",
+            )
+    else:
+        visualization_status = write_visualization_not_requested_status(run_dir)
     finished_at = utc_now()
     preserved = [
         RESULT_SUMMARY_NAME,
@@ -231,6 +249,7 @@ def run_experiment(run_dir: Path) -> RunSummary:
         RESULT_MANIFEST_NAME,
         CONFIG_SNAPSHOT_NAME,
         ENVIRONMENT_SNAPSHOT_NAME,
+        PROVENANCE_SNAPSHOT_NAME,
         VISUALIZATION_STATUS_NAME,
     ]
     if failure_evidence != "not_applicable":
@@ -249,8 +268,15 @@ def run_experiment(run_dir: Path) -> RunSummary:
         failure_evidence=failure_evidence,
         preserved_artifacts=tuple(preserved),
         close_condition=close_condition,
-        validation_oracle="non-empty cases; every case state and artifact digest read back",
+        validation_oracle=(
+            "pass: complete provenance, non-empty cases, terminal state invariants, "
+            "and every artifact digest read back"
+            if status == "success"
+            else "incomplete: completion provenance is not sufficient for success"
+        ),
         visualization_status=visualization_status,
+        template_complete=completion.is_complete,
+        completion_provenance=completion.to_dict(),
     )
     write_summary(run_dir, summary)
     write_artifact_manifest(run_dir, summary)

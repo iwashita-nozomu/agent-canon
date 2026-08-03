@@ -8,7 +8,7 @@
 # @dependency-end
 
 """
-Execute the optional visualization consumer with explicit status semantics.
+optional visualization consumer を明示的な status semantics で実行します。
 
 責務は notebook の optional execution と `visualization-status.json` の publication です。
 minimal run は `not_requested`、要求済みで runtime 不足なら `blocked` になります。
@@ -29,26 +29,51 @@ from artifact_schema import (
 )
 
 
-def execute_visualization_notebook(run_dir: Path, template_dir: Path) -> str:
+def write_visualization_not_requested_status(run_dir: Path) -> str:
     """
-    Execute the optional visualization consumer and record its terminal state.
-
-    Set `EXPERIMENT_RUN_VISUALIZATION=1` to require managed notebook execution.
-    The default `not_requested` state keeps the complete minimal scaffold runnable.
+    不完全 scaffold の可視化を実行せず、明示的な未要求状態を保存します。
 
     Args:
-        run_dir: Result directory receiving status and notebook output.
-        template_dir: Materialized experiment directory containing the notebook.
+        run_dir: status artifact を所有する run directory。
 
     Returns:
-        `not_requested`, `success`, or `blocked` when the notebook was requested.
-
-    Raises:
-        RuntimeError: If visualization was requested but Jupyter is unavailable.
-        subprocess.CalledProcessError: If notebook execution fails.
+        `not_requested` を返します。
 
     Side effects:
-        May execute Jupyter and atomically writes visualization-status.json.
+        visualization-status.json を atomic に書き込みます。
+    """
+    atomic_write_json(
+        run_dir / VISUALIZATION_STATUS_NAME,
+        {
+            "state": "not_requested",
+            "requested": False,
+            "consumer": VISUALIZE_NOTEBOOK_NAME,
+            "readback": "incomplete template did not execute visualization",
+        },
+    )
+    return "not_requested"
+
+
+def execute_visualization_notebook(run_dir: Path, template_dir: Path) -> str:
+    """
+    optional visualization consumer を実行し、terminal state を記録します。
+
+    `EXPERIMENT_RUN_VISUALIZATION=1` で managed notebook execution を要求します。
+    default の `not_requested` state は minimal scaffold の runnable 性を保ちます。
+
+    Args:
+        run_dir: status と notebook output を受け取る result directory。
+        template_dir: notebook を含む materialized experiment directory。
+
+    Returns:
+        `not_requested`、`success`、または notebook 要求時の `blocked`。
+
+    Raises:
+        RuntimeError: visualization を要求したが Jupyter がない場合。
+        subprocess.CalledProcessError: notebook execution に失敗した場合。
+
+    Side effects:
+        Jupyter を実行することがあり、visualization-status.json を atomic に書きます。
     """
     status_path = run_dir / VISUALIZATION_STATUS_NAME
     requested = os.environ.get("EXPERIMENT_RUN_VISUALIZATION", "0") == "1"

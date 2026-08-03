@@ -76,4 +76,4 @@ typed failure を記録します。
 
 ## Implementation Notes（implementation メモ）
 
-<!-- validation route を記録します。behavior-owned case では新しい public API、helper、return-shape、error-prose、mock-order、internal-call-sequence contract を導入せず placement note を指します。 -->
+<!-- validation route を記録します。behavior-owned cases（behavior が所有する case）では新しい public API、helper、return-shape、error-prose、mock-order、internal-call-sequence contract を導入せず placement note を指します。 -->
