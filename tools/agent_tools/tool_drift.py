@@ -296,7 +296,6 @@ CONTRACTS = (
             LinkCheck("tools/agent_tools/check_convention_compliance.py"),
             LinkCheck("tools/ci/agent_canon_pr_graph_selector.py"),
             LinkCheck("tools/ci/check_github_workflows.py"),
-            LinkCheck("tools/ci/run_all_checks.sh"),
         ),
         text_checks=(
             TextCheck(

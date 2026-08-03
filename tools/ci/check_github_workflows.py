@@ -214,6 +214,9 @@ AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
     "github.event.pull_request.head.sha || github.sha",
     "bash tools/ci/check_agent_canon_pr.sh",
 )
+PARENT_PROJECT_QUALITY_OWNER_ENV = "AGENT_CANON_PR_PROJECT_QUALITY_OWNER"
+PARENT_PROJECT_QUALITY_OWNER = "parent_ci"
+PARENT_PROJECT_QUALITY_COMMAND = "make ci"
 AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS = (
     "tool_catalog.py",
     "tool_drift.py",
@@ -238,7 +241,9 @@ AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS = (
 
 def is_template_or_derived_repo(root: Path) -> bool:
     """Return whether root is a template or derived repo with AgentCanon vendored."""
-    return (root / "vendor" / "agent-canon").exists() and (root / ".gitmodules").is_file()
+    return (root / "vendor" / "agent-canon").exists() and (
+        root / ".gitmodules"
+    ).is_file()
 
 
 def agent_canon_root(root: Path) -> Path:
@@ -410,7 +415,9 @@ def non_step_credential_env_names(workflow: dict[str, object]) -> set[str]:
     return names
 
 
-def agent_canon_checkout_command_steps(workflow: dict[str, object]) -> list[StepContext]:
+def agent_canon_checkout_command_steps(
+    workflow: dict[str, object],
+) -> list[StepContext]:
     """Return steps that invoke the AgentCanon checkout helper."""
     steps: list[StepContext] = []
     for context in step_contexts(workflow):
@@ -420,16 +427,21 @@ def agent_canon_checkout_command_steps(workflow: dict[str, object]) -> list[Step
     return steps
 
 
-def referenced_agent_canon_checkout_script_available(root: Path, workflow_text: str) -> bool:
+def referenced_agent_canon_checkout_script_available(
+    root: Path, workflow_text: str
+) -> bool:
     """Return whether at least one helper path referenced by the workflow exists."""
     roots = (root, agent_canon_root(root))
     return any(
-        path in workflow_text and any((candidate_root / path).is_file() for candidate_root in roots)
+        path in workflow_text
+        and any((candidate_root / path).is_file() for candidate_root in roots)
         for path in HELPER_PATHS
     )
 
 
-def workflow_declared_findings(path: Path, workflow: dict[str, object]) -> list[Finding]:
+def workflow_declared_findings(
+    path: Path, workflow: dict[str, object]
+) -> list[Finding]:
     """Return findings for workflow-level required declarations."""
     findings: list[Finding] = []
     if not has_permissions(workflow):
@@ -452,15 +464,29 @@ def agent_canon_checkout_policy_findings(
     requires_agent_canon_checkout = path.name not in AGENT_CANON_INDEPENDENT_WORKFLOWS
     if requires_agent_canon_checkout and checkouts and not helpers:
         findings.append(Finding("error", path, "missing_agent_canon_checkout_helper"))
-    if requires_agent_canon_checkout and checkouts and not any(name in workflow_text for name in AGENT_CANON_CREDENTIALS):
-        findings.append(Finding("error", path, "missing_agent_canon_repo_credential_env"))
+    if (
+        requires_agent_canon_checkout
+        and checkouts
+        and not any(name in workflow_text for name in AGENT_CANON_CREDENTIALS)
+    ):
+        findings.append(
+            Finding("error", path, "missing_agent_canon_repo_credential_env")
+        )
     if not requires_agent_canon_checkout:
         if helpers:
-            findings.append(Finding("error", path, "agent_canon_checkout_helper_not_allowed"))
+            findings.append(
+                Finding("error", path, "agent_canon_checkout_helper_not_allowed")
+            )
         if any(name in workflow_text for name in AGENT_CANON_CREDENTIALS):
-            findings.append(Finding("error", path, "agent_canon_credentials_not_allowed"))
-    if helpers and not referenced_agent_canon_checkout_script_available(root, workflow_text):
-        findings.append(Finding("error", path, "missing_referenced_agent_canon_checkout_helper"))
+            findings.append(
+                Finding("error", path, "agent_canon_credentials_not_allowed")
+            )
+    if helpers and not referenced_agent_canon_checkout_script_available(
+        root, workflow_text
+    ):
+        findings.append(
+            Finding("error", path, "missing_referenced_agent_canon_checkout_helper")
+        )
     non_step_credentials = non_step_credential_env_names(workflow)
     if helpers and non_step_credentials:
         findings.append(
@@ -579,7 +605,9 @@ def agent_canon_static_gate_findings(
                 )
             )
     if re.search(r"(?m)^  push:\s*$", workflow_text):
-        findings.append(Finding("error", path, "duplicate_push_trigger_for_candidate_gate"))
+        findings.append(
+            Finding("error", path, "duplicate_push_trigger_for_candidate_gate")
+        )
     for context, run in run_steps:
         if wrapper in run:
             continue
@@ -593,6 +621,72 @@ def agent_canon_static_gate_findings(
                     )
                 )
     return findings
+
+
+def project_quality_owner_value(source: Mapping[str, object]) -> object:
+    """Return the project-quality owner marker from a workflow object."""
+    env = as_string_dict(source.get("env"))
+    if env is None:
+        return None
+    return env.get(PARENT_PROJECT_QUALITY_OWNER_ENV)
+
+
+def has_canonical_project_quality_command(run: str) -> bool:
+    """Return whether a workflow run invokes the canonical parent quality command."""
+    return any(
+        line.strip() == PARENT_PROJECT_QUALITY_COMMAND for line in run.splitlines()
+    )
+
+
+def parent_project_quality_findings(root: Path) -> list[Finding]:
+    """Require a parent-owned quality route in derived repository workflows."""
+    workflow_dir = root / ".github" / "workflows"
+    owner_routes: list[tuple[Path, str | None]] = []
+    declared_owner = False
+    for path in sorted(workflow_dir.glob("*.y*ml")):
+        workflow = load_workflow(path)
+        for _job_name, job in job_items(workflow):
+            job_owner = project_quality_owner_value(job)
+            if job_owner is not None:
+                declared_owner = True
+            job_steps = job.get("steps")
+            steps = cast(list[object], job_steps) if isinstance(job_steps, list) else []
+            for step_object in steps:
+                step = as_string_dict(step_object)
+                if step is None:
+                    continue
+                step_owner = project_quality_owner_value(step)
+                if step_owner is not None:
+                    declared_owner = True
+                owner = step_owner if step_owner is not None else job_owner
+                if owner == PARENT_PROJECT_QUALITY_OWNER:
+                    run = step.get("run")
+                    owner_routes.append(
+                        (
+                            path,
+                            run if isinstance(run, str) else None,
+                        )
+                    )
+    if not owner_routes:
+        message = (
+            "parent_project_quality_owner_must_be_parent_ci"
+            if declared_owner
+            else "missing_parent_project_quality_owner"
+        )
+        return [Finding("error", workflow_dir, message)]
+    if any(
+        run is not None and has_canonical_project_quality_command(run)
+        for _path, run in owner_routes
+    ):
+        return []
+    return [
+        Finding(
+            "error",
+            path,
+            "parent_project_quality_route_missing_canonical_command",
+        )
+        for path, _run in owner_routes[:1]
+    ]
 
 
 def require_text(path: Path, required: Sequence[str]) -> list[Finding]:
@@ -618,7 +712,9 @@ def projected_template_requirements(
         item.replace("tools/agent_tools/", "tools/agent-canon/agent_tools/")
         .replace("tools/ci/", "tools/agent-canon/ci/")
         .replace("tools/sync_agent_canon.sh", "tools/agent-canon/sync_agent_canon.sh")
-        .replace("tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh")
+        .replace(
+            "tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh"
+        )
         for item in required
     )
 
@@ -626,7 +722,9 @@ def projected_template_requirements(
 def check_root_copy_headers(root: Path) -> list[Finding]:
     """Check synced root-copy workflow source markers."""
     findings: list[Finding] = []
-    stale_template_dashboard = root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+    stale_template_dashboard = (
+        root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+    )
     if is_template_or_derived_repo(root) and stale_template_dashboard.exists():
         findings.append(
             Finding(
@@ -711,7 +809,11 @@ def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]
                 ),
             ),
             (
-                root / "vendor" / "agent-canon" / ".github" / "PULL_REQUEST_TEMPLATE.md",
+                root
+                / "vendor"
+                / "agent-canon"
+                / ".github"
+                / "PULL_REQUEST_TEMPLATE.md",
                 STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS,
             ),
         ]
@@ -826,7 +928,12 @@ def check_pr_templates(root: Path) -> list[Finding]:
         findings.extend(require_text(path, required))
     canon_root = agent_canon_root(root)
     semantic_templates = {
-        canon_root / "templates" / "documents" / "github" / "pull-request" / "agent_canon.md",
+        canon_root
+        / "templates"
+        / "documents"
+        / "github"
+        / "pull-request"
+        / "agent_canon.md",
         root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md",
     }
     for path in sorted(semantic_templates):
@@ -847,7 +954,9 @@ def submodule_checkout_script_findings(root: Path) -> list[Finding]:
     )
     wrapper_path = root / "tools" / "ci" / "checkout_agent_canon_submodule.sh"
     if not wrapper_path.is_file():
-        wrapper_path = root / "tools" / "agent-canon" / "ci" / "checkout_agent_canon_submodule.sh"
+        wrapper_path = (
+            root / "tools" / "agent-canon" / "ci" / "checkout_agent_canon_submodule.sh"
+        )
     findings.extend(require_text(wrapper_path, SUBMODULE_CHECKOUT_WRAPPER_REQUIREMENTS))
     return findings
 
@@ -927,6 +1036,8 @@ def github_workflow_findings(root: Path) -> tuple[list[Finding], list[Path]]:
     findings: list[Finding] = []
     for path in workflows:
         findings.extend(check_workflow(root, path))
+    if is_template_or_derived_repo(root):
+        findings.extend(parent_project_quality_findings(root))
     findings.extend(check_root_copy_headers(root))
     findings.extend(check_pr_templates(root))
     findings.extend(check_github_support_surfaces(root))

@@ -1030,7 +1030,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream implementation ../agent_tools/check_convention_compliance.py convention gate",
                     "# upstream implementation ./agent_canon_pr_graph_selector.py graph selector",
                     "# upstream implementation ./check_github_workflows.py github checks",
-                    "# upstream implementation ./run_all_checks.sh quick ci",
                     "# @dependency-end",
                     "agentcanon_pr_dependency_graph_required() { return 0; }",
                     'python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py"',
@@ -1077,7 +1076,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             "tools/agent_tools/check_agent_runtime_alignment.py",
             "tools/agent_tools/check_convention_compliance.py",
             "tools/ci/check_github_workflows.py",
-            "tools/ci/run_all_checks.sh",
         ]:
             self.write_plain_manifest(root, relative)
 

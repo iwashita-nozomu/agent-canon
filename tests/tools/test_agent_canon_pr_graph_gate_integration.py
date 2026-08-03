@@ -15,6 +15,7 @@ import os
 import shutil
 import stat
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -262,9 +263,15 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             exit 0
             """,
         )
-        shutil.copy2(
-            PROJECT_ROOT / "tools" / "ci" / "run_all_checks.sh",
+        write_executable(
             source / "tools" / "ci" / "run_all_checks.sh",
+            """
+            #!/usr/bin/env bash
+            if [[ -n "${RUN_ALL_CHECKS_FIXTURE_LOG:-}" ]]; then
+                printf '%s\n' "$*" >>"${RUN_ALL_CHECKS_FIXTURE_LOG}"
+            fi
+            exit "${RUN_ALL_CHECKS_FIXTURE_RC:-0}"
+            """,
         )
         shutil.copy2(
             PROJECT_ROOT / "tools" / "ci" / "run_python_quality_checks.sh",
@@ -364,6 +371,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         *,
         include_manifest: bool = True,
         baseline_doc_diagnostics: int = 0,
+        project_quality_error: bool = False,
     ) -> tuple[Path, str]:
         """Create a template-like parent with one manifest-touching PR diff."""
         parent = root / "parent"
@@ -391,6 +399,11 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         (parent / "changed.py").write_text("before\n", encoding="utf-8")
         (parent / "legacy.py").write_text("legacy\n", encoding="utf-8")
         (parent / "related.py").write_text("related\n", encoding="utf-8")
+        if project_quality_error:
+            (parent / "existing_project_type_error.py").write_text(
+                "def existing_error(value: str) -> int:\n    return value\n",
+                encoding="utf-8",
+            )
         for relative in (
             "tests/agent_tools/test_artifact_identity.py",
             "tests/agent_tools/test_codex_hooks.py",
@@ -450,6 +463,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             source,
             include_manifest=scenario != "no_manifest",
             baseline_doc_diagnostics=1 if scenario == "pydoc_baseline" else 0,
+            project_quality_error=scenario == "parent_project_errors",
         )
         fake_bin = fixture_root / "bin"
         fake_home = fixture_root / "agent-canon-home"
@@ -499,6 +513,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "PYTHON_BIN": str(fake_bin / "python-recorder"),
                 "PYTHON_CALL_LOG": str(python_call_log),
                 "AGENT_CANON_TOOLS_HOME": str(fake_home),
+                "RUN_ALL_CHECKS_FIXTURE_LOG": str(temp_root / "run-all-checks.log"),
             }
         )
         result = run(
@@ -518,7 +533,8 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertEqual(valid.returncode, 0, valid.stdout + valid.stderr)
         self.assertIn('"status": "incomplete"', valid.stdout)
         self.assertIn("AGENT_CANON_PR_GRAPH_ACCEPTANCE=pass", valid.stdout)
-        self.assertIn("PR_GATE_RECEIPT=accepted dependency_graph=scoped", valid.stdout)
+        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", valid.stdout)
+        self.assertFalse((valid_state / "run-all-checks.log").exists())
         self.assertNotIn("REPO_DEPENDENCY_REVIEW_CALLED", valid.stdout)
         report = (
             valid_state
@@ -562,12 +578,27 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertIn(
             "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required", result.stdout
         )
-        self.assertIn(
-            "PR_GATE_RECEIPT=accepted dependency_graph=skipped", result.stdout
-        )
+        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", result.stdout)
 
-    def test_standalone_ordinary_change_runs_full_graph_gate(self) -> None:
-        """Standalone AgentCanon owns full graph completeness even on ordinary changes."""
+    def test_derived_parent_delegates_project_quality_to_parent_ci(self) -> None:
+        """Derived shared gates do not execute parent project quality checks."""
+        result, state = self.run_pr_check("parent_project_errors")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", result.stdout)
+        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY_OWNER=parent_ci", result.stdout)
+        self.assertFalse((state / "run-all-checks.log").exists())
+        project_quality = run(
+            state.parent / "parent",
+            sys.executable,
+            "-m",
+            "pyright",
+            "existing_project_type_error.py",
+            check=False,
+        )
+        self.assertNotEqual(project_quality.returncode, 0)
+
+    def test_standalone_ordinary_change_keeps_shared_gate_only(self) -> None:
+        """Standalone owns shared graph completeness without a quality job."""
         fixture_root = Path(tempfile.mkdtemp(prefix="graph-gate-standalone-"))
         self.addCleanup(shutil.rmtree, fixture_root)
         source = self.create_source_repo(fixture_root)
@@ -645,6 +676,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "AGENT_CANON_PR_TEMP_ROOT": str(temp_root),
                 "GRAPH_GATE_FIXTURE_SCENARIO": "standalone",
                 "AGENT_CANON_TOOLS_HOME": str(fake_home),
+                "RUN_ALL_CHECKS_FIXTURE_LOG": str(temp_root / "run-all-checks.log"),
             }
         )
         result = run(
@@ -656,6 +688,12 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", result.stdout)
+        self.assertIn(
+            "AGENT_CANON_PR_PROJECT_QUALITY_OWNER=agentcanon_project_ci",
+            result.stdout,
+        )
+        self.assertFalse((temp_root / "run-all-checks.log").exists())
         self.assertIn(
             "AGENT_CANON_PR_DEPENDENCY_GRAPH=required reason=standalone_source",
             result.stdout,
@@ -668,29 +706,23 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
 
     def test_real_pr_check_runs_header_scan_before_hard_graph_failure(self) -> None:
         """Trusted changed paths reach header scanning even when graph build fails hard."""
-        result, _ = self.run_pr_check("hard_failure")
+        result, state = self.run_pr_check("hard_failure")
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
         self.assertIn("HEADER_SCAN_REVIEW_CALLED", result.stdout)
         self.assertIn(
             "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=graph_build_failed rc=2",
             result.stdout,
         )
+        self.assertNotIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", result.stdout)
+        self.assertFalse((state / "run-all-checks.log").exists())
 
     def test_real_pr_check_reports_unchanged_production_baseline_once(self) -> None:
         """Shared correctness stays green while explicit Docstring review reports violations."""
         result, state = self.run_pr_check("pydoc_baseline")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("PYDOCSTYLE", result.stdout)
-        self.assertIn("RUFF=skip reason=quick_mode", result.stdout)
-        pr_calls = [
-            json.loads(line)
-            for line in (state / "pr-python-calls.jsonl")
-            .read_text(encoding="utf-8")
-            .splitlines()
-        ]
-        self.assertTrue(any(call[:2] == ["-m", "pytest"] for call in pr_calls))
-        self.assertTrue(any(call[:2] == ["-m", "pyright"] for call in pr_calls))
-        self.assertFalse(any("pydocstyle" in call for call in pr_calls))
+        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", result.stdout)
+        self.assertFalse((state / "run-all-checks.log").exists())
 
         parent = state.parent / "parent"
         target = "baseline_0.py"
