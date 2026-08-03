@@ -19,6 +19,7 @@
 # upstream implementation ../agent_tools/update_lifecycle_contract.py owns G1-G3 receipt identity.
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
 # upstream implementation ./run_all_checks.sh quick CI implementation
+# upstream implementation ../ci/run_python_quality_checks.sh owns shared Python static quality checks
 # @dependency-end
 
 set -euo pipefail
@@ -628,7 +629,18 @@ echo ""
 echo "6️⃣  dependency graph completeness"
 PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped
 PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=0
+PR_GATE_DEPENDENCY_GRAPH_REQUIRED=0
 if agentcanon_pr_dependency_graph_required; then
+  PR_GATE_DEPENDENCY_GRAPH_REQUIRED=1
+else
+  PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=$?
+  if [[ "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}" -ne 1 ]]; then
+    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=selector_failed"
+    exit "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}"
+  fi
+fi
+
+if [[ "${PR_GATE_DEPENDENCY_GRAPH_REQUIRED}" -eq 1 ]]; then
   # This graph build produces either a full strict review or scoped diagnostic
   # evidence for the subsequent quick CI receipt consumer.
   mkdir -p "${PR_DEPENDENCY_REVIEW_DIR}"
@@ -723,11 +735,6 @@ if agentcanon_pr_dependency_graph_required; then
     exit "${graph_build_rc}"
   fi
 else
-  PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=$?
-  if [[ "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}" -ne 1 ]]; then
-    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=selector_failed"
-    exit "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}"
-  fi
   bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" \
     --header-scan-only \
     --fail-missing \

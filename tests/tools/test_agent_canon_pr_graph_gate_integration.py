@@ -113,7 +113,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
 
         write_executable(
-            source / "tools" / "bin" / "agent-canon",
+            source / "tools" / "agent_tools" / "graph_fixture.py",
             r"""
             #!/usr/bin/env python3
             import json
@@ -243,6 +243,11 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             )
             """,
         )
+        (source / "tools" / "bin").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "bin" / "agent-canon",
+            source / "tools" / "bin" / "agent-canon",
+        )
         write_executable(
             source / "tools" / "sync_agent_canon.sh",
             """
@@ -257,16 +262,16 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             exit 0
             """,
         )
-        write_executable(
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "ci" / "run_all_checks.sh",
             source / "tools" / "ci" / "run_all_checks.sh",
-            """
-            #!/usr/bin/env bash
-            receipt="${@: -1}"
-            grep -Eq '^graph=(scoped|skipped|prepared)$' "${receipt}" || exit 91
-            cp "${receipt}" "${AGENT_CANON_PR_TEMP_ROOT}/consumed.receipt"
-            echo "QUICK_CI_RECEIPT_GRAPH=$(awk -F= '$1 == \"graph\" {print $2}' \"${receipt}\")"
-            """,
         )
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "ci" / "run_python_quality_checks.sh",
+            source / "tools" / "ci" / "run_python_quality_checks.sh",
+        )
+        (source / "tools" / "lib").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_PATHS, source / "tools" / "lib" / REPO_PATHS.name)
         write_executable(
             source / "tools" / "agent_tools" / "run_repo_dependency_review.sh",
             """
@@ -296,8 +301,35 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             'version = 1\nprefix = "vendor/agent-canon"\n',
             encoding="utf-8",
         )
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "ci" / "pydocstyle.toml",
+            source / "tools" / "ci" / "pydocstyle.toml",
+        )
+        catalog = source / "agents" / "skills" / "catalog.yaml"
+        catalog.parent.mkdir(parents=True, exist_ok=True)
+        catalog.write_text("skills: []\n", encoding="utf-8")
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "agent_tools" / "agent_canon_source_root.py",
+            source / "tools" / "agent_tools" / "agent_canon_source_root.py",
+        )
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "agent_tools" / "pydocstyle_review.py",
+            source / "tools" / "agent_tools" / "pydocstyle_review.py",
+        )
         generic_python = "raise SystemExit(0)\n"
         for relative in (
+            "tools/agent_tools/artifact_identity.py",
+            "tools/agent_tools/external_artifact_binding.py",
+            "tools/agent_tools/publication_integrator.py",
+            "tools/agent_tools/report_artifact_checks.py",
+            "tools/agent_tools/review_dispatch.py",
+            "tools/agent_tools/work_log.py",
+            "tests/agent_tools/test_artifact_identity.py",
+            "tests/agent_tools/test_codex_hooks.py",
+            "tests/agent_tools/test_external_artifact_binding.py",
+            "tests/agent_tools/test_publication_integrator.py",
+            "tests/agent_tools/test_review_dispatch.py",
+            "tests/agent_tools/test_work_log.py",
             "tools/agent_tools/tool_drift.py",
             "tools/agent_tools/tool_catalog.py",
             "tools/agent_tools/tool_proof_coverage.py",
@@ -331,6 +363,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         source: Path,
         *,
         include_manifest: bool = True,
+        baseline_doc_diagnostics: int = 0,
     ) -> tuple[Path, str]:
         """Create a template-like parent with one manifest-touching PR diff."""
         parent = root / "parent"
@@ -358,6 +391,25 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         (parent / "changed.py").write_text("before\n", encoding="utf-8")
         (parent / "legacy.py").write_text("legacy\n", encoding="utf-8")
         (parent / "related.py").write_text("related\n", encoding="utf-8")
+        for relative in (
+            "tests/agent_tools/test_artifact_identity.py",
+            "tests/agent_tools/test_codex_hooks.py",
+            "tests/agent_tools/test_external_artifact_binding.py",
+            "tests/agent_tools/test_publication_integrator.py",
+            "tests/agent_tools/test_review_dispatch.py",
+            "tests/agent_tools/test_work_log.py",
+        ):
+            target = parent / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("# recorder-only fixture\n", encoding="utf-8")
+        for index in range(baseline_doc_diagnostics):
+            (parent / f"baseline_{index}.py").write_text(
+                '"""Baseline fixture module."""\n\n\n'
+                f"def old_{index}():\n"
+                '    """Summary.\n\n    Detail.\n    """\n'
+                "    pass\n",
+                encoding="utf-8",
+            )
         run(parent, "git", "add", ".")
         run(parent, "git", "commit", "-m", "base")
         base = run(parent, "git", "rev-parse", "HEAD").stdout.strip()
@@ -397,8 +449,39 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             fixture_root,
             source,
             include_manifest=scenario != "no_manifest",
+            baseline_doc_diagnostics=1 if scenario == "pydoc_baseline" else 0,
         )
         fake_bin = fixture_root / "bin"
+        fake_home = fixture_root / "agent-canon-home"
+        fake_installed = fake_home / "agent-canon" / "bin" / "agent-canon"
+        fake_installed.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(
+            source / "tools" / "agent_tools" / "graph_fixture.py", fake_installed
+        )
+        fake_installed.chmod(fake_installed.stat().st_mode | stat.S_IXUSR)
+        temp_root = fixture_root / "pr-check-state"
+        temp_root.mkdir()
+        python_call_log = temp_root / "pr-python-calls.jsonl"
+        write_executable(
+            fake_bin / "python-recorder",
+            """
+            #!/usr/bin/env python3
+            import json
+            import os
+            import sys
+
+            with open(os.environ["PYTHON_CALL_LOG"], "a", encoding="utf-8") as stream:
+                stream.write(json.dumps(sys.argv[1:]) + "\\n")
+            raise SystemExit(0)
+            """,
+        )
+        write_executable(
+            fake_bin / "cargo",
+            """
+            #!/usr/bin/env bash
+            exit 0
+            """,
+        )
         write_executable(
             fake_bin / "gh",
             """
@@ -406,8 +489,6 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             exit 1
             """,
         )
-        temp_root = fixture_root / "pr-check-state"
-        temp_root.mkdir()
         environment = os.environ.copy()
         environment.update(
             {
@@ -415,6 +496,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "AGENT_CANON_PR_BASE_REF": base,
                 "AGENT_CANON_PR_TEMP_ROOT": str(temp_root),
                 "GRAPH_GATE_FIXTURE_SCENARIO": scenario,
+                "PYTHON_BIN": str(fake_bin / "python-recorder"),
+                "PYTHON_CALL_LOG": str(python_call_log),
+                "AGENT_CANON_TOOLS_HOME": str(fake_home),
             }
         )
         result = run(
@@ -434,10 +518,8 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertEqual(valid.returncode, 0, valid.stdout + valid.stderr)
         self.assertIn('"status": "incomplete"', valid.stdout)
         self.assertIn("AGENT_CANON_PR_GRAPH_ACCEPTANCE=pass", valid.stdout)
-        self.assertIn("QUICK_CI_RECEIPT_GRAPH=scoped", valid.stdout)
+        self.assertIn("PR_GATE_RECEIPT=accepted dependency_graph=scoped", valid.stdout)
         self.assertNotIn("REPO_DEPENDENCY_REVIEW_CALLED", valid.stdout)
-        receipt = valid_state / "consumed.receipt"
-        self.assertIn("graph=scoped", receipt.read_text(encoding="utf-8"))
         report = (
             valid_state
             / "dependency-review"
@@ -474,15 +556,14 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
 
     def test_real_pr_check_runs_header_scan_when_graph_selection_skips(self) -> None:
         """Changed/new files without manifests still reach the trusted header scan."""
-        result, state = self.run_pr_check("no_manifest")
+        result, _ = self.run_pr_check("no_manifest")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("HEADER_SCAN_REVIEW_CALLED", result.stdout)
         self.assertIn(
             "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required", result.stdout
         )
         self.assertIn(
-            "graph=skipped",
-            (state / "consumed.receipt").read_text(encoding="utf-8"),
+            "PR_GATE_RECEIPT=accepted dependency_graph=skipped", result.stdout
         )
 
     def test_standalone_ordinary_change_runs_full_graph_gate(self) -> None:
@@ -490,6 +571,28 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         fixture_root = Path(tempfile.mkdtemp(prefix="graph-gate-standalone-"))
         self.addCleanup(shutil.rmtree, fixture_root)
         source = self.create_source_repo(fixture_root)
+        standalone_doc = source / "standalone_docstyle.py"
+        standalone_doc.write_text(
+            '"""Standalone fixture module."""\n\n\n'
+            "def standalone_review():\n"
+            '    """Summary.\n\n    Detail.\n    """\n'
+            "    pass\n",
+            encoding="utf-8",
+        )
+        standalone_review = run(
+            source,
+            "tools/bin/agent-canon",
+            "pydocstyle-review",
+            "--target",
+            "standalone_docstyle.py",
+            check=False,
+        )
+        self.assertEqual(standalone_review.returncode, 1)
+        self.assertEqual(
+            (standalone_review.stdout + standalone_review.stderr).count("D213:"),
+            1,
+            standalone_review.stdout + standalone_review.stderr,
+        )
         shutil.copy2(PR_CHECK, source / "tools" / "ci" / PR_CHECK.name)
         repo_paths = source / "tools" / "lib" / REPO_PATHS.name
         repo_paths.parent.mkdir(parents=True, exist_ok=True)
@@ -511,6 +614,13 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         run(source, "git", "commit", "-m", "ordinary change")
 
         fake_bin = fixture_root / "bin"
+        fake_home = fixture_root / "agent-canon-home"
+        fake_installed = fake_home / "agent-canon" / "bin" / "agent-canon"
+        fake_installed.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(
+            source / "tools" / "agent_tools" / "graph_fixture.py", fake_installed
+        )
+        fake_installed.chmod(fake_installed.stat().st_mode | stat.S_IXUSR)
         write_executable(
             fake_bin / "cargo",
             """
@@ -534,6 +644,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "AGENT_CANON_PR_BASE_REF": base,
                 "AGENT_CANON_PR_TEMP_ROOT": str(temp_root),
                 "GRAPH_GATE_FIXTURE_SCENARIO": "standalone",
+                "AGENT_CANON_TOOLS_HOME": str(fake_home),
             }
         )
         result = run(
@@ -564,6 +675,65 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=graph_build_failed rc=2",
             result.stdout,
         )
+
+    def test_real_pr_check_reports_unchanged_production_baseline_once(self) -> None:
+        """Shared correctness stays green while explicit Docstring review reports violations."""
+        result, state = self.run_pr_check("pydoc_baseline")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("PYDOCSTYLE", result.stdout)
+        self.assertIn("RUFF=skip reason=quick_mode", result.stdout)
+        pr_calls = [
+            json.loads(line)
+            for line in (state / "pr-python-calls.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        ]
+        self.assertTrue(any(call[:2] == ["-m", "pytest"] for call in pr_calls))
+        self.assertTrue(any(call[:2] == ["-m", "pyright"] for call in pr_calls))
+        self.assertFalse(any("pydocstyle" in call for call in pr_calls))
+
+        parent = state.parent / "parent"
+        target = "baseline_0.py"
+        docstyle = run(
+            parent,
+            "vendor/agent-canon/tools/bin/agent-canon",
+            "pydocstyle-review",
+            "--target",
+            target,
+            check=False,
+        )
+        explicit_output = docstyle.stdout + docstyle.stderr
+        self.assertEqual(docstyle.returncode, 1)
+        self.assertEqual(explicit_output.count("D213:"), 1)
+        direct_log = state / "direct-python-calls.jsonl"
+        direct_environment = os.environ.copy()
+        fake_bin = state.parent / "bin"
+        direct_environment.update(
+            {
+                "PATH": f"{fake_bin}:{direct_environment['PATH']}",
+                "PYTHON_BIN": str(fake_bin / "python-recorder"),
+                "PYTHON_CALL_LOG": str(direct_log),
+            }
+        )
+        quality = run(
+            parent,
+            "bash",
+            "vendor/agent-canon/tools/ci/run_python_quality_checks.sh",
+            check=False,
+            environment=direct_environment,
+        )
+        self.assertEqual(quality.returncode, 0, quality.stdout + quality.stderr)
+        self.assertIn("PYTHON_QUALITY_CHECKS=pass", quality.stdout)
+        direct_calls = [
+            json.loads(line)
+            for line in direct_log.read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertTrue(any(call[:2] == ["-m", "pytest"] for call in direct_calls))
+        self.assertTrue(any(call[:2] == ["-m", "pyright"] for call in direct_calls))
+        self.assertTrue(
+            any(call[:3] == ["-m", "ruff", "check"] for call in direct_calls)
+        )
+        self.assertFalse(any("pydocstyle" in call for call in direct_calls))
 
     def test_real_pr_check_rejects_missing_or_stale_graph_identity(self) -> None:
         """Identity defects fail before scoped/full diagnostic classification."""

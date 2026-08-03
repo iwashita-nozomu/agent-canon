@@ -4,6 +4,8 @@
 # responsibility Provides stable shell entrypoint for the AgentCanon Rust CLI.
 # upstream design ../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 # upstream implementation ../../rust/agent-canon/src/main.rs Rust CLI entrypoint
+# downstream implementation ../agent_tools/agent_canon_source_root.py resolves public source-root tool routes
+# downstream implementation ../agent_tools/pydocstyle_review.py owns explicit Docstring review
 # @dependency-end
 
 set -euo pipefail
@@ -14,6 +16,13 @@ if command -v readlink >/dev/null 2>&1; then
 fi
 canon_root="$(cd "$(dirname "$script_path")/../.." && pwd)"
 manifest="${canon_root}/rust/agent-canon/Cargo.toml"
+
+if [ "${1:-}" = "pydocstyle-review" ]; then
+  shift
+  exec python3 "${canon_root}/tools/agent_tools/agent_canon_source_root.py" \
+    exec tools/agent_tools/pydocstyle_review.py "$@"
+fi
+
 tools_home="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
 installed_binary="${tools_home}/agent-canon/bin/agent-canon"
 legacy_binary="/opt/agent-canon/bin/agent-canon"

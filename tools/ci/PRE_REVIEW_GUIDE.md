@@ -6,6 +6,7 @@ responsibility Documents the verifier pre-review entrypoint for this repository.
 upstream design ../README.md shared automation index
 upstream implementation ./pre_review.sh verifier entrypoint
 upstream implementation ./run_python_quality_checks.sh shared Python quality gate
+downstream implementation ../agent_tools/pydocstyle_review.py explicit AgentCanon Docstring review
 @dependency-end
 -->
 
@@ -51,6 +52,20 @@ needed:
 ```bash
 bash tools/ci/run_python_quality_checks.sh
 ```
+
+The PR quick chain intentionally runs pytest and pyright while skipping Ruff;
+the explicit full Python quality command adds Ruff. Neither shared path invokes
+pydocstyle.
+
+Explicit Docstring review for selected Python targets:
+
+    tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>
+
+This command resolves the canonical AgentCanon source root and applies its D213
+configuration. Parent-specific Docstring review remains a separate parent-owner
+command and does not substitute its authority. Missing pydocstyle or reported
+diagnostics fail this explicit review only; the shared PR correctness gate is
+unaffected.
 
 ## Report Evidence
 

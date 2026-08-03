@@ -37,7 +37,7 @@ set -euo pipefail
 #
 # 用途: agent/runtime, dependency manifest, eval accumulation, Rust,
 #       GitHub workflow, container config, documentation, experiment registry,
-#       pytest, pyright, pydocstyle, and ruff checks を一括実行します。
+#       pytest, pyright, and ruff checks を一括実行します。
 #       普段の変更では Makefile の check-matrix から対象 profile を選び、
 #       この script は full confidence gate として使います。
 #
