@@ -267,6 +267,10 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             exit 99
             """,
         )
+        (source / "tools" / "agent_tools" / "surface_manifest.py").write_text(
+            "# current producer fixture\n",
+            encoding="utf-8",
+        )
         generic_python = "raise SystemExit(0)\n"
         for relative in (
             "tools/agent_tools/check_convention_compliance.py",

@@ -161,6 +161,9 @@ def graph_builder_exit_fixture(
     """Create a base repo and builder executable with independently chosen exits."""
     parent = root / "base-repo"
     parent.mkdir()
+    manifest = parent / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text("version = 1\nprefix = \"vendor/agent-canon\"\n", encoding="utf-8")
     base = graph_change_fixture(parent, {})
     source_root = root / "builder-source"
     executable = source_root / "tools" / "bin" / "agent-canon"
@@ -174,7 +177,60 @@ def graph_builder_exit_fixture(
         encoding="utf-8",
     )
     executable.chmod(0o755)
+    producer = source_root / "tools" / "agent_tools" / "surface_manifest.py"
+    producer.parent.mkdir(parents=True)
+    producer.write_text("# current producer fixture\n", encoding="utf-8")
     return parent, source_root, base
+
+
+def experiment_runner_legacy_base_fixture(root: Path) -> tuple[Path, str]:
+    """Create an ExperimentRunner-shaped parent pinned to the legacy AgentCanon."""
+    legacy_source = root / "agent-canon-f7e79cec"
+    subprocess.run(
+        [
+            "git",
+            "clone",
+            "--local",
+            "--no-hardlinks",
+            str(PROJECT_ROOT),
+            str(legacy_source),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    git(legacy_source, "checkout", "--detach", "--quiet", "f7e79cec")
+
+    parent = root / "experiment-runner"
+    parent.mkdir()
+    git(parent, "init", "-b", "main")
+    git(parent, "config", "user.email", "selector@example.invalid")
+    git(parent, "config", "user.name", "Selector Fixture")
+    git(
+        parent,
+        "-c",
+        "protocol.file.allow=always",
+        "submodule",
+        "add",
+        legacy_source.as_uri(),
+        "vendor/agent-canon",
+    )
+    (parent / "changed.py").write_text("before\n", encoding="utf-8")
+    git(parent, "add", ".")
+    git(parent, "commit", "-m", "ExperimentRunner legacy base")
+    base = git(parent, "rev-parse", "HEAD")
+    (parent / "changed.py").write_text(
+        "# @dependency-start\n"
+        "# contract implementation\n"
+        "# responsibility Current graph gate fixture.\n"
+        "# upstream design missing-base.md fixture target\n"
+        "# @dependency-end\n"
+        "after\n",
+        encoding="utf-8",
+    )
+    git(parent, "add", "changed.py")
+    git(parent, "commit", "-m", "ExperimentRunner current head")
+    return parent, base
 
 
 def write_graph_result(
@@ -371,6 +427,43 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         self.assertEqual(gitlink, expected_gitlink)
         self.assertEqual(trusted_base.snapshot_head, base)
         self.assertTrue(trusted_base.verified)
+
+    @unittest.skipUnless(
+        shutil.which("cargo"), "cargo is required for the real builder"
+    )
+    def test_experiment_runner_legacy_pin_reaches_partition_with_current_producer(
+        self,
+    ) -> None:
+        """A legacy base pin builds and exposes a new head diagnostic to partitioning."""
+        self.base_graph_patch.stop()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            parent, base = experiment_runner_legacy_base_fixture(Path(tmp_dir))
+            legacy_script = (
+                parent / "vendor" / "agent-canon" / "tools" / "agent_tools" / "surface_manifest.py"
+            )
+            self.assertNotIn("normalized-snapshot", legacy_script.read_text(encoding="utf-8"))
+            graph_result = write_graph_result(
+                parent,
+                ("changed.py",),
+                (),
+                (("target-unresolved", "changed.py:4:missing-base.md", "changed.py"),),
+            )
+
+            acceptance = selector.evaluate_built_graph(
+                parent,
+                graph_result,
+                {"AGENT_CANON_PR_BASE_REF": base},
+                source_root=PROJECT_ROOT,
+            )
+
+        self.assertEqual(acceptance.status, "fail")
+        self.assertEqual(
+            acceptance.report["trusted_base_graph"]["snapshot_head"],
+            base,
+        )
+        blocking = acceptance.report["blocking_diagnostics"]
+        self.assertEqual(len(blocking), 1)
+        self.assertFalse(blocking[0]["base_match"])
 
     def test_pr_entrypoint_prepares_and_passes_trusted_base(self) -> None:
         """The parent gate wires shallow preparation to the exact selector argument."""

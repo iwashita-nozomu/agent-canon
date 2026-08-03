@@ -1395,6 +1395,27 @@ def graph_executable(source_root: Path | None) -> Path:
     return resolved
 
 
+def surface_manifest_producer(source_root: Path | None) -> Path:
+    """Resolve the current source producer injected into trusted-base builds."""
+    if source_root is None:
+        candidate = Path(__file__).resolve().parents[1] / "agent_tools" / "surface_manifest.py"
+    else:
+        candidate = source_root / "tools" / "agent_tools" / "surface_manifest.py"
+    try:
+        resolved = candidate.resolve(strict=True)
+    except OSError:
+        raise SelectorFailure(
+            "trusted_base_graph_producer_unavailable",
+            f"path={candidate}",
+        ) from None
+    if not resolved.is_file():
+        raise SelectorFailure(
+            "trusted_base_graph_producer_unavailable",
+            f"path={resolved}",
+        )
+    return resolved
+
+
 def base_gitlinks(root: Path, base_sha: str) -> tuple[tuple[str, str], ...]:
     """Read every submodule path and exact object recorded by the base tree."""
     output = git_output(
@@ -1473,6 +1494,38 @@ def materialize_base_submodules(root: Path, base_sha: str) -> None:
             )
 
 
+def base_surface_manifest(root: Path, base_sha: str) -> str:
+    """Resolve the sole surface manifest from the exact base filesystem."""
+    submodule = root / "vendor" / "agent-canon"
+    if submodule.is_dir() and not submodule.is_symlink():
+        names = git_output(
+            submodule,
+            ["ls-tree", "-r", "--name-only", "HEAD", "--"],
+            "trusted_base_surface_manifest_unavailable",
+        ).splitlines()
+    else:
+        names = git_output(
+            root,
+            ["ls-tree", "-r", "--name-only", base_sha, "--"],
+            "trusted_base_surface_manifest_unavailable",
+        ).splitlines()
+    matches = tuple(
+        name for name in names if Path(name).name == "shared-runtime-surfaces.toml"
+    )
+    if len(matches) != 1:
+        raise SelectorFailure(
+            "trusted_base_surface_manifest_unavailable",
+            f"match_count={len(matches)}",
+        )
+    manifest = (submodule if submodule.is_dir() else root) / matches[0]
+    if not manifest.is_file() or manifest.is_symlink():
+        raise SelectorFailure(
+            "trusted_base_surface_manifest_unavailable",
+            f"path={matches[0]};detail=not_regular_file",
+        )
+    return matches[0]
+
+
 def validate_graph_build_exit_code(process_exit_code: int, output: str) -> None:
     """Require the builder process status and JSON result status to agree."""
     try:
@@ -1508,6 +1561,7 @@ def build_trusted_base_graph(
 ) -> TrustedBaseGraph:
     """Build and validate a complete/incomplete graph from the exact base tree."""
     executable = graph_executable(source_root)
+    producer = surface_manifest_producer(source_root)
     with tempfile.TemporaryDirectory(
         prefix="agent-canon-pr-base-",
         dir=root.parent,
@@ -1550,6 +1604,7 @@ def build_trusted_base_graph(
                 f"expected={base_sha};actual={resolved_head}",
             )
         materialize_base_submodules(base_root, base_sha)
+        manifest = base_surface_manifest(base_root, base_sha)
 
         build = subprocess.run(
             [
@@ -1562,6 +1617,10 @@ def build_trusted_base_graph(
                 GRAPH_PROFILE,
                 "--format",
                 "json",
+                "--surface-manifest-producer",
+                str(producer),
+                "--surface-manifest",
+                manifest,
             ],
             cwd=base_root,
             check=False,

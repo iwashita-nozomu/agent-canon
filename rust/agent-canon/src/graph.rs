@@ -166,6 +166,8 @@ struct GraphArgs {
     root: PathBuf,
     profile: String,
     format: String,
+    surface_manifest_producer: Option<PathBuf>,
+    surface_manifest: Option<PathBuf>,
     path: Option<String>,
     all: bool,
     relation: String,
@@ -1910,20 +1912,35 @@ fn capture_runtime_dashboard(snapshot: Option<&RuntimeEvidenceSnapshot>) -> Vec<
         .collect()
 }
 
-fn collect_build_material(root: &Path, profile: &str) -> Result<BuildMaterial, GraphError> {
-    collect_build_material_with_mode(root, profile, false)
+fn collect_build_material(
+    root: &Path,
+    profile: &str,
+    surface_manifest_producer: Option<&Path>,
+    surface_manifest: Option<&Path>,
+) -> Result<BuildMaterial, GraphError> {
+    collect_build_material_with_mode(
+        root,
+        profile,
+        false,
+        surface_manifest_producer,
+        surface_manifest,
+    )
 }
 
 fn collect_build_material_with_mode(
     root: &Path,
     profile: &str,
     _probe: bool,
+    surface_manifest_producer: Option<&Path>,
+    surface_manifest: Option<&Path>,
 ) -> Result<BuildMaterial, GraphError> {
     let runtime_evidence = load_optional_runtime_evidence_snapshot(root)?;
     let snapshot_request = SnapshotRequest {
         root: root.to_path_buf(),
         profile: "parent".to_string(),
         output_jsonl: root.join(".agent-canon/knowledge-graph/source_snapshot.jsonl"),
+        surface_manifest_producer: surface_manifest_producer.map(Path::to_path_buf),
+        surface_manifest: surface_manifest.map(Path::to_path_buf),
     };
     let snapshot = capture_snapshot(&snapshot_request)
         .map_err(|error| GraphError::Validation(error.to_string()))?;
@@ -2390,6 +2407,8 @@ fn parse_args(args: &[String]) -> Result<GraphArgs, GraphError> {
         root: PathBuf::from("."),
         profile: "default".to_string(),
         format: "text".to_string(),
+        surface_manifest_producer: None,
+        surface_manifest: None,
         path: None,
         all: false,
         relation: "dependency".to_string(),
@@ -2410,6 +2429,12 @@ fn parse_args(args: &[String]) -> Result<GraphArgs, GraphError> {
             "--root" => result.root = PathBuf::from(value(&mut index)?),
             "--profile" => result.profile = value(&mut index)?,
             "--format" => result.format = value(&mut index)?,
+            "--surface-manifest-producer" => {
+                result.surface_manifest_producer = Some(PathBuf::from(value(&mut index)?))
+            }
+            "--surface-manifest" => {
+                result.surface_manifest = Some(PathBuf::from(value(&mut index)?))
+            }
             "--path" => result.path = Some(value(&mut index)?),
             "--all" => result.all = true,
             "--relation" => result.relation = value(&mut index)?,
@@ -2422,7 +2447,7 @@ fn parse_args(args: &[String]) -> Result<GraphArgs, GraphError> {
             "--token" => result.token = Some(value(&mut index)?),
             "--help" | "-h" => {
                 return Err(GraphError::Usage(
-                    "graph <build|status|query|context> [--root PATH] [--format json]".to_string(),
+                    "graph <build|status|query|context> [--root PATH] [--format json] [--surface-manifest-producer PATH] [--surface-manifest PATH]".to_string(),
                 ))
             }
             unknown => return Err(GraphError::Usage(format!("unknown graph option {unknown}"))),
@@ -3039,7 +3064,12 @@ fn build_graph_with_failure(args: &GraphArgs) -> Result<Value, GraphError> {
         .root
         .canonicalize()
         .map_err(|error| GraphError::Io(error.to_string()))?;
-    let material = collect_build_material(&root, &args.profile)?;
+    let material = collect_build_material(
+        &root,
+        &args.profile,
+        args.surface_manifest_producer.as_deref(),
+        args.surface_manifest.as_deref(),
+    )?;
     let integration = materialize_graph_store(&material)?;
     let (unresolved_count, ambiguous_count, uncovered_count) =
         snapshot_completeness(&material.snapshot);
@@ -3451,6 +3481,8 @@ mod tests {
             root: root.to_path_buf(),
             profile: "default".to_string(),
             format: "json".to_string(),
+            surface_manifest_producer: None,
+            surface_manifest: None,
             path: Some("src/target.txt".to_string()),
             all: false,
             relation: "all".to_string(),
@@ -3465,7 +3497,8 @@ mod tests {
         let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
         let fixture = graph_fixture();
         let root = fixture.root.canonicalize().expect("canonical fixture root");
-        let material = collect_build_material(&root, "default").expect("build material");
+        let material =
+            collect_build_material(&root, "default", None, None).expect("build material");
         let operation_id = graph_operation_id(&material);
         let staging = GraphStaging::create(&operation_id).expect("exclusive local staging");
         let host_temp = std::env::temp_dir()

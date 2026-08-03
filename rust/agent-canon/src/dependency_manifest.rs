@@ -18,6 +18,7 @@ use std::process::Command;
 
 pub const SNAPSHOT_SCHEMA_VERSION: &str = "source_snapshot.v1";
 const SURFACE_MANIFEST_SNAPSHOT_SCHEMA: &str = "agent-canon.surface-manifest.v1";
+const DEFAULT_SURFACE_MANIFEST: &str = "documents/runtime/shared-runtime-surfaces.toml";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct SourceSpan {
@@ -154,6 +155,8 @@ pub(crate) struct SnapshotRequest {
     pub root: PathBuf,
     pub profile: String,
     pub output_jsonl: PathBuf,
+    pub surface_manifest_producer: Option<PathBuf>,
+    pub surface_manifest: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -360,7 +363,26 @@ fn require_exact_json_keys(
     Ok(())
 }
 
-fn surface_manifest_script(root: &Path) -> Result<(PathBuf, bool), ManifestError> {
+fn surface_manifest_script(
+    root: &Path,
+    producer: Option<&Path>,
+) -> Result<(PathBuf, bool), ManifestError> {
+    if let Some(producer) = producer {
+        let metadata = fs::metadata(producer).map_err(|error| {
+            ManifestError::SurfaceManifest(format!(
+                "surface_manifest_snapshot: producer unavailable: {error}"
+            ))
+        })?;
+        if !metadata.is_file() {
+            return Err(ManifestError::SurfaceManifest(
+                "surface_manifest_snapshot: producer is not a regular file".to_string(),
+            ));
+        }
+        return Ok((
+            producer.to_path_buf(),
+            root.join("vendor/agent-canon").is_dir(),
+        ));
+    }
     let parent_script = root.join("vendor/agent-canon/tools/agent_tools/surface_manifest.py");
     if parent_script.is_file() {
         return Ok((parent_script, true));
@@ -374,8 +396,12 @@ fn surface_manifest_script(root: &Path) -> Result<(PathBuf, bool), ManifestError
     ))
 }
 
-fn load_surface_manifest_snapshot(root: &Path) -> Result<SurfaceManifestSnapshot, ManifestError> {
-    let (script, requires_parent_gitlink) = surface_manifest_script(root)?;
+fn load_surface_manifest_snapshot(
+    root: &Path,
+    producer: Option<&Path>,
+    manifest: Option<&Path>,
+) -> Result<SurfaceManifestSnapshot, ManifestError> {
+    let (script, requires_parent_gitlink) = surface_manifest_script(root, producer)?;
     let output = Command::new("python3")
         .arg(script)
         .args([
@@ -388,7 +414,14 @@ fn load_surface_manifest_snapshot(root: &Path) -> Result<SurfaceManifestSnapshot
             "--prefix",
             "vendor/agent-canon",
             "--manifest",
-            "documents/runtime/shared-runtime-surfaces.toml",
+            manifest
+                .unwrap_or_else(|| Path::new(DEFAULT_SURFACE_MANIFEST))
+                .to_str()
+                .ok_or_else(|| {
+                    ManifestError::SurfaceManifest(
+                        "surface_manifest_snapshot: manifest is not UTF-8".to_string(),
+                    )
+                })?,
             "normalized-snapshot",
         ])
         .output()
@@ -1310,7 +1343,7 @@ pub(crate) fn probe_snapshot_identity(
     profile: &str,
 ) -> Result<SnapshotProbe, ManifestError> {
     let root = fs::canonicalize(root).map_err(|error| ManifestError::Io(error.to_string()))?;
-    let surface_manifest = load_surface_manifest_snapshot(&root)?;
+    let surface_manifest = load_surface_manifest_snapshot(&root, None, None)?;
     let head = git_text(&root, &["rev-parse", "--verify", "HEAD"])?;
     let authority = gitlink_authority(&root, &surface_manifest)?;
     let candidates = source_candidates(&root, &surface_manifest, &head, authority.as_ref())?;
@@ -1343,7 +1376,11 @@ pub(crate) fn capture_snapshot(
             root.display()
         )));
     }
-    let surface_manifest = load_surface_manifest_snapshot(&root)?;
+    let surface_manifest = load_surface_manifest_snapshot(
+        &root,
+        request.surface_manifest_producer.as_deref(),
+        request.surface_manifest.as_deref(),
+    )?;
     let git_head = git_text(&root, &["rev-parse", "--verify", "HEAD"])?;
     let authority = gitlink_authority(&root, &surface_manifest)?;
     let candidates = source_candidates(&root, &surface_manifest, &git_head, authority.as_ref())?;

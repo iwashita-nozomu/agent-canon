@@ -135,7 +135,12 @@ replaced base evidence fails closed. For a derived parent, every `160000`
 submodule gitlink recorded by the exact base tree is recursively materialized
 and verified at that commit before the builder runs. The builder process exit
 code must exactly equal the JSON result `exit_code`; only matching `0` or `1`
-results are admissible. The head gate then classifies every unique
+results are admissible. The graph builder receives the current AgentCanon
+source's surface-manifest producer and the unique surface-manifest path found
+inside that exact base gitlink. The producer runs with the isolated base root,
+so dependency target existence is evaluated against base content while parser
+semantics remain those of the current producer; no base-pinned helper is used
+as a compatibility fallback. The head gate then classifies every unique
 persisted diagnostic identity against the exact validated PR diff, the head
 graph's dependency/surface edges, and the trusted base diagnostics.
 
