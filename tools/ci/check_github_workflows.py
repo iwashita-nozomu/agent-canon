@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shlex
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -47,6 +48,20 @@ AGENT_CANON_CREDENTIALS = (
 )
 AGENT_CANON_PR_READ_CREDENTIAL = "AGENT_CANON_PR_READ_TOKEN"
 GITHUB_TOKEN_EXPRESSION = "${{ github.token }}"
+TEMPLATE_AGENT_CANON_PR_GATE_COMMAND = "make agent-canon-pr-check"
+OBSOLETE_TEMPLATE_AGENT_CANON_INTERNAL_COMMAND_PREFIXES = (
+    ("bash", "tools/agent_tools/run_repo_dependency_review.sh", "--fail-missing"),
+    (
+        "bash",
+        "tools/agent-canon/agent_tools/run_repo_dependency_review.sh",
+        "--fail-missing",
+    ),
+)
+HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
+MARKDOWN_FENCE_PATTERN = re.compile(r"^[ \t]{0,3}(?P<fence>`{3,}|~{3,})")
+CHECKLIST_ITEM_PATTERN = re.compile(
+    r"^(?P<indent>[ \t]{0,3})[-+*][ \t]+\[[ xX]\][ \t]*(?P<body>.*)$"
+)
 WORKFLOW_DISPATCH_INPUT_PATTERN = re.compile(
     r"\$\{\{\s*(?:inputs|github\.event\.inputs)"
     r"\s*(?:\.\s*[A-Za-z_][A-Za-z0-9_-]*|\[\s*['\"][^'\"]+['\"]\s*\])"
@@ -76,7 +91,7 @@ TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS = (
     "template submodule SHA:",
 )
 TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
-    "make agent-canon-pr-check",
+    TEMPLATE_AGENT_CANON_PR_GATE_COMMAND,
     "make agent-canon-ensure-latest",
     "Plan Mode Evidence",
     "Agent Orchestration Evidence",
@@ -97,7 +112,6 @@ TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
     "Direct `bash tools/sync_agent_canon.sh push` was not used",
     "agentcanon_structure_followup=required",
     "agentcanon_structure_followup=pass",
-    "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
     "python3 tools/agent_tools/check_agent_runtime_alignment.py",
     "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",
     "python3 tools/agent_tools/check_convention_compliance.py",
@@ -713,11 +727,110 @@ def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]
     ]
 
 
+def markdown_checklist_authority_commands(text: str) -> tuple[str, ...]:
+    """Return leading inline-code commands from Markdown checklist items."""
+    without_comments = HTML_COMMENT_PATTERN.sub(
+        lambda match: "\n" * match.group(0).count("\n"),
+        text,
+    )
+    lines = without_comments.splitlines()
+    commands: list[str] = []
+    active_fence: tuple[str, int] | None = None
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        fence_match = MARKDOWN_FENCE_PATTERN.match(line)
+        if fence_match:
+            fence = fence_match.group("fence")
+            if active_fence is None:
+                active_fence = (fence[0], len(fence))
+            elif fence[0] == active_fence[0] and len(fence) >= active_fence[1]:
+                active_fence = None
+            index += 1
+            continue
+        if active_fence is not None:
+            index += 1
+            continue
+
+        item_match = CHECKLIST_ITEM_PATTERN.match(line)
+        if item_match is None:
+            index += 1
+            continue
+        body = item_match.group("body").lstrip()
+        if not body.startswith("`"):
+            index += 1
+            continue
+        delimiter_length = len(body) - len(body.lstrip("`"))
+        delimiter = "`" * delimiter_length
+        command_text = body[delimiter_length:]
+        closing_index = command_text.find(delimiter)
+        item_indent = len(item_match.group("indent").expandtabs(4))
+        while closing_index < 0 and index + 1 < len(lines):
+            continuation = lines[index + 1]
+            continuation_indent = len(continuation) - len(continuation.lstrip(" \t"))
+            if not continuation.strip() or continuation_indent <= item_indent:
+                break
+            index += 1
+            command_text += "\n" + continuation.strip()
+            closing_index = command_text.find(delimiter)
+        if closing_index >= 0:
+            commands.append(" ".join(command_text[:closing_index].split()))
+        index += 1
+    return tuple(commands)
+
+
+def is_obsolete_template_agentcanon_command(command: str) -> bool:
+    """Return whether shell tokens begin with an obsolete internal command."""
+    try:
+        tokens = tuple(shlex.split(command))
+    except ValueError:
+        return False
+    return any(
+        tokens[: len(prefix)] == prefix
+        for prefix in OBSOLETE_TEMPLATE_AGENT_CANON_INTERNAL_COMMAND_PREFIXES
+    )
+
+
+def check_template_agentcanon_pr_gate(path: Path) -> list[Finding]:
+    """Require one public parent gate and reject internal command authority."""
+    if not path.exists():
+        return [Finding("error", path, "missing_file")]
+    text = read_text(path)
+    checklist_commands = markdown_checklist_authority_commands(text)
+    canonical_count = checklist_commands.count(TEMPLATE_AGENT_CANON_PR_GATE_COMMAND)
+    findings: list[Finding] = []
+    if canonical_count != 1:
+        findings.append(
+            Finding(
+                "error",
+                path,
+                f"canonical_parent_pr_gate_count:{canonical_count}",
+            )
+        )
+    for command in checklist_commands:
+        if is_obsolete_template_agentcanon_command(command):
+            findings.append(
+                Finding(
+                    "error",
+                    path,
+                    f"obsolete_internal_pr_gate_authority:{command}",
+                )
+            )
+    return findings
+
+
 def check_pr_templates(root: Path) -> list[Finding]:
     """Check PR template evidence fields."""
     findings: list[Finding] = []
     for path, required in pr_template_requirement_specs(root):
         findings.extend(require_text(path, required))
+    canon_root = agent_canon_root(root)
+    semantic_templates = {
+        canon_root / "templates" / "documents" / "github" / "pull-request" / "agent_canon.md",
+        root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md",
+    }
+    for path in sorted(semantic_templates):
+        findings.extend(check_template_agentcanon_pr_gate(path))
     return findings
 
 
