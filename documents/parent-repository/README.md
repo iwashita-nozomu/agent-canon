@@ -137,16 +137,17 @@ AgentCanon の実体パスを直接呼び出します。
   `vendor/agent-canon/.devcontainer/` を直接呼ぶ。
 - `post-create-parent.sh` は shared post-create の成功後に呼ぶ親固有 source とする。
 - Compose の生成物は親の `.agent-canon/docker-compose.generated.yml` に置く。
-- 親 image は digest-pinned plain `ubuntu:22.04` を基礎とし、host UID/GID build args
-  `DEVCONTAINER_USER_UID` / `DEVCONTAINER_USER_GID` から汎用 `developer` user/group
-  を作る。container-local passwordless sudo は mounted dependency の導入にだけ使い、
-  host sudo、host password prompt、host group mutation は要求しない。
+- 親 image は #524 canonical contract の digest-pinned plain `ubuntu:22.04` を基礎とし、
+  host UID/GID build args `PROJECT_UID` / `PROJECT_GID` から canonical `project`
+  user/group を作り、`USER project` で起動する。container-local passwordless sudo は
+  mounted dependency の導入にだけ使い、host sudo、host password prompt、host group
+  mutation は要求しない。
 - 親の default pack が zsh を選ぶ場合、generator は pack の `runtime.shell` を
-  process boundary とし、host の `${HOME}/.zshrc` expression を read-only mount
-  する。parent environment pair が有効な場合だけ、その shell source も read-only
-  mount する。validator は各 source expression、bind type、target、read-only を静的に
-  確認する。実行時には host `${HOME}/.zshrc` が regular file である必要があり、代替
-  path は探索しない。
+  process boundary とし、regular fileであるhost `${HOME}/.zshrc` expressionだけを
+  dedicated non-root homeへread-only mountする。欠落時はmountを省略し、parent
+  environment pairが有効な場合だけそのshell sourceをread-only mountする。validator
+  は各source expression、bind type、non-root target、read-onlyを静的に確認する。
+  zsh startupとfresh CIはhost zshrcの有無に依存せず、代替pathは探索しない。
 
 この分離により、shared runtime の更新と親プロジェクトの hook / build 設定を
 別々に review でき、親固有の変更が AgentCanon source の pin を汚染しません。

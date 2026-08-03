@@ -421,6 +421,8 @@ def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
         "initializeCommand": "AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
         "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
         "service": "workspace",
+        "containerUser": "project",
+        "remoteUser": "project",
         "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
         "postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace/${localWorkspaceFolderBasename} && bash .devcontainer/post-create-parent.sh /workspace/${localWorkspaceFolderBasename}",
         "postAttachCommand": "bash vendor/agent-canon/.devcontainer/post-attach.sh",
@@ -434,15 +436,22 @@ def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
                     f"{key}-expected:{expected}",
                 )
             )
-    for key in ("remoteUser", "updateRemoteUserUID"):
-        if key in config:
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    ".devcontainer/devcontainer.json",
-                    f"default-devcontainer-field-forbidden:{key}",
-                )
+    if "remoteUser" in config and config.get("remoteUser") != "project":
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                ".devcontainer/devcontainer.json",
+                "remoteUser-expected:project",
             )
+        )
+    if "updateRemoteUserUID" in config:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                ".devcontainer/devcontainer.json",
+                "default-devcontainer-field-forbidden:updateRemoteUserUID",
+            )
+        )
     return findings
 
 
@@ -663,6 +672,7 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         expected_workspace_layout = "managed-topic"
     else:
         expected_workspace_layout = None
+    parent_layout = (root / "vendor" / "agent-canon").is_dir()
     findings: list[Finding] = []
     if expected_workspace_layout is None:
         if topic_root.name.startswith("workspace-"):
@@ -686,6 +696,47 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         findings.append(
             Finding("inconsistency", relative, f"build-context:{build.get('context')}")
         )
+    standalone_dockerfile = root / ".devcontainer" / "Dockerfile"
+    if not parent_layout and standalone_dockerfile.is_file():
+        if build is None:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "standalone-build-required",
+                )
+            )
+        else:
+            if build.get("dockerfile") != ".devcontainer/Dockerfile":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "standalone-dockerfile-required:.devcontainer/Dockerfile",
+                    )
+                )
+            standalone_args = as_mapping(build.get("args"))
+            if standalone_args is None:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "standalone-build-args-required:PROJECT_UID,PROJECT_GID",
+                    )
+                )
+            else:
+                for name in ("PROJECT_UID", "PROJECT_GID"):
+                    value = standalone_args.get(name)
+                    if not isinstance(value, str) or re.fullmatch(
+                        r"[1-9][0-9]*", value
+                    ) is None:
+                        findings.append(
+                            Finding(
+                                "dependency_contract_violation",
+                                relative,
+                                f"standalone-build-arg-{name}-must-be-positive-integer",
+                            )
+                        )
     volumes = as_sequence(service.get("volumes"))
     if volumes is None:
         return [
@@ -810,7 +861,6 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                         "direct-repo-workspace-leak",
                     )
                 )
-    parent_layout = (root / "vendor" / "agent-canon").is_dir()
     expected_shell = pack.shell if pack is not None else "/bin/bash"
     if service.get("command") != f'{expected_shell} -lc "sleep infinity"':
         findings.append(
@@ -820,15 +870,19 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                 f"runtime-shell-command:{expected_shell}",
             )
         )
-    if "user" in service:
+    service_user = service.get("user")
+    if service_user is not None and (
+        not isinstance(service_user, str)
+        or re.fullmatch(r"[1-9][0-9]*:[1-9][0-9]*", service_user) is None
+    ):
         findings.append(
             Finding(
                 "dependency_contract_violation",
                 relative,
-                "default-service-user-forbidden",
+                "default-user-must-have-positive-uid-gid",
             )
         )
-    if "tmpfs" in service:
+    if not parent_layout and "tmpfs" in service:
         findings.append(
             Finding(
                 "dependency_contract_violation",
@@ -863,7 +917,7 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                 )
             )
     if parent_layout:
-        required_mounts = ["/etc/project-template/zsh/.zshrc"]
+        required_mounts: list[str] = []
         if parent_environment_enabled(root):
             required_mounts.insert(0, "/etc/project-template/parent-environment.sh")
         for target in required_mounts:
@@ -888,25 +942,110 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                         f"parent-environment-mount-read-only:{target}",
                     )
                 )
-            if target == "/etc/project-template/zsh/.zshrc" and len(matches) == 1:
-                host_zshrc = matches[0]
-                if volume_type(host_zshrc) != "bind":
+        zshrc_matches = [
+            raw_volume
+            for raw_volume in volumes
+            if volume_fields(raw_volume)[1] in {
+                "/home/project/.zshrc",
+                "/etc/project-template/zsh/.zshrc",
+            }
+        ]
+        for host_zshrc in zshrc_matches:
+            _, target = volume_fields(host_zshrc)
+            if target != "/home/project/.zshrc":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zshrc-target-must-be-/home/project/.zshrc",
+                    )
+                )
+            if volume_type(host_zshrc) != "bind":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zshrc-mount-type-must-be-bind",
+                    )
+                )
+            source, _ = volume_fields(host_zshrc)
+            if source != "${HOME}/.zshrc":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zshrc-source-must-be-${HOME}/.zshrc",
+                    )
+                )
+            if not volume_is_read_only(host_zshrc):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zshrc-mount-read-only",
+                    )
+                )
+        if not isinstance(service_user, str) or re.fullmatch(r"[1-9][0-9]*:[1-9][0-9]*", service_user) is None:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "default-user-must-have-positive-uid-gid",
+                )
+            )
+        build = as_mapping(service.get("build"))
+        build_args = as_mapping(build.get("args")) if build is not None else None
+        if build_args is None:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "build-args-required:PROJECT_UID,PROJECT_GID",
+                )
+            )
+        else:
+            if "PROJECT_USER" in build_args:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "build-arg-PROJECT_USER-forbidden-canonical-project",
+                    )
+                )
+            for name in ("PROJECT_UID", "PROJECT_GID"):
+                value = build_args.get(name)
+                if not isinstance(value, str) or re.fullmatch(r"[1-9][0-9]*", value) is None:
                     findings.append(
                         Finding(
                             "dependency_contract_violation",
                             relative,
-                            "host-zshrc-mount-type-must-be-bind",
+                            f"build-arg-{name}-must-be-positive-integer",
                         )
                     )
-                source, _ = volume_fields(host_zshrc)
-                if source != "${HOME}/.zshrc":
-                    findings.append(
-                        Finding(
-                            "dependency_contract_violation",
-                            relative,
-                            "host-zshrc-source-must-be-${HOME}/.zshrc",
-                        )
+            if (
+                isinstance(service_user, str)
+                and isinstance(build_args.get("PROJECT_UID"), str)
+                and isinstance(build_args.get("PROJECT_GID"), str)
+                and service_user
+                != f'{build_args["PROJECT_UID"]}:{build_args["PROJECT_GID"]}'
+            ):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "runtime-user-must-match-project-uid-gid-build-args",
                     )
+                )
+        for raw_volume in volumes:
+            source, target = volume_fields(raw_volume)
+            if (source and "/root/" in source) or (target and target.startswith("/root/")):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "root-home-mount-forbidden",
+                    )
+                )
     required_environment = {
         "AGENT_CANON_DEPENDENCY_PROFILE": (
             pack.dependency_profile if pack is not None else DEFAULT_DEPENDENCY_PROFILE
@@ -914,12 +1053,20 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         "AGENT_CANON_WORKSPACE_LAYOUT": expected_workspace_layout or "<invalid>",
         "AGENT_CANON_WORKSPACE_ROOT": "/workspace",
         "AGENT_CANON_REPOSITORY_ROOT": repo_target,
+        "DEPENDENCY_MODULE_CONTAINER_SOURCE": str(
+            root if expected_workspace_layout == "direct-repo" else topic_root
+        ),
+        "DEPENDENCY_MODULE_CONTAINER_TARGET": (
+            repo_target if expected_workspace_layout == "direct-repo" else "/workspace"
+        ),
     }
     if parent_layout:
         required_environment.update(
             {
-                "ZDOTDIR": "/etc/project-template/zsh",
+                "HOME": "/home/project",
+                "ZDOTDIR": "/home/project",
                 "SHELL": pack.shell if pack is not None else "/bin/bash",
+                "AGENT_CANON_CONTAINER_USER": "project",
             }
         )
     if environment is None:

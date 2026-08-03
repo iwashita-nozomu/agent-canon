@@ -9,7 +9,9 @@
 
 from __future__ import annotations
 
+import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -49,14 +51,40 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         self.assertEqual(parsed.args, ["check"])
 
     def test_exec_command_runs_tracked_entrypoint_script(self) -> None:
-        """Run sync_agent_canon.sh through source-root exec."""
-        script = PROJECT_ROOT / "tools" / "sync_agent_canon.sh"
-        self.assertEqual(script.stat().st_mode & stat.S_IXUSR, stat.S_IXUSR)
-        parser = build_parser().parse_args(
-            ["exec", "tools/sync_agent_canon.sh", "check"]
-        )
-        result = run(parser, resolver=lambda _: self._mock_resolution(PROJECT_ROOT))
-        self.assertNotEqual(result, 0)
+        """Run the public sync check in an isolated standalone source clone."""
+        with tempfile.TemporaryDirectory() as workspace:
+            clone = Path(workspace) / "agent-canon"
+            shutil.copytree(
+                PROJECT_ROOT,
+                clone,
+                symlinks=True,
+                ignore=shutil.ignore_patterns(
+                    ".git",
+                    ".agent-canon",
+                    "__pycache__",
+                    ".pytest_cache",
+                    ".ruff_cache",
+                ),
+            )
+            subprocess.run(["git", "init", "-q"], cwd=clone, check=True)
+            script = clone / "tools" / "sync_agent_canon.sh"
+            self.assertEqual(script.stat().st_mode & stat.S_IXUSR, stat.S_IXUSR)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(clone / "tools" / "agent_tools" / "agent_canon_source_root.py"),
+                    "exec",
+                    "tools/sync_agent_canon.sh",
+                    "check",
+                ],
+                cwd=clone,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("shared surface source manifest is valid", result.stdout)
 
     def test_exec_command_propagates_nonzero_exit(self) -> None:
         """Propagate a non-zero delegated command return code to the caller."""

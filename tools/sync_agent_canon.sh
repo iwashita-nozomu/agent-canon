@@ -6,8 +6,9 @@
 # upstream design ../documents/rule/dependency-module-changes.md dependency source branch and projection ownership
 # upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../documents/runtime/shared-runtime-surfaces.toml machine-readable surface manifest
-# upstream implementation ./agent_tools/surface_manifest.py renders link, copy, regular, and root-absent specs
+# upstream implementation ./agent_tools/surface_manifest.py renders projection and update-transition specs
 # downstream implementation ../tests/tools/test_update_agent_canon.py verifies sync/update behavior
+# downstream implementation ../tests/tools/test_update_agent_canon_surface_migration.py verifies bounded migration
 # @dependency-end
 set -euo pipefail
 export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
@@ -22,6 +23,11 @@ else
   ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 fi
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
+if [ "$PREFIX" = "." ]; then
+  PUBLIC_SYNC_COMMAND="bash tools/sync_agent_canon.sh"
+else
+  PUBLIC_SYNC_COMMAND="PYTHONPATH=${PREFIX}/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh"
+fi
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 FORCE_RELINK="${AGENT_CANON_FORCE_RELINK:-0}"
@@ -32,16 +38,19 @@ PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_comman
 COMMIT_AUTOMATION_AUTHOR_NAME="AgentCanon Sync Automation"
 COMMIT_AUTOMATION_AUTHOR_EMAIL="agent-canon-sync@automation.invalid"
 COMMIT_PROVENANCE_NEXT_ACTION="set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex> and rerun the same command"
+ACTIVE_ROOT_COPY_TRANSITION_ID=""
+declare -a ROOT_COPY_TRANSITION_CANDIDATES=()
+declare -a ROOT_COPY_TRANSITION_REMOVED_PATHS=()
 
 usage() {
   cat <<EOF
 Usage:
-  bash tools/sync_agent_canon.sh plan [branch]
-  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root
-  bash tools/sync_agent_canon.sh check
-  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh submodule-add <remote-url> [branch]
-  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh ensure-latest [branch]
-  bash tools/sync_agent_canon.sh status
+  $PUBLIC_SYNC_COMMAND plan [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> $PUBLIC_SYNC_COMMAND link-root
+  $PUBLIC_SYNC_COMMAND check
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> $PUBLIC_SYNC_COMMAND submodule-add <remote-url> [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> $PUBLIC_SYNC_COMMAND ensure-latest [branch]
+  $PUBLIC_SYNC_COMMAND status
 
 Legacy subtree / snapshot / direct push routes are compatibility-only and are
 not listed as user-facing commands. Use tools/update_agent_canon.sh for normal
@@ -527,6 +536,162 @@ build_copy_specs() {
     --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" copy-specs
 }
 
+build_update_transition_specs() {
+  python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
+    --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" update-transition-specs
+}
+
+active_root_copy_transition_id() {
+  local previous_pin=""
+  local staged_pin=""
+  local source_pin=""
+  local transition_id=""
+  local from_agent_canon_pins=""
+  local unused=""
+
+  is_submodule_prefix || return 1
+  previous_pin="$(git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX" 2>/dev/null || true)"
+  staged_pin="$(git -C "$ROOT_DIR" rev-parse ":$PREFIX" 2>/dev/null || true)"
+  source_pin="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD 2>/dev/null || true)"
+  [ -n "$previous_pin" ] && [ -n "$staged_pin" ] && [ -n "$source_pin" ] || return 1
+  [ "$staged_pin" = "$source_pin" ] && [ "$previous_pin" != "$source_pin" ] || return 1
+
+  while IFS="$(printf '\t')" read -r transition_id from_agent_canon_pins unused; do
+    [ -n "$transition_id" ] || continue
+    case ",$from_agent_canon_pins," in
+      *",$previous_pin,"*)
+        printf '%s\n' "$transition_id"
+        return 0
+        ;;
+    esac
+  done < <(build_update_transition_specs)
+  return 1
+}
+
+root_copy_transition_identity_matches() {
+  local path="$1"
+  local transition_id="$2"
+  local abs_path="$ROOT_DIR/$path"
+  local actual_blob=""
+  local actual_sha256=""
+  local actual_mode=""
+  local actual_target=""
+  local spec_transition_id=""
+  local from_agent_canon_pins=""
+  local spec_path=""
+  local kind=""
+  local git_blob=""
+  local content_sha256=""
+  local git_mode=""
+  local symlink_target=""
+
+  actual_mode="$(git -C "$ROOT_DIR" ls-files -s -- "$path" | awk 'NR == 1 {print $1}')"
+  if [ -L "$abs_path" ]; then
+    actual_target="$(readlink "$abs_path")"
+    actual_blob="$(printf '%s' "$actual_target" | git -C "$ROOT_DIR" hash-object --stdin)"
+    actual_sha256="$(printf '%s' "$actual_target" | sha256sum | awk '{print $1}')"
+  elif [ -f "$abs_path" ]; then
+    actual_blob="$(git -C "$ROOT_DIR" hash-object --no-filters "$abs_path")"
+    actual_sha256="$(sha256sum "$abs_path" | awk '{print $1}')"
+  else
+    return 1
+  fi
+
+  while IFS="$(printf '\t')" read -r \
+    spec_transition_id from_agent_canon_pins spec_path kind git_blob \
+    content_sha256 git_mode symlink_target; do
+    [ "$spec_transition_id" = "$transition_id" ] || continue
+    [ "$spec_path" = "$path" ] || continue
+    [ "$actual_blob" = "$git_blob" ] || continue
+    [ "$actual_sha256" = "$content_sha256" ] || continue
+    [ "$actual_mode" = "$git_mode" ] || continue
+    if [ "$kind" = "regular" ] && [ -f "$abs_path" ] && [ ! -L "$abs_path" ]; then
+      return 0
+    fi
+    if [ "$kind" = "symlink" ] && [ -L "$abs_path" ] \
+      && [ "$actual_target" = "$symlink_target" ]; then
+      return 0
+    fi
+  done < <(build_update_transition_specs)
+  return 1
+}
+
+preflight_root_copy_transition() {
+  local specs=""
+  local path=""
+
+  ACTIVE_ROOT_COPY_TRANSITION_ID="$(active_root_copy_transition_id || true)"
+  ROOT_COPY_TRANSITION_CANDIDATES=()
+  ROOT_COPY_TRANSITION_REMOVED_PATHS=()
+  [ -n "$ACTIVE_ROOT_COPY_TRANSITION_ID" ] || return 0
+  specs="$(build_update_transition_specs)"
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    if [ ! -e "$ROOT_DIR/$path" ] && [ ! -L "$ROOT_DIR/$path" ]; then
+      continue
+    fi
+    if root_copy_transition_identity_matches "$path" "$ACTIVE_ROOT_COPY_TRANSITION_ID"; then
+      ROOT_COPY_TRANSITION_CANDIDATES+=("$path")
+      echo "update_transition[$ACTIVE_ROOT_COPY_TRANSITION_ID][$path]=known_legacy_identity"
+    else
+      echo "update_transition[$ACTIVE_ROOT_COPY_TRANSITION_ID][$path]=parent_owned_preserved"
+    fi
+  done < <(
+    printf '%s\n' "$specs" \
+      | awk -F "$(printf '\t')" -v transition="$ACTIVE_ROOT_COPY_TRANSITION_ID" \
+          '$1 == transition {print $3}' \
+      | sort -u
+  )
+}
+
+migrate_root_copy_transition() {
+  local transition_state_dir="$ROOT_DIR/.agent-canon/update-lifecycle"
+  local quarantine=""
+  local path=""
+  local moved_path=""
+  local index=0
+  local -a moved_paths=()
+
+  [ -n "$ACTIVE_ROOT_COPY_TRANSITION_ID" ] || return 0
+  [ "${#ROOT_COPY_TRANSITION_CANDIDATES[@]}" -gt 0 ] || return 0
+
+  # Revalidate every candidate before moving the first path. Diverged paths
+  # were already classified as parent-owned and are not part of this set.
+  for path in "${ROOT_COPY_TRANSITION_CANDIDATES[@]}"; do
+    root_copy_transition_identity_matches "$path" "$ACTIVE_ROOT_COPY_TRANSITION_ID" \
+      || die "update transition candidate changed after preflight: $path"
+  done
+
+  mkdir -p "$transition_state_dir"
+  quarantine="$(mktemp -d "$transition_state_dir/root-surface-transition.XXXXXX")"
+  case "$quarantine" in
+    "$transition_state_dir"/root-surface-transition.*) ;;
+    *) die "invalid root-surface transition quarantine path" ;;
+  esac
+
+  for path in "${ROOT_COPY_TRANSITION_CANDIDATES[@]}"; do
+    mkdir -p "$quarantine/$(dirname "$path")"
+    if ! mv "$ROOT_DIR/$path" "$quarantine/$path"; then
+      for ((index = ${#moved_paths[@]} - 1; index >= 0; index--)); do
+        moved_path="${moved_paths[$index]}"
+        mkdir -p "$ROOT_DIR/$(dirname "$moved_path")"
+        mv "$quarantine/$moved_path" "$ROOT_DIR/$moved_path" \
+          || die "update transition rollback failed for $moved_path"
+      done
+      rm -rf "$quarantine"
+      die "update transition move failed for $path; all earlier moves were restored"
+    fi
+    moved_paths+=("$path")
+  done
+
+  rm -rf "$quarantine"
+  for path in "${ROOT_COPY_TRANSITION_CANDIDATES[@]}"; do
+    ROOT_COPY_TRANSITION_REMOVED_PATHS+=("$path")
+    echo "update_transition[$ACTIVE_ROOT_COPY_TRANSITION_ID][$path]=removed_known_legacy_identity"
+    rmdir "$ROOT_DIR/$(dirname "$path")" 2>/dev/null || true
+  done
+}
+
 link_path() {
   local path="$1"
   local target="$2"
@@ -805,7 +970,9 @@ cmd_link_root() {
     echo "agent_canon_projection_requirements=parent_vendor_named_branch_and_gitlink_match_required"
     echo "AGENT_CANON_LINK_ROOT_PROJECTION_WARNING=${next_action}"
   }
+  preflight_root_copy_transition
   ensure_surface_sync_safe "$force"
+  migrate_root_copy_transition
 
   local spec=""
   # Materialize regular containers before child links. This converts legacy
@@ -848,6 +1015,13 @@ cmd_snapshot() {
 
 cmd_check() {
   ensure_prefix_exists
+
+  if ! is_submodule_prefix && [ "$PREFIX" = "." ]; then
+    python3 "$ROOT_DIR/tools/agent_tools/surface_manifest.py" \
+      --root "$ROOT_DIR" --prefix "." --manifest "$SURFACE_MANIFEST" check-doc
+    echo "shared surface source manifest is valid"
+    return 0
+  fi
 
   local spec=""
   local failed=0
@@ -942,7 +1116,7 @@ cmd_check() {
 
   if [ "$failed" -ne 0 ]; then
     [ "$failed" -ne 0 ] || return 0
-    die "shared surface drift detected; set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and rerun 'bash tools/sync_agent_canon.sh link-root'"
+    die "shared surface drift detected; set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and rerun '$PUBLIC_SYNC_COMMAND link-root'"
   fi
 
   echo "shared surface is in sync"
@@ -967,6 +1141,11 @@ stage_sync_paths() {
       git -C "$ROOT_DIR" add -A -- "$spec"
     fi
   done < <(build_root_absent_paths)
+  for spec in "${ROOT_COPY_TRANSITION_REMOVED_PATHS[@]}"; do
+    if [ ! -e "$ROOT_DIR/$spec" ] && [ ! -L "$ROOT_DIR/$spec" ]; then
+      git -C "$ROOT_DIR" add -A -- "$spec"
+    fi
+  done
 }
 
 commit_sync_paths_if_needed() {
@@ -992,6 +1171,11 @@ commit_sync_paths_if_needed() {
       owned_paths+=("$spec")
     fi
   done < <(build_root_absent_paths)
+  for spec in "${ROOT_COPY_TRANSITION_REMOVED_PATHS[@]}"; do
+    if [ ! -e "$ROOT_DIR/$spec" ] && [ ! -L "$ROOT_DIR/$spec" ]; then
+      owned_paths+=("$spec")
+    fi
+  done
 
   stage_sync_paths
   if git -C "$ROOT_DIR" diff --cached --quiet -- "${owned_paths[@]}"; then
@@ -1186,7 +1370,7 @@ print_plan_summary() {
   case "$route" in
     submodule_detached) ;;
     *)
-      echo "agent_canon_plan_apply_command=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh ensure-latest $branch"
+      echo "agent_canon_plan_apply_command=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> $PUBLIC_SYNC_COMMAND ensure-latest $branch"
       ;;
   esac
 }

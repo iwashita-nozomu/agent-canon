@@ -67,8 +67,8 @@ its exact mode and target before running `git rm templates`.
 these fields:
 
 - `path`: root-relative path in the template or derived repo.
-- `mode`: `symlink`, `copy`, `regular`, `repo_state`, `standalone_only`, or
-  `removed_legacy`.
+- `mode`: `symlink`, `copy`, `regular`, `repo_state`,
+  `standalone_only`, or `removed_legacy`.
 - `owner`: the owner class in machine-readable form.
 - `class`: the behavior class, such as `runtime_surface`, `shared_policy`,
   `active_contract`, `durable_state`, `test_mirror`, or `github_copy`.
@@ -76,10 +76,12 @@ these fields:
 - `local_override_allowed`: whether a derived repo may make the root path its
   own truth surface after clone.
 
-`tools/sync_agent_canon.sh` reads the manifest through
-`tools/agent_tools/surface_manifest.py`. The shell script must not carry a
-separate long hard-coded list of root paths. If the manifest and this document
-disagree, update the manifest first and then adjust this reader-facing policy.
+Standalone source では `tools/sync_agent_canon.sh` が
+`tools/agent_tools/surface_manifest.py` を読みます。template / derived parent
+では同じ実体を `tools/agent-canon/` view または
+`vendor/agent-canon/tools/` から解決します。shell script は root path の
+長い固定一覧を別に持ちません。manifest と本文が不一致なら、manifest を先に
+更新してから reader-facing policy を追従します。
 
 ### sync_control と full-sync trigger の責務
 
@@ -114,12 +116,15 @@ clean pin/runtime projection. Repair the root view with:
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root \
+    exec tools/sync_agent_canon.sh link-root
 ```
 
 Core runtime surfaces include `AGENTS.md`, `agents/`, `.agents/`,
 `.codex/config.toml`, `.codex/README.md`, `.codex/agents/`,
-`.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, and `tools/`.
+`.codex/hooks.json`, `.codex/hooks/`, `.devcontainer/`, and the
+`tools/agent-canon` view. Root `tools/` and every sibling outside that view are
+parent-owned regular content.
 Reusable AgentCanon templates are not part of this root-link set. Parent
 consumers resolve them through `vendor/agent-canon/templates/`, while the
 standalone AgentCanon source resolves them from its source-root
@@ -265,7 +270,23 @@ are reviewed and committed as template or derived-repo content.
 
 `standalone_only` manifest entries are intentionally absent from template and
 derived repo roots. If a legacy symlink or copy remains at such a path,
-`bash tools/sync_agent_canon.sh check` reports it and `link-root` removes it.
+the source-root resolver `check` reports it and `link-root` removes it.
+
+`update_transition` は、既知の旧 AgentCanon gitlink pin から新しい pin へ更新する
+一回の transaction にだけ適用します。旧commit objectや履歴fetchは照合に使わず、
+shallow parentではsuperproject `HEAD`のgitlink SHAをtransition dataへ照合します。
+candidate は Git history で確認した
+blob、content SHA-256、Git mode の組に束縛し、現在の vendored source との `cmp` は
+identity authority にしません。`link-root` は全candidateを先に分類して再検証し、
+既知identityだけをtransaction用quarantineへ移してからまとめて削除します。途中の
+moveが失敗した場合は先行moveを復元します。
+
+未知のbytes、mode、symlink targetを持つ同名pathはparent-ownedとして保存し、
+transition実行と後続の`link-root` / `check`を止めません。transition完了後、この
+path群はshared surface、root-absent path、collision gateのいずれにも属さず、parentは
+同名のregular fileやsymlinkを所有できます。`/mnt/l` のようにmountが
+`file_mode=0755`を強制する環境でも、mode authorityはfilesystem statではなくGit
+indexです。
 
 AgentCanon may provide generic templates under the standalone source path
 `templates/documents/`, such as `server_host_inventory.template.md`,
@@ -311,7 +332,7 @@ from AgentCanon:
 
 Do not edit these root copies as independent truth surfaces. Edit the
 AgentCanon source, then run the request-evidence-authorized
-`bash tools/sync_agent_canon.sh link-root` command.
+source-root resolver `exec tools/sync_agent_canon.sh link-root` command.
 The `.github/scripts/checkout_agent_canon_submodule.sh` root copy is only a
 GitHub-path wrapper; the shared checkout implementation lives in
 `tools/ci/checkout_agent_canon_submodule.sh`.

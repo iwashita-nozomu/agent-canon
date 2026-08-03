@@ -94,6 +94,7 @@ BASE_CAPABILITIES = frozenset(
         "ca-certificates",
         "curl",
         "git",
+        "gnupg",
         "ninja-build",
         "node",
         "npm",

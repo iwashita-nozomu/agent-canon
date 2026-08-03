@@ -15,6 +15,8 @@
   "initializeCommand": "AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
   "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
   "service": "workspace",
+  "containerUser": "project",
+  "remoteUser": "project",
   "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
   "postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace/${localWorkspaceFolderBasename} && bash .devcontainer/post-create-parent.sh /workspace/${localWorkspaceFolderBasename}",
   "postAttachCommand": "bash vendor/agent-canon/.devcontainer/post-attach.sh",

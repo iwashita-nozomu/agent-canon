@@ -51,6 +51,21 @@ def test_print_only_runs_shared_post_create_before_codex() -> None:
     assert "exec codex" in result.stdout
 
 
+def test_standalone_dockerfile_uses_canonical_project_identity() -> None:
+    """Standalone source builds provide project UID/GID and container-local sudo."""
+    dockerfile = (PROJECT_ROOT / ".devcontainer" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+
+    assert "FROM ubuntu:22.04@sha256:" in dockerfile
+    assert "ARG PROJECT_UID" in dockerfile
+    assert "ARG PROJECT_GID" in dockerfile
+    assert "groupadd --gid \"${PROJECT_GID}\" project" in dockerfile
+    assert "useradd --uid \"${PROJECT_UID}\" --gid project" in dockerfile
+    assert "project ALL=(ALL) NOPASSWD:ALL" in dockerfile
+    assert "USER project" in dockerfile
+
+
 def test_runtime_identity(tmp_path: Path) -> None:
     """Nested Codex keeps opt-in identity scripts retained but unreachable by default."""
     pack = tmp_path / "pack.toml"
@@ -151,6 +166,11 @@ def test_runtime_identity(tmp_path: Path) -> None:
     assert '--profile "$dependency_profile"' in post_create
     assert 'echo "codex-state: ${codex_state_status}"' in post_attach
     assert 'workspace_layout="${AGENT_CANON_WORKSPACE_LAYOUT:-managed-topic}"' in post_attach
+    assert 'workspace_source="${DEPENDENCY_MODULE_CONTAINER_SOURCE:-}"' in post_attach
+    assert 'workspace_target="${DEPENDENCY_MODULE_CONTAINER_TARGET:-}"' in post_attach
+    assert 'DEPENDENCY_MODULE_CONTAINER_LAYOUT=${workspace_layout}' in post_attach
+    assert 'DEPENDENCY_MODULE_CONTAINER_SOURCE=${workspace_source}' in post_attach
+    assert 'DEPENDENCY_MODULE_CONTAINER_TARGET=${workspace_target}' in post_attach
     assert 'DEPENDENCY_MODULE_CONTAINER=not-selected layout=direct-repo' in post_attach
     assert '"${repo_root}/tools/agent_tools/dependency_module_change.py"' in post_attach
     assert (

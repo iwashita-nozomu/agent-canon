@@ -125,9 +125,13 @@ plan must contain at least one record. Provider, missing-dependency, cycle, and
 typed-verification invariants are unchanged.
 
 The parent-owned `docker/install_python_dependencies.sh` remains the owner of
-workspace Python packages. It runs after the shared dependency plan and before
-AgentCanon build/cache/projection. The parent-owned post-create command remains
-the final lifecycle action.
+workspace Python packages. Its `docker/requirements.txt` is the single resolved
+lock owner for JAX, CUDA plugin/PJRT distributions, and the remaining parent
+Python packages; `pyproject.toml` declares dependency intent but is not a second
+lock or install source. The installer reads only that lock with hash verification
+and does not re-resolve from project metadata. It runs after the shared dependency
+plan and before AgentCanon build/cache/projection. The parent-owned post-create
+command remains the final lifecycle action.
 
 The repo-local runtime pack owns `runtime.dependency_profile` as a first-class
 field. `full` is the default when the field is omitted. Shared pack smoke,
@@ -261,17 +265,16 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   under `/workspace/reports/agents/<run-id>/runtime` is copied to the workspace.
   Default Compose creates this path inside the container; it is not a host bind or
   shared-runtime path.
-- The default repository Docker pack uses a digest-pinned plain `ubuntu:22.04` base
-  (or an equivalent standard Ubuntu 22.04 image). The generator resolves host UID/GID
-  (or valid numeric overrides) and passes `DEVCONTAINER_USER_UID` /
-  `DEVCONTAINER_USER_GID` build args; the parent image creates the generic `developer`
-  user/group with those IDs and runs as `USER developer`. Linked `devcontainer.json`
-  omits `remoteUser`, `updateRemoteUserUID`, and service `user`; the generator omits
-  custom HOME tmpfs and AgentCanon-specific groups. `/home/developer` remains the
-  image-owned HOME. Container-local passwordless `sudo -n` is available for mounted
-  dependency operations.
-- This developer runtime is container-local and never invokes host `sudo`, prompts for
-  host passwords, or mutates host groups. A missing/mismatched developer UID/GID,
+- The default repository Docker pack uses the #524 canonical digest-pinned plain
+  `ubuntu:22.04` base. The generator resolves and validates `PROJECT_UID` /
+  `PROJECT_GID` build args; the parent image creates the canonical `project`
+  user/group with those IDs and runs as `USER project`. Linked `devcontainer.json`
+  sets `containerUser` and `remoteUser` to `project`; the generator omits custom
+  HOME tmpfs and AgentCanon-specific groups. `/home/project` remains the
+  image-owned HOME. Container-local passwordless `sudo -n` is available for
+  mounted dependency operations.
+- This project runtime is container-local and never invokes host `sudo`, prompts for
+  host passwords, or mutates host groups. A missing/mismatched project UID/GID,
   non-Ubuntu base, missing digest pin, or missing container-local sudo is a parent image
   contract failure; do not repair it by restoring host provisioning. Workspace bind
   outputs are expected to carry the host mapped UID/GID owner.
@@ -385,7 +388,7 @@ before editing.
 | Step | Required check                                                                                                                             |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1    | Classify each touched path as AgentCanon-owned, template-owned, project-owned, or GitHub path-constrained copy.                            |
-| 2    | Check the AgentCanon submodule pin and repair shared views with the request-evidence-authorized `bash tools/sync_agent_canon.sh link-root` route when needed. |
+| 2    | Check the AgentCanon submodule pin and repair shared views with the request-evidence-authorized source-root resolver `exec tools/sync_agent_canon.sh link-root` route when needed. |
 | 3    | Move agent convenience installs out of `Dockerfile` and into shared `.devcontainer/post-create.sh` when they are not product dependencies. |
 | 4    | Keep workspace-dependent Python package installation in `docker/install_python_dependencies.sh`.                                           |
 | 5    | Ensure Docker workflows checkout `vendor/agent-canon/` before shared devcontainer smoke.                                                   |
@@ -409,7 +412,8 @@ AgentCanon pin or root views change:
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root \
+    exec tools/sync_agent_canon.sh link-root
 make docker-build-check
 make ci
 ```

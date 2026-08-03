@@ -5,7 +5,7 @@
 contract skill
 responsibility Documents Shared Skill Canon for this repository.
 upstream design ./catalog.yaml enumerates public skill families
-# upstream design ./skill-dependencies.yaml owns the typed public-skill dependency dictionary
+upstream design ./skill-dependencies.yaml owns the typed public-skill dependency dictionary
 downstream design ../canonical/CODEX_WORKFLOW.md consumes the shared skill canon during task routing
 downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates public and official skill boundaries
 upstream design code-visualization.md sole public visualization owner and typed projection contract

@@ -31,6 +31,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "ci"))
 
+from agent_canon_preflight import surface_manifest_paths  # noqa: E402
 from check_agent_canon_pr import (  # noqa: E402
     GENERATED_COMPLETENESS_CHECK_IDS,
     materialize_generated_completeness_receipt,
@@ -925,6 +926,18 @@ def write_ready_closeout_bundle(
 class TaskStartAndCloseTest(unittest.TestCase):
     """Verify machine-driven task start and close behavior."""
 
+    def test_retired_tool_names_are_not_permanent_update_surfaces(self) -> None:
+        """One-time transition candidates do not reserve future parent paths."""
+        update_paths = set(surface_manifest_paths(PROJECT_ROOT))
+
+        self.assertTrue(
+            {
+                "tools/sync_agent_canon.sh",
+                "tools/agent_tools/surface_manifest.py",
+                "tools/agent_tools/update_agent_canon.sh",
+            }.isdisjoint(update_paths)
+        )
+
     def consume_update_lifecycle_fixture(
         self,
         payload: dict[str, object],
@@ -1565,19 +1578,39 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "agent-canon-ensure-latest:\n\t@touch make-sentinel\n",
                 encoding="utf-8",
             )
-            (workspace_root / "tools").mkdir()
-            (workspace_root / "tools" / "sync_agent_canon.sh").write_text(
+            source_root = workspace_root / "vendor" / "agent-canon"
+            source_agent_tools = source_root / "tools" / "agent_tools"
+            source_agent_tools.mkdir(parents=True)
+            (source_root / "agents" / "skills").mkdir(parents=True)
+            (source_root / "agents" / "skills" / "catalog.yaml").write_text(
+                "skills: []\n",
+                encoding="utf-8",
+            )
+            (source_agent_tools / "agent_canon_source_root.py").write_text(
+                (
+                    PROJECT_ROOT
+                    / "tools"
+                    / "agent_tools"
+                    / "agent_canon_source_root.py"
+                ).read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (source_agent_tools / "surface_manifest.py").write_text(
+                "#!/usr/bin/env python3\n",
+                encoding="utf-8",
+            )
+            (source_root / "tools" / "sync_agent_canon.sh").write_text(
                 "#!/usr/bin/env bash\nset -eu\n[ \"${1:-}\" = check ]\n",
                 encoding="utf-8",
             )
+            (source_root / "tools" / "sync_agent_canon.sh").chmod(0o755)
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
             subprocess.run(
                 [
                     "git",
                     "add",
                     "Makefile",
-                    "tools/sync_agent_canon.sh",
-                    "vendor/agent-canon/documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
+                    "vendor/agent-canon",
                 ],
                 cwd=workspace_root,
                 check=True,

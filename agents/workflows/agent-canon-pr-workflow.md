@@ -228,6 +228,18 @@ does not treat the incomplete graph as fresh or run graph-query consumers.
 Explicit parent graph migration and standalone source gates remain full-scope;
 no count-only baseline is an acceptance oracle.
 
+The consumer accepts source diagnostics only from the current typed
+`payload_json` identity: producer-resolved source and target, normalized
+declaration, declaration components, and source span. It validates that payload
+against the persisted rule and source node before evaluating changed scope
+$S(d)$ or the base-identity/severity predicates $N(d)$ and $W(d)$. Missing,
+empty, wrongly typed, span-inconsistent, target-node-inconsistent, or
+declaration-inconsistent identity fails closed before a scoped receipt can be
+published. This workflow projection consumes producer-owned identity and does
+not parse message formatting, restore a legacy schema, or provide a selector
+side fallback; current-producer and trusted-base authority remain bound by the
+parent graph contract.
+
 GitHub Actions resolves the comparison base from
 `pull_request.base.sha` in its trusted event payload. Before normal selection,
 `check_agent_canon_pr.sh` invokes `--prepare-ci-base`. The selector first verifies

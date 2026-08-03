@@ -118,14 +118,20 @@ owning them. It reads `docker/packs/default.toml`, builds the repo-local
 Compose service, and runs repo-local `docker/install_python_dependencies.sh`
 after the workspace is mounted.
 
-The default parent image contract is a digest-pinned plain `ubuntu:22.04` base.
-The generator passes host-resolved or explicitly validated numeric
-`DEVCONTAINER_USER_UID` / `DEVCONTAINER_USER_GID` build args to the parent image;
-the image creates the generic `developer` user/group with those IDs, runs as
-`USER developer`, and exposes passwordless container-local `sudo -n` for mounted
-dependency installation. This does not invoke host `sudo`, prompt for a host
-password, mutate host groups, or add an AgentCanon-specific group. Workspace bind
-outputs are expected to carry the host mapped UID/GID owner.
+When AgentCanon itself is opened as a standalone source checkout and no
+`docker/packs/default.toml` exists, the generator builds the source-owned
+`.devcontainer/Dockerfile` with the same canonical project UID/GID contract; it
+does not fall back to an unpinned `ubuntu:22.04` image.
+
+The default parent image contract is the #524 canonical identity: a
+digest-pinned plain `ubuntu:22.04` base whose image creates the `project`
+user/group from `PROJECT_UID` / `PROJECT_GID` build args and runs as
+`USER project`. The generator resolves and validates those numeric args; it does
+not expose a public user-name override. The image exposes passwordless
+container-local `sudo -n` for mounted dependency installation. This does not
+invoke host `sudo`, prompt for a host password, mutate host groups, or add an
+AgentCanon-specific group. Workspace bind outputs are expected to carry the host
+mapped UID/GID owner.
 
 `devcontainer.json` must not use a fixed AgentCanon display name for every
 parent repository. The generated Compose file must also set a top-level project

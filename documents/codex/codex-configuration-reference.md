@@ -819,7 +819,7 @@ Before changing Codex config in this repo:
 3. Prefer repo policy in `AGENTS.md` and runtime mechanics in `.codex/config.toml`.
 4. If changing shared canon, read `documents/rule/dependency-module-changes.md`,
    edit the managed topic-workspace source clone, and use the request-evidence-authorized
-   `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root`
+   `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を付けた source-root resolver の `exec tools/sync_agent_canon.sh link-root`
    command only when projecting the clean pin back into a parent repo.
 5. If adding a new document or script, add a dependency header first.
 6. Run dependency header scan, dependency graph validation, docs checks, and relevant static checks before closeout.

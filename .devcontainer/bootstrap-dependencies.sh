@@ -180,7 +180,17 @@ PY
   rm -rf "$work_dir"
 }
 
-install_base() {
+install_language_runtime() {
+  run_as_root apt-get update
+  run_as_root apt-get install -y --no-install-recommends ninja-build
+
+  if ! node_receipt_matches || ! check_node_activation; then
+    install_verified_node_archive
+  fi
+  check_bootstrap
+}
+
+install_standalone_base() {
   run_as_root apt-get update
   run_as_root apt-get install -y --no-install-recommends \
     python3 \
@@ -201,14 +211,35 @@ PY
     run_as_root apt-get install -y --no-install-recommends python3-tomli
   fi
 
-  if ! node_receipt_matches || ! check_node_activation; then
-    install_verified_node_archive
-  fi
-  check_bootstrap
+  install_language_runtime
 }
 
-if [ "$#" -gt 0 ] && [ "$1" = "--check" ]; then
-  check_bootstrap
-else
-  install_base
+mode="standalone"
+if [ "$#" -gt 0 ]; then
+  case "$1" in
+    --check)
+      mode="check"
+      ;;
+    --install-language-runtime)
+      mode="language-runtime"
+      ;;
+    --install)
+      mode="standalone"
+      ;;
+    *)
+      fail "unsupported mode: $1 (use --check, --install-language-runtime, or --install)"
+      ;;
+  esac
 fi
+
+case "$mode" in
+  check)
+    check_bootstrap
+    ;;
+  language-runtime)
+    install_language_runtime
+    ;;
+  standalone)
+    install_standalone_base
+    ;;
+esac

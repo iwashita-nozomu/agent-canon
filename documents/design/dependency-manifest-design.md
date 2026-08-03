@@ -156,6 +156,26 @@ A changed target that makes an unchanged declaration unresolved is therefore a
 new related blocker even when the source file is unchanged. Invalid
 `manifest-grammar` in a changed declaration cannot be hidden by baseline state.
 
+The `ManifestParser` owns the normalized declaration components: direction,
+kind, canonical repository-relative target, and reason. Every source diagnostic
+persists those components, the canonical declaration, and its source span in
+the strict `agent-canon.source-diagnostic.v1` `payload_json` object, together
+with the producer-resolved source and target. Non-source layers retain the
+shared diagnostics table through a valid generic/default payload object; they do
+not require the source identity schema. The graph fingerprint binds each
+typed diagnostic payload and severity, so a semantic identity change cannot
+reuse result or database identity.
+
+Before evaluating the changed-responsibility predicate $S(d)$ or the base
+identity/severity predicates $N(d)$ or $W(d)$, the selector validates the
+current diagnostics columns and typed payload field-for-field. Missing,
+malformed, empty, wrongly typed, span-inconsistent, target-node-inconsistent,
+or declaration-component-inconsistent identity data fails closed. This
+consumer validation does not replace the #513 current-producer and exact
+trusted-base authority: the current producer remains authoritative for head
+semantics, the exact base snapshot remains authoritative for comparison, and
+no base-pinned, message-derived, legacy-schema, or parser fallback is allowed.
+
 The report contains a duplicate-free, lossless partition of all head diagnostic
 identities into `blocking_diagnostics` and `baseline_diagnostics`, together with
 the base graph identity and diagnostic-set fingerprint. If a source identity
@@ -366,6 +386,38 @@ prepared certificate is present, duplicate, malformed, missing, uncertain, or
 source-mismatched runtime evidence remains a fail-closed runtime boundary.
 `status`, `query`, and `context` are read-only; they never rebuild or fall back
 to a header scan.
+Canonical current-tree consumers let `status` derive the current producer and
+manifest identity. The PR selector's trusted-base readback instead repeats the
+exact current producer identity and exact base-tree manifest used by its
+preceding build. `status` validates those explicit typed inputs, re-probes the
+base snapshot, and compares the resulting HEAD/source/input fingerprints with
+the persisted integration record; a missing, changed, or substituted input
+fails before diagnostic classification.
+
+Freshness recovery remains outside the read-only Graph operations.
+`run_repo_dependency_review.sh` owns the consumer transition: fresh status
+skips production. Exactly the typed canonical status tuple `status=stale`,
+`reason=source_changed`, and `probe_reason=source_changed`, with matching process
+and record exit code `2`, permits one canonical build followed by status
+readback. Every other stale reason, typed-unavailable status, persisted readback
+corruption, runtime receipt or evidence failure, producer mismatch, incomplete
+or invalid status, build failure, and non-fresh readback fails closed without
+admitting a build. The producer continues to own its existing lock, staging,
+atomic rename, and durability readback.
+
+The standalone runtime dashboard workflow is the periodic producer authority,
+not an ordinary graph consumer. Only its scheduled event invokes the
+source-root-resolved canonical Graph CLI to run one direct `graph build`; pull
+request, push, and manual-dispatch events skip that step. A fresh checkout with
+no ignored graph database therefore starts from the producer rather than from
+consumer status. The Graph CLI emits build exit `0` only with `status=fresh`;
+that result is required before the workflow runs `graph status` readback.
+Build failure and published incomplete status fail before readback. The
+read-only status command must then return exit `0` and fresh while revalidating
+the persisted publication, snapshot HEAD,
+source/content/input fingerprints, and producer identity. The scheduled build
+uses the producer's existing lock, staging, atomic rename, and durability
+contract. Its cron value remains owned only by that workflow.
 
 source snapshot の候補 path は、解決先の内容ではなく候補 path 自体の
 filesystem object を読む。`dependency_manifest.rs` の単一 source-path

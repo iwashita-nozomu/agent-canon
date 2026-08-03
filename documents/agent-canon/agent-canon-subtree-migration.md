@@ -117,15 +117,15 @@ remote 名や一台の host path に合わせて変えません。
 - dirty shared-canon 差分は pin 更新で消さず、AgentCanon branch と PR で upstream に取り込みます。
 - AgentCanon PR merge 後は template / derived repo 側で request-evidence-authorized
   `make agent-canon-ensure-latest`、request-evidence-authorized
-  `bash tools/sync_agent_canon.sh link-root`、parent pin commit を作ります。
-- `bash tools/sync_agent_canon.sh push` は maintainer が direct upstream push を明示した例外だけにします。
+  source-root resolver の `exec tools/sync_agent_canon.sh link-root`、parent pin commit を作ります。
+- source-root resolver の `exec tools/sync_agent_canon.sh push` は maintainer が direct upstream push を明示した例外だけにします。
 - GitHub 管理では、template PR と AgentCanon PR / commit の対応、submodule pin、GitHub `main` SHA、security check 状態を PR 本文に残します。
 
 ## 完了条件
 
 次をすべて満たしたときだけ AgentCanon update を完了扱いにします。
 
-- `bash tools/sync_agent_canon.sh check` が pass
+- source-root resolver の `exec tools/sync_agent_canon.sh check` が pass
 - `make agent-canon-pr-check` が pass
 - root 側の shared surface が構成どおりに再同期されている
 - AgentCanon GitHub `main` SHA、template submodule pin SHA、`git submodule status vendor/agent-canon` が PR / closeout evidence に残っている
@@ -197,8 +197,10 @@ root 側は owner class ごとに薄い wrapper、symlink view、copy surface、
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root \
+    exec tools/sync_agent_canon.sh link-root
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root \
+  exec tools/sync_agent_canon.sh check
 ```
 
 ### 7.2 互換 alias
@@ -207,7 +209,8 @@ bash tools/sync_agent_canon.sh check
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh snapshot
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root \
+    exec tools/sync_agent_canon.sh snapshot
 ```
 
 ### 7.3 初回 clone / recovery
@@ -217,7 +220,8 @@ git clone --recurse-submodules <template-url> <repo>
 cd <repo>
 git submodule sync vendor/agent-canon
 git submodule update --init --recursive vendor/agent-canon
-bash tools/sync_agent_canon.sh check
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root \
+  exec tools/sync_agent_canon.sh check
 ```
 
 ### 7.4 upstream から更新取得
@@ -276,7 +280,8 @@ commit message には `AgentCanon subtree-to-submodule migration` と、local wo
 標準 pin は `vendor/agent-canon` の submodule URL
 `https://github.com/iwashita-nozomu/agent-canon.git`、branch `main` です。
 親 repo の root symlink view は維持し、request-evidence-authorized
-`bash tools/sync_agent_canon.sh link-root` と `bash tools/sync_agent_canon.sh check` で検証します。
+source-root resolver の `exec tools/sync_agent_canon.sh link-root` と
+`exec tools/sync_agent_canon.sh check` で検証します。
 
 ### 7.6 template / 派生 repo 側の shared canon 変更を upstream へ戻す
 
@@ -285,12 +290,13 @@ returns to the user; it never triggers an implicit branch creation or switch.
 After approval, invoke the protected merge wrapper with all four inline Git
 authority/reason fields, then push the already-current branch.
 
-通常は AgentCanon branch と AgentCanon PR 経由で戻します。AgentCanon main に取り込まれた後、template / 派生 repo 側で request-evidence-authorized `make agent-canon-ensure-latest` と request-evidence-authorized `bash tools/sync_agent_canon.sh link-root` を再実行して差分を持ち帰ります。`sync_agent_canon.sh push` は maintainer が direct upstream push を選ぶ場合だけ使います。
+通常は AgentCanon branch と AgentCanon PR 経由で戻します。AgentCanon main に取り込まれた後、template / 派生 repo 側で request-evidence-authorized `make agent-canon-ensure-latest` と request-evidence-authorized source-root resolver の `exec tools/sync_agent_canon.sh link-root` を再実行して差分を持ち帰ります。`sync_agent_canon.sh push` は maintainer が direct upstream push を選ぶ場合だけ使います。
 
 ### 7.6 現在の設定確認
 
 ```bash
-bash tools/sync_agent_canon.sh status
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root \
+  exec tools/sync_agent_canon.sh status
 ```
 
 ### 7.7 GitHub Canonical Update Route
@@ -361,8 +367,8 @@ exit 条件:
 
 legacy subtree repo は移行完了まで次を互換 path として使えます。
 
-- `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh pull`
-- `bash tools/sync_agent_canon.sh push` (maintainer direct-push exception only)
+- `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を付けた source-root resolver の `exec tools/sync_agent_canon.sh pull`
+- source-root resolver の `exec tools/sync_agent_canon.sh push` (maintainer direct-push exception only)
 - `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> git subtree pull --prefix=vendor/agent-canon`
 - `git subtree push --prefix=vendor/agent-canon`
 - `snapshot_import_no_subtree*` alternate route
