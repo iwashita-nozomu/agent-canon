@@ -130,22 +130,24 @@ confirmed committed receipt during one `graph build`. Its v2 persisted
 runtime-evidence snapshot retains the exact artifact/receipt bytes, their
 hashes, the live source identity fingerprint, and the validated observation.
 An active pointer whose run contains no prepared runtime event is an
-observability-incomplete closeout condition; the deterministic graph still
-publishes source facts and completeness diagnostics without a runtime producer
-snapshot, and the selected workflow closeout owns reporting that condition.
-When a prepared event exists, duplicate, malformed, uncertain, missing, or
-mismatched certificates/receipts remain fail-closed. Without an active runtime
-pointer, the same builder publishes the source facts and completeness
-diagnostics without a runtime producer snapshot. `graph status`, `graph query`,
-`graph context`, and dependency-review consumers reuse that one snapshot and
-perform only one bounded freshness probe per command. They never rerun the
-runtime producer.
+observability-incomplete closeout condition, not a prepared-certificate route;
+the deterministic graph still publishes source facts and completeness
+diagnostics without a runtime producer snapshot, and the selected workflow
+closeout owns reporting that condition. Once a prepared event-shaped entry is
+present, duplicate, malformed, uncertain, missing, or mismatched
+certificates/receipts remain fail-closed. Without an active runtime pointer,
+the same builder publishes the source facts and completeness diagnostics
+without a runtime producer snapshot. `graph status`, `graph query`, `graph
+context`, and dependency-review consumers reuse that one snapshot and perform
+only one bounded freshness probe per command. They never rerun the runtime
+producer.
 Nonempty source completeness diagnostics produce `incomplete` rather than
 `fresh`; status remains inspectable, while query and context refuse to
 authorize evidence until the diagnostic sets are empty.
-Once a runtime pointer is present, missing, uncertain, invalid, stale, or
-mismatched runtime evidence remains unavailable or stale instead of being
-regenerated.
+After a prepared-certificate route has been published or persisted, missing,
+uncertain, invalid, stale, or mismatched runtime evidence remains unavailable
+or stale instead of being regenerated. An empty active run remains the
+observability-incomplete source-only case described above.
 
 ## Layout
 
