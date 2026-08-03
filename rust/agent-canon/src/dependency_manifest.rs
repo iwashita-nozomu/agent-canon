@@ -294,9 +294,10 @@ fn hash_bytes(bytes: &[u8]) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-pub(crate) fn validate_producer_identity(
+fn validate_producer_identity_inner(
     identity: &ProducerIdentity,
     producer: Option<&Path>,
+    verify_content: bool,
 ) -> Result<(), ManifestError> {
     if identity.version != PRODUCER_IDENTITY_VERSION
         || identity.contract != PRODUCER_IDENTITY_CONTRACT
@@ -334,32 +335,85 @@ pub(crate) fn validate_producer_identity(
     };
     let producer_path = canonical_file(&identity.producer_path, "producer_path")?;
     let manifest_path = canonical_file(&identity.manifest_path, "manifest_path")?;
-    if producer.map(|path| {
-        fs::canonicalize(path)
-            .map(|canonical| canonical == producer_path)
-            .unwrap_or(false)
-    }) != Some(true)
+    if producer.is_some()
+        && producer.map(|path| {
+            fs::canonicalize(path)
+                .map(|canonical| canonical == producer_path)
+                .unwrap_or(false)
+        }) != Some(true)
     {
-        if producer.is_some() {
+        return Err(ManifestError::SurfaceManifest(
+            "producer identity does not bind the executing producer".to_string(),
+        ));
+    }
+    if verify_content {
+        let producer_sha256 = hash_bytes(
+            &fs::read(&producer_path)
+                .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?,
+        );
+        let manifest_sha256 = hash_bytes(
+            &fs::read(&manifest_path)
+                .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?,
+        );
+        if identity.producer_sha256 != producer_sha256
+            || identity.manifest_sha256 != manifest_sha256
+        {
             return Err(ManifestError::SurfaceManifest(
-                "producer identity does not bind the executing producer".to_string(),
+                "producer identity content hash mismatch".to_string(),
             ));
         }
     }
-    let producer_sha256 = hash_bytes(
-        &fs::read(&producer_path)
-            .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?,
-    );
-    let manifest_sha256 = hash_bytes(
-        &fs::read(&manifest_path)
-            .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?,
-    );
-    if identity.producer_sha256 != producer_sha256 || identity.manifest_sha256 != manifest_sha256 {
-        return Err(ManifestError::SurfaceManifest(
-            "producer identity content hash mismatch".to_string(),
-        ));
-    }
     Ok(())
+}
+
+pub(crate) fn validate_producer_identity(
+    identity: &ProducerIdentity,
+    producer: Option<&Path>,
+) -> Result<(), ManifestError> {
+    validate_producer_identity_inner(identity, producer, true)
+}
+
+pub(crate) fn validate_persisted_producer_identity(
+    identity: &ProducerIdentity,
+) -> Result<(), ManifestError> {
+    validate_producer_identity_inner(identity, None, false)
+}
+
+pub(crate) fn current_producer_identity(root: &Path) -> Result<ProducerIdentity, ManifestError> {
+    let root = fs::canonicalize(root).map_err(|error| ManifestError::Io(error.to_string()))?;
+    let vendored_root = root.join("vendor/agent-canon");
+    let source_root = if vendored_root
+        .join("tools/agent_tools/surface_manifest.py")
+        .is_file()
+    {
+        vendored_root
+    } else {
+        root.clone()
+    };
+    let source_root = fs::canonicalize(&source_root)
+        .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
+    let producer_path = fs::canonicalize(source_root.join("tools/agent_tools/surface_manifest.py"))
+        .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
+    let manifest_path =
+        fs::canonicalize(source_root.join("documents/runtime/shared-runtime-surfaces.toml"))
+            .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?;
+    let identity = ProducerIdentity {
+        source_root: source_root.to_string_lossy().into_owned(),
+        producer_path: producer_path.to_string_lossy().into_owned(),
+        version: PRODUCER_IDENTITY_VERSION.to_string(),
+        contract: PRODUCER_IDENTITY_CONTRACT.to_string(),
+        producer_sha256: hash_bytes(
+            &fs::read(&producer_path)
+                .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?,
+        ),
+        manifest_path: manifest_path.to_string_lossy().into_owned(),
+        manifest_sha256: hash_bytes(
+            &fs::read(&manifest_path)
+                .map_err(|error| ManifestError::SurfaceManifest(error.to_string()))?,
+        ),
+    };
+    validate_producer_identity(&identity, Some(&producer_path))?;
+    Ok(identity)
 }
 
 fn hash_text(value: &str) -> String {
