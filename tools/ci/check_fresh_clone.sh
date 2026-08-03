@@ -20,7 +20,26 @@ TMP_DIR="$(mktemp -d -t template-fresh-clone-XXXXXX)"
 TOPIC_ROOT="${TMP_DIR}/workspace/fresh-clone"
 CLONE_DIR="${TOPIC_ROOT}/agent-canon"
 CLONE_TOOLS_ROOT=""
-trap 'rm -rf "${TMP_DIR}"' EXIT
+GIT_TEMP_CONFIG="${TMP_DIR}/safe.directory.gitconfig"
+ORIGINAL_GIT_CONFIG_GLOBAL="${GIT_CONFIG_GLOBAL-}"
+add_safe_directory_to_config() {
+  local repo_dir="$1"
+  git config --file "${GIT_TEMP_CONFIG}" --add safe.directory "${repo_dir}" >/dev/null
+}
+
+cleanup() {
+  if [ -n "${ORIGINAL_GIT_CONFIG_GLOBAL-}" ]; then
+    export GIT_CONFIG_GLOBAL="${ORIGINAL_GIT_CONFIG_GLOBAL}"
+  else
+    unset GIT_CONFIG_GLOBAL
+  fi
+  rm -rf "${TMP_DIR}"
+}
+trap cleanup EXIT
+
+touch "${GIT_TEMP_CONFIG}"
+export GIT_CONFIG_GLOBAL="${GIT_TEMP_CONFIG}"
+add_safe_directory_to_config "${CLONE_DIR}"
 
 mkdir -p "${TOPIC_ROOT}"
 
@@ -126,7 +145,6 @@ assert_update_plan_acceptance() {
 }
 
 git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
-git config --global --add safe.directory "${CLONE_DIR}"
 overlay_current_tree
 cd "${CLONE_DIR}"
 if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1; then
@@ -207,7 +225,7 @@ else
 fi
 git --git-dir="${AGENT_CANON_TEST_REMOTE}" symbolic-ref HEAD refs/heads/main
 git clone --no-local "${AGENT_CANON_TEST_REMOTE}" "${AGENT_CANON_TEST_WORK}" >/dev/null
-git config --global --add safe.directory "${AGENT_CANON_TEST_WORK}"
+add_safe_directory_to_config "${AGENT_CANON_TEST_WORK}"
 (
   cd "${AGENT_CANON_TEST_WORK}"
   printf "fresh clone update marker\n" > .fresh-clone-agent-canon-marker
