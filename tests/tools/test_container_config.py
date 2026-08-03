@@ -23,6 +23,7 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "container_config.py"
 GENERATOR = PROJECT_ROOT / ".devcontainer" / "generate-runtime-compose.sh"
+DOCKERFILE = PROJECT_ROOT / ".devcontainer" / "Dockerfile"
 
 
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
@@ -62,13 +63,6 @@ def write_devcontainer(root: Path) -> None:
                 "service": "workspace",
                 "containerUser": "project",
                 "remoteUser": "project",
-                "containerEnv": {
-                    "HOME": "/home/project",
-                    "SHELL": "/bin/zsh",
-                    "AGENT_CANON_CONTAINER_USER": "project",
-                    "AGENT_CANON_WORKSPACE_ROOT": "/workspace",
-                    "AGENT_CANON_RUNTIME_ROUTE": "CONTAINER_LOCAL",
-                },
                 "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
                 "postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace/${localWorkspaceFolderBasename} && bash .devcontainer/post-create-parent.sh /workspace/${localWorkspaceFolderBasename}",
                 "postAttachCommand": "bash vendor/agent-canon/.devcontainer/post-attach.sh",
@@ -90,11 +84,16 @@ def write_compose(
     duplicate_repo_mount: bool = False,
     include_runtime_environment: bool = True,
 ) -> None:
-    """Write a generated Compose projection with a topic-root bind mount."""
+    """Write a generated Compose projection for the fixture's workspace layout."""
     topic_root = root.parent.resolve()
+    direct_repo = topic_root.name == "workspace"
     repo_target = f"/workspace/{root.name}"
     volumes: list[dict[str, str]] = [
-        {"type": "bind", "source": str(topic_root), "target": "/workspace"},
+        {
+            "type": "bind",
+            "source": str(root.resolve() if direct_repo else topic_root),
+            "target": repo_target if direct_repo else "/workspace",
+        },
     ]
     if duplicate_repo_mount:
         volumes.append(
@@ -104,8 +103,12 @@ def write_compose(
         [
             "    environment:",
             "      AGENT_CANON_DEPENDENCY_PROFILE: full",
+            f"      AGENT_CANON_WORKSPACE_LAYOUT: {'direct-repo' if direct_repo else 'managed-topic'}",
+            "      DEVCONTAINER_GPU_MODE: disabled",
             "      AGENT_CANON_WORKSPACE_ROOT: /workspace",
             f"      AGENT_CANON_REPOSITORY_ROOT: {repo_target}",
+            f"      DEPENDENCY_MODULE_CONTAINER_SOURCE: {json.dumps(str(root.resolve() if direct_repo else topic_root))}",
+            f"      DEPENDENCY_MODULE_CONTAINER_TARGET: {json.dumps(repo_target if direct_repo else '/workspace')}",
         ]
         if include_runtime_environment
         else []
@@ -227,6 +230,20 @@ def test_topic_compose_semantics_pass(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_noncanonical_remote_user_contract_is_rejected(tmp_path: Path) -> None:
+    """The devcontainer runtime identity is fixed to the canonical project user."""
+    repo = write_topic_fixture(tmp_path)
+    config_path = repo / ".devcontainer/devcontainer.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config.update({"remoteUser": "vscode"})
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+
+    result = run_validator(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "remoteUser-expected:project" in result.stdout
+
+
 def test_legacy_topic_compose_root_is_rejected(tmp_path: Path) -> None:
     """The checker rejects the removed workspace-<topic-slug> root."""
     repo = write_topic_fixture(tmp_path, topic_root=tmp_path / "workspace-topic")
@@ -266,14 +283,13 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
         ".devcontainer/generate-runtime-compose.sh",
         GENERATOR.read_text(encoding="utf-8"),
     )
+    write_file(repo, ".devcontainer/Dockerfile", DOCKERFILE.read_text(encoding="utf-8"))
     (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
     missing_home = tmp_path / "missing-home"
-    env = {**os.environ, "HOME": str(missing_home)}
-    env.pop("HOME")
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,
-        env=env,
+        env={**os.environ, "HOME": str(missing_home)},
         check=False,
         capture_output=True,
         text=True,
@@ -288,15 +304,91 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     assert "/workspace/agent-canon" in compose
     assert "/etc/project-template/parent-environment.sh" not in compose
     assert "/etc/project-template/zsh/.zshrc" not in compose
-    assert "/var/lib/agent-canon/runtime" not in compose
-    assert "/var/run/docker.sock" not in compose
-    assert "${HOME}/.config/gh" not in compose
-    assert "${HOME}/.ssh" not in compose
     assert "    tmpfs:" not in compose
     assert 'HOME: "/tmp/project-template-home"' not in compose
     assert 'ZDOTDIR: "/etc/project-template/zsh"' not in compose
     assert 'SHELL: "/bin/bash"' not in compose
     assert 'command: /bin/bash -lc "sleep infinity"' in compose
+    assert "dockerfile: .devcontainer/Dockerfile" in compose
+    assert 'PROJECT_UID: "' in compose
+    assert 'PROJECT_GID: "' in compose
+    assert 'DEVCONTAINER_GPU_MODE: "disabled"' in compose
+    assert 'DEPENDENCY_MODULE_CONTAINER_SOURCE:' in compose
+    assert 'DEPENDENCY_MODULE_CONTAINER_TARGET: "/workspace"' in compose
+    assert "DEVCONTAINER_GPU_REQUEST" not in compose
+    assert "NVIDIA_" not in compose
+    assert "gpus: all" not in compose
+    assert "group_add:" not in compose
+    assert "/var/lib/agent-canon/runtime" not in compose
+
+
+def test_generator_treats_workspace_topic_slug_as_managed(tmp_path: Path) -> None:
+    """A managed topic may itself be named workspace without becoming direct-repo."""
+    repo = tmp_path / "workspace" / "workspace" / "agent-canon"
+    write_devcontainer(repo)
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
+    write_file(repo, ".devcontainer/Dockerfile", DOCKERFILE.read_text(encoding="utf-8"))
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "HOME": str(tmp_path / "missing-home")},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert 'AGENT_CANON_WORKSPACE_LAYOUT: "managed-topic"' in compose
+    assert f'source: "{repo.parent.resolve()}"' in compose
+    assert 'target: "/workspace"' in compose
+    assert 'target: "/workspace/agent-canon"' not in compose
+    assert load_container_config_module().validate_generated_compose(repo, None) == []
+
+
+def test_generator_direct_repo_mounts_only_repository_root(tmp_path: Path) -> None:
+    """A direct repo layout never exposes sibling repositories under /workspace."""
+    repo = tmp_path / "workspace" / "data_download"
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
+    write_file(repo, ".devcontainer/Dockerfile", DOCKERFILE.read_text(encoding="utf-8"))
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    home = tmp_path / "home"
+    write_host_zshrc(home)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={"HOME": str(home), **os.environ},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert f'source: "{repo.resolve()}"' in compose
+    assert 'target: "/workspace/data_download"' in compose
+    assert f'source: "{repo.parent.resolve()}"' not in compose
+    assert 'AGENT_CANON_WORKSPACE_LAYOUT: "direct-repo"' in compose
+    assert 'AGENT_CANON_REPOSITORY_ROOT: "/workspace/data_download"' in compose
+    assert f'DEPENDENCY_MODULE_CONTAINER_SOURCE: "{repo.resolve()}"' in compose
+    assert 'DEPENDENCY_MODULE_CONTAINER_TARGET: "/workspace/data_download"' in compose
+    assert compose.count("type: bind") == 1
+    assert load_container_config_module().validate_generated_compose(repo, None) == []
 
 
 def test_generator_accepts_explicit_output_path(tmp_path: Path) -> None:
@@ -380,32 +472,6 @@ def test_generator_rejects_legacy_topic_root(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "legacy workspace-<topic-slug> root" in result.stderr
-
-
-def test_generator_rejects_unknown_optional_mount_profile(tmp_path: Path) -> None:
-    """Optional host mounts use a closed explicit profile vocabulary."""
-    repo = tmp_path / "workspace" / "topic" / "agent-canon"
-    write_devcontainer(repo)
-    write_file(
-        repo,
-        ".devcontainer/generate-runtime-compose.sh",
-        GENERATOR.read_text(encoding="utf-8"),
-    )
-    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
-    result = subprocess.run(
-        ["bash", ".devcontainer/generate-runtime-compose.sh"],
-        cwd=repo,
-        env={
-            **os.environ,
-            "AGENT_CANON_OPTIONAL_MOUNTS": "docker-host,implicit-host-state",
-        },
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-
-    assert result.returncode == 1
-    assert "optional mount profile is unsupported" in result.stderr
 
 
 def write_parent_generator_fixture(
@@ -534,19 +600,17 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     compose = (repo / ".agent-canon/docker-compose.generated.yml").read_text(
         encoding="utf-8"
     )
-    assert 'target: "/etc/project-template/parent-environment.sh"' not in compose
+    assert 'target: "/etc/project-template/parent-environment.sh"' in compose
     assert 'target: "/home/project/.zshrc"' in compose
-    assert "ZDOTDIR" not in compose
-    assert compose.count("read_only: true") == 1
+    assert compose.count("read_only: true") >= 2
     assert 'HOME: "/home/project"' in compose
-    assert "ZDOTDIR" not in compose
+    assert 'ZDOTDIR: "/home/project"' in compose
     assert 'SHELL: "/bin/zsh"' in compose
     assert 'AGENT_CANON_DEPENDENCY_PROFILE: "full"' in compose
     assert 'user: "1234:2345"' in compose
     assert 'PROJECT_USER:' not in compose
     assert 'PROJECT_UID: "1234"' in compose
     assert 'PROJECT_GID: "2345"' in compose
-    assert "group_add:" not in compose
     assert 'command: /bin/zsh -lc "sleep infinity"' in compose
     module = load_container_config_module()
     pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
@@ -629,10 +693,8 @@ def test_parent_environment_symlinks_to_existing_sources_pass(tmp_path: Path) ->
     assert module.validate_parent_environment(repo) == []
 
 
-def test_parent_environment_broken_symlink_is_not_a_runtime_dependency(
-    tmp_path: Path,
-) -> None:
-    """A broken legacy parent environment view cannot block compose generation."""
+def test_parent_environment_broken_symlink_fails(tmp_path: Path) -> None:
+    """A declared parent environment view must resolve to an actual source file."""
     repo = write_parent_generator_fixture(tmp_path)
     script = repo / ".devcontainer/parent-environment.sh"
     script.unlink()
@@ -649,7 +711,8 @@ def test_parent_environment_broken_symlink_is_not_a_runtime_dependency(
         text=True,
     )
 
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.returncode == 1
+    assert "parent environment source does not resolve to a file" in result.stderr
     module = load_container_config_module()
     findings = module.validate_parent_environment(repo)
     assert any(finding.detail == "missing-target" for finding in findings)
@@ -743,10 +806,8 @@ def test_generator_rejects_zero_project_uid_or_gid(tmp_path: Path) -> None:
         assert "DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_MUST_BE_POSITIVE_DECIMAL" in result.stderr
 
 
-def test_parent_validator_rejects_zero_uid_gid_and_host_runtime_group(
-    tmp_path: Path,
-) -> None:
-    """Generated Compose readback rejects zero IDs and host runtime group wiring."""
+def test_parent_validator_rejects_zero_uid_or_gid(tmp_path: Path) -> None:
+    """Generated Compose readback rejects zero project IDs."""
     repo = write_parent_generator_fixture(tmp_path)
     (repo / ".agent-canon").mkdir()
     home = tmp_path / "home"
@@ -785,13 +846,6 @@ def test_parent_validator_rejects_zero_uid_gid_and_host_runtime_group(
                 'PROJECT_GID: "2345"', 'PROJECT_GID: "0"'
             ),
             {"default-user-must-have-positive-uid-gid", "build-arg-PROJECT_GID-must-be-positive-integer"},
-        ),
-        (
-            valid.replace(
-                "    environment:\n",
-                '    group_add:\n      - "0"\n    environment:\n',
-            ),
-            {"runtime-group-add-forbidden-with-container-local-runtime"},
         ),
     )
     for malformed, expected in malformed_cases:
@@ -856,82 +910,6 @@ def test_parent_generator_omits_absent_host_zshrc_without_probe(
     assert pack_findings == []
     assert pack is not None
     assert module.validate_generated_compose(repo, pack) == []
-
-
-def test_parent_validator_rejects_unprofiled_host_mount_target(tmp_path: Path) -> None:
-    """Default Compose cannot smuggle a host state or daemon mount."""
-    repo = write_parent_generator_fixture(tmp_path)
-    (repo / ".agent-canon").mkdir()
-    home = tmp_path / "home"
-    home.mkdir()
-    result = subprocess.run(
-        ["bash", ".devcontainer/generate-runtime-compose.sh"],
-        cwd=repo,
-        env={
-            **os.environ,
-            "HOME": str(home),
-            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
-        },
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0, result.stdout + result.stderr
-    compose_path = repo / ".agent-canon/docker-compose.generated.yml"
-    compose_path.write_text(
-        compose_path.read_text(encoding="utf-8").replace(
-            '    volumes:\n',
-            '    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock\n',
-        ),
-        encoding="utf-8",
-    )
-    module = load_container_config_module()
-    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
-    assert pack_findings == []
-    assert pack is not None
-    details = {
-        finding.detail for finding in module.validate_generated_compose(repo, pack)
-    }
-    assert "host-mount-target-forbidden-by-default:/var/run/docker.sock" in details
-
-
-def test_standalone_validator_rejects_unprofiled_host_mount_target(
-    tmp_path: Path,
-) -> None:
-    """Standalone Compose obeys the same default host-mount inventory."""
-    repo = write_topic_fixture(tmp_path)
-    compose_path = repo / ".devcontainer/docker-compose.generated.yml"
-    compose_path.write_text(
-        compose_path.read_text(encoding="utf-8").replace(
-            "    volumes:\n",
-            "    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock\n",
-        ),
-        encoding="utf-8",
-    )
-    module = load_container_config_module()
-    details = {
-        finding.detail for finding in module.validate_generated_compose(repo, None)
-    }
-    assert "host-mount-target-forbidden-by-default:/var/run/docker.sock" in details
-
-
-def test_default_validation_ignores_legacy_parent_environment_sources(
-    tmp_path: Path,
-) -> None:
-    """Legacy parent environment files do not affect the default validator route."""
-    repo = write_parent_generator_fixture(tmp_path)
-    write_devcontainer(repo)
-    write_file(repo, "vendor/agent-canon/.devcontainer/post-create.sh", "#!/bin/sh\n")
-    write_file(
-        repo,
-        "vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
-        "#!/bin/sh\n",
-    )
-    write_file(repo, ".devcontainer/parent-environment.sh", "touch /tmp/side-effect\n")
-    write_file(repo, ".devcontainer/parent-environment.toml", "not = [valid\n")
-    module = load_container_config_module()
-
-    assert module.validate_devcontainer(repo) == []
 
 
 

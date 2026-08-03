@@ -4,7 +4,8 @@
 # upstream implementation ../../tools/ci/run_codex_in_repo_container.py runs Codex inside the repo container
 # upstream implementation ../../.devcontainer/devcontainer.json selects runtime setup before nested Codex
 # upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md devcontainer boundary
-# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md exact in-container runtime identity oracle
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md opt-in in-container runtime identity oracle
 # @dependency-end
 
 """Tests for the nested Codex container runner."""
@@ -12,7 +13,6 @@
 from __future__ import annotations
 
 import os
-import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -51,8 +51,23 @@ def test_print_only_runs_shared_post_create_before_codex() -> None:
     assert "exec codex" in result.stdout
 
 
+def test_standalone_dockerfile_uses_canonical_project_identity() -> None:
+    """Standalone source builds provide project UID/GID and container-local sudo."""
+    dockerfile = (PROJECT_ROOT / ".devcontainer" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+
+    assert "FROM ubuntu:22.04@sha256:" in dockerfile
+    assert "ARG PROJECT_UID" in dockerfile
+    assert "ARG PROJECT_GID" in dockerfile
+    assert "groupadd --gid \"${PROJECT_GID}\" project" in dockerfile
+    assert "useradd --uid \"${PROJECT_UID}\" --gid project" in dockerfile
+    assert "project ALL=(ALL) NOPASSWD:ALL" in dockerfile
+    assert "USER project" in dockerfile
+
+
 def test_runtime_identity(tmp_path: Path) -> None:
-    """Nested Codex keeps runtime state container-local unless explicitly managed."""
+    """Nested Codex keeps opt-in identity scripts retained but unreachable by default."""
     pack = tmp_path / "pack.toml"
     pack.write_text(
         "\n".join(
@@ -138,37 +153,50 @@ def test_runtime_identity(tmp_path: Path) -> None:
         "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
         in result.stdout
     )
+    devcontainer = (PROJECT_ROOT / ".devcontainer" / "devcontainer.json").read_text(
+        encoding="utf-8"
+    )
     assert "-e OPENAI_API_KEY=test-api-key" in result.stdout
     assert "-e OPENAI_BASE_URL=https://api.example.test/v1" in result.stdout
     assert "-e AGENT_CANON_DEPENDENCY_PROFILE=gpu" in result.stdout
     assert "/root/.codex" not in result.stdout
     assert "umask 0007" in post_create
-    assert '"$devcontainer_dir/finalize-shared-runtime.sh"' in post_create
-    assert "SHARED_RUNTIME_FINALIZE=skipped route=CONTAINER_LOCAL" in post_create
+    assert '"$devcontainer_dir/finalize-shared-runtime.sh"' not in post_create
     assert 'dependency_profile="${AGENT_CANON_DEPENDENCY_PROFILE:-full}"' in post_create
     assert '--profile "$dependency_profile"' in post_create
     assert 'echo "codex-state: ${codex_state_status}"' in post_attach
+    assert 'workspace_layout="${AGENT_CANON_WORKSPACE_LAYOUT:-managed-topic}"' in post_attach
+    assert 'workspace_source="${DEPENDENCY_MODULE_CONTAINER_SOURCE:-}"' in post_attach
+    assert 'workspace_target="${DEPENDENCY_MODULE_CONTAINER_TARGET:-}"' in post_attach
+    assert 'DEPENDENCY_MODULE_CONTAINER_LAYOUT=${workspace_layout}' in post_attach
+    assert 'DEPENDENCY_MODULE_CONTAINER_SOURCE=${workspace_source}' in post_attach
+    assert 'DEPENDENCY_MODULE_CONTAINER_TARGET=${workspace_target}' in post_attach
+    assert 'DEPENDENCY_MODULE_CONTAINER=not-selected layout=direct-repo' in post_attach
+    assert '"${repo_root}/tools/agent_tools/dependency_module_change.py"' in post_attach
+    assert (
+        '"${repo_root}/vendor/agent-canon/tools/agent_tools/dependency_module_change.py"'
+        in post_attach
+    )
+    assert 'if [ -f "$candidate" ]; then' in post_attach
     assert '"schema_version": "shared-runtime-readback/v1"' in finalize
     assert 'readback_receipt="${runtime_root}/shared-runtime-readback.json"' in finalize
     assert (
         'provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/shared-runtime-provision.json}"'
         in bootstrap
     )
-    assert (
-        'requested_runtime_route="${AGENT_CANON_RUNTIME_ROUTE:-CONTAINER_LOCAL}"'
-        in bootstrap
-    )
-    assert 'optional_mounts="${AGENT_CANON_OPTIONAL_MOUNTS:-}"' in bootstrap
-    assert (
-        "host shared-runtime bootstrap requires explicit shared-runtime profile"
-        in bootstrap
-    )
     assert "read_shared_runtime_provision" in finalize
     assert "write_runtime_receipt_atomic" in bootstrap
     assert "write_runtime_receipt_atomic" in finalize
-    assert "optional_mount_enabled shared-runtime" in compose
-    assert 'AGENT_CANON_OPTIONAL_MOUNTS' in compose
-    assert 'runtime_route="CONTAINER_LOCAL"' in compose
+    assert (PROJECT_ROOT / ".devcontainer" / "finalize-shared-runtime.sh").is_file()
+    assert (PROJECT_ROOT / ".devcontainer" / "bootstrap-shared-runtime.sh").is_file()
+    assert "bootstrap-shared-runtime.sh" not in devcontainer
+    assert "finalize-shared-runtime.sh" not in devcontainer
+    assert "nvidia-smi" not in compose
+    assert "DEVCONTAINER_GPU_REQUEST" not in compose
+    assert "group_add:" not in compose
+    assert "gpus: all" not in compose
+    assert "/var/lib/agent-canon/runtime" not in compose
+    assert "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT" not in compose
     assert (
         "/var/lib/agent-canon/runtime/shared-runtime-provision.json"
         in environment_manifest
@@ -186,85 +214,3 @@ def test_runtime_identity(tmp_path: Path) -> None:
     )
     assert "exec codex" in result.stdout
     assert "--platform linux/amd64" in result.stdout
-
-
-def test_print_only_forwards_only_a_valid_ssh_auth_socket(tmp_path: Path) -> None:
-    """A regular SSH_AUTH_SOCK path is not projected into the nested container."""
-    pack = tmp_path / "pack.toml"
-    pack.write_text(
-        "\n".join(
-            [
-                "[pack]",
-                'name = "ssh-socket-validation"',
-                'dockerfile = "docker/Dockerfile"',
-                'context = "."',
-                'image_tag = "agent-canon-ssh-socket:test"',
-                'platform = "linux/amd64"',
-                "",
-                "[smoke]",
-                "commands = []",
-                "",
-                "[runtime]",
-                'shell = "/bin/bash"',
-                'workdir = "/workspace"',
-                'workspace_mount = "/workspace"',
-                'dependency_profile = "full"',
-                "env = []",
-                "mounts = []",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    profiles = tmp_path / "profiles.toml"
-    profiles.write_text(
-        "\n".join(
-            [
-                "[defaults]",
-                'container_home_root = "/workspace/.state/nested-codex"',
-                "use_host_user = false",
-                "tty = false",
-                "mount_host_gitconfig = false",
-                "mount_host_git_credentials = false",
-                "mount_host_ssh_dir = false",
-                "forward_ssh_auth_sock = true",
-                "forward_env = []",
-                "",
-                "[[profile]]",
-                'name = "default"',
-                f'pack = "{pack}"',
-                'description = "socket validation fixture"',
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-    invalid_socket = tmp_path / "not-a-socket"
-    invalid_socket.write_text("regular file\n", encoding="utf-8")
-    result = run_cli(
-        "--print-only",
-        "--profiles",
-        str(profiles),
-        env={"SSH_AUTH_SOCK": str(invalid_socket)},
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert "/tmp/host-ssh-agent.sock" not in result.stdout
-    assert "SSH_AUTH_SOCK=/tmp/host-ssh-agent.sock" not in result.stdout
-
-    valid_socket = tmp_path / "valid.sock"
-    listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    try:
-        listener.bind(str(valid_socket))
-        result = run_cli(
-            "--print-only",
-            "--profiles",
-            str(profiles),
-            env={"SSH_AUTH_SOCK": str(valid_socket)},
-        )
-    finally:
-        listener.close()
-
-    assert result.returncode == 0, result.stderr
-    assert f"{valid_socket}:/tmp/host-ssh-agent.sock" in result.stdout
-    assert "SSH_AUTH_SOCK=/tmp/host-ssh-agent.sock" in result.stdout

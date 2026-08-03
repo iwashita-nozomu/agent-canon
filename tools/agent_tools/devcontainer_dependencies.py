@@ -12,8 +12,8 @@
 # @dependency-end
 """Declarative, typed devcontainer dependency planning and installation.
 
-The fixed bootstrap provides ``packaging`` plus Python 3.11's ``tomllib``;
-older supported images use the bootstrapped ``tomli`` module instead.
+The fixed bootstrap provides ``packaging`` and bootstrapped ``tomli`` for the
+Ubuntu 22.04/Python 3.10 image; newer interpreters may use stdlib ``tomllib``.
 """
 
 from __future__ import annotations
@@ -95,6 +95,7 @@ BASE_CAPABILITIES = frozenset(
         "ca-certificates",
         "curl",
         "git",
+        "gnupg",
         "ninja-build",
         "node",
         "npm",
@@ -108,6 +109,7 @@ BASE_CAPABILITIES = frozenset(
         "xz-utils",
     }
 )
+NPM_GLOBAL_PREFIX = "/usr/local"
 
 
 class DependencyError(ValueError):
@@ -1487,7 +1489,7 @@ class EnvironmentBoundaryModel:
                     "rsync",
                     "openssh-client",
                     "graphviz",
-                    "python3.11-venv",
+                    "python3-venv",
                 ):
                     if package not in packages:
                         findings.append(
@@ -1884,6 +1886,8 @@ class Installer:
                 "npm",
                 "install",
                 "--global",
+                "--prefix",
+                NPM_GLOBAL_PREFIX,
                 f"{record.package}@{record.version}",
             ]
             if repair:
@@ -1985,27 +1989,32 @@ class Installer:
                 workspace=workspace,
                 env=tool_env,
             )
-            if repair:
-                installed = self._capture(
-                    ["elan", "toolchain", "list"],
-                    workspace=workspace,
-                    env=tool_env,
-                ).stdout
-                if any(
-                    line.split()[0] == record.version
-                    for line in installed.splitlines()
-                    if line.strip()
-                ):
-                    self._run(
-                        ["elan", "toolchain", "uninstall", record.version],
-                        workspace=workspace,
-                        env=tool_env,
-                    )
-            self._run(
-                ["elan", "toolchain", "install", record.version],
+            installed = self._capture(
+                ["elan", "toolchain", "list"],
                 workspace=workspace,
                 env=tool_env,
+            ).stdout
+            has_exact_toolchain = any(
+                line.split()[0] == record.version
+                for line in installed.splitlines()
+                if line.strip()
             )
+            if repair and has_exact_toolchain:
+                # A receipt-triggered repair is the explicit contract that
+                # permits replacing an already-installed exact toolchain.
+                # Fresh retries with no receipt preserve a usable live install.
+                self._run(
+                    ["elan", "toolchain", "uninstall", record.version],
+                    workspace=workspace,
+                    env=tool_env,
+                )
+                has_exact_toolchain = False
+            if not has_exact_toolchain:
+                self._run(
+                    ["elan", "toolchain", "install", record.version],
+                    workspace=workspace,
+                    env=tool_env,
+                )
             self._run(
                 ["elan", "default", record.version],
                 workspace=workspace,
@@ -2178,9 +2187,24 @@ class Installer:
             raise DependencyError(f"{record.id}: apt repository source is stale")
 
     def _verify_npm_package(self, record: DependencyRecord, *, workspace: Path) -> None:
+        npm_env = {
+            "PATH": os.pathsep.join(
+                [f"{NPM_GLOBAL_PREFIX}/bin", os.environ.get("PATH", "")]
+            )
+        }
         result = self._capture(
-            ["npm", "ls", "--global", "--json", "--depth=0", record.package],
+            [
+                "npm",
+                "ls",
+                "--global",
+                "--prefix",
+                NPM_GLOBAL_PREFIX,
+                "--json",
+                "--depth=0",
+                record.package,
+            ],
             workspace=workspace,
+            env=npm_env,
         )
         try:
             payload = json.loads(result.stdout)
@@ -2198,6 +2222,7 @@ class Installer:
         executable = self._capture(
             [spec.executable, *spec.args],
             workspace=workspace,
+            env=npm_env,
         )
         self._require_output(executable, spec.output_contains, record.id)
 
@@ -2293,7 +2318,7 @@ class Installer:
     def _verify_lean_toolchain(
         self, record: DependencyRecord, *, workspace: Path
     ) -> None:
-        active = self._capture(["elan", "default"], workspace=workspace)
+        active = self._capture(["elan", "show"], workspace=workspace)
         installed = self._capture(["elan", "toolchain", "list"], workspace=workspace)
         if record.version not in active.stdout or not any(
             line.split()[0] == record.version
@@ -2308,11 +2333,18 @@ class Installer:
             )
 
     def _cargo_source(self, record: DependencyRecord, workspace: Path) -> Path:
-        source = (workspace / record.source).resolve()
-        if not source.is_dir():
-            source = (workspace / "vendor" / "agent-canon" / record.source).resolve()
-        if os.path.commonpath((str(workspace.resolve()), str(source))) != str(
-            workspace.resolve()
+        workspace_root = workspace.resolve()
+        standalone_source = workspace_root / record.source
+        vendor_root = workspace_root / "vendor" / "agent-canon"
+        # A vendored AgentCanon checkout is the canonical source in a derived
+        # parent. Resolve it before considering the standalone layout so a
+        # stale parent-root copy cannot win merely because it exists.
+        if vendor_root.is_dir():
+            source = (vendor_root / record.source).resolve()
+        else:
+            source = standalone_source.resolve()
+        if os.path.commonpath((str(workspace_root), str(source))) != str(
+            workspace_root
         ):
             raise DependencyError(f"{record.id}: cargo source escapes workspace")
         if not source.is_dir():

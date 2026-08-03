@@ -118,6 +118,21 @@ owning them. It reads `docker/packs/default.toml`, builds the repo-local
 Compose service, and runs repo-local `docker/install_python_dependencies.sh`
 after the workspace is mounted.
 
+When AgentCanon itself is opened as a standalone source checkout and no
+`docker/packs/default.toml` exists, the generator builds the source-owned
+`.devcontainer/Dockerfile` with the same canonical project UID/GID contract; it
+does not fall back to an unpinned `ubuntu:22.04` image.
+
+The default parent image contract is the #524 canonical identity: a
+digest-pinned plain `ubuntu:22.04` base whose image creates the `project`
+user/group from `PROJECT_UID` / `PROJECT_GID` build args and runs as
+`USER project`. The generator resolves and validates those numeric args; it does
+not expose a public user-name override. The image exposes passwordless
+container-local `sudo -n` for mounted dependency installation. This does not
+invoke host `sudo`, prompt for a host password, mutate host groups, or add an
+AgentCanon-specific group. Workspace bind outputs are expected to carry the host
+mapped UID/GID owner.
+
 `devcontainer.json` must not use a fixed AgentCanon display name for every
 parent repository. The generated Compose file must also set a top-level project
 `name` derived from the repository path, while allowing an explicit
@@ -140,6 +155,20 @@ root を一度だけ `/workspace` に bind mountし、`AGENT_CANON_WORKSPACE_ROO
 の二重 mount、host absolute path の tracked config への書き込みは行いません。
 `/workspace` mount または dependency tool の欠落は startup design error として
 post-attach と `tools/ci/container_config.py` が報告します。
+
+Topic workspace の外側にある既存 repository checkout は `direct-repo` layout の
+canonical exception として扱います。direct-repo は exact repository root だけを
+`/workspace/<basename>` に bind し、親 `~/workspace` 全体、sibling clone、推測した
+別 path を mount しません。dependency-module topic marker/status guard は
+direct-repo では要求・実行せず、managed-topic では従来どおり必須です。
+
+generator は `AGENT_CANON_WORKSPACE_LAYOUT=managed-topic|direct-repo` を Compose
+environment に出力し、post-attach は `DEPENDENCY_MODULE_CONTAINER_LAYOUT`、
+`DEPENDENCY_MODULE_CONTAINER_SOURCE`、`DEPENDENCY_MODULE_CONTAINER_TARGET` と
+exact source/target を readback します。direct-repo の acceptance command は
+`devcontainer up --workspace-folder .` であり、layout env/readback が一致しない、
+source が repository root 以外、または sibling/parent workspace が bind された場合は
+startup design failure です。
 
 ## VS Code surface の責務境界
 

@@ -108,8 +108,9 @@ check_node_activation() {
   [ "$(npm --version)" = "$NODE_NPM_VERSION" ] || fail "npm is not $NODE_NPM_VERSION"
   [ "$(readlink -f "$(command -v node)")" = "$NODE_INSTALL_PATH/bin/node" ] || \
     fail "node is not activated from the verified archive install path"
-  [ "$(readlink -f "$(command -v npm)")" = "$NODE_INSTALL_PATH/bin/npm" ] || \
-    fail "npm is not activated from the verified archive install path"
+  [ "$(readlink -f "$(command -v npm)")" = \
+    "$NODE_INSTALL_PATH/lib/node_modules/npm/bin/npm-cli.js" ] || \
+    fail "npm is not activated from the verified bundled CLI path"
 }
 
 check_bootstrap() {
@@ -119,6 +120,7 @@ check_bootstrap() {
   check_python_requirement_capability || fail "python3-packaging capability is unavailable"
   check_node_activation
   node_receipt_matches || fail "verified Node bootstrap receipt is unavailable or stale"
+  command -v gpg >/dev/null 2>&1 || fail "gnupg capability is unavailable"
   command -v ninja >/dev/null 2>&1 || fail "ninja-build capability is unavailable"
   printf 'DEVCONTAINER_BASE_BOOTSTRAP=pass\n'
 }
@@ -196,6 +198,7 @@ install_standalone_base() {
     python3-packaging \
     ca-certificates \
     curl \
+    gnupg \
     xz-utils \
     ninja-build
   if ! python3 - <<'PY'

@@ -22,6 +22,21 @@ hooks/resource projection の public schema はこの packet の変更対象で�
 `pstree` は capability detection と bounded diagnostic に限り、proc が完全なら
 `pstree` 不在でも admission を継続します。
 
+## Default devcontainer boundary
+
+この packet は GPU admission 実験を実行する場合の source authority であり、
+既定 devcontainer の起動要件ではない。default profile は host `sudo`、system
+group、shared lock、`/var/lib/agent-canon/runtime` の bind、provision/readback
+receipt、GPU auto-request を選択しない。`bootstrap-shared-runtime.sh` と
+`finalize-shared-runtime.sh`、scheduler、managed experiment、receipt owner は
+AgentCanon source に保持し、明示 opt-in profile の候補として扱う。
+
+その opt-in profile の命名、host capability、権限境界、Compose projection、
+receipt validation は Issue [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521)
+で follow-up として追跡する。default 境界の authority は linked design/implementation
+であり、default 経路からの非選択は実験機能の wholesale deletion や
+R5 の runner/lifecycle semantics の変更を意味しない。
+
 ## GPU/MIG の証拠と状態
 
 - XML の topology/process hierarchy が physical UUID と MIG UUID の唯一の binding authority です。

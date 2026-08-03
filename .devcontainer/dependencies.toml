@@ -17,7 +17,7 @@ schema_version = 2
 id = "github-cli"
 package = "gh"
 method = "apt-repository"
-version = "2.93.0"
+version = "2.97.0"
 source = "https://cli.github.com/packages"
 key_url = "https://cli.github.com/packages/githubcli-archive-keyring.gpg"
 key_fingerprint = "2C6106201985B60E6C7AC87323F3D4EA75716059"
@@ -56,7 +56,7 @@ version = "1.61.0"
 source = "https://playwright.dev"
 browser = "chromium"
 browser_cache_path = "/usr/local/share/ms-playwright"
-verification = { kind = "browser-executable", executable_globs = ["chromium-*/chrome-linux/chrome", "chromium-*/chrome-linux64/chrome", "chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell"], args = ["--version"], output_contains = "Chromium" }
+verification = { kind = "browser-executable", executable_globs = ["chromium-*/chrome-linux/chrome", "chromium-*/chrome-linux64/chrome", "chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell"], args = ["--version"], output_contains = "Google Chrome for Testing" }
 deps = ["playwright"]
 provides = ["playwright-chromium"]
 failure_policy = "fail"
@@ -353,7 +353,7 @@ method = "cargo-source-build"
 version = "0.1.0"
 source = "rust/agent-canon"
 repo = "https://github.com/iwashita-nozomu/agent-canon.git"
-commit = "ec2cae45a57875bfbfcae2148a7d639692fb2934"
+commit = "434635f891c68c1f587d62010fb559412da96f51"
 locked = true
 verification = { kind = "cargo-binary", path = "target/release/agent-canon", args = ["--version"], output_contains = "agent-canon 0.1.0" }
 deps = ["cargo"]

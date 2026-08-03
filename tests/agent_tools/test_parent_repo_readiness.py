@@ -7,7 +7,8 @@
 # upstream implementation ../../tools/agent_tools/surface_manifest.py parses shared surface manifest
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared runtime surface manifest
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent readiness boundary
-# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md runtime identity receipt and shared-surface test contract
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md opt-in runtime identity and shared-surface test contract
 # @dependency-end
 
 from __future__ import annotations
@@ -117,7 +118,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             )
 
     def test_shared_surface_receipt(self) -> None:
-        """The shared devcontainer surface carries both exact identity receipt owners."""
+        """The shared devcontainer surface keeps opt-in receipt owners in source."""
         manifest = load_manifest(
             PROJECT_ROOT,
             ".",
@@ -156,10 +157,11 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 "../vendor/agent-canon/.devcontainer/devcontainer.json",
             )
             config = json.loads(devcontainer_json.read_text(encoding="utf-8"))
-            assert config["initializeCommand"].startswith(
-                "AGENT_CANON_DEVCONTAINER_REPO_ROOT=."
+            assert config["initializeCommand"] == (
+                "AGENT_CANON_DEVCONTAINER_REPO_ROOT=. "
+                "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml "
+                "bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh"
             )
-            assert "bootstrap-shared-runtime.sh" not in config["initializeCommand"]
             assert config["postCreateCommand"].startswith(
                 "bash vendor/agent-canon/.devcontainer/post-create.sh"
             )
@@ -174,6 +176,19 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 "post-create.sh",
             ):
                 self.assertFalse((devcontainer / name).exists())
+            self.assertTrue(
+                (
+                    root
+                    / "vendor/agent-canon/.devcontainer/bootstrap-shared-runtime.sh"
+                ).is_file()
+            )
+            self.assertTrue(
+                (
+                    root / "vendor/agent-canon/.devcontainer/finalize-shared-runtime.sh"
+                ).is_file()
+            )
+            self.assertNotIn("bootstrap-shared-runtime.sh", config["initializeCommand"])
+            self.assertNotIn("finalize-shared-runtime.sh", config["postCreateCommand"])
 
     def test_legacy_devcontainer_directory_symlink_is_rejected(self) -> None:
         """Whole-directory .devcontainer symlink is rejected by readiness checks."""

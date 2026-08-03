@@ -26,6 +26,7 @@ from typing import Any
 from unittest import mock
 
 from tools.agent_tools.devcontainer_dependencies import (
+    BASE_CAPABILITIES,
     DependencyError,
     Installer,
     LoadedManifest,
@@ -91,7 +92,7 @@ def default_verification(
             "kind": "browser-executable",
             "executable_globs": ["chromium-*/chrome-linux/chrome"],
             "args": ["--version"],
-            "output_contains": "Chromium",
+            "output_contains": "Google Chrome for Testing",
         }
     raise AssertionError(f"unsupported fixture method: {method}")
 
@@ -180,7 +181,7 @@ def write_boundary_fixture(
     write_file(
         "docker/Dockerfile",
         "FROM python:3.11\n"
-        "RUN apt-get install -y rsync openssh-client graphviz python3.11-venv\n",
+        "RUN apt-get install -y rsync openssh-client graphviz python3-venv\n",
     )
     requirements_path = write_file("docker/requirements.txt", requirements)
     write_file(
@@ -262,7 +263,7 @@ class FakeRunner:
                 f"install ok installed\t1.0.0\t{package}\n",
                 "",
             )
-        if command[:4] == ("npm", "ls", "--global", "--json"):
+        if command[:3] == ("npm", "ls", "--global") and "--json" in command:
             package = command[-1]
             return subprocess.CompletedProcess(
                 command,
@@ -291,20 +292,67 @@ class FakeRunner:
                 "clippy-x86_64-unknown-linux-gnu (installed)\n",
                 "",
             )
-        if command[:2] == ("elan", "default"):
+        if command[:2] == ("elan", "show"):
             return subprocess.CompletedProcess(
-                command, 0, "leanprover/lean4:v4.30.0\n", ""
+                command,
+                0,
+                "leanprover/lean4:v4.30.0 (default)\n"
+                "Lean (version 4.30.0, stable)\n",
+                "",
             )
         if command[:3] == ("elan", "toolchain", "list"):
             return subprocess.CompletedProcess(
                 command, 0, "leanprover/lean4:v4.30.0\n", ""
             )
         if Path(command[0]).name == "chrome":
-            return subprocess.CompletedProcess(command, 0, "Chromium 123\n", "")
+            return subprocess.CompletedProcess(
+                command, 0, "Google Chrome for Testing 149.0.7827.55\n", ""
+            )
         return subprocess.CompletedProcess(command, 0, "1.0.0\n", "")
 
 
+class LeanToolchainRetryRunner(FakeRunner):
+    """Model an install that leaves a live Lean toolchain before failing."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.lean_toolchain_installed = False
+        self.fail_install_once = True
+
+    def run(
+        self,
+        argv: Sequence[str],
+        *,
+        cwd: Path | None = None,
+        privileged: bool = False,
+        capture_output: bool = False,
+        env: Mapping[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        command = tuple(argv)
+        result = super().run(
+            argv,
+            cwd=cwd,
+            privileged=privileged,
+            capture_output=capture_output,
+            env=env,
+        )
+        if command[:3] == ("elan", "toolchain", "list"):
+            if not self.lean_toolchain_installed:
+                return subprocess.CompletedProcess(command, 0, "", "")
+            return result
+        if command[:3] == ("elan", "toolchain", "install"):
+            self.lean_toolchain_installed = True
+            if self.fail_install_once:
+                self.fail_install_once = False
+                raise subprocess.CalledProcessError(1, command)
+        return result
+
+
 class DependencyModelTests(unittest.TestCase):
+    def test_base_capabilities_include_gnupg_for_repository_bootstrap(self) -> None:
+        """A fixed image capability satisfies apt-repository gpg prerequisites."""
+        self.assertIn("gnupg", BASE_CAPABILITIES)
+
     """Exercise schema, merge, order, security, and receipt behavior."""
 
     def test_repository_manifest_validates_and_dry_run_has_stable_order(self) -> None:
@@ -339,6 +387,89 @@ class DependencyModelTests(unittest.TestCase):
             "npm-package",
         )
         self.assertNotIn("commands", dry_run["actions"][0])
+
+    def test_npm_global_uses_stable_prefix_for_install_and_verification(self) -> None:
+        parsed = parse_record(
+            record("codex", method="npm-global"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+        installer = Installer(runner)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            installer.install_record(parsed, workspace=root)
+            installer.verify(parsed, workspace=root)
+
+        install_call = next(
+            call for call in runner.calls if call[:2] == ("npm", "install")
+        )
+        self.assertEqual(
+            install_call,
+            ("npm", "install", "--global", "--prefix", "/usr/local", "codex@1.0.0"),
+        )
+        ls_index = next(
+            index
+            for index, call in enumerate(runner.calls)
+            if call[:2] == ("npm", "ls")
+        )
+        self.assertEqual(
+            runner.calls[ls_index],
+            (
+                "npm",
+                "ls",
+                "--global",
+                "--prefix",
+                "/usr/local",
+                "--json",
+                "--depth=0",
+                "codex",
+            ),
+        )
+        self.assertIsNotNone(runner.environments[ls_index])
+        assert runner.environments[ls_index] is not None
+        self.assertIn("/usr/local/bin", runner.environments[ls_index]["PATH"].split(os.pathsep))
+        executable_index = next(
+            index
+            for index, call in enumerate(runner.calls)
+            if call == ("codex", "--version")
+        )
+        self.assertEqual(runner.calls[executable_index], ("codex", "--version"))
+        self.assertIsNotNone(runner.environments[executable_index])
+
+    def test_cargo_source_prefers_vendored_canonical_and_rejects_escape(self) -> None:
+        cargo = parse_record(
+            record(
+                "agent-cli",
+                method="cargo-source-build",
+                source="rust/agent-canon",
+                repo="https://example.test/agent-canon.git",
+                commit="a" * 40,
+                locked=True,
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        installer = Installer(FakeRunner())
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            standalone = root / "rust" / "agent-canon"
+            standalone.mkdir(parents=True)
+            self.assertEqual(installer._cargo_source(cargo, root), standalone)
+
+            vendored = root / "vendor" / "agent-canon" / "rust" / "agent-canon"
+            vendored.mkdir(parents=True)
+            self.assertEqual(installer._cargo_source(cargo, root), vendored)
+
+            outside = root.parent / f"{root.name}-outside"
+            outside.mkdir()
+            vendor_root = root / "vendor" / "agent-canon"
+            vendored.rmdir()
+            (vendor_root / "rust").rmdir()
+            vendor_root.rmdir()
+            vendor_root.symlink_to(outside, target_is_directory=True)
+            with self.assertRaisesRegex(DependencyError, "escapes workspace"):
+                installer._cargo_source(cargo, root)
 
     def test_schema_rejects_missing_and_unknown_fields(self) -> None:
         value = record("invalid")
@@ -768,6 +899,20 @@ class DependencyModelTests(unittest.TestCase):
                 [expected_detail(path)],
             )
 
+    def test_boundary_accepts_native_python_venv_package(self) -> None:
+        """Ubuntu 22.04 uses the minor-independent python3-venv package."""
+        with tempfile.TemporaryDirectory() as temporary:
+            model, _ = write_boundary_fixture(
+                Path(temporary),
+                "jupyterlab\nnotebook\nipykernel\npydeps\nsnakeviz\npyyaml\n",
+            )
+            report = model.validate()
+
+        self.assertNotIn(
+            "missing-runtime-package:python3-venv",
+            [finding.detail for finding in report.findings],
+        )
+
     def test_canonical_manifest_owns_pinned_pyyaml_independently(self) -> None:
         """AgentCanon's mounted validators receive their own exact PyYAML record."""
         plan = load_plan(ROOT, ROOT)
@@ -1175,6 +1320,8 @@ class DependencyModelTests(unittest.TestCase):
             ),
             runner.calls,
         )
+        self.assertIn(("elan", "show"), runner.calls)
+        self.assertNotIn(("elan", "default"), runner.calls)
         cargo_build_index = next(
             index
             for index, command in enumerate(runner.calls)
@@ -1189,6 +1336,45 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(
             tool_environment["PATH"],
             f"{root}/.cargo/bin:{root}/.elan/bin:/tmp/fake-python-user-base/bin:/usr/bin",
+        )
+
+    def test_lean_retry_uses_live_toolchain_without_receipt(self) -> None:
+        lean = parse_record(
+            record(
+                "lean",
+                method="lean-toolchain",
+                version="leanprover/lean4:v4.30.0",
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (lean,)),))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            receipts = root / "receipts"
+            runner = LeanToolchainRetryRunner()
+            with self.assertRaises(DependencyError):
+                Installer(runner).install(plan, workspace=root, receipts=receipts)
+            self.assertFalse((receipts / "lean.json").exists())
+
+            first_attempt_calls = tuple(runner.calls)
+            self.assertIn(
+                ("elan", "toolchain", "install", "leanprover/lean4:v4.30.0"),
+                first_attempt_calls,
+            )
+            self.assertEqual(
+                Installer(runner).install(plan, workspace=root, receipts=receipts),
+                ("lean",),
+            )
+
+        second_attempt_calls = runner.calls[len(first_attempt_calls) :]
+        self.assertNotIn(
+            ("elan", "toolchain", "install", "leanprover/lean4:v4.30.0"),
+            second_attempt_calls,
+        )
+        self.assertIn(
+            ("elan", "default", "leanprover/lean4:v4.30.0"),
+            second_attempt_calls,
         )
 
     def test_method_specific_security_values_fail_closed(self) -> None:
@@ -1245,9 +1431,15 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("ninja-build", bootstrap)
         self.assertIn("python3-pip", bootstrap)
         self.assertIn("python3-packaging", bootstrap)
+        self.assertIn("gnupg", bootstrap)
+        self.assertIn("command -v gpg", bootstrap)
         self.assertIn("packaging.requirements", bootstrap)
         self.assertIn("NODE_BOOTSTRAP_RECEIPT", bootstrap)
         self.assertIn('NODE_NPM_VERSION="10.9.2"', bootstrap)
+        self.assertIn(
+            '"$NODE_INSTALL_PATH/lib/node_modules/npm/bin/npm-cli.js"', bootstrap
+        )
+        self.assertNotIn('"$NODE_INSTALL_PATH/bin/npm"', bootstrap)
         self.assertIn("tomllib", bootstrap)
         self.assertIn("tomli", bootstrap)
         self.assertIn('"$devcontainer_dir/bootstrap-dependencies.sh" --install-language-runtime', post_create)
@@ -1266,9 +1458,9 @@ class DependencyModelTests(unittest.TestCase):
         )[0]
         self.assertIn("if agent-canon structured-analysis build", cache_function)
         self.assertNotIn("return 1", cache_function)
-        self.assertEqual(
-            post_create.count('"$devcontainer_dir/finalize-shared-runtime.sh"'), 1
-        )
+        self.assertNotIn('"$devcontainer_dir/finalize-shared-runtime.sh"', post_create)
+        self.assertIn("ensure_container_local_runtime()", post_create)
+        self.assertIn("ensure_container_local_runtime\n", post_create)
         bootstrap_index = post_create.rindex(
             '"$devcontainer_dir/bootstrap-dependencies.sh" --check'
         )
@@ -1277,9 +1469,6 @@ class DependencyModelTests(unittest.TestCase):
         install_index = post_create.index("install --workspace")
         python_installer_index = post_create.rindex(
             "docker/install_python_dependencies.sh"
-        )
-        finalize_index = post_create.rindex(
-            '"$devcontainer_dir/finalize-shared-runtime.sh"'
         )
         cache_index = post_create.rindex("\nbuild_agent_canon_cache\n")
         projection_index = post_create.rindex("\npublish_container_local_runtime\n")
@@ -1293,8 +1482,7 @@ class DependencyModelTests(unittest.TestCase):
             install_index,
             python_installer_index,
         )
-        self.assertLess(python_installer_index, finalize_index)
-        self.assertLess(finalize_index, cache_index)
+        self.assertLess(python_installer_index, cache_index)
         self.assertLess(cache_index, projection_index)
         self.assertLess(
             python_installer_index,
