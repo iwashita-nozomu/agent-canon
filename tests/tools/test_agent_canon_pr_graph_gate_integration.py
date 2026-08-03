@@ -597,8 +597,8 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
         self.assertNotEqual(project_quality.returncode, 0)
 
-    def test_standalone_ordinary_change_runs_full_graph_gate(self) -> None:
-        """Standalone AgentCanon owns full graph completeness even on ordinary changes."""
+    def test_standalone_ordinary_change_delegates_project_quality(self) -> None:
+        """Standalone owns shared graph completeness and delegates project quality."""
         fixture_root = Path(tempfile.mkdtemp(prefix="graph-gate-standalone-"))
         self.addCleanup(shutil.rmtree, fixture_root)
         source = self.create_source_repo(fixture_root)
@@ -677,7 +677,6 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "GRAPH_GATE_FIXTURE_SCENARIO": "standalone",
                 "AGENT_CANON_TOOLS_HOME": str(fake_home),
                 "RUN_ALL_CHECKS_FIXTURE_LOG": str(temp_root / "run-all-checks.log"),
-                "RUN_ALL_CHECKS_FIXTURE_RC": "17",
             }
         )
         result = run(
@@ -688,10 +687,13 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             environment=environment,
         )
 
-        self.assertEqual(result.returncode, 17, result.stdout + result.stderr)
-        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=full", result.stdout)
-        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY_OWNER=agent_canon", result.stdout)
-        self.assertTrue((temp_root / "run-all-checks.log").exists())
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", result.stdout)
+        self.assertIn(
+            "AGENT_CANON_PR_PROJECT_QUALITY_OWNER=agentcanon_project_ci",
+            result.stdout,
+        )
+        self.assertFalse((temp_root / "run-all-checks.log").exists())
         self.assertIn(
             "AGENT_CANON_PR_DEPENDENCY_GRAPH=required reason=standalone_source",
             result.stdout,

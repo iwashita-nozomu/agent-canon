@@ -226,9 +226,8 @@
         "standalone-source tool_drift coverage once",
         "docs check",
         "generated-artifact guard",
-        "derived-parent project tests/type/lint delegated to the selected `parent_ci` job",
-        "standalone source uses full `run_all_checks.sh`",
-        "no derived-parent repo-wide project-quality scan in the shared gate"
+        "standalone and derived shared gates delegate project quality to the selected external CI job (`agentcanon_project_ci` or `parent_ci`)",
+        "no repository-wide project-quality runner in the shared gate"
       ]
     },
     {

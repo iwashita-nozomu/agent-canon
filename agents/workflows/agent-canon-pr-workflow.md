@@ -203,13 +203,13 @@ comma-separated `AGENT_CANON_PR_VALIDATION_PROFILES`; setting both or providing
 an unknown ID fails with a typed selector verdict.
 Otherwise `check_agent_canon_pr.sh` records
 `AGENT_CANON_PR_DEPENDENCY_GRAPH=skipped` and keeps the matching `skipped`
-receipt inside the shared gate. A derived parent does not invoke
-`run_all_checks.sh`: parent project tests, type checks, and lint are delegated
-with `AGENT_CANON_PR_PROJECT_QUALITY=delegated` and
-`AGENT_CANON_PR_PROJECT_QUALITY_OWNER=parent_ci`. The existing workflow checker
-owns whether a selected parent CI job exists; this gate does not add a second
-checker. A standalone AgentCanon source checkout retains the strict source
-graph gate and full `run_all_checks.sh` quality route.
+receipt inside the shared gate. The shared gate never runs repository project
+tests, type checks, or lint. A derived parent projects those checks with
+`AGENT_CANON_PR_PROJECT_QUALITY=delegated` and owner `parent_ci`; a standalone
+source projects them with the same evidence and owner `agentcanon_project_ci`.
+The selected repository workflow job is the blocking owner. The existing
+workflow checker owns whether that job contract exists; the PR script does not
+add a second workflow parser or fallback runner.
 
 When selection is required, the parent checker first builds the complete graph.
 A complete result records `prepared` and runs the full strict dependency review.
@@ -245,31 +245,22 @@ selector failure; no fallback base or empty-diff success is inferred.
 ### One-Judgment-Owner Check Handoff
 
 Each check family has one execution owner in a source PR gate. For a derived
-parent, the direct AgentCanon check function owns the shared runtime,
-convention, prompt/eval, and skill-command checks; it never enters the parent
-project's test/type/lint route. The conditional dependency section owns the
-dependency-header verdict and the canonical graph producer when parent graph
-completeness is selected. The standalone source path keeps that section strict
-and then invokes full `run_all_checks.sh`, which owns its remaining source
-quality consumers. The parent CI job owns derived-project quality consumers.
+parent or standalone source, the direct AgentCanon check function owns only the
+shared runtime, convention, prompt/eval, skill-command, Rust, documentation,
+dependency-header, and graph checks. It never enters a repository project's
+test/type/lint route. The standalone static workflow runs those shared gates in
+its `static-gates` job and its independent `project-quality` job runs the
+canonical Python quality tool with its required dependencies. The selected
+parent CI job owns derived-project quality consumers.
 
 After the selected dependency review, the PR gate writes a temporary receipt
 containing its owner, root identity, parent PID, matching
 `strict_dependency`/`graph` status (`prepared` or `skipped`), and selector
-reason/evidence. Standalone source passes that receipt to the full
-`run_all_checks.sh` route through the internal `--pr-gate-receipt` argument.
-The consumer accepts the handoff only when the receipt exists, its owner and
-root match, its recorded parent PID equals the consumer's current PPID, and
-the two status fields agree. A `prepared` receipt sets `CANON_GRAPH_READY=1`
-and suppresses the three dependency-header producers. A `skipped` receipt
-leaves graph completeness not applicable for the parent shared gate and is
-accepted only with non-empty selector reason/evidence. Derived parent project
-quality remains the parent CI owner's responsibility; it is not a second
-`run_all_checks.sh` consumer of this receipt. The receipt protects this
-checker-to-consumer process handoff; a cryptographic nonce for a hostile local
-caller is outside this trust boundary and would not establish that the caller
-ran the checker. An absent receipt is the ordinary run_all path; an invalid or
-missing receipt supplied through the internal argument fails closed.
+reason/evidence. The receipt protects the shared checker-to-consumer process
+handoff; a cryptographic nonce for a hostile local caller is outside this trust
+boundary and would not establish that the caller ran the checker. The selected
+workflow job is the sole blocking project-quality consumer, and an invalid or
+missing receipt supplied to any separate internal consumer fails closed.
 
 The upstream Materializer hook/archive hot-path defect remains an external
 dependency. This workflow records its evidence/blocker and does not implement a

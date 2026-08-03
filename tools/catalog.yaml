@@ -1216,7 +1216,7 @@ entries:
     writes: false
     default_wiring:
       ci: false
-      pr_check: true
+      pr_check: false
     docs:
       - tools/README.md
       - documents/tools/README.md

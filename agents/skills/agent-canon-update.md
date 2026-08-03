@@ -201,11 +201,13 @@ root runtime views, root-copy surfaces, or sync-control surfaces. Record
    AgentCanon source changes are integrated, or while preparing the parent
    pin/root-view PR.
 
-`make agent-canon-pr-check` keeps this owner boundary: standalone AgentCanon
-source runs the full `run_all_checks.sh` route, while template/derived parents
-emit `AGENT_CANON_PR_PROJECT_QUALITY=delegated` with owner `parent_ci` and leave
-project tests, type checks, and lint to the selected parent CI job. The shared
-gate does not add a parent-project baseline scanner.
+`make agent-canon-pr-check` keeps this owner boundary: both standalone
+AgentCanon and template/derived parents run only shared AgentCanon surfaces.
+They emit `AGENT_CANON_PR_PROJECT_QUALITY=delegated`; standalone uses owner
+`agentcanon_project_ci`, while derived parents use `parent_ci`. Project tests,
+type checks, and lint are blocking only through the selected repository CI job.
+The shared gate does not add a parent-project baseline scanner or invoke
+`run_all_checks.sh`.
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \

@@ -13,6 +13,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -125,7 +126,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
     ) -> None:
         """Semantic checks reject every non-single parent-gate checklist."""
         canonical = "- [ ] `make agent-canon-pr-check`"
-        variants = {
+        variants: dict[str, tuple[Callable[[str], str], str]] = {
             "missing": (
                 lambda text: text.replace(canonical, ""),
                 "canonical_parent_pr_gate_count:0",
@@ -135,17 +136,19 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 "canonical_parent_pr_gate_count:2",
             ),
             "obsolete_internal": (
-                lambda text: text
-                + "\n- [ ] `bash tools/agent-canon/agent_tools/"
-                "run_repo_dependency_review.sh\n"
-                "  --fail-missing` was run.\n",
+                lambda text: (
+                    text + "\n- [ ] `bash tools/agent-canon/agent_tools/"
+                    "run_repo_dependency_review.sh\n"
+                    "  --fail-missing` was run.\n"
+                ),
                 "obsolete_internal_pr_gate_authority:",
             ),
             "obsolete_internal_extra_args": (
-                lambda text: text
-                + "\n- [ ] `bash tools/agent-canon/agent_tools/"
-                "run_repo_dependency_review.sh --fail-missing "
-                "--cycle-report-only evidence.json`\n",
+                lambda text: (
+                    text + "\n- [ ] `bash tools/agent-canon/agent_tools/"
+                    "run_repo_dependency_review.sh --fail-missing "
+                    "--cycle-report-only evidence.json`\n"
+                ),
                 "obsolete_internal_pr_gate_authority:",
             ),
         }
@@ -210,12 +213,61 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             )
         )
 
-    def test_agent_canon_candidate_gate_requires_step_local_read_credential(self) -> None:
+    def test_static_gates_require_actual_parallel_project_quality_job(self) -> None:
+        """The workflow checker validates the real quality job, not a fixture stub."""
+        source = (
+            REPO_ROOT / ".github" / "workflows" / "agent-canon-static-gates.yml"
+        ).read_text(encoding="utf-8")
+        variants = {
+            "missing_job": (
+                source.replace("  project-quality:\n", "  project-quality-removed:\n"),
+                "missing_project_quality_job",
+            ),
+            "missing_command": (
+                source.replace(
+                    "bash tools/ci/run_python_quality_checks.sh",
+                    "bash tools/ci/run_python_quality_checks_removed.sh",
+                ),
+                "project_quality_job_missing_command",
+            ),
+            "dependent": (
+                source.replace(
+                    "  project-quality:\n    runs-on:",
+                    "  project-quality:\n    needs: static-gates\n    runs-on:",
+                ),
+                "project_quality_job_must_be_independent",
+            ),
+        }
+        for name, (workflow_text, finding) in variants.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                workflow = (
+                    root / ".github" / "workflows" / "agent-canon-static-gates.yml"
+                )
+                workflow.parent.mkdir(parents=True)
+                workflow.write_text(workflow_text, encoding="utf-8")
+                self.copy_required_surfaces(root)
+
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), "--root", str(root)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(finding, result.stdout)
+
+    def test_agent_canon_candidate_gate_requires_step_local_read_credential(
+        self,
+    ) -> None:
         """The trusted-base token cannot be omitted or promoted to job scope."""
         source = (
             REPO_ROOT / ".github" / "workflows" / "agent-canon-static-gates.yml"
         ).read_text(encoding="utf-8")
-        step_local = "        env:\n          AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}\n"
+        step_local = (
+            "        env:\n          AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}\n"
+        )
         variants = {
             "missing": source.replace(step_local, ""),
             "job_scope": source.replace(
@@ -610,7 +662,9 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             root = Path(tmp_dir)
             self.write_valid_workflow(root)
             self.copy_required_surfaces(root)
-            (root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh").unlink()
+            (
+                root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh"
+            ).unlink()
 
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--root", str(root)],
@@ -620,7 +674,9 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             )
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("missing_referenced_agent_canon_checkout_helper", result.stdout)
+            self.assertIn(
+                "missing_referenced_agent_canon_checkout_helper", result.stdout
+            )
 
     def test_helper_step_requires_credential_env(self) -> None:
         """Checkout helper steps need token or SSH credential context."""
@@ -669,8 +725,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "agent_canon_credentials_must_be_step_local:"
-                "AGENT_CANON_REPO_SSH_KEY",
+                "agent_canon_credentials_must_be_step_local:AGENT_CANON_REPO_SSH_KEY",
                 result.stdout,
             )
 
@@ -724,7 +779,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.copy_required_surfaces(root)
             self.copy_vendor_surfaces(root)
             (root / ".gitmodules").write_text(
-                "[submodule \"vendor/agent-canon\"]\n"
+                '[submodule "vendor/agent-canon"]\n'
                 "\tpath = vendor/agent-canon\n"
                 "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
                 encoding="utf-8",
@@ -754,7 +809,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.write_template_root_pr_template(root)
             self.copy_template_agent_canon_template(root)
             (root / ".gitmodules").write_text(
-                "[submodule \"vendor/agent-canon\"]\n"
+                '[submodule "vendor/agent-canon"]\n'
                 "\tpath = vendor/agent-canon\n"
                 "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
                 encoding="utf-8",
@@ -786,7 +841,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.copy_required_surfaces(root)
             self.copy_vendor_surfaces(root)
             (root / ".gitmodules").write_text(
-                "[submodule \"vendor/agent-canon\"]\n"
+                '[submodule "vendor/agent-canon"]\n'
                 "\tpath = vendor/agent-canon\n"
                 "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
                 encoding="utf-8",
@@ -816,10 +871,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         workflow_dir.mkdir(parents=True, exist_ok=True)
         permissions = "permissions:\n  contents: read\n" if top_permissions else ""
         job_permission_block = (
-            "    permissions:\n"
-            "      contents: read\n"
-            if job_permissions
-            else ""
+            "    permissions:\n      contents: read\n" if job_permissions else ""
         )
         env_block = (
             "        env:\n"
@@ -828,7 +880,9 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             if helper_env
             else ""
         )
-        helper_command = "        run: bash .github/scripts/checkout_agent_canon_submodule.sh\n"
+        helper_command = (
+            "        run: bash .github/scripts/checkout_agent_canon_submodule.sh\n"
+        )
         (workflow_dir / "ci.yml").write_text(
             "name: CI\n"
             + "on: [push]\n"
@@ -920,7 +974,9 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
                 encoding="utf-8",
             )
-            stale_dashboard = root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+            stale_dashboard = (
+                root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+            )
             stale_dashboard.parent.mkdir(parents=True, exist_ok=True)
             stale_dashboard.write_text("name: stale dashboard\n", encoding="utf-8")
 

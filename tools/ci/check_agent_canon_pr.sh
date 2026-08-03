@@ -18,7 +18,6 @@
 # upstream implementation ../agent_tools/skill_tool_commands.py runtime skill command packet gate
 # upstream implementation ../agent_tools/update_lifecycle_contract.py owns G1-G3 receipt identity.
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
-# upstream implementation ./run_all_checks.sh standalone full quality route
 # upstream implementation ../ci/run_python_quality_checks.sh owns shared Python static quality checks
 # @dependency-end
 
@@ -67,7 +66,6 @@ cleanup_agent_canon_pr_temp_root() {
 trap cleanup_agent_canon_pr_temp_root EXIT
 PR_DEPENDENCY_REVIEW_DIR="${AGENT_CANON_PR_TEMP_ROOT}/dependency-review/agent-canon-pr"
 PR_AGENT_EVAL_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/agent-canon-pr-gate"
-PR_RUN_ALL_CHECKS_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/run-all-checks"
 AGENT_CANON_G1_BUNDLE_ACTIVE=0
 if [[ -d vendor/agent-canon && -f .gitmodules ]]; then
   PR_AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
@@ -101,6 +99,7 @@ run_direct_agent_checks() {
     python3 "${CANON_TOOLS_ROOT}/agent_tools/evaluate_codex_agent_roles.py" --accumulate
   AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
     python3 "${CANON_TOOLS_ROOT}/agent_tools/evaluate_skill_workflow_prompts.py" --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check
 }
 
 run_convention_compliance_gate() {
@@ -382,21 +381,13 @@ run_pr_agent_checks() {
 }
 
 run_pr_project_quality_boundary() {
+  local owner="parent_ci"
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
-    local standalone_ci_rc=0
-    echo "AGENT_CANON_PR_PROJECT_QUALITY=full"
-    echo "AGENT_CANON_PR_PROJECT_QUALITY_OWNER=agent_canon"
-    echo "AGENT_CANON_PR_CI_COMMAND=bash ${CANON_TOOLS_ROOT}/ci/run_all_checks.sh --pr-gate-receipt ${PR_GATE_RECEIPT}"
-    set +e
-    AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
-      bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh" --pr-gate-receipt "${PR_GATE_RECEIPT}"
-    standalone_ci_rc=$?
-    set -e
-    echo "AGENT_CANON_PR_CI_EXIT=${standalone_ci_rc}"
-    return "${standalone_ci_rc}"
+    owner="agentcanon_project_ci"
   fi
   echo "AGENT_CANON_PR_PROJECT_QUALITY=delegated"
-  echo "AGENT_CANON_PR_PROJECT_QUALITY_OWNER=parent_ci"
+  echo "AGENT_CANON_PR_PROJECT_QUALITY_OWNER=${owner}"
+  echo "AGENT_CANON_PR_PROJECT_QUALITY_WORKFLOW=external_required_job"
   return 0
 }
 
