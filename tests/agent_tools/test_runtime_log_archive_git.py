@@ -41,15 +41,17 @@ from tools.agent_tools.runtime_log_paths import (
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "runtime_log_archive_git.py"
 LIFECYCLE_REVERSE_COVERAGE = {
-    "tools/agent_tools/log_repository_identity.py": {"RL-001", "RL-003", "RL-006", "RL-015"},
-    "tools/agent_tools/runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-015"},
-    "tools/agent_tools/check_agent_canon_log_policy.py": {"RL-009", "RL-010", "RL-012"},
-    "tests/agent_tools/test_log_repository_lifecycle.py": {"RL-001", "RL-002", "RL-003", "RL-005", "RL-006", "RL-007", "RL-008"},
-    "tests/agent_tools/test_runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-014", "RL-015"},
-    "tests/agent_tools/test_agent_canon_log_policy.py": {"RL-009", "RL-010", "RL-012"},
-    "documents/design/runtime-log-repository-lifecycle.md": {"RL-001", "RL-002", "RL-003", "RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-009", "RL-010", "RL-011", "RL-012", "RL-013", "RL-014", "RL-015"},
-    "documents/runtime/runtime-log-archive-migration.md": {"RL-009", "RL-010", "RL-011", "RL-012", "RL-015"},
+    ".devcontainer/generate-runtime-compose.sh": {"RL-002", "RL-004", "RL-013"},
+    "agent-canon-environment.toml": {"RL-002", "RL-004"},
+    "agents/skills/agent-log-analysis.md": {"RL-013"},
     "documents/design/runtime-log-repository-lifecycle-correspondence.json": {"RL-014"},
+    "documents/runtime/runtime-log-archive.md": {"RL-013"},
+    "documents/tools/README.md": {"RL-013"},
+    "tests/agent_tools/test_runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-014", "RL-015"},
+    "tests/tools/test_container_config.py": {"RL-002", "RL-004"},
+    "tests/tools/test_run_codex_in_repo_container.py": {"RL-002", "RL-004"},
+    "tools/agent_tools/runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-015"},
+    "tools/ci/run_codex_in_repo_container.py": {"RL-002", "RL-004"},
 }
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import runtime_log_archive_git  # noqa: E402
