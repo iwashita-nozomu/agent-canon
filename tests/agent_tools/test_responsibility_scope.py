@@ -16,8 +16,20 @@ import tempfile
 import unittest
 from pathlib import Path
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "responsibility_scope.py"
+STARTER_MANIFEST = (
+    PROJECT_ROOT / "templates" / "documents" / "responsibility-scope.template.toml"
+)
+
+sys.path.insert(0, str(SCRIPT.parent))
+
+from responsibility_scope import scope_covers, scope_from_mapping  # noqa: E402
 
 
 class ResponsibilityScopeTest(unittest.TestCase):
@@ -149,6 +161,42 @@ class ResponsibilityScopeTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("scope_overlap:tools/evidence.py:scopes:tools,evidence", result.stdout)
+
+    def test_starter_manifest_partitions_parent_tools_from_agent_canon_view(self) -> None:
+        """Assign only the AgentCanon tool view away from parent-owned tools."""
+        data = tomllib.loads(STARTER_MANIFEST.read_text(encoding="utf-8"))
+        scopes = {
+            str(raw["id"]): scope_from_mapping(raw)
+            for raw in data["scope"]
+        }
+        agent_canon = scopes["agent-canon-runtime-view"]
+        parent = scopes["parent-repo-active-contract"]
+
+        ownership = {
+            path: tuple(
+                scope.scope_id
+                for scope in (agent_canon, parent)
+                if scope_covers(scope, path)
+            )
+            for path in (
+                "tools/agent-canon/sync_agent_canon.sh",
+                "tools/project_check.py",
+                "tools/team/local.sh",
+            )
+        }
+
+        self.assertEqual(
+            ownership["tools/agent-canon/sync_agent_canon.sh"],
+            ("agent-canon-runtime-view",),
+        )
+        self.assertEqual(
+            ownership["tools/project_check.py"],
+            ("parent-repo-active-contract",),
+        )
+        self.assertEqual(
+            ownership["tools/team/local.sh"],
+            ("parent-repo-active-contract",),
+        )
 
     def write_fixture(self, root: Path) -> None:
         """Write a bounded responsibility-scope fixture repository."""

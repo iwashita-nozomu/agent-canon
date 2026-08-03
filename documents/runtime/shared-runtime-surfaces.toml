@@ -435,6 +435,41 @@ owner = "agent-canon-update"
 class = "projection_view"
 local_override_allowed = false
 
+[[update_transition]]
+id = "retire-shared-root-tool-projections-v1"
+from_agent_canon_pins = [
+  "5ea949c85d74b66427efdc4d2b847c62e547515c",
+  "da70b93730a268658b309bd2852dba7d07517b69",
+  "bf329228968d3d556c378c8a17e4f58d02e03d82",
+]
+
+[[update_transition.candidate]]
+path = "tools/sync_agent_canon.sh"
+
+[[update_transition.candidate.identity]]
+kind = "regular"
+git_blob = "a354e6597b7337a39bc650ff61dd57cab08981e8"
+content_sha256 = "608f82f54431261898819677e79c261876afdba6192423f04ed1e1e553eff550"
+git_mode = "100755"
+
+[[update_transition.candidate]]
+path = "tools/agent_tools/surface_manifest.py"
+
+[[update_transition.candidate.identity]]
+kind = "regular"
+git_blob = "9ebdc1f8198fbe63c037186da81867901f300ef5"
+content_sha256 = "a74b2ab516d0d472cab062498dd3f769a860ad9e4ad0e4b1782a52ec63c2966c"
+git_mode = "100644"
+
+[[update_transition.candidate]]
+path = "tools/agent_tools/update_agent_canon.sh"
+
+[[update_transition.candidate.identity]]
+kind = "regular"
+git_blob = "7c673f9b5b2bddac85d87f14466020acdeb9dd78"
+content_sha256 = "debdbf5f74f4f145dfe919b1632c712ff9450aac315e2a263496df8dddfe0e9a"
+git_mode = "100644"
+
 [[group]]
 mode = "removed_legacy"
 owner = "legacy"

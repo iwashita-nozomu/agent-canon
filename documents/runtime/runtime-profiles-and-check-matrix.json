@@ -237,7 +237,7 @@
     {
       "changed_surface": "Root shared views or submodule pin",
       "required_check": [
-        "`bash tools/sync_agent_canon.sh check`",
+        "source-root resolver `exec tools/sync_agent_canon.sh check`",
         "`git submodule status vendor/agent-canon` evidence"
       ]
     },
