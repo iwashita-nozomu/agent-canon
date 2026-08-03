@@ -41,6 +41,12 @@ GitHub copy, documents, evidence, memory, notes, and tests sections for
 path-specific ownership. Editing Rule and Validation close the workflow for
 changes to shared surfaces.
 
+Root `templates/` is not a shared-surface path after this migration. A
+template or derived repository may own a regular `templates/` directory;
+`link-root` and `check` leave that parent content unchanged. They also do
+not remove the formerly tracked shared symlink; the parent integration confirms
+its exact mode and target before running `git rm templates`.
+
 ## Owner Classes
 
 | Owner class | Root behavior | Edit source | Local override |

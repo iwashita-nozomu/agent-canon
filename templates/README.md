@@ -48,8 +48,11 @@ source-root `templates/documents/github/` から `.github/` へ再生成しま�
 
 この source change を parent repo に反映するときは、次を同じ parent update packet に記録します。
 
-- remove the retired root `templates` symlink and preserve
-  `vendor/agent-canon/templates/`
+- in the parent integration commit, run `git rm templates` only after
+  confirming the tracked entry is the former
+  `templates -> vendor/agent-canon/templates` symlink
+- preserve `vendor/agent-canon/templates/` and any parent-owned regular
+  `templates/` directory
 - delete parent `experiments/_template/`
 - delete the parent registry `_template` entry
 - delete parent docs and tests that only exercise the removed scaffold

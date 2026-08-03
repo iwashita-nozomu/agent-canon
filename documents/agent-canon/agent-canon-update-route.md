@@ -205,8 +205,10 @@ When a source update changes centralized template owners under source-root
 `templates/`, the parent projection packet is incomplete until it records all
 of the following:
 
-- removal of the retired parent-root `templates` symlink while preserving
-  `vendor/agent-canon/templates/`;
+- parent-integration `git rm templates` after confirming that the tracked
+  entry is the former `templates -> vendor/agent-canon/templates` symlink,
+  while preserving `vendor/agent-canon/templates/` and any parent-owned
+  regular `templates/` directory;
 - deletion of parent `experiments/_template/`;
 - deletion of only the `_template` entry in the parent project registry;
 - deletion of parent docs/tests that only exercise that removed scaffold; and

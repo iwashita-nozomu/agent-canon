@@ -127,7 +127,7 @@ class SurfaceMigrationTest(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
 
     def test_parent_root_resolution_and_devcontainer_migration(self) -> None:
-        """RootResolution and link-root must agree on a ready parent submodule."""
+        """RootResolution and link-root preserve parent-owned regular paths."""
         root = self.clone_parent_fixture()
         root_resolution = load_root_resolution_module()
         resolution = root_resolution.resolve_agent_canon_source_root(root)
@@ -137,13 +137,10 @@ class SurfaceMigrationTest(unittest.TestCase):
             resolution.source_root,
             (root / "vendor" / "agent-canon").resolve(),
         )
-        legacy_templates = root / "templates"
-        legacy_templates.symlink_to(
-            "vendor/agent-canon/templates",
-            target_is_directory=True,
-        )
-        self.git(root, "add", "templates")
-        self.git(root, "commit", "-m", "fixture legacy root template projection")
+        parent_templates = root / "templates"
+        parent_templates.mkdir()
+        template_sentinel = parent_templates / "parent-owned.txt"
+        template_sentinel.write_text("keep parent templates\n", encoding="utf-8")
 
         devcontainer = root / ".devcontainer"
         devcontainer.mkdir()
@@ -165,8 +162,12 @@ class SurfaceMigrationTest(unittest.TestCase):
         result = self.run_sync(root, "link-root")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("agent_canon_parent_submodule=projection_ready", result.stdout)
-        self.assertFalse(legacy_templates.exists())
-        self.assertFalse(legacy_templates.is_symlink())
+        self.assertTrue(parent_templates.is_dir())
+        self.assertFalse(parent_templates.is_symlink())
+        self.assertEqual(
+            template_sentinel.read_text(encoding="utf-8"),
+            "keep parent templates\n",
+        )
         self.assertTrue(
             (
                 root
@@ -238,6 +239,10 @@ class SurfaceMigrationTest(unittest.TestCase):
         check = self.run_sync(root, "check")
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
         self.assertIn("shared surface is in sync", check.stdout)
+        self.assertEqual(
+            template_sentinel.read_text(encoding="utf-8"),
+            "keep parent templates\n",
+        )
 
     def test_removed_legacy_surface_preserves_unknown_mirror(self) -> None:
         """Known retired mirrors are removed while unknown mirrors remain untouched."""

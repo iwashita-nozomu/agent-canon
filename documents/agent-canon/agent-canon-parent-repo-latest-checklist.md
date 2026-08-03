@@ -136,11 +136,14 @@ root follow-up is still mandatory after the source PR is integrated or while
 preparing the parent pin/root-view PR.
 
 For a centralized template source update, the parent follow-up packet must also
-record the exact structural cleanup: remove the retired parent-root
-`templates` symlink, preserve `vendor/agent-canon/templates/`, delete parent
-`experiments/_template/`, remove only the `_template` entry from the
-project-owned `experiments/registry.toml`, remove docs/tests that only
-exercise that scaffold, and regenerate the GitHub Issue/PR copies from
+record the exact structural cleanup. If the parent still tracks the former
+`templates -> vendor/agent-canon/templates` symlink, the parent integration
+commit runs `git rm templates` after confirming that exact tracked symlink
+identity. A parent-owned regular `templates/` directory remains unchanged.
+The same packet preserves `vendor/agent-canon/templates/`, deletes parent
+`experiments/_template/`, removes only the `_template` entry from the
+project-owned `experiments/registry.toml`, removes docs/tests that only
+exercise that scaffold, and regenerates the GitHub Issue/PR copies from
 `vendor/agent-canon/templates/documents/github/`. Do not delete other
 experiment topics or mutate the AgentCanon source registry (the source tree has
 no project registry).
