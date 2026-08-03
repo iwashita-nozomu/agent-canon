@@ -294,14 +294,17 @@ class SurfaceMigrationTest(unittest.TestCase):
                 / "github"
             ).is_dir()
         )
-        self.assertTrue(
-            (
-                root
-                / ".github"
-                / "PULL_REQUEST_TEMPLATE"
-                / "agent_canon.md"
-            ).is_file()
+        projected_pr_template = (
+            root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
         )
+        self.assertTrue(projected_pr_template.is_file())
+        projected_pr_template_text = projected_pr_template.read_text(encoding="utf-8")
+        for path_family in (
+            "tools/agent-canon",
+            "vendor/agent-canon/documents",
+            "issues",
+        ):
+            self.assertNotIn(f"{path_family}//", projected_pr_template_text)
         consumer = subprocess.run(
             [
                 sys.executable,
