@@ -412,6 +412,7 @@ run_pr_quick_ci() {
     set +e
     AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
       PYDOCSTYLE_REQUIRE_TRUSTED_PACKET=1 \
+      PYDOCSTYLE_SKIP=1 \
       PYDOCSTYLE_CHANGED_PATH_PACKET="${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
       PYDOCSTYLE_TRUSTED_BASE_SHA="${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" \
       bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh" "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
@@ -426,6 +427,7 @@ run_pr_quick_ci() {
   set +e
   AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
     PYDOCSTYLE_REQUIRE_TRUSTED_PACKET=1 \
+    PYDOCSTYLE_SKIP=1 \
     PYDOCSTYLE_CHANGED_PATH_PACKET="${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
     PYDOCSTYLE_TRUSTED_BASE_SHA="${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" \
     bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh" "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
@@ -542,6 +544,7 @@ run_pr_changed_pydocstyle() {
     return 2
   fi
   PYDOCSTYLE_REQUIRE_TRUSTED_PACKET=1 \
+    PYDOCSTYLE_REPORT_OUT="${PR_DEPENDENCY_REVIEW_DIR}/pydocstyle-changed-scope.json" \
     bash "${CANON_TOOLS_ROOT}/ci/run_python_quality_checks.sh" \
       --pydocstyle-only \
       --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
@@ -649,7 +652,33 @@ echo ""
 echo "6️⃣  dependency graph completeness"
 PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped
 PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=0
+PR_GATE_DEPENDENCY_GRAPH_REQUIRED=0
 if agentcanon_pr_dependency_graph_required; then
+  PR_GATE_DEPENDENCY_GRAPH_REQUIRED=1
+else
+  PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=$?
+  if [[ "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}" -ne 1 ]]; then
+    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=selector_failed"
+    exit "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}"
+  fi
+fi
+
+mkdir -p "${PR_DEPENDENCY_REVIEW_DIR}"
+PR_GATE_PYDOCSTYLE_LOG="${PR_DEPENDENCY_REVIEW_DIR}/pydocstyle-changed-scope.log"
+PR_GATE_PYDOCSTYLE_RC=0
+set +e
+run_pr_changed_pydocstyle >"${PR_GATE_PYDOCSTYLE_LOG}" 2>&1
+PR_GATE_PYDOCSTYLE_RC=$?
+set -e
+cat "${PR_GATE_PYDOCSTYLE_LOG}"
+echo "AGENT_CANON_PR_PYDOCSTYLE_EXIT=${PR_GATE_PYDOCSTYLE_RC}"
+if [[ "${PR_GATE_PYDOCSTYLE_RC}" -eq 2 ]]; then
+  echo "AGENT_CANON_PR_PYDOCSTYLE_EVIDENCE=fail_closed"
+else
+  echo "AGENT_CANON_PR_PYDOCSTYLE_EVIDENCE=changed_scope_reported"
+fi
+
+if [[ "${PR_GATE_DEPENDENCY_GRAPH_REQUIRED}" -eq 1 ]]; then
   # This graph build produces either a full strict review or scoped diagnostic
   # evidence for the subsequent quick CI receipt consumer.
   mkdir -p "${PR_DEPENDENCY_REVIEW_DIR}"
@@ -744,11 +773,6 @@ if agentcanon_pr_dependency_graph_required; then
     exit "${graph_build_rc}"
   fi
 else
-  PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=$?
-  if [[ "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}" -ne 1 ]]; then
-    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=selector_failed"
-    exit "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}"
-  fi
   bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" \
     --header-scan-only \
     --fail-missing \
@@ -757,8 +781,9 @@ else
     --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
   echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required"
 fi
-if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
-  run_pr_changed_pydocstyle
+if [[ "${PR_GATE_PYDOCSTYLE_RC}" -ne 0 ]]; then
+  echo "AGENT_CANON_PR_PYDOCSTYLE=fail"
+  exit "${PR_GATE_PYDOCSTYLE_RC}"
 fi
 write_pr_gate_receipt \
   "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" \

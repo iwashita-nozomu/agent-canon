@@ -264,6 +264,13 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             receipt="${@: -1}"
             grep -Eq '^graph=(scoped|skipped|prepared)$' "${receipt}" || exit 91
             cp "${receipt}" "${AGENT_CANON_PR_TEMP_ROOT}/consumed.receipt"
+            packet="${PYDOCSTYLE_CHANGED_PATH_PACKET:-}"
+            if [[ -n "${packet}" ]]; then
+              [[ "${PYDOCSTYLE_SKIP:-0}" == "1" && -f "${packet}" ]] || exit 92
+              packet_hash="$(sha256sum "${packet}" | awk '{print $1}')"
+              echo "PYDOCSTYLE_PACKET_SHARED_HASH=${packet_hash}"
+              echo "PYDOCSTYLE_PACKET_SHARED_ONCE=yes"
+            fi
             echo "QUICK_CI_RECEIPT_GRAPH=$(awk -F= '$1 == \"graph\" {print $2}' \"${receipt}\")"
             """,
         )
@@ -275,6 +282,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 && "$*" == *"--changed-path-packet"* \
                 && "$*" == *"--trusted-base-sha"* ]]; then
                 echo 'HEADER_SCAN_REVIEW_CALLED'
+                [[ "${GRAPH_GATE_FIXTURE_SCENARIO}" != "header_failure" ]] || exit 1
                 exit 0
             fi
             if [[ "$*" == *"--changed-path-packet"* \
@@ -289,6 +297,23 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         (source / "tools" / "agent_tools" / "surface_manifest.py").write_text(
             "# current producer fixture\n",
             encoding="utf-8",
+        )
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "agent_tools" / "pydocstyle_changed_scope.py",
+            source / "tools" / "agent_tools" / "pydocstyle_changed_scope.py",
+        )
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "ci" / "run_python_quality_checks.sh",
+            source / "tools" / "ci" / "run_python_quality_checks.sh",
+        )
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "ci" / "pydocstyle.toml",
+            source / "tools" / "ci" / "pydocstyle.toml",
+        )
+        (source / "tools" / "lib").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "lib" / "repo_paths.sh",
+            source / "tools" / "lib" / "repo_paths.sh",
         )
         manifest = source / "documents" / "runtime" / "shared-runtime-surfaces.toml"
         manifest.parent.mkdir(parents=True, exist_ok=True)
@@ -331,6 +356,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         source: Path,
         *,
         include_manifest: bool = True,
+        baseline_doc_diagnostics: int = 0,
     ) -> tuple[Path, str]:
         """Create a template-like parent with one manifest-touching PR diff."""
         parent = root / "parent"
@@ -355,26 +381,43 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         repo_paths = parent / "tools" / "lib" / REPO_PATHS.name
         repo_paths.parent.mkdir(parents=True)
         shutil.copy2(REPO_PATHS, repo_paths)
-        (parent / "changed.py").write_text("before\n", encoding="utf-8")
-        (parent / "legacy.py").write_text("legacy\n", encoding="utf-8")
-        (parent / "related.py").write_text("related\n", encoding="utf-8")
+        (parent / "changed.py").write_text(
+            '"""Changed fixture module."""\n', encoding="utf-8"
+        )
+        (parent / "legacy.py").write_text(
+            '"""Legacy fixture module."""\n', encoding="utf-8"
+        )
+        (parent / "related.py").write_text(
+            '"""Related fixture module."""\n', encoding="utf-8"
+        )
+        for index in range(baseline_doc_diagnostics):
+            (parent / f"baseline_{index}.py").write_text(
+                '"""Baseline fixture module."""\n\n\n'
+                f"def old_{index}():\n"
+                '    """Summary.\n\n    Detail.\n    """\n'
+                "    pass\n",
+                encoding="utf-8",
+            )
         run(parent, "git", "add", ".")
         run(parent, "git", "commit", "-m", "base")
         base = run(parent, "git", "rev-parse", "HEAD").stdout.strip()
         if include_manifest:
             changed_content = textwrap.dedent(
-                """
+                '''
                 # @dependency-start
                 # contract implementation
                 # responsibility Changed fixture responsibility.
                 # upstream design missing.md fixture dependency
                 # @dependency-end
+                """Changed fixture module."""
                 after
-                """
+                '''
             ).lstrip()
         else:
-            changed_content = "after\n"
-            (parent / "new.py").write_text("new source\n", encoding="utf-8")
+            changed_content = '"""Changed fixture module."""\nafter\n'
+            (parent / "new.py").write_text(
+                '"""New fixture module."""\n', encoding="utf-8"
+            )
         (parent / "changed.py").write_text(changed_content, encoding="utf-8")
         run(
             parent,
@@ -397,6 +440,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             fixture_root,
             source,
             include_manifest=scenario != "no_manifest",
+            baseline_doc_diagnostics=202 if scenario == "pydoc_baseline" else 0,
         )
         fake_bin = fixture_root / "bin"
         write_executable(
@@ -495,7 +539,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         repo_paths.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_PATHS, repo_paths)
         ordinary = source / "changed.py"
-        ordinary.write_text("before\n", encoding="utf-8")
+        ordinary.write_text(
+            '"""Ordinary fixture module."""\n\nbefore\n', encoding="utf-8"
+        )
         run(
             source,
             "git",
@@ -506,7 +552,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
         run(source, "git", "commit", "-m", "standalone base")
         base = run(source, "git", "rev-parse", "HEAD").stdout.strip()
-        ordinary.write_text("after\n", encoding="utf-8")
+        ordinary.write_text(
+            '"""Ordinary fixture module."""\n\nafter\n', encoding="utf-8"
+        )
         run(source, "git", "add", "changed.py")
         run(source, "git", "commit", "-m", "ordinary change")
 
@@ -557,13 +605,60 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
 
     def test_real_pr_check_runs_header_scan_before_hard_graph_failure(self) -> None:
         """Trusted changed paths reach header scanning even when graph build fails hard."""
-        result, _ = self.run_pr_check("hard_failure")
+        result, state = self.run_pr_check("hard_failure")
         self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("PYDOCSTYLE_CHANGED_SCOPE=pass", result.stdout)
+        self.assertIn("AGENT_CANON_PR_PYDOCSTYLE_EXIT=0", result.stdout)
+        self.assertIn(
+            "AGENT_CANON_PR_PYDOCSTYLE_EVIDENCE=changed_scope_reported",
+            result.stdout,
+        )
         self.assertIn("HEADER_SCAN_REVIEW_CALLED", result.stdout)
         self.assertIn(
             "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=graph_build_failed rc=2",
             result.stdout,
         )
+        self.assertTrue(
+            (
+                state
+                / "dependency-review"
+                / "agent-canon-pr"
+                / "pydocstyle-changed-scope.log"
+            ).is_file()
+        )
+
+    def test_real_pr_check_retains_pydocstyle_evidence_on_header_failure(self) -> None:
+        """Header failures retain the pydocstyle owner result and evidence."""
+        result, _ = self.run_pr_check("header_failure")
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("PYDOCSTYLE_CHANGED_SCOPE=pass", result.stdout)
+        self.assertIn("AGENT_CANON_PR_PYDOCSTYLE_EXIT=0", result.stdout)
+        self.assertIn(
+            "AGENT_CANON_PR_PYDOCSTYLE_EVIDENCE=changed_scope_reported",
+            result.stdout,
+        )
+        self.assertIn("HEADER_SCAN_REVIEW_CALLED", result.stdout)
+
+    def test_real_pr_check_reports_unchanged_production_baseline_once(self) -> None:
+        """Unchanged findings are evidence while the shared packet is reused."""
+        result, state = self.run_pr_check("pydoc_baseline")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("PYDOCSTYLE_CHANGED_SCOPE_SELECTED=1", result.stdout)
+        self.assertIn("PYDOCSTYLE_CHANGED_SCOPE_BASELINE=202", result.stdout)
+        self.assertIn("PYDOCSTYLE_CHANGED_SCOPE_BLOCKING=0", result.stdout)
+        self.assertIn("PYDOCSTYLE_CHANGED_SCOPE=pass", result.stdout)
+        self.assertIn("AGENT_CANON_PR_PYDOCSTYLE_EXIT=0", result.stdout)
+        self.assertIn("PYDOCSTYLE_PACKET_SHARED_ONCE=yes", result.stdout)
+        self.assertIn("PYDOCSTYLE_PACKET_SHARED_HASH=", result.stdout)
+        report = (
+            state
+            / "dependency-review"
+            / "agent-canon-pr"
+            / "pydocstyle-changed-scope.json"
+        )
+        payload = json.loads(report.read_text(encoding="utf-8"))
+        self.assertEqual(payload["unchanged_paths_baseline"]["diagnostic_count"], 202)
+        self.assertEqual(payload["blocking_diagnostics"], [])
 
     def test_real_pr_check_rejects_missing_or_stale_graph_identity(self) -> None:
         """Identity defects fail before scoped/full diagnostic classification."""

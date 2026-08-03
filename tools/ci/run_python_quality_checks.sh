@@ -73,6 +73,9 @@ run_changed_pydocstyle() {
     --trusted-base-sha "${TRUSTED_BASE_SHA}"
     --python-bin "${PYTHON_BIN}"
   )
+  if [[ -n "${PYDOCSTYLE_REPORT_OUT:-}" ]]; then
+    command+=(--report-out "${PYDOCSTYLE_REPORT_OUT}")
+  fi
   "${command[@]}"
 }
 
@@ -174,6 +177,8 @@ echo "5️⃣  pydocstyle を実行中... (Docstring チェック)"
 if [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
   echo "PYDOCSTYLE=skip"
   echo "AgentCanon Python source roots are absent in this checkout; skipping pydocstyle"
+elif [[ "${PYDOCSTYLE_SKIP:-0}" == "1" ]]; then
+  echo "PYDOCSTYLE=skip reason=pr_gate_owner_preflight"
 elif [[ -n "${CHANGED_PATH_PACKET}" || -n "${TRUSTED_BASE_SHA}" ]]; then
   if run_changed_pydocstyle; then
     echo "✅ pydocstyle changed production scope 成功"

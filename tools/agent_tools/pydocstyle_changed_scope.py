@@ -359,6 +359,21 @@ def config_files_for_paths(root: Path, paths: Sequence[str]) -> tuple[Path, ...]
     return tuple(sorted(files))
 
 
+def unchanged_production_paths(
+    root: Path,
+    changed_paths: Sequence[str],
+    views: Sequence[str],
+) -> list[str]:
+    """Return unchanged production files for non-blocking baseline evidence."""
+    changed = set(changed_paths)
+    candidates = run_git(root, ["ls-files", "--", "*.py"]).splitlines()
+    return [
+        path
+        for path in candidates
+        if path not in changed and production_path(root, path, views)[0]
+    ]
+
+
 def module_name(root: Path, filename: Path) -> str:
     """Return a stable module name independent of the checked-out root."""
     relative = filename.resolve().relative_to(root.resolve())
@@ -517,7 +532,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             else:
                 skipped.setdefault(reason, []).append(path)
 
-        config_files = config_files_for_paths(root, selected)
+        baseline_paths = unchanged_production_paths(root, packet.changed_paths, views)
+        all_production_paths = [*selected, *baseline_paths]
+        config_files = config_files_for_paths(root, all_production_paths)
         use_canonical_config = not config_files
         canonical_config = None
         if use_canonical_config:
@@ -530,9 +547,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "canonical_pydocstyle_config_missing", str(canonical_config)
                 )
 
-        head_paths = [root / Path(*PurePosixPath(path).parts) for path in selected]
+        head_paths = [
+            root / Path(*PurePosixPath(path).parts) for path in all_production_paths
+        ]
         before = {path: file_identity(path) for path in head_paths}
-        head_diagnostics = run_pydocstyle(
+        all_head_diagnostics = run_pydocstyle(
             root, head_paths, args.python_bin, canonical_config
         )
         if any(file_identity(path) != identity for path, identity in before.items()):
@@ -543,20 +562,48 @@ def main(argv: Sequence[str] | None = None) -> int:
             prefix="agent-canon-pydocstyle-base-"
         ) as base_dir:
             base_root = Path(base_dir)
-            base_paths = materialize_base_files(root, packet, selected, base_root)
+            base_paths = materialize_base_files(
+                root, packet, all_production_paths, base_root
+            )
             copy_head_configs(root, config_files, base_root)
-            base_diagnostics = run_pydocstyle(
+            all_base_diagnostics = run_pydocstyle(
                 base_root,
                 base_paths,
                 args.python_bin,
                 canonical_config,
             )
 
+        selected_set = set(selected)
+        baseline_set = set(baseline_paths)
+        head_diagnostics = tuple(
+            diagnostic
+            for diagnostic in all_head_diagnostics
+            if diagnostic.path in selected_set
+        )
+        unchanged_diagnostics = tuple(
+            diagnostic
+            for diagnostic in all_head_diagnostics
+            if diagnostic.path in baseline_set
+        )
+        base_diagnostics = tuple(
+            diagnostic
+            for diagnostic in all_base_diagnostics
+            if diagnostic.path in selected_set
+        )
         base_by_identity = {
             diagnostic.identity: diagnostic for diagnostic in base_diagnostics
         }
         blocking: list[dict[str, object]] = []
         baseline: list[dict[str, object]] = []
+        all_base_identities = {
+            diagnostic.identity for diagnostic in all_base_diagnostics
+        }
+        for diagnostic in unchanged_diagnostics:
+            record = diagnostic.report()
+            record["base_match"] = diagnostic.identity in all_base_identities
+            record["worsened"] = False
+            record["classification"] = "unchanged_baseline"
+            baseline.append(record)
         for diagnostic in {item.identity: item for item in head_diagnostics}.values():
             record = diagnostic.report()
             record["base_match"] = diagnostic.identity in base_by_identity
@@ -574,12 +621,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             "head_sha": packet.head_sha,
             "changed_paths": list(packet.changed_paths),
             "selected_production_paths": selected,
+            "baseline_production_paths": baseline_paths,
             "skipped_paths": skipped,
             "unchanged_paths_baseline": {
-                "evidence": "not_scanned_by_changed_scope",
-                "count": 0,
+                "evidence": "production_only_report_baseline",
+                "path_count": len(baseline_paths),
+                "diagnostic_count": len(unchanged_diagnostics),
             },
-            "head_diagnostics": [item.report() for item in head_diagnostics],
+            "head_diagnostics": [item.report() for item in all_head_diagnostics],
             "base_diagnostics": [item.report() for item in base_diagnostics],
             "blocking_diagnostics": blocking,
             "baseline_diagnostics": baseline,
