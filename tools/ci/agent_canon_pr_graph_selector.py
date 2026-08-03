@@ -40,8 +40,11 @@ MANIFEST_CHANGE_RE = re.compile(
 )
 HEX_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 HEX_FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
+HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 FULL_HISTORY_DEEPEN = "2147483647"
 GRAPH_PROFILE = "default"
+PRODUCER_IDENTITY_VERSION = "agent-canon.surface-manifest-producer.v1"
+PRODUCER_IDENTITY_CONTRACT = "agent-canon.surface-manifest.v1"
 
 
 class SelectorFailure(RuntimeError):
@@ -124,7 +127,33 @@ class GraphIntegrationIdentity:
     snapshot_head: str
     input_fingerprint: str
     graph_fingerprint: str
+    producer_identity: ProducerIdentity
     verified: bool
+
+
+@dataclass(frozen=True)
+class ProducerIdentity:
+    """Authority and semantic identity of the current graph producer."""
+
+    source_root: str
+    producer_path: str
+    version: str
+    contract: str
+    producer_sha256: str
+    manifest_path: str
+    manifest_sha256: str
+
+    def json(self) -> dict[str, str]:
+        """Return the exact JSON object bound into graph artifacts."""
+        return {
+            "source_root": self.source_root,
+            "producer_path": self.producer_path,
+            "version": self.version,
+            "contract": self.contract,
+            "producer_sha256": self.producer_sha256,
+            "manifest_path": self.manifest_path,
+            "manifest_sha256": self.manifest_sha256,
+        }
 
 
 @dataclass(frozen=True)
@@ -140,6 +169,7 @@ class GraphBuildIdentity:
     snapshot_head: str
     input_fingerprint: str
     graph_fingerprint: str
+    producer_identity: ProducerIdentity
     publication: str
     durability: str
     integration_identity: GraphIntegrationIdentity
@@ -154,6 +184,7 @@ class GraphBuildIdentity:
             "snapshot_head": self.snapshot_head,
             "input_fingerprint": self.input_fingerprint,
             "graph_fingerprint": self.graph_fingerprint,
+            "producer_identity": self.producer_identity.json(),
             "publication": self.publication,
             "durability": self.durability,
             "verified": self.integration_identity.verified,
@@ -190,6 +221,7 @@ class TrustedBaseGraph:
     snapshot_head: str
     input_fingerprint: str
     graph_fingerprint: str
+    producer_identity: ProducerIdentity
     publication: str
     durability: str
     verified: bool
@@ -209,6 +241,7 @@ class TrustedBaseGraph:
             "snapshot_head": self.snapshot_head,
             "input_fingerprint": self.input_fingerprint,
             "graph_fingerprint": self.graph_fingerprint,
+            "producer_identity": self.producer_identity.json(),
             "publication": self.publication,
             "durability": self.durability,
             "verified": self.verified,
@@ -248,6 +281,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--report-out",
         help="Write changed-responsibility and baseline diagnostics as JSON.",
+    )
+    parser.add_argument(
+        "--producer-identity",
+        action="store_true",
+        help="Print the authorized current producer identity as compact JSON.",
     )
     return parser
 
@@ -942,6 +980,15 @@ def validate_integration_identity(
         owner,
         HEX_FINGERPRINT_RE,
     )
+    if "producer_identity" not in record:
+        raise SelectorFailure(
+            "graph_identity_missing",
+            f"owner={owner};field=producer_identity",
+        )
+    producer_identity = validate_producer_identity(
+        record["producer_identity"],
+        f"{owner}.producer_identity",
+    )
     if "verified" not in record:
         raise SelectorFailure(
             "graph_identity_missing",
@@ -969,6 +1016,7 @@ def validate_integration_identity(
         snapshot_head,
         input_fingerprint,
         graph_fingerprint,
+        producer_identity,
         True,
     )
 
@@ -988,6 +1036,7 @@ def integration_identity_mismatches(
         "snapshot_head",
         "input_fingerprint",
         "graph_fingerprint",
+        "producer_identity",
         "verified",
     ):
         result_value = getattr(result, field)
@@ -1005,6 +1054,7 @@ def graph_build_identity(
     graph_result_path: Path,
     *,
     allow_complete: bool = False,
+    expected_producer_identity: ProducerIdentity | None = None,
 ) -> GraphBuildIdentity:
     """Validate one build result and capture its canonical database identity."""
     result_file_identity = regular_file_identity(
@@ -1061,6 +1111,21 @@ def graph_build_identity(
         result["integration_record"],
         "graph_build_result.integration_record",
     )
+    if "producer_identity" not in result:
+        raise SelectorFailure(
+            "graph_identity_missing",
+            "owner=graph_build_result;field=producer_identity",
+        )
+    result_producer_identity = validate_producer_identity(
+        result["producer_identity"],
+        "graph_build_result.producer_identity",
+        expected_producer_identity,
+    )
+    if result_producer_identity != integration.producer_identity:
+        raise SelectorFailure(
+            "graph_identity_mismatch",
+            "fields=producer_identity",
+        )
 
     canonical_root = root.resolve(strict=True)
     expected_database = (
@@ -1135,6 +1200,7 @@ def graph_build_identity(
         integration.snapshot_head,
         result_input,
         result_graph,
+        result_producer_identity,
         publication,
         durability,
         integration,
@@ -1163,7 +1229,7 @@ def read_bound_graph_acceptance_facts(
             list[tuple[str, str]],
             connection.execute(
                 "SELECT key, value FROM metadata WHERE key IN "
-                "('integration_record','snapshot_head','input_fingerprint','graph_fingerprint')"
+                "('integration_record','producer_identity','snapshot_head','input_fingerprint','graph_fingerprint')"
             ).fetchall(),
         )
         metadata = cast(
@@ -1172,6 +1238,7 @@ def read_bound_graph_acceptance_facts(
         )
         required_keys = {
             "integration_record",
+            "producer_identity",
             "snapshot_head",
             "input_fingerprint",
             "graph_fingerprint",
@@ -1191,6 +1258,22 @@ def read_bound_graph_acceptance_facts(
             json.loads(integration_json),
             "graph_database_metadata.integration_record",
         )
+        persisted_producer_identity = validate_producer_identity(
+            json.loads(
+                required_identity_string(
+                    metadata,
+                    "producer_identity",
+                    "graph_database_metadata",
+                )
+            ),
+            "graph_database_metadata.producer_identity",
+            build.producer_identity,
+        )
+        if persisted_producer_identity != persisted.producer_identity:
+            raise SelectorFailure(
+                "graph_identity_mismatch",
+                "owners=integration_record,graph_database_metadata;fields=producer_identity",
+            )
         mismatches = integration_identity_mismatches(
             build.integration_identity,
             persisted,
@@ -1374,12 +1457,170 @@ def base_source_is_unchanged(
     return False
 
 
+def selector_source_root() -> Path:
+    """Return the source tree that owns this selector and its producer."""
+    return Path(__file__).resolve().parents[2]
+
+
+def authorized_source_root(source_root: Path | None) -> Path:
+    """Canonicalize and authorize only this selector's current source tree."""
+    authority = selector_source_root().resolve(strict=True)
+    candidate = authority if source_root is None else source_root.resolve(strict=True)
+    if candidate != authority or not candidate.is_dir():
+        raise SelectorFailure(
+            "trusted_base_graph_source_root_unauthorized",
+            f"expected={authority};actual={candidate}",
+        )
+    return candidate
+
+
+def producer_content_sha256(path: Path, owner: str) -> str:
+    """Hash one canonical producer file while rejecting replacement types."""
+    regular_file_identity(path, "trusted_base_graph_producer_unavailable", owner)
+    try:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        raise SelectorFailure(
+            "trusted_base_graph_producer_unavailable",
+            f"path={path}",
+        ) from None
+
+
+def current_producer_identity(source_root: Path | None) -> ProducerIdentity:
+    """Build the current producer authority and semantic content identity."""
+    root = authorized_source_root(source_root)
+    producer = surface_manifest_producer(root)
+    manifest_candidate = (
+        root / PROFILE_INVENTORY.parent / "shared-runtime-surfaces.toml"
+    )
+    try:
+        manifest = manifest_candidate.resolve(strict=True)
+    except OSError:
+        raise SelectorFailure(
+            "trusted_base_graph_producer_manifest_unavailable",
+            f"path={manifest_candidate}",
+        ) from None
+    try:
+        manifest.relative_to(root)
+    except ValueError:
+        raise SelectorFailure(
+            "trusted_base_graph_producer_manifest_invalid",
+            f"path={manifest}",
+        ) from None
+    return ProducerIdentity(
+        source_root=str(root),
+        producer_path=str(producer),
+        version=PRODUCER_IDENTITY_VERSION,
+        contract=PRODUCER_IDENTITY_CONTRACT,
+        producer_sha256=producer_content_sha256(
+            producer,
+            "trusted_base_graph_producer_invalid",
+        ),
+        manifest_path=str(manifest),
+        manifest_sha256=producer_content_sha256(
+            manifest,
+            "trusted_base_graph_producer_manifest_invalid",
+        ),
+    )
+
+
+def validate_producer_identity(
+    payload: object,
+    owner: str,
+    expected: ProducerIdentity | None = None,
+) -> ProducerIdentity:
+    """Validate exact producer identity shape, paths, and live content hashes."""
+    if type(payload) is not dict:
+        raise SelectorFailure(
+            "graph_identity_invalid",
+            f"owner={owner};field=producer_identity;expected_type=object",
+        )
+    record = cast(dict[str, object], payload)
+    expected_fields = {
+        "source_root",
+        "producer_path",
+        "version",
+        "contract",
+        "producer_sha256",
+        "manifest_path",
+        "manifest_sha256",
+    }
+    if set(record) != expected_fields:
+        raise SelectorFailure(
+            "graph_identity_invalid",
+            f"owner={owner};field=producer_identity;detail=canonical_fields",
+        )
+    identity = ProducerIdentity(
+        required_identity_string(record, "source_root", owner),
+        required_identity_string(record, "producer_path", owner),
+        required_identity_string(record, "version", owner),
+        required_identity_string(record, "contract", owner),
+        required_identity_string(record, "producer_sha256", owner, HEX_SHA256_RE),
+        required_identity_string(record, "manifest_path", owner),
+        required_identity_string(record, "manifest_sha256", owner, HEX_SHA256_RE),
+    )
+    if (
+        identity.version != PRODUCER_IDENTITY_VERSION
+        or identity.contract != PRODUCER_IDENTITY_CONTRACT
+    ):
+        raise SelectorFailure(
+            "graph_identity_invalid",
+            f"owner={owner};field=version,contract",
+        )
+    for path_value, label in (
+        (identity.source_root, "source_root"),
+        (identity.producer_path, "producer_path"),
+        (identity.manifest_path, "manifest_path"),
+    ):
+        try:
+            canonical = Path(path_value).resolve(strict=True)
+        except OSError:
+            raise SelectorFailure(
+                "graph_identity_invalid",
+                f"owner={owner};field={label};detail=unavailable",
+            ) from None
+        if str(canonical) != path_value:
+            raise SelectorFailure(
+                "graph_identity_invalid",
+                f"owner={owner};field={label};detail=noncanonical",
+            )
+    source_root = Path(identity.source_root)
+    try:
+        Path(identity.producer_path).relative_to(source_root)
+        Path(identity.manifest_path).relative_to(source_root)
+    except ValueError:
+        raise SelectorFailure(
+            "graph_identity_invalid",
+            f"owner={owner};field=producer_path,manifest_path;detail=outside_source_root",
+        ) from None
+    actual_producer_sha = producer_content_sha256(
+        Path(identity.producer_path),
+        "graph_identity_invalid",
+    )
+    actual_manifest_sha = producer_content_sha256(
+        Path(identity.manifest_path),
+        "graph_identity_invalid",
+    )
+    if (
+        identity.producer_sha256 != actual_producer_sha
+        or identity.manifest_sha256 != actual_manifest_sha
+    ):
+        raise SelectorFailure(
+            "graph_identity_mismatch",
+            f"owner={owner};field=producer_sha256,manifest_sha256",
+        )
+    if expected is not None and identity != expected:
+        raise SelectorFailure(
+            "graph_identity_mismatch",
+            f"owner={owner};field=producer_identity",
+        )
+    return identity
+
+
 def graph_executable(source_root: Path | None) -> Path:
     """Resolve the canonical graph builder used for trusted base evidence."""
-    if source_root is None:
-        candidate = Path(__file__).resolve().parents[1] / "bin" / "agent-canon"
-    else:
-        candidate = source_root / "tools" / "bin" / "agent-canon"
+    root = authorized_source_root(source_root)
+    candidate = root / "tools" / "bin" / "agent-canon"
     try:
         resolved = candidate.resolve(strict=True)
     except OSError:
@@ -1397,12 +1638,8 @@ def graph_executable(source_root: Path | None) -> Path:
 
 def surface_manifest_producer(source_root: Path | None) -> Path:
     """Resolve the current source producer injected into trusted-base builds."""
-    if source_root is None:
-        candidate = (
-            Path(__file__).resolve().parents[1] / "agent_tools" / "surface_manifest.py"
-        )
-    else:
-        candidate = source_root / "tools" / "agent_tools" / "surface_manifest.py"
+    root = authorized_source_root(source_root)
+    candidate = root / "tools" / "agent_tools" / "surface_manifest.py"
     try:
         resolved = candidate.resolve(strict=True)
     except OSError:
@@ -1562,8 +1799,10 @@ def build_trusted_base_graph(
     source_root: Path | None,
 ) -> TrustedBaseGraph:
     """Build and validate a complete/incomplete graph from the exact base tree."""
-    executable = graph_executable(source_root)
-    producer = surface_manifest_producer(source_root)
+    authorized_root = authorized_source_root(source_root)
+    producer_identity = current_producer_identity(authorized_root)
+    executable = graph_executable(authorized_root)
+    producer = surface_manifest_producer(authorized_root)
     with tempfile.TemporaryDirectory(
         prefix="agent-canon-pr-base-",
         dir=root.parent,
@@ -1621,6 +1860,12 @@ def build_trusted_base_graph(
                 "json",
                 "--surface-manifest-producer",
                 str(producer),
+                "--surface-manifest-producer-identity",
+                json.dumps(
+                    producer_identity.json(),
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ),
                 "--surface-manifest",
                 manifest,
             ],
@@ -1657,6 +1902,7 @@ def build_trusted_base_graph(
             base_root,
             result_path,
             allow_complete=True,
+            expected_producer_identity=producer_identity,
         )
         _, _, diagnostics = read_bound_graph_acceptance_facts(
             identity,
@@ -1667,6 +1913,7 @@ def build_trusted_base_graph(
             identity.snapshot_head,
             identity.input_fingerprint,
             identity.graph_fingerprint,
+            identity.producer_identity,
             identity.publication,
             identity.durability,
             identity.integration_identity.verified,
@@ -1684,7 +1931,12 @@ def evaluate_built_graph(
 ) -> GraphAcceptance:
     """Compare head diagnostics with a graph built from the trusted base."""
     diff = load_diff(root, environment, trusted_base_sha)
-    build_identity = graph_build_identity(root, graph_result_path)
+    producer_identity = current_producer_identity(source_root)
+    build_identity = graph_build_identity(
+        root,
+        graph_result_path,
+        expected_producer_identity=producer_identity,
+    )
     node_paths, adjacency, diagnostics = read_bound_graph_acceptance_facts(
         build_identity,
         diff.head_sha,
@@ -1697,6 +1949,11 @@ def evaluate_built_graph(
         full_scope,
     )
     base_graph = build_trusted_base_graph(root, diff.base_sha, source_root)
+    if base_graph.producer_identity != build_identity.producer_identity:
+        raise SelectorFailure(
+            "graph_identity_mismatch",
+            "owners=trusted_base_graph,graph_build_result;fields=producer_identity",
+        )
     head_diagnostics = deduplicate_diagnostics(diagnostics)
     base_by_identity = {
         diagnostic_identity_key(diagnostic): diagnostic
@@ -1792,6 +2049,7 @@ def select(
     trusted_base_sha: str | None = None,
 ) -> Selection:
     """Return the strict graph selection for one parent PR."""
+    source_root = authorized_source_root(source_root)
     diff = load_diff(root, environment, trusted_base_sha)
     surfaces = dependency_surface_paths(source_root)
     profiles = load_profiles(source_root, environment)
@@ -1833,6 +2091,21 @@ def select(
 def main() -> int:
     """Run the selector and emit a typed result."""
     args = build_parser().parse_args()
+    if args.producer_identity:
+        try:
+            identity = current_producer_identity(Path(args.source_root).resolve())
+        except (OSError, SelectorFailure) as error:
+            if isinstance(error, SelectorFailure):
+                print(
+                    f"AGENT_CANON_PR_PRODUCER_IDENTITY=fail;reason={error.reason};evidence={error.evidence}"
+                )
+            else:
+                print(
+                    "AGENT_CANON_PR_PRODUCER_IDENTITY=fail;reason=producer_identity_unavailable"
+                )
+            return EXIT_FAILURE
+        print(json.dumps(identity.json(), sort_keys=True, separators=(",", ":")))
+        return EXIT_REQUIRED
     if args.evaluate_built_graph:
         if not args.graph_result or not args.report_out:
             emit_acceptance(

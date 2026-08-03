@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -33,6 +34,7 @@ assert SPEC is not None and SPEC.loader is not None
 selector = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = selector
 SPEC.loader.exec_module(selector)
+FIXTURE_PRODUCER_IDENTITY = selector.current_producer_identity(PROJECT_ROOT)
 
 
 def git(root: Path, *args: str, input_text: str | None = None) -> str:
@@ -182,6 +184,12 @@ def graph_builder_exit_fixture(
     producer = source_root / "tools" / "agent_tools" / "surface_manifest.py"
     producer.parent.mkdir(parents=True)
     producer.write_text("# current producer fixture\n", encoding="utf-8")
+    manifest = source_root / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+    manifest.parent.mkdir(parents=True)
+    shutil.copy2(
+        PROJECT_ROOT / "documents" / "runtime" / "shared-runtime-surfaces.toml",
+        manifest,
+    )
     return parent, source_root, base
 
 
@@ -258,6 +266,7 @@ def write_graph_result(
         "snapshot_head": snapshot_head,
         "input_fingerprint": input_fingerprint,
         "graph_fingerprint": graph_fingerprint,
+        "producer_identity": FIXTURE_PRODUCER_IDENTITY.json(),
         "contract_fingerprint": "fixture",
         "producer_artifacts": [],
         "runtime_evidence": None,
@@ -291,6 +300,7 @@ def write_graph_result(
             )
         for key, value in (
             ("integration_record", json.dumps(integration_record)),
+            ("producer_identity", json.dumps(FIXTURE_PRODUCER_IDENTITY.json())),
             ("snapshot_head", snapshot_head),
             ("input_fingerprint", input_fingerprint),
             ("graph_fingerprint", graph_fingerprint),
@@ -310,6 +320,7 @@ def write_graph_result(
                 "db_path": str(database.resolve()),
                 "input_fingerprint": input_fingerprint,
                 "graph_fingerprint": graph_fingerprint,
+                "producer_identity": FIXTURE_PRODUCER_IDENTITY.json(),
                 "integration_record": integration_record,
                 "publication": "published",
                 "durability": "durable",
@@ -332,6 +343,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 "0" * 40,
                 "1" * 64,
                 "2" * 64,
+                FIXTURE_PRODUCER_IDENTITY,
                 "published",
                 "durable",
                 True,
@@ -372,6 +384,101 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             "trusted_base_graph_exit_code_mismatch",
         )
 
+    def test_selector_rejects_an_arbitrary_producer_source_root(self) -> None:
+        """Producer execution authority is limited to the selector source tree."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            with self.assertRaises(selector.SelectorFailure) as raised:
+                selector.current_producer_identity(Path(tmp_dir))
+
+        self.assertEqual(
+            raised.exception.reason,
+            "trusted_base_graph_source_root_unauthorized",
+        )
+
+    def test_modified_producer_content_invalidates_captured_identity(self) -> None:
+        """A producer replacement after identity capture cannot be reused."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            _parent, source_root, _base = graph_builder_exit_fixture(
+                Path(tmp_dir), 0, 1
+            )
+            with patch.object(
+                selector, "selector_source_root", return_value=source_root
+            ):
+                identity = selector.current_producer_identity(source_root)
+                (source_root / "tools/agent_tools/surface_manifest.py").write_text(
+                    "# replaced producer\n",
+                    encoding="utf-8",
+                )
+                with self.assertRaises(selector.SelectorFailure) as raised:
+                    selector.validate_producer_identity(
+                        identity.json(),
+                        "fixture.producer_identity",
+                        identity,
+                    )
+
+        self.assertEqual(raised.exception.reason, "graph_identity_mismatch")
+
+    def test_head_and_trusted_base_producer_identities_must_match(self) -> None:
+        """Base/head graph comparison rejects different producer semantics."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {})
+            graph_result = write_graph_result(root, ("changed.py",), (), ())
+            mismatched = replace(
+                FIXTURE_PRODUCER_IDENTITY,
+                version="agent-canon.surface-manifest-producer.other",
+            )
+            with patch.object(
+                selector,
+                "build_trusted_base_graph",
+                return_value=selector.TrustedBaseGraph(
+                    base,
+                    "1" * 64,
+                    "2" * 64,
+                    mismatched,
+                    "published",
+                    "durable",
+                    True,
+                    "fresh",
+                    (),
+                ),
+            ):
+                with self.assertRaises(selector.SelectorFailure) as raised:
+                    selector.evaluate_built_graph(
+                        root,
+                        graph_result,
+                        {"AGENT_CANON_PR_BASE_REF": base},
+                    )
+
+        self.assertEqual(raised.exception.reason, "graph_identity_mismatch")
+
+    def test_result_and_database_producer_identity_types_fail_closed(self) -> None:
+        """Both JSON result and SQLite readback require an identity object."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {})
+            graph_result = write_graph_result(root, ("changed.py",), (), ())
+            payload = json.loads(graph_result.read_text(encoding="utf-8"))
+            valid_payload = dict(payload)
+            payload["producer_identity"] = []
+            graph_result.write_text(json.dumps(payload), encoding="utf-8")
+            with self.assertRaises(selector.SelectorFailure) as result_error:
+                selector.graph_build_identity(root, graph_result)
+
+            graph_result.write_text(json.dumps(valid_payload), encoding="utf-8")
+            database = root / ".agent-canon/knowledge-graph/graph.sqlite"
+            with sqlite3.connect(database) as connection:
+                connection.execute(
+                    "UPDATE metadata SET value=? WHERE key='producer_identity'",
+                    ("[]",),
+                )
+            identity = selector.graph_build_identity(root, graph_result)
+            with self.assertRaises(selector.SelectorFailure) as database_error:
+                selector.read_bound_graph_acceptance_facts(identity, base)
+
+        self.assertEqual(result_error.exception.reason, "graph_identity_invalid")
+        self.assertEqual(database_error.exception.reason, "graph_identity_invalid")
+
     def test_trusted_base_builder_rejects_process_zero_result_one_fixture(self) -> None:
         """The trusted-base process path rejects a zero/one exit mismatch."""
         self.base_graph_patch.stop()
@@ -381,8 +488,11 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 process_exit_code=0,
                 result_exit_code=1,
             )
-            with self.assertRaises(selector.SelectorFailure) as raised:
-                selector.build_trusted_base_graph(parent, base, source_root)
+            with patch.object(
+                selector, "selector_source_root", return_value=source_root
+            ):
+                with self.assertRaises(selector.SelectorFailure) as raised:
+                    selector.build_trusted_base_graph(parent, base, source_root)
 
         self.assertEqual(
             raised.exception.reason,
@@ -398,8 +508,11 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 process_exit_code=1,
                 result_exit_code=0,
             )
-            with self.assertRaises(selector.SelectorFailure) as raised:
-                selector.build_trusted_base_graph(parent, base, source_root)
+            with patch.object(
+                selector, "selector_source_root", return_value=source_root
+            ):
+                with self.assertRaises(selector.SelectorFailure) as raised:
+                    selector.build_trusted_base_graph(parent, base, source_root)
 
         self.assertEqual(
             raised.exception.reason,
@@ -773,6 +886,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                     base,
                     "1" * 64,
                     "2" * 64,
+                    FIXTURE_PRODUCER_IDENTITY,
                     "published",
                     "durable",
                     True,
@@ -820,6 +934,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                     base,
                     "1" * 64,
                     "2" * 64,
+                    FIXTURE_PRODUCER_IDENTITY,
                     "published",
                     "durable",
                     True,
