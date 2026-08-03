@@ -255,6 +255,7 @@ def build_nested_codex_script(
         "set -euo pipefail",
         'mkdir -p "$HOME"',
         'mkdir -p "$HOME/.codex"',
+        'export AGENT_CANON_CODEX_SESSION_ROOT="${AGENT_CANON_CODEX_SESSION_ROOT:-$HOME/.codex/sessions}"',
     ]
     lines.extend(
         [
