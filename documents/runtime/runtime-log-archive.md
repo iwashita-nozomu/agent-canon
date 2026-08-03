@@ -124,15 +124,22 @@ python3 tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
   --base-ref <base-ref>
 ```
 
-When an active runtime pointer exists, the Rust graph command consumes the
-prepared artifact plus the latest confirmed committed receipt during one
-`graph build`. Its v2 persisted runtime-evidence snapshot retains the exact
-artifact/receipt bytes, their hashes, the live source identity fingerprint,
-and the validated observation. Without an active runtime pointer, the same
-builder publishes the source facts and completeness diagnostics without a
-runtime producer snapshot. `graph status`, `graph query`, `graph context`, and
-dependency-review consumers reuse that one snapshot and perform only one
-bounded freshness probe per command. They never rerun the runtime producer.
+When an active runtime pointer exists and its run contains one prepared runtime
+event, the Rust graph command consumes the prepared artifact plus the latest
+confirmed committed receipt during one `graph build`. Its v2 persisted
+runtime-evidence snapshot retains the exact artifact/receipt bytes, their
+hashes, the live source identity fingerprint, and the validated observation.
+An active pointer whose run contains no prepared runtime event is an
+observability-incomplete closeout condition; the deterministic graph still
+publishes source facts and completeness diagnostics without a runtime producer
+snapshot, and the selected workflow closeout owns reporting that condition.
+When a prepared event exists, duplicate, malformed, uncertain, missing, or
+mismatched certificates/receipts remain fail-closed. Without an active runtime
+pointer, the same builder publishes the source facts and completeness
+diagnostics without a runtime producer snapshot. `graph status`, `graph query`,
+`graph context`, and dependency-review consumers reuse that one snapshot and
+perform only one bounded freshness probe per command. They never rerun the
+runtime producer.
 Nonempty source completeness diagnostics produce `incomplete` rather than
 `fresh`; status remains inspectable, while query and context refuse to
 authorize evidence until the diagnostic sets are empty.
