@@ -2828,7 +2828,7 @@ class DependencyManifestToolTest(unittest.TestCase):
     def graph_ensure_fixture(
         self,
         root: Path,
-        statuses: list[tuple[str, int]],
+        statuses: list[tuple[str, int, object, object]],
         build_exit: int = 0,
     ) -> tuple[Path, Path]:
         """Create a source-root fixture with scripted status/build readback."""
@@ -2867,10 +2867,12 @@ class DependencyManifestToolTest(unittest.TestCase):
             "if sys.argv[1:3] == ['graph', 'status']:\n"
             "    sequence = json.loads(os.environ['GRAPH_STATUS_SEQUENCE'])\n"
             "    index = sum(1 for line in calls.read_text().splitlines() if line == 'graph status') - 1\n"
-            "    status, exit_code = sequence[min(index, len(sequence) - 1)]\n"
+            "    status, exit_code, reason, probe_reason = sequence[min(index, len(sequence) - 1)]\n"
             "    payload = json.loads(os.environ['GRAPH_STATUS_JSON'])\n"
             "    payload['status'] = status\n"
             "    payload['exit_code'] = exit_code\n"
+            "    payload['reason'] = reason\n"
+            "    payload['probe_reason'] = probe_reason\n"
             "    print(json.dumps(payload))\n"
             "    raise SystemExit(exit_code)\n"
             "raise SystemExit(2)\n"
@@ -2883,7 +2885,7 @@ class DependencyManifestToolTest(unittest.TestCase):
     def run_graph_ensure_fixture(
         self,
         root: Path,
-        statuses: list[tuple[str, int]],
+        statuses: list[tuple[str, int, object, object]],
         build_exit: int = 0,
     ) -> subprocess.CompletedProcess[str]:
         """Run the existing dependency-review graph ensure route."""
@@ -2898,6 +2900,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "command": "status",
                         "status": "fresh",
                         "exit_code": 0,
+                        "reason": None,
+                        "probe_reason": None,
                     }
                 ),
             }
@@ -2923,7 +2927,7 @@ class DependencyManifestToolTest(unittest.TestCase):
         """Fresh status is accepted without invoking the producer."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             result = self.run_graph_ensure_fixture(
-                Path(tmp_dir), [("fresh", 0)]
+                Path(tmp_dir), [("fresh", 0, None, None)]
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -2934,37 +2938,72 @@ class DependencyManifestToolTest(unittest.TestCase):
                 ["graph status"],
             )
 
-    def test_graph_ensure_stale_builds_once_and_reads_fresh(self) -> None:
-        """Stale status performs one build and requires fresh readback."""
-        for initial_status in (("stale", 2), ("unavailable", 1)):
-            with self.subTest(initial_status=initial_status), tempfile.TemporaryDirectory() as tmp_dir:
-                result = self.run_graph_ensure_fixture(
-                    Path(tmp_dir), [initial_status, ("fresh", 0)]
-                )
+    def test_graph_ensure_source_changed_builds_once_and_reads_fresh(self) -> None:
+        """Only a typed source-change status performs one build."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result = self.run_graph_ensure_fixture(
+                Path(tmp_dir),
+                [
+                    ("stale", 2, "source_changed", "source_changed"),
+                    ("fresh", 0, None, None),
+                ],
+            )
 
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertIn("GRAPH_REBUILD=performed", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GRAPH_REBUILD=performed", result.stdout)
+            self.assertEqual(
+                result.calls_path.read_text(encoding="utf-8").splitlines(),
+                ["graph status", "graph build", "graph status"],
+            )
+
+    def test_graph_ensure_non_source_status_fails_without_build(self) -> None:
+        """Corruption, unknown, and non-source statuses never admit rebuilding."""
+        cases = (
+            (
+                "stale",
+                2,
+                "persisted_readback_mismatch",
+                "persisted_readback_mismatch",
+            ),
+            ("stale", 2, "unknown_reason", "unknown_reason"),
+            ("stale", 2, "runtime_evidence_changed", "runtime_evidence_changed"),
+            ("stale", 2, "producer_identity_changed", "producer_identity_changed"),
+            ("stale", 2, "source_changed", None),
+            ("stale", 2, 1, "source_changed"),
+            ("unavailable", 1, "graph_unavailable", None),
+            ("incomplete", 2, "source_completeness_incomplete", None),
+            ("invalid", 1, None, None),
+        )
+        for status in cases:
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as tmp_dir:
+                result = self.run_graph_ensure_fixture(Path(tmp_dir), [status])
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("REPO_DEPENDENCY_REVIEW=fail", result.stdout)
                 self.assertEqual(
                     result.calls_path.read_text(encoding="utf-8").splitlines(),
-                    ["graph status", "graph build", "graph status"],
+                    ["graph status"],
                 )
 
     def test_graph_ensure_fails_closed_for_build_or_readback_failure(self) -> None:
-        """Build, readback, completeness, and invalid-status failures stay closed."""
+        """Build failure and non-fresh readback stay closed."""
         cases = (
             ([
-                ("stale", 2),
+                ("stale", 2, "source_changed", "source_changed"),
             ], 3, "GRAPH_REBUILD=failed rc=3", True),
             ([
-                ("stale", 2),
-                ("stale", 2),
+                ("stale", 2, "source_changed", "source_changed"),
+                ("stale", 2, "source_changed", "source_changed"),
             ], 0, "REPO_DEPENDENCY_REVIEW=fail", True),
             ([
-                ("incomplete", 2),
-            ], 0, "REPO_DEPENDENCY_REVIEW=fail", False),
-            ([
-                ("invalid", 1),
-            ], 0, "REPO_DEPENDENCY_REVIEW=fail", False),
+                ("stale", 2, "source_changed", "source_changed"),
+                (
+                    "stale",
+                    2,
+                    "persisted_readback_mismatch",
+                    "persisted_readback_mismatch",
+                ),
+            ], 0, "REPO_DEPENDENCY_REVIEW=fail", True),
         )
         for statuses, build_exit, expected, build_expected in cases:
             with self.subTest(statuses=statuses, build_exit=build_exit), tempfile.TemporaryDirectory() as tmp_dir:

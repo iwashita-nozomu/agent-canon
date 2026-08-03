@@ -180,6 +180,18 @@ if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
     else
       status_rc=$?
     fi
+    status_schema="$(jq -r 'if (.schema | type) == "string" then .schema else "invalid" end' "$status_file" 2>/dev/null || true)"
+    status_command="$(jq -r 'if (.command | type) == "string" then .command else "invalid" end' "$status_file" 2>/dev/null || true)"
+    status_name="$(jq -r 'if (.status | type) == "string" then .status else "invalid" end' "$status_file" 2>/dev/null || true)"
+    status_record_exit="$(jq -r 'if ((.exit_code | type) == "number" and .exit_code == (.exit_code | floor)) then (.exit_code | tostring) else "invalid" end' "$status_file" 2>/dev/null || true)"
+    status_reason="$(jq -r 'if .reason == null then "null" elif (.reason | type) == "string" then .reason else "invalid" end' "$status_file" 2>/dev/null || true)"
+    status_probe_reason="$(jq -r 'if .probe_reason == null then "null" elif (.probe_reason | type) == "string" then .probe_reason else "invalid" end' "$status_file" 2>/dev/null || true)"
+    status_schema="${status_schema:-invalid}"
+    status_command="${status_command:-invalid}"
+    status_name="${status_name:-invalid}"
+    status_record_exit="${status_record_exit:-invalid}"
+    status_reason="${status_reason:-invalid}"
+    status_probe_reason="${status_probe_reason:-invalid}"
     printf '%s\n' "GRAPH_STATUS_RC=${status_rc}"
     cat "$status_file"
     return "$status_rc"
@@ -190,13 +202,16 @@ if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
   else
     status_exit=$?
   fi
-  status_name="$(jq -r '.status // "invalid"' "$status_file" 2>/dev/null || true)"
-  if [[ "$status_exit:$status_name" == "0:fresh" ]]; then
+  status_binding="${status_exit}:${status_schema}:${status_command}:${status_name}:${status_record_exit}:${status_reason}:${status_probe_reason}"
+  fresh_binding="0:agent-canon.graph.status.v1:status:fresh:0:null:null"
+  incomplete_binding="2:agent-canon.graph.status.v1:status:incomplete:2:source_completeness_incomplete:null"
+  source_changed_binding="2:agent-canon.graph.status.v1:status:stale:2:source_changed:source_changed"
+  if [[ "$status_binding" == "$fresh_binding" ]]; then
     echo "GRAPH_REBUILD=not_needed"
-  elif [[ "$status_exit:$status_name" == "2:incomplete" ]]; then
+  elif [[ "$status_binding" == "$incomplete_binding" ]]; then
     echo "GRAPH_REBUILD=not_needed status=incomplete"
-  elif [[ "$status_name" == "stale" || "$status_name" == "unavailable" ]]; then
-    echo "GRAPH_REBUILD=required status=${status_name}"
+  elif [[ "$status_binding" == "$source_changed_binding" ]]; then
+    echo "GRAPH_REBUILD=required status=stale reason=source_changed probe_reason=source_changed"
     set +e
     "$GRAPH_CLI" graph build --root "$ROOT_DIR" --profile default --format json
     build_exit=$?
@@ -212,9 +227,11 @@ if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
     else
       status_exit=$?
     fi
-    status_name="$(jq -r '.status // "invalid"' "$status_file" 2>/dev/null || true)"
+    status_binding="${status_exit}:${status_schema}:${status_command}:${status_name}:${status_record_exit}:${status_reason}:${status_probe_reason}"
+  else
+    echo "GRAPH_REBUILD=not_admitted status=${status_name} reason=${status_reason} probe_reason=${status_probe_reason}"
   fi
-  if [[ "$status_exit" -ne 0 || "$status_name" != "fresh" ]]; then
+  if [[ "$status_binding" != "$fresh_binding" ]]; then
     echo "REPO_DEPENDENCY_REVIEW=fail"
     cat "$status_file"
     exit 1

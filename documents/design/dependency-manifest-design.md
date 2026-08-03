@@ -396,13 +396,17 @@ fails before diagnostic classification.
 
 Freshness recovery remains outside the read-only Graph operations.
 `run_repo_dependency_review.sh` owns the consumer transition: fresh status
-skips production; stale or typed-unavailable status permits exactly one
-canonical build followed by status readback; incomplete, invalid, build-failed,
-or non-fresh readback fails closed. The producer continues to own its existing
-lock, staging, atomic rename, and durability readback. The standalone runtime
-dashboard workflow is the single periodic maintenance owner and invokes this
-same transition only for its scheduled event; its cron value remains owned only
-by that workflow.
+skips production. Exactly the typed canonical status tuple `status=stale`,
+`reason=source_changed`, and `probe_reason=source_changed`, with matching process
+and record exit code `2`, permits one canonical build followed by status
+readback. Every other stale reason, typed-unavailable status, persisted readback
+corruption, runtime receipt or evidence failure, producer mismatch, incomplete
+or invalid status, build failure, and non-fresh readback fails closed without
+admitting a build. The producer continues to own its existing lock, staging,
+atomic rename, and durability readback. The standalone runtime dashboard
+workflow is the single periodic maintenance owner and invokes this same
+admission predicate only for its scheduled event; its cron value remains owned
+only by that workflow.
 
 source snapshot の候補 path は、解決先の内容ではなく候補 path 自体の
 filesystem object を読む。`dependency_manifest.rs` の単一 source-path
