@@ -8,6 +8,10 @@
 # downstream implementation tools/rebuild_agent_tools.sh rebuilds compiled AgentCanon tools
 # downstream implementation rust/agent-canon/src/structured_analysis.rs implements structured-analysis cache build tooling
 # downstream implementation tools/agent_tools/prose_reasoning_graph.py creates prose graph DBs under user-home cache by default
+# downstream environment agents/skills/gpu-execution.md routes the audited provider identity
+# downstream environment documents/tools/dependency-tools-and-licenses.md projects environment tool ownership for readers
+# downstream environment tests/tools/test_run_managed_experiment.py verifies provider identity binding
+# downstream environment tools/experiments/run_managed_experiment.py binds the audited external provider identity
 # @dependency-end
 
 manifest_kind = "agent_canon_environment"
@@ -90,6 +94,20 @@ compose_user = "${LOCAL_UID}:${LOCAL_GID}"
 compose_group_add = "${AGENT_CANON_RUNTIME_GID}"
 compose_bind_source = "/var/lib/agent-canon/runtime"
 compose_bind_target = "/var/lib/agent-canon/runtime"
+
+[external_provider.experiment_runner_admitted]
+owner = "gpu-execution and ExperimentRunner provider contract"
+repository = "https://github.com/iwashita-nozomu/experiment-runner"
+merged_commit = "71b3630266151703bdf88b11741b7492eca92fb4"
+contract_path = "documents/experiment-runner-admission.md"
+contract_sha256 = "2de2b63aac3076e6aacdf1ff10b2c35a0235e835504aeff2db92a7750a720d85"
+executable = "experiment-runner-admitted"
+invocation = "experiment-runner-admitted --request <path> --result <path>"
+request_schema = "agentcanon-managed-run/v1"
+result_schema = "agentcanon-managed-run-result/v1"
+identity_binding = "request metadata and managed-run receipt"
+installation_owner = "consumer repository"
+agent_canon_install_policy = "forbidden; audit the consumer-provided executable"
 
 [structured_analysis_cache]
 owner = "agent-canon"

@@ -8,6 +8,7 @@ upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md ad
 upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md NVIDIA evidence boundary
 upstream design experiment-lifecycle.md experiment artifact boundary
 downstream implementation ../../.agents/skills/gpu-execution/SKILL.md Codex discovery shim
+upstream environment ../../agent-canon-environment.toml audited ExperimentRunner provider identity and runtime item
 @dependency-end
 -->
 
@@ -87,6 +88,12 @@ physical/MIG identifier を保持します。AgentCanon は admission で確定�
 identifier の順序と重複禁止を維持して、そのまま wire へ転送します。provider は transport
 identity と scheduler の内部 numeric key を分離するため、consumer は UUID を整数へ
 再解釈しません。`task.callable=main` は provider の argv adapter 境界で実行されます。
+
+この invocation は merged ExperimentRunner provider `71b3630266151703bdf88b11741b7492eca92fb4`
+の contract identityへ束縛します。provider repository、contract SHA-256、shell-free argvは
+request metadata、receipt、`agent-canon-environment.toml` の audit itemで一致しなければ
+なりません。AgentCanonは親providerをimport/installせず、consumer環境の実在console scriptを
+このidentityに対して監査します。
 
 ## Environment
 

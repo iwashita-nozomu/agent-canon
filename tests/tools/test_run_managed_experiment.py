@@ -8,6 +8,7 @@
 # upstream implementation ./resource_plan_test_evidence.py deterministic test-only injection boundary
 # upstream implementation ../../tools/ci/check_experiment_registry.py checker under test
 # downstream implementation ../../documents/experiments/gpu-admission-r5-ordered-integration-interface.json W1 public selectors
+# upstream environment ../../agent-canon-environment.toml audited ExperimentRunner provider identity and runtime item
 # @dependency-end
 
 """Tests for the managed experiment run helper."""
@@ -565,6 +566,27 @@ def test_r5_provider_request_wire_fields_forward_opaque_gpu_identifiers() -> Non
         if '"gpu_id": gpu_id' in line
     ) == ('"gpu_id": gpu_id,',)
     assert "for uuid, gpu_id in zip(selected_uuids, selected_gpu_ids)" in request_builder
+
+
+def test_r5_provider_identity_is_bound_to_request_and_environment_audit() -> None:
+    """Bind the merged provider contract without changing the UUID ancestry route."""
+    source = SCRIPT.read_text(encoding="utf-8")
+    request_builder = source[
+        source.index("def _build_managed_run_request") : source.index("def _resolve_admitted_runner")
+    ]
+    identity = (
+        "https://github.com/iwashita-nozomu/experiment-runner",
+        "71b3630266151703bdf88b11741b7492eca92fb4",
+        "documents/experiment-runner-admission.md",
+        "2de2b63aac3076e6aacdf1ff10b2c35a0235e835504aeff2db92a7750a720d85",
+        "experiment-runner-admitted --request <path> --result <path>",
+    )
+    assert '"agentcanon_provider_contract": _provider_contract_identity()' in request_builder
+    environment = (Path(__file__).resolve().parents[2] / "agent-canon-environment.toml").read_text(
+        encoding="utf-8"
+    )
+    for value in identity:
+        assert value in environment
 
 
 def _valid_provider_result(request_fingerprint: str) -> dict[str, object]:

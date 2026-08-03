@@ -11,6 +11,7 @@
 # downstream implementation ../../templates/experiments/_template/run.py exposes the topic main adapted from the frozen snapshot
 # downstream implementation ../../tests/tools/test_run_managed_experiment.py validates the sole composition and frozen topic adapter
 # upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md NVIDIA process/PID/MIG/UUID visibility gate
+# upstream environment ../../agent-canon-environment.toml audited ExperimentRunner provider identity and runtime item
 # @dependency-end
 
 # Static route evidence: run_cli -> execute_managed_run ->
@@ -102,6 +103,15 @@ STDERR_LOG_NAME = "stderr.log"
 MANAGED_RUN_EXECUTABLE = "experiment-runner-admitted"
 MANAGED_RUN_REQUEST_SCHEMA = "agentcanon-managed-run/v1"
 MANAGED_RUN_RESULT_SCHEMA = "agentcanon-managed-run-result/v1"
+MANAGED_RUN_PROVIDER_REPOSITORY = "https://github.com/iwashita-nozomu/experiment-runner"
+MANAGED_RUN_PROVIDER_COMMIT = "71b3630266151703bdf88b11741b7492eca92fb4"
+MANAGED_RUN_PROVIDER_CONTRACT_PATH = "documents/experiment-runner-admission.md"
+MANAGED_RUN_PROVIDER_CONTRACT_SHA256 = (
+    "2de2b63aac3076e6aacdf1ff10b2c35a0235e835504aeff2db92a7750a720d85"
+)
+MANAGED_RUN_PROVIDER_INVOCATION = (
+    "experiment-runner-admitted --request <path> --result <path>"
+)
 MANAGED_RUN_REQUEST_FILENAME = "managed-run-request.json"
 MANAGED_RUN_RESULT_FILENAME = "managed-run-result.json"
 MANAGED_RUN_RECEIPT_FILENAME = "managed-run-receipt.json"
@@ -506,6 +516,17 @@ def _provider_gpu_ids(selected_uuids: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(selected_uuids)
 
 
+def _provider_contract_identity() -> dict[str, str]:
+    """Return the merged provider identity bound into each managed request."""
+    return {
+        "repository": MANAGED_RUN_PROVIDER_REPOSITORY,
+        "commit": MANAGED_RUN_PROVIDER_COMMIT,
+        "contract_path": MANAGED_RUN_PROVIDER_CONTRACT_PATH,
+        "contract_sha256": MANAGED_RUN_PROVIDER_CONTRACT_SHA256,
+        "invocation": MANAGED_RUN_PROVIDER_INVOCATION,
+    }
+
+
 def _build_managed_run_request(
     context: RunContext,
     request: GpuRunRequest,
@@ -597,6 +618,7 @@ def _build_managed_run_request(
         },
         "selected_gpu_ids": selected_gpu_ids,
         "metadata": {
+            "agentcanon_provider_contract": _provider_contract_identity(),
             "agentcanon_admission_fingerprint": admitted_environment.admission_fingerprint,
             "agentcanon_plan_fingerprint": plan.plan_fingerprint,
             "agentcanon_source_paths": source_paths,
@@ -970,6 +992,7 @@ def _run_admitted_runner(
     )
     receipt = {
         "schema_version": "agentcanon-managed-run-receipt/v1",
+        "provider_contract": _provider_contract_identity(),
         "executable": MANAGED_RUN_EXECUTABLE,
         "resolved_executable": executable,
         "argv": argv,

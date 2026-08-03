@@ -110,6 +110,19 @@ result は `schema`、`request_fingerprint`、`run_id`、`worker_pid`/`worker_pi
 `descendant_quiescence`、cleanup failure、worker/process-group IDs を実値で検証します。
 result に AgentCanon 独自の `admission_fingerprint` や `result_fingerprint` は要求しません。
 
+provider identity は次の merged ExperimentRunner source snapshot に固定します。consumer は
+request の `metadata.agentcanon_provider_contract` と managed-run receipt の
+`provider_contract` にこの値を記録し、request fingerprintへ含めます。AgentCanon は provider
+をimport/installせず、監査時にこのidentityと実行環境のconsole scriptを照合します。
+
+| item | value |
+| --- | --- |
+| repository | `https://github.com/iwashita-nozomu/experiment-runner` |
+| merged commit | `71b3630266151703bdf88b11741b7492eca92fb4` |
+| contract | `documents/experiment-runner-admission.md` |
+| contract SHA-256 | `2de2b63aac3076e6aacdf1ff10b2c35a0235e835504aeff2db92a7750a720d85` |
+| invocation | `experiment-runner-admitted --request <path> --result <path>` |
+
 provider v1 は opaque GPU/MIG identifier を `selected_gpu_ids` と
 `capacity.gpu_devices[].gpu_id` に保持します。AgentCanon は admission で確定した
 non-empty identifier の順序と重複禁止を検証し、その値を整数 ordinal へ変換せず wire
