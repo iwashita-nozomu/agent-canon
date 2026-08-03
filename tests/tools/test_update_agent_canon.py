@@ -479,12 +479,35 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                 ],
                 check=True,
             )
-            subprocess.run(
-                ["git", "-C", str(script_root), "commit", "-m", "fixture fresh clone checker"],
-                check=True,
-                capture_output=True,
-                text=True,
+            staged_diff = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root),
+                    "diff",
+                    "--cached",
+                    "--quiet",
+                    "--",
+                    "tools/ci/check_fresh_clone.sh",
+                    "tools/lib/repo_paths.sh",
+                ],
+                check=False,
             )
+            self.assertIn(staged_diff.returncode, (0, 1))
+            if staged_diff.returncode == 1:
+                subprocess.run(
+                    [
+                        "git",
+                        "-C",
+                        str(script_root),
+                        "commit",
+                        "-m",
+                        "fixture fresh clone checker",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
 
             check_script = script_root / "tools" / "ci" / "check_fresh_clone.sh"
             self.assertTrue(check_script.exists(), check_script)
