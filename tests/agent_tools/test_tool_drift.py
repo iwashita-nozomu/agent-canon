@@ -366,11 +366,15 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     self.write_agent_canon_pr_contract(root)
                     script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
                     script.write_text(
-                        script.read_text(encoding="utf-8").replace(marker, "removed", 1),
+                        script.read_text(encoding="utf-8").replace(
+                            marker, "removed", 1
+                        ),
                         encoding="utf-8",
                     )
 
-                    result = self.run_checker(root, "--contract", "agent_canon_pr_check")
+                    result = self.run_checker(
+                        root, "--contract", "agent_canon_pr_check"
+                    )
 
                 self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
                 self.assertIn(
@@ -379,7 +383,9 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     result.stdout,
                 )
 
-    def test_pr_check_strict_dependency_review_command_does_not_count_comment(self) -> None:
+    def test_pr_check_strict_dependency_review_command_does_not_count_comment(
+        self,
+    ) -> None:
         """Dependency-review command only in comments is rejected."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -387,7 +393,9 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             command = (
                 'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
-                '--fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"'
+                "--fail-missing --cycle-report-only --changed-path-packet "
+                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir '
+                '"${PR_DEPENDENCY_REVIEW_DIR}"'
             )
             script.write_text(
                 script.read_text(encoding="utf-8").replace(command, f"# {command}"),
@@ -404,7 +412,9 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_pr_check_strict_dependency_review_command_does_not_count_echo_printf_or_suppression(self) -> None:
+    def test_pr_check_strict_dependency_review_command_does_not_count_echo_printf_or_suppression(
+        self,
+    ) -> None:
         """Dependency-review command via echo/printf/suppression is rejected."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -412,7 +422,9 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             command = (
                 'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
-                '--fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"'
+                "--fail-missing --cycle-report-only --changed-path-packet "
+                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir '
+                '"${PR_DEPENDENCY_REVIEW_DIR}"'
             )
             script.write_text(
                 script.read_text(encoding="utf-8").replace(
@@ -439,7 +451,9 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             command = (
                 'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
-                '--fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"'
+                "--fail-missing --cycle-report-only --changed-path-packet "
+                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir '
+                '"${PR_DEPENDENCY_REVIEW_DIR}"'
             )
             script.write_text(
                 script.read_text(encoding="utf-8") + f"\n{command}\n",
@@ -462,10 +476,10 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         gates = [
             (
                 "agent_canon_pr_check",
-                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
+                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
                 "missing-strict-dependency-review",
                 'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing',
-                '--cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
+                '--cycle-report-only --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
             ),
             (
                 "agent_canon_pr_check",
@@ -498,18 +512,17 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                         root = Path(tmp_dir)
                         self.write_agent_canon_pr_contract(root)
                         script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
-                        malformed = (
-                            script.read_text(encoding="utf-8")
-                            .replace(
-                                canonical_command,
-                                command_prefix + suffix + f"  {command_tail}",
-                            )
+                        malformed = script.read_text(encoding="utf-8").replace(
+                            canonical_command,
+                            command_prefix + suffix + f"  {command_tail}",
                         )
                         script.write_text(malformed, encoding="utf-8")
 
                         result = self.run_checker(root, "--contract", contract)
 
-                        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                        self.assertEqual(
+                            result.returncode, 1, result.stdout + result.stderr
+                        )
                         self.assertIn(
                             f"missing-required-command:{contract}:"
                             "tools/ci/check_agent_canon_pr.sh:"
@@ -529,6 +542,61 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertNotIn(
                 "missing-required-command:agent_canon_pr_check:"
                 "tools/ci/check_agent_canon_pr.sh:",
+                result.stdout,
+            )
+
+    def test_pr_check_strict_dependency_review_requires_changed_path_packet(
+        self,
+    ) -> None:
+        """A strict review without the trusted path packet is rejected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_agent_canon_pr_contract(root)
+            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            script.write_text(
+                script.read_text(encoding="utf-8").replace(
+                    ' --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}"',
+                    "",
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-required-command:agent_canon_pr_check:"
+                "tools/ci/check_agent_canon_pr.sh:missing-strict-dependency-review",
+                result.stdout,
+            )
+
+    def test_pr_check_strict_dependency_review_rejects_extra_arguments(
+        self,
+    ) -> None:
+        """An extra argument cannot satisfy the exact strict-review contract."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_agent_canon_pr_contract(root)
+            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
+            command = (
+                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
+                "--fail-missing --cycle-report-only --changed-path-packet "
+                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir '
+                '"${PR_DEPENDENCY_REVIEW_DIR}"'
+            )
+            script.write_text(
+                script.read_text(encoding="utf-8").replace(
+                    command, f"{command} --unexpected-bypass-argument"
+                ),
+                encoding="utf-8",
+            )
+
+            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn(
+                "missing-required-command:agent_canon_pr_check:"
+                "tools/ci/check_agent_canon_pr.sh:missing-strict-dependency-review",
                 result.stdout,
             )
 
@@ -964,8 +1032,8 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     'python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py"',
                     "PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped",
                     "if agentcanon_pr_dependency_graph_required; then",
-                    '  bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
-                    '  PR_GATE_DEPENDENCY_GRAPH_STATUS=prepared',
+                    '  bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
+                    "  PR_GATE_DEPENDENCY_GRAPH_STATUS=prepared",
                     "fi",
                     "printf 'selector_reason=%s\\n' \"${PR_GATE_DEPENDENCY_GRAPH_REASON}\"",
                     "printf 'selector_evidence=%s\\n' \"${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE}\"",

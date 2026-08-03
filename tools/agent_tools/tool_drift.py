@@ -348,7 +348,7 @@ CONTRACTS = (
         command_checks=(
             CommandCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                r'^bash\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/run_repo_dependency_review\.sh"\s+--fail-missing\s+--cycle-report-only\s+--report-dir\s+"\$\{PR_DEPENDENCY_REVIEW_DIR\}"\s*$',
+                r'^bash\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/run_repo_dependency_review\.sh"\s+--fail-missing\s+--cycle-report-only\s+--changed-path-packet\s+"\$\{PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET\}"\s+--report-dir\s+"\$\{PR_DEPENDENCY_REVIEW_DIR\}"\s*$',
                 "missing-strict-dependency-review",
             ),
             CommandCheck(
@@ -487,7 +487,9 @@ def resolve_repo_path(root: Path, relative_path: str) -> Path:
     if root_path.exists():
         return root_path
     if relative_path.startswith("tools/"):
-        projected_path = root / "tools" / "agent-canon" / relative_path.removeprefix("tools/")
+        projected_path = (
+            root / "tools" / "agent-canon" / relative_path.removeprefix("tools/")
+        )
         if projected_path.exists():
             return projected_path
     vendor_path = root / "vendor" / "agent-canon" / relative_path
@@ -696,7 +698,9 @@ def check_command(
     path = resolve_repo_path(root, command_check.path)
     if not path.is_file():
         return [
-            Finding("missing-file", contract.name, command_check.path, command_check.detail)
+            Finding(
+                "missing-file", contract.name, command_check.path, command_check.detail
+            )
         ]
     commands = collect_shell_executable_commands(path)
     pattern = re.compile(command_check.pattern)
@@ -727,13 +731,18 @@ def check_command(
 
 def projected_runtime_snippet(root: Path, snippet: str) -> str:
     """Map standalone AgentCanon tool paths to a parent runtime projection."""
-    if not (root / "tools" / "agent-canon").exists() or (root / "tools" / "ci").exists():
+    if (
+        not (root / "tools" / "agent-canon").exists()
+        or (root / "tools" / "ci").exists()
+    ):
         return snippet
     return (
         snippet.replace("tools/agent_tools/", "tools/agent-canon/agent_tools/")
         .replace("tools/ci/", "tools/agent-canon/ci/")
         .replace("tools/sync_agent_canon.sh", "tools/agent-canon/sync_agent_canon.sh")
-        .replace("tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh")
+        .replace(
+            "tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh"
+        )
     )
 
 
