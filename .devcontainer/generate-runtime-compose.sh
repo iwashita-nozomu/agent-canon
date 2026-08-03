@@ -111,6 +111,7 @@ reserved_environment = {
     "AGENT_CANON_OPTIONAL_MOUNTS",
     "AGENT_CANON_DEPENDENCY_PROFILE",
     "AGENT_CANON_RUNTIME_ROUTE",
+    "AGENT_CANON_CODEX_SESSION_ROOT",
     "AGENT_CANON_WORKSPACE_LAYOUT",
     "AGENT_CANON_WORKSPACE_ROOT",
     "AGENT_CANON_REPOSITORY_ROOT",
@@ -314,6 +315,7 @@ environment_lines=(
   "      AGENT_CANON_DEPENDENCY_PROFILE: \"${dependency_profile}\""
   '      AGENT_CANON_RUNTIME_ROUTE: "CONTAINER_LOCAL"'
   "      AGENT_CANON_WORKSPACE_LAYOUT: \"${workspace_layout}\""
+  "      AGENT_CANON_CODEX_SESSION_ROOT: \"${project_home}/.codex/sessions\""
   '      AGENT_CANON_WORKSPACE_ROOT: "/workspace"'
   "      AGENT_CANON_REPOSITORY_ROOT: \"${container_repo_root}\""
   "      DEPENDENCY_MODULE_CONTAINER_SOURCE: ${workspace_mount_source_yaml}"

@@ -54,6 +54,11 @@ skill、tool、workflow、hook、eval の蓄積ログを、AgentCanon source tre
 1. 通常分析の入力を structured API / Markdown summary に固定します。
 1. AgentCanon 側では external log archive の mount / branch 状態だけを確認します。
 
+1. Source-bound runtime-event collection requires the runtime owner to provide
+   `AGENT_CANON_CODEX_SESSION_ROOT` for the active container-local session
+   directory. It does not inspect host `HOME`, `CODEX_HOME`, or
+   `~/.codex/sessions`; an absent root is a fail-closed source absence.
+
 ```bash
 python3 tools/agent_tools/runtime_log_archive_git.py ensure
 python3 tools/agent_tools/runtime_log_archive_git.py status --porcelain

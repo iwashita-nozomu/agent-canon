@@ -1137,6 +1137,7 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
             repo_target if expected_workspace_layout == "direct-repo" else "/workspace"
         ),
         "AGENT_CANON_RUNTIME_ROUTE": "CONTAINER_LOCAL",
+        "AGENT_CANON_CODEX_SESSION_ROOT": "/home/project/.codex/sessions",
         "AGENT_CANON_SECRET_MOUNT": "/mnt/agent-canon-secrets",
     }
     if parent_layout:

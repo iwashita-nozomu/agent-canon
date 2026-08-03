@@ -97,6 +97,7 @@ RUNTIME_EVENT_RECEIPT_SCHEMA = (
     "agent_canon.runtime_event.publication_outcome_receipt.v1"
 )
 RUNTIME_EVENT_CONTEXT_SCHEMA = "codex.context_discovery.v1"
+RUNTIME_SESSION_ROOT_ENV = "AGENT_CANON_CODEX_SESSION_ROOT"
 CONTEXT_DISCOVERY_CERTIFICATE_SCHEMA = (
     "agent_canon.context_discovery_certificate.v1"
 )
@@ -951,19 +952,25 @@ def build_context(args: argparse.Namespace) -> ArchiveContext:
 
 
 def _runtime_session_roots() -> tuple[Path, ...]:
-    """Return the finite, deduplicated Codex session roots."""
-    candidates: list[Path] = []
-    configured = os.environ.get("AGENT_CANON_CODEX_SESSION_ROOT", "").strip()
-    if configured:
-        candidates.append(Path(configured))
-    codex_home = os.environ.get("CODEX_HOME", "").strip()
-    if codex_home:
-        candidates.append(Path(codex_home) / "sessions")
-    home = os.environ.get("HOME", "").strip()
-    if home:
-        candidates.append(Path(home) / ".codex" / "sessions")
-    roots = {candidate.resolve() for candidate in candidates if candidate.is_dir()}
-    return tuple(sorted(roots, key=lambda path: path.as_posix().encode("utf-8")))
+    """Return the session root explicitly supplied by the runtime owner.
+
+    Runtime-log collection is allowed to consume only a container-local or
+    otherwise explicitly owned session root. HOME and CODEX_HOME are
+    intentionally not consulted because they can silently identify host state.
+    """
+    configured = os.environ.get(RUNTIME_SESSION_ROOT_ENV, "").strip()
+    if not configured:
+        return ()
+    candidate = Path(configured)
+    if not candidate.is_absolute():
+        return ()
+    try:
+        root = candidate.resolve(strict=True)
+    except OSError:
+        return ()
+    if not root.is_dir():
+        return ()
+    return (root,)
 
 
 def _rollout_name_identity(path: Path) -> tuple[str, str] | None:

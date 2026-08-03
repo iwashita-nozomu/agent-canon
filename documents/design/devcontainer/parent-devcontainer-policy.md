@@ -87,7 +87,9 @@ default pack は zsh を選び、明示的な bash pack と smoke shell は bash
 runtime env は image、generated Compose、bootstrap/install の明示経路だけで供給し、
 zsh startup に parent environment の source を隠さない。関連する Compose-owned
 environment は `HOME`、`SHELL`、`AGENT_CANON_CONTAINER_USER`、
-`AGENT_CANON_RUNTIME_ROUTE` です。
+`AGENT_CANON_RUNTIME_ROUTE`、`AGENT_CANON_CODEX_SESSION_ROOT` です。後者は
+runtime-log ownerが利用するcontainer-local `/home/project/.codex/sessions` を
+指し、host `~/.codex` のmountやfallbackを意味しません。
 `HOME` は dedicated non-root userの `/home/project` であり、zsh startupはoptional
 host zshrcの有無にかかわらずimage-owned startup fileから開始します。
 standalone AgentCanon source layout では host `~/.zshrc`、parent environment mount、

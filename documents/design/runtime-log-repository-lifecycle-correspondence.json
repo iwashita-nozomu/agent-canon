@@ -38,25 +38,27 @@
   },
   "owner_stage": "implementation",
   "implementation_targets": [
-    {"path": "tools/agent_tools/log_repository_identity.py", "owner_stage": "implementation", "change_kind": "modify"},
-    {"path": "tools/agent_tools/runtime_log_archive_git.py", "owner_stage": "implementation", "change_kind": "modify"},
-    {"path": "tools/agent_tools/check_agent_canon_log_policy.py", "owner_stage": "implementation", "change_kind": "add"},
-    {"path": "tests/agent_tools/test_log_repository_lifecycle.py", "owner_stage": "validation", "change_kind": "modify"},
+    {"path": ".devcontainer/generate-runtime-compose.sh", "owner_stage": "implementation", "change_kind": "modify"},
+    {"path": "agent-canon-environment.toml", "owner_stage": "design", "change_kind": "modify"},
+    {"path": "agents/skills/agent-log-analysis.md", "owner_stage": "design", "change_kind": "modify"},
+    {"path": "documents/design/runtime-log-repository-lifecycle-correspondence.json", "owner_stage": "design", "change_kind": "modify"},
+    {"path": "documents/runtime/runtime-log-archive.md", "owner_stage": "design", "change_kind": "modify"},
+    {"path": "documents/tools/README.md", "owner_stage": "design", "change_kind": "modify"},
     {"path": "tests/agent_tools/test_runtime_log_archive_git.py", "owner_stage": "validation", "change_kind": "modify"},
-    {"path": "tests/agent_tools/test_agent_canon_log_policy.py", "owner_stage": "validation", "change_kind": "add"},
-    {"path": "documents/design/runtime-log-repository-lifecycle.md", "owner_stage": "design", "change_kind": "modify"},
-    {"path": "documents/runtime/runtime-log-archive-migration.md", "owner_stage": "design", "change_kind": "modify"},
-    {"path": "documents/design/runtime-log-repository-lifecycle-correspondence.json", "owner_stage": "design", "change_kind": "add"}
+    {"path": "tests/tools/test_container_config.py", "owner_stage": "validation", "change_kind": "modify"},
+    {"path": "tests/tools/test_run_codex_in_repo_container.py", "owner_stage": "validation", "change_kind": "modify"},
+    {"path": "tools/agent_tools/runtime_log_archive_git.py", "owner_stage": "implementation", "change_kind": "modify"},
+    {"path": "tools/ci/run_codex_in_repo_container.py", "owner_stage": "implementation", "change_kind": "modify"}
   ],
-  "implementation_targets_sha256": "62f84084c4d19fdf5e82baceeacdaa2329b507af8bb2c1d36cea35dedb91364b",
+  "implementation_targets_sha256": "9dfd6e261893aa1d0453097df31f240839ef5dcba007f0326419042669ca9d42",
   "validation_route": [
-    {"argv": ["python3", "-m", "unittest", "tests.agent_tools.test_log_repository_lifecycle"], "cwd": ".", "owner_stage": "validation"},
-    {"argv": ["python3", "-m", "unittest", "tests.agent_tools.test_agent_canon_log_policy"], "cwd": ".", "owner_stage": "validation"},
-    {"argv": ["python3", "-m", "unittest", "tests.agent_tools.test_runtime_log_archive_git.RuntimeLogArchiveGitTest.test_legacy_delete_waits_for_remote_readback_and_retains_on_failure"], "cwd": ".", "owner_stage": "validation"},
-    {"argv": ["python3", "-m", "unittest", "tests.agent_tools.test_runtime_log_archive_git.RuntimeLogArchiveGitTest.test_normal_sync_and_push_have_no_source_delete_authority"], "cwd": ".", "owner_stage": "validation"},
-    {"argv": ["python3", "-m", "unittest", "tests.agent_tools.test_runtime_log_archive_git.RuntimeLogArchiveGitTest.test_preflight_and_internal_transaction_order_is_explicit"], "cwd": ".", "owner_stage": "validation"},
-    {"argv": ["python3", "tools/agent_tools/check_agent_canon_log_policy.py", "--commit", "9f10130184539beaebe8991bbcfb5665d476fbe5"], "cwd": ".", "owner_stage": "validation"}
+    {"argv": ["python3", "-m", "pytest", "-q", "tests/agent_tools/test_runtime_log_archive_git.py", "-k", "context_discovery"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["python3", "-m", "pytest", "-q", "tests/tools/test_container_config.py", "tests/tools/test_run_codex_in_repo_container.py"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["bash", "-n", ".devcontainer/generate-runtime-compose.sh"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["bash", "tools/agent_tools/check_dependency_header_format.sh", "--root", ".", "--changed"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["tools/bin/agent-canon", "docs", "check", "documents/runtime/runtime-log-archive.md", "documents/tools/README.md", "agents/skills/agent-log-analysis.md"], "cwd": ".", "owner_stage": "validation"},
+    {"argv": ["git", "diff", "--check"], "cwd": ".", "owner_stage": "validation"}
   ],
-  "validation_route_sha256": "f4228570641835c897cef9c285ecbe2b65e92a4d9ed5ea268bec3dc65533d2bc",
+  "validation_route_sha256": "cf32425c68b1a1f0ee35178bfc802e81080fcbf60526e306736751be63e12ec7",
   "state": "review_ready"
 }
