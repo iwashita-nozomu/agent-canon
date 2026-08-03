@@ -165,6 +165,10 @@ The standalone AgentCanon source owns the real `tools/` directory. In a template
 or derived parent repository, Root `tools/` is a parent-owned regular container,
 and its shared-canon child is the single symlink
 `tools/agent-canon -> ../vendor/agent-canon/tools`.
+The standalone source materializes the same public namespace as the tracked
+self-view `tools/agent-canon -> .`; this is an alias to the source-owned `tools/`
+tree, not a second implementation surface. Parent root projection changes only
+the symlink target to `../vendor/agent-canon/tools`.
 
 Parent repositories call shared tooling through the explicit AgentCanon
 namespace, such as

@@ -169,22 +169,36 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         """Run the public sync check in an isolated standalone source clone."""
         with tempfile.TemporaryDirectory() as workspace:
             clone = Path(workspace) / "agent-canon"
+            copy_ignore = shutil.ignore_patterns(
+                ".git",
+                ".agent-canon",
+                "__pycache__",
+                ".pytest_cache",
+                ".ruff_cache",
+            )
+
+            def ignore_standalone_public_view(
+                directory: str, names: list[str]
+            ) -> set[str]:
+                """Avoid following the source self-view while copying the fixture."""
+                ignored = set(copy_ignore(directory, names))
+                if Path(directory).resolve() == (PROJECT_ROOT / "tools").resolve():
+                    ignored.add("agent-canon")
+                return ignored
+
             shutil.copytree(
                 PROJECT_ROOT,
                 clone,
                 symlinks=True,
-                ignore=shutil.ignore_patterns(
-                    ".git",
-                    ".agent-canon",
-                    "__pycache__",
-                    ".pytest_cache",
-                    ".ruff_cache",
-                ),
+                ignore=ignore_standalone_public_view,
             )
             subprocess.run(["git", "init", "-q"], cwd=clone, check=True)
             (clone / "tools" / "agent-canon").symlink_to(
                 ".", target_is_directory=True
             )
+            public_view = clone / "tools" / "agent-canon"
+            self.assertTrue(public_view.is_symlink())
+            self.assertEqual(os.readlink(public_view), ".")
             script = clone / "tools" / "sync_agent_canon.sh"
             self.assertEqual(script.stat().st_mode & stat.S_IXUSR, stat.S_IXUSR)
             result = subprocess.run(

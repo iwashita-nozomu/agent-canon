@@ -39,11 +39,11 @@ downstream implementation ../rust/agent-canon/src/test_design.rs runs test desig
 @dependency-end
 -->
 
-The standalone AgentCanon source owns the real `tools/` directory. In a
-template or derived parent repository, root `tools/` is a parent-owned regular
-container and `tools/agent-canon -> ../vendor/agent-canon/tools` is the single
-shared-tool view. These paths must not become separate AgentCanon ownership
-surfaces.
+The standalone AgentCanon source owns the real `tools/` directory and carries
+the tracked public self-view `tools/agent-canon -> .`. In a template or derived
+parent repository, root `tools/` is a parent-owned regular container and
+`tools/agent-canon -> ../vendor/agent-canon/tools` is the single shared-tool
+view. These paths must not become separate AgentCanon ownership surfaces.
 
 Shared agent helper, CI/check, container runner, experiment helper, Markdown
 maintenance, and validation tools live in the standalone source `tools/` and
