@@ -513,6 +513,14 @@
       "order": 63,
       "enabled": true,
       "host_config_entry_digest": "d58afb7f316511f560de5f666d7423d0aacaf786e3da422b829e77d04f027654"
+    },
+    {
+      "skill_id": "parent-repository-audit",
+      "path": "../.agents/skills/parent-repository-audit/SKILL.md",
+      "index": 64,
+      "order": 64,
+      "enabled": true,
+      "host_config_entry_digest": "ff94391182c533372064a1233f788f4ae42b8bc710796debfd7f8562e80e4bac"
     }
   ]
 }

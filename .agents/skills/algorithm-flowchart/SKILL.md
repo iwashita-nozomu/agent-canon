@@ -2,7 +2,7 @@
 name: algorithm-flowchart
 description: "Use when rendering JIT-canonical IR records, generated Lean evidence modules, and theorem-graph proof overlays into Mermaid block charts that show the implemented iterative algorithm and proof state."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"adbd6a80bab8864fe00746ef164eacd1558165717d434d8faf8601f754d5b3f2"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"9d1a7737cbfcd5fd589b2719c5ba501e3de4132de81ecf52ac8093571b6fb410"} -->
 
 <!--
 @dependency-start

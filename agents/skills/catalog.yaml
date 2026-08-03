@@ -1421,6 +1421,36 @@ skill_families:
         - ["古い", "ツール"]
         - ["旧", "文書"]
         - ["生成", "文書"]
+  - id: parent-repository-audit
+    purpose: Audit a complete parent tracked tree by canonical responsibility units and close findings through owner repair and readback.
+    canonical_doc: agents/skills/parent-repository-audit.md
+    shim: .agents/skills/parent-repository-audit/SKILL.md
+    discovery:
+      name: parent-repository-audit
+      description: "Use when auditing an AgentCanon-consuming parent repository across structure, ownership, environment, dependencies, code and types, OOP, tests, docs and design trace, CI/hooks/skills, templates, or Git/PR lifecycle, with owner-routed repair and finding closure."
+    tool_commands:
+      required:
+      - python3 tools/agent_tools/parent_repository_audit.py list --root <parent-root> --format text
+      conditional:
+      - python3 tools/agent_tools/parent_repository_audit.py check --root <parent-root> --format text
+      - python3 tools/agent_tools/skill_tool_commands.py show --skill parent-repository-audit --format json
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: parent repository audit capability requires deterministic unit selection and owner-routed finding closure
+      capabilities:
+      - id: parent_repository_audit
+        owner: parent_repository_audit
+        phase: repo_changing_audit
+        activation: explicit_capability
+        exclusive: true
+      triggers:
+        - ["親レポ", "監査"]
+        - ["parent repository", "audit"]
+        - ["repository", "audit", "repair"]
+        - ["監査", "finding", "修正"]
   - id: dependency-analysis
     visualization_owner: code-visualization
     visualization_role: adapter
