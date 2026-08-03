@@ -15,6 +15,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import os
 import subprocess
 import sys
@@ -48,6 +50,94 @@ def run_tool(*args: str, root: Path) -> subprocess.CompletedProcess[str]:
 
 class DependencyManifestToolTest(unittest.TestCase):
     """Exercise the dependency manifest shell tools."""
+
+    @staticmethod
+    def git_output(root: Path, *args: str) -> str:
+        """Run one successful Git fixture command."""
+        result = subprocess.run(
+            ["git", *args],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+
+    def changed_header_fixture(
+        self,
+        root: Path,
+        base_files: dict[str, str],
+        head_files: dict[str, str],
+    ) -> tuple[str, str]:
+        """Create a two-commit fixture for trusted changed-path scans."""
+        subprocess.run(
+            ["git", "init", "-b", "main"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.git_output(root, "config", "user.email", "headers@example.invalid")
+        self.git_output(root, "config", "user.name", "Header Fixture")
+        for relative, content in base_files.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        self.git_output(root, "add", "-A")
+        self.git_output(root, "commit", "-m", "base")
+        base = self.git_output(root, "rev-parse", "HEAD")
+        for relative in set(base_files) - set(head_files):
+            (root / relative).unlink()
+        for relative, content in head_files.items():
+            path = root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        self.git_output(root, "add", "-A")
+        self.git_output(root, "commit", "-m", "head")
+        return base, self.git_output(root, "rev-parse", "HEAD")
+
+    def write_changed_path_packet(
+        self,
+        root: Path,
+        base: str,
+        packet_path: Path,
+        changed_paths: list[str] | None = None,
+        root_value: str | None = None,
+    ) -> None:
+        """Write selector-compatible trusted path evidence for a fixture."""
+        head = self.git_output(root, "rev-parse", "HEAD")
+        actual_paths = self.git_output(
+            root, "diff", "--name-only", f"{base}...{head}", "--"
+        ).splitlines()
+        paths = actual_paths if changed_paths is None else changed_paths
+        packet = {
+            "schema": "agent-canon.pr-changed-paths.v1",
+            "root": str(root.resolve()) if root_value is None else root_value,
+            "base_sha": base,
+            "base_source": "fixture",
+            "base_tree": self.git_output(root, "rev-parse", f"{base}^{{tree}}"),
+            "head_sha": head,
+            "head_tree": self.git_output(root, "rev-parse", f"{head}^{{tree}}"),
+            "merge_base": self.git_output(root, "merge-base", base, head),
+            "changed_paths": paths,
+            "changed_paths_sha256": hashlib.sha256(
+                "\0".join(paths).encode("utf-8")
+            ).hexdigest(),
+        }
+        packet_path.write_text(
+            json.dumps(packet, sort_keys=True) + "\n", encoding="utf-8"
+        )
+
+    @staticmethod
+    def valid_header(label: str) -> str:
+        """Return one minimal registered dependency manifest."""
+        return (
+            "<!--\n"
+            "@dependency-start\n"
+            "contract test\n"
+            f"responsibility Defines {label}.\n"
+            "@dependency-end\n"
+        )
 
     def test_scan_reports_missing_manifest(self) -> None:
         """The scan tool reports missing markers and can fail on request."""
@@ -88,6 +178,269 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("MISSING_DEPENDENCY_MANIFEST=doc.md", result.stdout)
             self.assertIn("realpath=doc.md", result.stdout)
             self.assertIn("owner=product_file", result.stdout)
+
+    def test_trusted_packet_reports_unchanged_missing_as_baseline(self) -> None:
+        """Unchanged missing headers are evidence and do not fail the PR scan."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, _ = self.changed_header_fixture(
+                root,
+                {
+                    "README.md": self.valid_header("stable readme"),
+                    "unchanged.md": "# Existing missing header\n",
+                },
+                {
+                    "README.md": self.valid_header("stable readme"),
+                    "unchanged.md": "# Existing missing header\n",
+                    "changed.md": self.valid_header("changed source"),
+                },
+            )
+            packet = root / "changed-paths.json"
+            self.write_changed_path_packet(root, base, packet)
+
+            result = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_BASELINE=1", result.stdout)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_BLOCKING=0", result.stdout)
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_BASELINE_MISSING_PATH=unchanged.md",
+                result.stdout,
+            )
+            self.assertIn("DEPENDENCY_HEADER_SCAN=pass", result.stdout)
+
+    def test_trusted_packet_blocks_changed_missing_header(self) -> None:
+        """A changed product file without a manifest remains a blocking failure."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, _ = self.changed_header_fixture(
+                root,
+                {"changed.md": self.valid_header("base source")},
+                {"changed.md": "# Header removed in the PR\n"},
+            )
+            packet = root / "changed-paths.json"
+            self.write_changed_path_packet(root, base, packet)
+
+            result = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_BLOCKING=1", result.stdout)
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_CHANGED_MISSING_PATH=changed.md",
+                result.stdout,
+            )
+            self.assertIn("DEPENDENCY_HEADER_SCAN=fail", result.stdout)
+
+    def test_trusted_packet_blocks_new_missing_header(self) -> None:
+        """A newly added product file without a manifest is blocking."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, _ = self.changed_header_fixture(
+                root,
+                {"README.md": self.valid_header("stable readme")},
+                {
+                    "README.md": self.valid_header("stable readme"),
+                    "new.md": "# New source without a manifest\n",
+                },
+            )
+            packet = root / "changed-paths.json"
+            self.write_changed_path_packet(root, base, packet)
+
+            result = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_CHANGED_MISSING_PATH=new.md",
+                result.stdout,
+            )
+            self.assertIn("DEPENDENCY_HEADER_SCAN=fail", result.stdout)
+
+    def test_trusted_packet_changed_valid_header_passes(self) -> None:
+        """A changed product file with a valid manifest passes the strict scan."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, _ = self.changed_header_fixture(
+                root,
+                {"changed.md": "# Base source\n"},
+                {"changed.md": self.valid_header("changed source")},
+            )
+            packet = root / "changed-paths.json"
+            self.write_changed_path_packet(root, base, packet)
+
+            result = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_MISSING=0", result.stdout)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_BLOCKING=0", result.stdout)
+
+    def test_trusted_packet_deleted_file_is_skipped(self) -> None:
+        """A deleted path from the trusted diff is not scanned as a head file."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, _ = self.changed_header_fixture(
+                root,
+                {
+                    "README.md": self.valid_header("stable readme"),
+                    "deleted.md": "# Deleted source was missing\n",
+                },
+                {"README.md": self.valid_header("stable readme")},
+            )
+            packet = root / "changed-paths.json"
+            self.write_changed_path_packet(root, base, packet)
+
+            result = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_SKIPPED=1", result.stdout)
+            self.assertIn("DEPENDENCY_HEADER_SCAN_MISSING=0", result.stdout)
+
+    def test_trusted_packet_missing_or_wrong_fails_closed(self) -> None:
+        """Missing and mismatched trusted path packets cannot widen the scan."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, head = self.changed_header_fixture(
+                root,
+                {"changed.md": self.valid_header("base source")},
+                {"changed.md": self.valid_header("changed source")},
+            )
+            missing = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(root / "missing.json"),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+            self.assertNotEqual(missing.returncode, 0)
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_REASON=changed_path_packet_missing_or_wrong_type",
+                missing.stdout,
+            )
+
+            wrong = root / "wrong.json"
+            self.write_changed_path_packet(root, base, wrong, changed_paths=[])
+            mismatched = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(wrong),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+            self.assertNotEqual(mismatched.returncode, 0)
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_REASON=changed_path_packet_paths_mismatch",
+                mismatched.stdout,
+            )
+
+            packet = root / "packet.json"
+            self.write_changed_path_packet(root, base, packet)
+            substituted = run_tool(
+                str(SCAN),
+                "--root",
+                str(root),
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                head,
+                root=root,
+            )
+            self.assertNotEqual(substituted.returncode, 0)
+            self.assertIn(
+                "DEPENDENCY_HEADER_SCAN_REASON=changed_path_packet_trusted_base_mismatch",
+                substituted.stdout,
+            )
+
+    def test_repo_review_header_scan_only_runs_without_graph_executable(self) -> None:
+        """The trusted header gate is independent from graph-selection readiness."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base, _ = self.changed_header_fixture(
+                root,
+                {"changed.md": self.valid_header("base source")},
+                {"changed.md": self.valid_header("changed source")},
+            )
+            tool_dir = root / "tools" / "agent_tools"
+            tool_dir.mkdir(parents=True)
+            (tool_dir / "run_repo_dependency_review.sh").symlink_to(REPO_REVIEW)
+            (tool_dir / "scan_dependency_headers.sh").symlink_to(SCAN)
+            (tool_dir / "check_dependency_header_format.sh").symlink_to(FORMAT)
+            packet = root / "changed-paths.json"
+            self.write_changed_path_packet(root, base, packet)
+
+            result = run_tool(
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--header-scan-only",
+                "--fail-missing",
+                "--changed-path-packet",
+                str(packet),
+                "--trusted-base-sha",
+                base,
+                root=root,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_SCAN=pass", result.stdout)
+            self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
 
     def test_scan_accepts_large_file_with_manifest_markers_near_top(self) -> None:
         """Early marker matches in large files must not trip pipefail/SIGPIPE."""
@@ -331,7 +684,12 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
             subprocess.run(
-                ["git", "add", "documents/design/feature.md", "tools/feature_runner.py"],
+                [
+                    "git",
+                    "add",
+                    "documents/design/feature.md",
+                    "tools/feature_runner.py",
+                ],
                 cwd=root,
                 check=True,
                 capture_output=True,
@@ -353,7 +711,9 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("DESIGN_DOC_CLAIMS=pass", result.stdout)
             self.assertIn("REPO_DEPENDENCY_REVIEW=pass", result.stdout)
 
-    def test_repo_review_design_claim_checker_defaults_to_changed_design_docs(self) -> None:
+    def test_repo_review_design_claim_checker_defaults_to_changed_design_docs(
+        self,
+    ) -> None:
         """Wrapper claim checks stay migration-safe for legacy design backlog."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -476,7 +836,12 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
             subprocess.run(
-                ["git", "add", "documents/design/feature.md", "tools/feature_runner.py"],
+                [
+                    "git",
+                    "add",
+                    "documents/design/feature.md",
+                    "tools/feature_runner.py",
+                ],
                 cwd=root,
                 check=True,
                 capture_output=True,
@@ -558,9 +923,9 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "\n".join(
                     [
                         "[project]",
-                        "dependencies = [\"requests>=2\"]",
+                        'dependencies = ["requests>=2"]',
                         "[project.optional-dependencies]",
-                        "dev = [\"pytest>=8\"]",
+                        'dev = ["pytest>=8"]',
                         "",
                     ]
                 ),
@@ -584,14 +949,16 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("PYPROJECT_RUNTIME_DEPENDENCIES=1", result.stdout)
             self.assertIn("PYPROJECT_DOCKER_RUNTIME_MISSING=0", result.stdout)
 
-    def test_requirement_sync_fails_when_runtime_dependency_missing_from_docker(self) -> None:
+    def test_requirement_sync_fails_when_runtime_dependency_missing_from_docker(
+        self,
+    ) -> None:
         """Runtime package declarations in pyproject must be present in docker requirements."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "python").mkdir()
             (root / "docker").mkdir()
             (root / "pyproject.toml").write_text(
-                "[project]\ndependencies = [\"requests>=2\"]\n",
+                '[project]\ndependencies = ["requests>=2"]\n',
                 encoding="utf-8",
             )
             (root / "docker" / "requirements.txt").write_text("", encoding="utf-8")
@@ -622,7 +989,9 @@ class DependencyManifestToolTest(unittest.TestCase):
             (root / "tools" / "ci").mkdir(parents=True)
             (vendor / "tools" / "agent_tools").mkdir(parents=True)
             (vendor / ".devcontainer").mkdir()
-            (vendor / "tools" / "agent_tools" / "devcontainer_dependencies.py").symlink_to(
+            (
+                vendor / "tools" / "agent_tools" / "devcontainer_dependencies.py"
+            ).symlink_to(
                 PROJECT_ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
             )
             for relative in (
@@ -762,8 +1131,10 @@ class DependencyManifestToolTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "documents" / "design").mkdir(parents=True)
-            (root / "documents" / "design" / "dependency-contract-kinds.toml").write_text(
-                "allowed_kinds = [\n  \"test\"\n]\n",
+            (
+                root / "documents" / "design" / "dependency-contract-kinds.toml"
+            ).write_text(
+                'allowed_kinds = [\n  "test"\n]\n',
                 encoding="utf-8",
             )
             issue = root / "issues" / "closed" / "AC-1.md"
@@ -918,7 +1289,9 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("exactly one contract line", result.stdout)
             self.assertIn("fix: add 'contract <registered-kind>'", result.stdout)
-            self.assertIn("documents/design/dependency-contract-kinds.toml", result.stdout)
+            self.assertIn(
+                "documents/design/dependency-contract-kinds.toml", result.stdout
+            )
             self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
 
     def test_format_rejects_unregistered_contract_kind(self) -> None:
@@ -956,7 +1329,9 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("unregistered contract kind", result.stdout)
             self.assertIn("fix: use an existing allowed_kinds entry", result.stdout)
-            self.assertIn("documents/design/dependency-contract-kinds.toml", result.stdout)
+            self.assertIn(
+                "documents/design/dependency-contract-kinds.toml", result.stdout
+            )
             self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
 
     def test_format_accepts_skill_frontmatter_before_html_manifest(self) -> None:
@@ -1023,7 +1398,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                         "# upstream design target.md target context",
                         "# @dependency-end",
                         "[tool.demo]",
-                        'enabled = true',
+                        "enabled = true",
                         "",
                     ]
                 ),
@@ -1156,7 +1531,9 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "symlink=0 submodule_source=1 other=0",
                 result.stdout,
             )
-            self.assertIn("MISSING_DEPENDENCY_EXPLANATION_BEGIN=product.md", result.stdout)
+            self.assertIn(
+                "MISSING_DEPENDENCY_EXPLANATION_BEGIN=product.md", result.stdout
+            )
             self.assertIn(
                 "missing_start_and_end_markers_in_first_80_lines",
                 result.stdout,
@@ -1419,9 +1796,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                     encoding="utf-8",
                 )
                 source_paths.append(relative_source)
-                expected_edges.add(
-                    f"upstream\tdesign\t{relative_source}\tdesign.md"
-                )
+                expected_edges.add(f"upstream\tdesign\t{relative_source}\tdesign.md")
             graph_tsv = root / "reports" / "dependency_graph.tsv"
 
             result = run_tool(
@@ -1584,13 +1959,18 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertTrue((report_dir / "dependency_graph.tsv").is_file())
             self.assertTrue((report_dir / "dependency_edit_scope.txt").is_file())
-            self.assertIn("direction\tkind\tsource\ttarget", (report_dir / "dependency_graph.tsv").read_text(encoding="utf-8"))
+            self.assertIn(
+                "direction\tkind\tsource\ttarget",
+                (report_dir / "dependency_graph.tsv").read_text(encoding="utf-8"),
+            )
             self.assertIn(
                 "DEPENDENCY_EDIT_SCOPE_PATH role=search_hit path=source.md",
                 (report_dir / "dependency_edit_scope.txt").read_text(encoding="utf-8"),
             )
 
-    def test_repo_review_report_dir_without_search_hits_records_changed_scope(self) -> None:
+    def test_repo_review_report_dir_without_search_hits_records_changed_scope(
+        self,
+    ) -> None:
         """Report-dir dependency review persists changed-file edit scope by default."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -2334,7 +2714,9 @@ class DependencyManifestToolTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            artifact = root / "reports" / "dependency-review" / "run" / "search_hits.txt"
+            artifact = (
+                root / "reports" / "dependency-review" / "run" / "search_hits.txt"
+            )
             artifact.parent.mkdir(parents=True)
             artifact.write_text("source.md\n", encoding="utf-8")
             subprocess.run(
@@ -2361,7 +2743,9 @@ class DependencyManifestToolTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("REPO_DEPENDENCY_REVIEW_PATHS=2", result.stdout)
-            self.assertNotIn("reports/dependency-review/run/search_hits.txt", result.stdout)
+            self.assertNotIn(
+                "reports/dependency-review/run/search_hits.txt", result.stdout
+            )
 
     def test_repo_review_records_monitoring_when_report_dir_is_given(self) -> None:
         """The review wrapper records monitoring evidence when directed to a run."""

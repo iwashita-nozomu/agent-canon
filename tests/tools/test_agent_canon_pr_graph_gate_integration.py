@@ -128,6 +128,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 raise SystemExit(0)
             root = Path(args[args.index("--root") + 1]).resolve()
             scenario = os.environ["GRAPH_GATE_FIXTURE_SCENARIO"]
+            producer_identity = json.loads(
+                args[args.index("--surface-manifest-producer-identity") + 1]
+            )
             source_path = "related.py" if scenario == "reachable" else "legacy.py"
             graph_dir = root / ".agent-canon" / "knowledge-graph"
             graph_dir.mkdir(parents=True, exist_ok=True)
@@ -155,6 +158,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "snapshot_head": snapshot_head,
                 "input_fingerprint": input_fingerprint,
                 "graph_fingerprint": graph_fingerprint,
+                "producer_identity": producer_identity,
                 "contract_fingerprint": "fixture",
                 "producer_artifacts": [],
                 "runtime_evidence": None,
@@ -196,6 +200,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                     )
                 for key, value in (
                     ("integration_record", json.dumps(persisted_record)),
+                    ("producer_identity", json.dumps(producer_identity)),
                     ("snapshot_head", snapshot_head),
                     ("input_fingerprint", input_fingerprint),
                     ("graph_fingerprint", graph_fingerprint),
@@ -212,6 +217,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "db_path": str(database),
                 "input_fingerprint": input_fingerprint,
                 "graph_fingerprint": graph_fingerprint,
+                "producer_identity": producer_identity,
                 "integration_record": integration_record,
                 "publication": "published",
                 "durability": "durable",
@@ -232,7 +238,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             elif scenario == "stale_fingerprint":
                 result["input_fingerprint"] = "3" * 64
             print(json.dumps(result))
-            raise SystemExit(1 if has_diagnostic else 0)
+            raise SystemExit(
+                2 if scenario == "hard_failure" else 1 if has_diagnostic else 0
+            )
             """,
         )
         write_executable(
@@ -254,15 +262,26 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             """
             #!/usr/bin/env bash
             receipt="${@: -1}"
-            grep -q '^graph=scoped$' "${receipt}" || exit 91
+            grep -Eq '^graph=(scoped|skipped|prepared)$' "${receipt}" || exit 91
             cp "${receipt}" "${AGENT_CANON_PR_TEMP_ROOT}/consumed.receipt"
-            echo 'QUICK_CI_RECEIPT_GRAPH=scoped'
+            echo "QUICK_CI_RECEIPT_GRAPH=$(awk -F= '$1 == \"graph\" {print $2}' \"${receipt}\")"
             """,
         )
         write_executable(
             source / "tools" / "agent_tools" / "run_repo_dependency_review.sh",
             """
             #!/usr/bin/env bash
+            if [[ "$*" == *"--header-scan-only"* \
+                && "$*" == *"--changed-path-packet"* \
+                && "$*" == *"--trusted-base-sha"* ]]; then
+                echo 'HEADER_SCAN_REVIEW_CALLED'
+                exit 0
+            fi
+            if [[ "$*" == *"--changed-path-packet"* \
+                && "$*" == *"--trusted-base-sha"* ]]; then
+                echo 'REPO_DEPENDENCY_REVIEW_CALLED'
+                exit 0
+            fi
             echo 'REPO_DEPENDENCY_REVIEW_CALLED'
             exit 99
             """,
@@ -279,11 +298,21 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
         generic_python = "raise SystemExit(0)\n"
         for relative in (
+            "tools/agent_tools/tool_drift.py",
+            "tools/agent_tools/tool_catalog.py",
+            "tools/agent_tools/tool_proof_coverage.py",
+            "tools/agent_tools/responsibility_scope.py",
+            "tools/agent_tools/import_responsibility.py",
+            "tools/agent_tools/issue_sync.py",
+            "tools/agent_tools/run_accumulated_agent_evals.py",
+            "tools/agent_tools/eval_accumulation_check.py",
             "tools/agent_tools/check_convention_compliance.py",
             "tools/agent_tools/check_agent_runtime_alignment.py",
             "tools/agent_tools/evaluate_codex_agent_roles.py",
             "tools/agent_tools/evaluate_skill_workflow_prompts.py",
             "tools/agent_tools/generated_artifact_guard.py",
+            "tools/agent_tools/smoke_test_research_perspective_pack.py",
+            "tools/agent_tools/skill_tool_commands.py",
             "tools/agent_tools/render_dependency_manifest_graph.py",
             "tools/ci/check_github_workflows.py",
             "tools/ci/container_config.py",
@@ -296,7 +325,13 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         run(source, "git", "commit", "-m", "fixture source")
         return source
 
-    def create_parent_repo(self, root: Path, source: Path) -> tuple[Path, str]:
+    def create_parent_repo(
+        self,
+        root: Path,
+        source: Path,
+        *,
+        include_manifest: bool = True,
+    ) -> tuple[Path, str]:
         """Create a template-like parent with one manifest-touching PR diff."""
         parent = root / "parent"
         parent.mkdir()
@@ -326,8 +361,8 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         run(parent, "git", "add", ".")
         run(parent, "git", "commit", "-m", "base")
         base = run(parent, "git", "rev-parse", "HEAD").stdout.strip()
-        (parent / "changed.py").write_text(
-            textwrap.dedent(
+        if include_manifest:
+            changed_content = textwrap.dedent(
                 """
                 # @dependency-start
                 # contract implementation
@@ -336,10 +371,18 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 # @dependency-end
                 after
                 """
-            ).lstrip(),
-            encoding="utf-8",
+            ).lstrip()
+        else:
+            changed_content = "after\n"
+            (parent / "new.py").write_text("new source\n", encoding="utf-8")
+        (parent / "changed.py").write_text(changed_content, encoding="utf-8")
+        run(
+            parent,
+            "git",
+            "add",
+            "changed.py",
+            "new.py" if not include_manifest else ".",
         )
-        run(parent, "git", "add", "changed.py")
         run(parent, "git", "commit", "-m", "change manifest")
         return parent, base
 
@@ -350,7 +393,11 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         fixture_root = Path(tempfile.mkdtemp(prefix=f"graph-gate-{scenario}-"))
         self.addCleanup(shutil.rmtree, fixture_root)
         source = self.create_source_repo(fixture_root)
-        parent, base = self.create_parent_repo(fixture_root, source)
+        parent, base = self.create_parent_repo(
+            fixture_root,
+            source,
+            include_manifest=scenario != "no_manifest",
+        )
         fake_bin = fixture_root / "bin"
         write_executable(
             fake_bin / "gh",
@@ -423,6 +470,99 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertEqual(
             payload["blocking_diagnostics"][0]["classification"],
             "changed_responsibility",
+        )
+
+    def test_real_pr_check_runs_header_scan_when_graph_selection_skips(self) -> None:
+        """Changed/new files without manifests still reach the trusted header scan."""
+        result, state = self.run_pr_check("no_manifest")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("HEADER_SCAN_REVIEW_CALLED", result.stdout)
+        self.assertIn(
+            "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required", result.stdout
+        )
+        self.assertIn(
+            "graph=skipped",
+            (state / "consumed.receipt").read_text(encoding="utf-8"),
+        )
+
+    def test_standalone_ordinary_change_runs_full_graph_gate(self) -> None:
+        """Standalone AgentCanon owns full graph completeness even on ordinary changes."""
+        fixture_root = Path(tempfile.mkdtemp(prefix="graph-gate-standalone-"))
+        self.addCleanup(shutil.rmtree, fixture_root)
+        source = self.create_source_repo(fixture_root)
+        shutil.copy2(PR_CHECK, source / "tools" / "ci" / PR_CHECK.name)
+        repo_paths = source / "tools" / "lib" / REPO_PATHS.name
+        repo_paths.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_PATHS, repo_paths)
+        ordinary = source / "changed.py"
+        ordinary.write_text("before\n", encoding="utf-8")
+        run(
+            source,
+            "git",
+            "add",
+            "changed.py",
+            "tools/ci/check_agent_canon_pr.sh",
+            "tools/lib/repo_paths.sh",
+        )
+        run(source, "git", "commit", "-m", "standalone base")
+        base = run(source, "git", "rev-parse", "HEAD").stdout.strip()
+        ordinary.write_text("after\n", encoding="utf-8")
+        run(source, "git", "add", "changed.py")
+        run(source, "git", "commit", "-m", "ordinary change")
+
+        fake_bin = fixture_root / "bin"
+        write_executable(
+            fake_bin / "cargo",
+            """
+            #!/usr/bin/env bash
+            exit 0
+            """,
+        )
+        write_executable(
+            fake_bin / "gh",
+            """
+            #!/usr/bin/env bash
+            exit 1
+            """,
+        )
+        temp_root = fixture_root / "standalone-pr-check-state"
+        temp_root.mkdir()
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "PATH": f"{fake_bin}:{environment['PATH']}",
+                "AGENT_CANON_PR_BASE_REF": base,
+                "AGENT_CANON_PR_TEMP_ROOT": str(temp_root),
+                "GRAPH_GATE_FIXTURE_SCENARIO": "standalone",
+            }
+        )
+        result = run(
+            source,
+            "bash",
+            "tools/ci/check_agent_canon_pr.sh",
+            check=False,
+            environment=environment,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "AGENT_CANON_PR_DEPENDENCY_GRAPH=required reason=standalone_source",
+            result.stdout,
+        )
+        self.assertIn("REPO_DEPENDENCY_REVIEW_CALLED", result.stdout)
+        self.assertIn('"status": "fresh"', result.stdout)
+        self.assertNotIn(
+            "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required", result.stdout
+        )
+
+    def test_real_pr_check_runs_header_scan_before_hard_graph_failure(self) -> None:
+        """Trusted changed paths reach header scanning even when graph build fails hard."""
+        result, _ = self.run_pr_check("hard_failure")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("HEADER_SCAN_REVIEW_CALLED", result.stdout)
+        self.assertIn(
+            "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=graph_build_failed rc=2",
+            result.stdout,
         )
 
     def test_real_pr_check_rejects_missing_or_stale_graph_identity(self) -> None:

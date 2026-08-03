@@ -45,6 +45,7 @@ FULL_HISTORY_DEEPEN = "2147483647"
 GRAPH_PROFILE = "default"
 PRODUCER_IDENTITY_VERSION = "agent-canon.surface-manifest-producer.v1"
 PRODUCER_IDENTITY_CONTRACT = "agent-canon.surface-manifest.v1"
+CHANGED_PATH_PACKET_SCHEMA = "agent-canon.pr-changed-paths.v1"
 
 
 class SelectorFailure(RuntimeError):
@@ -286,6 +287,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--producer-identity",
         action="store_true",
         help="Print the authorized current producer identity as compact JSON.",
+    )
+    parser.add_argument(
+        "--changed-path-packet",
+        help="Write trusted base/head changed-path evidence for canonical scans.",
     )
     return parser
 
@@ -737,6 +742,52 @@ def changed_paths_digest(paths: Sequence[str]) -> str:
     """Return a stable digest for exact changed-path evidence."""
     payload = "\0".join(paths).encode("utf-8", errors="surrogateescape")
     return hashlib.sha256(payload).hexdigest()
+
+
+def write_changed_path_packet(
+    root: Path,
+    diff: DiffEvidence,
+    packet_path: Path,
+) -> None:
+    """Persist the selector-owned trusted base/head path evidence."""
+    merge_base = git_output(
+        root,
+        ["merge-base", diff.base_sha, diff.head_sha],
+        "pr_changed_paths_merge_base_failed",
+    ).strip()
+    base_tree = git_output(
+        root,
+        ["rev-parse", "--verify", "--end-of-options", f"{diff.base_sha}^{{tree}}"],
+        "pr_base_tree_unresolved",
+    ).strip()
+    head_tree = git_output(
+        root,
+        ["rev-parse", "--verify", "--end-of-options", f"{diff.head_sha}^{{tree}}"],
+        "pr_head_tree_unresolved",
+    ).strip()
+    packet = {
+        "schema": CHANGED_PATH_PACKET_SCHEMA,
+        "root": str(root),
+        "base_sha": diff.base_sha,
+        "base_source": diff.base_source,
+        "base_tree": base_tree,
+        "head_sha": diff.head_sha,
+        "head_tree": head_tree,
+        "merge_base": merge_base,
+        "changed_paths": list(diff.changed_paths),
+        "changed_paths_sha256": changed_paths_digest(diff.changed_paths),
+    }
+    try:
+        packet_path.parent.mkdir(parents=True, exist_ok=True)
+        packet_path.write_text(
+            json.dumps(packet, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+    except OSError as error:
+        raise SelectorFailure(
+            "pr_changed_path_packet_write_failed",
+            f"path={packet_path};error={type(error).__name__}",
+        ) from error
 
 
 def path_is_changed(path: str, changed_paths: Sequence[str]) -> bool:
@@ -2047,10 +2098,13 @@ def select(
     source_root: Path,
     environment: Mapping[str, str],
     trusted_base_sha: str | None = None,
+    changed_path_packet: Path | None = None,
 ) -> Selection:
     """Return the strict graph selection for one parent PR."""
     source_root = authorized_source_root(source_root)
     diff = load_diff(root, environment, trusted_base_sha)
+    if changed_path_packet is not None:
+        write_changed_path_packet(root, diff, changed_path_packet)
     surfaces = dependency_surface_paths(source_root)
     profiles = load_profiles(source_root, environment)
     touched_surfaces = tuple(path for path in diff.changed_paths if path in surfaces)
@@ -2064,6 +2118,8 @@ def select(
         f"changed_paths_sha256={changed_paths_digest(diff.changed_paths)}",
         f"dependency_surface_owner={DEPENDENCY_SURFACE_OWNER.as_posix()}",
     ]
+    if changed_path_packet is not None:
+        evidence.append(f"changed_path_packet={changed_path_packet}")
     if explicit_migration:
         reasons.append("parent_graph_migration")
         evidence.append("migration=explicit")
@@ -2168,6 +2224,9 @@ def main() -> int:
             Path(args.source_root).resolve(),
             os.environ,
             args.trusted_base_sha,
+            Path(args.changed_path_packet).resolve()
+            if args.changed_path_packet
+            else None,
         )
     except SelectorFailure as error:
         emit("fail", error.reason, error.evidence)

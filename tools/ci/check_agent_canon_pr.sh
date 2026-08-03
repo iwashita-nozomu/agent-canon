@@ -154,6 +154,7 @@ run_agent_canon() {
 PR_GATE_DEPENDENCY_GRAPH_REASON=""
 PR_GATE_DEPENDENCY_GRAPH_EVIDENCE=""
 PR_GATE_DEPENDENCY_GRAPH_BASE_SHA=""
+PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET=""
 agentcanon_pr_dependency_graph_required() {
   local base_fetch_output=""
   local base_fetch_rc=0
@@ -162,16 +163,18 @@ agentcanon_pr_dependency_graph_required() {
   local selector_output=""
   local selector_rc=0
   local selector_status=""
+  mkdir -p "${PR_DEPENDENCY_REVIEW_DIR}"
+  PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET="${PR_DEPENDENCY_REVIEW_DIR}/changed-paths.json"
   local selector_args=(
     --root "${WORKSPACE_ROOT}"
     --source-root "${AGENT_CANON_SOURCE_ROOT}"
+    --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}"
   )
 
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
     echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=required reason=standalone_source"
     PR_GATE_DEPENDENCY_GRAPH_REASON="standalone_source"
     PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="source_root=${AGENT_CANON_SOURCE_ROOT}"
-    return 0
   fi
   if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
     if base_fetch_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
@@ -213,9 +216,20 @@ agentcanon_pr_dependency_graph_required() {
         echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail reason=selected_base_missing" >&2
         return 2
       fi
+      if [[ ! -f "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" ]]; then
+        echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail reason=changed_path_packet_missing" >&2
+        return 2
+      fi
       return 0
       ;;
-    10:skipped) return 1 ;;
+    10:skipped)
+      if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
+        PR_GATE_DEPENDENCY_GRAPH_REASON="standalone_source"
+        PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE};standalone_full_graph=yes"
+        return 0
+      fi
+      return 1
+      ;;
     *)
       echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail rc=${selector_rc} status=${selector_status:-missing}" >&2
       return 2
@@ -645,7 +659,12 @@ if agentcanon_pr_dependency_graph_required; then
     if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
       python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py"
     fi
-    bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
+    bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" \
+      --fail-missing \
+      --cycle-report-only \
+      --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
+      --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" \
+      --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
     python3 "${CANON_TOOLS_ROOT}/agent_tools/render_dependency_manifest_graph.py" \
       --root . \
       --scope full \
@@ -653,6 +672,12 @@ if agentcanon_pr_dependency_graph_required; then
       --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
     PR_GATE_DEPENDENCY_GRAPH_STATUS=prepared
   elif [[ "${graph_build_rc}" -eq 1 && "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
+    bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" \
+      --header-scan-only \
+      --fail-missing \
+      --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
+      --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" \
+      --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
     graph_acceptance_output=""
     graph_acceptance_rc=0
     graph_acceptance_args=(
@@ -688,6 +713,12 @@ if agentcanon_pr_dependency_graph_required; then
     PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE};graph_acceptance_reason=${graph_acceptance_reason};${graph_acceptance_evidence}"
     PR_GATE_DEPENDENCY_GRAPH_STATUS=scoped
   else
+    bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" \
+      --header-scan-only \
+      --fail-missing \
+      --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
+      --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" \
+      --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
     echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=graph_build_failed rc=${graph_build_rc}"
     exit "${graph_build_rc}"
   fi
@@ -697,6 +728,12 @@ else
     echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=selector_failed"
     exit "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}"
   fi
+  bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" \
+    --header-scan-only \
+    --fail-missing \
+    --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
+    --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" \
+    --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
   echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required"
 fi
 write_pr_gate_receipt \
