@@ -40,6 +40,7 @@ required_coverage = [
   "python",
   "scripts",
   "tests",
+  "tools",
   "vendor/agent-canon",
   "README.md",
   "QUICK_START.md",
@@ -93,7 +94,8 @@ paths = [
   ".vscode/**",
   "evidence",
   "evidence/**",
-  "tools/**",
+  "tools/agent-canon",
+  "tools/agent-canon/**",
   "AGENTS.md",
 ]
 # Optional:
@@ -101,7 +103,7 @@ paths = [
 #   "evidence/agent-evals/**",
 # ]
 protecting_tools = [
-  "tools/agent_tools/responsibility_scope.py",
+  "tools/agent-canon/agent_tools/responsibility_scope.py",
   "tools/agent-canon/sync_agent_canon.sh",
 ]
 issues = []
@@ -120,9 +122,14 @@ paths = [
   "scripts/**",
   "python/**",
   "tests/**",
+  "tools/**",
+]
+exclude_paths = [
+  "tools/agent-canon",
+  "tools/agent-canon/**",
 ]
 protecting_tools = [
-  "tools/agent_tools/responsibility_scope.py",
+  "tools/agent-canon/agent_tools/responsibility_scope.py",
 ]
 issues = []
 
@@ -149,6 +156,6 @@ paths = [
   "notes/**",
 ]
 protecting_tools = [
-  "tools/agent_tools/responsibility_scope.py",
+  "tools/agent-canon/agent_tools/responsibility_scope.py",
 ]
 issues = []

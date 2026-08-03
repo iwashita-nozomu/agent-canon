@@ -2,12 +2,17 @@
 # contract test
 # responsibility Tests GitHub workflow convention checker behavior.
 # upstream implementation ../../tools/ci/check_github_workflows.py convention checker
+# upstream implementation ../../.github/workflows/agent-runtime-dashboard.yml scheduled graph producer orchestration
+# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py canonical source-root command execution
 # @dependency-end
 
 """Tests for GitHub workflow convention checks."""
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import shutil
 import subprocess
 import sys
@@ -16,12 +21,242 @@ import unittest
 from collections.abc import Callable
 from pathlib import Path
 
+import yaml
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "tools" / "ci" / "check_github_workflows.py"
+RUNTIME_DASHBOARD_WORKFLOW = (
+    REPO_ROOT / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+)
 
 
 class GitHubWorkflowCheckTest(unittest.TestCase):
     """Exercise the GitHub workflow checker."""
+
+    def scheduled_graph_command(self) -> tuple[str, str]:
+        """Read the producer-owned scheduled graph command from its workflow."""
+        payload = yaml.safe_load(
+            RUNTIME_DASHBOARD_WORKFLOW.read_text(encoding="utf-8")
+        )
+        steps = payload["jobs"]["dashboard"]["steps"]
+        step = next(
+            item
+            for item in steps
+            if item.get("name") == "Build and read back canonical graph"
+        )
+        return str(step["if"]), str(step["run"])
+
+    def scheduled_graph_fixture(self, root: Path) -> tuple[Path, Path]:
+        """Create a fresh source root with a recording canonical Graph CLI."""
+        subprocess.run(
+            ["git", "init", "-b", "main"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "graph@example.invalid"],
+            cwd=root,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Graph Fixture"],
+            cwd=root,
+            check=True,
+        )
+        (root / "README.md").write_text("scheduled graph fixture\n", encoding="utf-8")
+        (root / ".gitignore").write_text(
+            ".agent-canon/\n.scheduled-graph-calls\n",
+            encoding="utf-8",
+        )
+        catalog = root / "agents" / "skills" / "catalog.yaml"
+        catalog.parent.mkdir(parents=True)
+        catalog.write_text("skills: {}\n", encoding="utf-8")
+        module = root / "tools" / "agent_tools" / "agent_canon_source_root.py"
+        module.parent.mkdir(parents=True)
+        shutil.copy2(
+            REPO_ROOT / "tools" / "agent_tools" / "agent_canon_source_root.py",
+            module,
+        )
+        executable = root / "tools" / "bin" / "agent-canon"
+        executable.parent.mkdir(parents=True)
+        executable.write_text(
+            """#!/usr/bin/env python3
+import hashlib
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[sys.argv.index("--root") + 1]).resolve()
+command = sys.argv[1:3]
+calls = root / ".scheduled-graph-calls"
+prior = calls.read_text(encoding="utf-8") if calls.exists() else ""
+calls.write_text(prior + " ".join(command) + "\\n", encoding="utf-8")
+db = root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
+head = subprocess.check_output(
+    ["git", "rev-parse", "HEAD"], cwd=root, text=True
+).strip()
+content_fingerprint = hashlib.sha256(
+    (root / "README.md").read_bytes()
+).hexdigest()
+
+if command == ["graph", "build"]:
+    mode = os.environ.get("GRAPH_BUILD_MODE", "fresh")
+    if mode == "failure":
+        print(json.dumps({
+            "schema": "agent-canon.graph.build.v1",
+            "command": "build",
+            "status": "unavailable",
+            "exit_code": 1,
+        }))
+        raise SystemExit(1)
+    status = "incomplete" if mode == "incomplete" else "fresh"
+    exit_code = 1 if status == "incomplete" else 0
+    record = {
+        "schema": "agent-canon.graph.build.v1",
+        "command": "build",
+        "status": status,
+        "input_fingerprint": content_fingerprint,
+        "integration_record": {
+            "snapshot_head": head,
+            "input_fingerprint": content_fingerprint,
+        },
+        "publication": "published",
+        "durability": "durable",
+        "exit_code": exit_code,
+    }
+    db.parent.mkdir(parents=True, exist_ok=True)
+    db.write_text(json.dumps(record), encoding="utf-8")
+    print(json.dumps(record))
+    raise SystemExit(exit_code)
+
+if command == ["graph", "status"]:
+    if not db.exists():
+        print(json.dumps({
+            "schema": "agent-canon.graph.status.v1",
+            "command": "status",
+            "status": "unavailable",
+            "exit_code": 1,
+        }))
+        raise SystemExit(1)
+    record = json.loads(db.read_text(encoding="utf-8"))
+    integration = record["integration_record"]
+    fresh = (
+        record["status"] == "fresh"
+        and integration["snapshot_head"] == head
+        and integration["input_fingerprint"] == content_fingerprint
+    )
+    status = "fresh" if fresh else "stale"
+    reason = None if fresh else "source_changed"
+    payload = {
+        "schema": "agent-canon.graph.status.v1",
+        "command": "status",
+        "status": status,
+        "input_fingerprint": integration["input_fingerprint"],
+        "integration_record": integration,
+        "reason": reason,
+        "probe_reason": reason,
+        "exit_code": 0 if fresh else 2,
+    }
+    print(json.dumps(payload))
+    raise SystemExit(payload["exit_code"])
+
+raise SystemExit(2)
+""",
+            encoding="utf-8",
+        )
+        executable.chmod(0o755)
+        subprocess.run(
+            ["git", "add", "."],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "scheduled graph fixture"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        db = root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
+        return root / ".scheduled-graph-calls", db
+
+    def run_scheduled_graph_fixture(
+        self,
+        root: Path,
+        *,
+        build_mode: str,
+    ) -> subprocess.CompletedProcess[str]:
+        """Execute the workflow-owned schedule command in a fresh root."""
+        _condition, command = self.scheduled_graph_command()
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "GITHUB_WORKSPACE": str(root),
+                "GRAPH_BUILD_MODE": build_mode,
+            }
+        )
+        return subprocess.run(
+            ["bash", "-c", command],
+            cwd=root,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def test_scheduled_graph_bootstraps_absent_db_and_reads_fresh(self) -> None:
+        """The schedule owner builds once before fresh identity readback."""
+        condition, _command = self.scheduled_graph_command()
+        self.assertEqual(condition, "github.event_name == 'schedule'")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            calls, db = self.scheduled_graph_fixture(root)
+            self.assertFalse(db.exists())
+
+            result = self.run_scheduled_graph_fixture(root, build_mode="fresh")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(db.is_file())
+            self.assertEqual(
+                calls.read_text(encoding="utf-8").splitlines(),
+                ["graph build", "graph status"],
+            )
+            payload = json.loads(result.stdout.splitlines()[-1])
+            expected_head = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=root, text=True
+            ).strip()
+            expected_fingerprint = hashlib.sha256(
+                (root / "README.md").read_bytes()
+            ).hexdigest()
+            self.assertEqual(payload["status"], "fresh")
+            self.assertEqual(
+                payload["integration_record"]["snapshot_head"], expected_head
+            )
+            self.assertEqual(payload["input_fingerprint"], expected_fingerprint)
+
+    def test_scheduled_graph_build_failure_and_incomplete_stop_readback(self) -> None:
+        """Build failure and incomplete publication fail before status readback."""
+        for build_mode in ("failure", "incomplete"):
+            with self.subTest(build_mode=build_mode), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                calls, _db = self.scheduled_graph_fixture(root)
+
+                result = self.run_scheduled_graph_fixture(
+                    root,
+                    build_mode=build_mode,
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(
+                    calls.read_text(encoding="utf-8").splitlines(),
+                    ["graph build"],
+                )
 
     def test_current_repository_passes(self) -> None:
         """The current repository should satisfy GitHub workflow conventions."""

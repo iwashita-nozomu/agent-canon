@@ -2825,6 +2825,197 @@ class DependencyManifestToolTest(unittest.TestCase):
                 text,
             )
 
+    def graph_ensure_fixture(
+        self,
+        root: Path,
+        statuses: list[tuple[str, int, object, object]],
+        build_exit: int = 0,
+    ) -> tuple[Path, Path]:
+        """Create a source-root fixture with scripted status/build readback."""
+        subprocess.run(
+            ["git", "init", "-b", "main"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        self.git_output(root, "config", "user.email", "graph@example.invalid")
+        self.git_output(root, "config", "user.name", "Graph Fixture")
+        (root / "README.md").write_text("fixture\n", encoding="utf-8")
+        self.git_output(root, "add", "README.md")
+        self.git_output(root, "commit", "-m", "graph fixture")
+        tools_dir = root / "tools"
+        (tools_dir / "bin").mkdir(parents=True)
+        (tools_dir / "agent_tools").mkdir()
+        (tools_dir / "sync_agent_canon.sh").write_text(
+            "#!/usr/bin/env bash\nexit 0\n", encoding="utf-8"
+        )
+        (tools_dir / "sync_agent_canon.sh").chmod(0o755)
+        script = (
+            "#!/usr/bin/env python3\n"
+            "import json\n"
+            "import os\n"
+            "import sys\n"
+            "from pathlib import Path\n"
+            "root = Path(sys.argv[sys.argv.index('--root') + 1])\n"
+            "calls = root / '.graph-calls'\n"
+            "call = ' '.join(sys.argv[1:3])\n"
+            "calls.write_text(calls.read_text() + call + '\\n' if calls.exists() else call + '\\n')\n"
+            "if sys.argv[1:3] == ['graph', 'build']:\n"
+            f"    print(json.dumps({{'exit_code': {build_exit}}}))\n"
+            f"    raise SystemExit({build_exit})\n"
+            "if sys.argv[1:3] == ['graph', 'status']:\n"
+            "    sequence = json.loads(os.environ['GRAPH_STATUS_SEQUENCE'])\n"
+            "    index = sum(1 for line in calls.read_text().splitlines() if line == 'graph status') - 1\n"
+            "    status, exit_code, reason, probe_reason = sequence[min(index, len(sequence) - 1)]\n"
+            "    payload = json.loads(os.environ['GRAPH_STATUS_JSON'])\n"
+            "    payload['status'] = status\n"
+            "    payload['exit_code'] = exit_code\n"
+            "    payload['reason'] = reason\n"
+            "    payload['probe_reason'] = probe_reason\n"
+            "    print(json.dumps(payload))\n"
+            "    raise SystemExit(exit_code)\n"
+            "raise SystemExit(2)\n"
+        )
+        executable = tools_dir / "bin" / "agent-canon"
+        executable.write_text(script, encoding="utf-8")
+        executable.chmod(0o755)
+        return executable, root / ".graph-calls"
+
+    def run_graph_ensure_fixture(
+        self,
+        root: Path,
+        statuses: list[tuple[str, int, object, object]],
+        build_exit: int = 0,
+    ) -> subprocess.CompletedProcess[str]:
+        """Run the existing dependency-review graph ensure route."""
+        _executable, calls = self.graph_ensure_fixture(root, statuses, build_exit)
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "GRAPH_STATUS_SEQUENCE": json.dumps(statuses),
+                "GRAPH_STATUS_JSON": json.dumps(
+                    {
+                        "schema": "agent-canon.graph.status.v1",
+                        "command": "status",
+                        "status": "fresh",
+                        "exit_code": 0,
+                        "reason": None,
+                        "probe_reason": None,
+                    }
+                ),
+            }
+        )
+        result = subprocess.run(
+            [
+                "bash",
+                str(REPO_REVIEW),
+                "--root",
+                str(root),
+                "--ensure-graph",
+            ],
+            cwd=PROJECT_ROOT,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        result.calls_path = calls  # type: ignore[attr-defined]
+        return result
+
+    def test_graph_ensure_fresh_does_not_build(self) -> None:
+        """Fresh status is accepted without invoking the producer."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result = self.run_graph_ensure_fixture(
+                Path(tmp_dir), [("fresh", 0, None, None)]
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GRAPH_ENSURE=pass status=fresh", result.stdout)
+            self.assertIn("GRAPH_REBUILD=not_needed", result.stdout)
+            self.assertEqual(
+                result.calls_path.read_text(encoding="utf-8").splitlines(),
+                ["graph status"],
+            )
+
+    def test_graph_ensure_source_changed_builds_once_and_reads_fresh(self) -> None:
+        """Only a typed source-change status performs one build."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            result = self.run_graph_ensure_fixture(
+                Path(tmp_dir),
+                [
+                    ("stale", 2, "source_changed", "source_changed"),
+                    ("fresh", 0, None, None),
+                ],
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GRAPH_REBUILD=performed", result.stdout)
+            self.assertEqual(
+                result.calls_path.read_text(encoding="utf-8").splitlines(),
+                ["graph status", "graph build", "graph status"],
+            )
+
+    def test_graph_ensure_non_source_status_fails_without_build(self) -> None:
+        """Corruption, unknown, and non-source statuses never admit rebuilding."""
+        cases = (
+            (
+                "stale",
+                2,
+                "persisted_readback_mismatch",
+                "persisted_readback_mismatch",
+            ),
+            ("stale", 2, "unknown_reason", "unknown_reason"),
+            ("stale", 2, "runtime_evidence_changed", "runtime_evidence_changed"),
+            ("stale", 2, "producer_identity_changed", "producer_identity_changed"),
+            ("stale", 2, "source_changed", None),
+            ("stale", 2, 1, "source_changed"),
+            ("unavailable", 1, "graph_unavailable", None),
+            ("incomplete", 2, "source_completeness_incomplete", None),
+            ("invalid", 1, None, None),
+        )
+        for status in cases:
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as tmp_dir:
+                result = self.run_graph_ensure_fixture(Path(tmp_dir), [status])
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("REPO_DEPENDENCY_REVIEW=fail", result.stdout)
+                self.assertEqual(
+                    result.calls_path.read_text(encoding="utf-8").splitlines(),
+                    ["graph status"],
+                )
+
+    def test_graph_ensure_fails_closed_for_build_or_readback_failure(self) -> None:
+        """Build failure and non-fresh readback stay closed."""
+        cases = (
+            ([
+                ("stale", 2, "source_changed", "source_changed"),
+            ], 3, "GRAPH_REBUILD=failed rc=3", True),
+            ([
+                ("stale", 2, "source_changed", "source_changed"),
+                ("stale", 2, "source_changed", "source_changed"),
+            ], 0, "REPO_DEPENDENCY_REVIEW=fail", True),
+            ([
+                ("stale", 2, "source_changed", "source_changed"),
+                (
+                    "stale",
+                    2,
+                    "persisted_readback_mismatch",
+                    "persisted_readback_mismatch",
+                ),
+            ], 0, "REPO_DEPENDENCY_REVIEW=fail", True),
+        )
+        for statuses, build_exit, expected, build_expected in cases:
+            with self.subTest(statuses=statuses, build_exit=build_exit), tempfile.TemporaryDirectory() as tmp_dir:
+                result = self.run_graph_ensure_fixture(
+                    Path(tmp_dir), statuses, build_exit
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected, result.stdout)
+                calls = result.calls_path.read_text(encoding="utf-8").splitlines()
+                self.assertEqual("graph build" in calls, build_expected)
+
     def test_repo_review_reports_missing_manifests_by_default(self) -> None:
         """The repo-wide wrapper keeps missing headers report-only during migration."""
         with tempfile.TemporaryDirectory() as tmp_dir:

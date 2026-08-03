@@ -247,7 +247,7 @@ def write_graph_result(
     root: Path,
     paths: tuple[str, ...],
     edges: tuple[tuple[str, str], ...],
-    diagnostics: tuple[tuple[str, str, str], ...],
+    diagnostics: tuple[dict[str, object], ...],
 ) -> Path:
     """Write one result bound to canonical persisted integration metadata."""
     graph_dir = root / ".agent-canon" / "knowledge-graph"
@@ -256,6 +256,18 @@ def write_graph_result(
     snapshot_head = git(root, "rev-parse", "HEAD")
     input_fingerprint = "1" * 64
     graph_fingerprint = "2" * 64
+    diagnostic_counts = {
+        "unresolved_count": sum(
+            diagnostic["code"] not in {"target-ambiguous", "source-uncovered"}
+            for diagnostic in diagnostics
+        ),
+        "ambiguous_count": sum(
+            diagnostic["code"] == "target-ambiguous" for diagnostic in diagnostics
+        ),
+        "uncovered_count": sum(
+            diagnostic["code"] == "source-uncovered" for diagnostic in diagnostics
+        ),
+    }
     integration_record: dict[str, object] = {
         "schema": "agent-canon.graph.integration.v1",
         "root": str(root.resolve()),
@@ -280,7 +292,9 @@ def write_graph_result(
             "CREATE TABLE edges(layer TEXT, from_node_id TEXT, to_node_id TEXT)"
         )
         connection.execute(
-            "CREATE TABLE diagnostics(layer TEXT, rule TEXT, message TEXT, target_node_id TEXT)"
+            "CREATE TABLE diagnostics("
+            "layer TEXT, rule TEXT, message TEXT, target_node_id TEXT, "
+            "severity TEXT, payload_json TEXT)"
         )
         for path in paths:
             connection.execute(
@@ -292,11 +306,16 @@ def write_graph_result(
                 "INSERT INTO edges VALUES('source', ?, ?)",
                 (f"node:source:{source}", f"node:source:{target}"),
             )
-        for code, message, source in diagnostics:
-            target_node = f"node:source:{source}" if source else ""
+        for diagnostic in diagnostics:
             connection.execute(
-                "INSERT INTO diagnostics VALUES('source', ?, ?, ?)",
-                (code, message, target_node),
+                "INSERT INTO diagnostics VALUES('source', ?, ?, ?, ?, ?)",
+                (
+                    diagnostic["code"],
+                    diagnostic["message"],
+                    diagnostic["target_node_id"],
+                    diagnostic["severity"],
+                    diagnostic["payload_json"],
+                ),
             )
         for key, value in (
             ("integration_record", json.dumps(integration_record)),
@@ -324,11 +343,83 @@ def write_graph_result(
                 "integration_record": integration_record,
                 "publication": "published",
                 "durability": "durable",
+                **diagnostic_counts,
+            }
+        ),
+        encoding="utf-8",
+    )
+    (graph_dir / "graph-status.json").write_text(
+        json.dumps(
+            {
+                "schema": "agent-canon.graph.status.v1",
+                "command": "status",
+                "status": "incomplete",
+                "profile": "default",
+                "root": str(root.resolve()),
+                "db_path": str(database.resolve()),
+                "input_fingerprint": input_fingerprint,
+                "graph_fingerprint": graph_fingerprint,
+                "integration_record": integration_record,
+                **diagnostic_counts,
+                "probe_reason": None,
+                "reason": "source_completeness_incomplete",
+                "exit_code": 2,
             }
         ),
         encoding="utf-8",
     )
     return result
+
+
+def source_diagnostic_fixture(
+    code: str,
+    source: str,
+    target: str,
+    direction: str,
+    kind: str,
+    reason: str,
+    *,
+    severity: str = "blocker",
+    message: str = "fixture diagnostic",
+    start_line: int = 4,
+) -> dict[str, object]:
+    """Construct one explicit producer-owned typed diagnostic fixture."""
+    declaration = f"{direction} {kind} {target} {reason}"
+    payload = {
+        "schema": selector.SOURCE_DIAGNOSTIC_SCHEMA,
+        "code": code,
+        "source": source,
+        "target": target,
+        "declaration": declaration,
+        "source_span": {
+            "path": source,
+            "start_line": start_line,
+            "start_column": 1,
+            "end_line": start_line,
+            "end_column": 2,
+        },
+        "declaration_components": {
+            "direction": direction,
+            "kind": kind,
+            "target": target,
+            "reason": reason,
+        },
+    }
+    return {
+        "code": code,
+        "message": message,
+        "target_node_id": f"node:source:{source}",
+        "severity": severity,
+        "payload_json": json.dumps(payload, separators=(",", ":")),
+    }
+
+
+def isolated_current_builder_environment(root: Path) -> dict[str, str]:
+    """Bind real-builder fixtures to current source and temporary Cargo state."""
+    return {
+        "AGENT_CANON_TOOLS_HOME": str(root / "agent-canon-tools-home"),
+        "CARGO_TARGET_DIR": str(root / "agent-canon-cargo-target"),
+    }
 
 
 class AgentCanonPrGraphSelectorTest(unittest.TestCase):
@@ -353,6 +444,393 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         )
         self.base_graph_patch.start()
         self.addCleanup(self.base_graph_patch.stop)
+
+    def test_semantic_declaration_change_blocks_when_scoped(self) -> None:
+        """A declaration change is a new identity even when target and source match."""
+        base_diagnostic = {
+            "code": "target-unresolved",
+            "message": "old formatting",
+            "source_path": "changed.py",
+            "target_path": "missing.md",
+            "declaration": "upstream design missing.md missing target",
+            "severity": "blocker",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {})
+            graph_result = write_graph_result(
+                root,
+                ("changed.py",),
+                (),
+                (
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "changed.py",
+                        "missing.md",
+                        "upstream",
+                        "design",
+                        "changed reason",
+                        message="new line 99: missing.md",
+                        start_line=99,
+                    ),
+                ),
+            )
+            with patch.object(
+                selector,
+                "build_trusted_base_graph",
+                return_value=selector.TrustedBaseGraph(
+                    base,
+                    "1" * 64,
+                    "2" * 64,
+                    FIXTURE_PRODUCER_IDENTITY,
+                    "published",
+                    "durable",
+                    True,
+                    "incomplete",
+                    (base_diagnostic,),
+                ),
+            ):
+                acceptance = selector.evaluate_built_graph(
+                    root,
+                    graph_result,
+                    {"AGENT_CANON_PR_BASE_REF": base},
+                )
+
+        self.assertEqual(acceptance.status, "fail")
+        self.assertEqual(len(acceptance.report["blocking_diagnostics"]), 1)
+        self.assertFalse(acceptance.report["blocking_diagnostics"][0]["base_match"])
+
+    def test_line_and_message_changes_with_same_identity_remain_baseline(self) -> None:
+        """Location and message formatting do not create a diagnostic identity change."""
+        base_diagnostic = {
+            "code": "target-unresolved",
+            "message": "legacy.py:4:missing.md",
+            "source_path": "legacy.py",
+            "target_path": "missing.md",
+            "declaration": "upstream design missing.md missing target",
+            "severity": "blocker",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {"legacy.py": "legacy\n"})
+            graph_result = write_graph_result(
+                root,
+                ("changed.py", "legacy.py"),
+                (),
+                (
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "legacy.py",
+                        "missing.md",
+                        "upstream",
+                        "design",
+                        "missing target",
+                        message="legacy.py:19:formatted differently",
+                        start_line=19,
+                    ),
+                ),
+            )
+            with patch.object(
+                selector,
+                "build_trusted_base_graph",
+                return_value=selector.TrustedBaseGraph(
+                    base,
+                    "1" * 64,
+                    "2" * 64,
+                    FIXTURE_PRODUCER_IDENTITY,
+                    "published",
+                    "durable",
+                    True,
+                    "incomplete",
+                    (base_diagnostic,),
+                ),
+            ):
+                acceptance = selector.evaluate_built_graph(
+                    root,
+                    graph_result,
+                    {"AGENT_CANON_PR_BASE_REF": base},
+                )
+
+        self.assertEqual(acceptance.status, "pass")
+        self.assertEqual(acceptance.report["blocking_diagnostics"], [])
+        self.assertEqual(len(acceptance.report["baseline_diagnostics"]), 1)
+
+    def test_same_identity_with_worse_severity_blocks(self) -> None:
+        """Severity remains outside identity but a worsening severity blocks."""
+        base_diagnostic = {
+            "code": "target-unresolved",
+            "message": "warning formatting",
+            "source_path": "changed.py",
+            "target_path": "missing.md",
+            "declaration": "upstream design missing.md missing target",
+            "severity": "warning",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {})
+            graph_result = write_graph_result(
+                root,
+                ("changed.py",),
+                (),
+                (
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "changed.py",
+                        "missing.md",
+                        "upstream",
+                        "design",
+                        "missing target",
+                        severity="error",
+                    ),
+                ),
+            )
+            with patch.object(
+                selector,
+                "build_trusted_base_graph",
+                return_value=selector.TrustedBaseGraph(
+                    base,
+                    "1" * 64,
+                    "2" * 64,
+                    FIXTURE_PRODUCER_IDENTITY,
+                    "published",
+                    "durable",
+                    True,
+                    "incomplete",
+                    (base_diagnostic,),
+                ),
+            ):
+                acceptance = selector.evaluate_built_graph(
+                    root,
+                    graph_result,
+                    {"AGENT_CANON_PR_BASE_REF": base},
+                )
+
+        self.assertEqual(acceptance.status, "fail")
+        blocking = acceptance.report["blocking_diagnostics"]
+        self.assertEqual(len(blocking), 1)
+        self.assertTrue(blocking[0]["base_match"])
+        self.assertTrue(blocking[0]["worsened"])
+
+    def test_diagnostic_partition_is_exhaustive_and_duplicate_free(self) -> None:
+        """Blocking and baseline output partitions every unique head identity once."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {"legacy.py": "legacy\n"})
+            graph_result = write_graph_result(
+                root,
+                ("changed.py", "legacy.py"),
+                (),
+                (
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "changed.py",
+                        "missing.md",
+                        "upstream",
+                        "design",
+                        "missing target",
+                        severity="warning",
+                    ),
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "changed.py",
+                        "missing.md",
+                        "upstream",
+                        "design",
+                        "missing target",
+                        severity="blocker",
+                        message="duplicate stronger row",
+                    ),
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "legacy.py",
+                        "missing.md",
+                        "upstream",
+                        "design",
+                        "missing target",
+                    ),
+                ),
+            )
+            acceptance = selector.evaluate_built_graph(
+                root,
+                graph_result,
+                {"AGENT_CANON_PR_BASE_REF": base},
+            )
+
+        partitions = (
+            acceptance.report["blocking_diagnostics"]
+            + acceptance.report["baseline_diagnostics"]
+        )
+        identities = [item["identity"] for item in partitions]
+        self.assertEqual(len(identities), len(set(identities)))
+        self.assertEqual(
+            set(identities),
+            {
+                selector.diagnostic_identity_text(
+                    {
+                        "code": "target-unresolved",
+                        "message": "fixture",
+                        "source_path": "changed.py",
+                        "target_path": "missing.md",
+                        "declaration": "upstream design missing.md missing target",
+                        "severity": "blocker",
+                    }
+                ),
+                selector.diagnostic_identity_text(
+                    {
+                        "code": "target-unresolved",
+                        "message": "fixture",
+                        "source_path": "legacy.py",
+                        "target_path": "missing.md",
+                        "declaration": "upstream design missing.md missing target",
+                        "severity": "blocker",
+                    }
+                ),
+            },
+        )
+
+    def test_missing_payload_object_fails_before_classification(self) -> None:
+        """A missing typed payload object is rejected before reachability."""
+        fixture = source_diagnostic_fixture(
+            "target-unresolved",
+            "changed.py",
+            "missing.md",
+            "upstream",
+            "design",
+            "missing target",
+        )
+        with self.assertRaises(selector.SelectorFailure) as raised:
+            selector.validate_source_diagnostic(
+                rule=fixture["code"],
+                message=fixture["message"],
+                target_node_id=fixture["target_node_id"],
+                severity=fixture["severity"],
+                payload_value={},
+                node_paths={fixture["target_node_id"]: "changed.py"},
+                owner="fixture",
+            )
+
+        self.assertEqual(raised.exception.reason, "graph_diagnostic_invalid")
+
+    def test_missing_payload_column_fails_before_classification(self) -> None:
+        """A legacy diagnostics table without payload_json is rejected at readback."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {})
+            graph_result = write_graph_result(
+                root,
+                ("changed.py",),
+                (),
+                (
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "changed.py",
+                        "missing.md",
+                        "upstream",
+                        "design",
+                        "missing target",
+                    ),
+                ),
+            )
+            database = root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
+            with sqlite3.connect(database) as connection:
+                connection.execute("ALTER TABLE diagnostics RENAME TO diagnostics_old")
+                connection.execute(
+                    "CREATE TABLE diagnostics(layer TEXT, rule TEXT, message TEXT, target_node_id TEXT)"
+                )
+                connection.execute(
+                    "INSERT INTO diagnostics SELECT layer, rule, message, target_node_id FROM diagnostics_old"
+                )
+                connection.execute("DROP TABLE diagnostics_old")
+            identity = selector.graph_build_identity(root, graph_result)
+            with self.assertRaises(selector.SelectorFailure) as raised:
+                selector.read_bound_graph_acceptance_facts(
+                    identity,
+                    git(root, "rev-parse", "HEAD"),
+                )
+
+        self.assertEqual(raised.exception.reason, "graph_diagnostic_schema_missing")
+
+    def test_wrong_typed_source_span_bool_fails_before_classification(self) -> None:
+        """A bool source-span coordinate is not accepted as an integer."""
+        fixture = source_diagnostic_fixture(
+            "target-unresolved",
+            "changed.py",
+            "missing.md",
+            "upstream",
+            "design",
+            "missing target",
+        )
+        payload = json.loads(fixture["payload_json"])
+        payload["source_span"]["start_line"] = True
+        with self.assertRaises(selector.SelectorFailure) as raised:
+            selector.validate_source_diagnostic(
+                rule=fixture["code"],
+                message=fixture["message"],
+                target_node_id=fixture["target_node_id"],
+                severity=fixture["severity"],
+                payload_value=payload,
+                node_paths={fixture["target_node_id"]: "changed.py"},
+                owner="fixture",
+            )
+
+        self.assertEqual(raised.exception.reason, "graph_diagnostic_invalid")
+        self.assertIn("start_line", raised.exception.evidence)
+
+    def test_source_span_and_target_node_mismatch_fail_before_classification(self) -> None:
+        """Source span and target-node source mismatches fail closed."""
+        fixture = source_diagnostic_fixture(
+            "target-unresolved",
+            "changed.py",
+            "missing.md",
+            "upstream",
+            "design",
+            "missing target",
+        )
+        for mismatch in ("span", "node"):
+            with self.subTest(mismatch=mismatch):
+                payload = json.loads(fixture["payload_json"])
+                node_paths = {fixture["target_node_id"]: "changed.py"}
+                if mismatch == "span":
+                    payload["source_span"]["path"] = "other.py"
+                else:
+                    node_paths[fixture["target_node_id"]] = "other.py"
+                with self.assertRaises(selector.SelectorFailure) as raised:
+                    selector.validate_source_diagnostic(
+                        rule=fixture["code"],
+                        message=fixture["message"],
+                        target_node_id=fixture["target_node_id"],
+                        severity=fixture["severity"],
+                        payload_value=payload,
+                        node_paths=node_paths,
+                        owner="fixture",
+                    )
+                self.assertEqual(raised.exception.reason, "graph_diagnostic_invalid")
+
+    def test_declaration_component_mismatch_fails_before_classification(self) -> None:
+        """The persisted declaration must equal its typed components."""
+        fixture = source_diagnostic_fixture(
+            "target-unresolved",
+            "changed.py",
+            "missing.md",
+            "upstream",
+            "design",
+            "missing target",
+        )
+        payload = json.loads(fixture["payload_json"])
+        payload["declaration"] = "upstream design missing.md other reason"
+        with self.assertRaises(selector.SelectorFailure) as raised:
+            selector.validate_source_diagnostic(
+                rule=fixture["code"],
+                message=fixture["message"],
+                target_node_id=fixture["target_node_id"],
+                severity=fixture["severity"],
+                payload_value=payload,
+                node_paths={fixture["target_node_id"]: "changed.py"},
+                owner="fixture",
+            )
+
+        self.assertEqual(raised.exception.reason, "graph_diagnostic_invalid")
+        self.assertIn("declaration", raised.exception.evidence)
 
     def test_base_builder_process_zero_and_result_one_mismatch_fails_closed(
         self,
@@ -559,11 +1037,16 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 parent, "ls-tree", base, "vendor/agent-canon"
             ).split()[2]
 
-            trusted_base = selector.build_trusted_base_graph(
-                parent,
-                base,
-                PROJECT_ROOT,
-            )
+            with patch.dict(
+                os.environ,
+                isolated_current_builder_environment(Path(tmp_dir)),
+                clear=False,
+            ):
+                trusted_base = selector.build_trusted_base_graph(
+                    parent,
+                    base,
+                    PROJECT_ROOT,
+                )
 
         self.assertEqual(gitlink, expected_gitlink)
         self.assertEqual(trusted_base.snapshot_head, base)
@@ -594,15 +1077,30 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 parent,
                 ("changed.py",),
                 (),
-                (("target-unresolved", "changed.py:4:missing-base.md", "changed.py"),),
+                (
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "changed.py",
+                        "missing-base.md",
+                        "upstream",
+                        "design",
+                        "missing target",
+                        message="changed.py:4:missing-base.md",
+                    ),
+                ),
             )
 
-            acceptance = selector.evaluate_built_graph(
-                parent,
-                graph_result,
-                {"AGENT_CANON_PR_BASE_REF": base},
-                source_root=PROJECT_ROOT,
-            )
+            with patch.dict(
+                os.environ,
+                isolated_current_builder_environment(Path(tmp_dir)),
+                clear=False,
+            ):
+                acceptance = selector.evaluate_built_graph(
+                    parent,
+                    graph_result,
+                    {"AGENT_CANON_PR_BASE_REF": base},
+                    source_root=PROJECT_ROOT,
+                )
 
         self.assertEqual(acceptance.status, "fail")
         self.assertEqual(
@@ -792,7 +1290,17 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 root,
                 ("changed.py", "legacy.py"),
                 (),
-                (("target-unresolved", "legacy.py:4:missing.md", "legacy.py"),),
+                (
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "legacy.py",
+                        "missing.md",
+                        "upstream",
+                        "design",
+                        "missing target",
+                        message="legacy.py:4:missing.md",
+                    ),
+                ),
             )
 
             acceptance = selector.evaluate_built_graph(
@@ -828,7 +1336,17 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 root,
                 ("changed.py", "legacy.py"),
                 (),
-                (("target-unresolved", "legacy.py:4:missing.md", "legacy.py"),),
+                (
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "legacy.py",
+                        "missing.md",
+                        "upstream",
+                        "design",
+                        "missing target",
+                        message="legacy.py:4:missing.md",
+                    ),
+                ),
             )
             database = root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
             real_identity = selector.regular_file_identity
@@ -872,7 +1390,17 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 root,
                 ("changed.py", "related.py"),
                 (("changed.py", "related.py"),),
-                (("target-unresolved", "related.py:4:missing.md", "related.py"),),
+                (
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "related.py",
+                        "missing.md",
+                        "upstream",
+                        "design",
+                        "missing target",
+                        message="related.py:4:missing.md",
+                    ),
+                ),
             )
 
             acceptance = selector.evaluate_built_graph(
@@ -893,7 +1421,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             "message": "related.py:4:missing.md",
             "source_path": "related.py",
             "target_path": "missing.md",
-            "declaration": "missing.md",
+            "declaration": "upstream design missing.md missing target",
             "severity": "blocker",
         }
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -903,7 +1431,18 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 root,
                 ("changed.py", "related.py"),
                 (("changed.py", "related.py"),),
-                (("target-unresolved", "related.py:19:missing.md", "related.py"),),
+                (
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "related.py",
+                        "missing.md",
+                        "upstream",
+                        "design",
+                        "missing target",
+                        message="related.py:19:missing.md",
+                        start_line=19,
+                    ),
+                ),
             )
             with patch.object(
                 selector,
@@ -931,7 +1470,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         self.assertEqual(len(acceptance.report["baseline_diagnostics"]), 1)
         self.assertEqual(
             acceptance.report["baseline_diagnostics"][0]["declaration"],
-            "missing.md",
+            "upstream design missing.md missing target",
         )
 
     def test_same_count_replacement_is_a_new_blocker(self) -> None:
@@ -941,7 +1480,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             "message": "changed.py:4:old.md",
             "source_path": "changed.py",
             "target_path": "old.md",
-            "declaration": "old.md",
+            "declaration": "upstream design old.md old target",
             "severity": "blocker",
         }
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -951,7 +1490,18 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 root,
                 ("changed.py",),
                 (),
-                (("target-unresolved", "changed.py:40:new.md", "changed.py"),),
+                (
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "changed.py",
+                        "new.md",
+                        "upstream",
+                        "design",
+                        "new target",
+                        message="changed.py:40:new.md",
+                        start_line=40,
+                    ),
+                ),
             )
             with patch.object(
                 selector,
@@ -987,7 +1537,18 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 root,
                 ("changed.py",),
                 (),
-                (("manifest-grammar", "changed.py:3:upstream bad", ""),),
+                (
+                    source_diagnostic_fixture(
+                        "manifest-grammar",
+                        "changed.py",
+                        "invalid-target:fixture",
+                        "upstream",
+                        "bad-kind",
+                        "invalid reason",
+                        message="changed.py:3:upstream bad",
+                        start_line=3,
+                    ),
+                ),
             )
 
             acceptance = selector.evaluate_built_graph(
@@ -1020,7 +1581,17 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 root,
                 ("legacy.py",),
                 (),
-                (("target-unresolved", "legacy.py:4:deleted.md", "legacy.py"),),
+                (
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "legacy.py",
+                        "deleted.md",
+                        "upstream",
+                        "design",
+                        "deleted target",
+                        message="legacy.py:4:deleted.md",
+                    ),
+                ),
             )
 
             acceptance = selector.evaluate_built_graph(
@@ -1043,7 +1614,17 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 root,
                 ("changed.py", "legacy.py"),
                 (),
-                (("target-unresolved", "legacy.py:4:missing.md", "legacy.py"),),
+                (
+                    source_diagnostic_fixture(
+                        "target-unresolved",
+                        "legacy.py",
+                        "missing.md",
+                        "upstream",
+                        "design",
+                        "missing target",
+                        message="legacy.py:4:missing.md",
+                    ),
+                ),
             )
 
             acceptance = selector.evaluate_built_graph(

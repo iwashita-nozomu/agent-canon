@@ -395,5 +395,5 @@ PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_sou
 ## Legacy Compatibility Appendix
 
 Legacy subtree or committed snapshot repos should migrate to the submodule structure above.
-Until migration, use `bash tools/update_agent_canon.sh plan` only to classify compatibility routes such as `already_current_tree`, `already_current_split`, `snapshot_import_*`, or `subtree_pull`.
+Until migration, use the source-root resolver `exec tools/update_agent_canon.sh plan` only to classify compatibility routes such as `already_current_tree`, `already_current_split`, `snapshot_import_*`, or `subtree_pull`.
 Do not copy legacy route language into this template's normal task-start rules.

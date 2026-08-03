@@ -53,7 +53,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
   --owner "codex" \
   --workspace-root "$PWD"
 
-bash tools/update_agent_canon.sh plan
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/update_agent_canon.sh plan
 PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh status
 git status --short -- vendor/agent-canon .github/workflows .github/PULL_REQUEST_TEMPLATE
 git diff --stat -- vendor/agent-canon .github/workflows .github/PULL_REQUEST_TEMPLATE
