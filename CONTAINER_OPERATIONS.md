@@ -122,9 +122,13 @@ plan must contain at least one record. Provider, missing-dependency, cycle, and
 typed-verification invariants are unchanged.
 
 The parent-owned `docker/install_python_dependencies.sh` remains the owner of
-workspace Python packages. It runs after the shared dependency plan and before
-AgentCanon build/cache/projection. The parent-owned post-create command remains
-the final lifecycle action.
+workspace Python packages. Its `docker/requirements.txt` is the single resolved
+lock owner for JAX, CUDA plugin/PJRT distributions, and the remaining parent
+Python packages; `pyproject.toml` declares dependency intent but is not a second
+lock or install source. The installer reads only that lock with hash verification
+and does not re-resolve from project metadata. It runs after the shared dependency
+plan and before AgentCanon build/cache/projection. The parent-owned post-create
+command remains the final lifecycle action.
 
 The repo-local runtime pack owns `runtime.dependency_profile` as a first-class
 field. `full` is the default when the field is omitted. Shared pack smoke,

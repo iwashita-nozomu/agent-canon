@@ -60,6 +60,8 @@ def write_devcontainer(root: Path) -> None:
                 "initializeCommand": "bash vendor/agent-canon/.devcontainer/bootstrap-shared-runtime.sh && AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
                 "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
                 "service": "workspace",
+                "containerUser": "project",
+                "remoteUser": "project",
                 "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
                 "postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace/${localWorkspaceFolderBasename} && bash .devcontainer/post-create-parent.sh /workspace/${localWorkspaceFolderBasename}",
                 "postAttachCommand": "bash vendor/agent-canon/.devcontainer/post-attach.sh",
@@ -480,6 +482,8 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
         env={
             **os.environ,
             "HOME": str(home),
+            "PROJECT_UID": "1234",
+            "PROJECT_GID": "2345",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
         check=False,
@@ -492,17 +496,17 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
         encoding="utf-8"
     )
     assert 'target: "/etc/project-template/parent-environment.sh"' in compose
-    assert 'target: "/etc/project-template/zsh/.zshrc"' in compose
+    assert 'target: "/home/project/.zshrc"' in compose
     assert compose.count("read_only: true") >= 2
-    assert 'HOME: "/tmp/project-template-home"' in compose
-    assert 'ZDOTDIR: "/etc/project-template/zsh"' in compose
+    assert 'HOME: "/home/project"' in compose
+    assert 'ZDOTDIR: "/home/project"' in compose
     assert 'SHELL: "/bin/zsh"' in compose
     assert 'AGENT_CANON_DEPENDENCY_PROFILE: "full"' in compose
-    assert 'user: "${LOCAL_UID}:${LOCAL_GID}"' in compose
-    assert (
-        "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700"
-        in compose
-    )
+    assert 'user: "1234:2345"' in compose
+    assert 'PROJECT_USER:' not in compose
+    assert 'PROJECT_UID: "1234"' in compose
+    assert 'PROJECT_GID: "2345"' in compose
+    assert '      - "2345"' in compose
     assert 'command: /bin/zsh -lc "sleep infinity"' in compose
     module = load_container_config_module()
     pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
@@ -528,6 +532,8 @@ def test_parent_generator_disables_unconfigured_parent_environment(
         env={
             **os.environ,
             "HOME": str(home),
+            "PROJECT_UID": "1000",
+            "PROJECT_GID": "1000",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
         check=False,
@@ -540,7 +546,7 @@ def test_parent_generator_disables_unconfigured_parent_environment(
         encoding="utf-8"
     )
     assert 'target: "/etc/project-template/parent-environment.sh"' not in compose
-    assert 'target: "/etc/project-template/zsh/.zshrc"' in compose
+    assert 'target: "/home/project/.zshrc"' in compose
     module = load_container_config_module()
     assert module.validate_parent_environment(repo) == []
 
@@ -569,6 +575,8 @@ def test_parent_environment_symlinks_to_existing_sources_pass(tmp_path: Path) ->
         env={
             **os.environ,
             "HOME": str(home),
+            "PROJECT_UID": "1000",
+            "PROJECT_GID": "1000",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
         check=False,
@@ -606,8 +614,8 @@ def test_parent_environment_broken_symlink_fails(tmp_path: Path) -> None:
     assert any(finding.detail == "missing-target" for finding in findings)
 
 
-def test_parent_compose_rejects_malformed_user_and_home_tmpfs(tmp_path: Path) -> None:
-    """Parent Compose requires the exact mapped user and HOME tmpfs scalar."""
+def test_parent_compose_rejects_root_user_and_missing_build_args(tmp_path: Path) -> None:
+    """Parent Compose requires a non-root runtime identity and reproducible build args."""
     repo = write_parent_generator_fixture(tmp_path)
     (repo / ".agent-canon").mkdir()
     home = tmp_path / "home"
@@ -628,11 +636,8 @@ def test_parent_compose_rejects_malformed_user_and_home_tmpfs(tmp_path: Path) ->
     compose_path = repo / ".agent-canon/docker-compose.generated.yml"
     malformed = (
         compose_path.read_text(encoding="utf-8")
-        .replace('user: "${LOCAL_UID}:${LOCAL_GID}"', 'user: "1000:1000"')
-        .replace(
-            "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700",
-            "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=755",
-        )
+        .replace('user: "1000:1000"', 'user: "0:0"')
+        .replace('        PROJECT_GID: "1000"\n', "")
     )
     compose_path.write_text(malformed, encoding="utf-8")
     module = load_container_config_module()
@@ -642,8 +647,113 @@ def test_parent_compose_rejects_malformed_user_and_home_tmpfs(tmp_path: Path) ->
     details = {
         finding.detail for finding in module.validate_generated_compose(repo, pack)
     }
-    assert "user-mapping-must-be-${LOCAL_UID}:${LOCAL_GID}" in details
-    assert "mapped-uid-home-tmpfs-must-be-exact" in details
+    assert "default-user-must-have-positive-uid-gid" in details
+    assert "build-arg-PROJECT_GID-must-be-positive-integer" in details
+
+
+def test_generator_rejects_public_project_user_override(tmp_path: Path) -> None:
+    """The canonical username cannot be overridden through the generator environment."""
+    repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".agent-canon").mkdir()
+    home = tmp_path / "home"
+    write_host_zshrc(home)
+    environment = {**os.environ, "HOME": str(home), "PROJECT_USER": "alice"}
+    environment.pop("AGENT_CANON_RUNTIME_GID", None)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "DEVCONTAINER_IDENTITY_ERROR=PROJECT_USER_OVERRIDE_FORBIDDEN" in result.stderr
+
+
+def test_generator_rejects_zero_project_uid_or_gid(tmp_path: Path) -> None:
+    """Project UID and GID must both be positive decimal integers."""
+    for field, value in (("PROJECT_UID", "0"), ("PROJECT_GID", "0")):
+        case_root = tmp_path / field
+        repo = write_parent_generator_fixture(case_root)
+        (repo / ".agent-canon").mkdir()
+        home = case_root / "home"
+        write_host_zshrc(home)
+        environment = {
+            **os.environ,
+            "HOME": str(home),
+            "PROJECT_UID": "1234",
+            "PROJECT_GID": "2345",
+            field: value,
+        }
+        environment.pop("PROJECT_USER", None)
+        environment.pop("AGENT_CANON_RUNTIME_GID", None)
+        result = subprocess.run(
+            ["bash", ".devcontainer/generate-runtime-compose.sh"],
+            cwd=repo,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 1
+        assert "DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_MUST_BE_POSITIVE_DECIMAL" in result.stderr
+
+
+def test_parent_validator_rejects_zero_uid_gid_and_runtime_group(tmp_path: Path) -> None:
+    """Generated Compose readback rejects zero project IDs and runtime groups."""
+    repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".agent-canon").mkdir()
+    home = tmp_path / "home"
+    write_host_zshrc(home)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "PROJECT_UID": "1234",
+            "PROJECT_GID": "2345",
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose_path = repo / ".agent-canon/docker-compose.generated.yml"
+    valid = compose_path.read_text(encoding="utf-8")
+    module = load_container_config_module()
+    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack_findings == []
+    assert pack is not None
+
+    malformed_cases = (
+        (
+            valid.replace('user: "1234:2345"', 'user: "0:2345"').replace(
+                'PROJECT_UID: "1234"', 'PROJECT_UID: "0"'
+            ),
+            {"default-user-must-have-positive-uid-gid", "build-arg-PROJECT_UID-must-be-positive-integer"},
+        ),
+        (
+            valid.replace('user: "1234:2345"', 'user: "1234:0"').replace(
+                'PROJECT_GID: "2345"', 'PROJECT_GID: "0"'
+            ),
+            {"default-user-must-have-positive-uid-gid", "build-arg-PROJECT_GID-must-be-positive-integer"},
+        ),
+        (
+            valid.replace('      - "2345"', '      - "0"'),
+            {"runtime-group-must-have-positive-gid"},
+        ),
+    )
+    for malformed, expected in malformed_cases:
+        compose_path.write_text(malformed, encoding="utf-8")
+        details = {
+            finding.detail for finding in module.validate_generated_compose(repo, pack)
+        }
+        assert expected.issubset(details)
 
 
 def test_generator_rejects_runtime_shell_arguments(tmp_path: Path) -> None:
@@ -670,7 +780,7 @@ def test_generator_rejects_runtime_shell_arguments(tmp_path: Path) -> None:
     )
 
 
-def test_parent_generator_uses_host_zshrc_expression_without_host_probe(
+def test_parent_generator_omits_absent_host_zshrc_without_probe(
     tmp_path: Path,
 ) -> None:
     """Fresh-clone generation checks the host mount contract, not host state."""
@@ -694,32 +804,13 @@ def test_parent_generator_uses_host_zshrc_expression_without_host_probe(
     assert result.returncode == 0, result.stdout + result.stderr
     compose_path = repo / ".agent-canon/docker-compose.generated.yml"
     compose = compose_path.read_text(encoding="utf-8")
-    assert 'source: "${HOME}/.zshrc"' in compose
+    assert 'source: "${HOME}/.zshrc"' not in compose
     module = load_container_config_module()
     pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
     assert pack_findings == []
     assert pack is not None
     assert module.validate_generated_compose(repo, pack) == []
 
-    malformed = compose.replace(
-        "      - type: bind\n"
-        '        source: "${HOME}/.zshrc"\n'
-        '        target: "/etc/project-template/zsh/.zshrc"\n'
-        "        read_only: true",
-        "      - type: volume\n"
-        '        source: "/tmp/guessed-zshrc"\n'
-        '        target: "/etc/project-template/zsh/.zshrc"\n'
-        "        read_only: false",
-    )
-    compose_path.write_text(malformed, encoding="utf-8")
-    details = {
-        finding.detail for finding in module.validate_generated_compose(repo, pack)
-    }
-    assert "host-zshrc-mount-type-must-be-bind" in details
-    assert "host-zshrc-source-must-be-${HOME}/.zshrc" in details
-    assert (
-        "parent-environment-mount-read-only:/etc/project-template/zsh/.zshrc" in details
-    )
 
 
 def test_parent_environment_validator_is_static_and_ordered(tmp_path: Path) -> None:

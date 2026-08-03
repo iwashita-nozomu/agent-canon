@@ -41,18 +41,19 @@ optional pair で親環境を有効にする Compose は次の read-only bind mo
 
 ```text
 .devcontainer/parent-environment.sh -> /etc/project-template/parent-environment.sh
-host ~/.zshrc                         -> /etc/project-template/zsh/.zshrc
+host ~/.zshrc                         -> /home/project/.zshrc (when regular file exists)
 ```
 
 parent environment の両 path がない場合は一つ目の mount と source を生成しません。
 宣言された shell path は regular file 自身でも、regular file へ解決できる Symlink
 でも同じ親所有 source として扱います。
 
-host `${HOME}/.zshrc` は明示的な mount source expression です。validator は生成
-Compose の bind type、source expression、target、read-only を静的に検証します。
-実行時には展開後の exact path が regular file である必要がありますが、fresh clone / CI
-validation は現在の runner host file を probe しません。別の host path を探索したり、
-空の zshrc を生成したりしません。
+host `${HOME}/.zshrc` は明示的な optional mount source expression です。validator は
+生成Composeにmountがある場合のbind type、source expression、non-root target、
+read-onlyを静的に検証します。実行時には展開後のexact pathがregular fileの場合だけ
+mountし、欠落・directory・symlinkではmountを省略します。fresh clone / CI validation
+は現在のrunner host fileをprobeしません。別のhost pathを探索したり、空のzshrcを生成
+したりしません。
 
 parent environment が有効な場合、後続の親 image は image-owned
 `/etc/project-template/zsh/.zshenv` から mounted
@@ -69,12 +70,14 @@ generator は既存の `pack.runtime.shell` を interactive process として使
 standalone AgentCanon source layout では pack-derived command だけを生成し、host
 `~/.zshrc`、parent environment mount、`HOME`、`ZDOTDIR`、tmpfs は要求しません。
 
-Compose がこの境界で直接所有する environment は次の三つです。
+Compose がこの境界で直接所有する environment は次の四つです。
 
-- `HOME`: mapped UID/GID で作成された tmpfs（または同等の直接機構）を zsh startup
-  前に提供します。
-- `ZDOTDIR`: image-owned zsh startup directory を指します。
+- `HOME`: dedicated non-root userの `/home/project` を指します。
+- `ZDOTDIR`: `/home/project` を指し、image-owned `.zshenv` はoptional host `.zshrc` の
+  有無にかかわらず parent environment をsourceします。
 - `SHELL`: pack の `runtime.shell` と一致します。
+- `AGENT_CANON_CONTAINER_USER`: `project` と一致し、post-create/attachがruntime
+  user、HOME、ownershipをread backします。
 
 parent environment pair の両方不在、または両方が file 実体へ解決できることは、値や
 container behavior の十分条件ではありません。最終的な親側検証は、validator、
