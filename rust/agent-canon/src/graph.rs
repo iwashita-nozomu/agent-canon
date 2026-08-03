@@ -738,6 +738,37 @@ fn runtime_event_name(name: &str) -> Option<&str> {
     (runtime_hex(unit, 16)).then_some(unit)
 }
 
+fn scan_runtime_event_entries<I, F>(entries: I, metadata: F) -> Result<Vec<PathBuf>, GraphError>
+where
+    I: IntoIterator<Item = std::io::Result<fs::DirEntry>>,
+    F: Fn(&Path) -> std::io::Result<fs::Metadata>,
+{
+    let mut events = Vec::new();
+    for entry in entries {
+        let entry =
+            entry.map_err(|error| GraphError::Unavailable(format!("active run entry: {error}")))?;
+        let path = entry.path();
+        if path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .and_then(runtime_event_name)
+            .is_none()
+        {
+            continue;
+        }
+        let entry_metadata = metadata(&path)
+            .map_err(|error| GraphError::Unavailable(format!("runtime-event metadata: {error}")))?;
+        if !entry_metadata.file_type().is_file() {
+            return Err(GraphError::Validation(
+                "runtime-event entry is not a regular file".to_string(),
+            ));
+        }
+        events.push(path);
+    }
+    events.sort();
+    Ok(events)
+}
+
 fn runtime_boundary(reason: &str, detail: impl Into<String>) -> GraphError {
     GraphError::RuntimeBoundary {
         reason: reason.to_string(),
@@ -855,7 +886,7 @@ fn runtime_live_identity(
     ))
 }
 
-fn active_runtime_event(root: &Path) -> Result<(PathBuf, Vec<u8>), GraphError> {
+fn active_runtime_event(root: &Path) -> Result<Option<(PathBuf, Vec<u8>)>, GraphError> {
     let pointer = root.join("reports/agents/.active_run");
     let active = fs::read_to_string(&pointer)
         .map_err(|error| GraphError::Unavailable(format!("active run pointer: {error}")))?;
@@ -890,22 +921,14 @@ fn active_runtime_event(root: &Path) -> Result<(PathBuf, Vec<u8>), GraphError> {
         .ok_or_else(|| {
             GraphError::Validation("active run pointer escapes reports/agents".to_string())
         })?;
-    let mut events = fs::read_dir(&run_dir)
-        .map_err(|error| GraphError::Unavailable(format!("active run: {error}")))?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| {
-            fs::symlink_metadata(path)
-                .map(|metadata| metadata.file_type().is_file())
-                .unwrap_or(false)
-                && path
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .and_then(runtime_event_name)
-                    .is_some()
-        })
-        .collect::<Vec<_>>();
-    events.sort();
+    let mut events = scan_runtime_event_entries(
+        fs::read_dir(&run_dir)
+            .map_err(|error| GraphError::Unavailable(format!("active run: {error}")))?,
+        |path| fs::symlink_metadata(path),
+    )?;
+    if events.is_empty() {
+        return Ok(None);
+    }
     if events.len() != 1 {
         return Err(GraphError::Unavailable(format!(
             "expected one runtime-event certificate, found {}",
@@ -930,7 +953,7 @@ fn active_runtime_event(root: &Path) -> Result<(PathBuf, Vec<u8>), GraphError> {
         ));
     }
     let bytes = fs::read(&event).map_err(|error| GraphError::Unavailable(error.to_string()))?;
-    Ok((event, bytes))
+    Ok(Some((event, bytes)))
 }
 
 fn load_optional_runtime_evidence_snapshot(
@@ -938,9 +961,7 @@ fn load_optional_runtime_evidence_snapshot(
 ) -> Result<Option<RuntimeEvidenceSnapshot>, GraphError> {
     let pointer = root.join("reports/agents/.active_run");
     match fs::symlink_metadata(&pointer) {
-        Ok(metadata) if metadata.file_type().is_file() => {
-            load_runtime_evidence_snapshot(root).map(Some)
-        }
+        Ok(metadata) if metadata.file_type().is_file() => load_runtime_evidence_snapshot(root),
         Ok(_) => Err(runtime_boundary(
             "runtime_evidence_changed",
             "active run pointer is not a regular file",
@@ -1376,9 +1397,14 @@ fn load_latest_receipt(
     Ok((receipt_relative, bytes, value))
 }
 
-fn load_runtime_evidence_snapshot(root: &Path) -> Result<RuntimeEvidenceSnapshot, GraphError> {
-    let (path, artifact_bytes) = active_runtime_event(root)
-        .map_err(|error| runtime_boundary("runtime_evidence_changed", error.to_string()))?;
+fn load_runtime_evidence_snapshot(
+    root: &Path,
+) -> Result<Option<RuntimeEvidenceSnapshot>, GraphError> {
+    let Some((path, artifact_bytes)) = active_runtime_event(root)
+        .map_err(|error| runtime_boundary("runtime_evidence_changed", error.to_string()))?
+    else {
+        return Ok(None);
+    };
     if !artifact_bytes.ends_with(b"\n")
         || artifact_bytes[..artifact_bytes.len().saturating_sub(1)].contains(&b'\n')
         || artifact_bytes.len() <= 1
@@ -1755,7 +1781,7 @@ fn load_runtime_evidence_snapshot(root: &Path) -> Result<RuntimeEvidenceSnapshot
         .cloned()
         .unwrap_or(Value::Null);
     let freshness_certificate = json!({"artifact_sha256":artifact_sha256,"receipt_sha256":receipt_sha256,"attempt_id":attempt_id,"receipt_sequence":receipt_sequence,"receipt_outcome":receipt_outcome,"source_head_oid":source_head_oid,"base_ref":base_ref,"base_oid":base_oid,"target_identities":target_identities_value,"live_identity_fingerprint":live_identity_fingerprint});
-    Ok(RuntimeEvidenceSnapshot {
+    Ok(Some(RuntimeEvidenceSnapshot {
         artifact_path: relative,
         artifact_sha256,
         artifact_schema: RUNTIME_EVENT_SCHEMA.to_string(),
@@ -1790,7 +1816,7 @@ fn load_runtime_evidence_snapshot(root: &Path) -> Result<RuntimeEvidenceSnapshot
         artifact_value: value,
         receipt_bytes,
         receipt_value,
-    })
+    }))
 }
 
 fn runtime_evidence_json(snapshot: &RuntimeEvidenceSnapshot) -> Value {
@@ -3933,6 +3959,106 @@ mod tests {
         let status = read_graph_status(&args).expect("runtime-present status");
         assert_eq!(status["status"], "stale");
         assert_eq!(status["probe_reason"], "runtime_evidence_changed");
+    }
+
+    #[test]
+    fn graph_build_and_query_succeed_with_empty_active_runtime_run() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        fs::remove_file(&fixture.artifact).expect("remove runtime event");
+        fs::remove_file(&fixture.receipt).expect("remove runtime receipt");
+        let args = graph_args(&fixture.root);
+
+        let build = build_graph_with_failure(&args).expect("empty-run source-only graph build");
+        assert_eq!(build["status"], "fresh");
+        assert_eq!(build["integration_record"]["runtime_evidence"], Value::Null);
+        assert_eq!(build["producer_artifacts"], json!([]));
+        assert_eq!(
+            read_graph_status(&args).expect("empty-run status")["status"],
+            "fresh"
+        );
+        assert_eq!(
+            query_graph(&args).expect("empty-run query")["status"],
+            "fresh"
+        );
+    }
+
+    #[test]
+    fn graph_build_rejects_duplicate_and_mismatched_runtime_event_certificates() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let duplicate = graph_fixture();
+        let duplicate_path = duplicate
+            .artifact
+            .with_file_name("runtime_event.aaaaaaaaaaaaaaaa.json");
+        fs::write(&duplicate_path, &duplicate.artifact_bytes).expect("duplicate runtime event");
+        let duplicate_error = build_graph_with_failure(&graph_args(&duplicate.root))
+            .expect_err("duplicate runtime events must fail closed");
+        assert!(duplicate_error
+            .to_string()
+            .contains("expected one runtime-event certificate, found 2"));
+
+        let mismatch = graph_fixture();
+        let event = String::from_utf8(mismatch.artifact_bytes.clone()).expect("event UTF-8");
+        let mismatched = event.replacen("\"result\":\"PASS\"", "\"result\":\"FAIL\"", 1);
+        fs::write(&mismatch.artifact, mismatched).expect("mismatched runtime event");
+        assert!(build_graph_with_failure(&graph_args(&mismatch.root)).is_err());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn graph_build_rejects_event_shaped_symlink_and_nonregular_entries() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+
+        let symlink_fixture = graph_fixture();
+        fs::remove_file(&symlink_fixture.artifact).expect("remove runtime event");
+        fs::remove_file(&symlink_fixture.receipt).expect("remove runtime receipt");
+        let symlink_path = symlink_fixture
+            .root
+            .join("reports/agents/run-graph/runtime_event.bbbbbbbbbbbbbbbb.json");
+        std::os::unix::fs::symlink("missing-runtime-event", &symlink_path)
+            .expect("event-shaped symlink");
+        let symlink_error = build_graph_with_failure(&graph_args(&symlink_fixture.root))
+            .expect_err("event-shaped symlink must fail closed");
+        assert!(symlink_error
+            .to_string()
+            .contains("runtime-event entry is not a regular file"));
+
+        let nonregular_fixture = graph_fixture();
+        fs::remove_file(&nonregular_fixture.artifact).expect("remove runtime event");
+        fs::remove_file(&nonregular_fixture.receipt).expect("remove runtime receipt");
+        let directory_path = nonregular_fixture
+            .root
+            .join("reports/agents/run-graph/runtime_event.cccccccccccccccc.json");
+        fs::create_dir(&directory_path).expect("event-shaped directory");
+        let directory_error = build_graph_with_failure(&graph_args(&nonregular_fixture.root))
+            .expect_err("event-shaped directory must fail closed");
+        assert!(directory_error
+            .to_string()
+            .contains("runtime-event entry is not a regular file"));
+    }
+
+    #[test]
+    fn runtime_event_scan_rejects_metadata_errors() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        let entries = fs::read_dir(fixture.root.join("reports/agents/run-graph"))
+            .expect("runtime event directory");
+        let error = scan_runtime_event_entries(entries, |path| {
+            if path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .and_then(runtime_event_name)
+                .is_some()
+            {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "metadata denied",
+                ));
+            }
+            fs::symlink_metadata(path)
+        })
+        .expect_err("event metadata failure must fail closed");
+        assert!(error.to_string().contains("runtime-event metadata"));
     }
 
     #[test]

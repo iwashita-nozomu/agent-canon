@@ -135,7 +135,7 @@ branch/worktree and requests user direction.
 
 | Contract | Owner Surface | Validation |
 | -------- | ------------- | ---------- |
-| root runtime entrypoint | `ROOT_AGENTS.md`; `documents/runtime/shared-runtime-surfaces.toml` | `bash tools/sync_agent_canon.sh check` |
+| root runtime entrypoint | `ROOT_AGENTS.md`; `documents/runtime/shared-runtime-surfaces.toml` | `PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check` |
 | workflow family, spawn budget, role topology | `agents/task_catalog.yaml` | `check_agent_runtime_alignment.py` |
 | role behavior and stage conditions | `.codex/agents/*.toml`; `agents/agents_config.json` | `check_agent_runtime_alignment.py` |
 | public skill registry | `agents/skills/catalog.yaml`; `.agents/skills/*/SKILL.md` | `check_agent_runtime_alignment.py` |
@@ -186,5 +186,5 @@ validation route are the task packet for downstream agents.
 - runtime alignment: `python3 tools/agent_tools/check_agent_runtime_alignment.py`
 - structure contract: `python3 tools/agent_tools/repo_structure_contract.py --root . --contract documents/structure/repo-structure-contract.toml`
 - responsibility scope: `python3 tools/agent_tools/responsibility_scope.py --root .`
-- shared runtime views: `bash tools/sync_agent_canon.sh check`
+- shared runtime views: `PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check`
 - closeout: `python3 tools/agent_tools/task_close.py ...`

@@ -57,7 +57,7 @@ source-root `templates/documents/github/` から `.github/` へ再生成しま�
 - delete the parent registry `_template` entry
 - delete parent docs and tests that only exercise the removed scaffold
 - regenerate and check `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` projections
-- pass `bash tools/sync_agent_canon.sh check` from the parent root after the pin/root-view update
+- pass `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check` from the parent root after the pin/root-view update
 
 Parent `experiments/registry.toml` remains project-owned: only the obsolete `_template` entry is
 removed, and all real topic identities stay intact.

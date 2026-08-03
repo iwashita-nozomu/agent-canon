@@ -378,11 +378,14 @@ source snapshot and atomically publishes the parent-owned SQLite database at
 `.agent-canon/knowledge-graph/graph.sqlite`. Source facts and their typed
 completeness diagnostics are always required. A prepared runtime-event plus
 latest committed receipt is an optional producer snapshot: when
-`reports/agents/.active_run` is absent, the same Rust builder publishes a
-source-only graph with explicit `runtime_evidence=null`; when the pointer is
-present, malformed, missing, uncertain, or source-mismatched runtime evidence
-remains a fail-closed runtime boundary. `status`, `query`, and `context` are
-read-only; they never rebuild or fall back to a header scan.
+`reports/agents/.active_run` is absent, or the pointed active run has no
+prepared runtime-event certificate, the same Rust builder publishes a
+source-only graph with explicit `runtime_evidence=null`. The empty-run case is
+an observability closeout condition, not a semantic graph prerequisite. Once a
+prepared certificate is present, duplicate, malformed, missing, uncertain, or
+source-mismatched runtime evidence remains a fail-closed runtime boundary.
+`status`, `query`, and `context` are read-only; they never rebuild or fall back
+to a header scan.
 
 source snapshot の候補 path は、解決先の内容ではなく候補 path 自体の
 filesystem object を読む。`dependency_manifest.rs` の単一 source-path

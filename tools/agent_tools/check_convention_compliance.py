@@ -821,7 +821,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "root runtime entrypoint",
                     "ROOT_AGENTS.md",
-                    "bash tools/sync_agent_canon.sh check",
+                    "PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check",
                 ),
                 (
                     "workflow family, spawn budget, role topology",
