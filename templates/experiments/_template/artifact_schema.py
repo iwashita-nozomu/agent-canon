@@ -93,6 +93,23 @@ REQUIRED_COMPLETION_FIELDS = (
     "reproducibility.cleanup_command",
     "reproducibility.reconstructibility_readback",
 )
+REQUIRED_COMPLETION_STRUCTURES = (
+    (
+        "plan.options",
+        2,
+        ("id", "mechanism", "status", "rejected_rationale", "selection_evidence"),
+    ),
+    (
+        "plan.selection",
+        1,
+        ("selected_option", "rejected_rationale", "selection_evidence"),
+    ),
+    (
+        "review",
+        1,
+        ("independent_reviewer", "source_snapshot", "selection_evidence", "review_decision"),
+    ),
+)
 PLACEHOLDER_RE = re.compile(r"<[^>\n]+>")
 UNRESOLVED_MARKER_RE = re.compile(
     r"\b(?:IMPLEMENT HERE|TODO|TBD|FIXME|REPLACE ME|selected-or-rejected)\b",

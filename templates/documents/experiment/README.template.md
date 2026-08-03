@@ -259,18 +259,26 @@ completion field と placeholder/未解決 marker の registry は `artifact_sch
 所有し、gate は `config.yaml` を YAML として parse した後、config/provenance の mapping、list、
 scalar を再帰走査します。malformed YAML、TOML、nested reviewer の `<...>`、`IMPLEMENT HERE`
 などが残れば reject し、fixture も全 token の一括置換ではなく semantic field を個別に materialize
-して検証します。
+して検証します。さらに `plan.options` は2案以上と各選択理由/evidence、`plan.selection` は
+選択結果と却下理由/evidence、`review` は reviewer、source snapshot、selection evidence、
+decision を必須とします。
 
 ## Implementation Markers
 
-- `run.py` のtop-level importは `from __future__ import annotations` と軽量な定数・標準libraryに限定する。
+- `run.py` のtop-level importは `from __future__ import annotations`、標準 library、軽量な local
+  module (`artifact_io.py`、`artifact_schema.py`、`case_execution.py`、`case_model.py`、
+  `visualization.py`) に限定する。`cases.py` は completion gate 通過後の `load_cases()` 内で
+  lazy import し、重い project dependency を top-level に置かない。
 - `run.py` の `main()` は引数なしで固定し、`argparse` などのtopic CLIを追加しない。
 - `template_complete=false`、placeholder、または completion provenance 不足を成功へ変える
   production bypass flag は設けない。
-- JAX、CUDA、NumPy、EQX、Optax、project moduleなどの実験依存importは、`run_experiment()` または
-  `run_case_worker()` の内部へ置く。
-- 実験の実装箇所は `run.py`、`cases.py`、`config.yaml`、`visualize.ipynb` の `IMPLEMENT HERE`
-  markerで明示する。
+- JAX、CUDA、NumPy、EQX、Optax、project moduleなどの重い実験依存importは、利用者が追加する
+  `run_case_worker()` の内部または notebook の実行 cell に置き、`run.py` の top-level importへ
+  引き上げない。
+- `IMPLEMENT HERE` marker は現在 `config.yaml` の completion/config field と
+  `visualize.ipynb` の artifact reader/figure cell にだけあります。`run.py` と `cases.py` に
+  markerを追加せず、case registry は `cases.py` の `CASES`、domain algorithm は
+  `case_execution.py` の `run_case_worker()`、schema/readback は5 moduleの各 ownerへ実装します。
 - `run.py` は execution entrypoint/orchestration に限定し、上記5 moduleの責務を重複実装しない。
 - artifact manifest は run directory 内の nested regular file 全件を normalized relative path と
   SHA-256 で readback する。CaseResult の terminal state invariant を publication 前に通す。

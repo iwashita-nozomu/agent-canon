@@ -35,6 +35,7 @@ from artifact_schema import (
     ENVIRONMENT_SNAPSHOT_NAME,
     FAILURE_EVIDENCE_NAME,
     REQUIRED_COMPLETION_FIELDS,
+    REQUIRED_COMPLETION_STRUCTURES,
     REQUIRED_CONFIG_FIELDS,
     RESULT_CASES_NAME,
     RESULT_MANIFEST_NAME,
@@ -73,6 +74,36 @@ def _is_completed_value(value: object) -> bool:
     if isinstance(value, dict):
         return bool(value)
     return True
+
+
+def _missing_completion_structures(provenance: object) -> list[str]:
+    """Provenance の必須 table 構造と fields の不足を列挙します."""
+    missing: list[str] = []
+    for path, minimum_count, fields in REQUIRED_COMPLETION_STRUCTURES:
+        value = _completion_value(provenance, path)
+        if path == "plan.options":
+            records = value if isinstance(value, list) else []
+            if len(records) < minimum_count:
+                missing.append(
+                    f"provenance.{path} requires at least {minimum_count} records"
+                )
+        else:
+            records = [value] if isinstance(value, dict) else []
+            if not records:
+                missing.append(f"provenance.{path} is required")
+        for index, record in enumerate(records):
+            if not isinstance(record, dict):
+                missing.append(f"provenance.{path}[{index}] must be a mapping")
+                continue
+            for field in fields:
+                if not _is_completed_value(record.get(field)):
+                    field_path = (
+                        f"provenance.{path}[{index}].{field}"
+                        if path == "plan.options"
+                        else f"provenance.{path}.{field}"
+                    )
+                    missing.append(field_path)
+    return missing
 
 
 def load_completion_provenance(template_dir: Path) -> CompletionProvenance:
@@ -149,6 +180,7 @@ def load_completion_provenance(template_dir: Path) -> CompletionProvenance:
     for field in REQUIRED_COMPLETION_FIELDS:
         if not _is_completed_value(_completion_value(provenance, field)):
             missing.append(field)
+    missing.extend(_missing_completion_structures(provenance))
     return CompletionProvenance(
         template_complete=config_complete and template_complete,
         completion_status=completion_status,

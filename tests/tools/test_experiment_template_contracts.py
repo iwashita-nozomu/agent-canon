@@ -171,6 +171,51 @@ def test_completion_gate_recursively_rejects_nested_reviewer_placeholder(
     assert "provenance.review.reviewer.identity unresolved" in completion.missing_fields
 
 
+def test_completion_gate_requires_alternatives_selection_and_review_fields(
+    tmp_path: Path,
+) -> None:
+    """Completion gate が複数案、selection、review の構造を要求します."""
+    (tmp_path / "config.yaml").write_text(
+        "\n".join(
+            (
+                "template_complete: true",
+                "cases: {example: true}",
+                "metric: {name: sum}",
+                "runtime: {entrypoint: run.py}",
+                "algorithm_contract: {entrypoint: run_case_worker}",
+                "oracle: {necessary: [record]}",
+                "provenance: {owner: checker}",
+                "failure: {classification: expected_contract}",
+                "lifecycle: {cleanup: temporary}",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "provenance.toml").write_text(
+        "\n".join(
+            (
+                'template_complete = true',
+                'completion_status = "complete"',
+                "[plan]",
+                'options = [{ id = "option-a", mechanism = "m", status = "rejected", rejected_rationale = "r", selection_evidence = "e" }]',
+                "[plan.selection]",
+                'selected_option = "option-a"',
+                "[review]",
+                'independent_reviewer = ""',
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    completion = load_completion_provenance(tmp_path)
+
+    assert "provenance.plan.options requires at least 2 records" in completion.missing_fields
+    assert "provenance.plan.selection.rejected_rationale" in completion.missing_fields
+    assert "provenance.review.independent_reviewer" in completion.missing_fields
+
+
 def test_summary_requires_run_state_enum_and_completion_readback() -> None:
     """Summary が enum state と completion readback の不一致を拒否します."""
     with pytest.raises(ValueError, match="RunState enum"):
