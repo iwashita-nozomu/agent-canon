@@ -436,6 +436,23 @@ class = "projection_view"
 local_override_allowed = false
 
 [[group]]
+mode = "retired_copy"
+owner = "legacy"
+class = "retired_projection"
+paths = [
+  "tools/sync_agent_canon.sh",
+  "tools/agent_tools/surface_manifest.py",
+]
+
+[[surface]]
+path = "tools/agent_tools/update_agent_canon.sh"
+mode = "retired_copy"
+source = "tools/update_agent_canon.sh"
+owner = "legacy"
+class = "retired_projection"
+local_override_allowed = false
+
+[[group]]
 mode = "removed_legacy"
 owner = "legacy"
 class = "removed_legacy"

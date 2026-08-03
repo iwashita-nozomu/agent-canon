@@ -1565,19 +1565,39 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "agent-canon-ensure-latest:\n\t@touch make-sentinel\n",
                 encoding="utf-8",
             )
-            (workspace_root / "tools").mkdir()
-            (workspace_root / "tools" / "sync_agent_canon.sh").write_text(
+            source_root = workspace_root / "vendor" / "agent-canon"
+            source_agent_tools = source_root / "tools" / "agent_tools"
+            source_agent_tools.mkdir(parents=True)
+            (source_root / "agents" / "skills").mkdir(parents=True)
+            (source_root / "agents" / "skills" / "catalog.yaml").write_text(
+                "skills: []\n",
+                encoding="utf-8",
+            )
+            (source_agent_tools / "agent_canon_source_root.py").write_text(
+                (
+                    PROJECT_ROOT
+                    / "tools"
+                    / "agent_tools"
+                    / "agent_canon_source_root.py"
+                ).read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            (source_agent_tools / "surface_manifest.py").write_text(
+                "#!/usr/bin/env python3\n",
+                encoding="utf-8",
+            )
+            (source_root / "tools" / "sync_agent_canon.sh").write_text(
                 "#!/usr/bin/env bash\nset -eu\n[ \"${1:-}\" = check ]\n",
                 encoding="utf-8",
             )
+            (source_root / "tools" / "sync_agent_canon.sh").chmod(0o755)
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
             subprocess.run(
                 [
                     "git",
                     "add",
                     "Makefile",
-                    "tools/sync_agent_canon.sh",
-                    "vendor/agent-canon/documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
+                    "vendor/agent-canon",
                 ],
                 cwd=workspace_root,
                 check=True,

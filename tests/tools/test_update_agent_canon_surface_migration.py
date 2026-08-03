@@ -75,6 +75,14 @@ class SurfaceMigrationTest(unittest.TestCase):
         self.configure_git(source)
         self.git(source, "branch", "-M", "main")
         self.git(source, "add", "-A")
+        self.git(source, "update-index", "--chmod=+x", "tools/sync_agent_canon.sh")
+        self.git(
+            source,
+            "update-index",
+            "--chmod=-x",
+            "tools/agent_tools/surface_manifest.py",
+        )
+        self.git(source, "update-index", "--chmod=-x", "tools/update_agent_canon.sh")
         self.git(source, "commit", "-m", "fixture AgentCanon source")
 
         parent.mkdir()
@@ -119,6 +127,27 @@ class SurfaceMigrationTest(unittest.TestCase):
             },
         )
 
+    def run_resolved_sync(
+        self,
+        root: Path,
+        *commands: str,
+    ) -> subprocess.CompletedProcess[str]:
+        """Run sync through the public source-root resolver from a parent."""
+        source = root / "vendor" / "agent-canon"
+        return subprocess.run(
+            [
+                sys.executable,
+                str(source / "tools" / "agent_tools" / "agent_canon_source_root.py"),
+                "exec",
+                "tools/sync_agent_canon.sh",
+                *commands,
+            ],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
     def write_file(self, path: Path, text: str) -> None:
         """Write a file for the fixture."""
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -143,6 +172,38 @@ class SurfaceMigrationTest(unittest.TestCase):
         parent_tools.mkdir()
         tools_sentinel = parent_tools / "parent-local-tool.sh"
         tools_sentinel.write_text("keep parent tools\n", encoding="utf-8")
+        source_tools = root / "vendor" / "agent-canon" / "tools"
+        shutil.copy2(
+            source_tools / "sync_agent_canon.sh",
+            parent_tools / "sync_agent_canon.sh",
+        )
+        legacy_agent_tools = parent_tools / "agent_tools"
+        legacy_agent_tools.mkdir()
+        shutil.copy2(
+            source_tools / "agent_tools" / "surface_manifest.py",
+            legacy_agent_tools / "surface_manifest.py",
+        )
+        (legacy_agent_tools / "update_agent_canon.sh").symlink_to(
+            root
+            / "vendor"
+            / "agent-canon"
+            / "tools"
+            / "update_agent_canon.sh"
+        )
+        self.git(
+            root,
+            "add",
+            "tools/sync_agent_canon.sh",
+            "tools/agent_tools/surface_manifest.py",
+            "tools/agent_tools/update_agent_canon.sh",
+        )
+        self.git(root, "update-index", "--chmod=+x", "tools/sync_agent_canon.sh")
+        self.git(
+            root,
+            "update-index",
+            "--chmod=-x",
+            "tools/agent_tools/surface_manifest.py",
+        )
 
         devcontainer = root / ".devcontainer"
         devcontainer.mkdir()
@@ -256,6 +317,56 @@ class SurfaceMigrationTest(unittest.TestCase):
             tools_sentinel.read_text(encoding="utf-8"),
             "keep parent tools\n",
         )
+        resolved_check = self.run_resolved_sync(root, "check")
+        self.assertEqual(
+            resolved_check.returncode,
+            0,
+            resolved_check.stdout + resolved_check.stderr,
+        )
+
+    def test_diverged_retired_copy_blocks_before_any_migration(self) -> None:
+        """Preserve a parent-modified retired path and avoid partial deletion."""
+        root = self.clone_parent_fixture()
+        source_tools = root / "vendor" / "agent-canon" / "tools"
+        root_tools = root / "tools"
+        root_tools.mkdir()
+        exact_copy = root_tools / "sync_agent_canon.sh"
+        shutil.copy2(source_tools / "sync_agent_canon.sh", exact_copy)
+        diverged = root_tools / "agent_tools" / "surface_manifest.py"
+        self.write_file(diverged, "# parent-owned implementation\n")
+
+        result = self.run_sync(root, "link-root")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "retired_copy[tools/agent_tools/surface_manifest.py]=collision_preserved",
+            result.stderr,
+        )
+        self.assertTrue(exact_copy.is_file(), "preflight must prevent partial deletion")
+        self.assertEqual(
+            diverged.read_text(encoding="utf-8"),
+            "# parent-owned implementation\n",
+        )
+        self.assertFalse((root_tools / "agent-canon").exists())
+
+    def test_retired_copy_uses_git_index_executable_mode(self) -> None:
+        """Reject a byte-identical copy whose tracked executable mode diverges."""
+        root = self.clone_parent_fixture()
+        source = root / "vendor" / "agent-canon" / "tools" / "sync_agent_canon.sh"
+        destination = root / "tools" / "sync_agent_canon.sh"
+        destination.parent.mkdir()
+        shutil.copy2(source, destination)
+        self.git(root, "add", "tools/sync_agent_canon.sh")
+        self.git(root, "update-index", "--chmod=-x", "tools/sync_agent_canon.sh")
+
+        result = self.run_sync(root, "link-root")
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "retired_copy[tools/sync_agent_canon.sh]=collision_preserved",
+            result.stderr,
+        )
+        self.assertTrue(destination.is_file())
 
     def test_removed_legacy_surface_preserves_unknown_mirror(self) -> None:
         """Known retired mirrors are removed while unknown mirrors remain untouched."""

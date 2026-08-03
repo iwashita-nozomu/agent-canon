@@ -246,7 +246,7 @@ second command manual.
   - mutating な `latest` / `apply` と低レベル委譲は、既存の4つのGit authority/reason fieldに加えて `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` を同じcommand segmentで必須にします。digestはuser request recordまたはcanonical workflow authorization packetのexact bytesのSHA-256です。
   - `latest` は safe な AgentCanon `main` 更新、root view check、親 repo update TODO routing / acknowledge まで進めます。新規蓄積は `.agent-canon/log-archive/` を使い、source tree の `agents/evals/results/` を新規作成しません。pending TODO が残る場合も更新コマンドは成功終了し、`AGENT_CANON_LATEST_TOOL_RESULT=updated_with_pending_todos` と `NEXT_ACTION=apply_agent_canon_update_todos_then_rerun_latest` を出します。intended named branch の ahead / diverged / dirty state は evidence として保持し、`merge-main-into-current` は non-colliding local materialized paths をその場に残します。Git の仮想 merge conflict または exact update write set との collision だけを typed blocker として agent workflow に渡します。
   - Local bare / proposal / snapshot refresh route は user-facing command から外しています。submodule 化済み repo の通常 path は GitHub branch と AgentCanon PR です。
-  - 派生 repo 側の shared canon 差分を upstream に渡す場合は、`vendor/agent-canon/` 内で commit し、`bash tools/update_agent_canon.sh merge-main-into-current` で GitHub `main` を current branch に取り込み、validation 後にその branch を GitHub へ push して AgentCanon PR を開きます。
+  - 派生 repo 側の shared canon 差分を upstream に渡す場合は、`vendor/agent-canon/` 内で commit し、source-root resolver の `exec tools/update_agent_canon.sh merge-main-into-current` で GitHub `main` を current branch に取り込み、validation 後にその branch を GitHub へ push して AgentCanon PR を開きます。
   - AgentCanon PR merge 後に `make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。この target は `make agent-canon-latest` と同じ high-level route です。
   - GitHub 管理では `iwashita-nozomu/agent-canon` と template GitHub repo の `main` SHA、AgentCanon PR URL、submodule pin を PR 本文に残します。
 - `tools/agent_tools/agent_canon_update_todos.py`
@@ -263,7 +263,7 @@ second command manual.
   - 例: `profile_surface_resolver.py` は `route.py --area surface`、`$runtime-capability-routing` は `route.py --area runtime` として扱います。
   - 新しい public tool / skill を足す前に `python3 tools/agent_tools/route.py --name <candidate>` で既存 route に畳めるか確認します。
 - `tools/sync_agent_canon.sh`
-  - shared agent canon surface の drift check と再同期を行う低レベル入口です。通常の作業者は直接 `pull` せず、task 開始時の latest route、root view 修復の link-root route、drift check の `bash tools/sync_agent_canon.sh check` 経由で使います。
+  - shared agent canon surface の drift check と再同期を行う source 側の低レベル入口です。parent では `tools/agent-canon/` view または source-root resolver から実体を解決します。通常の作業者は直接 `pull` せず、task 開始時の latest route、root view 修復の link-root route、resolver 経由の `check` を使います。
   - `pull`、`ensure-latest`、`link-root` などのmutating入口は、staging・checkout・submodule update・root-view mutationの前に同じcommit request evidenceをfail-closedで検証します。自動sync commitは固定identityと `AgentCanon-*` formal trailersを持ちます。
   - `link-root` は symlink view と root copy surface を復元します。`goal.md` は repo-local state なので shared symlink に戻しません。
 - `tools/agent_tools/waterfall_gate_check.py`

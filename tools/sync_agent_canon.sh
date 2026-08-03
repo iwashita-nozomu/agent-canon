@@ -6,8 +6,9 @@
 # upstream design ../documents/rule/dependency-module-changes.md dependency source branch and projection ownership
 # upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../documents/runtime/shared-runtime-surfaces.toml machine-readable surface manifest
-# upstream implementation ./agent_tools/surface_manifest.py renders link, copy, regular, and root-absent specs
+# upstream implementation ./agent_tools/surface_manifest.py renders projection and retired-copy specs
 # downstream implementation ../tests/tools/test_update_agent_canon.py verifies sync/update behavior
+# downstream implementation ../tests/tools/test_update_agent_canon_surface_migration.py verifies bounded migration
 # @dependency-end
 set -euo pipefail
 export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
@@ -22,6 +23,11 @@ else
   ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 fi
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
+if [ "$PREFIX" = "." ]; then
+  PUBLIC_SYNC_COMMAND="bash tools/sync_agent_canon.sh"
+else
+  PUBLIC_SYNC_COMMAND="PYTHONPATH=${PREFIX}/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh"
+fi
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 FORCE_RELINK="${AGENT_CANON_FORCE_RELINK:-0}"
@@ -36,12 +42,12 @@ COMMIT_PROVENANCE_NEXT_ACTION="set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:
 usage() {
   cat <<EOF
 Usage:
-  bash tools/sync_agent_canon.sh plan [branch]
-  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root
-  bash tools/sync_agent_canon.sh check
-  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh submodule-add <remote-url> [branch]
-  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh ensure-latest [branch]
-  bash tools/sync_agent_canon.sh status
+  $PUBLIC_SYNC_COMMAND plan [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> $PUBLIC_SYNC_COMMAND link-root
+  $PUBLIC_SYNC_COMMAND check
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> $PUBLIC_SYNC_COMMAND submodule-add <remote-url> [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> $PUBLIC_SYNC_COMMAND ensure-latest [branch]
+  $PUBLIC_SYNC_COMMAND status
 
 Legacy subtree / snapshot / direct push routes are compatibility-only and are
 not listed as user-facing commands. Use tools/update_agent_canon.sh for normal
@@ -527,6 +533,87 @@ build_copy_specs() {
     --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" copy-specs
 }
 
+build_retired_copy_specs() {
+  python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
+    --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" retired-copy-specs
+}
+
+retired_copy_matches_source() {
+  local path="$1"
+  local source="$2"
+  local abs_path="$ROOT_DIR/$path"
+  local abs_source="$ROOT_DIR/$source"
+
+  [ -f "$abs_source" ] || die "retired copy source '$source' does not exist"
+  if [ -L "$abs_path" ]; then
+    [ "$(readlink -f "$abs_path")" = "$(readlink -f "$abs_source")" ]
+    return
+  fi
+  [ -f "$abs_path" ] || return 1
+  cmp -s "$abs_path" "$abs_source" || return 1
+
+  # Git tree mode is the executable-bit authority. Filesystems mounted with a
+  # forced mode (for example CIFS file_mode=0755) cannot supply that contract.
+  local source_relative="${source#"$PREFIX"/}"
+  local source_mode=""
+  local destination_mode=""
+  source_mode="$(git -C "$ROOT_DIR/$PREFIX" ls-files -s -- "$source_relative" | awk 'NR == 1 {print $1}')"
+  destination_mode="$(git -C "$ROOT_DIR" ls-files -s -- "$path" | awk 'NR == 1 {print $1}')"
+  [ -n "$source_mode" ] || die "retired copy source '$source' is not tracked"
+  [ -z "$destination_mode" ] || [ "$destination_mode" = "$source_mode" ]
+}
+
+preflight_retired_copy_migration() {
+  local spec=""
+  local failed=0
+
+  is_submodule_prefix || return 0
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    local path="${spec%%:*}"
+    local source="${spec#*:}"
+    local abs_path="$ROOT_DIR/$path"
+    if [ ! -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
+      continue
+    fi
+    if retired_copy_matches_source "$path" "$source"; then
+      echo "retired_copy[$path]=exact_legacy_projection"
+      continue
+    fi
+    echo "retired_copy[$path]=collision_preserved" >&2
+    failed=1
+  done < <(build_retired_copy_specs)
+
+  [ "$failed" -eq 0 ] \
+    || die "retired AgentCanon root copy collision detected; preserve parent-owned content and resolve ownership before retry"
+}
+
+migrate_retired_copies() {
+  local spec=""
+
+  is_submodule_prefix || return 0
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    local path="${spec%%:*}"
+    local source="${spec#*:}"
+    local abs_path="$ROOT_DIR/$path"
+    if [ -e "$abs_path" ] || [ -L "$abs_path" ]; then
+      retired_copy_matches_source "$path" "$source" \
+        || die "retired copy changed after preflight: $path"
+      rm -f "$abs_path"
+      echo "retired_copy[$path]=removed_exact_legacy_projection"
+    fi
+  done < <(build_retired_copy_specs)
+
+  # Remove only now-empty containers that existed solely for retired copies.
+  # Parent-owned siblings make rmdir fail safely and remain untouched.
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    local path="${spec%%:*}"
+    rmdir "$ROOT_DIR/$(dirname "$path")" 2>/dev/null || true
+  done < <(build_retired_copy_specs)
+}
+
 link_path() {
   local path="$1"
   local target="$2"
@@ -805,7 +892,9 @@ cmd_link_root() {
     echo "agent_canon_projection_requirements=parent_vendor_named_branch_and_gitlink_match_required"
     echo "AGENT_CANON_LINK_ROOT_PROJECTION_WARNING=${next_action}"
   }
+  preflight_retired_copy_migration
   ensure_surface_sync_safe "$force"
+  migrate_retired_copies
 
   local spec=""
   # Materialize regular containers before child links. This converts legacy
@@ -848,6 +937,13 @@ cmd_snapshot() {
 
 cmd_check() {
   ensure_prefix_exists
+
+  if ! is_submodule_prefix && [ "$PREFIX" = "." ]; then
+    python3 "$ROOT_DIR/tools/agent_tools/surface_manifest.py" \
+      --root "$ROOT_DIR" --prefix "." --manifest "$SURFACE_MANIFEST" check-doc
+    echo "shared surface source manifest is valid"
+    return 0
+  fi
 
   local spec=""
   local failed=0
@@ -899,6 +995,22 @@ cmd_check() {
     failed=1
   done < <(build_regular_specs)
 
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    local path="${spec%%:*}"
+    local source="${spec#*:}"
+    local abs_path="$ROOT_DIR/$path"
+    if [ ! -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
+      continue
+    fi
+    if retired_copy_matches_source "$path" "$source"; then
+      echo "retired_copy[$path]=migration_pending" >&2
+    else
+      echo "retired_copy[$path]=collision_preserved" >&2
+    fi
+    failed=1
+  done < <(build_retired_copy_specs)
+
   if ! python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
     --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" check-doc >&2; then
     failed=1
@@ -942,7 +1054,7 @@ cmd_check() {
 
   if [ "$failed" -ne 0 ]; then
     [ "$failed" -ne 0 ] || return 0
-    die "shared surface drift detected; set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and rerun 'bash tools/sync_agent_canon.sh link-root'"
+    die "shared surface drift detected; set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and rerun '$PUBLIC_SYNC_COMMAND link-root'"
   fi
 
   echo "shared surface is in sync"
@@ -967,6 +1079,14 @@ stage_sync_paths() {
       git -C "$ROOT_DIR" add -A -- "$spec"
     fi
   done < <(build_root_absent_paths)
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    local path="${spec%%:*}"
+    if [ ! -e "$ROOT_DIR/$path" ] && [ ! -L "$ROOT_DIR/$path" ] \
+      && path_is_tracked "$path"; then
+      git -C "$ROOT_DIR" add -A -- "$path"
+    fi
+  done < <(build_retired_copy_specs)
 }
 
 commit_sync_paths_if_needed() {
@@ -992,6 +1112,14 @@ commit_sync_paths_if_needed() {
       owned_paths+=("$spec")
     fi
   done < <(build_root_absent_paths)
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    local path="${spec%%:*}"
+    if [ ! -e "$ROOT_DIR/$path" ] && [ ! -L "$ROOT_DIR/$path" ] \
+      && path_is_tracked "$path"; then
+      owned_paths+=("$path")
+    fi
+  done < <(build_retired_copy_specs)
 
   stage_sync_paths
   if git -C "$ROOT_DIR" diff --cached --quiet -- "${owned_paths[@]}"; then
@@ -1186,7 +1314,7 @@ print_plan_summary() {
   case "$route" in
     submodule_detached) ;;
     *)
-      echo "agent_canon_plan_apply_command=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh ensure-latest $branch"
+      echo "agent_canon_plan_apply_command=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> $PUBLIC_SYNC_COMMAND ensure-latest $branch"
       ;;
   esac
 }

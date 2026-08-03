@@ -16,9 +16,9 @@ import json
 import os
 import sys
 
-if sys.version_info >= (3, 11):
+try:
     import tomllib
-else:
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
@@ -33,6 +33,7 @@ ALLOWED_MODES = frozenset(
         "symlink",
         "copy",
         "regular",
+        "retired_copy",
         "repo_state",
         "standalone_only",
         "removed_legacy",
@@ -65,6 +66,7 @@ ALLOWED_CLASSES = frozenset(
         "projection_view",
         "standalone_only",
         "transaction_state",
+        "retired_projection",
         "removed_legacy",
     }
 )
@@ -137,6 +139,7 @@ def build_parser() -> argparse.ArgumentParser:
     for command in (
         "link-specs",
         "copy-specs",
+        "retired-copy-specs",
         "regular-specs",
         "removed-legacy-paths",
         "root-absent-paths",
@@ -184,7 +187,7 @@ def validate_entry(entry: SurfaceEntry) -> SurfaceEntry:
         raise ValueError(f"{entry.path}: invalid owner {entry.owner}")
     if entry.surface_class not in ALLOWED_CLASSES:
         raise ValueError(f"{entry.path}: invalid class {entry.surface_class}")
-    if entry.mode in {"symlink", "copy"} and not entry.source_or_default():
+    if entry.mode in {"symlink", "copy", "retired_copy"} and not entry.source_or_default():
         raise ValueError(f"{entry.path}: {entry.mode} requires a source")
     return entry
 
@@ -316,6 +319,16 @@ def render_copy_specs(entries: Iterable[SurfaceEntry], prefix: str) -> str:
     return "\n".join(lines)
 
 
+def render_retired_copy_specs(entries: Iterable[SurfaceEntry], prefix: str) -> str:
+    """Render one-time migration specs for retired root copies."""
+    lines = [
+        f"{entry.path}:{source_for_entry(prefix, entry)}"
+        for entry in entries
+        if entry.mode == "retired_copy"
+    ]
+    return "\n".join(lines)
+
+
 def render_regular_specs(entries: Iterable[SurfaceEntry], prefix: str) -> str:
     """Render regular file materialization specs."""
     lines = [
@@ -408,6 +421,10 @@ def render_command_outputs(manifest: SurfaceManifest, root: Path) -> Mapping[str
     return {
         "link-specs": render_specs(manifest.entries, root, manifest.prefix),
         "copy-specs": render_copy_specs(manifest.entries, manifest.prefix),
+        "retired-copy-specs": render_retired_copy_specs(
+            manifest.entries,
+            manifest.prefix,
+        ),
         "regular-specs": render_regular_specs(manifest.entries, manifest.prefix),
         "removed-legacy-paths": render_removed_legacy(manifest.entries),
         "root-absent-paths": render_root_absent_paths(manifest.entries),
