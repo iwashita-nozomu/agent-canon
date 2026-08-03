@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Provides sync agent canon repository automation.
 # upstream design ../documents/agent-canon/agent-canon-update-route.md canonical update materialization acceptance
+# upstream design ../documents/rule/repository-topic-clone.md generic repository source clone lifecycle
 # upstream design ../documents/rule/dependency-module-changes.md dependency source branch and projection ownership
 # upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../documents/runtime/shared-runtime-surfaces.toml machine-readable surface manifest
@@ -958,7 +959,7 @@ cmd_link_root() {
     local projection_rc="$?"
     local next_action=""
     if [ "$projection_rc" -eq 1 ]; then
-      next_action="materialize_vendor_topic_commit_push_pr_or_use_workspace_fallback"
+      next_action="prepare_generic_repository_topic_clone_via_dependency_decorator"
     elif [ "$projection_rc" -eq 2 ]; then
       next_action="request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
     elif [ "$projection_rc" -eq 4 ]; then
@@ -1099,7 +1100,7 @@ cmd_check() {
   assert_parent_submodule_projection_ready || {
     projection_rc="$?"
     if [ "$projection_rc" -eq 1 ]; then
-      echo "NEXT_ACTION=materialize_vendor_topic_commit_push_pr_or_use_workspace_fallback"
+      echo "NEXT_ACTION=prepare_generic_repository_topic_clone_via_dependency_decorator"
       echo "agent_canon_projection_scope=pin_root_projection_current_parent_checkout_only"
     elif [ "$projection_rc" -eq 2 ]; then
       echo "NEXT_ACTION=request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"

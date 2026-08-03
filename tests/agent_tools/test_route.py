@@ -723,6 +723,39 @@ class RouteToolTest(unittest.TestCase):
                 self.assertNotIn("refactor-loop", decision["matched_skills"])
                 self.assertNotIn("refactor-loop", decision["active_skills"])
 
+    def test_repository_topic_clone_routes_repository_kind_as_decorator(self) -> None:
+        """Parent, dependency, and standalone clones share one generic owner."""
+        scenarios = (
+            (
+                "Clone a parent repository topic branch into workspace/<topic>/<repo>.",
+                False,
+            ),
+            (
+                "Clone a dependency source topic branch and then update its gitlink.",
+                True,
+            ),
+            (
+                "Clone a standalone repository into a workspace topic branch.",
+                False,
+            ),
+            (
+                "Clone the repository topic, then make a small .gitignore change whose broader owner also requires workflow docs.",
+                False,
+            ),
+        )
+        for prompt, dependency_expected in scenarios:
+            with self.subTest(prompt=prompt):
+                result = self.run_route("--prompt", prompt, "--format", "json")
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                decision = json.loads(result.stdout)
+                self.assertIn("repository-topic-clone", decision["active_skills"])
+                self.assertEqual(
+                    "dependency-module-change" in decision["matched_skills"],
+                    dependency_expected,
+                )
+                if ".gitignore" in prompt:
+                    self.assertNotIn("owner-bounded-routing", decision["matched_skills"])
+
     def test_prompt_routes_patch_only_no_validation_as_implementation(self) -> None:
         """No-validation clauses after patch-only work should not mean no patch."""
         result = self.run_route(

@@ -4,7 +4,8 @@
 # responsibility Provides GitHub-first AgentCanon submodule update automation.
 # upstream design ../documents/agent-canon/agent-canon-update-route.md owns update materialization acceptance and publication order.
 # upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md defines GitHub-first module policy.
-# upstream design ../documents/rule/dependency-module-changes.md defines independent source-clone and clean projection policy.
+# upstream design ../documents/rule/repository-topic-clone.md owns the generic topic-clone lifecycle.
+# upstream design ../documents/rule/dependency-module-changes.md decorates that lifecycle with pin/projection policy.
 # upstream design ../documents/agent-canon/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.
 # upstream implementation ./sync_agent_canon.sh performs low-level submodule freshness and root-view synchronization.
 # upstream implementation ./agent_tools/update_lifecycle_contract.py owns queue/frontier receipt mechanics and guards.
@@ -165,10 +166,11 @@ classify_parent_vendor_source() {
     workspace_root="$(dirname "$ROOT_DIR")/workspace/$fallback_topic/agent-canon"
     echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=$requested_topic"
     echo "AGENT_CANON_PARENT_BRANCH_SOURCE_CLONE_PATH=$workspace_root"
+    echo "AGENT_CANON_REPOSITORY_TOPIC_CLONE_OWNER=tools/agent_tools/repository_topic_clone.py"
     echo "AGENT_CANON_DEPENDENCY_MODULE_ROUTE=documents/rule/dependency-module-changes.md"
     echo "AGENT_CANON_DEPENDENCY_MODULE_TOOL=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic $fallback_topic --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
     echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-    echo "NEXT_ACTION=materialize_vendor_topic_commit_push_pr_or_use_workspace_fallback"
+    echo "NEXT_ACTION=prepare_generic_repository_topic_clone_via_dependency_decorator"
     return 2
   fi
 
@@ -200,10 +202,11 @@ classify_parent_vendor_source() {
     echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=$current_branch"
     echo "AGENT_CANON_PARENT_VENDOR_PIN=$parent_prefix_head"
     echo "AGENT_CANON_PARENT_VENDOR_SOURCE_HEAD=$source_head"
+    echo "AGENT_CANON_REPOSITORY_TOPIC_CLONE_OWNER=tools/agent_tools/repository_topic_clone.py"
     echo "AGENT_CANON_DEPENDENCY_MODULE_ROUTE=documents/rule/dependency-module-changes.md"
     echo "AGENT_CANON_DEPENDENCY_MODULE_TOOL=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic ${current_branch} --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
     echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-    echo "NEXT_ACTION=materialize_vendor_topic_commit_push_pr_or_use_workspace_fallback"
+    echo "NEXT_ACTION=prepare_generic_repository_topic_clone_via_dependency_decorator"
     return 2
   fi
 
@@ -389,8 +392,9 @@ emit_agentcanon_conflict_workflow_route() {
   echo "AGENT_CANON_LATEST_BLOCK_REASON=$reason"
   echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
   if [ "$AGENT_CANON_SOURCE_MODE" = "parent_projection" ]; then
+    echo "AGENT_CANON_LATEST_CLONE_OWNER=tools/agent_tools/repository_topic_clone.py"
     echo "AGENT_CANON_LATEST_DEPENDENCY_ROUTE=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic <topic> --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
-    echo "NEXT_ACTION=prepare_topic_workspace_source_clone"
+    echo "NEXT_ACTION=prepare_generic_repository_topic_clone_via_dependency_decorator"
   else
     echo "AGENT_CANON_LATEST_CONFLICT_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current"
     echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest"

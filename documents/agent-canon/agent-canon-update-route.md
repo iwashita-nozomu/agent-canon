@@ -4,6 +4,7 @@ contract reference
 responsibility Owns the canonical AgentCanon source-to-parent update transaction and namespace boundaries.
 upstream design ../../agents/skills/agent-orchestration.md owns Decision Sufficiency policy.
 upstream design ../../agents/skills/structure-refactor.md owns final-structure-first scope formation.
+upstream design ../rule/repository-topic-clone.md owns generic repository topic clone lifecycle.
 upstream design ../rule/dependency-module-changes.md owns generic dependency source-clone and clean-projection policy.
 upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns lifecycle schemas and transition guards.
 downstream implementation ../../tools/update_agent_canon.sh executes source rebind, queue/frontier, and parent-projection guards.
@@ -34,8 +35,14 @@ the user request record or canonical workflow authorization packet. Missing,
 uppercase, malformed, or fallback evidence is rejected; there is no actor or
 authority compatibility input.
 
-`tools/sync_agent_canon.sh::commit_sync_paths_if_needed` owns automatic sync
-commits. It always sets Author and Committer to
+AgentCanon source の
+`tools/sync_agent_canon.sh::commit_sync_paths_if_needed` が automatic sync
+commit を所有します。template / derived parent の root adapter は
+`agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` へ委譲し、
+full-sync 実装や root tool copy を所有しません。legacy full copy は既知 transition
+identity に一致するときだけ migration evidence として扱います。
+
+Source implementation always sets Author and Committer to
 `AgentCanon Sync Automation <agent-canon-sync@automation.invalid>` and emits
 formal `AgentCanon-*` trailers for the automation actor, validated authority
 source, destructive authority, request evidence, remote, update method, and
@@ -44,23 +51,19 @@ prefix. The trailers must remain readable by `git interpret-trailers --parse`.
 The parent repository has two distinct AgentCanon states. Parent pin/root
 projection is ready only when `vendor/agent-canon` is clean on named `main` and
 its worktree `HEAD` equals the staged index gitlink. Source editing is owned by
-a named topic branch in the current `vendor/agent-canon` checkout; `main` is
-only the topic-creation starting point. The intended topic branch may carry
-committed differences and collision-free uncommitted paths during source update
-materialization. A managed workspace clone is a fallback only when another
-topic already occupies the parent vendor with dirty state.
+a named branch in the generic repository topic clone at
+`workspace/<topic>/<repository>`; `main` is only the topic-creation starting
+point. Repository kind is applied after clone preparation as an update or
+dependency policy decorator. A specialized adapter mismatch removes that
+decorator only and returns the operation to the generic clone owner.
 
-The complete parent-state, requested-topic, and dirty-fallback decision is owned
-by [`documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table`](../rule/dependency-module-changes.md#agentcanon-parent-state-decision-table).
-The `latest` update-target branch is not a topic identity; reuse an existing topic
-owner or use `AGENT_CANON_TOPIC_SLUG` when an explicit requested topic is needed.
+The `latest` update-target branch is not a topic identity; reuse the requested
+topic owner or use `AGENT_CANON_TOPIC_SLUG` when an explicit topic is needed.
 
-For any dependency source edit, apply
-`documents/rule/dependency-module-changes.md`: default route uses the current
-`vendor/agent-canon` checkout for direct source work when it is the intended
-named topic branch; route to the managed topic workspace clone only when another
-active topic owns that checkout, publish there, and then project a clean vendor
-pin.
+For any dependency source edit, apply the generic lifecycle in
+`documents/rule/repository-topic-clone.md`, then the dependency decorator in
+`documents/rule/dependency-module-changes.md`. Publish from the managed source
+clone and project a clean vendor pin after integration.
 
 ## Update Materialization Acceptance
 

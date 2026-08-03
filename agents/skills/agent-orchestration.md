@@ -261,22 +261,20 @@ with required prerequisites and derives their topological invocation order from
 that dictionary. Prompt keywords select candidates only; they do not encode a
 second call order or related-skill list.
 
-### Parallel Fresh-Clone Workstreams
+### Repository Topic Clone Workstreams
 
-Vendor-first is the default for one nonparallel source stream. It is not a
-prohibition on explicitly requested parallel independent work. A parent may
-select `workspace/<topic-slug>/<module-basename>` fresh clones from latest
-`origin/main` only when the current vendor checkout is occupied by a different
-active topic or branch and the remaining DAG contains substantial replaceable
-responsibility units with disjoint write scopes, explicit dependency and merge
-order, independent validation routes, and distinct reviewer ownership. Parallel
-eligibility alone never triggers clone preparation. The typed lifecycle route is
-`dependency_module_change.py prepare --placement workspace`; its exact topic,
-module, branch, owner evidence, computed clone path, and source identity are
-part of the handoff evidence. Fresh mode always creates the requested branch
-from fetched `origin/main` and refuses an existing local or remote branch;
-continuation uses the separately typed
-`dependency_module_change.py prepare --placement workspace-continuation` route.
+親、依存、standalone の source workstream はすべて
+`repository-topic-clone` の単一 lifecycle を使います。要求された clone/edit/update
+operation を先に保ち、`workspace/<topic-slug>/<repo-name>` の exact identity が既存
+clone と一致すれば named branch を再利用し、branch が無ければ最新
+`origin/main` から作成します。repository kind は prepare 後の policy decorator
+であり、specialized skill の前提が合わない場合はその decorator だけを外して generic
+operation を続けます。
+
+workstream の scope は repository 構造、依存 edge、差し替え可能な責務単位、validation
+route から形成します。`.gitignore`、単一 file、行数、diff 件数は clone lifecycle や
+owner-bounded route の選択根拠になりません。複数 workstream は disjoint write scope、
+dependency/merge order、reviewer ownership が成立する場合だけ並列化します。
 
 For an eligible parallel set, the parent must launch every ready non-conflicting
 stream under actual capacity, preserve each stream's full responsibility unit,
@@ -286,9 +284,10 @@ file-sized clones, or timed fragments is not an independent workstream and is
 not admissible. Colliding or dependent streams remain ordered by the recorded
 dependency/merge order.
 
-Every stream branch must fetch and merge the latest `origin/main` before its
-candidate review or PR. The parent preserves the explicit merge order when
-integrating candidates; a base-read or CAS check without the merge is
+Every stream branch must fetch and normally merge the latest `origin/main`
+before its candidate review or PR. Dirty state and merge conflicts are preserved
+as typed evidence for intentional resolution. The parent preserves the explicit
+merge order when integrating candidates; a base-read or CAS check without the merge is
 insufficient.
 
 ## Decision Sufficiency Packet

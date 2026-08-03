@@ -288,6 +288,10 @@ enabled = true
 path = "../.agents/skills/parent-repository-audit/SKILL.md"
 enabled = true
 
+[[skills.config]]
+path = "../.agents/skills/repository-topic-clone/SKILL.md"
+enabled = true
+
 [agents]
 max_threads = 27
 max_depth = 2

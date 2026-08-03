@@ -49,7 +49,7 @@ TODO state up to date.
   dirty checkout state, or pending `.agent-canon/update-state.toml` TODOs.
 - `vendor/agent-canon/` contains the named topic branch for current source work,
   including collision-free local state, or another topic's state requires the
-  managed workspace fallback.
+  generic repository topic clone lifecycle.
   A `main` checkout is the topic-creation starting point, not a source-edit owner.
 
 ## Core References

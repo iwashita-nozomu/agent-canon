@@ -174,10 +174,9 @@ startup design failure です。
 
 依存 source clone の表示・構成のために、VS Code multi-root workspace、
 `*.code-workspace`、`workspace.json`、その他の editor workspace metadata を
-作成、更新、管理、または要求してはなりません。`prepare` が返す
-`PARENT_ROOT`、`SOURCE_CLONE`、`CONTINUE_PATH` は filesystem / lifecycle と
-devcontainer mount の path contract であり、VS Code workspace の構成入力では
-ありません。
+作成、更新、管理、または要求してはなりません。generic lifecycle の
+`prepare` が返す `SOURCE_CLONE` は filesystem / lifecycle と devcontainer
+mount の path contract であり、VS Code workspace の構成入力ではありません。
 
 この禁止は `.vscode/` の共有 extension/settings/tasks surface を変更しません。
 `.vscode/` は親所有の regular directory container とし、template と derived repo

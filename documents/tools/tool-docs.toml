@@ -145,11 +145,18 @@ language = "python"
 summary = "Semantic responsibility contract schema, identity, and reference checker documentation."
 
 [[tool]]
+id = "repository-topic-clone"
+tool = "tools/agent_tools/repository_topic_clone.py"
+doc = "documents/tools/repository_topic_clone.md"
+language = "python"
+summary = "Generic repository topic clone lifecycle and reconstructibility cleanup documentation."
+
+[[tool]]
 id = "dependency-module-change"
 tool = "tools/agent_tools/dependency_module_change.py"
 doc = "documents/tools/dependency_module_change.md"
 language = "python"
-summary = "Independent dependency source clone lifecycle and reconstructibility-gated cleanup documentation."
+summary = "Dependency policy decorator for the generic repository topic clone lifecycle."
 
 [[tool]]
 id = "classify-path-risk"

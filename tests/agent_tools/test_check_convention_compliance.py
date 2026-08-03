@@ -41,6 +41,7 @@ from tools.agent_tools.check_convention_compliance import (
     TEST_CONTRACT_ROUTING_MARKERS,
     TOOL_GATES,
     VALIDATION_FAILURE_RESPONSE_MARKERS,
+    check_surface_manifest_wiring,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -867,6 +868,57 @@ class CheckConventionComplianceTest(unittest.TestCase):
             )
             self.assertIn("missing-marker:.codex/hooks.json", result.stdout)
 
+    def test_parent_root_sync_adapter_delegates_to_vendored_source(self) -> None:
+        """A parent root adapter may delegate all sync internals to AgentCanon."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "vendor" / "agent-canon"
+            self.copy_minimal_repo(source)
+            adapter = root / "tools" / "sync_agent_canon.sh"
+            adapter.parent.mkdir(parents=True)
+            adapter.write_text(
+                "#!/usr/bin/env bash\n"
+                'exec env PYTHONPATH="vendor/agent-canon/tools:tools" \\\n'
+                "  python3 -m agent_tools.agent_canon_source_root exec \\\n"
+                '  tools/sync_agent_canon.sh "$@"\n',
+                encoding="utf-8",
+            )
+
+            findings = check_surface_manifest_wiring(root)
+
+            self.assertEqual(findings, [])
+
+    def test_parent_root_sync_adapter_missing_or_wrong_target_fails(self) -> None:
+        """Missing and mistargeted parent adapters fail without internal markers."""
+        for adapter_text in (
+            None,
+            "#!/usr/bin/env bash\n"
+            'exec env PYTHONPATH="vendor/agent-canon/tools:tools" '
+            "python3 -m agent_tools.agent_canon_source_root exec "
+            'tools/update_agent_canon.sh "$@"\n',
+        ):
+            with (
+                self.subTest(adapter_text=adapter_text),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
+                root = Path(tmp_dir)
+                source = root / "vendor" / "agent-canon"
+                self.copy_minimal_repo(source)
+                if adapter_text is not None:
+                    adapter = root / "tools" / "sync_agent_canon.sh"
+                    adapter.parent.mkdir(parents=True)
+                    adapter.write_text(adapter_text, encoding="utf-8")
+
+                findings = check_surface_manifest_wiring(root)
+
+                self.assertTrue(findings)
+                self.assertTrue(
+                    any(
+                        "missing-root-source-adapter-marker" in finding.detail
+                        for finding in findings
+                    )
+                )
+
     def test_hook_guardrail_policy_marker_fails(self) -> None:
         """Every stable dispatcher contract marker remains mechanically required."""
         path = ".codex/hooks/hook_dispatcher.py"
@@ -902,7 +954,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("hook_guardrail_policy:tools/agent_tools/hook_safety.py", result.stdout)
+            self.assertIn(
+                "hook_guardrail_policy:tools/agent_tools/hook_safety.py", result.stdout
+            )
             self.assertIn("missing-marker:operation", result.stdout)
 
     def test_parent_repo_can_keep_shared_docs_only_in_vendor_canon(self) -> None:
@@ -1491,7 +1545,9 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("branch_worktree_creation_guard", result.stdout)
-            self.assertIn("missing-marker:tools/agent_tools/hook_safety.py", result.stdout)
+            self.assertIn(
+                "missing-marker:tools/agent_tools/hook_safety.py", result.stdout
+            )
 
     def test_minimal_fixture_covers_branch_worktree_guard_surfaces(self) -> None:
         """The minimal test fixture includes every branch/worktree guard surface."""

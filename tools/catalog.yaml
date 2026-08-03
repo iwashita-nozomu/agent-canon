@@ -1110,8 +1110,29 @@ entries:
     tests:
       - tests/tools/test_container_config.py
 
+  - id: repository-topic-clone
+    summary: Owns the generic workspace topic clone, branch reuse, origin/main merge, publication readback, and reconstructibility cleanup lifecycle.
+    path: tools/agent_tools/repository_topic_clone.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    audience: skill
+    placement: skill_helper
+    command: python3 tools/agent_tools/repository_topic_clone.py
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/repository_topic_clone.md
+      - documents/rule/repository-topic-clone.md
+    tests:
+      - tests/agent_tools/test_repository_topic_clone.py
+
   - id: dependency-module-change
-    summary: Prepares, projects, and cleans independent dependency source clones using .gitmodules identity and remote reconstructibility gates.
+    summary: Decorates generic repository topic clones with .gitmodules, gitlink, pin, and projection policy.
     path: tools/agent_tools/dependency_module_change.py
     family: agent_tools
     role: workflow
