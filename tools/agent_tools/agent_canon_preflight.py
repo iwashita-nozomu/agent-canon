@@ -51,7 +51,6 @@ SURFACE_MANIFEST = Path("tools/agent_tools/surface_manifest.py")
 SURFACE_SPEC_COMMANDS = (
     "link-specs",
     "copy-specs",
-    "retired-copy-specs",
     "removed-legacy-paths",
 )
 

@@ -6,7 +6,7 @@
 # upstream design ../documents/rule/dependency-module-changes.md dependency source branch and projection ownership
 # upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../documents/runtime/shared-runtime-surfaces.toml machine-readable surface manifest
-# upstream implementation ./agent_tools/surface_manifest.py renders projection and retired-copy specs
+# upstream implementation ./agent_tools/surface_manifest.py renders projection and update-transition specs
 # downstream implementation ../tests/tools/test_update_agent_canon.py verifies sync/update behavior
 # downstream implementation ../tests/tools/test_update_agent_canon_surface_migration.py verifies bounded migration
 # @dependency-end
@@ -38,6 +38,9 @@ PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_comman
 COMMIT_AUTOMATION_AUTHOR_NAME="AgentCanon Sync Automation"
 COMMIT_AUTOMATION_AUTHOR_EMAIL="agent-canon-sync@automation.invalid"
 COMMIT_PROVENANCE_NEXT_ACTION="set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex> and rerun the same command"
+ACTIVE_ROOT_COPY_TRANSITION_ID=""
+declare -a ROOT_COPY_TRANSITION_CANDIDATES=()
+declare -a ROOT_COPY_TRANSITION_REMOVED_PATHS=()
 
 usage() {
   cat <<EOF
@@ -533,85 +536,160 @@ build_copy_specs() {
     --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" copy-specs
 }
 
-build_retired_copy_specs() {
+build_update_transition_specs() {
   python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
-    --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" retired-copy-specs
+    --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" update-transition-specs
 }
 
-retired_copy_matches_source() {
+active_root_copy_transition_id() {
+  local previous_pin=""
+  local staged_pin=""
+  local source_pin=""
+  local transition_id=""
+  local from_agent_canon_pins=""
+  local unused=""
+
+  is_submodule_prefix || return 1
+  previous_pin="$(git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX" 2>/dev/null || true)"
+  staged_pin="$(git -C "$ROOT_DIR" rev-parse ":$PREFIX" 2>/dev/null || true)"
+  source_pin="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD 2>/dev/null || true)"
+  [ -n "$previous_pin" ] && [ -n "$staged_pin" ] && [ -n "$source_pin" ] || return 1
+  [ "$staged_pin" = "$source_pin" ] && [ "$previous_pin" != "$source_pin" ] || return 1
+
+  while IFS="$(printf '\t')" read -r transition_id from_agent_canon_pins unused; do
+    [ -n "$transition_id" ] || continue
+    case ",$from_agent_canon_pins," in
+      *",$previous_pin,"*)
+        printf '%s\n' "$transition_id"
+        return 0
+        ;;
+    esac
+  done < <(build_update_transition_specs)
+  return 1
+}
+
+root_copy_transition_identity_matches() {
   local path="$1"
-  local source="$2"
+  local transition_id="$2"
   local abs_path="$ROOT_DIR/$path"
-  local abs_source="$ROOT_DIR/$source"
+  local actual_blob=""
+  local actual_sha256=""
+  local actual_mode=""
+  local actual_target=""
+  local spec_transition_id=""
+  local from_agent_canon_pins=""
+  local spec_path=""
+  local kind=""
+  local git_blob=""
+  local content_sha256=""
+  local git_mode=""
+  local symlink_target=""
 
-  [ -f "$abs_source" ] || die "retired copy source '$source' does not exist"
+  actual_mode="$(git -C "$ROOT_DIR" ls-files -s -- "$path" | awk 'NR == 1 {print $1}')"
   if [ -L "$abs_path" ]; then
-    [ "$(readlink -f "$abs_path")" = "$(readlink -f "$abs_source")" ]
-    return
+    actual_target="$(readlink "$abs_path")"
+    actual_blob="$(printf '%s' "$actual_target" | git -C "$ROOT_DIR" hash-object --stdin)"
+    actual_sha256="$(printf '%s' "$actual_target" | sha256sum | awk '{print $1}')"
+  elif [ -f "$abs_path" ]; then
+    actual_blob="$(git -C "$ROOT_DIR" hash-object --no-filters "$abs_path")"
+    actual_sha256="$(sha256sum "$abs_path" | awk '{print $1}')"
+  else
+    return 1
   fi
-  [ -f "$abs_path" ] || return 1
-  cmp -s "$abs_path" "$abs_source" || return 1
 
-  # Git tree mode is the executable-bit authority. Filesystems mounted with a
-  # forced mode (for example CIFS file_mode=0755) cannot supply that contract.
-  local source_relative="${source#"$PREFIX"/}"
-  local source_mode=""
-  local destination_mode=""
-  source_mode="$(git -C "$ROOT_DIR/$PREFIX" ls-files -s -- "$source_relative" | awk 'NR == 1 {print $1}')"
-  destination_mode="$(git -C "$ROOT_DIR" ls-files -s -- "$path" | awk 'NR == 1 {print $1}')"
-  [ -n "$source_mode" ] || die "retired copy source '$source' is not tracked"
-  [ -z "$destination_mode" ] || [ "$destination_mode" = "$source_mode" ]
+  while IFS="$(printf '\t')" read -r \
+    spec_transition_id from_agent_canon_pins spec_path kind git_blob \
+    content_sha256 git_mode symlink_target; do
+    [ "$spec_transition_id" = "$transition_id" ] || continue
+    [ "$spec_path" = "$path" ] || continue
+    [ "$actual_blob" = "$git_blob" ] || continue
+    [ "$actual_sha256" = "$content_sha256" ] || continue
+    [ "$actual_mode" = "$git_mode" ] || continue
+    if [ "$kind" = "regular" ] && [ -f "$abs_path" ] && [ ! -L "$abs_path" ]; then
+      return 0
+    fi
+    if [ "$kind" = "symlink" ] && [ -L "$abs_path" ] \
+      && [ "$actual_target" = "$symlink_target" ]; then
+      return 0
+    fi
+  done < <(build_update_transition_specs)
+  return 1
 }
 
-preflight_retired_copy_migration() {
-  local spec=""
-  local failed=0
+preflight_root_copy_transition() {
+  local specs=""
+  local path=""
 
-  is_submodule_prefix || return 0
-  while IFS= read -r spec; do
-    [ -n "$spec" ] || continue
-    local path="${spec%%:*}"
-    local source="${spec#*:}"
-    local abs_path="$ROOT_DIR/$path"
-    if [ ! -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
+  ACTIVE_ROOT_COPY_TRANSITION_ID="$(active_root_copy_transition_id || true)"
+  ROOT_COPY_TRANSITION_CANDIDATES=()
+  ROOT_COPY_TRANSITION_REMOVED_PATHS=()
+  [ -n "$ACTIVE_ROOT_COPY_TRANSITION_ID" ] || return 0
+  specs="$(build_update_transition_specs)"
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    if [ ! -e "$ROOT_DIR/$path" ] && [ ! -L "$ROOT_DIR/$path" ]; then
       continue
     fi
-    if retired_copy_matches_source "$path" "$source"; then
-      echo "retired_copy[$path]=exact_legacy_projection"
-      continue
+    if root_copy_transition_identity_matches "$path" "$ACTIVE_ROOT_COPY_TRANSITION_ID"; then
+      ROOT_COPY_TRANSITION_CANDIDATES+=("$path")
+      echo "update_transition[$ACTIVE_ROOT_COPY_TRANSITION_ID][$path]=known_legacy_identity"
+    else
+      echo "update_transition[$ACTIVE_ROOT_COPY_TRANSITION_ID][$path]=parent_owned_preserved"
     fi
-    echo "retired_copy[$path]=collision_preserved" >&2
-    failed=1
-  done < <(build_retired_copy_specs)
-
-  [ "$failed" -eq 0 ] \
-    || die "retired AgentCanon root copy collision detected; preserve parent-owned content and resolve ownership before retry"
+  done < <(
+    printf '%s\n' "$specs" \
+      | awk -F "$(printf '\t')" -v transition="$ACTIVE_ROOT_COPY_TRANSITION_ID" \
+          '$1 == transition {print $3}' \
+      | sort -u
+  )
 }
 
-migrate_retired_copies() {
-  local spec=""
+migrate_root_copy_transition() {
+  local transition_state_dir="$ROOT_DIR/.agent-canon/update-lifecycle"
+  local quarantine=""
+  local path=""
+  local moved_path=""
+  local index=0
+  local -a moved_paths=()
 
-  is_submodule_prefix || return 0
-  while IFS= read -r spec; do
-    [ -n "$spec" ] || continue
-    local path="${spec%%:*}"
-    local source="${spec#*:}"
-    local abs_path="$ROOT_DIR/$path"
-    if [ -e "$abs_path" ] || [ -L "$abs_path" ]; then
-      retired_copy_matches_source "$path" "$source" \
-        || die "retired copy changed after preflight: $path"
-      rm -f "$abs_path"
-      echo "retired_copy[$path]=removed_exact_legacy_projection"
+  [ -n "$ACTIVE_ROOT_COPY_TRANSITION_ID" ] || return 0
+  [ "${#ROOT_COPY_TRANSITION_CANDIDATES[@]}" -gt 0 ] || return 0
+
+  # Revalidate every candidate before moving the first path. Diverged paths
+  # were already classified as parent-owned and are not part of this set.
+  for path in "${ROOT_COPY_TRANSITION_CANDIDATES[@]}"; do
+    root_copy_transition_identity_matches "$path" "$ACTIVE_ROOT_COPY_TRANSITION_ID" \
+      || die "update transition candidate changed after preflight: $path"
+  done
+
+  mkdir -p "$transition_state_dir"
+  quarantine="$(mktemp -d "$transition_state_dir/root-surface-transition.XXXXXX")"
+  case "$quarantine" in
+    "$transition_state_dir"/root-surface-transition.*) ;;
+    *) die "invalid root-surface transition quarantine path" ;;
+  esac
+
+  for path in "${ROOT_COPY_TRANSITION_CANDIDATES[@]}"; do
+    mkdir -p "$quarantine/$(dirname "$path")"
+    if ! mv "$ROOT_DIR/$path" "$quarantine/$path"; then
+      for ((index = ${#moved_paths[@]} - 1; index >= 0; index--)); do
+        moved_path="${moved_paths[$index]}"
+        mkdir -p "$ROOT_DIR/$(dirname "$moved_path")"
+        mv "$quarantine/$moved_path" "$ROOT_DIR/$moved_path" \
+          || die "update transition rollback failed for $moved_path"
+      done
+      rm -rf "$quarantine"
+      die "update transition move failed for $path; all earlier moves were restored"
     fi
-  done < <(build_retired_copy_specs)
+    moved_paths+=("$path")
+  done
 
-  # Remove only now-empty containers that existed solely for retired copies.
-  # Parent-owned siblings make rmdir fail safely and remain untouched.
-  while IFS= read -r spec; do
-    [ -n "$spec" ] || continue
-    local path="${spec%%:*}"
+  rm -rf "$quarantine"
+  for path in "${ROOT_COPY_TRANSITION_CANDIDATES[@]}"; do
+    ROOT_COPY_TRANSITION_REMOVED_PATHS+=("$path")
+    echo "update_transition[$ACTIVE_ROOT_COPY_TRANSITION_ID][$path]=removed_known_legacy_identity"
     rmdir "$ROOT_DIR/$(dirname "$path")" 2>/dev/null || true
-  done < <(build_retired_copy_specs)
+  done
 }
 
 link_path() {
@@ -892,9 +970,9 @@ cmd_link_root() {
     echo "agent_canon_projection_requirements=parent_vendor_named_branch_and_gitlink_match_required"
     echo "AGENT_CANON_LINK_ROOT_PROJECTION_WARNING=${next_action}"
   }
-  preflight_retired_copy_migration
+  preflight_root_copy_transition
   ensure_surface_sync_safe "$force"
-  migrate_retired_copies
+  migrate_root_copy_transition
 
   local spec=""
   # Materialize regular containers before child links. This converts legacy
@@ -995,22 +1073,6 @@ cmd_check() {
     failed=1
   done < <(build_regular_specs)
 
-  while IFS= read -r spec; do
-    [ -n "$spec" ] || continue
-    local path="${spec%%:*}"
-    local source="${spec#*:}"
-    local abs_path="$ROOT_DIR/$path"
-    if [ ! -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
-      continue
-    fi
-    if retired_copy_matches_source "$path" "$source"; then
-      echo "retired_copy[$path]=migration_pending" >&2
-    else
-      echo "retired_copy[$path]=collision_preserved" >&2
-    fi
-    failed=1
-  done < <(build_retired_copy_specs)
-
   if ! python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
     --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" check-doc >&2; then
     failed=1
@@ -1079,14 +1141,11 @@ stage_sync_paths() {
       git -C "$ROOT_DIR" add -A -- "$spec"
     fi
   done < <(build_root_absent_paths)
-  while IFS= read -r spec; do
-    [ -n "$spec" ] || continue
-    local path="${spec%%:*}"
-    if [ ! -e "$ROOT_DIR/$path" ] && [ ! -L "$ROOT_DIR/$path" ] \
-      && path_is_tracked "$path"; then
-      git -C "$ROOT_DIR" add -A -- "$path"
+  for spec in "${ROOT_COPY_TRANSITION_REMOVED_PATHS[@]}"; do
+    if [ ! -e "$ROOT_DIR/$spec" ] && [ ! -L "$ROOT_DIR/$spec" ]; then
+      git -C "$ROOT_DIR" add -A -- "$spec"
     fi
-  done < <(build_retired_copy_specs)
+  done
 }
 
 commit_sync_paths_if_needed() {
@@ -1112,14 +1171,11 @@ commit_sync_paths_if_needed() {
       owned_paths+=("$spec")
     fi
   done < <(build_root_absent_paths)
-  while IFS= read -r spec; do
-    [ -n "$spec" ] || continue
-    local path="${spec%%:*}"
-    if [ ! -e "$ROOT_DIR/$path" ] && [ ! -L "$ROOT_DIR/$path" ] \
-      && path_is_tracked "$path"; then
-      owned_paths+=("$path")
+  for spec in "${ROOT_COPY_TRANSITION_REMOVED_PATHS[@]}"; do
+    if [ ! -e "$ROOT_DIR/$spec" ] && [ ! -L "$ROOT_DIR/$spec" ]; then
+      owned_paths+=("$spec")
     fi
-  done < <(build_retired_copy_specs)
+  done
 
   stage_sync_paths
   if git -C "$ROOT_DIR" diff --cached --quiet -- "${owned_paths[@]}"; then

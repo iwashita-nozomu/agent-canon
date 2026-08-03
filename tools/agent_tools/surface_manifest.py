@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sys
 
 try:
@@ -33,7 +34,6 @@ ALLOWED_MODES = frozenset(
         "symlink",
         "copy",
         "regular",
-        "retired_copy",
         "repo_state",
         "standalone_only",
         "removed_legacy",
@@ -66,7 +66,6 @@ ALLOWED_CLASSES = frozenset(
         "projection_view",
         "standalone_only",
         "transaction_state",
-        "retired_projection",
         "removed_legacy",
     }
 )
@@ -115,10 +114,39 @@ class SurfaceManifest:
 
     prefix: str
     entries: tuple[SurfaceEntry, ...]
+    update_transitions: tuple[UpdateTransition, ...]
 
     def by_mode(self, mode: str) -> tuple[SurfaceEntry, ...]:
         """Return manifest entries for one mode."""
         return tuple(entry for entry in self.entries if entry.mode == mode)
+
+
+@dataclass(frozen=True)
+class LegacyIdentity:
+    """One history-bound identity eligible for a one-time transition."""
+
+    kind: str
+    git_blob: str
+    content_sha256: str
+    git_mode: str
+    symlink_target: str
+
+
+@dataclass(frozen=True)
+class UpdateTransitionCandidate:
+    """One parent path considered during an update transition."""
+
+    path: str
+    identities: tuple[LegacyIdentity, ...]
+
+
+@dataclass(frozen=True)
+class UpdateTransition:
+    """A migration activated only by a known previous AgentCanon pin."""
+
+    transition_id: str
+    from_agent_canon_pins: tuple[str, ...]
+    candidates: tuple[UpdateTransitionCandidate, ...]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -139,7 +167,7 @@ def build_parser() -> argparse.ArgumentParser:
     for command in (
         "link-specs",
         "copy-specs",
-        "retired-copy-specs",
+        "update-transition-specs",
         "regular-specs",
         "removed-legacy-paths",
         "root-absent-paths",
@@ -187,7 +215,7 @@ def validate_entry(entry: SurfaceEntry) -> SurfaceEntry:
         raise ValueError(f"{entry.path}: invalid owner {entry.owner}")
     if entry.surface_class not in ALLOWED_CLASSES:
         raise ValueError(f"{entry.path}: invalid class {entry.surface_class}")
-    if entry.mode in {"symlink", "copy", "retired_copy"} and not entry.source_or_default():
+    if entry.mode in {"symlink", "copy"} and not entry.source_or_default():
         raise ValueError(f"{entry.path}: {entry.mode} requires a source")
     return entry
 
@@ -248,6 +276,79 @@ def entries_from_group(mapping: Mapping[str, object]) -> tuple[SurfaceEntry, ...
     return tuple(entries)
 
 
+def string_list(mapping: Mapping[str, object], key: str) -> tuple[str, ...]:
+    """Return one validated non-empty string list."""
+    raw_values = mapping.get(key)
+    if not isinstance(raw_values, list) or not raw_values:
+        raise ValueError(f"{key} must be a non-empty list")
+    values: list[str] = []
+    for item in cast(list[object], raw_values):
+        if not isinstance(item, str) or not item:
+            raise ValueError(f"{key} entries must be non-empty strings")
+        values.append(item)
+    return tuple(values)
+
+
+def legacy_identity_from_mapping(mapping: Mapping[str, object]) -> LegacyIdentity:
+    """Create and validate one history-derived legacy identity."""
+    identity = LegacyIdentity(
+        kind=string_value(mapping, "kind"),
+        git_blob=string_value(mapping, "git_blob"),
+        content_sha256=string_value(mapping, "content_sha256"),
+        git_mode=string_value(mapping, "git_mode"),
+        symlink_target=string_value(mapping, "symlink_target"),
+    )
+    if identity.kind not in {"regular", "symlink"}:
+        raise ValueError(f"legacy identity has invalid kind {identity.kind}")
+    if not re.fullmatch(r"[0-9a-f]{40}(?:[0-9a-f]{24})?", identity.git_blob):
+        raise ValueError("legacy identity git_blob must be a lowercase object id")
+    if not re.fullmatch(r"[0-9a-f]{64}", identity.content_sha256):
+        raise ValueError("legacy identity content_sha256 must be lowercase SHA-256")
+    if identity.kind == "regular":
+        if identity.git_mode not in {"100644", "100755"}:
+            raise ValueError("regular legacy identity requires Git mode 100644 or 100755")
+        if identity.symlink_target:
+            raise ValueError("regular legacy identity must not define symlink_target")
+    elif identity.git_mode != "120000" or not identity.symlink_target:
+        raise ValueError("symlink legacy identity requires mode 120000 and symlink_target")
+    return identity
+
+
+def update_transition_from_mapping(mapping: Mapping[str, object]) -> UpdateTransition:
+    """Create and validate one one-time update transition."""
+    transition_id = string_value(mapping, "id")
+    if not transition_id or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", transition_id):
+        raise ValueError("update_transition id must use lowercase kebab-case")
+    previous_pins = string_list(mapping, "from_agent_canon_pins")
+    if any(
+        not re.fullmatch(r"[0-9a-f]{40}(?:[0-9a-f]{24})?", value)
+        for value in previous_pins
+    ):
+        raise ValueError(f"{transition_id}: invalid from_agent_canon_pins")
+    candidates: list[UpdateTransitionCandidate] = []
+    for candidate in manifest_tables(mapping, "candidate"):
+        path = string_value(candidate, "path")
+        if not path or path.startswith("/") or "\t" in path or "\n" in path:
+            raise ValueError(f"{transition_id}: invalid transition candidate path")
+        identities = tuple(
+            legacy_identity_from_mapping(identity)
+            for identity in manifest_tables(candidate, "identity")
+        )
+        if not identities:
+            raise ValueError(f"{transition_id}:{path}: identities must not be empty")
+        candidates.append(UpdateTransitionCandidate(path=path, identities=identities))
+    if not candidates:
+        raise ValueError(f"{transition_id}: candidates must not be empty")
+    candidate_paths = [candidate.path for candidate in candidates]
+    if len(candidate_paths) != len(set(candidate_paths)):
+        raise ValueError(f"{transition_id}: duplicate candidate paths")
+    return UpdateTransition(
+        transition_id=transition_id,
+        from_agent_canon_pins=previous_pins,
+        candidates=tuple(candidates),
+    )
+
+
 def manifest_path(root: Path, prefix: str, raw_manifest: str) -> Path:
     """Resolve the manifest path."""
     relative = Path(raw_manifest)
@@ -284,7 +385,18 @@ def load_manifest(root: Path, prefix: str, raw_manifest: str) -> SurfaceManifest
     duplicates = sorted({path for path in paths if paths.count(path) > 1})
     if duplicates:
         raise ValueError(f"duplicate surface paths: {','.join(duplicates)}")
-    return SurfaceManifest(prefix=manifest_prefix, entries=tuple(entries))
+    update_transitions = tuple(
+        update_transition_from_mapping(table)
+        for table in manifest_tables(data, "update_transition")
+    )
+    transition_ids = [transition.transition_id for transition in update_transitions]
+    if len(transition_ids) != len(set(transition_ids)):
+        raise ValueError("duplicate update_transition ids")
+    return SurfaceManifest(
+        prefix=manifest_prefix,
+        entries=tuple(entries),
+        update_transitions=update_transitions,
+    )
 
 
 def target_for_entry(root: Path, prefix: str, entry: SurfaceEntry) -> str:
@@ -319,13 +431,27 @@ def render_copy_specs(entries: Iterable[SurfaceEntry], prefix: str) -> str:
     return "\n".join(lines)
 
 
-def render_retired_copy_specs(entries: Iterable[SurfaceEntry], prefix: str) -> str:
-    """Render one-time migration specs for retired root copies."""
-    lines = [
-        f"{entry.path}:{source_for_entry(prefix, entry)}"
-        for entry in entries
-        if entry.mode == "retired_copy"
-    ]
+def render_update_transition_specs(transitions: Iterable[UpdateTransition]) -> str:
+    """Render history-bound transition identities for the shell updater."""
+    lines: list[str] = []
+    for transition in transitions:
+        previous_pins = ",".join(transition.from_agent_canon_pins)
+        for candidate in transition.candidates:
+            for identity in candidate.identities:
+                lines.append(
+                    "\t".join(
+                        (
+                            transition.transition_id,
+                            previous_pins,
+                            candidate.path,
+                            identity.kind,
+                            identity.git_blob,
+                            identity.content_sha256,
+                            identity.git_mode,
+                            identity.symlink_target,
+                        )
+                    )
+                )
     return "\n".join(lines)
 
 
@@ -421,9 +547,8 @@ def render_command_outputs(manifest: SurfaceManifest, root: Path) -> Mapping[str
     return {
         "link-specs": render_specs(manifest.entries, root, manifest.prefix),
         "copy-specs": render_copy_specs(manifest.entries, manifest.prefix),
-        "retired-copy-specs": render_retired_copy_specs(
-            manifest.entries,
-            manifest.prefix,
+        "update-transition-specs": render_update_transition_specs(
+            manifest.update_transitions
         ),
         "regular-specs": render_regular_specs(manifest.entries, manifest.prefix),
         "removed-legacy-paths": render_removed_legacy(manifest.entries),

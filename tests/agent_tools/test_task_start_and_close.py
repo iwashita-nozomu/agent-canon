@@ -31,6 +31,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "ci"))
 
+from agent_canon_preflight import surface_manifest_paths  # noqa: E402
 from check_agent_canon_pr import (  # noqa: E402
     GENERATED_COMPLETENESS_CHECK_IDS,
     materialize_generated_completeness_receipt,
@@ -924,6 +925,18 @@ def write_ready_closeout_bundle(
 
 class TaskStartAndCloseTest(unittest.TestCase):
     """Verify machine-driven task start and close behavior."""
+
+    def test_retired_tool_names_are_not_permanent_update_surfaces(self) -> None:
+        """One-time transition candidates do not reserve future parent paths."""
+        update_paths = set(surface_manifest_paths(PROJECT_ROOT))
+
+        self.assertTrue(
+            {
+                "tools/sync_agent_canon.sh",
+                "tools/agent_tools/surface_manifest.py",
+                "tools/agent_tools/update_agent_canon.sh",
+            }.isdisjoint(update_paths)
+        )
 
     def consume_update_lifecycle_fixture(
         self,

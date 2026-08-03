@@ -67,7 +67,7 @@ its exact mode and target before running `git rm templates`.
 these fields:
 
 - `path`: root-relative path in the template or derived repo.
-- `mode`: `symlink`, `copy`, `regular`, `retired_copy`, `repo_state`,
+- `mode`: `symlink`, `copy`, `regular`, `repo_state`,
   `standalone_only`, or `removed_legacy`.
 - `owner`: the owner class in machine-readable form.
 - `class`: the behavior class, such as `runtime_surface`, `shared_policy`,
@@ -265,14 +265,21 @@ are reviewed and committed as template or derived-repo content.
 derived repo roots. If a legacy symlink or copy remains at such a path,
 the source-root resolver `check` reports it and `link-root` removes it.
 
-`retired_copy` は過去に AgentCanon が生成した root copy を一度だけ移行する
-binding です。`link-root` は全対象を先に検査し、source と byte content が一致し、
-tracked path では Git index mode も一致する copy、または同じ source を指す
-symlink だけを削除します。1件でも divergence があれば全対象を保存して typed
-collision で停止します。`/mnt/l` のように mount が `file_mode=0755` を強制する
-環境では filesystem mode を実行可能契約に使わず、Git tree/index mode を正本に
-します。この mode は恒久的な root absence を意味せず、移行後に parent が同名
-path を所有することを禁止しません。
+`update_transition` は、既知の旧 AgentCanon gitlink pin から新しい pin へ更新する
+一回の transaction にだけ適用します。旧commit objectや履歴fetchは照合に使わず、
+shallow parentではsuperproject `HEAD`のgitlink SHAをtransition dataへ照合します。
+candidate は Git history で確認した
+blob、content SHA-256、Git mode の組に束縛し、現在の vendored source との `cmp` は
+identity authority にしません。`link-root` は全candidateを先に分類して再検証し、
+既知identityだけをtransaction用quarantineへ移してからまとめて削除します。途中の
+moveが失敗した場合は先行moveを復元します。
+
+未知のbytes、mode、symlink targetを持つ同名pathはparent-ownedとして保存し、
+transition実行と後続の`link-root` / `check`を止めません。transition完了後、この
+path群はshared surface、root-absent path、collision gateのいずれにも属さず、parentは
+同名のregular fileやsymlinkを所有できます。`/mnt/l` のようにmountが
+`file_mode=0755`を強制する環境でも、mode authorityはfilesystem statではなくGit
+indexです。
 
 AgentCanon may provide generic templates under the standalone source path
 `templates/documents/`, such as `server_host_inventory.template.md`,
