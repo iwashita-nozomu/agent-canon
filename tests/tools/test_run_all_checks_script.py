@@ -38,8 +38,10 @@ class RunAllChecksScriptTest(unittest.TestCase):
             'AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${AGENT_CANON_CI_EVAL_LOG_DIR}"'
         )
         state_default_marker = 'AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${WORKSPACE_ROOT}/.state/agent-eval-runs/run-all-checks"'
-        producer_marker = 'tools/agent_tools/run_accumulated_agent_evals.py "${accumulated_eval_args[@]}"'
-        checker_marker = "tools/agent_tools/eval_accumulation_check.py"
+        producer_marker = (
+            'run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}"'
+        )
+        checker_marker = 'eval_accumulation_check.py" 2>&1; then'
         command_env_marker = (
             'AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"'
         )
@@ -144,7 +146,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         pre_review_text = PRE_REVIEW_SCRIPT.read_text(encoding="utf-8")
         quality_text = PYTHON_QUALITY_SCRIPT.read_text(encoding="utf-8")
 
-        self.assertIn("tools/ci/run_python_quality_checks.sh", ci_text)
+        self.assertIn('bash "${CANON_CI_ROOT}/run_python_quality_checks.sh"', ci_text)
         self.assertIn("tools/ci/run_python_quality_checks.sh", pre_review_text)
         self.assertIn(
             "python_quality_runner=tools/ci/run_python_quality_checks.sh",
