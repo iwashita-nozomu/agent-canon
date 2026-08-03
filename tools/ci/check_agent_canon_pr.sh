@@ -154,6 +154,7 @@ run_agent_canon() {
 PR_GATE_DEPENDENCY_GRAPH_REASON=""
 PR_GATE_DEPENDENCY_GRAPH_EVIDENCE=""
 PR_GATE_DEPENDENCY_GRAPH_BASE_SHA=""
+PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET=""
 agentcanon_pr_dependency_graph_required() {
   local base_fetch_output=""
   local base_fetch_rc=0
@@ -162,16 +163,18 @@ agentcanon_pr_dependency_graph_required() {
   local selector_output=""
   local selector_rc=0
   local selector_status=""
+  mkdir -p "${PR_DEPENDENCY_REVIEW_DIR}"
+  PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET="${PR_DEPENDENCY_REVIEW_DIR}/changed-paths.json"
   local selector_args=(
     --root "${WORKSPACE_ROOT}"
     --source-root "${AGENT_CANON_SOURCE_ROOT}"
+    --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}"
   )
 
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
     echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=required reason=standalone_source"
     PR_GATE_DEPENDENCY_GRAPH_REASON="standalone_source"
     PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="source_root=${AGENT_CANON_SOURCE_ROOT}"
-    return 0
   fi
   if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
     if base_fetch_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
@@ -211,6 +214,10 @@ agentcanon_pr_dependency_graph_required() {
     0:required)
       if [[ ! "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
         echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail reason=selected_base_missing" >&2
+        return 2
+      fi
+      if [[ ! -f "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" ]]; then
+        echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail reason=changed_path_packet_missing" >&2
         return 2
       fi
       return 0
@@ -645,7 +652,11 @@ if agentcanon_pr_dependency_graph_required; then
     if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
       python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_drift.py"
     fi
-    bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
+    bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" \
+      --fail-missing \
+      --cycle-report-only \
+      --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
+      --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
     python3 "${CANON_TOOLS_ROOT}/agent_tools/render_dependency_manifest_graph.py" \
       --root . \
       --scope full \

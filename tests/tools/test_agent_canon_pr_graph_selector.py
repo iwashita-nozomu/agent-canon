@@ -384,6 +384,32 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             "trusted_base_graph_exit_code_mismatch",
         )
 
+    def test_selector_writes_trusted_changed_path_packet(self) -> None:
+        """The selector owns exact trusted base/head path evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {})
+            packet = root / "reports" / "dependency-review" / "changed-paths.json"
+
+            selection = selector.select(
+                root,
+                PROJECT_ROOT,
+                {"AGENT_CANON_PR_BASE_REF": base},
+                changed_path_packet=packet,
+            )
+
+            self.assertEqual(selection.status, "skipped")
+            payload = json.loads(packet.read_text(encoding="utf-8"))
+            self.assertEqual(payload["schema"], "agent-canon.pr-changed-paths.v1")
+            self.assertEqual(payload["root"], str(root.resolve()))
+            self.assertEqual(payload["base_sha"], base)
+            self.assertEqual(payload["head_sha"], git(root, "rev-parse", "HEAD"))
+            self.assertEqual(payload["changed_paths"], ["changed.py"])
+            self.assertEqual(
+                payload["changed_paths_sha256"],
+                selector.changed_paths_digest(("changed.py",)),
+            )
+
     def test_selector_rejects_an_arbitrary_producer_source_root(self) -> None:
         """Producer execution authority is limited to the selector source tree."""
         with tempfile.TemporaryDirectory() as tmp_dir:
