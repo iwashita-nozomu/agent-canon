@@ -15,7 +15,6 @@ import os
 import shutil
 import stat
 import subprocess
-import sys
 import tempfile
 import textwrap
 import unittest
@@ -114,7 +113,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
 
         write_executable(
-            source / "tools" / "bin" / "agent-canon",
+            source / "tools" / "agent_tools" / "graph_fixture.py",
             r"""
             #!/usr/bin/env python3
             import json
@@ -243,6 +242,11 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 2 if scenario == "hard_failure" else 1 if has_diagnostic else 0
             )
             """,
+        )
+        (source / "tools" / "bin").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "bin" / "agent-canon",
+            source / "tools" / "bin" / "agent-canon",
         )
         write_executable(
             source / "tools" / "sync_agent_canon.sh",
@@ -445,9 +449,16 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             fixture_root,
             source,
             include_manifest=scenario != "no_manifest",
-            baseline_doc_diagnostics=202 if scenario == "pydoc_baseline" else 0,
+            baseline_doc_diagnostics=1 if scenario == "pydoc_baseline" else 0,
         )
         fake_bin = fixture_root / "bin"
+        fake_home = fixture_root / "agent-canon-home"
+        fake_installed = fake_home / "agent-canon" / "bin" / "agent-canon"
+        fake_installed.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(
+            source / "tools" / "agent_tools" / "graph_fixture.py", fake_installed
+        )
+        fake_installed.chmod(fake_installed.stat().st_mode | stat.S_IXUSR)
         temp_root = fixture_root / "pr-check-state"
         temp_root.mkdir()
         python_call_log = temp_root / "pr-python-calls.jsonl"
@@ -487,6 +498,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "GRAPH_GATE_FIXTURE_SCENARIO": scenario,
                 "PYTHON_BIN": str(fake_bin / "python-recorder"),
                 "PYTHON_CALL_LOG": str(python_call_log),
+                "AGENT_CANON_TOOLS_HOME": str(fake_home),
             }
         )
         result = run(
@@ -569,15 +581,17 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
         standalone_review = run(
             source,
-            sys.executable,
-            "tools/agent_tools/pydocstyle_review.py",
-            str(standalone_doc),
+            "tools/bin/agent-canon",
+            "pydocstyle-review",
+            "--target",
+            "standalone_docstyle.py",
             check=False,
         )
         self.assertEqual(standalone_review.returncode, 1)
         self.assertEqual(
             (standalone_review.stdout + standalone_review.stderr).count("D213:"),
             1,
+            standalone_review.stdout + standalone_review.stderr,
         )
         shutil.copy2(PR_CHECK, source / "tools" / "ci" / PR_CHECK.name)
         repo_paths = source / "tools" / "lib" / REPO_PATHS.name
@@ -600,6 +614,13 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         run(source, "git", "commit", "-m", "ordinary change")
 
         fake_bin = fixture_root / "bin"
+        fake_home = fixture_root / "agent-canon-home"
+        fake_installed = fake_home / "agent-canon" / "bin" / "agent-canon"
+        fake_installed.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(
+            source / "tools" / "agent_tools" / "graph_fixture.py", fake_installed
+        )
+        fake_installed.chmod(fake_installed.stat().st_mode | stat.S_IXUSR)
         write_executable(
             fake_bin / "cargo",
             """
@@ -623,6 +644,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "AGENT_CANON_PR_BASE_REF": base,
                 "AGENT_CANON_PR_TEMP_ROOT": str(temp_root),
                 "GRAPH_GATE_FIXTURE_SCENARIO": "standalone",
+                "AGENT_CANON_TOOLS_HOME": str(fake_home),
             }
         )
         result = run(
@@ -659,6 +681,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         result, state = self.run_pr_check("pydoc_baseline")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("PYDOCSTYLE", result.stdout)
+        self.assertIn("RUFF=skip reason=quick_mode", result.stdout)
         pr_calls = [
             json.loads(line)
             for line in (state / "pr-python-calls.jsonl")
@@ -670,17 +693,18 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertFalse(any("pydocstyle" in call for call in pr_calls))
 
         parent = state.parent / "parent"
-        targets = [str(parent / f"baseline_{index}.py") for index in range(202)]
+        target = "baseline_0.py"
         docstyle = run(
             parent,
-            sys.executable,
-            "vendor/agent-canon/tools/agent_tools/pydocstyle_review.py",
-            *targets,
+            "vendor/agent-canon/tools/bin/agent-canon",
+            "pydocstyle-review",
+            "--target",
+            target,
             check=False,
         )
         explicit_output = docstyle.stdout + docstyle.stderr
         self.assertEqual(docstyle.returncode, 1)
-        self.assertEqual(explicit_output.count("D213:"), 202)
+        self.assertEqual(explicit_output.count("D213:"), 1)
         direct_log = state / "direct-python-calls.jsonl"
         direct_environment = os.environ.copy()
         fake_bin = state.parent / "bin"
@@ -699,6 +723,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             environment=direct_environment,
         )
         self.assertEqual(quality.returncode, 0, quality.stdout + quality.stderr)
+        self.assertIn("PYTHON_QUALITY_CHECKS=pass", quality.stdout)
         direct_calls = [
             json.loads(line)
             for line in direct_log.read_text(encoding="utf-8").splitlines()

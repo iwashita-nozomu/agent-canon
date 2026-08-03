@@ -1247,7 +1247,7 @@ entries:
     family: agent_tools
     role: checker
     status: canonical
-    command: python3 tools/agent_tools/pydocstyle_review.py <python-target>
+    command: tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>
     writes: false
     default_wiring:
       ci: false

@@ -53,9 +53,13 @@ needed:
 bash tools/ci/run_python_quality_checks.sh
 ```
 
+The PR quick chain intentionally runs pytest and pyright while skipping Ruff;
+the explicit full Python quality command adds Ruff. Neither shared path invokes
+pydocstyle.
+
 Explicit Docstring review for selected Python targets:
 
-    python3 tools/agent_tools/pydocstyle_review.py <python-target>
+    tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>
 
 This command resolves the canonical AgentCanon source root and applies its D213
 configuration. Parent-specific Docstring review remains a separate parent-owner

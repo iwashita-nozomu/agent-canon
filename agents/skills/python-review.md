@@ -51,7 +51,7 @@ changed mechanism が明示的に required とした場合だけ mechanism-requi
 
 - 親 packet の `validation_route` にある exact validation commands
 - Docstring qualityを明示的にレビューする場合は、対象を限定して
-  `python3 tools/agent_tools/pydocstyle_review.py <python-target>` を実行する。これは
+  `tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>` を実行する。これは
   source-root resolverが選ぶAgentCanon canonical D213 configを使う明示routeであり、
   shared correctness gateとは分離する。親固有のDocstring reviewは親ownerの別commandで
   実行し、このAgentCanon routeへauthorityを置き換えない。

@@ -289,7 +289,7 @@ surface に応じて semantic clause を読み戻します。catalog capability 
 
 `pydocstyle` は compile/runtime/graph/header correctness の必要条件ではなく、
 shared PR/static gate では実行しません。明示的な Docstring review で、対象を限定して
-`python3 tools/agent_tools/pydocstyle_review.py <python-target>` を実行します。このtoolは
+`tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>` を実行します。このtoolは
 source-root resolverが選ぶAgentCanon canonical D213 configを適用し、toolが無い場合または
 診断がある場合は明示 command が nonzero で終了します。
 

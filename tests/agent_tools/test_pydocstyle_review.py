@@ -13,10 +13,12 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.agent_tools.agent_canon_source_root import RootResolution
+import pytest
+from tools.agent_tools.agent_canon_source_root import RootResolution, SourceRootFailure
 from tools.agent_tools.pydocstyle_review import (
     build_parser,
     resolve_canonical_config,
+    resolve_target,
     run,
 )
 
@@ -62,7 +64,9 @@ def test_run_binds_absolute_source_config(tmp_path: Path) -> None:
     config = source / "tools" / "ci" / "pydocstyle.toml"
     config.parent.mkdir(parents=True)
     config.write_text("[tool.pydocstyle]\n", encoding="utf-8")
-    parsed = build_parser().parse_args(["changed.py"])
+    target = tmp_path / "changed.py"
+    target.write_text("# target\n", encoding="utf-8")
+    parsed = build_parser().parse_args(["--target", "changed.py"])
     with patch("tools.agent_tools.pydocstyle_review.subprocess.run") as process:
         process.return_value.returncode = 0
         assert (
@@ -76,4 +80,65 @@ def test_run_binds_absolute_source_config(tmp_path: Path) -> None:
 
     command = process.call_args.args[0]
     assert f"--config={config.resolve()}" in command
-    assert command[-1] == "changed.py"
+    assert command[command.index(f"--config={config.resolve()}") + 1] == "--"
+    assert command[-1] == str(target.resolve())
+
+
+def test_target_boundaries_reject_escape_injection_symlink_and_wrong_type(
+    tmp_path: Path,
+) -> None:
+    """Target validation rejects every path outside the single regular .py contract."""
+    root = tmp_path / "repo"
+    source = root / "vendor" / "agent-canon"
+    (source / "tools" / "ci").mkdir(parents=True)
+    (source / "tools" / "ci" / "pydocstyle.toml").write_text(
+        "[tool.pydocstyle]\n", encoding="utf-8"
+    )
+    (root / "valid.py").write_text("# valid\n", encoding="utf-8")
+    (root / "directory.py").mkdir()
+    outside = tmp_path / "outside.py"
+    outside.write_text("# outside\n", encoding="utf-8")
+    (root / "escape.py").symlink_to(outside)
+
+    def resolver(_: Path) -> RootResolution:
+        return _resolution(root, source, "vendored")
+
+    invalid_targets = (
+        str((root / "valid.py").resolve()),
+        "../outside.py",
+        "--config=override.toml",
+        "valid.txt",
+        "directory.py",
+        "missing.py",
+        "escape.py",
+    )
+    for invalid in invalid_targets:
+        with pytest.raises(SourceRootFailure):
+            resolve_target(root, invalid, resolver=resolver)
+
+
+def test_parser_rejects_config_override_and_multiple_targets() -> None:
+    """The public parser owns one target and never accepts a config override."""
+    parser = build_parser()
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--config=override.toml", "--target", "valid.py"])
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--target", "one.py", "--target", "two.py"])
+
+
+def test_missing_tool_and_diagnostic_exit_codes_are_preserved(tmp_path: Path) -> None:
+    """Explicit review failures remain nonzero without affecting the shared gate."""
+    source = tmp_path / "source"
+    config = source / "tools" / "ci" / "pydocstyle.toml"
+    config.parent.mkdir(parents=True)
+    config.write_text("[tool.pydocstyle]\n", encoding="utf-8")
+    (tmp_path / "target.py").write_text("# target\n", encoding="utf-8")
+    parsed = build_parser().parse_args(["--target", "target.py"])
+
+    def resolver(_: Path) -> RootResolution:
+        return _resolution(tmp_path, source, "vendored")
+
+    for returncode in (127, 1):
+        with patch("tools.agent_tools.pydocstyle_review.subprocess.run") as process:
+            process.return_value.returncode = returncode
+            assert run(parsed, raw_root=tmp_path, resolver=resolver) == returncode
