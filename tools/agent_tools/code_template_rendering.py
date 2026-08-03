@@ -5,7 +5,7 @@
 # downstream implementation ../../templates/code/python/docstring_template.py parse-valid source.
 # @dependency-end
 
-"""code template を canonical source root から安全に materialize します。"""
+"""Code template を canonical source root から安全に materialize します."""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ else:
 
 def render_code_template(template_name: str) -> str:
     """
-    canonical source root 内の code template を読み戻します。
+    Canonical source root 内の code template を読み戻します.
 
     Args:
         template_name: `templates/code/` からの英語相対 path。

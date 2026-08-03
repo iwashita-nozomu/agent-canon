@@ -7,7 +7,7 @@
 # @dependency-end
 
 """
-case 一件を実行し、その outcome を完全な typed record へ変換します。
+Case 一件を実行し、その outcome を完全な typed record へ変換します.
 
 責務は case worker の replaceable domain seam、実行時間、failure-cause classification です。
 artifact serialization と run-level acceptance は別 module が所有します。
@@ -25,7 +25,7 @@ from case_model import CaseResult, CaseSpec
 
 def failure_class(error: BaseException) -> str:
     """
-    元の message を隠さず exception を分類します。
+    元の message を隠さず exception を分類します.
 
     Args:
         error: case または visualization execution で観測した exception。
@@ -45,7 +45,7 @@ def failure_class(error: BaseException) -> str:
 
 def registry_failure(error: BaseException, started_at: str) -> CaseResult:
     """
-    case registry の import または shape failure を typed record として保持します。
+    Case registry の import または shape failure を typed record として保持します.
 
     Args:
         error: orchestration boundary で観測した registry error。
@@ -72,7 +72,7 @@ def registry_failure(error: BaseException, started_at: str) -> CaseResult:
 
 def run_case_worker(case: CaseSpec, run_dir_text: str) -> CaseResult:
     """
-    replaceable domain case worker を実行し、typed success record を返します。
+    実行可能な domain case worker を実行し、typed success record を返します.
 
     Args:
         case: case identity と JSON-serializable parameter mapping。
@@ -133,7 +133,7 @@ def run_case_worker(case: CaseSpec, run_dir_text: str) -> CaseResult:
 
 def execute_case(case: CaseSpec, run_dir_text: str) -> CaseResult:
     """
-    case 一件を実行・計測し、failure semantics を保持します。
+    Case 一件を実行・計測し、failure semantics を保持します.
 
     Args:
         case: registry が選択した検証済み case specification。

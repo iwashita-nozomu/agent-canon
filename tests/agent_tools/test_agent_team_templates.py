@@ -51,7 +51,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
         self.assertNotIn("return None", rendered)
 
     def test_code_template_renderer_works_from_repo_root_package_route(self) -> None:
-        """repo root の canonical package invocation が source を読み戻せる。"""
+        """リポジトリ root の canonical package invocation が source を読み戻せます."""
         environment = dict(os.environ)
         environment["PYTHONPATH"] = str(PROJECT_ROOT / "tools")
         result = subprocess.run(

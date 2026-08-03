@@ -8,7 +8,7 @@
 # @dependency-end
 
 """
-optional visualization consumer を明示的な status semantics で実行します。
+Optional visualization consumer を明示的な status semantics で実行します.
 
 責務は notebook の optional execution と `visualization-status.json` の publication です。
 minimal run は `not_requested`、要求済みで runtime 不足なら `blocked` になります。
@@ -31,7 +31,7 @@ from artifact_schema import (
 
 def write_visualization_not_requested_status(run_dir: Path) -> str:
     """
-    不完全 scaffold の可視化を実行せず、明示的な未要求状態を保存します。
+    不完全 scaffold の可視化を実行せず、明示的な未要求状態を保存します.
 
     Args:
         run_dir: status artifact を所有する run directory。
@@ -56,7 +56,7 @@ def write_visualization_not_requested_status(run_dir: Path) -> str:
 
 def execute_visualization_notebook(run_dir: Path, template_dir: Path) -> str:
     """
-    optional visualization consumer を実行し、terminal state を記録します。
+    実行時に optional visualization consumer を実行し、terminal state を記録します.
 
     `EXPERIMENT_RUN_VISUALIZATION=1` で managed notebook execution を要求します。
     default の `not_requested` state は minimal scaffold の runnable 性を保ちます。

@@ -6,7 +6,7 @@
 # @dependency-end
 
 """
-managed experiment 用の replaceable case と record model を定義します。
+Managed experiment 用の replaceable case と record model を定義します.
 
 責務は case input の invariant と、cases.jsonl に保存する typed record の schema です。
 実行、artifact I/O、resource admission は別 module が所有します。
@@ -25,7 +25,7 @@ CaseState = Literal["success", "failed", "blocked"]
 @dataclass(frozen=True)
 class CaseSpec:
     """
-    再現可能な case input 一件と、その ownership boundary を記述します。
+    再現可能な case input 一件と、その ownership boundary を記述します.
 
     `case_id` は run 内で一意です。`parameters` は JSON-serializable で、domain が必要とする
     unit や shape を保持します。
@@ -49,7 +49,7 @@ class CaseSpec:
 
     def __post_init__(self) -> None:
         """
-        worker が case を受け取る前に case invariant を強制します。
+        Worker が case を受け取る前に case invariant を強制します.
 
         Raises:
             ValueError: identifier が空、parameters が dict でない、または JSON serialize
@@ -71,7 +71,7 @@ class CaseSpec:
 @dataclass(frozen=True)
 class CaseResult:
     """
-    一件の case execution を安定した JSON-serializable schema で表します。
+    一件の case execution を安定した JSON-serializable schema で表します.
 
     invariant は `success` が `result` に observation を持ち、`failed` または `blocked` が
     failure class、message、evidence name を持つことです。
@@ -109,7 +109,7 @@ class CaseResult:
 
     def __post_init__(self) -> None:
         """
-        cases.jsonl へ書く前に record schema を検証します。
+        cases.jsonl へ書く前に record schema を検証します.
 
         Raises:
             ValueError: identity、timestamp、failure classification、duration が record
@@ -151,7 +151,7 @@ class CaseResult:
 
     def to_dict(self) -> dict[str, object]:
         """
-        この record を line-oriented JSON artifact schema へ projection します。
+        この record を line-oriented JSON artifact schema へ projection します.
 
         Returns:
             独立 readback に必要な全 field を含む mapping。

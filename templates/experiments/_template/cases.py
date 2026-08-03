@@ -6,7 +6,7 @@
 # @dependency-end
 
 """
-Define topic-owned cases for the managed experiment entrypoint.
+managed experiment entrypoint の topic-owned case を定義します.
 
 責務は case identity と JSON-serializable な入力だけを定義することです。domain import、
 resource admission、artifact I/O は `run.py` の owning boundary に置きます。

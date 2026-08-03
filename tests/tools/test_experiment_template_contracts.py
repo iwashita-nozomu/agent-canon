@@ -6,7 +6,7 @@
 # upstream implementation ../../templates/experiments/_template/case_model.py owns case invariants.
 # @dependency-end
 
-"""experiment template の completion、state、manifest contract を検証します。"""
+"""experiment template の completion、state、manifest contract を検証します."""
 
 from __future__ import annotations
 
@@ -20,18 +20,18 @@ import pytest
 TEMPLATE_ROOT = Path(__file__).resolve().parents[2] / "templates" / "experiments" / "_template"
 sys.path.insert(0, str(TEMPLATE_ROOT))
 
-from artifact_io import write_artifact_manifest  # noqa: E402
-from artifact_schema import RunSummary  # noqa: E402
+from artifact_io import load_completion_provenance, write_artifact_manifest  # noqa: E402
+from artifact_schema import ArtifactManifest, RunState, RunSummary  # noqa: E402
 from case_model import CaseResult  # noqa: E402
 
 
 def _timestamp() -> str:
-    """検証用の RFC3339 timestamp を返します。"""
+    """検証用の RFC3339 timestamp を返します."""
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _result(**overrides: object) -> CaseResult:
-    """最小の valid CaseResult を作ります。"""
+    """最小の valid CaseResult を作ります."""
     values: dict[str, object] = {
         "case_id": "case",
         "state": "success",
@@ -48,11 +48,11 @@ def _result(**overrides: object) -> CaseResult:
 
 
 def _summary() -> RunSummary:
-    """nested manifest test 用の complete success summary を作ります。"""
+    """検証用 nested manifest の complete success summary を作ります."""
     timestamp = _timestamp()
     return RunSummary(
         run_id="run",
-        status="success",
+        status=RunState.SUCCESS,
         started_at=timestamp,
         finished_at=timestamp,
         exit_status=0,
@@ -62,17 +62,31 @@ def _summary() -> RunSummary:
         blocked_count=0,
         failure_class="not_applicable",
         failure_evidence="not_applicable",
-        preserved_artifacts=("summary.json",),
+        preserved_artifacts=(
+            "summary.json",
+            "cases.jsonl",
+            "artifact-manifest.json",
+            "config_snapshot.json",
+            "environment.json",
+            "provenance_snapshot.toml",
+            "visualization-status.json",
+        ),
         close_condition="not_applicable",
         validation_oracle="pass: complete provenance",
         visualization_status="not_requested",
         template_complete=True,
-        completion_provenance={"state": "complete"},
+        completion_provenance={
+            "template_complete": True,
+            "completion_status": "complete",
+            "provenance_path": "provenance.toml",
+            "missing_fields": [],
+            "state": "complete",
+        },
     )
 
 
 def test_case_result_rejects_terminal_cross_field_mismatch() -> None:
-    """success と failure field の混在を publication 前に拒否します。"""
+    """Success と failure field の混在を publication 前に拒否します."""
     with pytest.raises(ValueError, match="successful case cannot carry failure fields"):
         _result(failure_class="implementation_algorithm", failure_message="unexpected")
     with pytest.raises(ValueError, match="failed or blocked case requires failure fields"):
@@ -86,7 +100,7 @@ def test_case_result_rejects_terminal_cross_field_mismatch() -> None:
 
 
 def test_artifact_manifest_reads_nested_regular_files(tmp_path: Path) -> None:
-    """manifest が nested regular file の normalized path と hash を含めます。"""
+    """Manifest が nested regular file の normalized path と hash を含めます."""
     (tmp_path / "summary.json").write_text("{}\n", encoding="utf-8")
     nested = tmp_path / "logs" / "nested" / "trace.txt"
     nested.parent.mkdir(parents=True)
@@ -101,3 +115,84 @@ def test_artifact_manifest_reads_nested_regular_files(tmp_path: Path) -> None:
     assert "logs/nested/trace.txt" in manifest
     assert "logs/artifact-manifest.json" in manifest
     assert expected_digest in manifest
+
+
+def test_completion_gate_rejects_malformed_yaml(tmp_path: Path) -> None:
+    """Completion gate が malformed YAML を未完了として拒否します."""
+    (tmp_path / "config.yaml").write_text("template_complete: [", encoding="utf-8")
+    (tmp_path / "provenance.toml").write_text(
+        'template_complete = false\ncompletion_status = "incomplete"\n',
+        encoding="utf-8",
+    )
+
+    completion = load_completion_provenance(tmp_path)
+
+    assert not completion.is_complete
+    assert "config.yaml.parseable" in completion.missing_fields
+
+
+def test_completion_gate_recursively_rejects_nested_reviewer_placeholder(
+    tmp_path: Path,
+) -> None:
+    """Completion gate が nested reviewer placeholder を再帰的に拒否します."""
+    (tmp_path / "config.yaml").write_text(
+        "\n".join(
+            (
+                "template_complete: true",
+                "cases: {example: true}",
+                "metric: {name: sum}",
+                "runtime: {entrypoint: run.py}",
+                "algorithm_contract: {entrypoint: run_case_worker}",
+                "oracle: {necessary: [record]}",
+                "provenance: {owner: checker}",
+                "failure: {classification: expected_contract}",
+                "lifecycle: {cleanup: temporary}",
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+    (tmp_path / "provenance.toml").write_text(
+        "\n".join(
+            (
+                'template_complete = true',
+                'completion_status = "complete"',
+                "[review]",
+                'reviewer = { identity = "<nested-reviewer>" }',
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    completion = load_completion_provenance(tmp_path)
+
+    assert not completion.is_complete
+    assert "provenance.review.reviewer.identity unresolved" in completion.missing_fields
+
+
+def test_summary_requires_run_state_enum_and_completion_readback() -> None:
+    """Summary が enum state と completion readback の不一致を拒否します."""
+    with pytest.raises(ValueError, match="RunState enum"):
+        RunSummary(**{**_summary().__dict__, "status": "success"})
+    with pytest.raises(ValueError, match="completion readback"):
+        RunSummary(
+            **{
+                **_summary().__dict__,
+                "completion_provenance": {
+                    "template_complete": False,
+                    "completion_status": "incomplete",
+                    "provenance_path": "provenance.toml",
+                    "missing_fields": ["config.template_complete=true"],
+                    "state": "incomplete",
+                },
+            }
+        )
+    with pytest.raises(ValueError, match="non-zero exit status"):
+        RunSummary(**{**_summary().__dict__, "status": RunState.FAILED, "exit_status": 0})
+
+
+def test_manifest_requires_run_state_enum() -> None:
+    """Manifest schema が文字列 state を enum の代用として受け付けません."""
+    with pytest.raises(ValueError, match="RunState enum"):
+        ArtifactManifest(run_id="run", state="success", artifacts=())

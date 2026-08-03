@@ -9,25 +9,26 @@
 # downstream implementation ../../tests/tools/test_check_experiment_template.py tests this smoke checker
 # @dependency-end
 
-"""Smoke-check the centralized experiment template through the parent route."""
+"""中央 experiment template を parent route 経由で smoke-check します."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
 
+import yaml
+
 TOPIC = "template-smoke"
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the checker CLI."""
+    """チェッカー CLI の parser を構築します."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--source-root",
@@ -43,7 +44,7 @@ def run_checked(
     cwd: Path,
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
-    """Run one non-GPU validation command with strict failure semantics."""
+    """GPU を使わない validation command 一つを strict failure semantics で実行します."""
     result = subprocess.run(
         command,
         cwd=cwd,
@@ -61,7 +62,7 @@ def run_checked(
 
 
 def write_parent_registry(parent_root: Path) -> Path:
-    """Create only the temporary parent-owned registry fixture."""
+    """一時的な parent-owned registry fixture だけを作成します."""
     registry_path = parent_root / "experiments" / "registry.toml"
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     registry_path.write_text(
@@ -86,7 +87,7 @@ def write_parent_registry(parent_root: Path) -> Path:
 
 
 def materialize_parent_fixture(source_root: Path, parent_root: Path) -> None:
-    """Materialize the minimum parent-shaped source and runner surfaces."""
+    """最小の parent-shaped source と runner surface を materialize します."""
     canon_root = parent_root / "vendor" / "agent-canon"
     shutil.copytree(source_root / "templates", canon_root / "templates")
     runner_path = parent_root / "tools" / "experiments" / "run_managed_experiment.py"
@@ -95,24 +96,105 @@ def materialize_parent_fixture(source_root: Path, parent_root: Path) -> None:
 
 
 def complete_template_fixture(topic_dir: Path) -> None:
-    """テスト専用に required completion provenance を満たす fixture を作ります。"""
+    """テスト専用に semantic completion field を個別 materialize します."""
     config_path = topic_dir / "config.yaml"
-    config_text = config_path.read_text(encoding="utf-8")
+    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    if not isinstance(config, dict):
+        raise RuntimeError("completion fixture requires a YAML mapping")
+    config.update(
+        {
+            "template_complete": True,
+            "cases": {"example": {"values": [1.0, 2.0], "unit": "unitless", "shape": [2]}},
+            "metric": {"name": "sum", "direction": "higher_is_better"},
+            "runtime": {"entrypoint": "run.py", "managed": True},
+            "algorithm_contract": {
+                "public_entrypoint": "run_case_worker",
+                "state_transition": "case_to_terminal_record",
+            },
+            "oracle": {"necessary": ["case record"], "sufficient": ["digest readback"]},
+            "provenance": {"source": "smoke fixture", "owner": "checker"},
+            "failure": {"classification": "expected_contract", "evidence": "failure-evidence.json"},
+            "lifecycle": {"retention": "test run", "cleanup": "temporary directory"},
+        }
+    )
     config_path.write_text(
-        config_text.replace("template_complete: false", "template_complete: true", 1),
+        yaml.safe_dump(config, allow_unicode=True, sort_keys=False),
         encoding="utf-8",
     )
     provenance_path = topic_dir / "provenance.toml"
     provenance_text = provenance_path.read_text(encoding="utf-8")
+    provenance_text = provenance_text.replace("template_complete = false", "template_complete = true", 1)
     provenance_text = provenance_text.replace(
-        "template_complete = false", "template_complete = true", 1
-    ).replace('completion_status = "incomplete"', 'completion_status = "complete"', 1)
-    provenance_text = re.sub(r"<[^>]+>", "completed", provenance_text)
+        'completion_status = "incomplete"', 'completion_status = "complete"', 1
+    )
+    placeholder_values = {
+        "topic": "template-smoke",
+        "owner": "smoke-owner",
+        "question": "does the scaffold publish a typed result",
+        "hypothesis": "complete provenance permits one case",
+        "sha256": "a" * 64,
+        "non-goal": "production benchmark",
+        "baseline": "baseline",
+        "candidate": "candidate",
+        "case-id": "example",
+        "metric": "sum",
+        "stopping-rule": "one case",
+        "oracle": "summary and manifest readback",
+        "entrypoint": "run_case_worker",
+        "input-schema": "CaseSpec",
+        "state-transition-or-recurrence": "case to terminal record",
+        "invariant": "terminal state is explicit",
+        "typed-failure-and-preserved-state": "failure record is preserved",
+        "observation": "typed case observation",
+        "claim-outside-oracle": "performance claim",
+        "required-or-not-applicable-with-reason": "required for smoke",
+        "mechanism-and-cost": "local case worker",
+        "rationale-or-none": "not selected",
+        "evidence-path-or-record": "summary.json",
+        "option-id": "option-a",
+        "why-other-options-were-rejected": "not selected",
+        "cpu-memory-gpu-request": "cpu-only smoke",
+        "capability-or-scheduler-reason": "no device required",
+        "none-or-recorded-limit": "none",
+        "caller-or-scheduler-record": "smoke caller",
+        "repository": "agent-canon",
+        "branch": "codex/template-canon-refresh",
+        "commit-sha": "a" * 40,
+        "config-path": "experiments/template-smoke/config.yaml",
+        "result-path": "result/template-smoke-run",
+        "exit-status": "0",
+        "required-close-condition": "rerun after contract repair",
+        "required-oracle-and-observation": "summary and manifest pass",
+        "preserved-intent-or-none": "none",
+        "none-or-description": "none",
+        "evidence-path-or-command": "summary.json",
+        "seed-policy": "deterministic fixture",
+        "managed-runner": "tools/experiments/run_managed_experiment.py",
+        "exact-command": "python3 experiments/template-smoke/run.py",
+        "run-id": "template-smoke-run",
+        "RFC3339": "2026-08-04T00:00:00Z",
+        "expected|infrastructure|implementation|oracle|unknown|none": "none",
+        "required-path-or-none": "none",
+        "required-reason-or-none": "none",
+        "policy": "retain until checker exits",
+        "command": "temporary directory cleanup",
+        "reviewer": "independent-smoke-reviewer",
+        "commit-or-artifact": "a" * 40,
+        "pass-or-revise-or-reject": "pass",
+        "parameter-record": "values=[1.0, 2.0]",
+        "expected-observation": "sum=3.0",
+    }
+    for token, value in placeholder_values.items():
+        provenance_text = provenance_text.replace(f'"<{token}>"', f'"{value}"')
+    provenance_text = provenance_text.replace("<result-path>", "result/template-smoke-run")
+    provenance_text = provenance_text.replace(
+        'status = "selected-or-rejected"', 'status = "rejected"'
+    )
     provenance_path.write_text(provenance_text, encoding="utf-8")
 
 
 def validate_run_state(result_dir: Path, expected_state: str, expected_case_count: int) -> None:
-    """materialized run の state、case 数、completion provenance を検証します。"""
+    """生成済み run の state、case 数、completion provenance を検証します."""
     summary = json.loads((result_dir / "summary.json").read_text(encoding="utf-8"))
     if summary.get("status") != expected_state:
         raise RuntimeError(
@@ -130,7 +212,7 @@ def validate_run_state(result_dir: Path, expected_state: str, expected_case_coun
 
 
 def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
-    """Validate generated registry identity, topic structure, and run artifacts."""
+    """生成した registry identity、topic structure、run artifact を検証します."""
     topic_dir = parent_root / "experiments" / TOPIC
     required_files = (
         topic_dir / "README.md",
@@ -184,7 +266,7 @@ def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
 
 
 def main() -> int:
-    """Create, validate, and remove an isolated parent-shaped fixture."""
+    """分離した parent-shaped fixture を作成、検証、削除します."""
     args = build_parser().parse_args()
     source_root = Path(args.source_root).resolve()
     create_tool = source_root / "tools" / "experiments" / "create_experiment_topic.py"

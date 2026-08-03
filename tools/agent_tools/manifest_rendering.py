@@ -911,7 +911,7 @@ def render_template(template_name: str, replacements: dict[str, str]) -> str:
 
 
 def render_code_template(template_name: str) -> str:
-    """互換 facade から package-safe code-template renderer を呼び出します。"""
+    """互換 facade から package-safe code-template renderer を呼び出します."""
     if __package__:
         from .code_template_rendering import render_code_template as render_source
     else:

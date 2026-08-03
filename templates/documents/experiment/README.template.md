@@ -255,6 +255,11 @@ completion fixture を埋めた代表 run だけが success になります。ca
 `blocked`、case failure なら `failed` とし、成功 record だけを残して failure を隠しません。
 `EXPERIMENT_RUN_VISUALIZATION=1` を指定しない場合、visualization は
 `visualization-status.json` に `not_requested` と記録され、Jupyter を必須にしません。
+completion field と placeholder/未解決 marker の registry は `artifact_schema.py` が一つだけ
+所有し、gate は `config.yaml` を YAML として parse した後、config/provenance の mapping、list、
+scalar を再帰走査します。malformed YAML、TOML、nested reviewer の `<...>`、`IMPLEMENT HERE`
+などが残れば reject し、fixture も全 token の一括置換ではなく semantic field を個別に materialize
+して検証します。
 
 ## Implementation Markers
 
@@ -269,9 +274,32 @@ completion fixture を埋めた代表 run だけが success になります。ca
 - `run.py` は execution entrypoint/orchestration に限定し、上記5 moduleの責務を重複実装しない。
 - artifact manifest は run directory 内の nested regular file 全件を normalized relative path と
   SHA-256 で readback する。CaseResult の terminal state invariant を publication 前に通す。
+- `ArtifactManifest` と `RunSummary` は `RunState` enum、`exit_status`、`template_complete`、
+  `completion_provenance`、required readback artifact の cross-field invariant を publication
+  前に検証する。JSON へ出すときだけ enum の `.value` を使う。
 - GPU visibility、JAX platform、allocator、preallocation、serial worker数はtopic code / checked-in
   configへ埋め込まない。GPU/resource admissionと実行環境はmanaged runnerおよびcaller/schedulerの
   owner boundaryで決め、provenanceへ記録する。
+
+### Local responsibility imports and extension points
+
+各 module の local responsibility import と、利用者が追加する重い project dependency を
+分けます。軽量な local import は責務境界を接続しますが、JAX、CUDA、NumPy、EQX、Optax、
+project-specific package などの重い dependency は `run_case_worker()` または notebook の
+実行経路へ遅延させます。次の5 moduleが extension point と implementation trace の正本です。
+
+| module | local responsibility import | heavy project dependency boundary | extension point / implementation trace |
+| --- | --- | --- | --- |
+| `case_model.py` | 標準 library の dataclass、JSON、数値検証 | なし。domain object は受け取らない | `CaseSpec` と `CaseResult` が input、terminal state、cross-field invariant を所有する |
+| `case_execution.py` | `case_model.py` と `artifact_io.py` | `run_case_worker()` 内だけに domain algorithm と重い dependency を置く | `run_case_worker()` が一 case の algorithm seam、`execute_case()` が failure record trace を所有する |
+| `artifact_schema.py` | 標準 library の enum、型、schema helper | なし。serialization は import しない | `RunState`、completion registry、`ArtifactManifest`、`RunSummary` が publication contract を所有する |
+| `artifact_io.py` | `artifact_schema.py`、`case_model.py`、YAML/TOML parser | project runtime や device dependency は持たない | YAML/TOML completion gate、atomic writer、nested digest readback を実装する |
+| `visualization.py` | `artifact_io.py` と標準 library | Jupyter は `EXPERIMENT_RUN_VISUALIZATION=1` の実行時だけ要求する | visualization status と notebook consumer の readback を実装し、run の success gateとは分離する |
+
+`run.py` はこの5 moduleを呼ぶ execution entrypoint/orchestrator に留めます。利用者が
+domain algorithm、追加 artifact、重い runtime を実装するときは、対応する extension point の
+contract、provenance、failure semantics、readback evidence を更新し、同じ責務を `run.py` に
+複製しません。
 
 ## Result state and failure results are evidence
 

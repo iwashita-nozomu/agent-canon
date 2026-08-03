@@ -13,7 +13,7 @@
 # @dependency-end
 
 """
-Provide the minimal complete managed experiment entrypoint.
+最小の managed experiment entrypoint を提供します.
 
 責務は managed runner の入口、case 実行の orchestration、実行状態の集約、各責務 module
 への接続です。case model、artifact schema、record serialization、visualization 実行は
@@ -60,26 +60,26 @@ DEFAULT_RUN_NAME_PREFIX = "run"
 
 def compact_timestamp() -> str:
     """
-    Create a compact UTC value for managed run names.
+    実験の managed run name 用の compact UTC 値を生成します.
 
     責務は run identity の timestamp 部分だけを生成することです。副作用はなく、UTC と
     caller/scheduler provenance の境界を変更しません。
 
     Returns:
-        A compact UTC timestamp suitable for a topic-local result directory name.
+        topic-local result directory name に使える compact UTC timestamp。
     """
     return datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
 
 
 def resolve_run_dir() -> Path:
     """
-    Select the caller-provided or timestamped output directory.
+    実行 caller 指定または timestamped output directory を選択します.
 
     `EXPERIMENT_RUN_DIR` を優先し、未指定時だけ topic-local result path を選びます。
     resource admission と GPU visibility はここで決めません。
 
     Returns:
-        The absolute result directory selected for this invocation.
+        この invocation が選択した absolute result directory。
     """
     raw_run_dir = os.environ.get("EXPERIMENT_RUN_DIR", "")
     if raw_run_dir:
@@ -93,13 +93,13 @@ def resolve_run_dir() -> Path:
 
 def load_cases() -> tuple[CaseSpec, ...]:
     """
-    Load the topic-owned case registry without importing domain dependencies.
+    実験の domain dependency を import せず topic-owned case registry を読み込みます.
 
     Returns:
-        Immutable case specifications declared by `cases.py`.
+        `cases.py` が宣言した immutable case specifications。
 
     Raises:
-        ValueError: If the topic registry is not a tuple of valid case records.
+        ValueError: topic registry が valid case record の tuple でない場合。
     """
     from cases import CASES
 
@@ -112,16 +112,16 @@ def load_cases() -> tuple[CaseSpec, ...]:
 
 def _case_state_counts(records: tuple[CaseResult, ...]) -> tuple[int, int, int]:
     """
-    Count successful, failed, and blocked case records.
+    success、failed、blocked の case record 数を数えます.
 
     Args:
-        records: Materialized case records owned by the current run.
+        records: current run が所有する materialized case records。
 
     Returns:
-        Counts in the stable order success, failed, blocked.
+        success、failed、blocked の順の count。
 
     Side effects:
-        Reads only the supplied immutable record sequence.
+        渡された immutable record sequence だけを読みます。
     """
     return (
         sum(record.state == "success" for record in records),
@@ -135,63 +135,63 @@ def _run_acceptance(
     completion: CompletionProvenance,
 ) -> tuple[RunState, str, str]:
     """
-    Derive run status, failure class, and close condition from case records.
+    実行 case record から run status、failure class、close condition を導出します.
 
     Args:
-        records: Complete case execution records, including preserved failures.
+        records: preserved failure を含む complete case execution records。
 
     Returns:
-        The derived state, stable failure class, and required close condition.
+        導出した state、安定した failure class、required close condition。
 
     Side effects:
-        Does not write artifacts or mutate records.
+        artifact を書かず、record も変更しません。
     """
     if not completion.is_complete:
         return (
-            "incomplete",
+            RunState.INCOMPLETE,
             "expected_contract",
-            "complete config.yaml and provenance.toml required before execution",
+            "実行前に config.yaml と provenance.toml の completion が必要です",
         )
     if not records:
-        return "blocked", "expected_contract", "declare at least one case in cases.py"
+        return RunState.BLOCKED, "expected_contract", "cases.py に少なくとも一つの case を宣言してください"
     failed_records = [record for record in records if record.state == "failed"]
     if failed_records:
         return (
-            "failed",
+            RunState.FAILED,
             failed_records[0].failure_class,
-            "repair the failed case and rerun the managed command",
+            "failed case を修復して managed command を再実行してください",
         )
     blocked_records = [record for record in records if record.state == "blocked"]
     if blocked_records:
         return (
-            "blocked",
+            RunState.BLOCKED,
             blocked_records[0].failure_class,
-            "resolve the blocked case owner and rerun the managed command",
+            "blocked case の owner を解決して managed command を再実行してください",
         )
     return (
-        "success",
+        RunState.SUCCESS,
         "not_applicable",
-        "summary, cases, manifest, and validation oracle read back",
+        "summary、cases、manifest、validation oracle の readback が完了しました",
     )
 
 
 def run_experiment(run_dir: Path) -> RunSummary:
     """
-    Orchestrate one complete run and atomically publish its result set.
+    一つの run を orchestration し、result set を atomic に公開します.
 
-    Empty `CASES` is `blocked`; any failed or blocked case preserves all
-    successful records and writes failure evidence. Only a non-empty set of
-    successful records with a completed visualization status is `success`.
+    空の `CASES` は `blocked` とし、failed または blocked case があれば成功 record を
+    保持したまま failure evidence を書きます。空でない全成功 record と完了した
+    visualization status がそろった場合だけ `success` にします。
 
     Args:
-        run_dir: Caller-owned result directory for this run identity.
+        run_dir: この run identity のために caller が所有する result directory。
 
     Returns:
-        The typed aggregate summary also written to summary.json.
+        `summary.json` にも書く typed aggregate summary。
 
     Side effects:
-        Creates provenance, case, failure, visualization, summary, and manifest
-        artifacts through the owning atomic I/O module.
+        owning atomic I/O module を通して provenance、case、failure、visualization、summary、
+        manifest artifact を生成します。
     """
     run_dir.mkdir(parents=True, exist_ok=True)
     started_at = utc_now()
@@ -228,9 +228,9 @@ def run_experiment(run_dir: Path) -> RunSummary:
             visualization_status = execute_visualization_notebook(run_dir, template_dir)
         except Exception as error:
             visualization_status = "blocked"
-            status = "failed"
+            status = RunState.FAILED
             failure_class = "infrastructure_environment"
-            close_condition = "provide the visualization runtime and rerun the managed command"
+            close_condition = "visualization runtime を用意して managed command を再実行してください"
             failure_evidence = FAILURE_EVIDENCE_NAME
             write_failure_evidence(
                 run_dir,
@@ -259,7 +259,7 @@ def run_experiment(run_dir: Path) -> RunSummary:
         status=status,
         started_at=started_at,
         finished_at=finished_at,
-        exit_status=0 if status == "success" else 1,
+        exit_status=0 if status is RunState.SUCCESS else 1,
         case_count=len(records),
         success_count=success_count,
         failed_count=failed_count,
@@ -269,10 +269,10 @@ def run_experiment(run_dir: Path) -> RunSummary:
         preserved_artifacts=tuple(preserved),
         close_condition=close_condition,
         validation_oracle=(
-            "pass: complete provenance, non-empty cases, terminal state invariants, "
-            "and every artifact digest read back"
-            if status == "success"
-            else "incomplete: completion provenance is not sufficient for success"
+            "pass: complete provenance、non-empty cases、terminal state invariant、"
+            "全 artifact digest の readback"
+            if status is RunState.SUCCESS
+            else "incomplete: completion provenance が success の条件を満たしていません"
         ),
         visualization_status=visualization_status,
         template_complete=completion.is_complete,
@@ -285,13 +285,13 @@ def run_experiment(run_dir: Path) -> RunSummary:
 
 def require_managed_runner_route() -> None:
     """
-    Require the managed runner manifest before direct topic execution.
+    直接の topic execution 前に managed runner manifest を要求します.
 
     Raises:
-        RuntimeError: If the managed runner did not provide its manifest.
+        RuntimeError: managed runner が manifest を提供しない場合。
 
     Side effects:
-        Reads the caller environment and does not start an experiment.
+        caller environment だけを読み、experiment は開始しません。
     """
     if not os.environ.get("EXPERIMENT_RUN_MANIFEST", ""):
         raise RuntimeError(
@@ -301,23 +301,22 @@ def require_managed_runner_route() -> None:
 
 def main() -> int:
     """
-    Coordinate one managed experiment run through the selected modules.
+    選択した module を通して一つの managed experiment run を調整します.
 
-    `main()` is the argument-free execution entrypoint. Algorithm, case,
-    schema, serialization, visualization, and oracle choices remain in their
-    owning contracts and replaceable modules.
+    `main()` は引数なしの execution entrypoint です。algorithm、case、schema、serialization、
+    visualization、oracle の選択は各 owning contract と replaceable module に残します。
 
     Returns:
-        Zero for a successful non-empty run; one for failed or blocked results.
+        空でない成功 run では zero、failed または blocked result では one。
 
     Side effects:
-        Publishes the complete run artifact set selected by `run_experiment`.
+        `run_experiment` が選択した complete run artifact set を公開します。
     """
     require_managed_runner_route()
     run_dir = resolve_run_dir()
     summary = run_experiment(run_dir)
     print(f"run_dir={run_dir}")
-    print(f"status={summary.status}")
+    print(f"status={summary.status.value}")
     print(f"summary={run_dir / RESULT_SUMMARY_NAME}")
     return summary.exit_status
 

@@ -7,7 +7,7 @@
 # @dependency-end
 
 """
-experiment artifact を一つの atomic/readback boundary から公開します。
+Experiment artifact を一つの atomic/readback boundary から公開します.
 
 責務は JSON/JSONL serialization、config/environment provenance、atomic replacement、manifest
 digest 作成です。case execution と run acceptance の判断は別 module が所有します。
@@ -18,11 +18,12 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 import sys
 import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
+
+import yaml
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -33,64 +34,26 @@ from artifact_schema import (
     CONFIG_SNAPSHOT_NAME,
     ENVIRONMENT_SNAPSHOT_NAME,
     FAILURE_EVIDENCE_NAME,
+    REQUIRED_COMPLETION_FIELDS,
+    REQUIRED_CONFIG_FIELDS,
     RESULT_CASES_NAME,
     RESULT_MANIFEST_NAME,
     RESULT_SUMMARY_NAME,
     ArtifactEntry,
     ArtifactManifest,
     CompletionProvenance,
+    PLACEHOLDER_RE,
+    UNRESOLVED_MARKER_RE,
+    unresolved_field_paths,
     PROVENANCE_SNAPSHOT_NAME,
+    RunState,
     RunSummary,
 )
 from case_model import CaseResult
 
-REQUIRED_COMPLETION_FIELDS = (
-    "experiment.topic",
-    "experiment.owner",
-    "experiment.question",
-    "experiment.hypothesis",
-    "experiment.plan_digest",
-    "plan.baseline",
-    "plan.candidate",
-    "plan.cases",
-    "plan.metrics",
-    "plan.stopping_rule",
-    "plan.acceptance_oracle",
-    "plan.algorithm_contract.public_entrypoint",
-    "plan.algorithm_contract.input_schema",
-    "plan.algorithm_contract.state_transition",
-    "plan.algorithm_contract.invariants",
-    "plan.algorithm_contract.stopping_rule",
-    "plan.algorithm_contract.failure_semantics",
-    "plan.oracle_boundary.necessary_observations",
-    "plan.oracle_boundary.sufficient_observations",
-    "plan.oracle_boundary.test_activation",
-    "source.repository",
-    "source.branch",
-    "source.commit",
-    "source.dirty_state",
-    "resource.admission_owner",
-    "resource.request",
-    "resource.selection_reason",
-    "resource.gpu_visibility",
-    "resource.parallelism_policy",
-    "resource.environment_limit",
-    "resource.allocation_evidence",
-    "reproducibility.readback_command",
-    "reproducibility.required_artifacts",
-    "reproducibility.required_case_artifact",
-    "reproducibility.environment_snapshot",
-    "reproducibility.retention_owner",
-    "reproducibility.cleanup_policy",
-    "reproducibility.cleanup_command",
-    "reproducibility.reconstructibility_readback",
-)
-PLACEHOLDER_RE = re.compile(r"<[^>]+>")
-TEMPLATE_COMPLETE_RE = re.compile(r"(?m)^template_complete\s*:\s*(true|false)\s*(?:#.*)?$")
-
 
 def _completion_value(data: object, path: str) -> object:
-    """指定した TOML dotted path の値を取得します。"""
+    """指定した TOML dotted path の値を取得します."""
     current = data
     for part in path.split("."):
         if not isinstance(current, dict) or part not in current:
@@ -100,7 +63,7 @@ def _completion_value(data: object, path: str) -> object:
 
 
 def _is_completed_value(value: object) -> bool:
-    """空値または placeholder を completion failure として判定します。"""
+    """空値または placeholder を completion failure として判定します."""
     if value is None or value is False:
         return False
     if isinstance(value, str):
@@ -114,7 +77,7 @@ def _is_completed_value(value: object) -> bool:
 
 def load_completion_provenance(template_dir: Path) -> CompletionProvenance:
     """
-    config と provenance の completion contract を読み戻します。
+    Config と provenance の completion contract を読み戻します.
 
     Args:
         template_dir: config.yaml と provenance.toml を含む materialized topic directory。
@@ -128,13 +91,30 @@ def load_completion_provenance(template_dir: Path) -> CompletionProvenance:
     config_path = template_dir / "config.yaml"
     provenance_path = template_dir / "provenance.toml"
     config_text = config_path.read_text(encoding="utf-8") if config_path.is_file() else ""
-    config_match = TEMPLATE_COMPLETE_RE.search(config_text)
-    missing = []
-    config_complete = bool(config_match and config_match.group(1) == "true")
-    if not config_match:
-        missing.append("config.template_complete")
-    elif not config_complete:
+    missing: list[str] = []
+    config: object = None
+    if not config_path.is_file():
+        missing.append("config.yaml")
+    else:
+        try:
+            config = yaml.safe_load(config_text)
+        except yaml.YAMLError:
+            missing.append("config.yaml.parseable")
+    config_mapping = config if isinstance(config, dict) else {}
+    config_complete = config_mapping.get("template_complete") is True
+    if not config_mapping:
+        missing.append("config.yaml.mapping")
+    if not config_complete:
         missing.append("config.template_complete=true")
+    if PLACEHOLDER_RE.search(config_text) or UNRESOLVED_MARKER_RE.search(config_text):
+        missing.append("config.raw unresolved")
+    missing.extend(
+        f"{path} unresolved"
+        for path in unresolved_field_paths(config_mapping, "config")
+    )
+    for field in REQUIRED_CONFIG_FIELDS:
+        if not _is_completed_value(_completion_value(config_mapping, field)):
+            missing.append(f"config.{field}")
     if not provenance_path.is_file():
         missing.append("provenance.toml")
         return CompletionProvenance(
@@ -143,8 +123,9 @@ def load_completion_provenance(template_dir: Path) -> CompletionProvenance:
             provenance_path="provenance.toml",
             missing_fields=tuple(missing),
         )
+    provenance_text = provenance_path.read_text(encoding="utf-8")
     try:
-        provenance = tomllib.loads(provenance_path.read_text(encoding="utf-8"))
+        provenance = tomllib.loads(provenance_text)
     except (OSError, tomllib.TOMLDecodeError):
         missing.append("provenance.toml.parseable")
         return CompletionProvenance(
@@ -159,6 +140,12 @@ def load_completion_provenance(template_dir: Path) -> CompletionProvenance:
         missing.append("provenance.template_complete=true")
     if completion_status != "complete":
         missing.append("provenance.completion_status=complete")
+    if PLACEHOLDER_RE.search(provenance_text) or UNRESOLVED_MARKER_RE.search(provenance_text):
+        missing.append("provenance.raw unresolved")
+    missing.extend(
+        f"{path} unresolved"
+        for path in unresolved_field_paths(provenance, "provenance")
+    )
     for field in REQUIRED_COMPLETION_FIELDS:
         if not _is_completed_value(_completion_value(provenance, field)):
             missing.append(field)
@@ -172,7 +159,7 @@ def load_completion_provenance(template_dir: Path) -> CompletionProvenance:
 
 def utc_now() -> str:
     """
-    artifact provenance 用の RFC3339 UTC timestamp を返します。
+    Artifact provenance 用の RFC3339 UTC timestamp を返します.
 
     Returns:
         末尾に `Z` を持つ timezone-aware timestamp string。
@@ -185,7 +172,7 @@ def utc_now() -> str:
 
 def atomic_write_text(path: Path, content: str) -> None:
     """
-    temporary sibling を flush した後に artifact 一件を atomic replace します。
+    Temporary sibling を flush した後に artifact 一件を atomic replace します.
 
     Args:
         path: この run が所有する destination artifact。
@@ -218,7 +205,7 @@ def atomic_write_text(path: Path, content: str) -> None:
 
 def atomic_write_json(path: Path, payload: dict[str, object]) -> None:
     """
-    JSON object 一件を serialize し、atomic_write_text 経由で公開します。
+    JSON object 一件を serialize し、atomic_write_text 経由で公開します.
 
     Args:
         path: destination JSON artifact。
@@ -238,7 +225,7 @@ def atomic_write_json(path: Path, payload: dict[str, object]) -> None:
 
 def sha256_file(path: Path) -> str:
     """
-    artifact-manifest.json が使う content digest を計算します。
+    Artifact manifest が使う content digest を計算します.
 
     Args:
         path: bytes を読む既存 file。
@@ -265,7 +252,7 @@ def write_provenance_snapshots(
     completion: CompletionProvenance,
 ) -> tuple[str, str, str]:
     """
-    case execution 前に config、completion、runtime identity を snapshot します。
+    Case execution 前に config、completion、runtime identity を snapshot します.
 
     Args:
         run_dir: snapshot を受け取る result directory。
@@ -313,7 +300,7 @@ def write_provenance_snapshots(
 
 def write_case_records(run_dir: Path, records: tuple[CaseResult, ...]) -> None:
     """
-    typed case record 全件を一つの atomic JSONL artifact として serialize します。
+    Typed case record 全件を一つの atomic JSONL artifact として serialize します.
 
     Args:
         run_dir: cases.jsonl を受け取る result directory。
@@ -332,14 +319,14 @@ def write_case_records(run_dir: Path, records: tuple[CaseResult, ...]) -> None:
 def write_failure_evidence(
     run_dir: Path,
     *,
-    status: str,
+    status: RunState,
     failure_class: str,
     records: tuple[CaseResult, ...],
     close_condition: str,
     visualization_error: str = "not_applicable",
 ) -> None:
     """
-    failure-cause classification と rerun closure evidence を保持します。
+    Failure-cause classification と rerun closure evidence を保持します.
 
     Args:
         run_dir: failure-evidence.json を受け取る result directory。
@@ -355,7 +342,7 @@ def write_failure_evidence(
     atomic_write_json(
         run_dir / FAILURE_EVIDENCE_NAME,
         {
-            "state": status,
+            "state": status.value,
             "failure_class": failure_class,
             "records": [record.to_dict() for record in records],
             "visualization_error": visualization_error,
@@ -366,7 +353,7 @@ def write_failure_evidence(
 
 def write_summary(run_dir: Path, summary: RunSummary) -> None:
     """
-    typed RunSummary を summary.json として atomic に公開します。
+    Typed RunSummary を summary.json として atomic に公開します.
 
     Args:
         run_dir: summary.json を受け取る result directory。
@@ -380,7 +367,7 @@ def write_summary(run_dir: Path, summary: RunSummary) -> None:
 
 def write_artifact_manifest(run_dir: Path, summary: RunSummary) -> None:
     """
-    manifest 自身を除く run artifact 全件の digest を公開します。
+    Manifest 自身を除く run artifact 全件の digest を公開します.
 
     Args:
         run_dir: 完全な run snapshot を含む result directory。
