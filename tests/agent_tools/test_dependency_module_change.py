@@ -1,5 +1,14 @@
 """Tests for dependency module topic adapter behavior."""
 
+# @dependency-start
+# contract test
+# responsibility Verifies dependency identity decoration over the generic repository topic lifecycle.
+# upstream design ../../documents/rule/repository-topic-clone.md generic repository topic lifecycle
+# upstream design ../../documents/rule/dependency-module-changes.md dependency adapter responsibility
+# downstream implementation ../../tools/agent_tools/dependency_module_change.py applies dependency policy
+# downstream implementation ../../tools/agent_tools/repository_topic_clone.py owns clone lifecycle behavior
+# @dependency-end
+
 from __future__ import annotations
 
 import os
