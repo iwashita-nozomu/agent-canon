@@ -34,6 +34,76 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
 
+    def test_template_agentcanon_gate_source_and_projection_have_one_authority(
+        self,
+    ) -> None:
+        """The source and generated checklist expose only the parent PR gate."""
+        canonical = "- [ ] `make agent-canon-pr-check`"
+        obsolete_commands = (
+            "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
+            "bash tools/agent-canon/agent_tools/run_repo_dependency_review.sh --fail-missing",
+        )
+        for relative in (
+            "templates/documents/github/pull-request/agent_canon.md",
+            ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+        ):
+            with self.subTest(path=relative):
+                text = (REPO_ROOT / relative).read_text(encoding="utf-8")
+                normalized = " ".join(text.split())
+                self.assertEqual(text.count(canonical), 1)
+                for command in obsolete_commands:
+                    self.assertNotIn(command, normalized)
+
+    def test_template_agentcanon_gate_rejects_missing_duplicate_or_internal_authority(
+        self,
+    ) -> None:
+        """Semantic checks reject every non-single parent-gate checklist."""
+        canonical = "- [ ] `make agent-canon-pr-check`"
+        variants = {
+            "missing": (
+                lambda text: text.replace(canonical, ""),
+                "canonical_parent_pr_gate_count:0",
+            ),
+            "duplicate": (
+                lambda text: text + f"\n{canonical}\n",
+                "canonical_parent_pr_gate_count:2",
+            ),
+            "obsolete_internal": (
+                lambda text: text
+                + "\n- [ ] `bash tools/agent-canon/agent_tools/"
+                "run_repo_dependency_review.sh --fail-missing`\n",
+                "obsolete_internal_pr_gate_authority:",
+            ),
+        }
+        targets = (
+            "templates/documents/github/pull-request/agent_canon.md",
+            ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+        )
+        for relative in targets:
+            for variant, (mutate, finding) in variants.items():
+                with (
+                    self.subTest(path=relative, variant=variant),
+                    tempfile.TemporaryDirectory() as tmp_dir,
+                ):
+                    root = Path(tmp_dir)
+                    self.write_valid_workflow(root)
+                    self.copy_required_surfaces(root)
+                    path = root / relative
+                    path.write_text(
+                        mutate(path.read_text(encoding="utf-8")),
+                        encoding="utf-8",
+                    )
+
+                    result = subprocess.run(
+                        [sys.executable, str(SCRIPT), "--root", str(root)],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(finding, result.stdout)
+
     def test_agent_canon_candidate_tree_has_one_remote_gate_consumer(self) -> None:
         """PR CI invokes the canonical gate once and has no duplicate push trigger."""
         workflow = REPO_ROOT / ".github" / "workflows" / "agent-canon-static-gates.yml"
@@ -714,6 +784,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             "tools/ci/checkout_agent_canon_submodule.sh",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+            "templates/documents/github/pull-request/agent_canon.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             "issues/README.md",
             "issues/open/AC-20260517-eval-accumulation-gaps.md",
@@ -747,6 +818,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         for relative in [
             "README.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
+            "templates/documents/github/pull-request/agent_canon.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             ".github/workflows/agent-coordination.yml",
             ".github/workflows/agent-runtime-dashboard.yml",

@@ -47,6 +47,12 @@ AGENT_CANON_CREDENTIALS = (
 )
 AGENT_CANON_PR_READ_CREDENTIAL = "AGENT_CANON_PR_READ_TOKEN"
 GITHUB_TOKEN_EXPRESSION = "${{ github.token }}"
+TEMPLATE_AGENT_CANON_PR_GATE_COMMAND = "make agent-canon-pr-check"
+OBSOLETE_TEMPLATE_AGENT_CANON_INTERNAL_COMMANDS = (
+    "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
+    "bash tools/agent-canon/agent_tools/run_repo_dependency_review.sh --fail-missing",
+)
+CHECKLIST_COMMAND_PATTERN = re.compile(r"(?m)^\s*-\s*\[\s*\]\s*`([^`\n]+)`\s*$")
 WORKFLOW_DISPATCH_INPUT_PATTERN = re.compile(
     r"\$\{\{\s*(?:inputs|github\.event\.inputs)"
     r"\s*(?:\.\s*[A-Za-z_][A-Za-z0-9_-]*|\[\s*['\"][^'\"]+['\"]\s*\])"
@@ -76,7 +82,7 @@ TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS = (
     "template submodule SHA:",
 )
 TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
-    "make agent-canon-pr-check",
+    TEMPLATE_AGENT_CANON_PR_GATE_COMMAND,
     "make agent-canon-ensure-latest",
     "Plan Mode Evidence",
     "Agent Orchestration Evidence",
@@ -97,7 +103,6 @@ TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
     "Direct `bash tools/sync_agent_canon.sh push` was not used",
     "agentcanon_structure_followup=required",
     "agentcanon_structure_followup=pass",
-    "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
     "python3 tools/agent_tools/check_agent_runtime_alignment.py",
     "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",
     "python3 tools/agent_tools/check_convention_compliance.py",
@@ -713,11 +718,47 @@ def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]
     ]
 
 
+def check_template_agentcanon_pr_gate(path: Path) -> list[Finding]:
+    """Require one public parent gate and reject internal command authority."""
+    if not path.exists():
+        return [Finding("error", path, "missing_file")]
+    text = read_text(path)
+    checklist_commands = tuple(CHECKLIST_COMMAND_PATTERN.findall(text))
+    canonical_count = checklist_commands.count(TEMPLATE_AGENT_CANON_PR_GATE_COMMAND)
+    findings: list[Finding] = []
+    if canonical_count != 1:
+        findings.append(
+            Finding(
+                "error",
+                path,
+                f"canonical_parent_pr_gate_count:{canonical_count}",
+            )
+        )
+    normalized_text = " ".join(text.split())
+    for command in OBSOLETE_TEMPLATE_AGENT_CANON_INTERNAL_COMMANDS:
+        if command in normalized_text:
+            findings.append(
+                Finding(
+                    "error",
+                    path,
+                    f"obsolete_internal_pr_gate_authority:{command}",
+                )
+            )
+    return findings
+
+
 def check_pr_templates(root: Path) -> list[Finding]:
     """Check PR template evidence fields."""
     findings: list[Finding] = []
     for path, required in pr_template_requirement_specs(root):
         findings.extend(require_text(path, required))
+    canon_root = agent_canon_root(root)
+    semantic_templates = {
+        canon_root / "templates" / "documents" / "github" / "pull-request" / "agent_canon.md",
+        root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md",
+    }
+    for path in sorted(semantic_templates):
+        findings.extend(check_template_agentcanon_pr_gate(path))
     return findings
 
 
