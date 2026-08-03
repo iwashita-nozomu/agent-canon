@@ -666,7 +666,7 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
     root = root.resolve()
     topic_root = root.parent.resolve()
     repo_target = f"/workspace/{root.name}"
-    if topic_root.name == "workspace":
+    if topic_root.name == "workspace" and topic_root.parent.name != "workspace":
         expected_workspace_layout = "direct-repo"
     elif topic_root.parent.name == "workspace":
         expected_workspace_layout = "managed-topic"

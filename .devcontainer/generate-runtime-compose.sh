@@ -21,7 +21,8 @@ workspace_root="$(cd "${repo_root}/.." && pwd -P)"
   exit 1
 }
 workspace_parent="$(cd "${workspace_root}/.." && pwd -P)"
-if [ "$(basename "$workspace_root")" = "workspace" ]; then
+if [ "$(basename "$workspace_root")" = "workspace" ] \
+  && [ "$(basename "$workspace_parent")" != "workspace" ]; then
   workspace_layout="direct-repo"
 elif [ "$(basename "$workspace_parent")" != "workspace" ]; then
   case "$(basename "$workspace_root")" in

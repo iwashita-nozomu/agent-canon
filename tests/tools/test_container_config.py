@@ -322,6 +322,38 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     assert "/var/lib/agent-canon/runtime" not in compose
 
 
+def test_generator_treats_workspace_topic_slug_as_managed(tmp_path: Path) -> None:
+    """A managed topic may itself be named workspace without becoming direct-repo."""
+    repo = tmp_path / "workspace" / "workspace" / "agent-canon"
+    write_devcontainer(repo)
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
+    write_file(repo, ".devcontainer/Dockerfile", DOCKERFILE.read_text(encoding="utf-8"))
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "HOME": str(tmp_path / "missing-home")},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert 'AGENT_CANON_WORKSPACE_LAYOUT: "managed-topic"' in compose
+    assert f'source: "{repo.parent.resolve()}"' in compose
+    assert 'target: "/workspace"' in compose
+    assert 'target: "/workspace/agent-canon"' not in compose
+    assert load_container_config_module().validate_generated_compose(repo, None) == []
+
+
 def test_generator_direct_repo_mounts_only_repository_root(tmp_path: Path) -> None:
     """A direct repo layout never exposes sibling repositories under /workspace."""
     repo = tmp_path / "workspace" / "data_download"
