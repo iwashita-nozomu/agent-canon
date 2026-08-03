@@ -597,8 +597,8 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
         self.assertNotEqual(project_quality.returncode, 0)
 
-    def test_standalone_ordinary_change_delegates_project_quality(self) -> None:
-        """Standalone owns shared graph completeness and delegates project quality."""
+    def test_standalone_ordinary_change_keeps_shared_gate_only(self) -> None:
+        """Standalone owns shared graph completeness without a quality job."""
         fixture_root = Path(tempfile.mkdtemp(prefix="graph-gate-standalone-"))
         self.addCleanup(shutil.rmtree, fixture_root)
         source = self.create_source_repo(fixture_root)

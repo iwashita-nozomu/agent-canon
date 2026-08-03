@@ -203,11 +203,13 @@ root runtime views, root-copy surfaces, or sync-control surfaces. Record
 
 `make agent-canon-pr-check` keeps this owner boundary: both standalone
 AgentCanon and template/derived parents run only shared AgentCanon surfaces.
-They emit `AGENT_CANON_PR_PROJECT_QUALITY=delegated`; standalone uses owner
-`agentcanon_project_ci`, while derived parents use `parent_ci`. Project tests,
-type checks, and lint are blocking only through the selected repository CI job.
-The shared gate does not add a parent-project baseline scanner or invoke
-`run_all_checks.sh`.
+Derived parents emit `AGENT_CANON_PR_PROJECT_QUALITY=delegated` with owner
+`parent_ci`; the workflow checker requires that parent workflows expose the
+owner marker and canonical `make ci` command, independent of job name. Project
+tests, type checks, and lint are blocking only through that selected parent CI
+route. Standalone AgentCanon keeps its existing `static-gates` shared owner
+and adds no repository-wide project-quality job. The shared gate does not add a
+parent-project baseline scanner or invoke `run_all_checks.sh`.
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \

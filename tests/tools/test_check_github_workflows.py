@@ -213,40 +213,107 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             )
         )
 
-    def test_static_gates_require_actual_parallel_project_quality_job(self) -> None:
-        """The workflow checker validates the real quality job, not a fixture stub."""
+    def test_standalone_static_gates_have_no_project_quality_job(self) -> None:
+        """Standalone static gates do not create a repository-wide quality owner."""
         source = (
             REPO_ROOT / ".github" / "workflows" / "agent-canon-static-gates.yml"
         ).read_text(encoding="utf-8")
+        self.assertNotIn("project-quality:", source)
+        self.assertNotIn("run_python_quality_checks.sh", source)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow = root / ".github" / "workflows" / "agent-canon-static-gates.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(source, encoding="utf-8")
+            self.copy_required_surfaces(root)
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_derived_parent_quality_route_uses_owner_and_command_not_job_name(
+        self,
+    ) -> None:
+        """Derived quality ownership is bound to a parent marker and command."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            self.copy_vendor_surfaces(root)
+            self.write_template_root_pr_template(root)
+            self.copy_template_agent_canon_template(root)
+            (root / ".gitmodules").write_text(
+                '[submodule "vendor/agent-canon"]\n'
+                "\tpath = vendor/agent-canon\n"
+                "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
+                encoding="utf-8",
+            )
+            workflow_path = root / ".github" / "workflows" / "ci.yml"
+            workflow_path.write_text(
+                workflow_path.read_text(encoding="utf-8").replace(
+                    "  test:\n", "  project-quality-owner:\n"
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_derived_parent_quality_route_fails_without_owner_or_command(self) -> None:
+        """Derived quality routes fail closed when owner or canonical command is absent."""
         variants = {
-            "missing_job": (
-                source.replace("  project-quality:\n", "  project-quality-removed:\n"),
-                "missing_project_quality_job",
+            "missing_owner": (
+                "",
+                "        run: make ci\n",
+                "missing_parent_project_quality_owner",
             ),
             "missing_command": (
-                source.replace(
-                    "bash tools/ci/run_python_quality_checks.sh",
-                    "bash tools/ci/run_python_quality_checks_removed.sh",
-                ),
-                "project_quality_job_missing_command",
+                "          AGENT_CANON_PR_PROJECT_QUALITY_OWNER: parent_ci\n",
+                "        run: echo no-quality-route\n",
+                "parent_project_quality_route_missing_canonical_command",
             ),
-            "dependent": (
-                source.replace(
-                    "  project-quality:\n    runs-on:",
-                    "  project-quality:\n    needs: static-gates\n    runs-on:",
-                ),
-                "project_quality_job_must_be_independent",
+            "wrong_owner": (
+                "          AGENT_CANON_PR_PROJECT_QUALITY_OWNER: wrong_owner\n",
+                "        run: make ci\n",
+                "parent_project_quality_owner_must_be_parent_ci",
             ),
         }
-        for name, (workflow_text, finding) in variants.items():
+        for name, (owner_text, command_text, finding) in variants.items():
             with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp_dir:
                 root = Path(tmp_dir)
-                workflow = (
-                    root / ".github" / "workflows" / "agent-canon-static-gates.yml"
-                )
-                workflow.parent.mkdir(parents=True)
-                workflow.write_text(workflow_text, encoding="utf-8")
+                self.write_valid_workflow(root)
                 self.copy_required_surfaces(root)
+                self.copy_vendor_surfaces(root)
+                self.write_template_root_pr_template(root)
+                self.copy_template_agent_canon_template(root)
+                (root / ".gitmodules").write_text(
+                    '[submodule "vendor/agent-canon"]\n'
+                    "\tpath = vendor/agent-canon\n"
+                    "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
+                    encoding="utf-8",
+                )
+                workflow_path = root / ".github" / "workflows" / "ci.yml"
+                workflow_text = workflow_path.read_text(encoding="utf-8")
+                workflow_text = workflow_text.replace(
+                    "          AGENT_CANON_PR_PROJECT_QUALITY_OWNER: parent_ci\n",
+                    owner_text,
+                )
+                workflow_text = workflow_text.replace(
+                    "        run: make ci\n", command_text
+                )
+                workflow_path.write_text(workflow_text, encoding="utf-8")
 
                 result = subprocess.run(
                     [sys.executable, str(SCRIPT), "--root", str(root)],
@@ -900,7 +967,11 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             + "          persist-credentials: false\n"
             + "      - name: Checkout AgentCanon submodule\n"
             + env_block
-            + helper_command,
+            + helper_command
+            + "      - name: Parent project quality\n"
+            + "        env:\n"
+            + "          AGENT_CANON_PR_PROJECT_QUALITY_OWNER: parent_ci\n"
+            + "        run: make ci\n",
             encoding="utf-8",
         )
 

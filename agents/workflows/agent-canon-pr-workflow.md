@@ -205,11 +205,13 @@ Otherwise `check_agent_canon_pr.sh` records
 `AGENT_CANON_PR_DEPENDENCY_GRAPH=skipped` and keeps the matching `skipped`
 receipt inside the shared gate. The shared gate never runs repository project
 tests, type checks, or lint. A derived parent projects those checks with
-`AGENT_CANON_PR_PROJECT_QUALITY=delegated` and owner `parent_ci`; a standalone
-source projects them with the same evidence and owner `agentcanon_project_ci`.
-The selected repository workflow job is the blocking owner. The existing
-workflow checker owns whether that job contract exists; the PR script does not
-add a second workflow parser or fallback runner.
+`AGENT_CANON_PR_PROJECT_QUALITY=delegated` and owner `parent_ci`; its parent
+workflow must expose that owner marker together with the canonical `make ci`
+command. The existing workflow checker validates this route by owner and
+command semantics, not by a fixed job name. Standalone AgentCanon keeps the
+existing `static-gates` shared-surface owner and introduces no repository-wide
+project-quality job. The PR script does not add a second workflow parser or
+fallback runner.
 
 When selection is required, the parent checker first builds the complete graph.
 A complete result records `prepared` and runs the full strict dependency review.
@@ -248,10 +250,11 @@ Each check family has one execution owner in a source PR gate. For a derived
 parent or standalone source, the direct AgentCanon check function owns only the
 shared runtime, convention, prompt/eval, skill-command, Rust, documentation,
 dependency-header, and graph checks. It never enters a repository project's
-test/type/lint route. The standalone static workflow runs those shared gates in
-its `static-gates` job and its independent `project-quality` job runs the
-canonical Python quality tool with its required dependencies. The selected
-parent CI job owns derived-project quality consumers.
+test/type/lint route. The standalone static workflow runs the shared gates in
+its existing `static-gates` job; it does not add a repository-wide
+project-quality job. The selected parent CI route owns derived-project quality
+consumers, and the workflow checker validates that route's owner marker and
+canonical command.
 
 After the selected dependency review, the PR gate writes a temporary receipt
 containing its owner, root identity, parent PID, matching

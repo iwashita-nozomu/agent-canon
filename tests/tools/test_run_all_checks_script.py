@@ -58,8 +58,8 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertLess(text.index(producer_marker), text.index(checker_marker))
         self.assertNotIn("export AGENT_CANON_HOOK_ARCHIVE_DIR", text)
 
-    def test_pr_gate_only_projects_project_quality_to_external_ci(self) -> None:
-        """The PR gate projects quality ownership without running run_all_checks."""
+    def test_pr_gate_only_keeps_shared_surface_ownership(self) -> None:
+        """The PR gate emits ownership evidence without running run_all_checks."""
         ci_text = SCRIPT.read_text(encoding="utf-8")
         pr_text = PR_SCRIPT.read_text(encoding="utf-8")
 

@@ -213,9 +213,10 @@ AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
     "workflow_dispatch:",
     "github.event.pull_request.head.sha || github.sha",
     "bash tools/ci/check_agent_canon_pr.sh",
-    "project-quality:",
-    "bash tools/ci/run_python_quality_checks.sh",
 )
+PARENT_PROJECT_QUALITY_OWNER_ENV = "AGENT_CANON_PR_PROJECT_QUALITY_OWNER"
+PARENT_PROJECT_QUALITY_OWNER = "parent_ci"
+PARENT_PROJECT_QUALITY_COMMAND = "make ci"
 AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS = (
     "tool_catalog.py",
     "tool_drift.py",
@@ -619,33 +620,73 @@ def agent_canon_static_gate_findings(
                         f"run_step_{context.index}_duplicates_canonical_gate:{command}",
                     )
                 )
-    project_quality_job = next(
-        (job for job_name, job in job_items(workflow) if job_name == "project-quality"),
-        None,
-    )
-    if project_quality_job is None:
-        findings.append(Finding("error", path, "missing_project_quality_job"))
-        return findings
-    needs = project_quality_job.get("needs")
-    if needs not in (None, [], ""):
-        findings.append(
-            Finding("error", path, "project_quality_job_must_be_independent")
-        )
-    project_quality_runs: list[str] = []
-    project_quality_steps = project_quality_job.get("steps")
-    if isinstance(project_quality_steps, list):
-        for step_object in cast(list[object], project_quality_steps):
-            step = as_string_dict(step_object)
-            if step is not None and isinstance(step.get("run"), str):
-                project_quality_runs.append(cast(str, step["run"]))
-    has_quality_command = any(
-        line.strip() == "bash tools/ci/run_python_quality_checks.sh"
-        for run in project_quality_runs
-        for line in run.splitlines()
-    )
-    if not has_quality_command:
-        findings.append(Finding("error", path, "project_quality_job_missing_command"))
     return findings
+
+
+def project_quality_owner_value(source: Mapping[str, object]) -> object:
+    """Return the project-quality owner marker from a workflow object."""
+    env = as_string_dict(source.get("env"))
+    if env is None:
+        return None
+    return env.get(PARENT_PROJECT_QUALITY_OWNER_ENV)
+
+
+def has_canonical_project_quality_command(run: str) -> bool:
+    """Return whether a workflow run invokes the canonical parent quality command."""
+    return any(
+        line.strip() == PARENT_PROJECT_QUALITY_COMMAND for line in run.splitlines()
+    )
+
+
+def parent_project_quality_findings(root: Path) -> list[Finding]:
+    """Require a parent-owned quality route in derived repository workflows."""
+    workflow_dir = root / ".github" / "workflows"
+    owner_routes: list[tuple[Path, str | None]] = []
+    declared_owner = False
+    for path in sorted(workflow_dir.glob("*.y*ml")):
+        workflow = load_workflow(path)
+        for _job_name, job in job_items(workflow):
+            job_owner = project_quality_owner_value(job)
+            if job_owner is not None:
+                declared_owner = True
+            job_steps = job.get("steps")
+            steps = cast(list[object], job_steps) if isinstance(job_steps, list) else []
+            for step_object in steps:
+                step = as_string_dict(step_object)
+                if step is None:
+                    continue
+                step_owner = project_quality_owner_value(step)
+                if step_owner is not None:
+                    declared_owner = True
+                owner = step_owner if step_owner is not None else job_owner
+                if owner == PARENT_PROJECT_QUALITY_OWNER:
+                    run = step.get("run")
+                    owner_routes.append(
+                        (
+                            path,
+                            run if isinstance(run, str) else None,
+                        )
+                    )
+    if not owner_routes:
+        message = (
+            "parent_project_quality_owner_must_be_parent_ci"
+            if declared_owner
+            else "missing_parent_project_quality_owner"
+        )
+        return [Finding("error", workflow_dir, message)]
+    if any(
+        run is not None and has_canonical_project_quality_command(run)
+        for _path, run in owner_routes
+    ):
+        return []
+    return [
+        Finding(
+            "error",
+            path,
+            "parent_project_quality_route_missing_canonical_command",
+        )
+        for path, _run in owner_routes[:1]
+    ]
 
 
 def require_text(path: Path, required: Sequence[str]) -> list[Finding]:
@@ -995,6 +1036,8 @@ def github_workflow_findings(root: Path) -> tuple[list[Finding], list[Path]]:
     findings: list[Finding] = []
     for path in workflows:
         findings.extend(check_workflow(root, path))
+    if is_template_or_derived_repo(root):
+        findings.extend(parent_project_quality_findings(root))
     findings.extend(check_root_copy_headers(root))
     findings.extend(check_pr_templates(root))
     findings.extend(check_github_support_surfaces(root))

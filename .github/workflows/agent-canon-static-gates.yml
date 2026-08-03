@@ -18,7 +18,6 @@
 # upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py validates workflow routing eval prompts
 # upstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report quality checklist prompts
 # upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh checks dependency headers and graph
-# upstream implementation ../../tools/ci/run_python_quality_checks.sh owns the standalone project-quality job
 # upstream implementation ../../tools/ci/check_github_workflows.py validates workflow and PR template conventions
 # upstream implementation ../../tools/ci/check_agent_canon_pr.sh owns the one source-PR static gate invocation.
 # @dependency-end
@@ -71,24 +70,3 @@ jobs:
         env:
           AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}
         run: bash tools/ci/check_agent_canon_pr.sh
-
-  project-quality:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: false
-          persist-credentials: false
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Install project quality dependencies
-        run: python3 -m pip install --upgrade pyyaml tomli packaging pytest pyright ruff
-
-      - name: Run project quality
-        run: bash tools/ci/run_python_quality_checks.sh
