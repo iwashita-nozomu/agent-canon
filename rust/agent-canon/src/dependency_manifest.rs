@@ -21,6 +21,7 @@ const SURFACE_MANIFEST_SNAPSHOT_SCHEMA: &str = "agent-canon.surface-manifest.v1"
 const DEFAULT_SURFACE_MANIFEST: &str = "documents/runtime/shared-runtime-surfaces.toml";
 pub(crate) const PRODUCER_IDENTITY_VERSION: &str = "agent-canon.surface-manifest-producer.v1";
 pub(crate) const PRODUCER_IDENTITY_CONTRACT: &str = "agent-canon.surface-manifest.v1";
+pub(crate) const SOURCE_DIAGNOSTIC_SCHEMA: &str = "agent-canon.source-diagnostic.v1";
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -50,11 +51,21 @@ pub(crate) struct SourceSpan {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct DeclarationIdentity {
+    pub direction: String,
+    pub kind: String,
+    pub target: String,
+    pub reason: String,
+    pub canonical_declaration: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Diagnostic {
     pub code: String,
     pub message: String,
     pub severity: String,
-    pub source_span: Option<SourceSpan>,
+    pub source_span: SourceSpan,
+    pub declaration: DeclarationIdentity,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -71,6 +82,7 @@ pub(crate) struct DependencyDeclaration {
     pub declared_direction: String,
     pub declared_kind: String,
     pub declared_target: String,
+    pub canonical_target: String,
     pub resolved_target_identity_id: Option<String>,
     pub source_span: SourceSpan,
     pub reason: String,
@@ -695,6 +707,105 @@ fn resolve_source_relative_target(
     normalize_relative(&source_parent.join(target))
 }
 
+fn normalize_declaration_component(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn invalid_declaration_component(name: &str, line: &str) -> String {
+    format!("invalid-{name}:{}", hash_text(line))
+}
+
+fn declaration_identity(
+    direction: &str,
+    kind: &str,
+    target: &str,
+    reason: &str,
+) -> DeclarationIdentity {
+    let direction = normalize_declaration_component(direction);
+    let kind = normalize_declaration_component(kind);
+    let target = normalize_declaration_component(target);
+    let reason = normalize_declaration_component(reason);
+    let identity_seed = format!("{direction}\0{kind}\0{target}\0{reason}");
+    let direction = if direction.is_empty() {
+        invalid_declaration_component("direction", &identity_seed)
+    } else {
+        direction
+    };
+    let kind = if kind.is_empty() {
+        invalid_declaration_component("kind", &identity_seed)
+    } else {
+        kind
+    };
+    let target = if target.is_empty() {
+        invalid_declaration_component("target", &identity_seed)
+    } else {
+        target
+    };
+    let reason = if reason.is_empty() {
+        invalid_declaration_component("reason", &identity_seed)
+    } else {
+        reason
+    };
+    let canonical_declaration = format!("{direction} {kind} {target} {reason}");
+    DeclarationIdentity {
+        direction,
+        kind,
+        target,
+        reason,
+        canonical_declaration,
+    }
+}
+
+fn source_span(relative: &str, line_number: usize, line: &str) -> SourceSpan {
+    SourceSpan {
+        path: relative.to_string(),
+        start_line: line_number,
+        start_column: 1,
+        end_line: line_number,
+        end_column: line.len() + 1,
+    }
+}
+
+fn source_diagnostic(
+    code: &str,
+    message: String,
+    severity: &str,
+    span: SourceSpan,
+    declaration: DeclarationIdentity,
+) -> Diagnostic {
+    Diagnostic {
+        code: code.to_string(),
+        message,
+        severity: severity.to_string(),
+        source_span: span,
+        declaration,
+    }
+}
+
+pub(crate) fn diagnostic_identity_json(diagnostic: &Diagnostic) -> serde_json::Value {
+    let declaration = &diagnostic.declaration;
+    json!({
+        "schema": SOURCE_DIAGNOSTIC_SCHEMA,
+        "code": diagnostic.code,
+        "source": diagnostic.source_span.path,
+        "target": declaration.target,
+        "declaration": declaration.canonical_declaration,
+        "source_span": {
+            "path": diagnostic.source_span.path,
+            "start_line": diagnostic.source_span.start_line,
+            "start_column": diagnostic.source_span.start_column,
+            "end_line": diagnostic.source_span.end_line,
+            "end_column": diagnostic.source_span.end_column,
+        },
+        "declaration_components": {
+            "direction": declaration.direction,
+            "kind": declaration.kind,
+            "target": declaration.target,
+            "reason": declaration.reason,
+        },
+    })
+}
+
 fn target_path_diagnostic_code(error: TargetPathError) -> &'static str {
     match error {
         TargetPathError::Absolute => "target-absolute",
@@ -708,19 +819,15 @@ fn target_path_diagnostic(
     line: &str,
     target: &str,
     error: TargetPathError,
+    declaration: DeclarationIdentity,
 ) -> Diagnostic {
-    Diagnostic {
-        code: target_path_diagnostic_code(error).to_string(),
-        message: format!("{relative}:{line_number}:{target}"),
-        severity: "error".to_string(),
-        source_span: Some(SourceSpan {
-            path: relative.to_string(),
-            start_line: line_number,
-            start_column: 1,
-            end_line: line_number,
-            end_column: line.len() + 1,
-        }),
-    }
+    source_diagnostic(
+        target_path_diagnostic_code(error),
+        format!("{relative}:{line_number}:{target}"),
+        "error",
+        source_span(relative, line_number, line),
+        declaration,
+    )
 }
 
 fn target_unresolved_diagnostic(
@@ -728,19 +835,15 @@ fn target_unresolved_diagnostic(
     line_number: usize,
     line: &str,
     target: &str,
+    declaration: DeclarationIdentity,
 ) -> Diagnostic {
-    Diagnostic {
-        code: "target-unresolved".to_string(),
-        message: format!("{relative}:{line_number}:{target}"),
-        severity: "error".to_string(),
-        source_span: Some(SourceSpan {
-            path: relative.to_string(),
-            start_line: line_number,
-            start_column: 1,
-            end_line: line_number,
-            end_column: line.len() + 1,
-        }),
-    }
+    source_diagnostic(
+        "target-unresolved",
+        format!("{relative}:{line_number}:{target}"),
+        "error",
+        source_span(relative, line_number, line),
+        declaration,
+    )
 }
 
 pub(crate) fn diagnostic_category(code: &str) -> &'static str {
@@ -1668,69 +1771,91 @@ pub(crate) fn capture_snapshot(
             },
         );
         for (line_number, line) in entries {
-            let mut fields = line.splitn(4, ' ');
+            let mut fields = line.split_whitespace();
             let direction = fields.next().unwrap_or_default();
             let kind = fields.next().unwrap_or_default();
             let target = fields.next().unwrap_or_default();
-            let reason = fields.next().unwrap_or_default().trim().to_string();
+            let reason = fields.collect::<Vec<_>>().join(" ");
+            if matches!(direction, "contract" | "responsibility" | "coverage") {
+                continue;
+            }
             if !matches!(direction, "upstream" | "downstream") {
+                diagnostics.push(source_diagnostic(
+                    "manifest-grammar",
+                    format!("{relative}:{line_number}:{line}"),
+                    "error",
+                    source_span(relative, line_number, &line),
+                    declaration_identity(direction, kind, target, &reason),
+                ));
                 continue;
             }
             if !matches!(kind, "design" | "implementation" | "environment")
                 || target.is_empty()
                 || reason.is_empty()
             {
-                diagnostics.push(Diagnostic {
-                    code: "manifest-grammar".to_string(),
-                    message: format!("{relative}:{line_number}:{line}"),
-                    severity: "error".to_string(),
-                    source_span: None,
-                });
+                diagnostics.push(source_diagnostic(
+                    "manifest-grammar",
+                    format!("{relative}:{line_number}:{line}"),
+                    "error",
+                    source_span(relative, line_number, &line),
+                    declaration_identity(direction, kind, target, &reason),
+                ));
                 continue;
             }
-            let (resolved, attestation_key) = match resolve_source_relative_target(relative, target)
-            {
-                Ok(target_path) => {
-                    let canonical_target_path = canonicalize_surface_path(
-                        &surface_manifest,
-                        authority.as_ref(),
-                        &target_path,
-                    )?;
-                    if manifest_repo_state_target(
-                        &surface_manifest,
-                        authority.as_ref(),
-                        &canonical_target_path,
-                    )
-                    .is_some()
-                    {
-                        (None, "surface-manifest-repo-state")
-                    } else {
-                        let resolved = identity_by_path
-                            .get(&canonical_target_path)
-                            .filter(|_| !excluded_set.contains(&canonical_target_path))
-                            .cloned();
-                        if resolved.is_none() {
-                            diagnostics.push(target_unresolved_diagnostic(
-                                relative,
-                                line_number,
-                                &line,
-                                target,
-                            ));
+            let (resolved, attestation_key, canonical_target) =
+                match resolve_source_relative_target(relative, target) {
+                    Ok(target_path) => {
+                        let canonical_target_path = canonicalize_surface_path(
+                            &surface_manifest,
+                            authority.as_ref(),
+                            &target_path,
+                        )?;
+                        if manifest_repo_state_target(
+                            &surface_manifest,
+                            authority.as_ref(),
+                            &canonical_target_path,
+                        )
+                        .is_some()
+                        {
+                            (None, "surface-manifest-repo-state", canonical_target_path)
+                        } else {
+                            let resolved = identity_by_path
+                                .get(&canonical_target_path)
+                                .filter(|_| !excluded_set.contains(&canonical_target_path))
+                                .cloned();
+                            if resolved.is_none() {
+                                diagnostics.push(target_unresolved_diagnostic(
+                                    relative,
+                                    line_number,
+                                    &line,
+                                    target,
+                                    declaration_identity(
+                                        direction,
+                                        kind,
+                                        &canonical_target_path,
+                                        &reason,
+                                    ),
+                                ));
+                            }
+                            (resolved, "dependency-header", canonical_target_path)
                         }
-                        (resolved, "dependency-header")
                     }
-                }
-                Err(error) => {
-                    diagnostics.push(target_path_diagnostic(
-                        relative,
-                        line_number,
-                        &line,
-                        target,
-                        error,
-                    ));
-                    (None, "dependency-header")
-                }
-            };
+                    Err(error) => {
+                        diagnostics.push(target_path_diagnostic(
+                            relative,
+                            line_number,
+                            &line,
+                            target,
+                            error,
+                            declaration_identity(direction, kind, target, &reason),
+                        ));
+                        (
+                            None,
+                            "dependency-header",
+                            normalize_declaration_component(target),
+                        )
+                    }
+                };
             declarations.push(DependencyDeclaration {
                 declaration_id: hash_text(&format!(
                     "{snapshot_id}\0{relative}\0{line_number}\0{line}"
@@ -1739,14 +1864,9 @@ pub(crate) fn capture_snapshot(
                 declared_direction: direction.to_string(),
                 declared_kind: kind.to_string(),
                 declared_target: target.to_string(),
+                canonical_target,
                 resolved_target_identity_id: resolved,
-                source_span: SourceSpan {
-                    path: relative.clone(),
-                    start_line: line_number,
-                    start_column: 1,
-                    end_line: line_number,
-                    end_column: line.len() + 1,
-                },
+                source_span: source_span(relative, line_number, &line),
                 reason,
                 raw_line_hash: hash_text(&line),
                 attestation_key: attestation_key.to_string(),
@@ -1880,7 +2000,7 @@ pub(crate) fn write_snapshot_jsonl(
     )
     .map_err(|error| ManifestError::Io(error.to_string()))?;
     for declaration in &snapshot.declarations {
-        let value = json!({"record_type":"dependency_declaration","declaration_id":declaration.declaration_id,"source_identity_id":declaration.source_identity_id,"declared_direction":declaration.declared_direction,"declared_kind":declaration.declared_kind,"declared_target":declaration.declared_target,"resolved_target_identity_id":declaration.resolved_target_identity_id,"source_span": {"path":declaration.source_span.path,"start_line":declaration.source_span.start_line,"start_column":declaration.source_span.start_column,"end_line":declaration.source_span.end_line,"end_column":declaration.source_span.end_column},"reason":declaration.reason,"attestation_key":declaration.attestation_key,"snapshot_id":declaration.snapshot_id});
+        let value = json!({"record_type":"dependency_declaration","declaration_id":declaration.declaration_id,"source_identity_id":declaration.source_identity_id,"declared_direction":declaration.declared_direction,"declared_kind":declaration.declared_kind,"declared_target":declaration.declared_target,"canonical_target":declaration.canonical_target,"resolved_target_identity_id":declaration.resolved_target_identity_id,"source_span": {"path":declaration.source_span.path,"start_line":declaration.source_span.start_line,"start_column":declaration.source_span.start_column,"end_line":declaration.source_span.end_line,"end_column":declaration.source_span.end_column},"reason":declaration.reason,"attestation_key":declaration.attestation_key,"snapshot_id":declaration.snapshot_id});
         writeln!(
             writer,
             "{}",
@@ -1895,8 +2015,9 @@ pub(crate) fn write_snapshot_jsonl(
 #[cfg(test)]
 mod tests {
     use super::{
-        manifest_lines, resolve_source_relative_target, target_path_diagnostic_code,
-        TargetPathError,
+        declaration_identity, diagnostic_identity_json, manifest_lines,
+        resolve_source_relative_target, source_diagnostic, source_span,
+        target_path_diagnostic_code, TargetPathError, SOURCE_DIAGNOSTIC_SCHEMA,
     };
     use std::path::Path;
 
@@ -1968,5 +2089,102 @@ mod tests {
             target_path_diagnostic_code(TargetPathError::EscapesRoot),
             "target-escapes-root"
         );
+    }
+
+    #[test]
+    fn diagnostic_identity_normalizes_declaration_and_excludes_location_and_message() {
+        let declaration = declaration_identity(
+            " upstream ",
+            " design ",
+            "documents/target.md",
+            "reason   with   spaces",
+        );
+        let moved = source_diagnostic(
+            "target-unresolved",
+            "different:message:format".to_string(),
+            "error",
+            source_span("documents/source.md", 18, "moved line"),
+            declaration_identity(
+                "upstream",
+                "design",
+                "documents/target.md",
+                "reason with spaces",
+            ),
+        );
+        let original = source_diagnostic(
+            "target-unresolved",
+            "documents/source.md:3:documents/target.md".to_string(),
+            "error",
+            source_span("documents/source.md", 3, "original line"),
+            declaration,
+        );
+        let original_payload = diagnostic_identity_json(&original);
+        let moved_payload = diagnostic_identity_json(&moved);
+        for field in ["code", "source", "target", "declaration"] {
+            assert_eq!(
+                original_payload[field], moved_payload[field],
+                "field={field}"
+            );
+        }
+        assert_ne!(
+            original_payload["source_span"], moved_payload["source_span"],
+            "location evidence remains separate from identity"
+        );
+
+        let direction_change = declaration_identity(
+            "downstream",
+            "design",
+            "documents/target.md",
+            "reason with spaces",
+        );
+        let kind_change = declaration_identity(
+            "upstream",
+            "implementation",
+            "documents/target.md",
+            "reason with spaces",
+        );
+        let reason_change = declaration_identity(
+            "upstream",
+            "design",
+            "documents/target.md",
+            "different reason",
+        );
+        assert_ne!(
+            original.declaration.canonical_declaration,
+            direction_change.canonical_declaration
+        );
+        assert_ne!(
+            original.declaration.canonical_declaration,
+            kind_change.canonical_declaration
+        );
+        assert_ne!(
+            original.declaration.canonical_declaration,
+            reason_change.canonical_declaration
+        );
+    }
+
+    #[test]
+    fn malformed_manifest_diagnostic_has_nonempty_typed_identity() {
+        let diagnostic = source_diagnostic(
+            "manifest-grammar",
+            "source.md:7:upstream design".to_string(),
+            "error",
+            source_span("source.md", 7, "upstream design"),
+            declaration_identity("upstream", "design", "", ""),
+        );
+        let payload = diagnostic_identity_json(&diagnostic);
+        assert_eq!(payload["schema"], SOURCE_DIAGNOSTIC_SCHEMA);
+        for field in ["code", "source", "target", "declaration"] {
+            assert!(payload[field]
+                .as_str()
+                .is_some_and(|value| !value.is_empty()));
+        }
+        for field in ["direction", "kind", "target", "reason"] {
+            assert!(payload["declaration_components"][field]
+                .as_str()
+                .is_some_and(|value| !value.is_empty()));
+        }
+        assert_eq!(payload["source_span"]["path"], "source.md");
+        assert_eq!(payload["source_span"]["start_line"], 7);
     }
 }

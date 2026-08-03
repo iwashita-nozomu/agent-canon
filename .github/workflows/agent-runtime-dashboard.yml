@@ -6,6 +6,8 @@
 # upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py validates workflow routing cases
 # upstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report quality checklist cases
 # upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py renders dashboard artifact
+# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py resolves the canonical Graph CLI
+# upstream implementation ../../rust/agent-canon/src/graph.rs builds and reads back the canonical graph snapshot
 # @dependency-end
 
 # Standalone-only workflow. Template and derived repositories should not copy
@@ -18,6 +20,8 @@ on:
     branches:
       - "**"
   workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
 
 permissions:
   contents: read
@@ -46,6 +50,17 @@ jobs:
 
       - name: Prepare runtime log archive
         run: mkdir -p .agent-canon/log-archive
+
+      - name: Build and read back canonical graph
+        if: github.event_name == 'schedule'
+        run: |
+          set -euo pipefail
+          PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec \
+            tools/bin/agent-canon graph build \
+            --root "${GITHUB_WORKSPACE}" --profile default --format json
+          PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec \
+            tools/bin/agent-canon graph status \
+            --root "${GITHUB_WORKSPACE}" --profile default --format json
 
       - name: Run accumulated eval producers
         run: |
