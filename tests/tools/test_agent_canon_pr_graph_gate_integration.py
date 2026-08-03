@@ -94,7 +94,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             ).lstrip(),
             encoding="utf-8",
         )
-        inventory = source / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
+        inventory = (
+            source / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
+        )
         inventory.parent.mkdir(parents=True)
         inventory.write_text(
             json.dumps(
@@ -130,6 +132,8 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             graph_dir = root / ".agent-canon" / "knowledge-graph"
             graph_dir.mkdir(parents=True, exist_ok=True)
             database = graph_dir / "graph.sqlite"
+            changed_text = (root / "changed.py").read_text(encoding="utf-8")
+            has_diagnostic = "upstream" in changed_text
             snapshot_head = subprocess.run(
                 ["git", "rev-parse", "HEAD"],
                 cwd=root,
@@ -185,10 +189,11 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                         "INSERT INTO edges VALUES('source', ?, ?)",
                         ("node:source:changed.py", "node:source:related.py"),
                     )
-                connection.execute(
-                    "INSERT INTO diagnostics VALUES('source', 'target-unresolved', ?, ?)",
-                    (f"{source_path}:4:missing.md", f"node:source:{source_path}"),
-                )
+                if has_diagnostic:
+                    connection.execute(
+                        "INSERT INTO diagnostics VALUES('source', 'target-unresolved', ?, ?)",
+                        (f"{source_path}:4:missing.md", f"node:source:{source_path}"),
+                    )
                 for key, value in (
                     ("integration_record", json.dumps(persisted_record)),
                     ("snapshot_head", snapshot_head),
@@ -199,9 +204,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             result = {
                 "schema": "agent-canon.graph.build.v1",
                 "command": "build",
-                "status": "incomplete",
-                "graph_status": "incomplete",
-                "exit_code": 1,
+                "status": "incomplete" if has_diagnostic else "fresh",
+                "graph_status": "incomplete" if has_diagnostic else "fresh",
+                "exit_code": 1 if has_diagnostic else 0,
                 "root": str(root),
                 "profile": "default",
                 "db_path": str(database),
@@ -210,20 +215,24 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "integration_record": integration_record,
                 "publication": "published",
                 "durability": "durable",
-                "unresolved_count": 1,
-                "unresolved": [
-                    {
-                        "code": "target-unresolved",
-                        "message": f"{source_path}:4:missing.md",
-                    }
-                ],
+                "unresolved_count": 1 if has_diagnostic else 0,
+                "unresolved": (
+                    [
+                        {
+                            "code": "target-unresolved",
+                            "message": f"{source_path}:4:missing.md",
+                        }
+                    ]
+                    if has_diagnostic
+                    else []
+                ),
             }
             if scenario == "missing_identity":
                 del result["integration_record"]
             elif scenario == "stale_fingerprint":
                 result["input_fingerprint"] = "3" * 64
             print(json.dumps(result))
-            raise SystemExit(1)
+            raise SystemExit(1 if has_diagnostic else 0)
             """,
         )
         write_executable(
@@ -324,7 +333,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         run(parent, "git", "commit", "-m", "change manifest")
         return parent, base
 
-    def run_pr_check(self, scenario: str) -> tuple[subprocess.CompletedProcess[str], Path]:
+    def run_pr_check(
+        self, scenario: str
+    ) -> tuple[subprocess.CompletedProcess[str], Path]:
         """Run the production PR check with only unrelated gates stubbed."""
         fixture_root = Path(tempfile.mkdtemp(prefix=f"graph-gate-{scenario}-"))
         self.addCleanup(shutil.rmtree, fixture_root)
@@ -358,7 +369,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
         return result, temp_root
 
-    def test_real_pr_check_routes_incomplete_graph_to_scoped_or_blocking_selector(self) -> None:
+    def test_real_pr_check_routes_incomplete_graph_to_scoped_or_blocking_selector(
+        self,
+    ) -> None:
         """The same incomplete build reaches selector acceptance in both outcomes."""
         valid, valid_state = self.run_pr_check("valid_binding")
         self.assertEqual(valid.returncode, 0, valid.stdout + valid.stderr)
@@ -374,7 +387,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             / "agent-canon-pr"
             / "changed-responsibility-acceptance.json"
         )
-        valid_identity = json.loads(report.read_text(encoding="utf-8"))["graph_identity"]
+        valid_identity = json.loads(report.read_text(encoding="utf-8"))[
+            "graph_identity"
+        ]
         self.assertEqual(valid_identity["publication"], "published")
         self.assertEqual(valid_identity["durability"], "durable")
         self.assertEqual(valid_identity["profile"], "default")

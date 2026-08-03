@@ -128,22 +128,37 @@ baseline.
 When the gate is selected, graph construction still covers the complete parent
 repository. A complete graph produces the existing `prepared` receipt and
 retains the full strict review. If construction publishes an incomplete graph,
-the gate classifies every persisted diagnostic against the exact validated PR
-diff and the graph's dependency/surface edges. Changed paths are responsibility
-seeds, reachability is traversed in both directions, and diagnostics declared by
-the resulting closure remain blockers. A changed target that makes an unchanged
-declaration unresolved is also a blocker. Invalid `manifest-grammar` in a
-changed declaration therefore cannot be hidden by baseline state.
+the gate first builds an equivalent graph from the exact trusted base SHA in an
+isolated checkout. The base build must publish a valid graph result and bound
+SQLite database; missing, stale, malformed, unavailable, or concurrently
+replaced base evidence fails closed. For a derived parent, every `160000`
+submodule gitlink recorded by the exact base tree is recursively materialized
+and verified at that commit before the builder runs. The builder process exit
+code must exactly equal the JSON result `exit_code`; only matching `0` or `1`
+results are admissible. The head gate then classifies every unique
+persisted diagnostic identity against the exact validated PR diff, the head
+graph's dependency/surface edges, and the trusted base diagnostics.
 
-A diagnostic outside that closure is accepted only when its declaring source
-identity is unchanged from the validated base. Each accepted diagnostic is
-written to the changed-responsibility report with its code, message, source,
-target, and classification; it is not reduced to a baseline count. If source
-identity cannot be confirmed, the gate fails closed. This accepted incomplete
-state produces a `scoped` receipt. Its quick-CI consumer does not claim that the
-graph is fresh and does not run graph-query consumers. An explicit parent graph
-migration owns the full graph, so every diagnostic remains in scope. Standalone
-AgentCanon source PRs also retain full completeness.
+The canonical diagnostic identity is the normalized tuple
+`(code, source, target, declaration)`. Line numbers, diagnostic counts, and
+message formatting that does not change the declaration are not identity. Changed
+paths are responsibility seeds, reachability is traversed in both directions,
+and a diagnostic is related when its source, target, or required closure is
+changed. A related diagnostic blocks when its identity is absent from the
+trusted base or its severity is worse than the trusted-base instance. A related
+diagnostic with the same non-worsened identity is retained as baseline evidence.
+A changed target that makes an unchanged declaration unresolved is therefore a
+new related blocker even when the source file is unchanged. Invalid
+`manifest-grammar` in a changed declaration cannot be hidden by baseline state.
+
+The report contains a duplicate-free, lossless partition of all head diagnostic
+identities into `blocking_diagnostics` and `baseline_diagnostics`, together with
+the base graph identity and diagnostic-set fingerprint. If a source identity
+outside the changed responsibility cannot be confirmed, the gate fails closed.
+This accepted incomplete state produces a `scoped` receipt; `scoped` is not a
+complete graph and its quick-CI consumer does not run graph-query consumers. An
+explicit parent graph migration owns the full graph, so every diagnostic remains
+in scope. Standalone AgentCanon source PRs also retain full completeness.
 
 The selector reads dependency surfaces from this document's downstream
 manifest instead of maintaining a second path list. The manifest therefore
