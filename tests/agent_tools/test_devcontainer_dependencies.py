@@ -197,7 +197,7 @@ def write_boundary_fixture(
     write_file(".gitignore", ".venv/\nvenv/\n")
     write_file(
         ".devcontainer/devcontainer.json",
-        '{"postCreateCommand": "python3 tools/agent_tools/agent_canon_source_root.py '
+        '{"postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py '
         'exec .devcontainer/post-create-entrypoint.sh post-create-parent.sh"}\n',
     )
     write_file(".devcontainer/post-create-parent.sh", "#!/bin/sh\n", executable=True)

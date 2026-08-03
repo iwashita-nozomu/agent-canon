@@ -59,7 +59,7 @@ symlink 先の `devcontainer.json` は、親レポのルートから AgentCanon 
 直接呼び出す。
 
 - すべての public entry は source-root resolver 経由で呼ぶ。
-  `python3 tools/agent_tools/agent_canon_source_root.py exec .devcontainer/<entry>`
+  `python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/<entry>`
   は standalone source root と derived `vendor/agent-canon` root の両方を解決する。
   `devcontainer.json` は `vendor/agent-canon` の固定 script path を直接参照しない。
 

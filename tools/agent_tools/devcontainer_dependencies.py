@@ -1630,7 +1630,8 @@ class EnvironmentBoundaryModel:
         else:
             command_text = json.dumps(post_create, sort_keys=True)
             required = (
-                "agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh"
+                "tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
+                ".devcontainer/post-create-entrypoint.sh"
             )
             if required not in command_text:
                 findings.append(

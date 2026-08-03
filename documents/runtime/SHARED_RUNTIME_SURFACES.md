@@ -205,10 +205,12 @@ decide which repo-specific documents appear in root `documents/`.
 Its minimum shared shape is the symlink
 `.devcontainer/devcontainer.json -> ../vendor/agent-canon/.devcontainer/devcontainer.json`
 and any parent-specific source such as `post-create-parent.sh`. The linked config
-calls the default Compose generator, post-create, and post-attach stages directly
-under `vendor/agent-canon/.devcontainer/`; parent wrappers and copied shared scripts
-are not part of the surface. Generated Compose is written to the ignored parent state
-path `.agent-canon/docker-compose.generated.yml`.
+calls initialize, post-create, and post-attach through the single public source-root
+entry `tools/agent-canon/agent_tools/agent_canon_source_root.py`; the resolver then
+selects the standalone source or the vendored AgentCanon root. Direct parent-root
+`tools/agent_tools` references, fixed `vendor/agent-canon` script paths, parent
+wrappers, and copied shared scripts are not part of the surface. Generated Compose
+is written to the ignored parent state path `.agent-canon/docker-compose.generated.yml`.
 
 The devcontainer consumes repo-local `docker/Dockerfile`,
 `docker/packs/default.toml`, and `docker/install_python_dependencies.sh`; it does

@@ -159,16 +159,16 @@ class ParentRepoReadinessTest(unittest.TestCase):
             config = json.loads(devcontainer_json.read_text(encoding="utf-8"))
             assert config["initializeCommand"] == (
                 "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml "
-                "python3 tools/agent_tools/agent_canon_source_root.py exec "
+                "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
                 ".devcontainer/generate-runtime-compose.sh"
             )
             assert config["postCreateCommand"] == (
-                "python3 tools/agent_tools/agent_canon_source_root.py exec "
+                "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
                 ".devcontainer/post-create-entrypoint.sh "
                 "/workspace/${localWorkspaceFolderBasename}"
             )
             assert config["postAttachCommand"] == (
-                "python3 tools/agent_tools/agent_canon_source_root.py exec "
+                "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
                 ".devcontainer/post-attach.sh"
             )
             for name in (
@@ -422,9 +422,9 @@ class ParentRepoReadinessTest(unittest.TestCase):
             ".devcontainer/devcontainer.json": "\n".join(
                 [
                     "{",
-                    '  "initializeCommand": "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",',
-                    '  "postCreateCommand": "python3 tools/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",',
-                    '  "postAttachCommand": "python3 tools/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",',
+                    '  "initializeCommand": "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",',
+                    '  "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",',
+                    '  "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",',
                     '  "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",',
                     '  "service": "workspace",',
                     '  "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",',
