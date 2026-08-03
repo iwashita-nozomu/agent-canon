@@ -209,16 +209,24 @@ standalone AgentCanon source checkout retains the strict source graph gate.
 
 When selection is required, the parent checker first builds the complete graph.
 A complete result records `prepared` and runs the full strict dependency review.
-For an incomplete parent graph, the checker uses the same validated base diff as
-the selector and traverses persisted dependency/surface edges in both directions
-from changed paths. Diagnostics declared by that closure, diagnostics whose
-target changed, changed `manifest-grammar`, and diagnostics without confirmed
-base source identity fail. Non-reachable diagnostics whose source identity is
-unchanged from the base are written individually to the acceptance report and
-produce a `scoped` receipt. The quick-CI consumer accepts that bound receipt but
-does not treat the incomplete graph as fresh or run graph-query consumers.
-Explicit parent graph migration and standalone source gates remain full-scope;
-no count-only baseline is an acceptance oracle.
+For an incomplete parent graph, the checker materializes the exact trusted base
+in its task-owned temporary root and builds the comparison graph with the same
+command owner. The selector binds both result/DB records to their canonical
+root, profile, snapshot SHA, fingerprints, publication, durability, and file
+identity before classification. It traverses persisted dependency/surface
+edges from source identities that actually differ across base/head; a changed
+gitlink path alone does not seed every descendant.
+
+The selector normalizes each diagnostic as
+`(code, source, target, declaration)`, excluding line number and count. A head
+diagnostic blocks when it belongs to the changed responsibility, mandatory
+closure, changed declaration, or changed target and its normalized identity is
+absent from base or has greater severity. Every other head diagnostic is
+written individually to the baseline report, and the two lists must be an
+exact partition before a `scoped` receipt is produced. The quick-CI consumer
+accepts that bound receipt but does not treat the incomplete graph as fresh or
+run graph-query consumers. Explicit parent graph migration and standalone
+source gates remain full-scope; no count-only baseline is an acceptance oracle.
 
 GitHub Actions resolves the comparison base from
 `pull_request.base.sha` in its trusted event payload. Before normal selection,

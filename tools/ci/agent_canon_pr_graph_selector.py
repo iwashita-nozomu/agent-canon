@@ -47,6 +47,7 @@ class SelectorFailure(RuntimeError):
     """One typed selector failure."""
 
     def __init__(self, reason: str, evidence: str) -> None:
+        """Create one failure with line-safe typed evidence."""
         super().__init__(reason)
         self.reason = reason
         self.evidence = evidence
@@ -141,9 +142,11 @@ class GraphBuildIdentity:
     graph_fingerprint: str
     publication: str
     durability: str
+    status: str
+    exit_code: int
     integration_identity: GraphIntegrationIdentity
 
-    def report(self) -> dict[str, str]:
+    def report(self) -> dict[str, object]:
         """Return the identity fields preserved in the scoped receipt."""
         return {
             "root": self.root,
@@ -153,8 +156,34 @@ class GraphBuildIdentity:
             "graph_fingerprint": self.graph_fingerprint,
             "publication": self.publication,
             "durability": self.durability,
+            "status": self.status,
+            "exit_code": self.exit_code,
             "db_path": str(self.database),
         }
+
+
+@dataclass(frozen=True)
+class SourceNodeIdentity:
+    """Typed source identity used to compare one path across graph snapshots."""
+
+    path: str
+    file_mode: str
+    git_object: str
+    content_sha256: str
+
+    def material_identity(self) -> tuple[str, str, str]:
+        """Return fields whose change means the source responsibility changed."""
+        return (self.file_mode, self.git_object, self.content_sha256)
+
+
+@dataclass(frozen=True)
+class GraphAcceptanceFacts:
+    """Identity-bound graph facts consumed by scoped acceptance."""
+
+    node_paths: Mapping[str, str]
+    nodes_by_path: Mapping[str, SourceNodeIdentity]
+    adjacency: Mapping[str, set[str]]
+    diagnostics: tuple[Mapping[str, str], ...]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -183,6 +212,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--graph-result",
         help="JSON result emitted by the incomplete graph build.",
+    )
+    parser.add_argument(
+        "--base-root",
+        help="Trusted-base snapshot root used to build the comparison graph.",
+    )
+    parser.add_argument(
+        "--base-graph-result",
+        help="JSON result emitted by the trusted-base graph build.",
     )
     parser.add_argument(
         "--report-out",
@@ -640,12 +677,9 @@ def changed_paths_digest(paths: Sequence[str]) -> str:
     return hashlib.sha256(payload).hexdigest()
 
 
-def path_is_changed(path: str, changed_paths: Sequence[str]) -> bool:
-    """Return whether an exact changed path owns the graph path."""
-    return any(
-        path == changed or path.startswith(f"{changed.rstrip('/')}/")
-        for changed in changed_paths
-    )
+def path_is_exactly_changed(path: str, changed_paths: Sequence[str]) -> bool:
+    """Return whether Git reported the exact graph path as changed."""
+    return path in changed_paths
 
 
 def diagnostic_source_path(
@@ -675,6 +709,219 @@ def diagnostic_target_path(source_path: str, code: str, message: str) -> str:
     if normalized == ".." or normalized.startswith("../"):
         return ""
     return normalized
+
+
+def source_node_changed(
+    path: str,
+    base_nodes: Mapping[str, SourceNodeIdentity],
+    head_nodes: Mapping[str, SourceNodeIdentity],
+) -> bool:
+    """Compare one graph path by persisted source identity, not path prefix."""
+    base = base_nodes.get(path)
+    head = head_nodes.get(path)
+    if base is None or head is None:
+        return base is not head
+    return base.material_identity() != head.material_identity()
+
+
+def path_is_changed_by_diff(
+    path: str,
+    changed_paths: Sequence[str],
+    base_nodes: Mapping[str, SourceNodeIdentity],
+    head_nodes: Mapping[str, SourceNodeIdentity],
+) -> bool:
+    """Bind exact changes and changed container descendants to source identity deltas."""
+    if path_is_exactly_changed(path, changed_paths):
+        return True
+    if not any(path.startswith(f"{changed.rstrip('/')}/") for changed in changed_paths):
+        return False
+    return source_node_changed(path, base_nodes, head_nodes)
+
+
+def git_tree_entry(root: Path, commit: str, path: str) -> tuple[str, str, str] | None:
+    """Return one exact tree entry as mode, type, and object ID."""
+    result = run_git(root, ["ls-tree", "-z", commit, "--", path])
+    if result.returncode != 0:
+        raise SelectorFailure(
+            "graph_diagnostic_identity_unavailable",
+            f"operation=ls_tree;commit={commit};path={path}",
+        )
+    records = [record for record in result.stdout.split("\0") if record]
+    for record in records:
+        metadata, separator, recorded_path = record.partition("\t")
+        fields = metadata.split()
+        if separator and recorded_path == path and len(fields) == 3:
+            return fields[0], fields[1], fields[2]
+    return None
+
+
+def snapshot_file_text(root: Path, commit: str, path: str) -> str:
+    """Read one file from an exact parent or recursively pinned gitlink snapshot."""
+    entry = git_tree_entry(root, commit, path)
+    if entry is not None:
+        mode, object_type, _object_id = entry
+        if mode == "160000" or object_type != "blob":
+            raise SelectorFailure(
+                "graph_diagnostic_identity_invalid",
+                f"detail=source_not_blob;commit={commit};path={path}",
+            )
+        return git_output(
+            root,
+            ["show", f"{commit}:{path}"],
+            "graph_diagnostic_identity_unavailable",
+        )
+
+    parts = path.split("/")
+    for index in range(1, len(parts)):
+        ancestor = "/".join(parts[:index])
+        ancestor_entry = git_tree_entry(root, commit, ancestor)
+        if ancestor_entry is None or ancestor_entry[0] != "160000":
+            continue
+        submodule_root = root.joinpath(*parts[:index])
+        try:
+            resolved_submodule = submodule_root.resolve(strict=True)
+        except OSError:
+            raise SelectorFailure(
+                "graph_diagnostic_identity_unavailable",
+                f"detail=submodule_checkout_missing;path={ancestor}",
+            ) from None
+        pinned_commit = ancestor_entry[2]
+        available = run_git(
+            resolved_submodule,
+            ["cat-file", "-e", f"{pinned_commit}^{{commit}}"],
+        )
+        if available.returncode != 0:
+            raise SelectorFailure(
+                "graph_diagnostic_identity_unavailable",
+                f"detail=submodule_commit_missing;path={ancestor};commit={pinned_commit}",
+            )
+        return snapshot_file_text(
+            resolved_submodule,
+            pinned_commit,
+            "/".join(parts[index:]),
+        )
+    raise SelectorFailure(
+        "graph_diagnostic_identity_unavailable",
+        f"detail=source_missing;commit={commit};path={path}",
+    )
+
+
+def normalize_declaration(source_path: str, raw_line: str) -> str:
+    """Normalize one parser-owned dependency declaration without its line number."""
+    trimmed = raw_line.lstrip()
+    extension = posixpath.splitext(source_path)[1].lstrip(".")
+    if extension in {"md", "html", "xml", "svg"}:
+        payload = trimmed.strip()
+    elif extension in {"rs", "c", "cc", "cpp", "h", "hpp", "js", "ts"}:
+        if not trimmed.startswith("//"):
+            raise SelectorFailure(
+                "graph_diagnostic_identity_invalid",
+                f"detail=declaration_comment;path={source_path}",
+            )
+        payload = trimmed[2:].strip()
+    else:
+        if not trimmed.startswith("#"):
+            raise SelectorFailure(
+                "graph_diagnostic_identity_invalid",
+                f"detail=declaration_comment;path={source_path}",
+            )
+        payload = trimmed[1:].strip()
+    normalized = " ".join(payload.split())
+    if not normalized:
+        raise SelectorFailure(
+            "graph_diagnostic_identity_invalid",
+            f"detail=declaration_empty;path={source_path}",
+        )
+    return normalized
+
+
+def severity_rank(severity: str) -> int:
+    """Return the exact persisted diagnostic severity ordering."""
+    ranks = {"info": 0, "warn": 1, "blocker": 2}
+    if severity not in ranks:
+        raise SelectorFailure(
+            "graph_diagnostic_identity_invalid",
+            f"detail=severity;value={severity}",
+        )
+    return ranks[severity]
+
+
+def bind_diagnostic_identity(
+    snapshot_root: Path,
+    snapshot_head: str,
+    diagnostic: Mapping[str, str],
+) -> dict[str, str]:
+    """Bind one persisted diagnostic to normalized code/source/target/declaration."""
+    code = diagnostic["code"].strip()
+    source_path = posixpath.normpath(diagnostic["source_path"])
+    message = diagnostic["message"]
+    fields = message.split(":", 2)
+    if (
+        not code
+        or not source_path
+        or source_path in {".", ".."}
+        or source_path.startswith("../")
+        or source_path.startswith("/")
+        or len(fields) != 3
+        or fields[0] != source_path
+    ):
+        raise SelectorFailure(
+            "graph_diagnostic_identity_invalid",
+            f"detail=message_shape;code={code or 'missing'};source={source_path or 'missing'}",
+        )
+    try:
+        line_number = int(fields[1])
+    except ValueError:
+        line_number = 0
+    if line_number < 1:
+        raise SelectorFailure(
+            "graph_diagnostic_identity_invalid",
+            f"detail=line_number;source={source_path}",
+        )
+    source_text = snapshot_file_text(snapshot_root, snapshot_head, source_path)
+    source_lines = source_text.splitlines()
+    if line_number > len(source_lines):
+        raise SelectorFailure(
+            "graph_diagnostic_identity_invalid",
+            f"detail=line_unavailable;source={source_path}",
+        )
+    declaration = normalize_declaration(source_path, source_lines[line_number - 1])
+    message_payload = " ".join(fields[2].split())
+    if code == "manifest-grammar":
+        if declaration != message_payload:
+            raise SelectorFailure(
+                "graph_diagnostic_identity_invalid",
+                f"detail=grammar_declaration_mismatch;source={source_path}",
+            )
+    elif code.startswith("target-"):
+        declaration_fields = declaration.split(" ", 3)
+        if len(declaration_fields) < 3 or declaration_fields[2] != message_payload:
+            raise SelectorFailure(
+                "graph_diagnostic_identity_invalid",
+                f"detail=target_declaration_mismatch;source={source_path}",
+            )
+    else:
+        raise SelectorFailure(
+            "graph_diagnostic_identity_invalid",
+            f"detail=unsupported_code;code={code}",
+        )
+    target_path = diagnostic["target_path"]
+    identity_payload = {
+        "code": code,
+        "source": source_path,
+        "target": target_path,
+        "declaration": declaration,
+    }
+    identity = hashlib.sha256(
+        json.dumps(identity_payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return {
+        **diagnostic,
+        "code": code,
+        "source_path": source_path,
+        "declaration": declaration,
+        "diagnostic_identity": identity,
+    }
 
 
 def regular_file_identity(
@@ -840,7 +1087,11 @@ def integration_identity_mismatches(
     return tuple(mismatches)
 
 
-def graph_build_identity(root: Path, graph_result_path: Path) -> GraphBuildIdentity:
+def graph_build_identity(
+    root: Path,
+    graph_result_path: Path,
+    allowed_statuses: Mapping[str, int],
+) -> GraphBuildIdentity:
     """Validate one build result and capture its canonical database identity."""
     result_file_identity = regular_file_identity(
         graph_result_path,
@@ -871,16 +1122,17 @@ def graph_build_identity(root: Path, graph_result_path: Path) -> GraphBuildIdent
             "graph_identity_invalid",
             "owner=graph_build_result;field=exit_code;expected_type=integer",
         )
+    expected_exit = allowed_statuses.get(status_value)
     if (
         schema != "agent-canon.graph.build.v1"
         or command != "build"
-        or status_value != "incomplete"
-        or graph_status != "incomplete"
-        or result["exit_code"] != 1
+        or graph_status != status_value
+        or expected_exit is None
+        or result["exit_code"] != expected_exit
     ):
         raise SelectorFailure(
             "graph_build_result_invalid",
-            "detail=expected_incomplete_build",
+            f"detail=unexpected_build_status;status={status_value}",
         )
     if "integration_record" not in result:
         raise SelectorFailure(
@@ -965,6 +1217,8 @@ def graph_build_identity(root: Path, graph_result_path: Path) -> GraphBuildIdent
         result_graph,
         publication,
         durability,
+        status_value,
+        cast(int, result["exit_code"]),
         integration,
     )
 
@@ -972,12 +1226,13 @@ def graph_build_identity(root: Path, graph_result_path: Path) -> GraphBuildIdent
 def read_bound_graph_acceptance_facts(
     build: GraphBuildIdentity,
     expected_head: str,
-) -> tuple[dict[str, str], dict[str, set[str]], list[dict[str, str]]]:
+) -> GraphAcceptanceFacts:
     """Bind persisted integration metadata, then read classification facts."""
     uri = f"file:{quote(build.database.as_posix(), safe='/')}?mode=ro&immutable=1"
     connection: sqlite3.Connection | None = None
     pending_error: SelectorFailure | None = None
     node_paths: dict[str, str] = {}
+    nodes_by_path: dict[str, SourceNodeIdentity] = {}
     adjacency: dict[str, set[str]] = {}
     diagnostics: list[dict[str, str]] = []
     try:
@@ -1067,29 +1322,77 @@ def read_bound_graph_acceptance_facts(
         for node_id, payload_json in node_rows:
             raw_payload: object = json.loads(payload_json)
             if not isinstance(raw_payload, dict):
-                continue
+                raise SelectorFailure(
+                    "graph_source_identity_invalid",
+                    f"node={node_id};field=payload_json",
+                )
             node_payload = cast(dict[str, object], raw_payload)
             path = node_payload.get("path")
-            if isinstance(path, str):
-                node_paths[node_id] = path
+            identity_payload = node_payload.get("payload")
+            if (
+                type(path) is not str
+                or not path
+                or type(identity_payload) is not dict
+            ):
+                raise SelectorFailure(
+                    "graph_source_identity_invalid",
+                    f"node={node_id};fields=path,payload",
+                )
+            identity_record = cast(dict[str, object], identity_payload)
+            file_mode = identity_record.get("file_mode")
+            git_object = identity_record.get("git_blob_oid")
+            content_sha256 = identity_record.get("content_sha256")
+            if (
+                type(file_mode) is not str
+                or not file_mode
+                or type(git_object) is not str
+                or not git_object
+                or type(content_sha256) is not str
+                or not content_sha256
+                or path in nodes_by_path
+            ):
+                raise SelectorFailure(
+                    "graph_source_identity_invalid",
+                    f"node={node_id};fields=file_mode,git_blob_oid,content_sha256,path_unique",
+                )
+            node_paths[node_id] = path
+            nodes_by_path[path] = SourceNodeIdentity(
+                path,
+                file_mode,
+                git_object,
+                content_sha256,
+            )
         adjacency = {node_id: set() for node_id in node_paths}
         edge_rows = cast(
-            list[tuple[str, str]],
+            list[tuple[str, str, str]],
             connection.execute(
-                "SELECT from_node_id, to_node_id FROM edges WHERE layer='source'"
+                "SELECT kind, from_node_id, to_node_id FROM edges WHERE layer='source'"
             ).fetchall(),
         )
-        for from_node, to_node in edge_rows:
+        for kind, from_node, to_node in edge_rows:
+            if kind not in {"dependency", "view"}:
+                raise SelectorFailure(
+                    "graph_source_edge_invalid",
+                    f"kind={kind}",
+                )
             if from_node in adjacency and to_node in adjacency:
                 adjacency[from_node].add(to_node)
                 adjacency[to_node].add(from_node)
         diagnostic_rows = cast(
-            list[tuple[str, str, str]],
+            list[tuple[str, str, str, str, str]],
             connection.execute(
-                "SELECT rule, message, target_node_id FROM diagnostics WHERE layer='source'"
+                "SELECT id, rule, message, target_node_id, severity "
+                "FROM diagnostics WHERE layer='source' ORDER BY id"
             ).fetchall(),
         )
-        for rule, message, target_node_id in diagnostic_rows:
+        seen_diagnostic_ids: set[str] = set()
+        for record_id, rule, message, target_node_id, severity in diagnostic_rows:
+            if not record_id or record_id in seen_diagnostic_ids:
+                raise SelectorFailure(
+                    "graph_diagnostic_identity_invalid",
+                    "detail=diagnostic_record_id",
+                )
+            seen_diagnostic_ids.add(record_id)
             source_path = diagnostic_source_path(
                 target_node_id,
                 message,
@@ -1097,8 +1400,10 @@ def read_bound_graph_acceptance_facts(
             )
             diagnostics.append(
                 {
+                    "diagnostic_record_id": record_id,
                     "code": rule,
                     "message": message,
+                    "severity": severity,
                     "source_path": source_path,
                     "target_path": diagnostic_target_path(
                         source_path,
@@ -1121,13 +1426,18 @@ def read_bound_graph_acceptance_facts(
     assert_file_identity(build.database, build.database_file_identity, "graph_database")
     if pending_error is not None:
         raise pending_error
-    return node_paths, adjacency, diagnostics
+    return GraphAcceptanceFacts(
+        node_paths,
+        nodes_by_path,
+        adjacency,
+        tuple(diagnostics),
+    )
 
 
 def graph_reachable_paths(
     node_paths: Mapping[str, str],
     adjacency: Mapping[str, set[str]],
-    changed_paths: Sequence[str],
+    changed_responsibility_paths: frozenset[str],
     full_scope: bool,
 ) -> frozenset[str]:
     """Return the dependency/surface closure owned by the changed responsibility."""
@@ -1136,7 +1446,7 @@ def graph_reachable_paths(
     pending = [
         node_id
         for node_id, path in node_paths.items()
-        if path_is_changed(path, changed_paths)
+        if path in changed_responsibility_paths
     ]
     visited = set(pending)
     while pending:
@@ -1148,89 +1458,180 @@ def graph_reachable_paths(
     return frozenset(node_paths[node_id] for node_id in visited)
 
 
-def base_source_is_unchanged(
-    root: Path,
+def changed_responsibility_paths(
     diff: DiffEvidence,
-    source_path: str,
-) -> bool:
-    """Confirm that a non-reachable diagnostic source is represented by the base."""
-    if not source_path or path_is_changed(source_path, diff.changed_paths):
-        return False
-    direct = run_git(
-        root,
-        ["cat-file", "-e", f"{diff.base_sha}:{source_path}"],
+    base_nodes: Mapping[str, SourceNodeIdentity],
+    head_nodes: Mapping[str, SourceNodeIdentity],
+) -> frozenset[str]:
+    """Return changed source identities without promoting every gitlink descendant."""
+    return frozenset(
+        path
+        for path in head_nodes
+        if path_is_changed_by_diff(
+            path,
+            diff.changed_paths,
+            base_nodes,
+            head_nodes,
+        )
     )
-    if direct.returncode == 0:
-        return True
-    parts = source_path.split("/")
-    for index in range(1, len(parts)):
-        ancestor = "/".join(parts[:index])
-        base_tree = run_git(root, ["ls-tree", diff.base_sha, "--", ancestor])
-        head_tree = run_git(root, ["ls-tree", diff.head_sha, "--", ancestor])
-        if (
-            base_tree.returncode == 0
-            and base_tree.stdout.startswith("160000 ")
-            and base_tree.stdout == head_tree.stdout
-        ):
-            return True
-    return False
 
 
 def evaluate_built_graph(
     root: Path,
     graph_result_path: Path,
+    base_root: Path,
+    base_graph_result_path: Path,
     environment: Mapping[str, str],
     trusted_base_sha: str | None = None,
 ) -> GraphAcceptance:
-    """Gate only diagnostics reached from the exact changed responsibility."""
+    """Gate new or worsened diagnostics in the exact changed responsibility."""
     diff = load_diff(root, environment, trusted_base_sha)
-    build_identity = graph_build_identity(root, graph_result_path)
-    node_paths, adjacency, diagnostics = read_bound_graph_acceptance_facts(
+    build_identity = graph_build_identity(
+        root,
+        graph_result_path,
+        {"incomplete": 1},
+    )
+    base_build_identity = graph_build_identity(
+        base_root,
+        base_graph_result_path,
+        {"fresh": 0, "incomplete": 1},
+    )
+    head_facts = read_bound_graph_acceptance_facts(
         build_identity,
         diff.head_sha,
     )
+    base_facts = read_bound_graph_acceptance_facts(
+        base_build_identity,
+        diff.base_sha,
+    )
     full_scope = migration_requested(environment)
+    changed_responsibilities = changed_responsibility_paths(
+        diff,
+        base_facts.nodes_by_path,
+        head_facts.nodes_by_path,
+    )
     reachable_paths = graph_reachable_paths(
-        node_paths,
-        adjacency,
-        diff.changed_paths,
+        head_facts.node_paths,
+        head_facts.adjacency,
+        changed_responsibilities,
         full_scope,
     )
+    base_diagnostics = tuple(
+        bind_diagnostic_identity(
+            base_root,
+            diff.base_sha,
+            diagnostic,
+        )
+        for diagnostic in base_facts.diagnostics
+    )
+    head_diagnostics = tuple(
+        bind_diagnostic_identity(
+            root,
+            diff.head_sha,
+            diagnostic,
+        )
+        for diagnostic in head_facts.diagnostics
+    )
+    base_severity_by_identity: dict[str, int] = {}
+    for diagnostic in base_diagnostics:
+        identity = diagnostic["diagnostic_identity"]
+        rank = severity_rank(diagnostic["severity"])
+        base_severity_by_identity[identity] = max(
+            rank,
+            base_severity_by_identity.get(identity, rank),
+        )
     blocking: list[dict[str, str]] = []
     baseline: list[dict[str, str]] = []
-    for diagnostic in diagnostics:
+    for diagnostic in head_diagnostics:
         source_path = diagnostic["source_path"]
         target_path = diagnostic["target_path"]
-        if (
-            full_scope
-            or source_path in reachable_paths
-            or path_is_changed(source_path, diff.changed_paths)
-            or (target_path and path_is_changed(target_path, diff.changed_paths))
-        ):
-            blocking.append({**diagnostic, "classification": "changed_responsibility"})
+        target_changed = bool(target_path) and path_is_changed_by_diff(
+            target_path,
+            diff.changed_paths,
+            base_facts.nodes_by_path,
+            head_facts.nodes_by_path,
+        )
+        in_scope = (
+            source_path in reachable_paths
+            or source_path in changed_responsibilities
+            or target_changed
+        )
+        identity = diagnostic["diagnostic_identity"]
+        head_severity = severity_rank(diagnostic["severity"])
+        base_severity = base_severity_by_identity.get(identity)
+        is_new = base_severity is None
+        is_worsened = base_severity is not None and head_severity > base_severity
+        if full_scope:
+            blocking.append({**diagnostic, "classification": "full_scope_incomplete"})
             continue
-        if not base_source_is_unchanged(root, diff, source_path):
-            blocking.append({**diagnostic, "classification": "base_identity_unconfirmed"})
+        if in_scope and is_new:
+            blocking.append(
+                {
+                    **diagnostic,
+                    "classification": "changed_responsibility_new_diagnostic",
+                }
+            )
             continue
-        baseline.append({**diagnostic, "classification": "unchanged_base_source"})
+        if in_scope and is_worsened:
+            blocking.append(
+                {
+                    **diagnostic,
+                    "classification": "changed_responsibility_worsened_diagnostic",
+                }
+            )
+            continue
+        if in_scope:
+            classification = "base_identical_changed_responsibility"
+        elif is_new or is_worsened:
+            classification = "new_or_worsened_outside_changed_responsibility"
+        else:
+            classification = "base_identical_outside_changed_responsibility"
+        baseline.append({**diagnostic, "classification": classification})
+    expected_record_ids = {
+        diagnostic["diagnostic_record_id"] for diagnostic in head_diagnostics
+    }
+    blocking_record_ids = {
+        diagnostic["diagnostic_record_id"] for diagnostic in blocking
+    }
+    baseline_record_ids = {
+        diagnostic["diagnostic_record_id"] for diagnostic in baseline
+    }
+    if (
+        len(expected_record_ids) != len(head_diagnostics)
+        or blocking_record_ids.intersection(baseline_record_ids)
+        or blocking_record_ids.union(baseline_record_ids) != expected_record_ids
+        or len(blocking) + len(baseline) != len(head_diagnostics)
+    ):
+        raise SelectorFailure(
+            "graph_diagnostic_partition_invalid",
+            f"head={len(head_diagnostics)};blocking={len(blocking)};baseline={len(baseline)}",
+        )
     report: dict[str, object] = {
-        "schema": "agent-canon.pr-graph-acceptance.v1",
+        "schema": "agent-canon.pr-graph-acceptance.v2",
         "base_sha": diff.base_sha,
         "head_sha": diff.head_sha,
         "graph_identity": build_identity.report(),
+        "base_graph_identity": base_build_identity.report(),
         "changed_paths": list(diff.changed_paths),
         "changed_paths_sha256": changed_paths_digest(diff.changed_paths),
         "full_scope": full_scope,
+        "changed_responsibility_paths": sorted(changed_responsibilities),
         "reachable_paths": sorted(reachable_paths),
+        "base_diagnostic_identities": sorted(base_severity_by_identity),
+        "head_diagnostic_count": len(head_diagnostics),
+        "head_diagnostic_record_ids": sorted(expected_record_ids),
         "blocking_diagnostics": blocking,
         "baseline_diagnostics": baseline,
+        "partition_verified": True,
     }
     report_digest = hashlib.sha256(
         json.dumps(report, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
     evidence = (
         f"base={diff.base_sha};changed_paths_sha256={changed_paths_digest(diff.changed_paths)};"
-        f"reachable={len(reachable_paths)};blocking={len(blocking)};"
+        f"changed_responsibilities={len(changed_responsibilities)};"
+        f"reachable={len(reachable_paths)};base_identities={len(base_severity_by_identity)};"
+        f"head_diagnostics={len(head_diagnostics)};blocking={len(blocking)};"
         f"baseline_reported={len(baseline)};report_sha256={report_digest}"
     )
     if blocking:
@@ -1297,17 +1698,24 @@ def main() -> int:
     """Run the selector and emit a typed result."""
     args = build_parser().parse_args()
     if args.evaluate_built_graph:
-        if not args.graph_result or not args.report_out:
+        if (
+            not args.graph_result
+            or not args.base_root
+            or not args.base_graph_result
+            or not args.report_out
+        ):
             emit_acceptance(
                 "fail",
                 "graph_acceptance_arguments_missing",
-                "required=graph_result,report_out",
+                "required=graph_result,base_root,base_graph_result,report_out",
             )
             return EXIT_FAILURE
         try:
             acceptance = evaluate_built_graph(
                 Path(args.root).resolve(),
                 Path(args.graph_result).resolve(),
+                Path(args.base_root).resolve(),
+                Path(args.base_graph_result).resolve(),
                 os.environ,
                 args.trusted_base_sha,
             )

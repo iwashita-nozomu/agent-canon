@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import importlib.util
 import json
 import os
@@ -152,26 +153,40 @@ def write_graph_result(
             "CREATE TABLE nodes(id TEXT, layer TEXT, payload_json TEXT)"
         )
         connection.execute(
-            "CREATE TABLE edges(layer TEXT, from_node_id TEXT, to_node_id TEXT)"
+            "CREATE TABLE edges(layer TEXT, kind TEXT, from_node_id TEXT, to_node_id TEXT)"
         )
         connection.execute(
-            "CREATE TABLE diagnostics(layer TEXT, rule TEXT, message TEXT, target_node_id TEXT)"
+            "CREATE TABLE diagnostics(id TEXT, layer TEXT, rule TEXT, message TEXT, target_node_id TEXT, severity TEXT)"
         )
         for path in paths:
+            content = (root / path).read_bytes()
+            content_sha256 = hashlib.sha256(content).hexdigest()
             connection.execute(
                 "INSERT INTO nodes VALUES(?, 'source', ?)",
-                (f"node:source:{path}", json.dumps({"path": path})),
+                (
+                    f"node:source:{path}",
+                    json.dumps(
+                        {
+                            "path": path,
+                            "payload": {
+                                "file_mode": "100644",
+                                "git_blob_oid": content_sha256,
+                                "content_sha256": content_sha256,
+                            },
+                        }
+                    ),
+                ),
             )
         for source, target in edges:
             connection.execute(
-                "INSERT INTO edges VALUES('source', ?, ?)",
+                "INSERT INTO edges VALUES('source', 'dependency', ?, ?)",
                 (f"node:source:{source}", f"node:source:{target}"),
             )
-        for code, message, source in diagnostics:
+        for index, (code, message, source) in enumerate(diagnostics):
             target_node = f"node:source:{source}" if source else ""
             connection.execute(
-                "INSERT INTO diagnostics VALUES('source', ?, ?, ?)",
-                (code, message, target_node),
+                "INSERT INTO diagnostics VALUES(?, 'source', ?, ?, ?, 'blocker')",
+                (f"diagnostic:{index}", code, message, target_node),
             )
         for key, value in (
             ("integration_record", json.dumps(integration_record)),
@@ -181,14 +196,16 @@ def write_graph_result(
         ):
             connection.execute("INSERT INTO metadata VALUES(?, ?)", (key, value))
     result = graph_dir / "graph-build.json"
+    status = "incomplete" if diagnostics else "fresh"
+    exit_code = 1 if diagnostics else 0
     result.write_text(
         json.dumps(
             {
                 "schema": "agent-canon.graph.build.v1",
                 "command": "build",
-                "status": "incomplete",
-                "graph_status": "incomplete",
-                "exit_code": 1,
+                "status": status,
+                "graph_status": status,
+                "exit_code": exit_code,
                 "root": str(root.resolve()),
                 "profile": "default",
                 "db_path": str(database.resolve()),
@@ -202,6 +219,35 @@ def write_graph_result(
         encoding="utf-8",
     )
     return result
+
+
+def clone_base_snapshot(root: Path, base: str) -> Path:
+    """Materialize one exact trusted-base root for bound diagnostic comparison."""
+    base_root = root / ".fixture-trusted-base"
+    subprocess.run(
+        ["git", "clone", "--quiet", "--no-checkout", str(root), str(base_root)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    git(base_root, "checkout", "--detach", base)
+    if (base_root / ".gitmodules").is_file():
+        subprocess.run(
+            [
+                "git",
+                "-c",
+                "protocol.file.allow=always",
+                "submodule",
+                "update",
+                "--init",
+                "--recursive",
+            ],
+            cwd=base_root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    return base_root
 
 
 class AgentCanonPrGraphSelectorTest(unittest.TestCase):
@@ -381,7 +427,21 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         """An unchanged non-reachable declaration remains evidence, not a PR blocker."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            base = graph_change_fixture(root, {"legacy.py": "legacy\n"})
+            legacy = (
+                "# @dependency-start\n"
+                "# contract implementation\n"
+                "# responsibility Legacy fixture.\n"
+                "# upstream design missing.md unresolved fixture\n"
+                "# @dependency-end\n"
+            )
+            base = graph_change_fixture(root, {"legacy.py": legacy})
+            base_root = clone_base_snapshot(root, base)
+            base_graph_result = write_graph_result(
+                base_root,
+                ("changed.py", "legacy.py"),
+                (),
+                (("target-unresolved", "legacy.py:4:missing.md", "legacy.py"),),
+            )
             graph_result = write_graph_result(
                 root,
                 ("changed.py", "legacy.py"),
@@ -392,6 +452,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             acceptance = selector.evaluate_built_graph(
                 root,
                 graph_result,
+                base_root,
+                base_graph_result,
                 {"AGENT_CANON_PR_BASE_REF": base},
             )
             head = git(root, "rev-parse", "HEAD")
@@ -412,12 +474,151 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         baseline = acceptance.report["baseline_diagnostics"]
         self.assertEqual(len(baseline), 1)
         self.assertEqual(baseline[0]["source_path"], "legacy.py")
+        self.assertEqual(
+            baseline[0]["classification"],
+            "base_identical_outside_changed_responsibility",
+        )
+        self.assertTrue(acceptance.report["partition_verified"])
+        self.assertEqual(acceptance.report["head_diagnostic_count"], 1)
+
+    def test_base_identical_in_scope_diagnostic_ignores_line_number(self) -> None:
+        """Line movement and head multiplicity do not change diagnostic identity."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            git(root, "init", "-b", "main")
+            git(root, "config", "user.email", "selector@example.invalid")
+            git(root, "config", "user.name", "Selector Fixture")
+            base_text = (
+                "# @dependency-start\n"
+                "# contract implementation\n"
+                "# responsibility Changed fixture.\n"
+                "# upstream design missing.md unresolved fixture\n"
+                "# @dependency-end\n"
+            )
+            (root / "changed.py").write_text(base_text, encoding="utf-8")
+            git(root, "add", "changed.py")
+            git(root, "commit", "-m", "base")
+            base = git(root, "rev-parse", "HEAD")
+            (root / "changed.py").write_text(
+                base_text.replace(
+                    "# upstream design missing.md unresolved fixture\n",
+                    "#\n# upstream design missing.md unresolved fixture\n",
+                ),
+                encoding="utf-8",
+            )
+            git(root, "add", "changed.py")
+            git(root, "commit", "-m", "move declaration")
+            base_root = clone_base_snapshot(root, base)
+            base_graph_result = write_graph_result(
+                base_root,
+                ("changed.py",),
+                (),
+                (("target-unresolved", "changed.py:4:missing.md", "changed.py"),),
+            )
+            graph_result = write_graph_result(
+                root,
+                ("changed.py",),
+                (),
+                (
+                    ("target-unresolved", "changed.py:5:missing.md", "changed.py"),
+                    ("target-unresolved", "changed.py:5:missing.md", "changed.py"),
+                ),
+            )
+
+            acceptance = selector.evaluate_built_graph(
+                root,
+                graph_result,
+                base_root,
+                base_graph_result,
+                {"AGENT_CANON_PR_BASE_REF": base},
+            )
+
+        self.assertEqual(acceptance.status, "pass")
+        self.assertEqual(acceptance.report["blocking_diagnostics"], [])
+        baseline = acceptance.report["baseline_diagnostics"]
+        self.assertEqual(len(baseline), 2)
+        self.assertTrue(
+            all(
+                item["classification"]
+                == "base_identical_changed_responsibility"
+                for item in baseline
+            )
+        )
+        self.assertEqual(acceptance.report["head_diagnostic_count"], 2)
+        self.assertTrue(acceptance.report["partition_verified"])
+
+    def test_in_scope_severity_worsening_blocks_same_identity(self) -> None:
+        """A higher head severity blocks even when normalized identity is unchanged."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            declaration = (
+                "# @dependency-start\n"
+                "# contract implementation\n"
+                "# responsibility Changed fixture.\n"
+                "# upstream design missing.md unresolved fixture\n"
+                "# @dependency-end\n"
+            )
+            git(root, "init", "-b", "main")
+            git(root, "config", "user.email", "selector@example.invalid")
+            git(root, "config", "user.name", "Selector Fixture")
+            (root / "changed.py").write_text(declaration, encoding="utf-8")
+            git(root, "add", "changed.py")
+            git(root, "commit", "-m", "base")
+            base = git(root, "rev-parse", "HEAD")
+            (root / "changed.py").write_text(declaration + "after\n", encoding="utf-8")
+            git(root, "add", "changed.py")
+            git(root, "commit", "-m", "change source")
+            base_root = clone_base_snapshot(root, base)
+            base_graph_result = write_graph_result(
+                base_root,
+                ("changed.py",),
+                (),
+                (("target-unresolved", "changed.py:4:missing.md", "changed.py"),),
+            )
+            with sqlite3.connect(
+                base_root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
+            ) as connection:
+                connection.execute("UPDATE diagnostics SET severity='warn'")
+            graph_result = write_graph_result(
+                root,
+                ("changed.py",),
+                (),
+                (("target-unresolved", "changed.py:4:missing.md", "changed.py"),),
+            )
+
+            acceptance = selector.evaluate_built_graph(
+                root,
+                graph_result,
+                base_root,
+                base_graph_result,
+                {"AGENT_CANON_PR_BASE_REF": base},
+            )
+
+        self.assertEqual(acceptance.status, "fail")
+        self.assertEqual(
+            acceptance.report["blocking_diagnostics"][0]["classification"],
+            "changed_responsibility_worsened_diagnostic",
+        )
 
     def test_concurrent_database_replacement_is_typed_failure(self) -> None:
         """Replacing the canonical DB after open cannot reach classification."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            base = graph_change_fixture(root, {"legacy.py": "legacy\n"})
+            legacy = (
+                "# @dependency-start\n"
+                "# contract implementation\n"
+                "# responsibility Legacy fixture.\n"
+                "# upstream design missing.md unresolved fixture\n"
+                "# @dependency-end\n"
+            )
+            base = graph_change_fixture(root, {"legacy.py": legacy})
+            base_root = clone_base_snapshot(root, base)
+            base_graph_result = write_graph_result(
+                base_root,
+                ("changed.py", "legacy.py"),
+                (),
+                (("target-unresolved", "legacy.py:4:missing.md", "legacy.py"),),
+            )
             graph_result = write_graph_result(
                 root,
                 ("changed.py", "legacy.py"),
@@ -451,50 +652,96 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                     selector.evaluate_built_graph(
                         root,
                         graph_result,
+                        base_root,
+                        base_graph_result,
                         {"AGENT_CANON_PR_BASE_REF": base},
                     )
 
         self.assertEqual(raised.exception.reason, "graph_identity_replaced")
         self.assertIn("artifact=graph_database", raised.exception.evidence)
 
-    def test_reachable_unresolved_blocks_changed_responsibility(self) -> None:
-        """A diagnostic reached through a dependency edge remains a blocker."""
+    def test_new_reachable_unresolved_blocks_changed_responsibility(self) -> None:
+        """A new diagnostic reached through a dependency edge remains a blocker."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            base = graph_change_fixture(root, {"related.py": "related\n"})
+            related = (
+                "# @dependency-start\n"
+                "# contract implementation\n"
+                "# responsibility Related fixture.\n"
+                "# upstream design target.md resolved in base\n"
+                "# @dependency-end\n"
+            )
+            base = graph_change_fixture(
+                root,
+                {"related.py": related, "target.md": "target\n"},
+            )
+            (root / "target.md").unlink()
+            git(root, "add", "target.md")
+            git(root, "commit", "-m", "remove related target")
+            base_root = clone_base_snapshot(root, base)
+            base_graph_result = write_graph_result(
+                base_root,
+                ("changed.py", "related.py", "target.md"),
+                (),
+                (),
+            )
             graph_result = write_graph_result(
                 root,
                 ("changed.py", "related.py"),
                 (("changed.py", "related.py"),),
-                (("target-unresolved", "related.py:4:missing.md", "related.py"),),
+                (("target-unresolved", "related.py:4:target.md", "related.py"),),
             )
 
             acceptance = selector.evaluate_built_graph(
                 root,
                 graph_result,
+                base_root,
+                base_graph_result,
                 {"AGENT_CANON_PR_BASE_REF": base},
             )
 
         self.assertEqual(acceptance.status, "fail")
         blocking = acceptance.report["blocking_diagnostics"]
         self.assertEqual(len(blocking), 1)
-        self.assertEqual(blocking[0]["classification"], "changed_responsibility")
+        self.assertEqual(
+            blocking[0]["classification"],
+            "changed_responsibility_new_diagnostic",
+        )
 
     def test_changed_manifest_grammar_blocks_without_target_node(self) -> None:
         """Invalid grammar in a changed declaration is always in the gate closure."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             base = graph_change_fixture(root, {})
+            (root / "changed.py").write_text(
+                "# @dependency-start\n"
+                "# contract implementation\n"
+                "# responsibility Changed fixture.\n"
+                "# upstream bad\n"
+                "# @dependency-end\n",
+                encoding="utf-8",
+            )
+            git(root, "add", "changed.py")
+            git(root, "commit", "-m", "add invalid manifest")
+            base_root = clone_base_snapshot(root, base)
+            base_graph_result = write_graph_result(
+                base_root,
+                ("changed.py",),
+                (),
+                (),
+            )
             graph_result = write_graph_result(
                 root,
                 ("changed.py",),
                 (),
-                (("manifest-grammar", "changed.py:3:upstream bad", ""),),
+                (("manifest-grammar", "changed.py:4:upstream bad", ""),),
             )
 
             acceptance = selector.evaluate_built_graph(
                 root,
                 graph_result,
+                base_root,
+                base_graph_result,
                 {"AGENT_CANON_PR_BASE_REF": base},
             )
 
@@ -510,7 +757,14 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             git(root, "init", "-b", "main")
             git(root, "config", "user.email", "selector@example.invalid")
             git(root, "config", "user.name", "Selector Fixture")
-            (root / "legacy.py").write_text("legacy\n", encoding="utf-8")
+            (root / "legacy.py").write_text(
+                "# @dependency-start\n"
+                "# contract implementation\n"
+                "# responsibility Legacy fixture.\n"
+                "# upstream design deleted.md resolved in base\n"
+                "# @dependency-end\n",
+                encoding="utf-8",
+            )
             (root / "deleted.md").write_text("target\n", encoding="utf-8")
             git(root, "add", ".")
             git(root, "commit", "-m", "base")
@@ -518,6 +772,13 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             (root / "deleted.md").unlink()
             git(root, "add", "deleted.md")
             git(root, "commit", "-m", "delete target")
+            base_root = clone_base_snapshot(root, base)
+            base_graph_result = write_graph_result(
+                base_root,
+                ("legacy.py", "deleted.md"),
+                (),
+                (),
+            )
             graph_result = write_graph_result(
                 root,
                 ("legacy.py",),
@@ -528,19 +789,134 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             acceptance = selector.evaluate_built_graph(
                 root,
                 graph_result,
+                base_root,
+                base_graph_result,
                 {"AGENT_CANON_PR_BASE_REF": base},
             )
 
         self.assertEqual(acceptance.status, "fail")
         blocking = acceptance.report["blocking_diagnostics"]
         self.assertEqual(blocking[0]["target_path"], "deleted.md")
-        self.assertEqual(blocking[0]["classification"], "changed_responsibility")
+        self.assertEqual(
+            blocking[0]["classification"],
+            "changed_responsibility_new_diagnostic",
+        )
+
+    def test_changed_gitlink_target_blocks_new_unresolved_identity(self) -> None:
+        """A target removed by a changed pin is new even when its declaration is unchanged."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture = Path(tmp_dir)
+            module = fixture / "module"
+            module.mkdir()
+            git(module, "init", "-b", "main")
+            git(module, "config", "user.email", "selector@example.invalid")
+            git(module, "config", "user.name", "Selector Fixture")
+            (module / "retired.md").write_text("base target\n", encoding="utf-8")
+            git(module, "add", "retired.md")
+            git(module, "commit", "-m", "base module")
+            module_base = git(module, "rev-parse", "HEAD")
+            (module / "retired.md").unlink()
+            git(module, "add", "retired.md")
+            git(module, "commit", "-m", "remove target")
+            module_head = git(module, "rev-parse", "HEAD")
+
+            root = fixture / "parent"
+            root.mkdir()
+            git(root, "init", "-b", "main")
+            git(root, "config", "user.email", "selector@example.invalid")
+            git(root, "config", "user.name", "Selector Fixture")
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "protocol.file.allow=always",
+                    "submodule",
+                    "add",
+                    str(module),
+                    "vendor/agent-canon",
+                ],
+                cwd=root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            git(root / "vendor/agent-canon", "checkout", module_base)
+            gitmodules = root / ".gitmodules"
+            gitmodules.write_text(
+                "# @dependency-start\n"
+                "# contract configuration\n"
+                "# responsibility Pins fixture source.\n"
+                "# upstream design vendor/agent-canon/retired.md base target\n"
+                "# @dependency-end\n"
+                + gitmodules.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+            git(root, "add", ".gitmodules", "vendor/agent-canon")
+            git(root, "commit", "-m", "base parent")
+            base = git(root, "rev-parse", "HEAD")
+            git(root / "vendor/agent-canon", "checkout", module_head)
+            git(root, "add", "vendor/agent-canon")
+            git(root, "commit", "-m", "update pin")
+
+            base_root = clone_base_snapshot(root, base)
+            base_graph_result = write_graph_result(
+                base_root,
+                (".gitmodules", "vendor/agent-canon/retired.md"),
+                (),
+                (),
+            )
+            graph_result = write_graph_result(
+                root,
+                (".gitmodules",),
+                (),
+                (
+                    (
+                        "target-unresolved",
+                        ".gitmodules:4:vendor/agent-canon/retired.md",
+                        ".gitmodules",
+                    ),
+                ),
+            )
+
+            acceptance = selector.evaluate_built_graph(
+                root,
+                graph_result,
+                base_root,
+                base_graph_result,
+                {"AGENT_CANON_PR_BASE_REF": base},
+            )
+
+        self.assertEqual(acceptance.status, "fail")
+        blocking = acceptance.report["blocking_diagnostics"]
+        self.assertEqual(len(blocking), 1)
+        self.assertEqual(
+            blocking[0]["target_path"],
+            "vendor/agent-canon/retired.md",
+        )
+        self.assertEqual(
+            blocking[0]["classification"],
+            "changed_responsibility_new_diagnostic",
+        )
 
     def test_explicit_parent_migration_keeps_full_graph_completeness(self) -> None:
         """A declared migration owns baseline diagnostics across the whole graph."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            base = graph_change_fixture(root, {"legacy.py": "legacy\n"})
+            legacy = (
+                "# @dependency-start\n"
+                "# contract implementation\n"
+                "# responsibility Legacy fixture.\n"
+                "# upstream design missing.md unresolved fixture\n"
+                "# @dependency-end\n"
+            )
+            base = graph_change_fixture(root, {"legacy.py": legacy})
+            base_root = clone_base_snapshot(root, base)
+            base_graph_result = write_graph_result(
+                base_root,
+                ("changed.py", "legacy.py"),
+                (),
+                (("target-unresolved", "legacy.py:4:missing.md", "legacy.py"),),
+            )
             graph_result = write_graph_result(
                 root,
                 ("changed.py", "legacy.py"),
@@ -551,6 +927,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             acceptance = selector.evaluate_built_graph(
                 root,
                 graph_result,
+                base_root,
+                base_graph_result,
                 {
                     "AGENT_CANON_PR_BASE_REF": base,
                     "AGENT_CANON_PR_PARENT_GRAPH_MIGRATION": "yes",

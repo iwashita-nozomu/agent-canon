@@ -128,22 +128,43 @@ baseline.
 When the gate is selected, graph construction still covers the complete parent
 repository. A complete graph produces the existing `prepared` receipt and
 retains the full strict review. If construction publishes an incomplete graph,
-the gate classifies every persisted diagnostic against the exact validated PR
-diff and the graph's dependency/surface edges. Changed paths are responsibility
-seeds, reachability is traversed in both directions, and diagnostics declared by
-the resulting closure remain blockers. A changed target that makes an unchanged
-declaration unresolved is also a blocker. Invalid `manifest-grammar` in a
-changed declaration therefore cannot be hidden by baseline state.
+the PR checker materializes the exact trusted base in its task-owned temporary
+root and builds a second graph with the same AgentCanon command owner. A fresh
+or incomplete base build is valid comparison input; base tool/build failure is
+not. Both result records remain field-by-field bound to their canonical
+persisted DB integration records, roots, profiles, snapshot SHAs, input and
+graph fingerprints, publication, durability, and file identities before any
+scope or diagnostic classification occurs.
 
-A diagnostic outside that closure is accepted only when its declaring source
-identity is unchanged from the validated base. Each accepted diagnostic is
-written to the changed-responsibility report with its code, message, source,
-target, and classification; it is not reduced to a baseline count. If source
-identity cannot be confirmed, the gate fails closed. This accepted incomplete
-state produces a `scoped` receipt. Its quick-CI consumer does not claim that the
-graph is fresh and does not run graph-query consumers. An explicit parent graph
-migration owns the full graph, so every diagnostic remains in scope. Standalone
-AgentCanon source PRs also retain full completeness.
+The selector compares persisted source identity across those bound base/head
+graphs. An exact changed path is a responsibility seed. A descendant of a
+changed gitlink, symlink, or replaced container becomes a seed only when its
+persisted file mode, Git object, or content identity actually differs; a pin
+change does not promote every vendored source path. Dependency and surface
+reachability is traversed in both directions to form the mandatory closure.
+
+Each base and head diagnostic is normalized to
+`(code, source, target, declaration)`. Source line numbers and duplicate counts
+are receipt location/cardinality evidence, not diagnostic identity. Let `S(d)`
+mean that head diagnostic `d` is declared by the changed responsibility or its
+mandatory closure, or names a directly changed target. Let `N(d)` mean that no
+equal normalized identity exists in the bound base diagnostics, and let `W(d)`
+mean that the head severity is greater than the maximum base severity for that
+identity. Selected parent PR scope blocks exactly
+`S(d) and (N(d) or W(d))`. Thus an unchanged declaration newly unresolved by a
+changed gitlink target blocks, while a base-identical reachable diagnostic
+remains typed evidence. Invalid `manifest-grammar` in a changed declaration
+also remains a blocker.
+
+The receipt partitions every head diagnostic exactly once into blocking or
+baseline records and includes normalized identity, declaration, source, target,
+severity, and classification. It does not reduce baseline evidence to a count.
+Missing source/diagnostic identity or an incomplete partition fails closed. A
+passing incomplete classification produces a `scoped` receipt; its quick-CI
+consumer does not claim that the graph is fresh and does not run graph-query
+consumers. Explicit parent graph migration and standalone AgentCanon source PRs
+retain full completeness, so every persisted diagnostic remains a blocker in
+those routes.
 
 The selector reads dependency surfaces from this document's downstream
 manifest instead of maintaining a second path list. The manifest therefore
@@ -688,9 +709,10 @@ Full-repo missing-header scan remains report-only until the repository is migrat
 canonical profile owner が graph-required と宣言する validation profile のときだけ
 graph gate を起動します。full-repo migration と standalone source は
 `bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` の strict
-baseline を維持します。parent PR の incomplete graph は changed responsibility
-closure を gate し、base と同一で非到達な `target-unresolved` や
-`manifest-grammar` は個別 evidence として残します。pin-only parent changes は
+baseline を維持します。parent PR の incomplete graph は bound base/head graph
+から changed responsibility closure と normalized diagnostic identity delta を
+gate し、base と同一な `target-unresolved` や `manifest-grammar` は到達性に
+かかわらず個別 evidence として残します。pin-only parent changes は
 skipped receipt で表現します。Goal-driven cleanup or shared-surface migration
 closeout repeats the strict baseline and records stable
 `DEPENDENCY_HEADER_SCAN_MISSING=0` and `REPO_DEPENDENCY_REVIEW=pass` evidence.

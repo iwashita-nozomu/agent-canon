@@ -114,6 +114,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             source / "tools" / "bin" / "agent-canon",
             r"""
             #!/usr/bin/env python3
+            import hashlib
             import json
             import os
             import sqlite3
@@ -127,6 +128,8 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             root = Path(args[args.index("--root") + 1]).resolve()
             scenario = os.environ["GRAPH_GATE_FIXTURE_SCENARIO"]
             source_path = "related.py" if scenario == "reachable" else "legacy.py"
+            is_base = (root / "changed.py").read_text(encoding="utf-8") == "before\n"
+            has_diagnostic = scenario != "reachable" or not is_base
             graph_dir = root / ".agent-canon" / "knowledge-graph"
             graph_dir.mkdir(parents=True, exist_ok=True)
             database = graph_dir / "graph.sqlite"
@@ -137,7 +140,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             ).stdout.strip()
-            if scenario == "stale_head":
+            if scenario == "stale_head" or (scenario == "stale_base_head" and is_base):
                 snapshot_head = "0" * 40
             input_fingerprint = "1" * 64
             graph_fingerprint = "2" * 64
@@ -170,25 +173,44 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 connection.execute("CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT)")
                 connection.execute("CREATE TABLE nodes(id TEXT, layer TEXT, payload_json TEXT)")
                 connection.execute(
-                    "CREATE TABLE edges(layer TEXT, from_node_id TEXT, to_node_id TEXT)"
+                    "CREATE TABLE edges(layer TEXT, kind TEXT, from_node_id TEXT, to_node_id TEXT)"
                 )
                 connection.execute(
-                    "CREATE TABLE diagnostics(layer TEXT, rule TEXT, message TEXT, target_node_id TEXT)"
+                    "CREATE TABLE diagnostics(id TEXT, layer TEXT, rule TEXT, message TEXT, target_node_id TEXT, severity TEXT)"
                 )
-                for path in ("changed.py", source_path):
+                paths = ["changed.py", source_path]
+                if (root / "target.md").exists():
+                    paths.append("target.md")
+                for path in paths:
+                    content = (root / path).read_bytes()
+                    content_sha256 = hashlib.sha256(content).hexdigest()
                     connection.execute(
                         "INSERT INTO nodes VALUES(?, 'source', ?)",
-                        (f"node:source:{path}", json.dumps({"path": path})),
+                        (
+                            f"node:source:{path}",
+                            json.dumps(
+                                {
+                                    "path": path,
+                                    "payload": {
+                                        "file_mode": "100644",
+                                        "git_blob_oid": content_sha256,
+                                        "content_sha256": content_sha256,
+                                    },
+                                }
+                            ),
+                        ),
                     )
-                if scenario == "reachable":
+                if scenario == "reachable" and not is_base:
                     connection.execute(
-                        "INSERT INTO edges VALUES('source', ?, ?)",
+                        "INSERT INTO edges VALUES('source', 'dependency', ?, ?)",
                         ("node:source:changed.py", "node:source:related.py"),
                     )
-                connection.execute(
-                    "INSERT INTO diagnostics VALUES('source', 'target-unresolved', ?, ?)",
-                    (f"{source_path}:4:missing.md", f"node:source:{source_path}"),
-                )
+                if has_diagnostic:
+                    target = "target.md" if scenario == "reachable" else "missing.md"
+                    connection.execute(
+                        "INSERT INTO diagnostics VALUES('diagnostic:0', 'source', 'target-unresolved', ?, ?, 'blocker')",
+                        (f"{source_path}:4:{target}", f"node:source:{source_path}"),
+                    )
                 for key, value in (
                     ("integration_record", json.dumps(persisted_record)),
                     ("snapshot_head", snapshot_head),
@@ -196,12 +218,15 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                     ("graph_fingerprint", graph_fingerprint),
                 ):
                     connection.execute("INSERT INTO metadata VALUES(?, ?)", (key, value))
+            status = "incomplete" if has_diagnostic else "fresh"
+            exit_code = 1 if has_diagnostic else 0
+            target = "target.md" if scenario == "reachable" else "missing.md"
             result = {
                 "schema": "agent-canon.graph.build.v1",
                 "command": "build",
-                "status": "incomplete",
-                "graph_status": "incomplete",
-                "exit_code": 1,
+                "status": status,
+                "graph_status": status,
+                "exit_code": exit_code,
                 "root": str(root),
                 "profile": "default",
                 "db_path": str(database),
@@ -210,20 +235,22 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "integration_record": integration_record,
                 "publication": "published",
                 "durability": "durable",
-                "unresolved_count": 1,
+                "unresolved_count": 1 if has_diagnostic else 0,
                 "unresolved": [
                     {
                         "code": "target-unresolved",
-                        "message": f"{source_path}:4:missing.md",
+                        "message": f"{source_path}:4:{target}",
                     }
-                ],
+                ] if has_diagnostic else [],
             }
-            if scenario == "missing_identity":
+            if scenario == "missing_identity" or (
+                scenario == "missing_base_identity" and is_base
+            ):
                 del result["integration_record"]
             elif scenario == "stale_fingerprint":
                 result["input_fingerprint"] = "3" * 64
             print(json.dumps(result))
-            raise SystemExit(1)
+            raise SystemExit(exit_code)
             """,
         )
         write_executable(
@@ -302,8 +329,23 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         repo_paths.parent.mkdir(parents=True)
         shutil.copy2(REPO_PATHS, repo_paths)
         (parent / "changed.py").write_text("before\n", encoding="utf-8")
-        (parent / "legacy.py").write_text("legacy\n", encoding="utf-8")
-        (parent / "related.py").write_text("related\n", encoding="utf-8")
+        (parent / "legacy.py").write_text(
+            "# @dependency-start\n"
+            "# contract implementation\n"
+            "# responsibility Legacy fixture.\n"
+            "# upstream design missing.md unresolved fixture\n"
+            "# @dependency-end\n",
+            encoding="utf-8",
+        )
+        (parent / "related.py").write_text(
+            "# @dependency-start\n"
+            "# contract implementation\n"
+            "# responsibility Related fixture.\n"
+            "# upstream design target.md resolved in base\n"
+            "# @dependency-end\n",
+            encoding="utf-8",
+        )
+        (parent / "target.md").write_text("target\n", encoding="utf-8")
         run(parent, "git", "add", ".")
         run(parent, "git", "commit", "-m", "base")
         base = run(parent, "git", "rev-parse", "HEAD").stdout.strip()
@@ -313,14 +355,16 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 # @dependency-start
                 # contract implementation
                 # responsibility Changed fixture responsibility.
-                # upstream design missing.md fixture dependency
+                # upstream design related.py fixture dependency
                 # @dependency-end
                 after
                 """
             ).lstrip(),
             encoding="utf-8",
         )
+        (parent / "target.md").unlink()
         run(parent, "git", "add", "changed.py")
+        run(parent, "git", "add", "target.md")
         run(parent, "git", "commit", "-m", "change manifest")
         return parent, base
 
@@ -378,6 +422,14 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertEqual(valid_identity["publication"], "published")
         self.assertEqual(valid_identity["durability"], "durable")
         self.assertEqual(valid_identity["profile"], "default")
+        valid_payload = json.loads(report.read_text(encoding="utf-8"))
+        self.assertEqual(valid_payload["head_diagnostic_count"], 1)
+        self.assertEqual(len(valid_payload["baseline_diagnostics"]), 1)
+        self.assertTrue(valid_payload["partition_verified"])
+        self.assertEqual(
+            valid_payload["base_graph_identity"]["snapshot_head"],
+            valid_payload["base_sha"],
+        )
 
         reachable, reachable_state = self.run_pr_check("reachable")
         self.assertEqual(reachable.returncode, 2, reachable.stdout + reachable.stderr)
@@ -397,15 +449,20 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         payload = json.loads(report.read_text(encoding="utf-8"))
         self.assertEqual(
             payload["blocking_diagnostics"][0]["classification"],
-            "changed_responsibility",
+            "changed_responsibility_new_diagnostic",
         )
+        self.assertEqual(payload["head_diagnostic_count"], 1)
+        self.assertEqual(payload["baseline_diagnostics"], [])
+        self.assertTrue(payload["partition_verified"])
 
     def test_real_pr_check_rejects_missing_or_stale_graph_identity(self) -> None:
         """Identity defects fail before scoped/full diagnostic classification."""
         scenarios = {
             "missing_identity": "graph_identity_missing",
+            "missing_base_identity": "graph_identity_missing",
             "stale_fingerprint": "graph_identity_mismatch",
             "stale_head": "graph_snapshot_head_stale",
+            "stale_base_head": "graph_snapshot_head_stale",
             "persisted_verified_int": "graph_identity_invalid",
             "persisted_fingerprint_int": "graph_identity_invalid",
             "persisted_path_int": "graph_identity_invalid",

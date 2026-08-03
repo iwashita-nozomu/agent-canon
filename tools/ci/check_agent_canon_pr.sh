@@ -637,6 +637,35 @@ if agentcanon_pr_dependency_graph_required; then
       --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
     PR_GATE_DEPENDENCY_GRAPH_STATUS=prepared
   elif [[ "${graph_build_rc}" -eq 1 && "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
+    base_graph_root="${PR_DEPENDENCY_REVIEW_DIR}/trusted-base-snapshot"
+    base_graph_result="${PR_DEPENDENCY_REVIEW_DIR}/base-graph-build.json"
+    if ! git clone --shared --no-checkout "${WORKSPACE_ROOT}" "${base_graph_root}"; then
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=base_snapshot_clone_failed"
+      exit 2
+    fi
+    if ! git -C "${base_graph_root}" checkout --detach "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}"; then
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=base_snapshot_checkout_failed"
+      exit 2
+    fi
+    if ! git -C "${base_graph_root}" -c protocol.file.allow=always submodule update --init --recursive vendor/agent-canon; then
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=base_snapshot_submodule_failed"
+      exit 2
+    fi
+    base_snapshot_head="$(git -C "${base_graph_root}" rev-parse --verify HEAD)"
+    if [[ "${base_snapshot_head}" != "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" ]]; then
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=base_snapshot_identity_mismatch"
+      exit 2
+    fi
+    if run_agent_canon graph build --root "${base_graph_root}" --profile default --format json >"${base_graph_result}"; then
+      base_graph_build_rc=0
+    else
+      base_graph_build_rc=$?
+    fi
+    cat "${base_graph_result}"
+    if [[ "${base_graph_build_rc}" -ne 0 && "${base_graph_build_rc}" -ne 1 ]]; then
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=base_graph_build_failed rc=${base_graph_build_rc}"
+      exit "${base_graph_build_rc}"
+    fi
     graph_acceptance_output=""
     graph_acceptance_rc=0
     graph_acceptance_args=(
@@ -644,6 +673,8 @@ if agentcanon_pr_dependency_graph_required; then
       --source-root "${AGENT_CANON_SOURCE_ROOT}"
       --evaluate-built-graph
       --graph-result "${graph_build_result}"
+      --base-root "${base_graph_root}"
+      --base-graph-result "${base_graph_result}"
       --report-out "${PR_DEPENDENCY_REVIEW_DIR}/changed-responsibility-acceptance.json"
     )
     if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
