@@ -25,7 +25,7 @@ import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
+from typing import TypedDict, cast
 from urllib.parse import quote
 
 PROFILE_INVENTORY = Path("documents/runtime/runtime-profiles-and-check-matrix.json")
@@ -163,6 +163,26 @@ class GraphBuildIdentity:
         }
 
 
+class DiagnosticRecord(TypedDict):
+    """One validated persisted graph diagnostic."""
+
+    code: str
+    message: str
+    source_path: str
+    target_path: str
+    declaration: str
+    severity: str
+
+
+class ClassifiedDiagnostic(DiagnosticRecord):
+    """One diagnostic in the duplicate-free blocking/baseline partition."""
+
+    identity: str
+    base_match: bool
+    worsened: bool
+    classification: str
+
+
 @dataclass(frozen=True)
 class TrustedBaseGraph:
     """Diagnostics and identity facts built from the validated PR base."""
@@ -174,7 +194,7 @@ class TrustedBaseGraph:
     durability: str
     verified: bool
     build_status: str
-    diagnostics: tuple[dict[str, str], ...]
+    diagnostics: tuple[DiagnosticRecord, ...]
 
     def report(self, base_sha: str) -> dict[str, object]:
         """Return durable base-comparison evidence without the temp path."""
@@ -726,7 +746,7 @@ def diagnostic_declaration(source_path: str, message: str) -> str:
     return " ".join(message.split())
 
 
-def diagnostic_identity_key(diagnostic: Mapping[str, str]) -> tuple[str, str, str, str]:
+def diagnostic_identity_key(diagnostic: DiagnosticRecord) -> tuple[str, str, str, str]:
     """Return the canonical code/source/target/declaration diagnostic identity."""
     return (
         diagnostic["code"],
@@ -736,7 +756,7 @@ def diagnostic_identity_key(diagnostic: Mapping[str, str]) -> tuple[str, str, st
     )
 
 
-def diagnostic_identity_text(diagnostic: Mapping[str, str]) -> str:
+def diagnostic_identity_text(diagnostic: DiagnosticRecord) -> str:
     """Serialize one normalized identity without line numbers or counts."""
     return json.dumps(diagnostic_identity_key(diagnostic), separators=(",", ":"))
 
@@ -761,10 +781,10 @@ def severity_rank(value: str) -> int:
 
 
 def deduplicate_diagnostics(
-    diagnostics: Sequence[dict[str, str]],
-) -> tuple[dict[str, str], ...]:
+    diagnostics: Sequence[DiagnosticRecord],
+) -> tuple[DiagnosticRecord, ...]:
     """Collapse duplicate rows by normalized identity before base comparison."""
-    selected: dict[tuple[str, str, str, str], dict[str, str]] = {}
+    selected: dict[tuple[str, str, str, str], DiagnosticRecord] = {}
     for diagnostic in diagnostics:
         for field in (
             "code",
@@ -787,6 +807,28 @@ def deduplicate_diagnostics(
         ):
             selected[key] = diagnostic
     return tuple(selected[key] for key in sorted(selected))
+
+
+def classify_diagnostic(
+    diagnostic: DiagnosticRecord,
+    *,
+    base_match: bool,
+    worsened: bool,
+    classification: str,
+) -> ClassifiedDiagnostic:
+    """Add typed classification fields to one validated diagnostic record."""
+    return {
+        "code": diagnostic["code"],
+        "message": diagnostic["message"],
+        "source_path": diagnostic["source_path"],
+        "target_path": diagnostic["target_path"],
+        "declaration": diagnostic["declaration"],
+        "severity": diagnostic["severity"],
+        "identity": diagnostic_identity_text(diagnostic),
+        "base_match": base_match,
+        "worsened": worsened,
+        "classification": classification,
+    }
 
 
 def regular_file_identity(
@@ -1097,21 +1139,21 @@ def graph_build_identity(
         durability,
         integration,
         status_value,
-        cast(int, result["exit_code"]),
+        result["exit_code"],
     )
 
 
 def read_bound_graph_acceptance_facts(
     build: GraphBuildIdentity,
     expected_head: str,
-) -> tuple[dict[str, str], dict[str, set[str]], list[dict[str, str]]]:
+) -> tuple[dict[str, str], dict[str, set[str]], list[DiagnosticRecord]]:
     """Bind persisted integration metadata, then read classification facts."""
     uri = f"file:{quote(build.database.as_posix(), safe='/')}?mode=ro&immutable=1"
     connection: sqlite3.Connection | None = None
     pending_error: SelectorFailure | None = None
     node_paths: dict[str, str] = {}
     adjacency: dict[str, set[str]] = {}
-    diagnostics: list[dict[str, str]] = []
+    diagnostics: list[DiagnosticRecord] = []
     try:
         connection = sqlite3.connect(uri, uri=True)
         assert_file_identity(
@@ -1353,6 +1395,112 @@ def graph_executable(source_root: Path | None) -> Path:
     return resolved
 
 
+def base_gitlinks(root: Path, base_sha: str) -> tuple[tuple[str, str], ...]:
+    """Read every submodule path and exact object recorded by the base tree."""
+    output = git_output(
+        root,
+        ["ls-tree", "-r", "--full-tree", base_sha, "--"],
+        "trusted_base_submodule_identity_unavailable",
+    )
+    gitlinks: list[tuple[str, str]] = []
+    for line in output.splitlines():
+        if "\t" not in line:
+            raise SelectorFailure(
+                "trusted_base_submodule_identity_invalid",
+                "detail=malformed_ls_tree_record",
+            )
+        metadata, path = line.split("\t", 1)
+        fields = metadata.split()
+        if len(fields) != 3:
+            raise SelectorFailure(
+                "trusted_base_submodule_identity_invalid",
+                "detail=malformed_ls_tree_metadata",
+            )
+        mode, object_type, object_id = fields
+        if mode == "160000":
+            if object_type != "commit" or not HEX_SHA_RE.fullmatch(object_id):
+                raise SelectorFailure(
+                    "trusted_base_submodule_identity_invalid",
+                    f"path={path};detail=invalid_gitlink",
+                )
+            gitlinks.append((path, object_id.lower()))
+    return tuple(gitlinks)
+
+
+def materialize_base_submodules(root: Path, base_sha: str) -> None:
+    """Materialize and verify every base-tree gitlink before graph build."""
+    expected = base_gitlinks(root, base_sha)
+    if not expected:
+        return
+    update = run_git(
+        root,
+        [
+            "-c",
+            "protocol.file.allow=always",
+            "submodule",
+            "update",
+            "--init",
+            "--recursive",
+        ],
+    )
+    if update.returncode != 0:
+        stderr = update.stderr.strip()
+        raise SelectorFailure(
+            "trusted_base_submodule_materialization_failed",
+            f"exit={update.returncode};stderr_sha256="
+            f"{hashlib.sha256(stderr.encode()).hexdigest()}",
+        )
+    for relative_path, expected_head in expected:
+        submodule = root / relative_path
+        if not submodule.is_dir() or submodule.is_symlink():
+            raise SelectorFailure(
+                "trusted_base_submodule_materialization_failed",
+                f"path={relative_path};detail=missing_checkout",
+            )
+        actual_head = (
+            git_output(
+                submodule,
+                ["rev-parse", "HEAD"],
+                "trusted_base_submodule_identity_unavailable",
+            )
+            .strip()
+            .lower()
+        )
+        if actual_head != expected_head:
+            raise SelectorFailure(
+                "trusted_base_submodule_identity_mismatch",
+                f"path={relative_path};expected={expected_head};actual={actual_head}",
+            )
+
+
+def validate_graph_build_exit_code(process_exit_code: int, output: str) -> None:
+    """Require the builder process status and JSON result status to agree."""
+    try:
+        payload: object = json.loads(output)
+    except ValueError:
+        raise SelectorFailure(
+            "trusted_base_graph_result_invalid",
+            "detail=invalid_json",
+        ) from None
+    if type(payload) is not dict:
+        raise SelectorFailure(
+            "trusted_base_graph_result_invalid",
+            "detail=not_object",
+        )
+    result = cast(dict[str, object], payload)
+    result_exit_code = result.get("exit_code")
+    if type(result_exit_code) is not int:
+        raise SelectorFailure(
+            "trusted_base_graph_exit_code_mismatch",
+            "field=exit_code;expected_type=integer",
+        )
+    if result_exit_code != process_exit_code:
+        raise SelectorFailure(
+            "trusted_base_graph_exit_code_mismatch",
+            f"process={process_exit_code};result={result_exit_code}",
+        )
+
+
 def build_trusted_base_graph(
     root: Path,
     base_sha: str,
@@ -1401,6 +1549,7 @@ def build_trusted_base_graph(
                 "trusted_base_graph_identity_mismatch",
                 f"expected={base_sha};actual={resolved_head}",
             )
+        materialize_base_submodules(base_root, base_sha)
 
         build = subprocess.run(
             [
@@ -1432,6 +1581,7 @@ def build_trusted_base_graph(
                 "trusted_base_graph_build_failed",
                 f"exit={build.returncode};stdout=empty",
             )
+        validate_graph_build_exit_code(build.returncode, build.stdout)
         result_path = (
             base_root / ".agent-canon" / "knowledge-graph" / "graph-build.json"
         )
@@ -1491,8 +1641,8 @@ def evaluate_built_graph(
         diagnostic_identity_key(diagnostic): diagnostic
         for diagnostic in base_graph.diagnostics
     }
-    blocking: list[dict[str, str]] = []
-    baseline: list[dict[str, str]] = []
+    blocking: list[ClassifiedDiagnostic] = []
+    baseline: list[ClassifiedDiagnostic] = []
     for diagnostic in head_diagnostics:
         source_path = diagnostic["source_path"]
         target_path = diagnostic["target_path"]
@@ -1508,19 +1658,34 @@ def evaluate_built_graph(
             and severity_rank(diagnostic["severity"])
             > severity_rank(base_diagnostic["severity"])
         )
-        rendered = {
-            **diagnostic,
-            "identity": diagnostic_identity_text(diagnostic),
-            "base_match": base_diagnostic is not None,
-            "worsened": worsened,
-        }
         if related and (base_diagnostic is None or worsened):
-            blocking.append({**rendered, "classification": "changed_responsibility"})
+            blocking.append(
+                classify_diagnostic(
+                    diagnostic,
+                    base_match=base_diagnostic is not None,
+                    worsened=worsened,
+                    classification="changed_responsibility",
+                )
+            )
             continue
         if not related and not base_source_is_unchanged(root, diff, source_path):
-            blocking.append({**rendered, "classification": "base_identity_unconfirmed"})
+            blocking.append(
+                classify_diagnostic(
+                    diagnostic,
+                    base_match=base_diagnostic is not None,
+                    worsened=worsened,
+                    classification="base_identity_unconfirmed",
+                )
+            )
             continue
-        baseline.append({**rendered, "classification": "unchanged_base_diagnostic"})
+        baseline.append(
+            classify_diagnostic(
+                diagnostic,
+                base_match=base_diagnostic is not None,
+                worsened=worsened,
+                classification="unchanged_base_diagnostic",
+            )
+        )
     report: dict[str, object] = {
         "schema": "agent-canon.pr-graph-acceptance.v1",
         "base_sha": diff.base_sha,

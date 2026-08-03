@@ -14,6 +14,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import sqlite3
 import subprocess
 import sys
@@ -119,6 +120,63 @@ def graph_change_fixture(root: Path, extra_base_files: dict[str, str]) -> str:
     return base
 
 
+def derived_parent_graph_fixture(root: Path) -> tuple[Path, str, str]:
+    """Create a derived parent whose base contains an AgentCanon gitlink."""
+    parent = root / "derived-parent"
+    parent.mkdir()
+    git(parent, "init", "-b", "main")
+    git(parent, "config", "user.email", "selector@example.invalid")
+    git(parent, "config", "user.name", "Selector Fixture")
+    git(
+        parent,
+        "-c",
+        "protocol.file.allow=always",
+        "submodule",
+        "add",
+        PROJECT_ROOT.as_uri(),
+        "vendor/agent-canon",
+    )
+    manifest = parent / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(
+        PROJECT_ROOT / "documents" / "runtime" / "shared-runtime-surfaces.toml",
+        manifest,
+    )
+    (parent / "changed.py").write_text("before\n", encoding="utf-8")
+    git(parent, "add", ".")
+    git(parent, "commit", "-m", "derived parent base")
+    base = git(parent, "rev-parse", "HEAD")
+    gitlink = git(parent, "ls-tree", "HEAD", "vendor/agent-canon").split()[2]
+    (parent / "changed.py").write_text("after\n", encoding="utf-8")
+    git(parent, "add", "changed.py")
+    git(parent, "commit", "-m", "derived parent change")
+    return parent, base, gitlink
+
+
+def graph_builder_exit_fixture(
+    root: Path,
+    process_exit_code: int,
+    result_exit_code: int,
+) -> tuple[Path, Path, str]:
+    """Create a base repo and builder executable with independently chosen exits."""
+    parent = root / "base-repo"
+    parent.mkdir()
+    base = graph_change_fixture(parent, {})
+    source_root = root / "builder-source"
+    executable = source_root / "tools" / "bin" / "agent-canon"
+    executable.parent.mkdir(parents=True)
+    executable.write_text(
+        "#!/usr/bin/env python3\n"
+        "import json\n"
+        "import sys\n"
+        f"print(json.dumps({{'exit_code': {result_exit_code}}}))\n"
+        f"raise SystemExit({process_exit_code})\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    return parent, source_root, base
+
+
 def write_graph_result(
     root: Path,
     paths: tuple[str, ...],
@@ -132,7 +190,7 @@ def write_graph_result(
     snapshot_head = git(root, "rev-parse", "HEAD")
     input_fingerprint = "1" * 64
     graph_fingerprint = "2" * 64
-    integration_record = {
+    integration_record: dict[str, object] = {
         "schema": "agent-canon.graph.integration.v1",
         "root": str(root.resolve()),
         "db_path": str(database.resolve()),
@@ -225,6 +283,94 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         )
         self.base_graph_patch.start()
         self.addCleanup(self.base_graph_patch.stop)
+
+    def test_base_builder_process_zero_and_result_one_mismatch_fails_closed(
+        self,
+    ) -> None:
+        """A successful process cannot publish a failing JSON result."""
+        with self.assertRaises(selector.SelectorFailure) as raised:
+            selector.validate_graph_build_exit_code(
+                0,
+                json.dumps({"exit_code": 1}),
+            )
+
+        self.assertEqual(
+            raised.exception.reason,
+            "trusted_base_graph_exit_code_mismatch",
+        )
+
+    def test_base_builder_process_one_and_result_zero_mismatch_fails_closed(
+        self,
+    ) -> None:
+        """A failing process cannot publish a successful JSON result."""
+        with self.assertRaises(selector.SelectorFailure) as raised:
+            selector.validate_graph_build_exit_code(
+                1,
+                json.dumps({"exit_code": 0}),
+            )
+
+        self.assertEqual(
+            raised.exception.reason,
+            "trusted_base_graph_exit_code_mismatch",
+        )
+
+    def test_trusted_base_builder_rejects_process_zero_result_one_fixture(self) -> None:
+        """The trusted-base process path rejects a zero/one exit mismatch."""
+        self.base_graph_patch.stop()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            parent, source_root, base = graph_builder_exit_fixture(
+                Path(tmp_dir),
+                process_exit_code=0,
+                result_exit_code=1,
+            )
+            with self.assertRaises(selector.SelectorFailure) as raised:
+                selector.build_trusted_base_graph(parent, base, source_root)
+
+        self.assertEqual(
+            raised.exception.reason,
+            "trusted_base_graph_exit_code_mismatch",
+        )
+
+    def test_trusted_base_builder_rejects_process_one_result_zero_fixture(self) -> None:
+        """The trusted-base process path rejects a one/zero exit mismatch."""
+        self.base_graph_patch.stop()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            parent, source_root, base = graph_builder_exit_fixture(
+                Path(tmp_dir),
+                process_exit_code=1,
+                result_exit_code=0,
+            )
+            with self.assertRaises(selector.SelectorFailure) as raised:
+                selector.build_trusted_base_graph(parent, base, source_root)
+
+        self.assertEqual(
+            raised.exception.reason,
+            "trusted_base_graph_exit_code_mismatch",
+        )
+
+    @unittest.skipUnless(
+        shutil.which("cargo"), "cargo is required for the real builder"
+    )
+    def test_real_builder_reads_materialized_derived_parent_base_submodule(
+        self,
+    ) -> None:
+        """The trusted base build uses the exact derived-parent AgentCanon gitlink."""
+        self.base_graph_patch.stop()
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            parent, base, gitlink = derived_parent_graph_fixture(Path(tmp_dir))
+            expected_gitlink = git(
+                parent, "ls-tree", base, "vendor/agent-canon"
+            ).split()[2]
+
+            trusted_base = selector.build_trusted_base_graph(
+                parent,
+                base,
+                PROJECT_ROOT,
+            )
+
+        self.assertEqual(gitlink, expected_gitlink)
+        self.assertEqual(trusted_base.snapshot_head, base)
+        self.assertTrue(trusted_base.verified)
 
     def test_pr_entrypoint_prepares_and_passes_trusted_base(self) -> None:
         """The parent gate wires shallow preparation to the exact selector argument."""

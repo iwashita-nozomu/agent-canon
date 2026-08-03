@@ -131,7 +131,11 @@ retains the full strict review. If construction publishes an incomplete graph,
 the gate first builds an equivalent graph from the exact trusted base SHA in an
 isolated checkout. The base build must publish a valid graph result and bound
 SQLite database; missing, stale, malformed, unavailable, or concurrently
-replaced base evidence fails closed. The head gate then classifies every unique
+replaced base evidence fails closed. For a derived parent, every `160000`
+submodule gitlink recorded by the exact base tree is recursively materialized
+and verified at that commit before the builder runs. The builder process exit
+code must exactly equal the JSON result `exit_code`; only matching `0` or `1`
+results are admissible. The head gate then classifies every unique
 persisted diagnostic identity against the exact validated PR diff, the head
 graph's dependency/surface edges, and the trusted base diagnostics.
 
