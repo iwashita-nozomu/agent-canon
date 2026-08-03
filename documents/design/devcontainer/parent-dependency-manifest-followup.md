@@ -22,10 +22,13 @@ downstream implementation ../../../tools/sync_agent_canon.sh pin and root projec
 developer/agent tool record だけを置きます。schema は
 `agent-canon.devcontainer-dependencies` version `2`、record は
 `id/package/method/version/source/verification/deps/provides/failure_policy` を
-必須とし、method-specific な key fingerprint、checksum、repo/commit/locked、
-browser fields も型付きで記録します。`verification` は method と一致する
+必須とし、method-specific な key fingerprint、checksum、
+repo/commit/source_identity/locked、browser fields も型付きで記録します。
+`verification` は method と一致する
 closed kind と owner-specific fields を持ち、generic command 配列や
 container identity を receipt の十分条件にしません。
+Cargo の AgentCanon CLI record は `source_identity = "active-source"` を選択し、
+SHA を manifest に複製しません。
 
 共有 post-create は次の順で一度だけ読みます。
 
@@ -56,6 +59,12 @@ record owner の typed verification を毎回実行し、package-owned state、
 apt repository の key/source、exact executable、toolchain/components、
 browser cache executable、または source-local Cargo binary が欠落・不一致
 なら receipt を削除して repair installation と再 verification を行います。
+active-source の receipt は実行時に解決した source identity も記録します。
+derived parent では committed `HEAD:vendor/agent-canon` gitlink と selected
+vendor source-root `HEAD` が同一であることを provider identity とし、standalone
+AgentCanon では checked-out source-root `HEAD` を identity とします。identity または
+binary verification が一致しない場合は receipt を再利用せず fail/repair し、別の
+固定 SHA、stale source、compatibility fallback は選択しません。
 
 ## pin と root projection
 
