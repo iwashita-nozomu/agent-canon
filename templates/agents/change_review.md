@@ -13,6 +13,9 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+{{>review_contract}}
+
 ## Chunk Findings
 
 | Chunk | Finding | Severity | Status |

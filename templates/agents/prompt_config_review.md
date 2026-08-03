@@ -13,6 +13,9 @@ upstream design ../../agents/canonical/CODEX_SUBAGENTS.md Codex subagent role in
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+{{>review_contract}}
+
 ## Prompt And Config Findings
 
 <!-- Record duplicated routing policy, stale role descriptions, parent-heavy prompt guidance, and circular role boundaries. -->

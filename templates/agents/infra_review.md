@@ -12,6 +12,9 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+{{>review_contract}}
+
 ## Safety Review
 
 <!-- Check rollout, rollback, permissions, and operational risk. -->

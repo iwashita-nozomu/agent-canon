@@ -12,6 +12,8 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+
 ## Surface Area
 
 <!-- List the CI, Docker, experiment runner, automation, or platform surfaces touched. -->

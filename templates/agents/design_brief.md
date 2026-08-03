@@ -56,6 +56,45 @@ rather than local implementation judgment.
 - Evaluation axes:
 - Canonical-surface relationships:
 
+## Algorithm Contract Before Tests
+
+<!-- Fix the production mechanism before test expectations. Keep private implementation shape, mock order, and helper names out of the contract unless they are observable. -->
+
+- public entrypoint and input schema:
+- state transition / recurrence:
+- invariants and preconditions:
+- stopping / acceptance rule:
+- typed failure semantics and preserved state:
+- selected implementation mechanism:
+
+## Necessary-And-Sufficient Oracle Boundary
+
+- necessary observations:
+- sufficient observations:
+- oracle owner:
+- not proven by this oracle:
+- test activation condition or static-only reason:
+
+## Failure Cause And Conflict Intent
+
+- cause class: expected / infrastructure / implementation / oracle / unknown:
+- evidence and owner:
+- preserved user/design intent:
+- conflicting source or contract:
+- escalation / rejection evidence:
+
+## Alternatives And Independent Review
+
+| option | mechanism | evidence | cost/risk | status |
+| --- | --- | --- | --- | --- |
+| A | `<mechanism>` | `<evidence>` | `<risk>` | selected / rejected |
+| B | `<mechanism>` | `<evidence>` | `<risk>` | selected / rejected |
+
+- selection rule:
+- rejected rationale:
+- independent reviewer:
+- reviewer source snapshot and readback:
+
 ## Evidence And Assumption Ledger
 
 <!-- Tie design claims to current code, dependency headers, existing docs, and parent documents. Record first-use DSL terms, problem standard forms, normalization rules, and governing parent-doc differences before file-by-file implementation design. For design-doc claim checking, cite code paths, tool paths, dependency-header evidence, or parent documents with stable paths. -->

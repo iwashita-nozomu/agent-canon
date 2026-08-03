@@ -21,6 +21,18 @@ record, artifacts, and critical review in that order, while writing the
 abstract last. Use it for run-scoped empirical evidence; do not use it as the
 place to promote durable policy, workflow changes, or unsupported conclusions.
 
+## Contract Readback
+
+- owner / responsibility and OOP boundary:
+- design-to-implementation trace:
+- dependency / side-effect map:
+- algorithm contract before tests:
+- necessary-and-sufficient oracle:
+- failure-cause classification:
+- conflict intent and preserved interpretation:
+- independent review and source snapshot:
+- result/environment provenance and cleanup readback:
+
 ## Abstract
 
 <!-- Write last. 4-7 sentences with question, protocol, strongest result with numbers, meaning, and limitation. -->

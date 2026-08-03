@@ -12,6 +12,8 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+
 ## Questions
 
 <!-- List the algorithm or external questions being researched. -->

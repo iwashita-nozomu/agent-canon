@@ -17,9 +17,16 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 - Owner: {{OWNER}}
 - Created At (UTC): {{CREATED_AT}}
 
+{{>reader_map}}
+
 ## Signals
 
 <!-- Record workflow signals observed during execution. Prefer `python3 tools/agent_tools/workflow_monitor.py --report-dir <run> --signal "..."` and tool-level `--report-dir` hooks over hand edits. Required signals include selected skills, stage owners, subagent or parent-direct routing, wave_id, repo dependency intake, web-research decision, review status, validation status, and any drift risk. The run-bundle producer emits one canonical `runtime_measurement_input=<JSON>` signal through `workflow_monitor.py`; preserve null versus explicit zero and do not hand-author or duplicate that measurement record. -->
+
+- failure-cause classification:
+- conflict intent / preserved user or design clause:
+- unexpected action report and parent handoff:
+- cleanup/materialization readback:
 
 ## Behavior Events
 

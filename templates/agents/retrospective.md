@@ -13,6 +13,8 @@ upstream design workflow_monitoring.md records monitoring observations and impro
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+
 ## What Worked
 
 <!-- Capture techniques, tools, sequencing, monitoring signals, or workflow interventions that helped. -->

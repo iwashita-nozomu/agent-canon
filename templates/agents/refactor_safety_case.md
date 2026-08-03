@@ -8,6 +8,36 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 -->
 
 
+## Reader Map
+
+この safety case は、behavior contract を保った構造変更の責務、path mapping、OOP boundary、
+regression oracle、integration risk、cleanup を記録します。
+
+- purpose:
+- intended reader and decision:
+- what this case contains:
+- canonical owner / structural boundary:
+- design-to-implementation trace:
+- validation and readback:
+- lifecycle cleanup owner:
+
+{{>review_contract}}
+
+## Reader Map
+
+この safety case は、behavior contract を保った構造変更の責務、path mapping、OOP boundary、
+regression oracle、integration risk、cleanup を記録します。
+
+- purpose:
+- intended reader and decision:
+- what this case contains:
+- canonical owner / structural boundary:
+- design-to-implementation trace:
+- validation and readback:
+- lifecycle cleanup owner:
+
+{{>review_contract}}
+
 ## Summary
 
 - Refactor scope:

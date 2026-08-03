@@ -13,9 +13,17 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Owner: {{OWNER}}
 - Created At (UTC): {{CREATED_AT}}
 
+{{>reader_map}}
+
 ## Purpose
 
 <!-- Keep a chronological run-local log for meaningful execution steps. This is required even when no worktree action log is active. -->
+
+- owner / responsibility unit:
+- design-to-implementation trace:
+- dependency / side-effect map:
+- conflict intent and preserved state:
+- failure-cause classification for unexpected actions:
 
 ## Entries
 

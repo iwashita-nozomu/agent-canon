@@ -13,6 +13,8 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Owner: {\{OWNER}}
 - Created At (UTC): {\{CREATED_AT}}
 
+{{>reader_map}}
+
 ## Goal
 
 <!-- Record the target outcome and acceptance criteria. -->

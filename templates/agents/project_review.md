@@ -12,6 +12,9 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+{{>review_contract}}
+
 ## Repo Inventory Findings
 
 <!-- Record stale surfaces, duplicated canon, settings-vs-docs drift, or integration gaps. -->

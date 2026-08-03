@@ -4,6 +4,8 @@ contract template
 responsibility Documents reusable run artifact templates for this repository.
 upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement contract.
 downstream implementation ../../tools/agent_tools/agent_team.py renders templates and partials.
+downstream implementation ./_partials/reader_map.md shared reader-path fields.
+downstream implementation ./_partials/review_contract.md shared review evidence boundary.
 @dependency-end
 -->
 
@@ -12,6 +14,20 @@ downstream implementation ../../tools/agent_tools/agent_team.py renders template
 `templates/agents/` contains source templates for run-bundle artifacts.
 `tools/agent_tools/agent_team.py` renders these files into
 `reports/agents/<run-id>/`.
+
+## Reader Map
+
+この README は、run-bundle artifact template の source owner、partial の再利用境界、
+active design packet の射影、生成後の readback を説明します。読者はまず各 artifact の
+`Reader Map`、次に責務・入力・validation・cleanup を読みます。
+
+- purpose: run-local artifact の構造と renderer 境界を固定する。
+- intended reader: task owner、実装者、reviewer、closeout verifier。
+- what this directory contains: role artifact と再利用可能な partial source。
+- canonical source: `templates/agents/`。
+- generated projection: `reports/agents/<run-id>/`（手編集しない）。
+- validation/readback: renderer の partial 展開、dependency header、選択 gate の証跡。
+- lifecycle: run closeout 後に retention policy と cleanup owner が扱う。
 
 ## Partials
 
@@ -31,6 +47,10 @@ Use partials only for repeated structure whose generated meaning must stay the
 same across artifacts, such as common findings tables or decision sections.
 Do not use partials to hide role-specific review focus, required evidence, or
 approval criteria.
+
+共通 partial `reader_map.md` は読者経路・内容・owner・validation・cleanup の欄を提供し、
+`review_contract.md` は review の design trace、dependency/effect、oracle、failure cause、
+conflict intent を提供します。role 固有の判断は各 top-level template に残します。
 
 ## Active Design Packet Projection
 

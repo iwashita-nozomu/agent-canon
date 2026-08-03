@@ -11,6 +11,20 @@ upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared docume
 この template は、main server host の inventory と readiness gap を記録するためのものです。
 実値は host 固有なので、そのまま `documents/` に置かず、必要なら `notes/` か infra 管理 repo に複製して使います。
 
+## Reader Map
+
+この inventory は host identity → runtime/storage/mount → Git/mirror → validation → gap/owner/cleanup
+の順で読みます。ここには reader が再構築に必要な実値と evidence の所在を記録し、host
+固有値を AgentCanon の policy source に戻しません。
+
+- purpose:
+- intended reader and decision:
+- what this document contains:
+- canonical owner / responsibility boundary:
+- source, generated, and local inventory surfaces:
+- validation/readback command:
+- retention and lifecycle cleanup owner:
+
 ## Host Summary
 
 - Host id:
@@ -69,3 +83,12 @@ upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared docume
 - `Decision:`
 - `Owner:`
 - `Next check:`
+
+## Contract and readback
+
+- owner / responsibility unit:
+- dependency and side-effect map:
+- failure-cause classification:
+- conflict intent / preserved host contract:
+- formatter/readback: `tools/bin/agent-canon docs check <path>`（Markdown）
+- cleanup command and reconstructibility evidence:

@@ -34,6 +34,44 @@ upstream design ../../../../.github/AGENTS.md GitHub subtree instructions
 - Public/API/schema impact:
 - Explicit non-goals:
 
+## Reader Map And Contents
+
+この PR template は、変更の本質、canonical owner、設計から実装への trace、依存/副作用、
+validation、projection、cleanup を一つの reviewer path にまとめます。読者は `PR Essence`
+と `Scope` で判断対象を固定し、`Validation Trust Boundary` と `Artifact And Clone Cleanup`
+で完了証拠を read back します。
+
+- intended reader and decision:
+- what this PR contains:
+- canonical source / generated projection / run-local artifact:
+- owner and responsibility / OOP boundary:
+- required formatter, parse, projection, and post-format readback:
+- lifecycle retention and cleanup owner:
+
+## Design, Algorithm, And Oracle Trace
+
+- design-to-implementation trace:
+- algorithm/state contract before tests:
+- necessary observations:
+- sufficient observations:
+- not proven by this oracle:
+- test activation or static-only reason:
+- dependency and side-effect map:
+- failure-cause classification and preserved artifacts:
+- conflict intent and escalation owner:
+
+## Alternatives And Independent Review
+
+| option | mechanism | evidence needed | cost/risk | status |
+| --- | --- | --- | --- | --- |
+| A | `<mechanism>` | `<evidence>` | `<risk>` | selected / rejected |
+| B | `<mechanism>` | `<evidence>` | `<risk>` | selected / rejected |
+
+- selected option and selection rule:
+- rejected rationale:
+- independent reviewer:
+- source snapshot and review readback:
+
 ## Dependency Closure
 
 - upstream design / contract:
@@ -190,6 +228,10 @@ paste the key pass lines here
 - format / lint / parse result:
 - artifact path, producer, digest, and readback:
 - validation failure semantics and escalation:
+- Markdown/math/Mermaid command: `tools/bin/agent-canon docs check <changed-markdown-paths>`
+- formatter/fixer command, if any:
+- post-format source readback and projection identity:
+- TOML/YAML/JSON parse evidence:
 
 ## Shared Surface Changes
 
@@ -228,6 +270,11 @@ Upstream sync note:
 - generated artifacts retained:
 - cleanup command and owner:
 - cleanup result / explicit preservation reason:
+- generic topic-clone lifecycle/materialization manifest:
+- source remote / branch / base SHA readback:
+- local-only commit or untracked artifact decision:
+- reconstructibility evidence before removal:
+- cleanup failure cause and typed hold condition:
 
 ## Submodule Pin Change
 

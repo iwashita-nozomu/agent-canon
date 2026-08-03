@@ -14,6 +14,8 @@ upstream design ../../agents/skills/agent-orchestration.md execution-time-aware 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+
 ## Stage Plan
 
 | Stage | Owner Agent | Review Agent | Inputs | Exit Criteria | Status |

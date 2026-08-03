@@ -13,6 +13,19 @@ downstream implementation README.md implements the approved boundary.
 
 この template は、設計判断を実装可能な責務境界へ変換するための正本雛形です。
 
+## Reader Map
+
+この design document は、target state、責務/OOP boundary、依存と副作用、algorithm contract、
+oracle、failure semantics、選択肢、実装 trace、validation、再構築、cleanup をこの順に示します。
+読者は requester → designer → implementer → reviewer → maintainer の順に必要な判断を追えます。
+
+- purpose:
+- intended reader and decision:
+- what this document contains:
+- canonical owner / generated evidence boundary:
+- required source readback and targeted validation:
+- lifecycle retention and cleanup owner:
+
 ## Dependency header sample
 
 派生 repo で利用するときは、実際の implementation path に置き換えた dependency header を
@@ -99,6 +112,18 @@ assumption ledger を含めます。実装詳細の羅列、未検証の性能�
 - invalid state that the type must make unrepresentable:
 - test or checker that exercises this boundary:
 
+## Algorithm contract before tests
+
+tests の期待値を決める前に、public entrypoint、入力 domain、state transition/recurrence、
+invariants、stopping/acceptance rule、typed failure semantics を固定します。
+
+- public entrypoint and input schema:
+- state transition / recurrence:
+- invariants and preconditions:
+- stopping / acceptance rule:
+- failure semantics and preserved state:
+- implementation mechanism selected from this contract:
+
 ## Dependency closure and effects
 
 ### Dependency direction
@@ -122,6 +147,16 @@ request / caller -> public entrypoint -> owned unit -> collaborator -> external 
 State what is preserved on failure, what is fail-closed, and which caller may retry.
 Do not turn an environment limitation into a silent fallback or a test-only branch.
 
+### Failure-cause classification
+
+| cause class | observable evidence | owner | accepted result or repair route |
+| --- | --- | --- | --- |
+| expected contract failure | `<evidence>` | `<owner>` | `<accepted-failure-oracle>` |
+| infrastructure / environment | `<evidence>` | `<owner>` | `<blocked-or-retry-condition>` |
+| implementation / algorithm | `<evidence>` | `<owner>` | `<repair-and-regression-route>` |
+| oracle / specification | `<evidence>` | `<owner>` | `<design-adjudication-route>` |
+| unknown | `<evidence>` | `<owner>` | `<investigation-close-condition>` |
+
 ## Options and decision
 
 Compare at least two viable options before selecting one.
@@ -136,6 +171,14 @@ Compare at least two viable options before selecting one.
 - selection rule:
 - rejected options and concrete rejection evidence:
 - unresolved branch that could change owner, mechanism, or validation:
+
+### Independent review of alternatives
+
+- independent reviewer:
+- review scope and source snapshot:
+- selected option readback:
+- rejected option evidence:
+- conflict intent preserved by the selection:
 
 ## Adversarial review
 
@@ -175,6 +218,15 @@ Review the selected design as if trying to break its boundary.
 - known limitations:
 - close condition:
 
+### Necessary-and-sufficient oracle boundary
+
+- necessary observations:
+- sufficient observations:
+- oracle owner:
+- what the oracle does not prove:
+- test activation condition:
+- static / targeted validation route:
+
 ## Evidence and assumption ledger
 
 | id | kind | claim / assumption | source path and line | confidence | how falsified |
@@ -183,3 +235,12 @@ Review the selected design as if trying to break its boundary.
 
 この template を埋めた設計文書は、承認後に実装へ投影します。run-local report、
 raw log、生成済み mirror はこの文書の正本ではありません。
+
+## Formatter, readback, and lifecycle
+
+- Markdown/math/Mermaid command: `tools/bin/agent-canon docs check <paths...>`
+- formatter/fixer command when needed:
+- post-format source readback:
+- generated projection readback:
+- artifact retention path and owner:
+- cleanup command, timing, and reconstructibility evidence:

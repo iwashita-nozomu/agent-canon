@@ -8,6 +8,9 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 -->
 
 
+{{>reader_map}}
+{{>review_contract}}
+
 {{>findings_required_change_table}}
 
 ## Review Focus

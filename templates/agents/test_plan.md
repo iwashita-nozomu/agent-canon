@@ -12,6 +12,9 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+{{>review_contract}}
+
 ## Static Path Survey
 
 <!-- Record code/test paths, branches, error handling, parsing logic, and state transitions as survey and placement evidence. Do not use path evidence to freeze unapproved API shape, private helpers, private return shape, error prose, mock order, or internal call sequence. -->
@@ -20,6 +23,36 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 | Contract Source | Behavior Contract | Observation Level | Observable Outcome | Oracle | Input Space | Adequacy Evidence | Do Not Freeze |
 | --------------- | ----------------- | ----------------- | ------------------ | ------ | ----------- | ----------------- | ------------- |
+
+## Algorithm Contract Before Tests
+
+テストの expected value や private call sequence を先に固定せず、production design の
+public entrypoint、input domain、state transition/recurrence、invariant、stopping/acceptance、
+typed failure を記録します。
+
+- algorithm contract source:
+- public behavior / observable state:
+- state transition or recurrence:
+- invariants and preconditions:
+- stopping / acceptance rule:
+- failure semantics and preserved artifacts:
+- implementation mechanism:
+
+## Necessary-And-Sufficient Oracle Boundary
+
+- necessary observations:
+- sufficient observations:
+- oracle owner:
+- not proven by this oracle:
+- test activation condition:
+- static/targeted route when test is not necessary:
+
+## Failure Cause And Conflict Intent
+
+- failure-cause class: expected / infrastructure / implementation / oracle / unknown:
+- evidence and owner:
+- conflict intent / preserved design or user clause:
+- escalation or rejection evidence:
 
 ## Contract-Only Wrapper Classification
 

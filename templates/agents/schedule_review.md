@@ -12,6 +12,9 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+{{>review_contract}}
+
 ## Stage Order Review
 
 <!-- Check stage ordering, dependency realism, and rollback points. -->

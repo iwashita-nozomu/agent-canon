@@ -14,6 +14,8 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces pass st
 - Owner: {{OWNER}}
 - Created At (UTC): {{CREATED_AT}}
 
+{{>reader_map}}
+
 ## Gate Status
 
 - evaluation_status: pending

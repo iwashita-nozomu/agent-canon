@@ -13,6 +13,20 @@ downstream implementation README.md owns the described entrypoint.
 この template は、読者が正しい入口から目的の source、実装、検証へ到達するための
 README 正本雛形です。
 
+## Reader Map
+
+この README は、対象階層の目的、含む内容、source/projection 境界、owner、再現、
+validation、cleanup を最初に固定します。本文の各 section はこの順序を保ち、読者が
+canonical source と生成済み・run-local・履歴 artifact を混同しないようにします。
+
+- purpose:
+- intended reader and decision:
+- what this document contains:
+- canonical owner / responsibility boundary:
+- source, generated projection, run-local, historical surfaces:
+- required readback and targeted validation:
+- retention and lifecycle cleanup owner:
+
 ## Dependency header sample
 
 派生 repo で利用するときは、実際の repository path に置き換えた dependency header を
@@ -74,6 +88,9 @@ validation と既知の制約を含めます。README は設計契約や巨大�
 - governing design / contract:
 - downstream consumers:
 - update owner and cadence:
+- OOP/type boundary or responsibility unit:
+- design-to-implementation trace:
+- dependency and side-effect map:
 
 ## Reproduce
 
@@ -101,6 +118,14 @@ validation と既知の制約を含めます。README は設計契約や巨大�
 - typed failure or accepted failure-result condition:
 - cleanup or retention rule:
 
+## Contract before tests
+
+- algorithm or state-transition contract:
+- necessary-and-sufficient oracle boundary:
+- failure-cause classification:
+- conflict intent and preserved behavior:
+- alternatives and independent review evidence:
+
 ## Canonical and non-canonical surfaces
 
 - canonical source:
@@ -124,6 +149,7 @@ promote a report, log, or example into a second source of truth.
 - validation command:
 - acceptance evidence:
 - rollback / stale projection handling:
+- Markdown/math/Mermaid formatter and post-format readback:
 
 ## Known limitations
 

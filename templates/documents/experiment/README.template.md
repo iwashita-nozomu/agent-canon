@@ -16,6 +16,19 @@ downstream implementation ../../../tools/experiments/create_experiment_topic.py 
 再現性を一つの reader path にまとめる正本雛形です。実験コードの runnable scaffold は
 `templates/experiments/_template/` を再利用し、この文書はその topic の判断と証跡を所有します。
 
+## Reader Map
+
+この README は、experiment の question → algorithm/variant → case/oracle → resource/env →
+managed run → result/failure → interpretation → retention/cleanup の順で読みます。
+
+- purpose: 実験の判断と再現可能な証拠を一つの topic contract に固定する。
+- intended reader and decision: 実験設計者、実行担当者、reviewer、保守者。
+- what this document contains: plan、複数案、algorithm contract、必要十分 oracle、resource/env/result provenance、failure semantics。
+- canonical source / generated surface: この README と `provenance.toml` が topic source、`result/<run-id>/` は run-local result。
+- owner boundary: orchestration、domain logic、metrics、visualization、artifact I/O の OOP/type 境界を分ける。
+- required readback: managed command、config snapshot、resource admission、result manifest、docs formatter/readback。
+- lifecycle: result retention、cleanup owner、再構築可能性を closeout 前に確認する。
+
 ## 責務
 
 - 仮説・比較対象・受入条件を実行前に固定する。
@@ -93,6 +106,27 @@ topic作成後の編集順は `run.py`、`cases.py`、`config.yaml`、`visualize
 - expected result and decision rule:
 - non-goals:
 
+## Algorithm contract before tests
+
+実験の期待値や test を先に作らず、対象 algorithm の public entrypoint、入力、state transition/
+recurrence、invariants、stopping/acceptance rule、typed failure を先に固定します。
+
+- algorithm / variant contract:
+- state transition or recurrence:
+- invariants and preconditions:
+- stopping / acceptance rule:
+- implementation mechanism and selected responsibility unit:
+- necessary-and-sufficient oracle:
+- test activation condition and static-only boundary:
+
+## OOP and C++ boundary
+
+実験の orchestration、domain logic、metrics、visualization、artifact I/O は独立した責務として
+記録し、variant の差分は factory/function boundary に閉じます。C++ の experiment/test は
+topic 内の一つの single-project boundary として扱い、必要な `CMakeLists.txt` はその topic
+直下だけに置きます。template root に top-level CMake を要求せず、他の topic・親repoの build
+system・共有 header を勝手に取り込みません。
+
 ## Options and selection
 
 候補を一つだけ書いて後付けで正当化しません。少なくとも実行可能な複数案を比較し、
@@ -108,6 +142,8 @@ selected option、rejected rationale、selection evidence を同じ判断記録�
 - rejected rationale:
 - selection evidence:
 - unresolved choice and decision owner:
+- independent reviewer:
+- independent review evidence and source snapshot:
 
 ## Machine-readable contract
 
@@ -122,6 +158,19 @@ selected option、rejected rationale、selection evidence を同じ判断記録�
 - result directory:
 - selected option / selection evidence:
 - rejected rationale:
+
+## Conflict intent and failure-cause classification
+
+- conflict intent / preserved user or design intent:
+- unresolved conflict owner and escalation route:
+
+| cause class | observed evidence | result state | accepted reason / close condition |
+| --- | --- | --- | --- |
+| expected contract failure | `<evidence>` | failed / accepted | `<reason>` |
+| infrastructure / environment | `<evidence>` | blocked / failed | `<owner-and-close-condition>` |
+| implementation / algorithm | `<evidence>` | failed | `<repair-and-regression>` |
+| oracle / specification | `<evidence>` | blocked | `<design-adjudication>` |
+| unknown | `<evidence>` | blocked | `<investigation>` |
 
 ## Resource and GPU selection
 
@@ -227,6 +276,8 @@ caller/schedulerのresource admission、run name、artifact readbackをprovenanc
 - command and expected exit status:
 - artifact readback command:
 - deterministic seed / nondeterminism note:
+- environment snapshot and versions:
+- result manifest / digest readback:
 
 ## Acceptance and retention
 
@@ -238,3 +289,12 @@ caller/schedulerのresource admission、run name、artifact readbackをprovenanc
 - result retention path and cleanup owner:
 - reviewer decision: pass / revise / reject:
 - close condition:
+
+## Formatter and lifecycle closeout
+
+- Markdown/math/Mermaid check: `tools/bin/agent-canon docs check <README.md>`
+- TOML parse/readback: `python3 -c 'import pathlib,tomllib; tomllib.loads(pathlib.Path("provenance.toml").read_text())'`
+- formatter/fixer used:
+- post-format source and rendered readback:
+- result cleanup command and owner:
+- reconstructibility proof after cleanup:

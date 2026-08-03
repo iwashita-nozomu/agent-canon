@@ -16,6 +16,8 @@ upstream implementation ../../tools/agent_tools/check_design_doc_claims.py verif
 
 {{>findings_area_table}}
 
+{{>review_contract}}
+
 ## Reader Map
 
 This template is materialized only when a distinct unresolved design claim is

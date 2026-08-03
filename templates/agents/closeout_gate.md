@@ -21,6 +21,10 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - Verifiers and auditors should start with `## Gate Status` and `## Unlock Rule`, then fill only the evidence sections activated by the current run profile.
 - For chunked reading, keep the status keys as the checklist anchor and open each evidence section only when its corresponding key is still pending.
 
+この artifact は、user-facing completion を unlock するための最終 readback を所有します。
+現在の runtime profile が選んだ targeted validation と、選ばなかった full suite/full scan の
+境界を分け、source/projection identity、failure response、cleanup の証拠を先に確認します。
+
 ## Gate Status
 
 - verifier_status: pending
@@ -53,6 +57,13 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - commit_created: no
 - push_completed: no
 - user_completion_report: locked
+- algorithm_contract_before_tests: pending
+- necessary_sufficient_oracle_boundary: pending
+- failure_cause_classification_complete: no
+- conflict_intent_readback: pending
+- lifecycle_cleanup_complete: no
+- clone_materialization_readback: pending
+- unexpected_action_report: none
 
 ## Unlock Rule
 
@@ -87,6 +98,13 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - runtime_log_archive_synced: yes
 - commit_created: yes
 - push_completed: yes
+- algorithm_contract_before_tests: pass / not_applicable_with_reason
+- necessary_sufficient_oracle_boundary: pass / not_applicable_with_reason
+- failure_cause_classification_complete: yes
+- conflict_intent_readback: pass / not_applicable
+- lifecycle_cleanup_complete: yes
+- clone_materialization_readback: pass / not_applicable
+- unexpected_action_report: none / resolved / handed_to_parent
 
 ## Completion Boundary Evidence
 
@@ -119,6 +137,9 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - selected_non_python_static_evidence:
 - typed_owner_boundary_status:
 - mapping_error_sets_empty:
+- Markdown/math/Mermaid source paths:
+- formatter/fixer command and post-format readback:
+- targeted-only reason or selected full-suite owner:
 
 ## CompletionCoverage And Failure Response Evidence
 
@@ -172,6 +193,17 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 - tool_warning_monitoring_status:
 - tool_warning_open_items:
 - tool_warning_resolution_evidence:
+
+## Lifecycle And Cleanup Evidence
+
+<!-- Record generated projection, temporary clone, run-local artifact, and raw-log cleanup only after remote/source/readback identity is complete. A typed hold condition remains blocked until the owner resolves it. -->
+
+- source/remote/materialization identities:
+- generated artifacts retained:
+- cleanup command and owner:
+- reconstructibility readback:
+- cleanup failure cause and typed hold:
+- parent handoff for any unexpected action:
 
 ## Mechanical Completion Loop Evidence
 

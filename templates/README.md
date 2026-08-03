@@ -20,6 +20,22 @@ downstream implementation ../tools/sync_agent_canon.sh retires the parent-root t
 `agents/templates/`、`documents/templates/`、`experiments/_template/` は存在せず、alias、
 wrapper、互換コピーも作りません。
 
+## Reader Map
+
+この README は、template source の全体像、各 source view の責務、生成 projection、
+親repoとの境界、更新・再現・cleanup の入口を提供します。最初にこの表で source owner
+を決め、次に対象 template の `what this document contains`、owner、設計 trace、
+validation/readback、lifecycle を読みます。
+
+- purpose: adaptable な AgentCanon template source を一つの canonical path で提供する。
+- intended reader: template利用者、実装者、reviewer、親repo integrator、保守者。
+- what this directory contains: agent artifact、reader-facing document、experiment scaffold、GitHub source。
+- canonical source: `templates/`。
+- generated / local surfaces: `.github/` projection、run/result、reports、親repoの view。
+- update owner: 各 source template とその直接 consumer。index/manifest は参照が変わる場合だけ更新する。
+- required readback: source→consumer→projection identity、formatter/docs、dependency header、scope/projection checks。
+- lifecycle: run-local data と generated copies は retention policy / producer owner が cleanup する。
+
 ## Source-view index
 
 | Source view | Responsibility | Materialization rule |
@@ -27,6 +43,7 @@ wrapper、互換コピーも作りません。
 | `templates/agents/` | task-start、run bundle、review、closeout の artifact template | Agent team がこの path を直接 render する |
 | `templates/documents/` | README、design、experiment、host、remote execution、GitHub template source | GitHub surface は manifest 経由で `.github/` へ copy projection する |
 | `templates/experiments/_template/` | runnable experiment scaffold の frozen source | `create_experiment_topic.py` が新規 `experiments/<topic>/` へ copy する |
+| `templates/agents/_partials/` | reader map、review contract、finding/decision の再利用部品 | top-level agent artifact の render 時だけ展開する |
 
 親 template / derived repo は、この正本を
 `vendor/agent-canon/templates/` から直接解決します。root `templates` symlink
@@ -73,3 +90,21 @@ anchor when that trace is materialized.
 `templates/documents/semantic-responsibility-contract.template.toml` は空の instance
 shape を提供します。値を埋めた semantic responsibility contract は run-local artifact
 として active design packet から参照し、template source へ戻しません。
+
+## Required document and artifact fields
+
+各 template の利用者は、必要性を判断できる最小の field を埋めます。reader map は文書の
+冒頭に置き、設計・実装・review・experiment・PR の選択がある場合は次を相互参照します。
+
+- owner / responsibility と OOP/type boundary
+- design-to-implementation trace と dependency / side-effect map
+- tests より前の algorithm contract
+- necessary-and-sufficient oracle/test boundary
+- failure-cause classification、accepted failure、conflict intent
+- 複数の viable alternatives と独立 reviewer / selection evidence
+- Markdown/math/Mermaid formatter、post-format readback、targeted validation
+- artifact retention、再構築、lifecycle cleanup owner
+
+Markdown の整形・数式・Mermaid は `tools/bin/agent-canon docs check` を必須の一つの入口とし、
+formatter/fixer 後は同じ source path を read back します。examples は適応可能な placeholder
+にし、単一 repo の path、GPU 番号、serial throttle、固有 API を template の意味として固定しません。
