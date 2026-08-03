@@ -1,4 +1,4 @@
-# Fair Data Review
+# Fair Data Review（データ公平性レビュー）
 <!--
 @dependency-start
 contract template
@@ -12,11 +12,14 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+{{>review_contract}}
+
 {{>findings_required_change_table}}
 
-## Focus
+## Focus（確認点）
 
-- Metadata completeness
-- Naming and path clarity
-- Reuse outside the original session
-- Durable result organization
+- metadata の完全性
+- naming と path の明確さ
+- 元の session 外での再利用性
+- durable result の整理

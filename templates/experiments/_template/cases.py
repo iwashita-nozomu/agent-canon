@@ -1,14 +1,28 @@
 # @dependency-start
 # contract reference
-# responsibility Holds template experiment case definitions after copying.
+# responsibility Holds topic-owned case definitions for the managed experiment entrypoint.
 # upstream design ../../../documents/experiments/experiment-registry.md defines managed experiment expectations.
 # upstream design ../../../documents/conventions/DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse Python projection traces.
-# downstream implementation run.py consumes topic-specific cases after the template is filled in.
 # @dependency-end
-"""Define topic-owned cases consumed by the managed experiment entrypoint."""
 
-# IMPLEMENT HERE: define domain cases for topic-owned reports only.
-# The managed route does not import this module as an execution entrypoint; it
-# adapts the selected topic main() into one external ExperimentRunner task.
-# Worker-only dependencies belong inside run.py run_case_worker() after the
-# frozen child environment has been installed.
+"""
+managed experiment entrypoint の topic-owned case を定義します.
+
+責務は case identity と JSON-serializable な入力だけを定義することです。domain import、
+resource admission、artifact I/O は `run.py` の owning boundary に置きます。
+"""
+
+from __future__ import annotations
+
+from case_model import CaseSpec
+
+CASES: tuple[CaseSpec, ...] = (
+    CaseSpec(
+        case_id="example",
+        parameters={
+            "values": [1.0, 2.0, 3.0],
+            "unit": "unitless",
+            "shape": [3],
+        },
+    ),
+)

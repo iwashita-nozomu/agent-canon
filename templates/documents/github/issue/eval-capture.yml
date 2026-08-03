@@ -12,14 +12,14 @@
 # Canonical source: templates/documents/github/issue/eval-capture.yml. Generated projection targets .github/ISSUE_TEMPLATE/eval-capture.yml; edit this source only.
 
 name: Agent behavior eval capture
-description: Convert an observed agent/workflow failure into a reusable eval case.
+description: 観測した agent/workflow failure を再利用可能な eval case に変換します。
 title: "[eval] "
 labels: ["agent-quality", "eval"]
 body:
   - type: dropdown
     id: category
     attributes:
-      label: Failure category
+      label: Failure category / 原因分類
       options:
         - scope-creep
         - helper-sprawl
@@ -36,7 +36,7 @@ body:
   - type: textarea
     id: trigger
     attributes:
-      label: Trigger
+      label: Trigger / 発生条件
       value: |
         user request:
         repo state / relevant files:
@@ -46,8 +46,8 @@ body:
   - type: textarea
     id: observed_evidence
     attributes:
-      label: Observed evidence and impact
-      description: Identify the observed artifact/path, reproducibility, affected owner, and practical impact.
+      label: 観測証拠と影響
+      description: 観測 artifact/path、再現性、影響する owner、実務上の影響を特定します。
       value: |
         observed facts:
         evidence paths:
@@ -58,7 +58,7 @@ body:
   - type: textarea
     id: bad_behavior
     attributes:
-      label: Bad behavior to catch
+      label: 捕捉する bad behavior
       value: |
         forbidden action 1:
         forbidden action 2:
@@ -67,7 +67,7 @@ body:
   - type: textarea
     id: required_behavior
     attributes:
-      label: Required behavior
+      label: 必須の挙動
       value: |
         must inspect:
         must ask / must not ask:
@@ -78,7 +78,7 @@ body:
   - type: textarea
     id: eval_shape
     attributes:
-      label: Eval shape
+      label: Eval shape / oracle boundary
       value: |
         input prompt:
         fixtures / repo snapshot:
@@ -86,23 +86,28 @@ body:
         assertions:
         negative assertions:
         oracle type: machine / rubric / human-reviewed
+        necessary evidence:
+        sufficient evidence:
+        not proven:
     validations:
       required: true
   - type: textarea
     id: options_and_non_goals
     attributes:
-      label: Options, rejected rationale, and non-goals
+      label: Options、棄却根拠、non-goals、conflict intent
       value: |
         option A:
         option B:
         selected / rejected rationale:
         non-goals:
+        conflict intent:
+        independent reviewer and evidence:
     validations:
       required: true
   - type: textarea
     id: acceptance
     attributes:
-      label: Acceptance and close condition
+      label: 受入と close condition
       value: |
         acceptance oracle:
         validation:
@@ -112,11 +117,13 @@ body:
   - type: textarea
     id: close_condition
     attributes:
-      label: Close condition
+      label: Close condition / lifecycle
       value: |
         eval added:
         eval fails before fix:
         eval passes after fix:
         linked rule / workflow / tool updated:
+        failure-cause classification:
+        retention / cleanup owner:
     validations:
       required: true

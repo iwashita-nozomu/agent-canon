@@ -6,6 +6,7 @@
 # upstream implementation ./packets.py provides rendering packet inputs.
 # upstream implementation ./workspace_scope.py provides rendering paths.
 # downstream implementation ./agent_team.py facade consumes rendering APIs.
+# downstream implementation ./code_template_rendering.py owns package-safe code source rendering.
 # downstream implementation ./task_start.py consumes rendering APIs.
 # @dependency-end
 """Own AgentTeam manifest, template, and output rendering."""
@@ -180,6 +181,8 @@ def _render_prompt_entry(value: object, field_name: str) -> str:
 
 
 TEMPLATE_ROOT = ROOT / "templates" / "agents"
+
+CODE_TEMPLATE_ROOT = ROOT / "templates" / "code"
 
 TEMPLATE_PARTIAL_ROOT = TEMPLATE_ROOT / "_partials"
 
@@ -905,6 +908,15 @@ def render_template(template_name: str, replacements: dict[str, str]) -> str:
     content = expand_template_partials(content)
     content = apply_template_replacements(content, replacements)
     return content
+
+
+def render_code_template(template_name: str) -> str:
+    """互換 facade から package-safe code-template renderer を呼び出します."""
+    if __package__:
+        from .code_template_rendering import render_code_template as render_source
+    else:
+        from code_template_rendering import render_code_template as render_source
+    return render_source(template_name)
 
 
 def has_template(artifact_name: str) -> bool:

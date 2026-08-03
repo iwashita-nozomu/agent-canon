@@ -1,4 +1,4 @@
-# Benchmark Review
+# Benchmark Review（benchmark レビュー）
 <!--
 @dependency-start
 contract template
@@ -12,11 +12,14 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
+{{>reader_map}}
+{{>review_contract}}
+
 {{>findings_required_change_table}}
 
-## Focus
+## Focus（確認点）
 
-- Fairness of comparison conditions
-- Confounders and hidden asymmetry
-- Case mix and coverage
-- Benchmark anti-patterns and overclaim risk
+- 比較条件の公平性
+- confounder と隠れた非対称性
+- case mix と coverage
+- benchmark の anti-pattern と過大主張リスク

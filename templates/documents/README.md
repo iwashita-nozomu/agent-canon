@@ -17,6 +17,19 @@ downstream implementation ../../tools/experiments/create_experiment_topic.py pla
 本文は日本語とし、実値は各利用 repo、topic、host、GitHub event へ投影します。実値を
 この階層へ戻して別の正本にしません。
 
+## Reader Map
+
+この README は、文書 template の責務、source/projection 境界、含む内容、更新順、
+formatter/readback、retention/cleanup を最初に示します。各 template の冒頭にも同じ
+reader path の要約を置き、読者が本文を逆戻りせずに owner と完了条件へ到達できるようにします。
+
+- purpose: 設計・README・experiment・GitHub の適応可能な文書雛形を提供する。
+- intended reader: 文書作成者、実装者、reviewer、親repo integrator。
+- what this directory contains: Markdown、TOML、GitHub Issue Form、PR source。
+- canonical source: `templates/documents/`。generated `.github` と run-local report は source ではない。
+- validation/readback: dependency header、YAML/TOML parse、`agent-canon docs check`、surface manifest readback。
+- lifecycle: generated projection と result/report artifact の retention/cleanup owner を本文で固定する。
+
 ## 責務
 
 - 設計、README、experiment の項目名・責務境界・再構築・受入構造を正本として提供する。
@@ -75,3 +88,15 @@ render/readback で向きを確認します。親repoへ投影しない文書tem
   template source として扱いません。
 - 新しい template を追加したら、owner、entrypoint、reconstruct command、validation、
   generated/non-canonical boundary をこのREADMEまたは対応templateに記録します。
+
+## 共通の最小契約
+
+設計・README・experiment・Issue/PR template は、必要に応じて次の欄を同じ語彙で投影します。
+owner/responsibility と OOP/type boundary、design-to-implementation trace、dependency/
+side-effect map、algorithm contract before tests、necessary-and-sufficient oracle、failure
+cause、conflict intent、alternatives と独立 review、再現用 environment/result provenance、
+formatter/readback、lifecycle cleanup です。不要な欄は `not_applicable` と理由を残し、
+空欄のまま成功扱いにしません。
+
+Markdown/math/Mermaid は `tools/bin/agent-canon docs check <paths...>` を必須 route とし、
+formatter/fixer の後に source と generated projection を読み戻します。

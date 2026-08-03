@@ -14,11 +14,25 @@ downstream implementation ../../../documents/runtime/shared-runtime-surfaces.tom
 @dependency-end
 -->
 
-# GitHub template sources
+# GitHub template source（GitHub template の正本）
 
 このディレクトリが GitHub template の唯一の canonical owner です。GitHub が認識する
 path と format は、生成された `.github/ISSUE_TEMPLATE/` と
 `.github/PULL_REQUEST_TEMPLATE/` へ投影した結果であり、そこを直接編集しません。
+
+## Reader Map
+
+この README は、Issue/PR source、GitHub-recognized projection、manifest、readback、owner、
+cleanup の境界を最初に説明します。Issue/PR の本文は reader map、PR Essence または observed
+facts、owner/OOP boundary、design trace、dependency/effect、oracle/failure、conflict intent、
+alternatives/independent review、validation、projection readback の順で記録します。
+
+- purpose: GitHub Issue/PR source を一つの canonical path で提供する。
+- intended reader and decision: issue author、PR author/reviewer、maintainer、親repo integrator。
+- what this directory contains: Issue Form YAML、config、AgentCanon PR Markdown source。
+- generated surface: `.github/ISSUE_TEMPLATE/` と `.github/PULL_REQUEST_TEMPLATE/`。
+- validation/readback: YAML parse、`agent-canon docs check`、surface manifest copy-specs/check-doc、source/target identity。
+- lifecycle: generated projection、temporary clone、run-local evidence の retention/cleanup owner。
 
 ## 責務
 
@@ -67,3 +81,11 @@ projection向きを確認します。
 - `python3 tools/agent_tools/surface_manifest.py --manifest documents/runtime/shared-runtime-surfaces.toml copy-specs`
   で projection spec を renderし、同じ manifest の `check-doc` と source/target readback を実行する。
 - GitHub YAML parse と Markdown/docs format/check を実行する。
+
+## Required evidence vocabulary（必要な evidence 用語）
+
+source の変更では、必要な範囲で owner/responsibility と OOP/type boundary、design-to-
+implementation trace、dependency/side-effect map、algorithm contract before tests、
+necessary-and-sufficient oracle、failure-cause classification、conflict intent、複数案と
+independent review、formatter/readback、lifecycle cleanup を同じ terms で入力します。
+不要な欄は `not_applicable` と理由を記録します。

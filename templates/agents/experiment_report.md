@@ -1,4 +1,4 @@
-# Experiment Report
+# Experiment Report（実験 report）
 <!--
 @dependency-start
 contract template
@@ -13,116 +13,127 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Owner: {\{OWNER}}
 - Created At (UTC): {\{CREATED_AT}}
 
-## Reader Map
+## Reader Map（読者 map）
 
-This template owns the structure of a single experiment report. Fill the
-question, protocol, results, interpretation, limitations, reproducibility
-record, artifacts, and critical review in that order, while writing the
-abstract last. Use it for run-scoped empirical evidence; do not use it as the
-place to promote durable policy, workflow changes, or unsupported conclusions.
+この template は 1 つの experiment report の構造を所有します。question、protocol、results、
+interpretation、limitations、reproducibility record、artifacts、critical review の順に埋め、
+abstract は最後に書きます。run-scoped empirical evidence に使い、durable policy、workflow
+change、根拠のない conclusion を昇格させる場所にはしません。
 
-## Abstract
+## Contract Readback（契約 readback）
 
-<!-- Write last. 4-7 sentences with question, protocol, strongest result with numbers, meaning, and limitation. -->
+- owner / responsibility and OOP boundary:
+- design-to-implementation trace:
+- dependency / side-effect map:
+- algorithm contract before tests:
+- necessary-and-sufficient oracle:
+- failure-cause classification:
+- conflict intent and preserved interpretation:
+- independent review and source snapshot:
+- result/environment provenance and cleanup readback:
 
-## Question and Context
+## Abstract（abstract）
 
-### Question
+<!-- 最後に書きます。question、protocol、数値付きの strongest result、意味、limitation を 4〜7 文で記録します。 -->
 
-<!-- What empirical question did this run address? -->
+## Question and Context（問いと context）
 
-### Formulation
+### Question（問い）
 
-<!-- Mathematical / algorithmic setup in words. -->
+<!-- この run はどの empirical question を扱ったか。 -->
 
-### Comparison Target
+### Formulation（定式化）
 
-<!-- main, baseline, prior method, or external reference. -->
+<!-- mathematical/algorithmic setup を prose で記録します。 -->
 
-### Metrics
+### Comparison Target（比較対象）
 
-<!-- Accuracy, time, memory, failure rate, robustness, etc. -->
+<!-- main、baseline、prior method、external reference。 -->
 
-## Protocol
+### Metrics（metric）
 
-### Command
+<!-- accuracy、time、memory、failure rate、robustness など。 -->
 
-<!-- Exact command or script entry point. -->
+## Protocol（protocol）
 
-### Environment
+### Command（command）
 
-<!-- Branch, commit, worktree, hardware, software versions, timeout, seeds. -->
+<!-- exact command または script entry point。 -->
 
-### Fairness Notes
+### Environment（environment）
 
-<!-- Same case set, same hardware, same timeout, same dtype policy, etc. -->
+<!-- branch、commit、worktree、hardware、software version、timeout、seed。 -->
 
-## Results
+### Fairness Notes（公平性メモ）
 
-### Quantitative Summary
+<!-- same case set、same hardware、same timeout、same dtype policy など。 -->
 
-<!-- Case count, success rate, failure kinds, representative metrics, variability. -->
+## Results（結果）
 
-### Comparison Table
+### Quantitative Summary（定量要約）
 
-<!-- Same-case comparison against baseline/main/reference. -->
+<!-- case count、success rate、failure kind、代表 metric、変動性。 -->
 
-### Main Trends
+### Comparison Table（比較表）
 
-<!-- Report the main observed findings first, with concrete numbers. -->
+<!-- 同じ case に対する baseline/main/reference の比較。 -->
 
-### Exceptions and Failures
+### Main Trends（主要な傾向）
 
-<!-- Unexpected outcomes, unstable regions, and failure patterns. -->
+<!-- 具体的な数値とともに、観測した主要 finding を先に報告します。 -->
 
-### Figures
+### Exceptions and Failures（例外と failure）
 
-<!-- Each figure must state axis names, units, linear/log scale, and at least one sentence on how to read it. -->
+<!-- unexpected outcome、unstable region、failure pattern。 -->
 
-## Discussion
+### Figures（figure）
 
-### Supported Interpretation
+<!-- 各 figure は axis name、unit、linear/log scale、読み方を示す一文を持ちます。 -->
 
-<!-- What the observed results support. -->
+## Discussion（考察）
 
-### Comparison with Baseline or Prior Work
+### Supported Interpretation（証拠に支えられた解釈）
 
-<!-- How these findings relate to main / baseline / literature. -->
+<!-- 観測結果が支える内容。 -->
 
-### Speculative Interpretation
+### Comparison with Baseline or Prior Work（baseline/prior work との比較）
 
-<!-- Possible explanations that still need more evidence. -->
+<!-- finding が main、baseline、literature とどう関係するか。 -->
 
-## Conclusion
+### Speculative Interpretation（推測的解釈）
 
-<!-- State the final takeaways and cite the supporting figure/table for each major claim. -->
+<!-- さらに evidence が必要な可能性のある説明。 -->
 
-## Limitations
+## Conclusion（結論）
 
-<!-- Scope limits, sample size limits, hardware dependence, comparison gaps. -->
+<!-- final takeaway を述べ、各 major claim の supporting figure/table を引用します。 -->
 
-## Reproducibility Record
+## Limitations（制約）
 
-<!-- Commit, exact command, environment, final JSON, raw JSONL, renderer / plot command. -->
+<!-- scope limit、sample size limit、hardware dependence、comparison gap。 -->
 
-## Artifacts and Carry-Over
+## Reproducibility Record（再現性 record）
 
-<!-- Which outputs remain as run artifacts in main and which results are promoted into durable docs, notes, or summaries. -->
+<!-- commit、exact command、environment、final JSON、raw JSONL、renderer/plot command。 -->
 
-## Critical Review
+## Artifacts and Carry-Over（artifact と carry-over）
 
-### Overclaim Risk
+<!-- main に run artifact として残す output と、durable docs、notes、summary に昇格する result。 -->
 
-<!-- What this report does not yet justify saying. -->
+## Critical Review（批判的レビュー）
 
-### Missing Evidence
+### Overclaim Risk（過大主張リスク）
 
-<!-- What still needs to be run or compared. -->
+<!-- この report だけではまだ正当化できない発言。 -->
 
-### Alternative Explanation
+### Missing Evidence（不足 evidence）
 
-<!-- Plausible competing interpretations. -->
+<!-- これから実行または比較する必要があるもの。 -->
 
-### Next Check
+### Alternative Explanation（代替説明）
 
-<!-- The next concrete experiment or code change justified by this report. -->
+<!-- 競合する妥当な interpretation。 -->
+
+### Next Check（次の確認）
+
+<!-- この report が正当化する次の具体的な experiment または code change。 -->

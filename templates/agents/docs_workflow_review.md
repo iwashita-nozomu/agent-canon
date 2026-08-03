@@ -1,4 +1,4 @@
-# Docs Workflow Review
+# Docs Workflow Review（文書 workflow レビュー）
 <!--
 @dependency-start
 contract workflow
@@ -12,15 +12,18 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Canon And Adapter Findings
+{{>reader_map}}
+{{>review_contract}}
 
-<!-- Record duplication, stale wrapper text, and cases where settings must replace prose. -->
+## Canon And Adapter Findings（canon と adapter の指摘）
 
-## Required Canon Updates
+<!-- 重複、古い wrapper 文、prose ではなく設定が所有すべき箇所を記録します。 -->
+
+## Required Canon Updates（必要な canon 更新）
 
 | Surface | Finding | Status |
 | ------- | ------- | ------ |
 
-## Follow-Up
+## Follow-Up（後続対応）
 
-<!-- Record remaining docs/workflow cleanup items. -->
+<!-- 残っている docs/workflow cleanup 項目を記録します。 -->

@@ -10,46 +10,46 @@
 
 # Canonical source: templates/documents/github/issue/agentcanon-maintenance.yml. Generated projection targets .github/ISSUE_TEMPLATE/agentcanon-maintenance.yml; edit this source only.
 
-name: AgentCanon maintenance issue
-description: Track an AgentCanon runtime, tool, workflow, docs, or propagation defect.
+name: AgentCanon 保守 Issue
+description: AgentCanon runtime、tool、workflow、文書、projection の defect を記録します。
 title: "[agent-canon] "
 labels: ["agent-canon", "maintenance"]
 body:
   - type: dropdown
     id: runtime_profile
     attributes:
-      label: Affected runtime profile
+      label: 影響する runtime profile
       options:
         - Agent runtime
-        - Docs
+        - 文書
         - Python/tooling
         - Docker/devcontainer
         - GitHub automation
         - MCP
         - Submodule/update
         - Eval/logging
-        - Other
+        - その他
     validations:
       required: true
   - type: input
     id: affected_surface
     attributes:
-      label: Affected surface/path
-      placeholder: "agents/workflows/..., tools/..., .codex/..."
+      label: 影響する surface/path
+      placeholder: "agents/workflows/...、tools/...、.codex/..."
     validations:
       required: true
   - type: textarea
     id: current_behavior
     attributes:
-      label: Observed facts / current behavior
-      description: Record only observed command, hook, CI, workflow, or artifact facts with paths and timestamps.
+      label: 観測事実 / 現在の挙動
+      description: command、hook、CI、workflow、artifact の観測事実だけを path と時刻付きで記録します。
     validations:
       required: true
   - type: textarea
     id: reproduction
     attributes:
-      label: Reproduction
-      description: Give the smallest clean-state command, fixture, branch, and expected versus actual result.
+      label: 再現
+      description: clean state、fixture、branch、期待結果と実結果を含む最小 command を記録します。
       value: |
         preconditions:
         command:
@@ -60,28 +60,28 @@ body:
   - type: input
     id: owner
     attributes:
-      label: Canonical owner / responsible unit
-      placeholder: "documents/..., agents/..., tools/..."
+      label: canonical owner / responsibility unit
+      placeholder: "documents/...、agents/...、tools/..."
     validations:
       required: true
   - type: textarea
     id: impact
     attributes:
-      label: Impact and failure semantics
-      description: State who is blocked, what becomes unsafe or non-reproducible, and what remains preserved.
+      label: 影響と failure semantics
+      description: blocked になる主体、unsafe/non-reproducible になる状態、保存される証拠を記録します。
     validations:
       required: true
   - type: textarea
     id: expected_behavior
     attributes:
-      label: Expected behavior
+      label: 期待する挙動
     validations:
       required: true
   - type: textarea
     id: options
     attributes:
-      label: Options considered
-      description: Record at least two viable repair options and the selected mechanism.
+      label: 比較した options
+      description: 少なくとも二つの viable repair option と selected mechanism を記録します。
       value: |
         option A:
         option B:
@@ -91,15 +91,15 @@ body:
   - type: textarea
     id: rejected_rationale
     attributes:
-      label: Rejected options and rationale
-      description: Explain why each rejected option violates the contract, ownership, safety, or validation oracle.
+      label: 棄却 option と根拠
+      description: contract、owner、safety、validation oracle のどれに反するかを option ごとに説明します。
     validations:
       required: true
   - type: textarea
     id: acceptance
     attributes:
-      label: Acceptance conditions
-      description: Define the observable contract, evidence oracle, validation command, and close condition.
+      label: 受入条件
+      description: observable contract、evidence oracle、validation command、close condition を定義します。
       value: |
         observable contract:
         evidence / oracle:
@@ -110,46 +110,144 @@ body:
   - type: textarea
     id: non_goal
     attributes:
-      label: Non-goals
-      description: Name adjacent cleanup or behavior that this finding deliberately does not change.
+      label: non-goals
+      description: この finding が変更しない隣接 cleanup または挙動を明記します。
     validations:
       required: true
   - type: textarea
     id: downstream_impact
     attributes:
-      label: Downstream impact
-      description: Note template/derived repo impact or say not applicable.
+      label: downstream impact
+      description: template/derived repo への影響を記録し、該当しなければ not_applicable とします。
     validations:
       required: true
   - type: textarea
     id: required_validation
     attributes:
-      label: Required validation
+      label: 必須 validation
       value: |
         - [ ] targeted local check:
-        - [ ] docs/link check:
-        - [ ] AgentCanon PR gate:
+        - [ ] Markdown/math/Mermaid docs check:
+        - [ ] projection/readback check:
     validations:
       required: true
   - type: textarea
     id: eval_required
     attributes:
-      label: Eval required or not required
-      description: Link an eval case, or explain why this cannot be evaled.
+      label: Eval の要否
+      description: eval case をリンクするか、eval が不要な理由を説明します。
     validations:
       required: true
   - type: textarea
     id: rollback
     attributes:
-      label: Rollback consideration
-      description: Include rollback command or explain why rollback is not applicable.
+      label: rollback の考慮
+      description: rollback command、または not_applicable の理由を記録します。
   - type: textarea
     id: closeout_evidence
     attributes:
-      label: Closeout evidence
+      label: closeout evidence
       value: |
         - fixed by:
         - validation:
         - issue/eval links:
+    validations:
+      required: true
+  - type: textarea
+    id: reader_context
+    attributes:
+      label: Reader map / 含む内容
+      description: 読者、判断、含める証拠、canonical/generated/local の境界を記録します。
+      value: |
+        intended reader and decision:
+        what this issue contains:
+        canonical source / generated projection:
+        owner and responsibility boundary:
+    validations:
+      required: true
+  - type: textarea
+    id: design_trace
+    attributes:
+      label: Design-to-implementation trace
+      description: request/design clause から実装 path、生成 path、validation evidence への対応を記録します。
+      value: |
+        design clause:
+        implementation path:
+        generated/readback path:
+        validation evidence:
+    validations:
+      required: true
+  - type: textarea
+    id: dependency_effect_map
+    attributes:
+      label: Dependency / side-effect map
+      description: upstream/downstream、OOP/type boundary、副作用、保存/rollback を記録します。
+      value: |
+        owner / responsibility unit:
+        OOP/type boundary:
+        upstream:
+        downstream:
+        side effects and preserved artifacts:
+    validations:
+      required: true
+  - type: textarea
+    id: algorithm_oracle
+    attributes:
+      label: Algorithm contract / oracle boundary
+      description: tests より前の contract と necessary-and-sufficient oracle を記録します。該当なしでも理由を明記します。
+      value: |
+        algorithm or state contract:
+        necessary observations:
+        sufficient observations:
+        not proven:
+        test activation or not_applicable reason:
+    validations:
+      required: true
+  - type: textarea
+    id: failure_cause
+    attributes:
+      label: Failure-cause classification
+      description: expected、infrastructure、implementation、oracle、unknown の分類と close condition を記録します。
+      value: |
+        cause class:
+        evidence:
+        accepted result / repair owner:
+        close condition:
+    validations:
+      required: true
+  - type: textarea
+    id: conflict_intent
+    attributes:
+      label: Conflict intent
+      description: conflict 解決時に保持する user/design intent と escalation owner を記録します。
+      value: |
+        preserved intent:
+        conflicting contract:
+        decision owner:
+        escalation / rejection evidence:
+    validations:
+      required: true
+  - type: textarea
+    id: independent_review
+    attributes:
+      label: Independent review
+      description: 複数案を独立 reviewer が確認した source snapshot と選択証拠を記録します。
+      value: |
+        reviewer:
+        source snapshot:
+        selected option:
+        rejected option rationale:
+        evidence:
+    validations:
+      required: true
+  - type: textarea
+    id: lifecycle_cleanup
+    attributes:
+      label: Lifecycle / cleanup
+      description: result、生成 projection、temporary clone の retention、cleanup command、再構築 readback を記録します。
+      value: |
+        retention owner:
+        cleanup command:
+        reconstructibility readback:
     validations:
       required: true

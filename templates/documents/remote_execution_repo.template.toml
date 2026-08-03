@@ -4,6 +4,10 @@
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 # @dependency-end
 
+# Reader map: この file は repo identity、runtime profile、artifact root、再現用 source/env/result
+# provenance を保持する。owner は remote execution contract、generated/run-local result は別 surface。
+# algorithm/oracle/failure semantics は topic contract 側で記録し、ここへ固定しない。
+
 [repository]
 id = "project-template"
 label = "project-template"

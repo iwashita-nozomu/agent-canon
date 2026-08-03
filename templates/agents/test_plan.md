@@ -1,4 +1,4 @@
-# Test Plan
+# Test Plan（test 計画）
 <!--
 @dependency-start
 contract template
@@ -12,35 +12,68 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Static Path Survey
+{{>reader_map}}
+{{>review_contract}}
 
-<!-- Record code/test paths, branches, error handling, parsing logic, and state transitions as survey and placement evidence. Do not use path evidence to freeze unapproved API shape, private helpers, private return shape, error prose, mock order, or internal call sequence. -->
+## Static Path Survey（static path 調査）
 
-## Behavior Contract Matrix
+<!-- code/test path、branch、error handling、parsing logic、state transition を survey と placement evidence として記録します。path evidence で未承認の API shape、private helper、private return shape、error prose、mock order、internal call sequence を固定しません。 -->
+
+## Behavior Contract Matrix（behavior contract matrix）
 
 | Contract Source | Behavior Contract | Observation Level | Observable Outcome | Oracle | Input Space | Adequacy Evidence | Do Not Freeze |
 | --------------- | ----------------- | ----------------- | ------------------ | ------ | ----------- | ----------------- | ------------- |
 
-## Contract-Only Wrapper Classification
+## Algorithm Contract Before Tests（tests より前の algorithm contract）
+
+テストの expected value や private call sequence を先に固定せず、production design の
+public entrypoint、input domain、state transition/recurrence、invariant、stopping/acceptance、
+typed failure を記録します。
+
+- algorithm contract source:
+- public behavior / observable state:
+- state transition or recurrence:
+- invariants and preconditions:
+- stopping / acceptance rule:
+- failure semantics and preserved artifacts:
+- implementation mechanism:
+
+## Necessary-And-Sufficient Oracle Boundary（必要十分 oracle 境界）
+
+- necessary observations:
+- sufficient observations:
+- oracle owner:
+- not proven by this oracle:
+- test activation condition:
+- static/targeted route when test is not necessary:
+
+## Failure Cause And Conflict Intent（failure cause と conflict intent）
+
+- failure-cause class: expected / infrastructure / implementation / oracle / unknown:
+- evidence and owner:
+- conflict intent / preserved design or user clause:
+- escalation or rejection evidence:
+
+## Contract-Only Wrapper Classification（contract-only wrapper の分類）
 
 | Wrapper / Adapter | Observable Trigger | Static Validation Route | Classification | Notes |
 | ----------------- | ------------------ | ----------------------- | -------------- | ----- |
 
-<!-- If there is no observable behavior, branch, parser/error behavior, public state mutation, diagnostic key, serialization shape, or external process behavior, route validation back to static contract validation and canonical command evidence instead of adding execution-only tests. -->
+<!-- observable behavior、branch、parser/error behavior、public state mutation、diagnostic key、serialization shape、external process behavior がなければ、execution-only test を追加せず static contract validation と canonical command evidence に戻します。 -->
 
-## Nasty Cases
+## Nasty Cases（難しい case）
 
 | Contract Source | Observation Level | Case | Why It Is Nasty | Observable Outcome | Oracle | Status |
 | --------------- | ----------------- | ---- | --------------- | ------------------ | ------ | ------ |
 
-## Regression Cases To Keep
+## Regression Cases To Keep（保持する regression case）
 
-<!-- Record previously broken or easy-to-rebreak scenarios that must become durable tests. -->
+<!-- 以前壊れた、または再発しやすく durable test にすべき scenario を記録します。 -->
 
-## Placement Notes
+## Placement Notes（配置メモ）
 
-<!-- Record where tests should live, which existing style/fixture/naming pattern to mirror, and which paths were used only as survey evidence. -->
+<!-- test の配置先、mirror する既存 style/fixture/naming pattern、survey evidence だけに使った path を記録します。 -->
 
-## Implementation Notes
+## Implementation Notes（implementation メモ）
 
-<!-- Record the validation route. For behavior-owned cases, point to placement notes instead of introducing new public API, helper, return-shape, error-prose, mock-order, or internal-call-sequence contracts. -->
+<!-- validation route を記録します。behavior-owned cases（behavior が所有する case）では新しい public API、helper、return-shape、error-prose、mock-order、internal-call-sequence contract を導入せず placement note を指します。 -->

@@ -7,21 +7,23 @@ upstream design ../../agents/skills/agent-orchestration.md execution-time-aware 
 @dependency-end
 -->
 
-# Schedule
+# Schedule（schedule）
 
 
 - Run ID: {\{RUN_ID}}
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Stage Plan
+{{>reader_map}}
+
+## Stage Plan（stage 計画）
 
 | Stage | Owner Agent | Review Agent | Inputs | Exit Criteria | Status |
 | ----- | ----------- | ------------ | ------ | ------------- | ------ |
 
-## Execution-Time-Aware Plan
+## Execution-Time-Aware Plan（実行時間を考慮した計画）
 
-<!-- Project the canonical owner below; do not restate its scheduling policy or add duration cutoffs. -->
+<!-- 下記の canonical owner を射影し、scheduling policy を再記述したり duration cutoff を追加したりしません。 -->
 
 - Owner contract: `agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract`
 - Executable scheduling fields: `dependency_dag`, `makespan_objective`, `responsibility_completeness`, `correctness`, `critical_path`, `ready_set`, `context_reuse`, `affected_evidence_invalidation`.
@@ -40,37 +42,37 @@ upstream design ../../agents/skills/agent-orchestration.md execution-time-aware 
 | DAG Node | Depends On | Conflict Scope | Status | Evidence |
 | -------- | ---------- | -------------- | ------ | -------- |
 
-## Clause Coverage
+## Clause Coverage（clause coverage）
 
 | Clause ID | Covered By Stage | Review Gate | Status |
 | --------- | ---------------- | ----------- | ------ |
 
-## Planned Work Units
+## Planned Work Units（planned work unit）
 
-<!-- This table is the canonical task TODO surface. Keep concrete work units and statuses here until closeout. -->
+<!-- この table が canonical task TODO surface です。closeout まで具体的な work unit と status をここに保持します。 -->
 
 | Unit ID | Clause IDs | Owner | Completion Evidence | Next Gate | Status |
 | ------- | ---------- | ----- | ------------------- | --------- | ------ |
 
-## Task Completion Boundary
+## Task Completion Boundary（task 完了境界）
 
-<!-- Define what must be true before user-facing completion: all active clauses resolved, selected work units complete, one selected owning review gate adjudicated, mechanical completion loop complete, validation complete, closeout gate unlocked, commit and push done. Candidate review packs and rejected hypotheses do not create work; a chunk, slice, checkpoint, or subpass is internal progress only. -->
+<!-- user-facing completion 前に成立すべき条件を定義します。active clause 解決、selected work unit 完了、selected owning review gate の判定、mechanical completion loop、validation、closeout gate unlock、commit/push を含みます。candidate review pack と rejected hypothesis は work を作らず、chunk/slice/checkpoint/subpass は内部進捗だけです。 -->
 
-## Explicit Subagents
+## Explicit Subagents（明示的 subagent）
 
-<!-- Record the concrete Codex subagents or permanent team roles used for each stage. -->
+<!-- 各 stage に使う具体的な Codex subagent または permanent team role を記録します。 -->
 
-## Agent Wave Ledger
+## Agent Wave Ledger（agent wave ledger）
 
-<!-- This is the authoritative fanout ledger when a wave route is selected. Intake Responsibility Wave is an intake responsibility slice rather than a total cap; do not create an intake row merely because the catalog lists it. Add rows only for selected or actually skipped/delegated waves. If a planned row has no actual event, classify the row in Status or Skipped Roles / Rationale as exactly one of `overplanning`, `logging_gap`, or `unresolved`; overplanning/unresolved rows are not backfilled, while logging_gap remains a validation blocker. On any mid-task user addition, classify it as `same_active_task_delta`, `scope_or_contract_change`, or `new_task` and prefer `python3 tools/agent_tools/workflow_monitor.py --mid-task-user-input ...` when durable coordination/resumption evidence is needed. Keep `Delegated Policy Ref` pointing at `team_manifest.yaml#run.delegated_spawn_policy` or `team_manifest.yaml#run.subagent_lifecycle_policy`. -->
+<!-- wave route を選択した場合の authoritative fanout ledger です。Intake Responsibility Wave は total cap ではなく intake responsibility slice なので、catalog にあるだけでは intake row を作りません。selected または実際に skipped/delegated した wave だけを追加します。planned row に event がなければ Status または Skipped Roles / Rationale を `overplanning`、`logging_gap`、`unresolved` のいずれかに分類し、overplanning/unresolved は backfill せず logging_gap は validation blocker とします。mid-task user addition は same_active_task_delta、scope_or_contract_change、new_task に分類し、durable coordination/resumption evidence が必要なら `python3 tools/agent_tools/workflow_monitor.py --mid-task-user-input ...` を優先します。`Delegated Policy Ref` は指定された team_manifest path を指します。 -->
 
 | Wave ID | Parent Or Delegate | Spawn Authority | Trigger | Budget Before | Budget After | Runtime Max Threads | Runtime Max Depth | Spawned Roles | Role Instances | Skipped Roles / Rationale | Allowed Paths | Do Not Read | Write Scope | Validation Route | Review Gate | Handoff Artifacts | Delegated Policy Ref | Status |
 | ------- | ------------------ | --------------- | ------- | ------------- | ------------ | ------------------- | ----------------- | ------------- | -------------- | ------------------------- | ------------- | ----------- | ----------- | ---------------- | ----------- | ----------------- | -------------------- | ------ |
 
-## Reuse And Continuity Constraints
+## Reuse And Continuity Constraints（reuse と継続の制約）
 
-<!-- Record which existing code, naming, APIs, tests, and docs style must be followed. -->
+<!-- 従うべき既存 code、naming、API、test、docs style を記録します。 -->
 
-## Risks
+## Risks（リスク）
 
-<!-- Note sequencing risks, merge risks, or verification risks. -->
+<!-- sequencing risk、merge risk、verification risk を記録します。 -->

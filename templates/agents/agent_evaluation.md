@@ -1,4 +1,4 @@
-# Agent Evaluation
+# Agent Evaluation（agent 評価）
 
 <!--
 @dependency-start
@@ -14,7 +14,9 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces pass st
 - Owner: {{OWNER}}
 - Created At (UTC): {{CREATED_AT}}
 
-## Gate Status
+{{>reader_map}}
+
+## Gate Status（gate status）
 
 - evaluation_status: pending
 - score: 0
@@ -23,20 +25,20 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces pass st
 - feedback_actions_resolved: no
 - learning_capture_complete: no
 
-## Scope
+## Scope（対象）
 
-<!-- Record the run bundle evaluated and whether the evidence came from workflow_monitoring.md, traces, run artifacts, review artifacts, validation logs, or user feedback. -->
+<!-- 評価した run bundle と、証拠が workflow_monitoring.md、trace、run artifact、review artifact、validation log、user feedback のどこから来たかを記録します。 -->
 
-## Rubric
+## Rubric（評価基準）
 
 | Criterion | Score | Max | Status | Feedback |
 | --------- | ----- | --- | ------ | -------- |
 
-## Feedback Actions
+## Feedback Actions（feedback 対応）
 
 | Action ID | Severity | Action | Status |
 | --------- | -------- | ------ | ------ |
 
-## Learning Capture
+## Learning Capture（学習の保存）
 
-<!-- Record whether durable agent-side observations should be logged with tools/agent_tools/log_agent_learning.py, and whether any skill/config/workflow change was applied or explicitly not_applicable. Do not paste raw chat. If runtime feedback was observed and action was not no_op, cite the applied or recorded improvement decision and its concrete target. -->
+<!-- durable な agent-side observation を tools/agent_tools/log_agent_learning.py で記録するか、skill/config/workflow change を適用したか、明示的に not_applicable としたかを記録します。raw chat は貼り付けません。runtime feedback を観測し action が no_op でない場合は、適用または記録した improvement decision と具体的な target を引用します。 -->

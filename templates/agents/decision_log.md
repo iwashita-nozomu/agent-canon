@@ -1,4 +1,4 @@
-# Decision Log
+# Decision Log（判断ログ）
 <!--
 @dependency-start
 contract template
@@ -13,22 +13,24 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 - Owner: {\{OWNER}}
 - Created At (UTC): {\{CREATED_AT}}
 
-## Goal
+{{>reader_map}}
 
-<!-- Record the target outcome and acceptance criteria. -->
+## Goal（目標）
 
-## Constraints
+<!-- target outcome と acceptance criteria を記録します。 -->
 
-- Keep edits inside the approved scope.
-- Run verification before closeout.
-- Escalate if scope, safety, or ownership becomes unclear.
+## Constraints（制約）
 
-## Decisions
+- edit を approved scope 内に保ちます。
+- closeout 前に verification を実行します。
+- scope、safety、ownership が不明確になったら escalate します。
+
+## Decisions（判断）
 
 | Time (UTC) | Agent | Decision | Reason | Evidence |
 | ---------- | ----- | -------- | ------ | -------- |
 
-## Handoffs
+## Handoffs（handoff）
 
 | From | To  | Gate | Status |
 | ---- | --- | ---- | ------ |

@@ -5,6 +5,10 @@
 # downstream implementation ../../tools/agent_tools/responsibility_scope.py validates responsibility scopes
 # @dependency-end
 
+# Reader map: この TOML は derived repo の owner/responsibility、import boundary、scope coverage、
+# exclude_paths、protecting tools を機械可読に記録する。source/view/projection と generated/local
+# artifact の境界をこの scope から再構築し、scope check の readbackを完了証拠にする。
+
 catalog_kind = "agent_canon_responsibility_scope"
 version = 1
 

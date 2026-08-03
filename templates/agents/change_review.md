@@ -1,4 +1,4 @@
-# Change Review
+# Change Review（変更レビュー）
 <!--
 @dependency-start
 contract template
@@ -13,62 +13,65 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 - Task: {\{TASK}}
 - Owner: {\{OWNER}}
 
-## Chunk Findings
+{{>reader_map}}
+{{>review_contract}}
+
+## Chunk Findings（chunk の指摘）
 
 | Chunk | Finding | Severity | Status |
 | ----- | ------- | -------- | ------ |
 
-## Hypothesis Adjudication
+## Hypothesis Adjudication（仮説の判定）
 
 | Hypothesis | Snapshot Ref | Reachable Input / Control Path | Contract Ref | Witness / Static Proof | Adjudication | Reason Code | Evidence Ref | Opens Rework Wave |
 | ---------- | ------------ | ----------------------------- | ------------ | ---------------------- | ------------ | ----------- | ------------ | ----------------- |
 
-<!-- Reviewer output is hypothesis input. Parent / integration owner accepts only a current-snapshot, reachable-path, contract, and witness/static-proof-backed hypothesis that changes behavior, owner/design boundary, correctness, validation, or publication state. Rejected rows use reason_code and evidence_ref and do not authorize edit, revert, rollback, publication, or a new wave. -->
+<!-- reviewer output は仮説入力です。parent/integration owner は current snapshot、reachable path、contract、witness/static proof がそろい、behavior、owner/design boundary、correctness、validation、publication state のいずれかを変える仮説だけを受け付けます。却下行は reason_code と evidence_ref を使い、edit、revert、rollback、publication、新 wave を許可しません。 -->
 
-## Reuse And Style Findings
+## Reuse And Style Findings（reuse と style の指摘）
 
-<!-- Record whether the implementation follows the detailed design document and mirrors existing code, naming, tests, and docs style. -->
+<!-- implementation が detailed design document に従い、既存 code、naming、tests、docs style を mirror しているか記録します。 -->
 
-## Semantic Responsibility Candidate Review
+## Semantic Responsibility Candidate Review（意味的責務候補レビュー）
 
-<!-- Inspect `semantic_index_merge_candidates_*.jsonl`, `semantic_index_thin_docs_*.jsonl`, and optional `semantic_index_search_*.jsonl` from `review_backlog_scan.sh` when present. Record same-responsibility duplicates, consolidation candidates, thin wrappers, or adjacent search hits that affect this diff. Treat semantic-index output as advisory review evidence only; confirm with dependency review, exact search, structure checks, and source inspection before requiring a merge or deletion. -->
+<!-- 存在する場合は `review_backlog_scan.sh` の `semantic_index_merge_candidates_*.jsonl`、`semantic_index_thin_docs_*.jsonl`、任意の `semantic_index_search_*.jsonl` を確認します。この diff に影響する同一責務の重複、統合候補、thin wrapper、隣接検索 hit を記録します。semantic-index output は advisory な review evidence とし、merge や deletion を要求する前に dependency review、exact search、structure check、source inspection で確認します。 -->
 
-## Cross-Doc Coverage Review
+## Cross-Doc Coverage Review（文書横断 coverage レビュー）
 
-<!-- Check whether the implementer and parent used the cross-cutting packet rather than relying only on one workflow branch. Return revise if relevant review, guardrail, migration, or lifecycle docs were omitted from the implementation basis. -->
+<!-- implementer と parent が 1 つの workflow branch だけに依存せず cross-cutting packet を使ったか確認します。関連する review、guardrail、migration、lifecycle docs が implementation の根拠から抜けていれば revise とします。 -->
 
-## Design-Base Implementation Review
+## Design-Base Implementation Review（design 起点の実装レビュー）
 
-<!-- Check the one integrated responsibility-unit diff against all four active-packet entries, including the Abstract Design Frame and Implementation Source Packet. Confirm that every changed slice traces to the approved design section, Design Side-Effect Map item, user-request clause ID, source/reuse document or code path, and test-plan item only when test design was activated. Confirm that scope came from the approved responsibility model rather than the nearest file, helper, or current finding. Every source, generated, and deletion record must trace to the approved artifact, clause, owner, source/reuse path, dependency order, and validation evidence. Return revise for duplicate parser/writer paths, partial file-sized completion, or test-first production behavior; return escalate for design drift or design gaps. -->
+<!-- Abstract Design Frame と Implementation Source Packet を含む active-packet の 4 entry に対して、1 つの統合 responsibility-unit diff を確認します。各変更 slice が approved design section、Design Side-Effect Map、user-request clause ID、source/reuse document または code path、test design が有効な場合だけ test-plan item に trace することを確認します。scope が最寄りの file、helper、finding ではなく approved responsibility model から来ていることを確認します。source、generated、deletion の各 record は approved artifact、clause、owner、source/reuse path、dependency order、validation evidence に trace します。duplicate parser/writer path、file 単位だけの部分完了、test-first production behavior は revise、design drift または design gap は escalate とします。 -->
 
-## Canonical Tree-Head Review
+## Canonical Tree-Head Review（canonical tree head レビュー）
 
-<!-- Confirm that the diff updates only the canonical implementation paths declared by the design and that no non-canonical design doc, copied implementation, backup file, snapshot tree, or alternate truth surface remains in the tracked tree. Return revise if any parallel state remains. -->
+<!-- diff が design で宣言した canonical implementation path だけを更新し、non-canonical design doc、copied implementation、backup file、snapshot tree、alternate truth surface が tracked tree に残らないことを確認します。parallel state があれば revise とします。 -->
 
-## Remaining Work Review
+## Remaining Work Review（残作業レビュー）
 
-<!-- Check whether this is only a chunk/slice/checkpoint and whether remaining planned work units or active clauses still exist. Return revise if the implementer treats internal progress as task completion. -->
+<!-- これが chunk/slice/checkpoint だけでないか、planned work unit や active clause が残っていないか確認します。implementer が内部進捗を task completion と扱う場合は revise とします。 -->
 
-## User Request Trace Review
+## User Request Trace Review（user request trace レビュー）
 
-<!-- Record whether the diff satisfies the declared clause IDs and whether it drifted into work the user did not request. -->
+<!-- diff が宣言された clause ID を満たすか、user が要求していない作業へ drift していないか記録します。 -->
 
-## Repo-Wide Dependency Review
+## Repo-Wide Dependency Review（repo-wide dependency レビュー）
 
-<!-- Run static and targeted checks first. Run `bash tools/agent_tools/run_repo_dependency_review.sh` against the full repository only when the selected final candidate contract requires it; otherwise record the targeted route and why the broad check was not selected. -->
+<!-- 最初に static と targeted check を実行します。selected final candidate contract が要求する場合だけ全 repository に `bash tools/agent_tools/run_repo_dependency_review.sh` を実行し、それ以外は targeted route と broad check を選ばなかった理由を記録します。 -->
 
-## Revision Loop
+## Revision Loop（改訂ループ）
 
-<!-- Record only accepted findings that change behavior, owner/design boundary, correctness, validation, or publication state. Rejected hypotheses retain reason_code/evidence_ref and do not create a new review wave. -->
+<!-- behavior、owner/design boundary、correctness、validation、publication state を変える accepted finding だけを記録します。rejected hypothesis は reason_code/evidence_ref を保持し、新しい review wave を作りません。 -->
 
-## Review Rejection Response Review
+## Review Rejection Response Review（reject 応答レビュー）
 
-<!-- Confirm that any revise / required_change / rejected diff / requested-change handling preserves the user-requested clause or approved design intent. Return revise if the response simply reverts, discards, or shrinks requested behavior. If a revert or discard is justified, record withdrawal / supersession / owner-boundary / unsafe-replacement / escalation authority and the clauses still preserved. -->
+<!-- revise / required_change / rejected diff / requested-change の処理が user-requested clause または approved design intent を保持するか確認します。単に revert、discard、requested behavior の縮小をした場合は revise とします。revert や discard が正当なら withdrawal / supersession / owner-boundary / unsafe-replacement / escalation authority と保持した clause を記録します。 -->
 
-## Post-Review Fix Rerun Requirement
+## Post-Review Fix Rerun Requirement（修正後 rerun 要件）
 
-<!-- If the parent adjudicates an accepted finding that changes behavior, owner/design boundary, correctness, validation, or publication state, record the selected owning gate rerun on the updated diff. Duplicate, stylistic, already-covered, evidence-free, unreachable, stale, private/incidental, out-of-scope, or unproven design-conflict hypotheses receive reason_code and evidence_ref and do not open a wave or rollback. -->
+<!-- parent が behavior、owner/design boundary、correctness、validation、publication state を変える finding を accepted と判定した場合、updated diff に対する selected owning gate の rerun を記録します。duplicate、stylistic、already-covered、evidence-free、unreachable、stale、private/incidental、out-of-scope、unproven design-conflict hypothesis は reason_code と evidence_ref を持ち、wave や rollback を開始しません。 -->
 
-## Follow-Up
+## Follow-Up（後続対応）
 
-<!-- Record what the implementer must revise before the next chunk proceeds. -->
+<!-- 次の chunk に進む前に implementer が改訂する内容を記録します。 -->

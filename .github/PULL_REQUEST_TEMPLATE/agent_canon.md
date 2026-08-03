@@ -15,13 +15,13 @@ upstream design ../AGENTS.md GitHub subtree instructions
 @dependency-end
 -->
 
-<!-- Canonical source: templates/documents/github/pull-request/agent_canon.md. Generated projections target .github/PULL_REQUEST_TEMPLATE/agent_canon.md; edit this source only. -->
+<!-- canonical source は templates/documents/github/pull-request/agent_canon.md です。generated projection は .github/PULL_REQUEST_TEMPLATE/agent_canon.md を対象とするため、この source だけを編集します。 -->
 
 ## Reader Map
 
-- This template owns the PR checklist for AgentCanon changes made through a template or derived repository.
-- Use `PR Essence`, `Summary`, and `Scope` to state the change route; use the branch, authority, automation, plan, orchestration, issue, validation, integration, sync, mirror, and risk sections for required evidence.
-- Read it when preparing or reviewing a template-side PR that changes shared canon surfaces or updates an AgentCanon pin/root view.
+- この template は、template または derived repository を通じた AgentCanon change の PR checklist を所有します。
+- `PR Essence`、`Summary`、`Scope` で change route を示し、branch、authority、automation、plan、orchestration、issue、validation、integration、sync、mirror、risk section に必要な evidence を記録します。
+- shared canon surface の変更、または AgentCanon pin/root view の更新を行う template-side PR を作成・review するときに読みます。
 
 ## PR Essence
 
@@ -33,6 +33,44 @@ upstream design ../AGENTS.md GitHub subtree instructions
 - Replaceable responsibility unit:
 - Public/API/schema impact:
 - Explicit non-goals:
+
+## Reader Map And Contents
+
+この PR template は、変更の本質、canonical owner、設計から実装への trace、依存/副作用、
+validation、projection、cleanup を一つの reviewer path にまとめます。読者は `PR Essence`
+と `Scope` で判断対象を固定し、`Validation Trust Boundary` と `Artifact And Clone Cleanup`
+で完了証拠を read back します。
+
+- intended reader and decision:
+- what this PR contains:
+- canonical source / generated projection / run-local artifact:
+- owner and responsibility / OOP boundary:
+- required formatter, parse, projection, and post-format readback:
+- lifecycle retention and cleanup owner:
+
+## Design, Algorithm, And Oracle Trace
+
+- design-to-implementation trace:
+- algorithm/state contract before tests:
+- necessary observations:
+- sufficient observations:
+- not proven by this oracle:
+- test activation or static-only reason:
+- dependency and side-effect map:
+- failure-cause classification and preserved artifacts:
+- conflict intent and escalation owner:
+
+## Alternatives And Independent Review
+
+| option | mechanism | evidence needed | cost/risk | status |
+| --- | --- | --- | --- | --- |
+| A | `<mechanism>` | `<evidence>` | `<risk>` | selected / rejected |
+| B | `<mechanism>` | `<evidence>` | `<risk>` | selected / rejected |
+
+- selected option and selection rule:
+- rejected rationale:
+- independent reviewer:
+- source snapshot and review readback:
 
 ## Dependency Closure
 
@@ -190,6 +228,10 @@ paste the key pass lines here
 - format / lint / parse result:
 - artifact path, producer, digest, and readback:
 - validation failure semantics and escalation:
+- Markdown/math/Mermaid command: `tools/bin/agent-canon docs check <changed-markdown-paths>`
+- formatter/fixer command, if any:
+- post-format source readback and projection identity:
+- TOML/YAML/JSON parse evidence:
 
 ## Shared Surface Changes
 
@@ -228,6 +270,11 @@ Upstream sync note:
 - generated artifacts retained:
 - cleanup command and owner:
 - cleanup result / explicit preservation reason:
+- generic topic-clone lifecycle/materialization manifest:
+- source remote / branch / base SHA readback:
+- local-only commit or untracked artifact decision:
+- reconstructibility evidence before removal:
+- cleanup failure cause and typed hold condition:
 
 ## Submodule Pin Change
 
