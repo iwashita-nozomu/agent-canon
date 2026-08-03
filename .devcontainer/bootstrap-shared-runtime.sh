@@ -12,6 +12,8 @@
 
 set -euo pipefail
 
+requested_runtime_route="${AGENT_CANON_RUNTIME_ROUTE:-CONTAINER_LOCAL}"
+optional_mounts="${AGENT_CANON_OPTIONAL_MOUNTS:-}"
 runtime_root="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-/var/lib/agent-canon/runtime}"
 runtime_group="agent-canon-runtime"
 provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/shared-runtime-provision.json}"
@@ -25,6 +27,12 @@ fail() {
   printf 'shared runtime bootstrap failed: %s\n' "$1" >&2
   exit 1
 }
+
+[ "$requested_runtime_route" = "MANAGED_CONTAINER" ] || fail "host shared-runtime bootstrap requires explicit shared-runtime profile"
+case ",${optional_mounts}," in
+  *,shared-runtime,*) ;;
+  *) fail "host shared-runtime bootstrap requires AGENT_CANON_OPTIONAL_MOUNTS=shared-runtime" ;;
+esac
 
 umask 0007
 [ "$(umask)" = "0007" ] || fail "process umask is not exactly 0007"

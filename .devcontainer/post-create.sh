@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract environment
-# responsibility Runs the shared lifecycle around the validated mounted dependency plan.
+# responsibility Runs the default container-local lifecycle around the validated mounted dependency plan.
 # upstream design ../CONTAINER_OPERATIONS.md container image versus mounted developer/agent tooling boundary
+# upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
 # upstream design ../documents/design/devcontainer/parent-dependency-manifest-followup.md parent manifest merge and post-create order
 # upstream implementation bootstrap-dependencies.sh establishes the fixed base capability set
 # upstream implementation ../tools/agent_tools/devcontainer_dependencies.py validates and executes records
@@ -160,8 +161,31 @@ build_agent_canon_cache() {
   fi
 }
 
+ensure_container_local_runtime() {
+  if [ -d "$runtime_root" ] && [ -w "$runtime_root" ]; then
+    return 0
+  fi
+  local owner_uid
+  local owner_gid
+  owner_uid="$(id -u)"
+  owner_gid="$(id -g)"
+  if [ "$owner_uid" = "0" ]; then
+    install -d -o "$owner_uid" -g "$owner_gid" -m 755 "$runtime_root"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo install -d -o "$owner_uid" -g "$owner_gid" -m 755 "$runtime_root"
+  else
+    echo "post-create cannot create container-local runtime without root or sudo: $runtime_root" >&2
+    return 1
+  fi
+  [ -w "$runtime_root" ] || {
+    echo "post-create container-local runtime is not writable: $runtime_root" >&2
+    return 1
+  }
+}
+
 publish_container_local_runtime() {
   local tool_status
+  ensure_container_local_runtime
   install -d -m 755 "$runtime_root" "$runtime_root/runs" "$runtime_root/logs" "$source_projection_root"
   tool_status="$(
     for tool in agent-canon codex gh jq tree; do
@@ -217,7 +241,6 @@ else
   echo "repo-local Python dependency installer absent; skipping docker/install_python_dependencies.sh"
 fi
 
-"$devcontainer_dir/finalize-shared-runtime.sh"
 publish_agent_tools_profile
 publish_agent_canon_cli
 build_agent_canon_cache

@@ -174,6 +174,10 @@ The standalone AgentCanon source owns the real `tools/` directory. In a template
 or derived parent repository, Root `tools/` is a parent-owned regular container,
 and its shared-canon child is the single symlink
 `tools/agent-canon -> ../vendor/agent-canon/tools`.
+The standalone source materializes the same public namespace as the tracked
+self-view `tools/agent-canon -> .`; this is an alias to the source-owned `tools/`
+tree, not a second implementation surface. Parent root projection changes only
+the symlink target to `../vendor/agent-canon/tools`.
 
 Parent repositories call shared tooling through the explicit AgentCanon
 namespace, such as
@@ -214,8 +218,11 @@ decide which repo-specific documents appear in root `documents/`.
 Its minimum shared shape is the symlink
 `.devcontainer/devcontainer.json -> ../vendor/agent-canon/.devcontainer/devcontainer.json`
 and any parent-specific source such as `post-create-parent.sh`. The linked config
-calls shared scripts directly under `vendor/agent-canon/.devcontainer/`; parent
-wrappers and copied shared scripts are not part of the surface. Generated Compose
+calls initialize, post-create, and post-attach through the single public source-root
+entry `tools/agent-canon/agent_tools/agent_canon_source_root.py`; the resolver then
+selects the standalone source or the vendored AgentCanon root. Direct parent-root
+`tools/agent_tools` references, fixed `vendor/agent-canon` script paths, parent
+wrappers, and copied shared scripts are not part of the surface. Generated Compose
 is written to the ignored parent state path `.agent-canon/docker-compose.generated.yml`.
 
 The devcontainer consumes repo-local `docker/Dockerfile`,
@@ -223,12 +230,18 @@ The devcontainer consumes repo-local `docker/Dockerfile`,
 not make `docker/` AgentCanon-owned.
 
 GPU admission runtime identity scripts (`bootstrap-shared-runtime.sh`,
-`finalize-shared-runtime.sh`, `post-attach.sh`) remain in AgentCanon source and are
-invoked from the linked config by their direct `vendor/agent-canon/.devcontainer/`
-paths. The exact
-receipt paths and parser/writer ownership are defined by
+`finalize-shared-runtime.sh`) remain in AgentCanon source but are not selected by the
+default linked config. The default profile does not create a host runtime group,
+mount `/var/lib/agent-canon/runtime`, add `group_add`, probe host GPU/NVIDIA runtime,
+request `gpus: all`, or depend on provision/readback receipts. It emits
+`DEVCONTAINER_GPU_MODE=disabled` and leaves `DEVCONTAINER_GPU_REQUEST` absent. Their
+exact receipt paths and parser/writer ownership remain defined by
 `documents/experiments/gpu-admission-r5-source-packet.md` and
-`agent-canon-environment.toml`.
+`agent-canon-environment.toml` for a future explicit opt-in profile tracked in Issue
+[#521](https://github.com/iwashita-nozomu/agent-canon/issues/521); that issue is a
+follow-up tracker, not the authority for this default boundary. Keeping these scripts,
+the experiment scheduler, and managed experiment functionality is intentional; this
+boundary is not a wholesale deletion.
 
 `parent-hook` must not replace AgentCanon shared stages. The linked config runs
 `vendor/agent-canon/.devcontainer/post-create.sh` first, then

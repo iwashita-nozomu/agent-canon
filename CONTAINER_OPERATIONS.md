@@ -103,7 +103,10 @@ The mounted workspace devcontainer contract is separate. The fixed
 `.devcontainer/bootstrap-dependencies.sh` establishes only the base capabilities
 needed to read a manifest: `python3` with `tomllib` or `tomli` and
 `python3-packaging` for structured PEP 508 parsing, pinned Node/npm 22.14.0
-with architecture-specific SHA256 verification, and `ninja-build`.
+with architecture-specific SHA256 verification, `ninja-build`, and the fixed
+APT-repository prerequisite `gnupg` with a working `gpg` executable. The bootstrap
+checks `gpg` before any repository-key/source operation and fails closed when the
+capability is absent.
 `.devcontainer/dependencies.toml` then describes mounted developer/agent tools.
 The shared post-create validates and merges the parent manifest before the
 AgentCanon manifest, validates the complete graph, and executes it only after
@@ -259,22 +262,51 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - Runtime state and logs are container-local under
   `/var/lib/agent-canon/runtime`; only the controlled source-bound projection
   under `/workspace/reports/agents/<run-id>/runtime` is copied to the workspace.
+  Default Compose creates this path inside the container; it is not a host bind or
+  shared-runtime path.
+- The default repository Docker pack uses the #524 canonical digest-pinned plain
+  `ubuntu:22.04` base. The generator resolves and validates `PROJECT_UID` /
+  `PROJECT_GID` build args; the parent image creates the canonical `project`
+  user/group with those IDs and runs as `USER project`. Linked `devcontainer.json`
+  sets `containerUser` and `remoteUser` to `project`; the generator omits custom
+  HOME tmpfs and AgentCanon-specific groups. `/home/project` remains the
+  image-owned HOME. Container-local passwordless `sudo -n` is available for
+  mounted dependency operations.
+- This project runtime is container-local and never invokes host `sudo`, prompts for
+  host passwords, or mutates host groups. A missing/mismatched project UID/GID,
+  non-Ubuntu base, missing digest pin, or missing container-local sudo is a parent image
+  contract failure; do not repair it by restoring host provisioning. Workspace bind
+  outputs are expected to carry the host mapped UID/GID owner.
+- Devcontainers support two explicit source layouts. `managed-topic` keeps the
+  `workspace/<topic-slug>` workspace-root bind and dependency-module topic
+  marker/status guard. `direct-repo` binds only the exact repository root to
+  `/workspace/<basename>`; it does not mount the parent `~/workspace`, sibling
+  repositories, or guessed paths, and it does not require or run the topic
+  marker/status guard. The generator emits `AGENT_CANON_WORKSPACE_LAYOUT`, and
+  post-attach reads back `DEPENDENCY_MODULE_CONTAINER_LAYOUT` with the same value plus
+  `DEPENDENCY_MODULE_CONTAINER_SOURCE` and `DEPENDENCY_MODULE_CONTAINER_TARGET` exact
+  source/target fields. The direct path is validated by
+  `devcontainer up --workspace-folder .`.
   Host `~/.codex` is never mounted. Successful post-create tool availability is
   recorded and later certified by `EnvironmentCertificate`, not by a second
   environment policy surface.
 - Nested Codex uses container-local state under the selected workspace runtime
   home. The runner may forward `OPENAI_API_KEY` and `OPENAI_BASE_URL` explicitly;
   it never mounts or seeds host Codex state.
-- GPU admission runtime identity uses exactly
-  `/var/lib/agent-canon/runtime/shared-runtime-provision.json` and
-  `/var/lib/agent-canon/runtime/shared-runtime-readback.json`. Bootstrap runs
-  before Compose generation and publishes the host receipt; generated Compose
-  preserves the same UID/GID, supplementary runtime group, bind source/target,
-  and provision path. Post-create establishes `umask 0007` before finalize;
-  finalize validates the provision receipt and publishes readback. Post-attach
-  is observational only. Receipt parsing and atomic publication are owned by
-  `tools/experiments/execution_resource_plan.py`; scripts do not carry a second
-  JSON parser or writer and do not repair failed identity.
+- 既定 devcontainer は GPU admission の host runtime identity を要求しない。
+  `bootstrap-shared-runtime.sh`、`finalize-shared-runtime.sh`、shared lock、
+  provision/readback receipt、および固定 supplementary group は AgentCanon source
+  に保持するが、linked config の default lifecycle からは非選択とする。これらは
+  Issue [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) で追跡する
+  将来 profile の source 候補であり、今回の public optional profile ではない。既定境界の
+  authority は本 rulebook と linked implementation に置く。experiment scheduler
+  や managed experiment の wholesale deletion を意味しない。
+- Opt-in profile を実装するまでは、`/var/lib/agent-canon/runtime` の
+  `shared-runtime-provision.json` / `shared-runtime-readback.json` を default の
+  Compose environment、bind、post-create、post-attach の前提にしてはならない。
+  Receipt parsing と atomic publication の owner は引き続き
+  `tools/experiments/execution_resource_plan.py` とし、scripts に第二の parser/writer
+  や identity repair を追加しない。
 - Mount behavior belongs in `.devcontainer/devcontainer.json`.
 - Shared devcontainer names must be repository-specific. Do not use a fixed
   `name` or Compose project name that makes every template-derived repository
@@ -285,22 +317,24 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - The generated Docker Compose file must not pin subnet, gateway, or other
   IPAM values. Let Docker Compose allocate the default network automatically so
   multiple checkouts and host networks do not collide.
-- GPU discovery is best-effort and notification-only by default. The generated
-  Compose file may include `gpus: all` only when the host GPU and Docker NVIDIA
-  runtime are both visible, or when `DEVCONTAINER_GPU_REQUEST=enabled` can be
-  satisfied. Missing GPU access must not fail container creation in the default
-  path; it should be reported in the generated status and post-attach banner.
+- 既定 profile は host GPU、`nvidia-smi`、Docker NVIDIA runtime を probe せず、生成
+  environment に `DEVCONTAINER_GPU_MODE=disabled` を設定する。`DEVCONTAINER_GPU_REQUEST`
+  は absent とし、`gpus: all` も生成しない。GPU が見える host でも default Compose
+  は GPU runtime を自動追加せず、GPU 不在を default container creation の分岐条件に
+  しない。GPU を必要とする実験の opt-in profile は #521 で追跡するが、既定境界は
+  本 rulebook と linked implementation が所有する。
 - Host authentication must stay host-local. The container may reuse mounted
   credentials, but the Docker image must not bake user tokens or auth state.
 - `safe.directory` setup must be dynamic for `/workspace` and
   `/workspace/vendor/<name>`.
-- `/mnt/git` is compatibility-only. Configure it only when the host path exists.
+- `/mnt/git` is compatibility-only and is never a default bind. Select the typed
+  `host-git` optional profile only when the host path exists.
 - A private host directory for confidential local Git repositories or other
   operator-local material may be mounted only through
   `AGENT_CANON_SECRET_DIR`. The shared generator must skip the mount when the
-  variable is unset or the path is absent, must not print the host path, and must
-  use `AGENT_CANON_SECRET_MOUNT` for the container target
-  (`/mnt/agent-canon-secrets` by default). Use
+  profile is absent, the variable is unset, or the path is absent, and must use
+  the fixed container target `/mnt/agent-canon-secrets`. Any custom
+  `AGENT_CANON_SECRET_MOUNT` target is rejected. Use
   `AGENT_CANON_SECRET_DIR_MODE=rw` only when the container must update local
   Git remotes; otherwise keep the default read-only mode.
 - Shared post-create logic must tolerate a repository that has no local bare

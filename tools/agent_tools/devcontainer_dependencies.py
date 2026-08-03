@@ -12,8 +12,8 @@
 # @dependency-end
 """Declarative, typed devcontainer dependency planning and installation.
 
-The fixed bootstrap provides ``packaging`` plus Python 3.11's ``tomllib``;
-older supported images use the bootstrapped ``tomli`` module instead.
+The fixed bootstrap provides ``packaging`` and bootstrapped ``tomli`` for the
+Ubuntu 22.04/Python 3.10 image; newer interpreters may use stdlib ``tomllib``.
 """
 
 from __future__ import annotations
@@ -83,6 +83,7 @@ SEMVER_RE = re.compile(
     r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
 )
 VERSION_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.+:~_-]*$")
+PLATFORM_RE = re.compile(r"^linux/(?:amd64|arm64)$")
 SAFE_MEMBER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 TRAVERSAL_RE = re.compile(r"(?:^|[/\\])\.\.(?:[/\\]|$)")
 SHELL_EXECUTABLES = frozenset(
@@ -94,6 +95,7 @@ BASE_CAPABILITIES = frozenset(
         "ca-certificates",
         "curl",
         "git",
+        "gnupg",
         "ninja-build",
         "node",
         "npm",
@@ -107,10 +109,83 @@ BASE_CAPABILITIES = frozenset(
         "xz-utils",
     }
 )
+NPM_GLOBAL_PREFIX = "/usr/local"
 
 
 class DependencyError(ValueError):
     """Base error for schema, merge, plan, and execution failures."""
+
+
+@dataclass(frozen=True)
+class RuntimeIdentity:
+    """Runtime OS and architecture identity required by the canonical installer."""
+
+    os_id: str
+    version_id: str
+    platform: str
+
+
+def read_runtime_identity(
+    os_release: Path = Path("/etc/os-release"),
+    *,
+    machine: str | None = None,
+) -> RuntimeIdentity:
+    """Read the typed Ubuntu/Jammy and Linux platform identity before installs."""
+    values: dict[str, str] = {}
+    try:
+        for raw_line in os_release.read_text(encoding="utf-8").splitlines():
+            name, separator, raw_value = raw_line.partition("=")
+            if separator and name in {"ID", "VERSION_ID"}:
+                values[name] = raw_value.strip().strip('"').strip("'")
+    except OSError as exc:
+        raise DependencyError(f"runtime identity cannot read {os_release}: {exc}") from exc
+    os_id = values.get("ID", "")
+    version_id = values.get("VERSION_ID", "")
+    machine_name = (machine or platform.machine()).lower()
+    machine_alias = {
+        "x86_64": "amd64",
+        "amd64": "amd64",
+        "aarch64": "arm64",
+        "arm64": "arm64",
+    }
+    runtime_platform = f"linux/{machine_alias.get(machine_name, machine_name)}"
+    if not os_id or not version_id or runtime_platform == "linux/":
+        raise DependencyError(
+            f"runtime identity is incomplete: ID={os_id!r} VERSION_ID={version_id!r} "
+            f"platform={runtime_platform!r}"
+        )
+    return RuntimeIdentity(os_id, version_id, runtime_platform)
+
+
+def validate_runtime_identity(
+    plan: DependencyPlan,
+    identity: RuntimeIdentity | None = None,
+) -> RuntimeIdentity:
+    """Fail closed on non-Ubuntu22/amd64 before any installer side effect."""
+    resolved = identity or read_runtime_identity()
+    if resolved.os_id != "ubuntu" or resolved.version_id != "22.04":
+        raise DependencyError(
+            "runtime identity requires Ubuntu 22.04: "
+            f"ID={resolved.os_id} VERSION_ID={resolved.version_id}"
+        )
+    if resolved.platform != "linux/amd64":
+        raise DependencyError(
+            f"runtime identity requires linux/amd64: platform={resolved.platform}"
+        )
+    for record in plan.records:
+        if record.platform is not None and record.platform != resolved.platform:
+            raise DependencyError(
+                f"dependency record {record.id} requires {record.platform}, "
+                f"but runtime platform is {resolved.platform}; no compatibility fallback is defined"
+            )
+        if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY} \
+            and record.source.startswith("ubuntu:") \
+            and record.source != "ubuntu:22.04":
+            raise DependencyError(
+                f"dependency record {record.id} requires canonical source ubuntu:22.04, "
+                f"got {record.source}"
+            )
+    return resolved
 
 
 # StrEnum is unavailable on supported tomli/Python <3.11 runtimes.
@@ -197,6 +272,7 @@ class DependencyRecord:
     deps: tuple[str, ...]
     provides: tuple[str, ...]
     failure_policy: str
+    platform: str | None = None
     key_fingerprint: str | None = None
     key_url: str | None = None
     checksum: str | None = None
@@ -663,6 +739,7 @@ def _validate_method_fields(
         "method",
         "version",
         "source",
+        "platform",
         "verification",
         "deps",
         "provides",
@@ -697,6 +774,10 @@ def _validate_method_fields(
 
 def _validate_method_values(record: DependencyRecord) -> None:
     """Validate all method-owned values before any executor argv is built."""
+    if record.platform is not None and PLATFORM_RE.fullmatch(record.platform) is None:
+        raise DependencyError(
+            f"{record.id}.platform must be one of linux/amd64 or linux/arm64"
+        )
     _validate_package(record)
     if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}:
         if VERSION_TOKEN_RE.fullmatch(record.version) is None:
@@ -811,6 +892,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         "method",
         "version",
         "source",
+        "platform",
         "verification",
         "deps",
         "provides",
@@ -869,6 +951,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         method=Method(method_value),
         version=_string(raw["version"], f"{record_id}.version"),
         source=_string(raw["source"], f"{record_id}.source"),
+        platform=_optional_string(raw.get("platform"), f"{record_id}.platform"),
         verification=_parse_verification(
             raw["verification"], record_id=record_id, method=Method(method_value)
         ),
@@ -1066,6 +1149,7 @@ def merge_records(manifests: Sequence[LoadedManifest]) -> tuple[DependencyRecord
                 "method",
                 "version",
                 "source",
+                "platform",
                 "verification",
                 "failure_policy",
                 "key_fingerprint",
@@ -1134,6 +1218,21 @@ def build_plan(
     records = merge_records(manifests)
     if not records:
         raise DependencyError("merged dependency plan must contain at least one record")
+    machine = platform.machine().lower()
+    machine_alias = {
+        "x86_64": "amd64",
+        "amd64": "amd64",
+        "aarch64": "arm64",
+        "arm64": "arm64",
+    }
+    runtime_platform = f"linux/{machine_alias.get(machine, machine)}"
+    for record in records:
+        if record.platform is not None and record.platform != runtime_platform:
+            raise DependencyError(
+                f"dependency record {record.id} requires {record.platform}, "
+                f"but runtime platform is {runtime_platform}; "
+                "no compatibility fallback is defined"
+            )
     by_id = {record.id: record for record in records}
     providers: dict[str, list[str]] = {}
     for record in records:
@@ -1462,7 +1561,7 @@ class EnvironmentBoundaryModel:
                     "rsync",
                     "openssh-client",
                     "graphviz",
-                    "python3.11-venv",
+                    "python3-venv",
                 ):
                     if package not in packages:
                         findings.append(
@@ -1530,16 +1629,35 @@ class EnvironmentBoundaryModel:
             )
         else:
             command_text = json.dumps(post_create, sort_keys=True)
-            for required in (
-                "vendor/agent-canon/.devcontainer/post-create.sh",
-                "post-create-parent.sh",
-            ):
-                if required not in command_text:
-                    findings.append(
-                        BoundaryFinding(
-                            "parent", str(config), f"missing-command:{required}"
+            required = (
+                "tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
+                ".devcontainer/post-create-entrypoint.sh"
+            )
+            if required not in command_text:
+                findings.append(
+                    BoundaryFinding("parent", str(config), f"missing-command:{required}")
+                )
+            entrypoint = self._require(
+                findings,
+                checked,
+                "vendor/agent-canon/.devcontainer/post-create-entrypoint.sh",
+                "parent",
+                executable=True,
+            )
+            if entrypoint is not None:
+                entrypoint_text = entrypoint.read_text(encoding="utf-8")
+                for required in (
+                    'parent_hook="$workspace/.devcontainer/post-create-parent.sh"',
+                    'bash "$parent_hook" "$workspace"',
+                ):
+                    if required not in entrypoint_text:
+                        findings.append(
+                            BoundaryFinding(
+                                "parent",
+                                str(entrypoint),
+                                f"missing-parent-hook-dispatch:{required}",
+                            )
                         )
-                    )
 
     def validate(self) -> EnvironmentBoundaryReport:
         """Validate typed ownership coverage without running project commands."""
@@ -1859,6 +1977,8 @@ class Installer:
                 "npm",
                 "install",
                 "--global",
+                "--prefix",
+                NPM_GLOBAL_PREFIX,
                 f"{record.package}@{record.version}",
             ]
             if repair:
@@ -1960,27 +2080,32 @@ class Installer:
                 workspace=workspace,
                 env=tool_env,
             )
-            if repair:
-                installed = self._capture(
-                    ["elan", "toolchain", "list"],
-                    workspace=workspace,
-                    env=tool_env,
-                ).stdout
-                if any(
-                    line.split()[0] == record.version
-                    for line in installed.splitlines()
-                    if line.strip()
-                ):
-                    self._run(
-                        ["elan", "toolchain", "uninstall", record.version],
-                        workspace=workspace,
-                        env=tool_env,
-                    )
-            self._run(
-                ["elan", "toolchain", "install", record.version],
+            installed = self._capture(
+                ["elan", "toolchain", "list"],
                 workspace=workspace,
                 env=tool_env,
+            ).stdout
+            has_exact_toolchain = any(
+                line.split()[0] == record.version
+                for line in installed.splitlines()
+                if line.strip()
             )
+            if repair and has_exact_toolchain:
+                # A receipt-triggered repair is the explicit contract that
+                # permits replacing an already-installed exact toolchain.
+                # Fresh retries with no receipt preserve a usable live install.
+                self._run(
+                    ["elan", "toolchain", "uninstall", record.version],
+                    workspace=workspace,
+                    env=tool_env,
+                )
+                has_exact_toolchain = False
+            if not has_exact_toolchain:
+                self._run(
+                    ["elan", "toolchain", "install", record.version],
+                    workspace=workspace,
+                    env=tool_env,
+                )
             self._run(
                 ["elan", "default", record.version],
                 workspace=workspace,
@@ -2153,9 +2278,24 @@ class Installer:
             raise DependencyError(f"{record.id}: apt repository source is stale")
 
     def _verify_npm_package(self, record: DependencyRecord, *, workspace: Path) -> None:
+        npm_env = {
+            "PATH": os.pathsep.join(
+                [f"{NPM_GLOBAL_PREFIX}/bin", os.environ.get("PATH", "")]
+            )
+        }
         result = self._capture(
-            ["npm", "ls", "--global", "--json", "--depth=0", record.package],
+            [
+                "npm",
+                "ls",
+                "--global",
+                "--prefix",
+                NPM_GLOBAL_PREFIX,
+                "--json",
+                "--depth=0",
+                record.package,
+            ],
             workspace=workspace,
+            env=npm_env,
         )
         try:
             payload = json.loads(result.stdout)
@@ -2173,6 +2313,7 @@ class Installer:
         executable = self._capture(
             [spec.executable, *spec.args],
             workspace=workspace,
+            env=npm_env,
         )
         self._require_output(executable, spec.output_contains, record.id)
 
@@ -2268,7 +2409,7 @@ class Installer:
     def _verify_lean_toolchain(
         self, record: DependencyRecord, *, workspace: Path
     ) -> None:
-        active = self._capture(["elan", "default"], workspace=workspace)
+        active = self._capture(["elan", "show"], workspace=workspace)
         installed = self._capture(["elan", "toolchain", "list"], workspace=workspace)
         if record.version not in active.stdout or not any(
             line.split()[0] == record.version
@@ -2283,11 +2424,18 @@ class Installer:
             )
 
     def _cargo_source(self, record: DependencyRecord, workspace: Path) -> Path:
-        source = (workspace / record.source).resolve()
-        if not source.is_dir():
-            source = (workspace / "vendor" / "agent-canon" / record.source).resolve()
-        if os.path.commonpath((str(workspace.resolve()), str(source))) != str(
-            workspace.resolve()
+        workspace_root = workspace.resolve()
+        standalone_source = workspace_root / record.source
+        vendor_root = workspace_root / "vendor" / "agent-canon"
+        # A vendored AgentCanon checkout is the canonical source in a derived
+        # parent. Resolve it before considering the standalone layout so a
+        # stale parent-root copy cannot win merely because it exists.
+        if vendor_root.is_dir():
+            source = (vendor_root / record.source).resolve()
+        else:
+            source = standalone_source.resolve()
+        if os.path.commonpath((str(workspace_root), str(source))) != str(
+            workspace_root
         ):
             raise DependencyError(f"{record.id}: cargo source escapes workspace")
         if not source.is_dir():
@@ -2488,6 +2636,19 @@ def _cli_plan(args: argparse.Namespace) -> DependencyPlan:
     return load_plan(workspace, vendor_root)
 
 
+def install_plan(
+    plan: DependencyPlan,
+    *,
+    workspace: Path,
+    receipts: Path,
+    runner: CommandRunner | None = None,
+    identity: RuntimeIdentity | None = None,
+) -> tuple[str, ...]:
+    """Validate runtime identity, then begin installation with no earlier side effect."""
+    validate_runtime_identity(plan, identity)
+    return Installer(runner).install(plan, workspace=workspace, receipts=receipts)
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the dependency model CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
@@ -2542,8 +2703,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                     / ".agent-canon"
                     / "dependency-receipts"
                 )
-                completed = Installer().install(
-                    plan, workspace=Path(args.workspace).resolve(), receipts=receipts
+                completed = install_plan(
+                    plan,
+                    workspace=Path(args.workspace).resolve(),
+                    receipts=receipts,
                 )
                 payload = {
                     "status": "pass",

@@ -46,7 +46,8 @@ remote execution contract が「repo が外部 server から実行される条�
 - path / mount / builder 前提を
   `vendor/agent-canon/templates/documents/server_runtime_layout.template.toml`
   で明文化する
-- `python3 tools/ci/check_server_readiness.py` で定期的に readiness を確認する
+- `AGENT_CANON_HOST_WORKSPACE_ROOT=/path/to/workspace python3 tools/ci/check_server_readiness.py`
+  または `--layout <layout.toml>` で、対象workspaceを明示して readiness を確認する
 
 ## Storage Rule
 
@@ -88,6 +89,8 @@ AgentCanon standalone source root では source-root の template を指定し�
 
 ```bash
 python3 tools/ci/check_server_readiness.py
+AGENT_CANON_HOST_WORKSPACE_ROOT=/path/to/workspace \
+  python3 tools/ci/check_server_readiness.py
 python3 tools/ci/check_server_readiness.py \
   --layout templates/documents/server_runtime_layout.template.toml
 ```
@@ -96,6 +99,8 @@ Template / derived parent root では vendored AgentCanon の template を指定
 
 ```bash
 python3 vendor/agent-canon/tools/ci/check_server_readiness.py
+AGENT_CANON_HOST_WORKSPACE_ROOT=/path/to/workspace \
+  python3 vendor/agent-canon/tools/ci/check_server_readiness.py
 python3 vendor/agent-canon/tools/ci/check_server_readiness.py \
   --layout vendor/agent-canon/templates/documents/server_runtime_layout.template.toml
 ```

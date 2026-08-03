@@ -4,7 +4,8 @@
 # upstream implementation ../../tools/ci/run_codex_in_repo_container.py runs Codex inside the repo container
 # upstream implementation ../../.devcontainer/devcontainer.json selects runtime setup before nested Codex
 # upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md devcontainer boundary
-# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md exact in-container runtime identity oracle
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md opt-in in-container runtime identity oracle
 # @dependency-end
 
 """Tests for the nested Codex container runner."""
@@ -51,8 +52,23 @@ def test_print_only_runs_shared_post_create_before_codex() -> None:
     assert "exec codex" in result.stdout
 
 
+def test_standalone_dockerfile_uses_canonical_project_identity() -> None:
+    """Standalone source builds provide project UID/GID and container-local sudo."""
+    dockerfile = (PROJECT_ROOT / ".devcontainer" / "Dockerfile").read_text(
+        encoding="utf-8"
+    )
+
+    assert "FROM ubuntu:22.04@sha256:" in dockerfile
+    assert "ARG PROJECT_UID" in dockerfile
+    assert "ARG PROJECT_GID" in dockerfile
+    assert "groupadd --gid \"${PROJECT_GID}\" project" in dockerfile
+    assert "useradd --uid \"${PROJECT_UID}\" --gid project" in dockerfile
+    assert "project ALL=(ALL) NOPASSWD:ALL" in dockerfile
+    assert "USER project" in dockerfile
+
+
 def test_runtime_identity(tmp_path: Path) -> None:
-    """Nested Codex reaches the exact finalize/readback identity path before launch."""
+    """Nested Codex keeps opt-in identity scripts retained but unreachable by default."""
     pack = tmp_path / "pack.toml"
     pack.write_text(
         "\n".join(
@@ -138,15 +154,31 @@ def test_runtime_identity(tmp_path: Path) -> None:
         "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
         in result.stdout
     )
+    devcontainer = (PROJECT_ROOT / ".devcontainer" / "devcontainer.json").read_text(
+        encoding="utf-8"
+    )
     assert "-e OPENAI_API_KEY=test-api-key" in result.stdout
     assert "-e OPENAI_BASE_URL=https://api.example.test/v1" in result.stdout
     assert "-e AGENT_CANON_DEPENDENCY_PROFILE=gpu" in result.stdout
     assert "/root/.codex" not in result.stdout
     assert "umask 0007" in post_create
-    assert '"$devcontainer_dir/finalize-shared-runtime.sh"' in post_create
+    assert '"$devcontainer_dir/finalize-shared-runtime.sh"' not in post_create
     assert 'dependency_profile="${AGENT_CANON_DEPENDENCY_PROFILE:-full}"' in post_create
     assert '--profile "$dependency_profile"' in post_create
     assert 'echo "codex-state: ${codex_state_status}"' in post_attach
+    assert 'workspace_layout="${AGENT_CANON_WORKSPACE_LAYOUT:-managed-topic}"' in post_attach
+    assert 'workspace_source="${DEPENDENCY_MODULE_CONTAINER_SOURCE:-}"' in post_attach
+    assert 'workspace_target="${DEPENDENCY_MODULE_CONTAINER_TARGET:-}"' in post_attach
+    assert 'DEPENDENCY_MODULE_CONTAINER_LAYOUT=${workspace_layout}' in post_attach
+    assert 'DEPENDENCY_MODULE_CONTAINER_SOURCE=${workspace_source}' in post_attach
+    assert 'DEPENDENCY_MODULE_CONTAINER_TARGET=${workspace_target}' in post_attach
+    assert 'DEPENDENCY_MODULE_CONTAINER=not-selected layout=direct-repo' in post_attach
+    assert '"${repo_root}/tools/agent_tools/dependency_module_change.py"' in post_attach
+    assert (
+        '"${repo_root}/vendor/agent-canon/tools/agent_tools/dependency_module_change.py"'
+        in post_attach
+    )
+    assert 'if [ -f "$candidate" ]; then' in post_attach
     assert '"schema_version": "shared-runtime-readback/v1"' in finalize
     assert 'readback_receipt="${runtime_root}/shared-runtime-readback.json"' in finalize
     assert (
@@ -156,7 +188,16 @@ def test_runtime_identity(tmp_path: Path) -> None:
     assert "read_shared_runtime_provision" in finalize
     assert "write_runtime_receipt_atomic" in bootstrap
     assert "write_runtime_receipt_atomic" in finalize
-    assert "/var/lib/agent-canon/runtime/shared-runtime-provision.json" in compose
+    assert (PROJECT_ROOT / ".devcontainer" / "finalize-shared-runtime.sh").is_file()
+    assert (PROJECT_ROOT / ".devcontainer" / "bootstrap-shared-runtime.sh").is_file()
+    assert "bootstrap-shared-runtime.sh" not in devcontainer
+    assert "finalize-shared-runtime.sh" not in devcontainer
+    assert "nvidia-smi" not in compose
+    assert "DEVCONTAINER_GPU_REQUEST" not in compose
+    assert "group_add:" not in compose
+    assert "gpus: all" not in compose
+    assert "/var/lib/agent-canon/runtime" not in compose
+    assert "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT" not in compose
     assert (
         "/var/lib/agent-canon/runtime/shared-runtime-provision.json"
         in environment_manifest

@@ -22,6 +22,22 @@ fail() {
   exit 1
 }
 
+validate_runtime_identity() {
+  local runtime_id
+  local runtime_version
+  local runtime_machine
+  runtime_id="$(awk -F= '$1 == "ID" { gsub(/^"|"$/, "", $2); print $2; exit }' /etc/os-release)"
+  runtime_version="$(awk -F= '$1 == "VERSION_ID" { gsub(/^"|"$/, "", $2); print $2; exit }' /etc/os-release)"
+  case "$(uname -m)" in
+    x86_64|amd64) runtime_machine="amd64" ;;
+    *) runtime_machine="$(uname -m)" ;;
+  esac
+  [ "$runtime_id" = "ubuntu" ] || fail "runtime ID must be ubuntu, got: $runtime_id"
+  [ "$runtime_version" = "22.04" ] || fail "runtime VERSION_ID must be 22.04, got: $runtime_version"
+  [ "$runtime_machine" = "amd64" ] || fail "runtime platform must be linux/amd64, got: linux/$runtime_machine"
+  printf 'DEVCONTAINER_RUNTIME_IDENTITY=pass:ubuntu:%s:linux/%s\n' "$runtime_version" "$runtime_machine"
+}
+
 run_as_root() {
   if [ "$(id -u)" -eq 0 ]; then
     "$@"
@@ -108,8 +124,9 @@ check_node_activation() {
   [ "$(npm --version)" = "$NODE_NPM_VERSION" ] || fail "npm is not $NODE_NPM_VERSION"
   [ "$(readlink -f "$(command -v node)")" = "$NODE_INSTALL_PATH/bin/node" ] || \
     fail "node is not activated from the verified archive install path"
-  [ "$(readlink -f "$(command -v npm)")" = "$NODE_INSTALL_PATH/bin/npm" ] || \
-    fail "npm is not activated from the verified archive install path"
+  [ "$(readlink -f "$(command -v npm)")" = \
+    "$NODE_INSTALL_PATH/lib/node_modules/npm/bin/npm-cli.js" ] || \
+    fail "npm is not activated from the verified bundled CLI path"
 }
 
 check_bootstrap() {
@@ -119,6 +136,7 @@ check_bootstrap() {
   check_python_requirement_capability || fail "python3-packaging capability is unavailable"
   check_node_activation
   node_receipt_matches || fail "verified Node bootstrap receipt is unavailable or stale"
+  command -v gpg >/dev/null 2>&1 || fail "gnupg capability is unavailable"
   command -v ninja >/dev/null 2>&1 || fail "ninja-build capability is unavailable"
   printf 'DEVCONTAINER_BASE_BOOTSTRAP=pass\n'
 }
@@ -196,6 +214,7 @@ install_standalone_base() {
     python3-packaging \
     ca-certificates \
     curl \
+    gnupg \
     xz-utils \
     ninja-build
   if ! python3 - <<'PY'
@@ -228,6 +247,8 @@ if [ "$#" -gt 0 ]; then
       ;;
   esac
 fi
+
+validate_runtime_identity
 
 case "$mode" in
   check)
