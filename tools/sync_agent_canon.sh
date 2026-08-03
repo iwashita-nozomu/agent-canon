@@ -640,13 +640,11 @@ regular_path() {
     return
   fi
   if [ -z "$source" ]; then
-    if [ "$path" = ".devcontainer" ] && [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
-      prune_parent_devcontainer_artifacts
-      return
-    fi
-    rm -rf "$abs_path"
-    mkdir -p "$abs_path"
-    if [ "$path" = ".devcontainer" ] && is_submodule_prefix; then
+    if [ -L "$abs_path" ]; then
+      # Remove legacy whole-directory views before child links materialize.
+      # Do not create an empty parent; the child surface creates it safely.
+      rm -f "$abs_path"
+    elif [ "$path" = ".devcontainer" ] && [ -e "$abs_path" ]; then
       prune_parent_devcontainer_artifacts
     fi
     return
