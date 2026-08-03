@@ -26,6 +26,20 @@ workspace="$1"
 workspace="$(cd "$workspace" && pwd)"
 devcontainer_dir="$(cd "$(dirname "$0")" && pwd)"
 agent_canon_root="$(cd -P "$devcontainer_dir/.." && pwd)"
+if [ -n "${AGENT_CANON_CONTAINER_USER:-}" ]; then
+  [ "$(id -u)" -ne 0 ] || {
+    echo "post-create must execute as the dedicated non-root user" >&2
+    exit 1
+  }
+  [ "$(id -un)" = "$AGENT_CANON_CONTAINER_USER" ] || {
+    echo "post-create user mismatch: expected ${AGENT_CANON_CONTAINER_USER}, got $(id -un)" >&2
+    exit 1
+  }
+  [ "${HOME:-}" = "/home/${AGENT_CANON_CONTAINER_USER}" ] || {
+    echo "post-create HOME mismatch: ${HOME:-<unset>}" >&2
+    exit 1
+  }
+fi
 tools_home="$HOME/.tools"
 runtime_root="/var/lib/agent-canon/runtime"
 source_projection_root="$workspace/reports/agents/devcontainer/runtime"
@@ -171,7 +185,7 @@ publish_container_local_runtime() {
   echo "ENVIRONMENT_TOOL_AVAILABILITY=$runtime_root/tool-availability.json"
 }
 
-"$devcontainer_dir/bootstrap-dependencies.sh"
+"$devcontainer_dir/bootstrap-dependencies.sh" --install-language-runtime
 "$devcontainer_dir/bootstrap-dependencies.sh" --check
 
 pip_user_script_dir="$(python3 - <<'PY'
