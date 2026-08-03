@@ -371,9 +371,11 @@ implementation.
 - Edit template-owned active contracts at the root after they are regular
   files.
 - Edit project-owned durable state at the root.
-- Repair root symlinks and GitHub copy surfaces with the request-evidence-authorized
-  `bash tools/sync_agent_canon.sh link-root` command.
-- Audit root-view drift with `bash tools/sync_agent_canon.sh check`.
+- Repair root symlinks and GitHub copy surfaces in a template or derived parent
+  with the request-evidence-authorized source-root resolver command:
+  `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root`.
+  Standalone AgentCanon uses the same command with `PYTHONPATH=tools`.
+- Audit root-view drift with the corresponding resolver command and `check`.
 - Before recreating a missing shared path, check the template root,
   `vendor/agent-canon/`, standalone AgentCanon, the manifest, and
   `tools/sync_agent_canon.sh`.
@@ -381,9 +383,9 @@ implementation.
 ## Validation
 
 ```bash
-python3 tools/agent_tools/surface_manifest.py check-doc
-bash tools/sync_agent_canon.sh check
-python3 tools/agent_tools/check_convention_compliance.py
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/agent_tools/surface_manifest.py check-doc
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/agent_tools/check_convention_compliance.py
 make agent-checks
 make agent-canon-pr-check
 ```

@@ -85,15 +85,23 @@ class CheckBootstrapDocsTest(unittest.TestCase):
         """Derived repos may expose the shared template bootstrap doc as a symlink."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            shared_doc = root / "vendor" / "agent-canon" / "documents" / "template-bootstrap.md"
+            shared_doc = (
+                root
+                / "vendor"
+                / "agent-canon"
+                / "documents"
+                / "contracts"
+                / "template-bootstrap.md"
+            )
             self.write_file(root / "pyproject.toml", '[project]\nname = "derived-project"\n')
             self.write_minimal_bootstrap_docs(root)
             self.write_file(
                 shared_doc,
                 "Project Template\nlegacy template remote\n",
             )
-            (root / "documents" / "template-bootstrap.md").unlink()
-            (root / "documents" / "template-bootstrap.md").symlink_to(
+            shared_root_doc = root / "documents" / "contracts" / "template-bootstrap.md"
+            shared_root_doc.unlink()
+            shared_root_doc.symlink_to(
                 Path("../vendor/agent-canon/documents/contracts/template-bootstrap.md")
             )
 

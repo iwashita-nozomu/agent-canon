@@ -49,27 +49,6 @@ class = "active_contract"
 local_override_allowed = true
 
 [[surface]]
-path = "tools/sync_agent_canon.sh"
-mode = "regular"
-owner = "agent-canon"
-class = "runtime_surface"
-sync_control = true
-
-[[surface]]
-path = "tools/agent_tools/surface_manifest.py"
-mode = "regular"
-owner = "agent-canon"
-class = "active_contract"
-sync_control = true
-
-[[surface]]
-path = "tools/agent_tools/update_agent_canon.sh"
-mode = "regular"
-owner = "agent-canon"
-class = "active_contract"
-sync_control = true
-
-[[surface]]
 path = "documents/runtime/SHARED_RUNTIME_SURFACES.md"
 mode = "standalone_only"
 owner = "agent-canon"
