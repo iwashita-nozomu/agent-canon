@@ -54,11 +54,13 @@ bash tools/ci/run_python_quality_checks.sh
 
 Explicit Docstring review for selected Python targets:
 
-    python3 -m pydocstyle <python-target>
+    python3 -m pydocstyle --config=tools/ci/pydocstyle.toml <python-target>
 
-This command uses normal pydocstyle configuration discovery. Missing pydocstyle
-or reported diagnostics fail this explicit review only; the shared PR
-correctness gate is unaffected.
+This command applies the canonical AgentCanon convention. Parent-local
+pydocstyle configuration remains available through normal configuration
+discovery when the explicit review route is run there. Missing pydocstyle or
+reported diagnostics fail this explicit review only; the shared PR correctness
+gate is unaffected.
 
 ## Report Evidence
 

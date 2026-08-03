@@ -51,8 +51,9 @@ changed mechanism が明示的に required とした場合だけ mechanism-requi
 
 - 親 packet の `validation_route` にある exact validation commands
 - Docstring qualityを明示的にレビューする場合は、対象を限定して
-  python3 -m pydocstyle <python-target> を実行する。これはshared correctness gateとは
-  分離した明示routeであり、通常のpydocstyle config discoveryを使う。
+  python3 -m pydocstyle --config=tools/ci/pydocstyle.toml <python-target> を実行する。
+  これはshared correctness gateとは分離した明示routeであり、親repositoryの設定は
+  明示toolの通常config discoveryで扱う。
 - 変更 mechanism が必要とする static/read-only confirmation。該当時の `pyright`、
   `bash tools/ci/run_python_quality_checks.sh` が選択する canonical Python owner path の
   Ruff、`python3 tools/agent_tools/check_convention_compliance.py`、OOP readability、

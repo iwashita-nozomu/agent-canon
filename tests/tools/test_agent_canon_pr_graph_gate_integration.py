@@ -258,16 +258,16 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             exit 0
             """,
         )
-        write_executable(
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "ci" / "run_all_checks.sh",
             source / "tools" / "ci" / "run_all_checks.sh",
-            """
-            #!/usr/bin/env bash
-            receipt="${@: -1}"
-            grep -Eq '^graph=(scoped|skipped|prepared)$' "${receipt}" || exit 91
-            cp "${receipt}" "${AGENT_CANON_PR_TEMP_ROOT}/consumed.receipt"
-            echo "QUICK_CI_RECEIPT_GRAPH=$(awk -F= '$1 == \"graph\" {print $2}' \"${receipt}\")"
-            """,
         )
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "ci" / "run_python_quality_checks.sh",
+            source / "tools" / "ci" / "run_python_quality_checks.sh",
+        )
+        (source / "tools" / "lib").mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_PATHS, source / "tools" / "lib" / REPO_PATHS.name)
         write_executable(
             source / "tools" / "agent_tools" / "run_repo_dependency_review.sh",
             """
@@ -299,6 +299,18 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
         generic_python = "raise SystemExit(0)\n"
         for relative in (
+            "tools/agent_tools/artifact_identity.py",
+            "tools/agent_tools/external_artifact_binding.py",
+            "tools/agent_tools/publication_integrator.py",
+            "tools/agent_tools/report_artifact_checks.py",
+            "tools/agent_tools/review_dispatch.py",
+            "tools/agent_tools/work_log.py",
+            "tests/agent_tools/test_artifact_identity.py",
+            "tests/agent_tools/test_codex_hooks.py",
+            "tests/agent_tools/test_external_artifact_binding.py",
+            "tests/agent_tools/test_publication_integrator.py",
+            "tests/agent_tools/test_review_dispatch.py",
+            "tests/agent_tools/test_work_log.py",
             "tools/agent_tools/tool_drift.py",
             "tools/agent_tools/tool_catalog.py",
             "tools/agent_tools/tool_proof_coverage.py",
@@ -360,6 +372,17 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         (parent / "changed.py").write_text("before\n", encoding="utf-8")
         (parent / "legacy.py").write_text("legacy\n", encoding="utf-8")
         (parent / "related.py").write_text("related\n", encoding="utf-8")
+        for relative in (
+            "tests/agent_tools/test_artifact_identity.py",
+            "tests/agent_tools/test_codex_hooks.py",
+            "tests/agent_tools/test_external_artifact_binding.py",
+            "tests/agent_tools/test_publication_integrator.py",
+            "tests/agent_tools/test_review_dispatch.py",
+            "tests/agent_tools/test_work_log.py",
+        ):
+            target = parent / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("# recorder-only fixture\n", encoding="utf-8")
         for index in range(baseline_doc_diagnostics):
             (parent / f"baseline_{index}.py").write_text(
                 '"""Baseline fixture module."""\n\n\n'
@@ -368,6 +391,10 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "    pass\n",
                 encoding="utf-8",
             )
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "ci" / "pydocstyle.toml",
+            parent / "tools" / "ci" / "pydocstyle.toml",
+        )
         run(parent, "git", "add", ".")
         run(parent, "git", "commit", "-m", "base")
         base = run(parent, "git", "rev-parse", "HEAD").stdout.strip()
@@ -410,6 +437,29 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             baseline_doc_diagnostics=202 if scenario == "pydoc_baseline" else 0,
         )
         fake_bin = fixture_root / "bin"
+        temp_root = fixture_root / "pr-check-state"
+        temp_root.mkdir()
+        python_call_log = temp_root / "python-calls.jsonl"
+        write_executable(
+            fake_bin / "python-recorder",
+            """
+            #!/usr/bin/env python3
+            import json
+            import os
+            import sys
+
+            with open(os.environ["PYTHON_CALL_LOG"], "a", encoding="utf-8") as stream:
+                stream.write(json.dumps(sys.argv[1:]) + "\\n")
+            raise SystemExit(0)
+            """,
+        )
+        write_executable(
+            fake_bin / "cargo",
+            """
+            #!/usr/bin/env bash
+            exit 0
+            """,
+        )
         write_executable(
             fake_bin / "gh",
             """
@@ -417,8 +467,6 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             exit 1
             """,
         )
-        temp_root = fixture_root / "pr-check-state"
-        temp_root.mkdir()
         environment = os.environ.copy()
         environment.update(
             {
@@ -426,6 +474,8 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "AGENT_CANON_PR_BASE_REF": base,
                 "AGENT_CANON_PR_TEMP_ROOT": str(temp_root),
                 "GRAPH_GATE_FIXTURE_SCENARIO": scenario,
+                "PYTHON_BIN": str(fake_bin / "python-recorder"),
+                "PYTHON_CALL_LOG": str(python_call_log),
             }
         )
         result = run(
@@ -442,7 +492,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 sys.executable,
                 "-m",
                 "pydocstyle",
-                "--select=D213",
+                "--config=tools/ci/pydocstyle.toml",
                 *targets,
                 check=False,
             )
@@ -451,6 +501,19 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             )
             (temp_root / "explicit-pydocstyle.exit").write_text(
                 str(docstyle.returncode), encoding="utf-8"
+            )
+            quality = run(
+                parent,
+                "bash",
+                "vendor/agent-canon/tools/ci/run_python_quality_checks.sh",
+                check=False,
+                environment=environment,
+            )
+            (temp_root / "python-quality.stdout").write_text(
+                f"{quality.stdout}{quality.stderr}", encoding="utf-8"
+            )
+            (temp_root / "python-quality.exit").write_text(
+                str(quality.returncode), encoding="utf-8"
             )
         return result, temp_root
 
@@ -462,10 +525,8 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertEqual(valid.returncode, 0, valid.stdout + valid.stderr)
         self.assertIn('"status": "incomplete"', valid.stdout)
         self.assertIn("AGENT_CANON_PR_GRAPH_ACCEPTANCE=pass", valid.stdout)
-        self.assertIn("QUICK_CI_RECEIPT_GRAPH=scoped", valid.stdout)
+        self.assertIn("PR_GATE_RECEIPT=accepted dependency_graph=scoped", valid.stdout)
         self.assertNotIn("REPO_DEPENDENCY_REVIEW_CALLED", valid.stdout)
-        receipt = valid_state / "consumed.receipt"
-        self.assertIn("graph=scoped", receipt.read_text(encoding="utf-8"))
         report = (
             valid_state
             / "dependency-review"
@@ -502,15 +563,14 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
 
     def test_real_pr_check_runs_header_scan_when_graph_selection_skips(self) -> None:
         """Changed/new files without manifests still reach the trusted header scan."""
-        result, state = self.run_pr_check("no_manifest")
+        result, _ = self.run_pr_check("no_manifest")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("HEADER_SCAN_REVIEW_CALLED", result.stdout)
         self.assertIn(
             "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required", result.stdout
         )
         self.assertIn(
-            "graph=skipped",
-            (state / "consumed.receipt").read_text(encoding="utf-8"),
+            "PR_GATE_RECEIPT=accepted dependency_graph=skipped", result.stdout
         )
 
     def test_standalone_ordinary_change_runs_full_graph_gate(self) -> None:
@@ -606,6 +666,23 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             1,
         )
         self.assertEqual(explicit_output.count("D213:"), 202)
+        self.assertEqual(
+            int((state / "python-quality.exit").read_text(encoding="utf-8")),
+            0,
+        )
+        quality_output = (state / "python-quality.stdout").read_text(encoding="utf-8")
+        self.assertIn("PYTHON_QUALITY_CHECKS=pass", quality_output)
+        self.assertNotIn("pydocstyle", quality_output.lower())
+        calls = [
+            json.loads(line)
+            for line in (state / "python-calls.jsonl")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        ]
+        self.assertTrue(any(call[:2] == ["-m", "pytest"] for call in calls))
+        self.assertTrue(any(call[:2] == ["-m", "pyright"] for call in calls))
+        self.assertTrue(any(call[:3] == ["-m", "ruff", "check"] for call in calls))
+        self.assertFalse(any("pydocstyle" in call for call in calls))
 
     def test_real_pr_check_rejects_missing_or_stale_graph_identity(self) -> None:
         """Identity defects fail before scoped/full diagnostic classification."""

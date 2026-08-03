@@ -289,14 +289,17 @@ surface に応じて semantic clause を読み戻します。catalog capability 
 
 `pydocstyle` は compile/runtime/graph/header correctness の必要条件ではなく、
 shared PR/static gate では実行しません。明示的な Docstring review で、対象を限定して
-`python3 -m pydocstyle <python-target>` を実行します。通常の pydocstyle config discovery
-を使い、tool が無い場合または診断がある場合は明示 command が nonzero で終了します。
+`python3 -m pydocstyle --config=tools/ci/pydocstyle.toml <python-target>` を実行します。
+AgentCanon の既定 convention を明示的に適用し、tool が無い場合または診断がある場合は
+明示 command が nonzero で終了します。
 
 AgentCanon の既定 review convention は `tools/ci/pydocstyle.toml` で D213 を選択し、
 相反する D212 を無視します。D212 と D213 を同時に要求しません。親 repository に有効な
 pydocstyle / pep257 設定があれば、明示 review command の通常 discovery を優先します。
-PR の blocking predicate は compiler、runtime、graph、header の owner に限定し、
-pydocstyle の missing/diagnostic を merge gateへ昇格しません。
+PR の blocking predicate には pydocstyle を含めず、pydocstyle の missing/diagnostic を
+merge gateへ昇格しません。他の active profile が選択する compiler、runtime、graph、
+header、Rust、workflow、container、docs、registry、pytest、pyright などの owner gate は
+それぞれの正本に従います。
 
 ### Performance and non-enforcement evaluation
 

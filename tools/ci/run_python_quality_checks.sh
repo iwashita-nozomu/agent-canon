@@ -130,10 +130,6 @@ else
 fi
 echo ""
 
-echo "5️⃣  pydocstyle は明示的な Docstring review route でのみ実行します"
-echo "PYDOCSTYLE=not_run reason=explicit_doc_quality_review_only"
-echo ""
-
 if [ "$QUICK_MODE" -eq 1 ]; then
   echo "RUFF=skip reason=quick_mode"
 elif [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
