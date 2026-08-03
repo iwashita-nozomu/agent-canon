@@ -907,6 +907,26 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.write_valid_workflow(root)
             self.copy_required_surfaces(root)
             self.copy_vendor_surfaces(root)
+            derived_template = (
+                root
+                / "templates"
+                / "documents"
+                / "github"
+                / "pull-request"
+                / "agent_canon.md"
+            )
+            derived_text = derived_template.read_text(encoding="utf-8")
+            derived_template.write_text(
+                derived_text.replace(
+                    "python3 tools/agent-canon/agent_tools/evaluate_skill_workflow_prompts.py "
+                    "--manifest evidence/agent-evals/skill_workflow_prompt_eval.toml\n",
+                    "",
+                ).replace(
+                    "python3 tools/agent-canon/agent_tools/eval_accumulation_check.py\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
             (root / ".gitmodules").write_text(
                 '[submodule "vendor/agent-canon"]\n'
                 "\tpath = vendor/agent-canon\n"
