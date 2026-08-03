@@ -33,7 +33,6 @@ class = "runtime_surface"
 paths = [
   "agents",
   ".agents",
-  "templates",
   ".codex/config.toml",
   ".codex/README.md",
   ".codex/agents",
@@ -468,6 +467,7 @@ paths = [
   ".github/instructions",
   "CLAUDE.md",
   "mcp",
+  "templates",
   "documents/WORKFLOW_GUIDE.md",
   "documents/academic-writing-workflow.md",
   "documents/adaptive-improvement-workflow.md",

@@ -83,6 +83,7 @@ class SurfaceMigrationTest(unittest.TestCase):
         self.configure_git(parent)
         (parent / "tools").mkdir()
         shutil.copy2(SYNC, parent / "tools" / "sync_agent_canon.sh")
+        shutil.copytree(PROJECT_ROOT / "tools" / "lib", parent / "tools" / "lib")
         os.chmod(parent / "tools" / "sync_agent_canon.sh", 0o755)
 
         self.git(
@@ -136,6 +137,13 @@ class SurfaceMigrationTest(unittest.TestCase):
             resolution.source_root,
             (root / "vendor" / "agent-canon").resolve(),
         )
+        legacy_templates = root / "templates"
+        legacy_templates.symlink_to(
+            "vendor/agent-canon/templates",
+            target_is_directory=True,
+        )
+        self.git(root, "add", "templates")
+        self.git(root, "commit", "-m", "fixture legacy root template projection")
 
         devcontainer = root / ".devcontainer"
         devcontainer.mkdir()
@@ -157,6 +165,57 @@ class SurfaceMigrationTest(unittest.TestCase):
         result = self.run_sync(root, "link-root")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("agent_canon_parent_submodule=projection_ready", result.stdout)
+        self.assertFalse(legacy_templates.exists())
+        self.assertFalse(legacy_templates.is_symlink())
+        self.assertTrue(
+            (
+                root
+                / "vendor"
+                / "agent-canon"
+                / "templates"
+                / "documents"
+                / "github"
+            ).is_dir()
+        )
+        self.assertTrue(
+            (
+                root
+                / ".github"
+                / "PULL_REQUEST_TEMPLATE"
+                / "agent_canon.md"
+            ).is_file()
+        )
+        consumer = subprocess.run(
+            [
+                sys.executable,
+                str(
+                    root
+                    / "vendor"
+                    / "agent-canon"
+                    / "tools"
+                    / "experiments"
+                    / "create_experiment_topic.py"
+                ),
+                "projection-consumer",
+                "--repo-root",
+                str(root),
+                "--dry-run",
+            ],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(consumer.returncode, 0, consumer.stdout + consumer.stderr)
+        self.assertIn(
+            f"template_dir={root / 'vendor' / 'agent-canon' / 'templates' / 'experiments' / '_template'}",
+            consumer.stdout,
+        )
+        self.assertIn(
+            "canonical_readme_template="
+            f"{root / 'vendor' / 'agent-canon' / 'templates' / 'documents' / 'experiment' / 'README.template.md'}",
+            consumer.stdout,
+        )
         self.assertTrue(devcontainer.is_dir() and not devcontainer.is_symlink())
         self.assertTrue((devcontainer / "devcontainer.json").is_symlink())
         self.assertEqual(

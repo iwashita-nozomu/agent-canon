@@ -201,10 +201,12 @@ identity and ordering only; they do not rerun the owned check.
 
 ## Centralized Template Parent Follow-Up
 
-When a source update moves template owners under `templates/`, the parent
-projection packet is incomplete until it records all of the following:
+When a source update changes centralized template owners under source-root
+`templates/`, the parent projection packet is incomplete until it records all
+of the following:
 
-- root managed symlink `templates -> vendor/agent-canon/templates`;
+- removal of the retired parent-root `templates` symlink while preserving
+  `vendor/agent-canon/templates/`;
 - deletion of parent `experiments/_template/`;
 - deletion of only the `_template` entry in the parent project registry;
 - deletion of parent docs/tests that only exercise that removed scaffold; and
