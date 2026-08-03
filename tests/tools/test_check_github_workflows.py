@@ -40,6 +40,15 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
     ) -> None:
         """The source and generated checklist expose only the parent PR gate."""
         canonical = "- [ ] `make agent-canon-pr-check`"
+        derived_boundary = (
+            "Derived parent shared gate owns AgentCanon pin/projection/header/"
+            "graph/workflow/skill-command surfaces only; development prompt and "
+            "accumulated evals run only in the standalone AgentCanon static owner."
+        )
+        stale_eval_commands = (
+            "evaluate_skill_workflow_prompts.py",
+            "eval_accumulation_check.py",
+        )
         for relative in (
             "templates/documents/github/pull-request/agent_canon.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
@@ -47,6 +56,9 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             with self.subTest(path=relative):
                 text = (REPO_ROOT / relative).read_text(encoding="utf-8")
                 self.assertEqual(text.count(canonical), 1)
+                self.assertIn(derived_boundary, text)
+                for command in stale_eval_commands:
+                    self.assertNotIn(command, text)
 
     def test_template_agentcanon_gate_allows_obsolete_command_in_prose(
         self,
@@ -700,11 +712,22 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         )
 
     def copy_template_agent_canon_template(self, root: Path) -> None:
-        """Copy the template-side AgentCanon PR template."""
-        source = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
+        """Project the temporary root's canonical AgentCanon PR template."""
+        source = (
+            root
+            / "templates"
+            / "documents"
+            / "github"
+            / "pull-request"
+            / "agent_canon.md"
+        )
         destination = root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
+        self.assertEqual(
+            source.read_text(encoding="utf-8"),
+            destination.read_text(encoding="utf-8"),
+        )
 
     def test_job_level_permissions_are_accepted(self) -> None:
         """Workflow permissions may be declared on every job."""
@@ -907,6 +930,18 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.write_valid_workflow(root)
             self.copy_required_surfaces(root)
             self.copy_vendor_surfaces(root)
+            derived_template = (
+                root
+                / "templates"
+                / "documents"
+                / "github"
+                / "pull-request"
+                / "agent_canon.md"
+            )
+            self.assertIn(
+                "development prompt and accumulated evals run only in the standalone",
+                derived_template.read_text(encoding="utf-8"),
+            )
             (root / ".gitmodules").write_text(
                 '[submodule "vendor/agent-canon"]\n'
                 "\tpath = vendor/agent-canon\n"
@@ -982,7 +1017,6 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             ".github/scripts/checkout_agent_canon_submodule.sh",
             "tools/ci/checkout_agent_canon_submodule.sh",
             ".github/PULL_REQUEST_TEMPLATE.md",
-            ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
             "templates/documents/github/pull-request/agent_canon.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             "issues/README.md",
@@ -1011,6 +1045,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             if source.is_symlink():
                 source = source.resolve()
             shutil.copy2(source, destination)
+        self.copy_template_agent_canon_template(root)
 
     def copy_vendor_surfaces(self, root: Path) -> None:
         """Copy minimal vendor surfaces required by template-mode checks."""

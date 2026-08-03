@@ -113,7 +113,6 @@ TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
     "agentcanon_structure_followup=required",
     "agentcanon_structure_followup=pass",
     "python3 tools/agent_tools/check_agent_runtime_alignment.py",
-    "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",
     "python3 tools/agent_tools/check_convention_compliance.py",
     "Submodule Pin Change",
     "GitHub Mirror / Submodule Evidence",

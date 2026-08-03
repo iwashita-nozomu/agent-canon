@@ -95,10 +95,6 @@ run_direct_agent_checks() {
   fi
   run_convention_compliance_gate
   python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 "${CANON_TOOLS_ROOT}/agent_tools/evaluate_codex_agent_roles.py" --accumulate
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 "${CANON_TOOLS_ROOT}/agent_tools/evaluate_skill_workflow_prompts.py" --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml --accumulate
   python3 "${CANON_TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check
 }
 

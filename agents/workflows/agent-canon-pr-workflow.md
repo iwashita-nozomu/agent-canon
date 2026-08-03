@@ -178,9 +178,11 @@ Branch push and merged-main push do not rerun the same source candidate gate.
 then invokes `check_agent_canon_pr.py` to materialize G2 from those exact
 passing checks. G3 is materialized afterward by the GitHub publication owner;
 tests consume the production G2 owner and do not claim its owner identity.
-Runtime alignment, prompt/eval, convention, skill-command, GitHub workflow,
-dependency, docs, and quick-CI work are not called through a second standalone
-loop in the same run.
+Runtime alignment, convention, skill-command, GitHub workflow, dependency, docs,
+and quick-CI work are not called through a second standalone loop in the same
+run. AgentCanon development prompt and accumulated eval producers are owned by
+the standalone AgentCanon static-gates route only; a derived parent shared gate
+does not invoke them or apply their diagnostics to parent-owned documents.
 
 ### Parent Gate Necessary Conditions
 
@@ -247,11 +249,12 @@ selector failure; no fallback base or empty-diff success is inferred.
 ### One-Judgment-Owner Check Handoff
 
 Each check family has one execution owner in a source PR gate. For a derived
-parent or standalone source, the direct AgentCanon check function owns only the
-shared runtime, convention, prompt/eval, skill-command, Rust, documentation,
-dependency-header, and graph checks. It never enters a repository project's
-test/type/lint route. The standalone static workflow runs the shared gates in
-its existing `static-gates` job; it does not add a repository-wide
+parent, the direct AgentCanon check function owns only shared runtime,
+convention, skill-command, GitHub workflow, documentation, dependency-header,
+and graph checks; it does not run AgentCanon development prompt or accumulated
+eval producers, and it never enters a repository project's test/type/lint
+route. Standalone AgentCanon owns those eval producers in its existing
+`static-gates` job. The standalone static workflow does not add a repository-wide
 project-quality job. The selected parent CI route owns derived-project quality
 consumers, and the workflow checker validates that route's owner marker and
 canonical command.

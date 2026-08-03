@@ -324,6 +324,26 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             source / "tools" / "agent_tools" / "pydocstyle_review.py",
         )
         generic_python = "raise SystemExit(0)\n"
+        eval_python = textwrap.dedent(
+            """
+            import os
+            from pathlib import Path
+
+            log_path = os.environ.get("AGENT_CANON_EVAL_CALL_LOG")
+            if log_path:
+                with Path(log_path).open("a", encoding="utf-8") as stream:
+                    stream.write(Path(__file__).name + "\\n")
+            if Path(__file__).name == "run_accumulated_agent_evals.py":
+                raise SystemExit(int(os.environ.get("AGENT_CANON_EVAL_RC", "0")))
+            raise SystemExit(0)
+            """
+        ).lstrip()
+        eval_tools = {
+            "tools/agent_tools/evaluate_codex_agent_roles.py",
+            "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+            "tools/agent_tools/run_accumulated_agent_evals.py",
+            "tools/agent_tools/eval_accumulation_check.py",
+        }
         for relative in (
             "tools/agent_tools/artifact_identity.py",
             "tools/agent_tools/external_artifact_binding.py",
@@ -358,7 +378,10 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         ):
             target = source / relative
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(generic_python, encoding="utf-8")
+            target.write_text(
+                eval_python if relative in eval_tools else generic_python,
+                encoding="utf-8",
+            )
 
         run(source, "git", "add", ".")
         run(source, "git", "commit", "-m", "fixture source")
@@ -514,6 +537,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "PYTHON_CALL_LOG": str(python_call_log),
                 "AGENT_CANON_TOOLS_HOME": str(fake_home),
                 "RUN_ALL_CHECKS_FIXTURE_LOG": str(temp_root / "run-all-checks.log"),
+                "AGENT_CANON_EVAL_CALL_LOG": str(
+                    temp_root / "agent-canon-eval-calls.log"
+                ),
             }
         )
         result = run(
@@ -587,6 +613,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", result.stdout)
         self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY_OWNER=parent_ci", result.stdout)
         self.assertFalse((state / "run-all-checks.log").exists())
+        self.assertFalse((state / "agent-canon-eval-calls.log").exists())
         project_quality = run(
             state.parent / "parent",
             sys.executable,
@@ -677,6 +704,10 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "GRAPH_GATE_FIXTURE_SCENARIO": "standalone",
                 "AGENT_CANON_TOOLS_HOME": str(fake_home),
                 "RUN_ALL_CHECKS_FIXTURE_LOG": str(temp_root / "run-all-checks.log"),
+                "AGENT_CANON_EVAL_CALL_LOG": str(
+                    temp_root / "agent-canon-eval-calls.log"
+                ),
+                "AGENT_CANON_EVAL_RC": "0",
             }
         )
         result = run(
@@ -694,6 +725,15 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             result.stdout,
         )
         self.assertFalse((temp_root / "run-all-checks.log").exists())
+        eval_calls = (
+            (temp_root / "agent-canon-eval-calls.log")
+            .read_text(encoding="utf-8")
+            .splitlines()
+        )
+        self.assertIn("run_accumulated_agent_evals.py", eval_calls)
+        self.assertIn("eval_accumulation_check.py", eval_calls)
+        self.assertNotIn("evaluate_codex_agent_roles.py", eval_calls)
+        self.assertNotIn("evaluate_skill_workflow_prompts.py", eval_calls)
         self.assertIn(
             "AGENT_CANON_PR_DEPENDENCY_GRAPH=required reason=standalone_source",
             result.stdout,
@@ -702,6 +742,23 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertIn('"status": "fresh"', result.stdout)
         self.assertNotIn(
             "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required", result.stdout
+        )
+
+        environment["AGENT_CANON_EVAL_RC"] = "17"
+        failed = run(
+            source,
+            "bash",
+            "tools/ci/check_agent_canon_pr.sh",
+            check=False,
+            environment=environment,
+        )
+        self.assertEqual(failed.returncode, 17, failed.stdout + failed.stderr)
+        self.assertGreaterEqual(
+            (temp_root / "agent-canon-eval-calls.log")
+            .read_text(encoding="utf-8")
+            .splitlines()
+            .count("run_accumulated_agent_evals.py"),
+            2,
         )
 
     def test_real_pr_check_runs_header_scan_before_hard_graph_failure(self) -> None:
