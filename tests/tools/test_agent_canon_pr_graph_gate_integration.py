@@ -297,6 +297,21 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             'version = 1\nprefix = "vendor/agent-canon"\n',
             encoding="utf-8",
         )
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "ci" / "pydocstyle.toml",
+            source / "tools" / "ci" / "pydocstyle.toml",
+        )
+        catalog = source / "agents" / "skills" / "catalog.yaml"
+        catalog.parent.mkdir(parents=True, exist_ok=True)
+        catalog.write_text("skills: []\n", encoding="utf-8")
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "agent_tools" / "agent_canon_source_root.py",
+            source / "tools" / "agent_tools" / "agent_canon_source_root.py",
+        )
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "agent_tools" / "pydocstyle_review.py",
+            source / "tools" / "agent_tools" / "pydocstyle_review.py",
+        )
         generic_python = "raise SystemExit(0)\n"
         for relative in (
             "tools/agent_tools/artifact_identity.py",
@@ -391,10 +406,6 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "    pass\n",
                 encoding="utf-8",
             )
-        shutil.copy2(
-            PROJECT_ROOT / "tools" / "ci" / "pydocstyle.toml",
-            parent / "tools" / "ci" / "pydocstyle.toml",
-        )
         run(parent, "git", "add", ".")
         run(parent, "git", "commit", "-m", "base")
         base = run(parent, "git", "rev-parse", "HEAD").stdout.strip()
@@ -439,7 +450,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         fake_bin = fixture_root / "bin"
         temp_root = fixture_root / "pr-check-state"
         temp_root.mkdir()
-        python_call_log = temp_root / "python-calls.jsonl"
+        python_call_log = temp_root / "pr-python-calls.jsonl"
         write_executable(
             fake_bin / "python-recorder",
             """
@@ -485,36 +496,6 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             check=False,
             environment=environment,
         )
-        if scenario == "pydoc_baseline":
-            targets = [str(parent / f"baseline_{index}.py") for index in range(202)]
-            docstyle = run(
-                parent,
-                sys.executable,
-                "-m",
-                "pydocstyle",
-                "--config=tools/ci/pydocstyle.toml",
-                *targets,
-                check=False,
-            )
-            (temp_root / "explicit-pydocstyle.stdout").write_text(
-                f"{docstyle.stdout}{docstyle.stderr}", encoding="utf-8"
-            )
-            (temp_root / "explicit-pydocstyle.exit").write_text(
-                str(docstyle.returncode), encoding="utf-8"
-            )
-            quality = run(
-                parent,
-                "bash",
-                "vendor/agent-canon/tools/ci/run_python_quality_checks.sh",
-                check=False,
-                environment=environment,
-            )
-            (temp_root / "python-quality.stdout").write_text(
-                f"{quality.stdout}{quality.stderr}", encoding="utf-8"
-            )
-            (temp_root / "python-quality.exit").write_text(
-                str(quality.returncode), encoding="utf-8"
-            )
         return result, temp_root
 
     def test_real_pr_check_routes_incomplete_graph_to_scoped_or_blocking_selector(
@@ -578,6 +559,26 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         fixture_root = Path(tempfile.mkdtemp(prefix="graph-gate-standalone-"))
         self.addCleanup(shutil.rmtree, fixture_root)
         source = self.create_source_repo(fixture_root)
+        standalone_doc = source / "standalone_docstyle.py"
+        standalone_doc.write_text(
+            '"""Standalone fixture module."""\n\n\n'
+            "def standalone_review():\n"
+            '    """Summary.\n\n    Detail.\n    """\n'
+            "    pass\n",
+            encoding="utf-8",
+        )
+        standalone_review = run(
+            source,
+            sys.executable,
+            "tools/agent_tools/pydocstyle_review.py",
+            str(standalone_doc),
+            check=False,
+        )
+        self.assertEqual(standalone_review.returncode, 1)
+        self.assertEqual(
+            (standalone_review.stdout + standalone_review.stderr).count("D213:"),
+            1,
+        )
         shutil.copy2(PR_CHECK, source / "tools" / "ci" / PR_CHECK.name)
         repo_paths = source / "tools" / "lib" / REPO_PATHS.name
         repo_paths.parent.mkdir(parents=True, exist_ok=True)
@@ -658,31 +659,56 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         result, state = self.run_pr_check("pydoc_baseline")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertNotIn("PYDOCSTYLE", result.stdout)
-        explicit_output = (state / "explicit-pydocstyle.stdout").read_text(
-            encoding="utf-8"
-        )
-        self.assertEqual(
-            int((state / "explicit-pydocstyle.exit").read_text(encoding="utf-8")),
-            1,
-        )
-        self.assertEqual(explicit_output.count("D213:"), 202)
-        self.assertEqual(
-            int((state / "python-quality.exit").read_text(encoding="utf-8")),
-            0,
-        )
-        quality_output = (state / "python-quality.stdout").read_text(encoding="utf-8")
-        self.assertIn("PYTHON_QUALITY_CHECKS=pass", quality_output)
-        self.assertNotIn("pydocstyle", quality_output.lower())
-        calls = [
+        pr_calls = [
             json.loads(line)
-            for line in (state / "python-calls.jsonl")
+            for line in (state / "pr-python-calls.jsonl")
             .read_text(encoding="utf-8")
             .splitlines()
         ]
-        self.assertTrue(any(call[:2] == ["-m", "pytest"] for call in calls))
-        self.assertTrue(any(call[:2] == ["-m", "pyright"] for call in calls))
-        self.assertTrue(any(call[:3] == ["-m", "ruff", "check"] for call in calls))
-        self.assertFalse(any("pydocstyle" in call for call in calls))
+        self.assertTrue(any(call[:2] == ["-m", "pytest"] for call in pr_calls))
+        self.assertTrue(any(call[:2] == ["-m", "pyright"] for call in pr_calls))
+        self.assertFalse(any("pydocstyle" in call for call in pr_calls))
+
+        parent = state.parent / "parent"
+        targets = [str(parent / f"baseline_{index}.py") for index in range(202)]
+        docstyle = run(
+            parent,
+            sys.executable,
+            "vendor/agent-canon/tools/agent_tools/pydocstyle_review.py",
+            *targets,
+            check=False,
+        )
+        explicit_output = docstyle.stdout + docstyle.stderr
+        self.assertEqual(docstyle.returncode, 1)
+        self.assertEqual(explicit_output.count("D213:"), 202)
+        direct_log = state / "direct-python-calls.jsonl"
+        direct_environment = os.environ.copy()
+        fake_bin = state.parent / "bin"
+        direct_environment.update(
+            {
+                "PATH": f"{fake_bin}:{direct_environment['PATH']}",
+                "PYTHON_BIN": str(fake_bin / "python-recorder"),
+                "PYTHON_CALL_LOG": str(direct_log),
+            }
+        )
+        quality = run(
+            parent,
+            "bash",
+            "vendor/agent-canon/tools/ci/run_python_quality_checks.sh",
+            check=False,
+            environment=direct_environment,
+        )
+        self.assertEqual(quality.returncode, 0, quality.stdout + quality.stderr)
+        direct_calls = [
+            json.loads(line)
+            for line in direct_log.read_text(encoding="utf-8").splitlines()
+        ]
+        self.assertTrue(any(call[:2] == ["-m", "pytest"] for call in direct_calls))
+        self.assertTrue(any(call[:2] == ["-m", "pyright"] for call in direct_calls))
+        self.assertTrue(
+            any(call[:3] == ["-m", "ruff", "check"] for call in direct_calls)
+        )
+        self.assertFalse(any("pydocstyle" in call for call in direct_calls))
 
     def test_real_pr_check_rejects_missing_or_stale_graph_identity(self) -> None:
         """Identity defects fail before scoped/full diagnostic classification."""

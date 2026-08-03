@@ -1,8 +1,9 @@
 # @dependency-start
 # contract configuration
-# responsibility Defines the single AgentCanon pydocstyle convention used when a parent has no local policy.
+# responsibility Defines the single AgentCanon convention for source-root-bound explicit Docstring review.
 # upstream design ../README.md shared CI automation index
 # upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract
+# upstream implementation ../agent_tools/pydocstyle_review.py resolves source-root authority
 # downstream design ./PRE_REVIEW_GUIDE.md documents explicit Docstring review usage
 # @dependency-end
 

@@ -1241,6 +1241,24 @@ entries:
     tests:
       - tests/tools/test_run_all_checks_script.py
 
+  - id: pydocstyle-review
+    summary: Runs explicit AgentCanon Docstring review with source-root-bound canonical D213 configuration.
+    path: tools/agent_tools/pydocstyle_review.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/pydocstyle_review.py <python-target>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/conventions/DOCSTRING_GUIDE.md
+      - tools/ci/PRE_REVIEW_GUIDE.md
+      - agents/skills/python-review.md
+    tests:
+      - tests/agent_tools/test_pydocstyle_review.py
+
   - id: check-agent-canon-latest
     summary: Checks whether the AgentCanon pin and source are current and emits the PR-first handoff when shared canon is dirty.
     path: tools/ci/check_agent_canon_latest.sh

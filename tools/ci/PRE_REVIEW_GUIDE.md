@@ -6,6 +6,7 @@ responsibility Documents the verifier pre-review entrypoint for this repository.
 upstream design ../README.md shared automation index
 upstream implementation ./pre_review.sh verifier entrypoint
 upstream implementation ./run_python_quality_checks.sh shared Python quality gate
+downstream implementation ../agent_tools/pydocstyle_review.py explicit AgentCanon Docstring review
 @dependency-end
 -->
 
@@ -54,13 +55,13 @@ bash tools/ci/run_python_quality_checks.sh
 
 Explicit Docstring review for selected Python targets:
 
-    python3 -m pydocstyle --config=tools/ci/pydocstyle.toml <python-target>
+    python3 tools/agent_tools/pydocstyle_review.py <python-target>
 
-This command applies the canonical AgentCanon convention. Parent-local
-pydocstyle configuration remains available through normal configuration
-discovery when the explicit review route is run there. Missing pydocstyle or
-reported diagnostics fail this explicit review only; the shared PR correctness
-gate is unaffected.
+This command resolves the canonical AgentCanon source root and applies its D213
+configuration. Parent-specific Docstring review remains a separate parent-owner
+command and does not substitute its authority. Missing pydocstyle or reported
+diagnostics fail this explicit review only; the shared PR correctness gate is
+unaffected.
 
 ## Report Evidence
 
