@@ -125,6 +125,81 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             from pathlib import Path
 
             args = sys.argv[1:]
+            if args[:2] == ["graph", "status"]:
+                root = Path(args[args.index("--root") + 1]).resolve()
+                scenario = os.environ["GRAPH_GATE_FIXTURE_SCENARIO"]
+                if scenario == "status_missing":
+                    raise SystemExit(1)
+                database = root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
+                if not database.is_file():
+                    raise SystemExit(1)
+                with sqlite3.connect(database) as connection:
+                    metadata = dict(
+                        connection.execute(
+                            "SELECT key, value FROM metadata WHERE key IN "
+                            "('integration_record','input_fingerprint','graph_fingerprint')"
+                        ).fetchall()
+                    )
+                    count_rows = connection.execute(
+                        "SELECT rule, COUNT(*) FROM diagnostics WHERE layer='source' "
+                        "GROUP BY rule"
+                    ).fetchall()
+                integration_record = json.loads(metadata["integration_record"])
+                counts = {
+                    "unresolved_count": 0,
+                    "ambiguous_count": 0,
+                    "uncovered_count": 0,
+                }
+                for rule, count in count_rows:
+                    category = {
+                        "target-ambiguous": "ambiguous_count",
+                        "source-uncovered": "uncovered_count",
+                    }.get(rule, "unresolved_count")
+                    counts[category] += count
+                complete = sum(counts.values()) == 0
+                status_name = "fresh" if complete else "incomplete"
+                reason = None if complete else "source_completeness_incomplete"
+                probe_reason = None
+                status_root = str(root)
+                status_input = metadata["input_fingerprint"]
+                if scenario == "status_source_changed":
+                    status_name = "stale"
+                    reason = "source_changed"
+                    probe_reason = "source_changed"
+                elif scenario == "status_stale":
+                    status_name = "stale"
+                    reason = "producer_identity_changed"
+                    probe_reason = "producer_identity_changed"
+                elif scenario == "status_mismatch":
+                    status_input = "3" * 64
+                elif scenario == "status_typed_verified_int":
+                    integration_record["verified"] = 1
+                elif scenario == "status_typed_fingerprint_int":
+                    integration_record["input_fingerprint"] = 1
+                elif scenario == "status_typed_path_int":
+                    integration_record["db_path"] = 1
+                elif scenario == "status_typed_profile_int":
+                    integration_record["profile"] = 1
+                print(
+                    json.dumps(
+                        {
+                            "schema": "agent-canon.graph.status.v1",
+                            "command": "status",
+                            "status": status_name,
+                            "profile": "default",
+                            "root": status_root,
+                            "db_path": str(database),
+                            "input_fingerprint": status_input,
+                            "graph_fingerprint": metadata["graph_fingerprint"],
+                            "integration_record": integration_record,
+                            **counts,
+                            "probe_reason": probe_reason,
+                            "reason": reason,
+                            "exit_code": 0 if status_name == "fresh" else 2,
+                        }
+                    )
+                )
+                raise SystemExit(0 if status_name == "fresh" else 2)
             if args[:2] != ["graph", "build"]:
                 raise SystemExit(0)
             root = Path(args[args.index("--root") + 1]).resolve()
@@ -182,7 +257,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                     "CREATE TABLE edges(layer TEXT, from_node_id TEXT, to_node_id TEXT)"
                 )
                 connection.execute(
-                    "CREATE TABLE diagnostics(layer TEXT, rule TEXT, message TEXT, target_node_id TEXT)"
+                    "CREATE TABLE diagnostics("
+                    "layer TEXT, rule TEXT, message TEXT, target_node_id TEXT, "
+                    "severity TEXT, payload_json TEXT)"
                 )
                 for path in ("changed.py", source_path):
                     connection.execute(
@@ -195,9 +272,41 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                         ("node:source:changed.py", "node:source:related.py"),
                     )
                 if has_diagnostic:
+                    producer_target = "missing.md"
+                    declaration = (
+                        "upstream design missing.md fixture missing target"
+                    )
+                    typed_payload = {
+                        "schema": "agent-canon.source-diagnostic.v1",
+                        "code": "target-unresolved",
+                        "source": source_path,
+                        "target": producer_target,
+                        "declaration": declaration,
+                        "source_span": {
+                            "path": source_path,
+                            "start_line": 4,
+                            "start_column": 1,
+                            "end_line": 4,
+                            "end_column": 2,
+                        },
+                        "declaration_components": {
+                            "direction": "upstream",
+                            "kind": "design",
+                            "target": producer_target,
+                            "reason": "fixture missing target",
+                        },
+                    }
+                    if scenario == "malformed_payload":
+                        typed_payload["source_span"]["start_line"] = True
                     connection.execute(
-                        "INSERT INTO diagnostics VALUES('source', 'target-unresolved', ?, ?)",
-                        (f"{source_path}:4:missing.md", f"node:source:{source_path}"),
+                        "INSERT INTO diagnostics VALUES('source', ?, ?, ?, ?, ?)",
+                        (
+                            "target-unresolved",
+                            "fixture diagnostic",
+                            f"node:source:{source_path}",
+                            "blocker",
+                            json.dumps(typed_payload, separators=(",", ":")),
+                        ),
                     )
                 for key, value in (
                     ("integration_record", json.dumps(persisted_record)),
@@ -223,6 +332,8 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 "publication": "published",
                 "durability": "durable",
                 "unresolved_count": 1 if has_diagnostic else 0,
+                "ambiguous_count": 0,
+                "uncovered_count": 0,
                 "unresolved": (
                     [
                         {
@@ -857,6 +968,27 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                     / "changed-responsibility-acceptance.json"
                 )
                 self.assertFalse(report.exists())
+
+    def test_real_pr_check_rejects_malformed_typed_diagnostic_before_receipt(
+        self,
+    ) -> None:
+        """Malformed typed identity fails before scoped acceptance is published."""
+        result, state = self.run_pr_check("malformed_payload")
+        self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertIn("AGENT_CANON_PR_GRAPH_ACCEPTANCE=fail", result.stdout)
+        self.assertIn(
+            "AGENT_CANON_PR_GRAPH_ACCEPTANCE_REASON=graph_diagnostic_invalid",
+            result.stdout,
+        )
+        self.assertNotIn("QUICK_CI_RECEIPT_GRAPH=scoped", result.stdout)
+        self.assertNotIn("REPO_DEPENDENCY_REVIEW_CALLED", result.stdout)
+        report = (
+            state
+            / "dependency-review"
+            / "agent-canon-pr"
+            / "changed-responsibility-acceptance.json"
+        )
+        self.assertFalse(report.exists())
 
 
 if __name__ == "__main__":

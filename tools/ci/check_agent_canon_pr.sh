@@ -640,6 +640,14 @@ if [[ "${PR_GATE_DEPENDENCY_GRAPH_REQUIRED}" -eq 1 ]]; then
       --dot-out "${PR_DEPENDENCY_REVIEW_DIR}/dependency_manifest_graph.dot"
     PR_GATE_DEPENDENCY_GRAPH_STATUS=prepared
   elif [[ "${graph_build_rc}" -eq 1 && "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
+    graph_status_result="${PR_DEPENDENCY_REVIEW_DIR}/graph-status.json"
+    graph_status_rc=0
+    if run_agent_canon graph status --root . --profile default --format json >"${graph_status_result}"; then
+      graph_status_rc=0
+    else
+      graph_status_rc=$?
+    fi
+    cat "${graph_status_result}"
     bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" \
       --header-scan-only \
       --fail-missing \
@@ -653,6 +661,7 @@ if [[ "${PR_GATE_DEPENDENCY_GRAPH_REQUIRED}" -eq 1 ]]; then
       --source-root "${AGENT_CANON_SOURCE_ROOT}"
       --evaluate-built-graph
       --graph-result "${graph_build_result}"
+      --status-result "${graph_status_result}"
       --report-out "${PR_DEPENDENCY_REVIEW_DIR}/changed-responsibility-acceptance.json"
     )
     if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then

@@ -16,7 +16,6 @@ import base64
 import hashlib
 import json
 import os
-import posixpath
 import re
 import sqlite3
 import stat
@@ -43,9 +42,11 @@ HEX_FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
 HEX_SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 FULL_HISTORY_DEEPEN = "2147483647"
 GRAPH_PROFILE = "default"
+SOURCE_DIAGNOSTIC_SCHEMA = "agent-canon.source-diagnostic.v1"
 PRODUCER_IDENTITY_VERSION = "agent-canon.surface-manifest-producer.v1"
 PRODUCER_IDENTITY_CONTRACT = "agent-canon.surface-manifest.v1"
 CHANGED_PATH_PACKET_SCHEMA = "agent-canon.pr-changed-paths.v1"
+GRAPH_STATUS_SCHEMA = "agent-canon.graph.status.v1"
 
 
 class SelectorFailure(RuntimeError):
@@ -195,6 +196,15 @@ class GraphBuildIdentity:
         }
 
 
+@dataclass(frozen=True)
+class GraphStatusBinding:
+    """One status result bound to the exact graph candidate artifacts."""
+
+    path: Path
+    file_identity: FileIdentity
+    payload: dict[str, object]
+
+
 class DiagnosticRecord(TypedDict):
     """One validated persisted graph diagnostic."""
 
@@ -204,6 +214,25 @@ class DiagnosticRecord(TypedDict):
     target_path: str
     declaration: str
     severity: str
+
+
+class DiagnosticSourceSpan(TypedDict):
+    """Source span carried by one producer-owned diagnostic payload."""
+
+    path: str
+    start_line: int
+    start_column: int
+    end_line: int
+    end_column: int
+
+
+class DiagnosticDeclarationComponents(TypedDict):
+    """Typed manifest declaration components carried by a diagnostic payload."""
+
+    direction: str
+    kind: str
+    target: str
+    reason: str
 
 
 class ClassifiedDiagnostic(DiagnosticRecord):
@@ -278,6 +307,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--graph-result",
         help="JSON result emitted by the incomplete graph build.",
+    )
+    parser.add_argument(
+        "--status-result",
+        help="JSON result emitted by the bound graph status readback.",
     )
     parser.add_argument(
         "--report-out",
@@ -798,41 +831,207 @@ def path_is_changed(path: str, changed_paths: Sequence[str]) -> bool:
     )
 
 
-def diagnostic_source_path(
-    target_node_id: str,
-    message: str,
-    node_paths: Mapping[str, str],
+def diagnostic_payload_string(
+    payload: Mapping[str, object],
+    field: str,
+    owner: str,
 ) -> str:
-    """Resolve the declaring source path for one persisted graph diagnostic."""
-    if target_node_id in node_paths:
-        return node_paths[target_node_id]
-    return message.partition(":")[0]
+    """Read one required nonempty diagnostic payload string without coercion."""
+    if field not in payload:
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};field={field};required=yes",
+        )
+    value = payload[field]
+    if type(value) is not str:
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};field={field};expected_type=string",
+        )
+    if not value.strip():
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};field={field};required_nonempty=yes",
+        )
+    return value
 
 
-def diagnostic_target_path(source_path: str, code: str, message: str) -> str:
-    """Resolve a target diagnostic's declared path without touching the filesystem."""
-    if not code.startswith("target-"):
-        return ""
-    fields = message.split(":", 2)
-    if len(fields) != 3 or not source_path or fields[0] != source_path:
-        return ""
-    declared = fields[2]
-    if declared.startswith("/"):
-        return ""
-    normalized = posixpath.normpath(
-        posixpath.join(posixpath.dirname(source_path), declared)
+def diagnostic_payload_object(
+    value: object,
+    owner: str,
+    expected_fields: frozenset[str],
+) -> dict[str, object]:
+    """Read one strict diagnostic payload object with an exact field set."""
+    if type(value) is not dict:
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};expected_type=object",
+        )
+    payload = cast(dict[str, object], value)
+    actual_fields = frozenset(payload)
+    if actual_fields != expected_fields:
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};fields=expected:{','.join(sorted(expected_fields))};"
+            f"actual:{','.join(sorted(actual_fields))}",
+        )
+    return payload
+
+
+def validate_source_diagnostic(
+    *,
+    rule: object,
+    message: object,
+    target_node_id: object,
+    severity: object,
+    payload_value: object,
+    node_paths: Mapping[str, str],
+    owner: str,
+) -> DiagnosticRecord:
+    """Validate one producer-owned source diagnostic before classification."""
+    if type(rule) is not str or not rule.strip():
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};field=rule;expected_type=nonempty_string",
+        )
+    if type(message) is not str or not message.strip():
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};field=message;expected_type=nonempty_string",
+        )
+    if type(target_node_id) is not str or not target_node_id.strip():
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};field=target_node_id;expected_type=nonempty_string",
+        )
+    if target_node_id not in node_paths:
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};field=target_node_id;target_node=missing",
+        )
+    if type(severity) is not str or not severity.strip():
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};field=severity;expected_type=nonempty_string",
+        )
+    severity_rank(cast(str, severity))
+    payload = diagnostic_payload_object(
+        payload_value,
+        f"{owner}.payload_json",
+        frozenset(
+            {
+                "schema",
+                "code",
+                "source",
+                "target",
+                "declaration",
+                "source_span",
+                "declaration_components",
+            }
+        ),
     )
-    if normalized == ".." or normalized.startswith("../"):
-        return ""
-    return normalized
+    schema = diagnostic_payload_string(payload, "schema", owner)
+    if schema != SOURCE_DIAGNOSTIC_SCHEMA:
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};field=schema;value={schema}",
+        )
+    code = diagnostic_payload_string(payload, "code", owner)
+    source_path = diagnostic_payload_string(payload, "source", owner)
+    target_path = diagnostic_payload_string(payload, "target", owner)
+    declaration = diagnostic_payload_string(payload, "declaration", owner)
+    if code != rule:
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};fields=rule,code;values_differ=yes",
+        )
 
+    span_payload = diagnostic_payload_object(
+        payload["source_span"],
+        f"{owner}.source_span",
+        frozenset({"path", "start_line", "start_column", "end_line", "end_column"}),
+    )
+    span = cast(DiagnosticSourceSpan, span_payload)
+    span_path = diagnostic_payload_string(span_payload, "path", f"{owner}.source_span")
+    if span_path != source_path or node_paths[target_node_id] != source_path:
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};fields=source,source_span.path,target_node_id;values_differ=yes",
+        )
+    for field in ("start_line", "start_column", "end_line", "end_column"):
+        value = span_payload[field]
+        if type(value) is not int:
+            raise SelectorFailure(
+                "graph_diagnostic_invalid",
+                f"owner={owner}.source_span;field={field};expected_type=integer",
+            )
+        if value < 1:
+            raise SelectorFailure(
+                "graph_diagnostic_invalid",
+                f"owner={owner}.source_span;field={field};required_positive=yes",
+            )
+    if (
+        cast(int, span["end_line"]) < cast(int, span["start_line"])
+        or (
+            span["end_line"] == span["start_line"]
+            and span["end_column"] < span["start_column"]
+        )
+    ):
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner}.source_span;ordering=invalid",
+        )
 
-def diagnostic_declaration(source_path: str, message: str) -> str:
-    """Extract a line-independent declaration payload from one diagnostic."""
-    fields = message.split(":", 2)
-    if len(fields) == 3 and fields[0] == source_path and fields[1].isdigit():
-        return " ".join(fields[2].split())
-    return " ".join(message.split())
+    components_payload = diagnostic_payload_object(
+        payload["declaration_components"],
+        f"{owner}.declaration_components",
+        frozenset({"direction", "kind", "target", "reason"}),
+    )
+    components = cast(DiagnosticDeclarationComponents, components_payload)
+    direction = diagnostic_payload_string(
+        components_payload,
+        "direction",
+        f"{owner}.declaration_components",
+    )
+    kind = diagnostic_payload_string(
+        components_payload,
+        "kind",
+        f"{owner}.declaration_components",
+    )
+    component_target = diagnostic_payload_string(
+        components_payload,
+        "target",
+        f"{owner}.declaration_components",
+    )
+    reason = diagnostic_payload_string(
+        components_payload,
+        "reason",
+        f"{owner}.declaration_components",
+    )
+    if component_target != target_path:
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};fields=target,declaration_components.target;values_differ=yes",
+        )
+    canonical_declaration = " ".join((direction, kind, component_target, reason))
+    if declaration != canonical_declaration:
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};fields=declaration,declaration_components;values_differ=yes",
+        )
+    if any(value != " ".join(value.split()) for value in (direction, kind, component_target, reason)):
+        raise SelectorFailure(
+            "graph_diagnostic_invalid",
+            f"owner={owner};field=declaration_components;canonical_whitespace=no",
+        )
+    return {
+        "code": code,
+        "message": cast(str, message),
+        "source_path": source_path,
+        "target_path": target_path,
+        "declaration": declaration,
+        "severity": cast(str, severity),
+    }
 
 
 def diagnostic_identity_key(diagnostic: DiagnosticRecord) -> tuple[str, str, str, str]:
@@ -1224,6 +1423,20 @@ def graph_build_identity(
             "fields=root,profile,db_path,input_fingerprint,graph_fingerprint,publication",
         )
 
+    for field in ("unresolved_count", "ambiguous_count", "uncovered_count"):
+        value = result.get(field)
+        if field not in result:
+            raise SelectorFailure(
+                "graph_identity_missing",
+                f"owner=graph_build_result;field={field}",
+            )
+        if type(value) is not int or value < 0:
+            raise SelectorFailure(
+                "graph_identity_invalid",
+                f"owner=graph_build_result;field={field};"
+                "expected_type=nonnegative_integer",
+            )
+
     database_file_identity = regular_file_identity(
         expected_database,
         "graph_database_unavailable",
@@ -1258,6 +1471,444 @@ def graph_build_identity(
         status_value,
         result["exit_code"],
     )
+
+
+def status_result_string(
+    payload: Mapping[str, object],
+    field: str,
+    owner: str,
+    pattern: re.Pattern[str] | None = None,
+) -> str:
+    """Read one exact nonempty string from a graph status result."""
+    value = payload.get(field)
+    if type(value) is not str or not value:
+        raise SelectorFailure(
+            "graph_status_result_invalid",
+            f"owner={owner};field={field};expected_type=nonempty_string",
+        )
+    if pattern is not None and not pattern.fullmatch(value):
+        raise SelectorFailure(
+            "graph_status_result_invalid",
+            f"owner={owner};field={field};format=invalid",
+        )
+    return value
+
+
+def status_result_file_identity(path: Path) -> FileIdentity:
+    """Capture one status result file identity with status-specific failures."""
+    return regular_file_identity(
+        path,
+        "graph_status_result_unavailable",
+        "graph_status_result_invalid",
+    )
+
+
+def assert_status_result_identity(path: Path, expected: FileIdentity) -> None:
+    """Reject status replacement during candidate validation."""
+    try:
+        current = status_result_file_identity(path)
+    except SelectorFailure:
+        raise SelectorFailure(
+            "graph_status_result_replaced",
+            f"path={path}",
+        ) from None
+    if current != expected:
+        raise SelectorFailure(
+            "graph_status_result_replaced",
+            f"path={path}",
+        )
+
+
+def validate_graph_status_binding(
+    status_result_path: Path,
+    build: GraphBuildIdentity,
+    *,
+    expected_status: str = "incomplete",
+) -> GraphStatusBinding:
+    """Validate status and bind it to build output plus persisted DB identity."""
+    status_file_identity = status_result_file_identity(status_result_path)
+    try:
+        raw_status = status_result_path.read_text(encoding="utf-8")
+    except OSError:
+        raise SelectorFailure(
+            "graph_status_result_unavailable",
+            f"path={status_result_path}",
+        ) from None
+    if not raw_status.strip():
+        raise SelectorFailure(
+            "graph_status_result_unavailable",
+            f"path={status_result_path};detail=empty",
+        )
+    try:
+        status_value: object = json.loads(raw_status)
+    except (TypeError, ValueError):
+        raise SelectorFailure(
+            "graph_status_result_invalid",
+            f"path={status_result_path};detail=invalid_json",
+        ) from None
+    assert_status_result_identity(status_result_path, status_file_identity)
+    if type(status_value) is not dict:
+        raise SelectorFailure(
+            "graph_status_result_invalid",
+            "detail=not_object",
+        )
+    status = cast(dict[str, object], status_value)
+    schema = status_result_string(status, "schema", "graph_status_result")
+    command = status_result_string(status, "command", "graph_status_result")
+    status_name = status_result_string(status, "status", "graph_status_result")
+    if schema != GRAPH_STATUS_SCHEMA or command != "status":
+        raise SelectorFailure(
+            "graph_status_result_invalid",
+            "fields=schema,command;expected=canonical_status",
+        )
+    if status_name == "unavailable":
+        expected_fields = frozenset(
+            {"schema", "command", "status", "reason", "exit_code"}
+        )
+        if frozenset(status) != expected_fields:
+            raise SelectorFailure(
+                "graph_status_result_invalid",
+                "status=unavailable;fields=unexpected",
+            )
+        reason = status_result_string(status, "reason", "graph_status_result")
+        exit_code = status.get("exit_code")
+        if type(exit_code) is not int or exit_code != 1:
+            raise SelectorFailure(
+                "graph_status_result_invalid",
+                "status=unavailable;field=exit_code;expected=1",
+            )
+        raise SelectorFailure(
+            "graph_status_unavailable",
+            f"reason={reason}",
+        )
+
+    expected_fields = frozenset(
+        {
+            "schema",
+            "command",
+            "status",
+            "profile",
+            "root",
+            "db_path",
+            "input_fingerprint",
+            "graph_fingerprint",
+            "integration_record",
+            "unresolved_count",
+            "ambiguous_count",
+            "uncovered_count",
+            "probe_reason",
+            "reason",
+            "exit_code",
+        }
+    )
+    if frozenset(status) != expected_fields:
+        raise SelectorFailure(
+            "graph_status_result_invalid",
+            "fields=expected_status_schema;exact=yes",
+        )
+    profile = status_result_string(status, "profile", "graph_status_result")
+    root = status_result_string(status, "root", "graph_status_result")
+    db_path = status_result_string(status, "db_path", "graph_status_result")
+    input_fingerprint = status_result_string(
+        status,
+        "input_fingerprint",
+        "graph_status_result",
+        HEX_FINGERPRINT_RE,
+    )
+    graph_fingerprint = status_result_string(
+        status,
+        "graph_fingerprint",
+        "graph_status_result",
+        HEX_FINGERPRINT_RE,
+    )
+    if expected_status not in {"fresh", "incomplete"}:
+        raise SelectorFailure(
+            "graph_status_result_invalid",
+            f"expected_status={expected_status}",
+        )
+    reason_value = status.get("reason")
+    if reason_value is not None and (
+        type(reason_value) is not str or not reason_value
+    ):
+        raise SelectorFailure(
+            "graph_status_result_invalid",
+            "field=reason;expected_type=null_or_nonempty_string",
+        )
+    probe_reason = status.get("probe_reason")
+    if probe_reason is not None and (type(probe_reason) is not str or not probe_reason):
+        raise SelectorFailure(
+            "graph_status_result_invalid",
+            "field=probe_reason;expected_type=null_or_nonempty_string",
+        )
+    counts: dict[str, int] = {}
+    for field in ("unresolved_count", "ambiguous_count", "uncovered_count"):
+        value = status.get(field)
+        if type(value) is not int or value < 0:
+            raise SelectorFailure(
+                "graph_status_result_invalid",
+                f"field={field};expected_type=nonnegative_integer",
+            )
+        counts[field] = value
+    exit_code = status.get("exit_code")
+    if type(exit_code) is not int:
+        raise SelectorFailure(
+            "graph_status_result_invalid",
+            "field=exit_code;expected_type=integer",
+        )
+    if status_name == "stale":
+        if probe_reason == "source_changed":
+            raise SelectorFailure(
+                "graph_status_source_changed",
+                "probe_reason=source_changed",
+            )
+        raise SelectorFailure(
+            "graph_status_stale",
+            f"probe_reason={probe_reason or 'missing'}",
+        )
+    if status_name == "fresh":
+        if expected_status != "fresh":
+            raise SelectorFailure(
+                "graph_status_fresh",
+                "required_status=incomplete",
+            )
+        if exit_code != 0:
+            raise SelectorFailure(
+                "graph_status_exit_code_mismatch",
+                f"expected=0;actual={exit_code}",
+            )
+        if reason_value is not None:
+            raise SelectorFailure(
+                "graph_status_reason_mismatch",
+                f"expected=null;actual={reason_value}",
+            )
+        if probe_reason is not None:
+            raise SelectorFailure(
+                "graph_status_probe_reason_mismatch",
+                "expected=null",
+            )
+    elif status_name == "incomplete":
+        if expected_status != "incomplete":
+            raise SelectorFailure(
+                "graph_status_incomplete",
+                "required_status=fresh",
+            )
+        if type(reason_value) is not str or not reason_value:
+            raise SelectorFailure(
+                "graph_status_result_invalid",
+                "field=reason;expected_type=nonempty_string",
+            )
+        if exit_code != 2:
+            raise SelectorFailure(
+                "graph_status_exit_code_mismatch",
+                f"expected=2;actual={exit_code}",
+            )
+        if reason_value != "source_completeness_incomplete":
+            raise SelectorFailure(
+                "graph_status_reason_mismatch",
+                "expected=source_completeness_incomplete;"
+                f"actual={reason_value}",
+            )
+        if probe_reason is not None:
+            raise SelectorFailure(
+                "graph_status_probe_reason_mismatch",
+                "expected=null",
+            )
+    else:
+        raise SelectorFailure(
+            "graph_status_not_incomplete",
+            f"status={status_name}",
+        )
+    integration_value = status.get("integration_record")
+    if type(integration_value) is not dict:
+        raise SelectorFailure(
+            "graph_status_result_invalid",
+            "field=integration_record;expected_type=object",
+        )
+    status_integration = validate_integration_identity(
+        integration_value,
+        "graph_status_result.integration_record",
+    )
+
+    try:
+        assert_file_identity(
+            build.result_path,
+            build.result_file_identity,
+            "graph_build_result",
+        )
+        build_result_value: object = json.loads(
+            build.result_path.read_text(encoding="utf-8")
+        )
+    except (OSError, ValueError):
+        raise SelectorFailure(
+            "graph_status_identity_mismatch",
+            "owner=graph_build_result;detail=unavailable",
+        ) from None
+    if type(build_result_value) is not dict:
+        raise SelectorFailure(
+            "graph_status_identity_mismatch",
+            "owner=graph_build_result;detail=not_object",
+        )
+    build_result = cast(dict[str, object], build_result_value)
+    if "integration_record" not in build_result:
+        raise SelectorFailure(
+            "graph_identity_missing",
+            "owner=graph_build_result;field=integration_record",
+        )
+    build_integration = validate_integration_identity(
+        build_result["integration_record"],
+        "graph_build_result.integration_record",
+    )
+    integration_mismatches = integration_identity_mismatches(
+        status_integration,
+        build_integration,
+    )
+    if integration_mismatches:
+        raise SelectorFailure(
+            "graph_status_identity_mismatch",
+            "owners=graph_status_result,graph_build_result;fields="
+            + ",".join(integration_mismatches),
+        )
+    integration_mismatches = integration_identity_mismatches(
+        status_integration,
+        build.integration_identity,
+    )
+    if integration_mismatches:
+        raise SelectorFailure(
+            "graph_status_identity_mismatch",
+            "owners=graph_status_result,graph_build_identity;fields="
+            + ",".join(integration_mismatches),
+        )
+    for field in ("unresolved_count", "ambiguous_count", "uncovered_count"):
+        if field not in build_result:
+            raise SelectorFailure(
+                "graph_identity_missing",
+                f"owner=graph_build_result;field={field}",
+            )
+        value = build_result[field]
+        if type(value) is not int or value < 0:
+            raise SelectorFailure(
+                "graph_identity_invalid",
+                f"owner=graph_build_result;field={field};"
+                "expected_type=nonnegative_integer",
+            )
+        if counts[field] != value:
+            raise SelectorFailure(
+                "graph_status_counts_mismatch",
+                f"field={field};build={value};status={counts[field]}",
+            )
+
+    try:
+        assert_file_identity(build.database, build.database_file_identity, "graph_database")
+        uri = f"file:{quote(build.database.as_posix(), safe='/')}?mode=ro&immutable=1"
+        with sqlite3.connect(uri, uri=True) as connection:
+            rows = connection.execute(
+                "SELECT key, value FROM metadata WHERE key IN "
+                "('integration_record','input_fingerprint','graph_fingerprint')"
+            ).fetchall()
+            diagnostic_count_rows = connection.execute(
+                "SELECT rule, COUNT(*) FROM diagnostics WHERE layer='source' "
+                "GROUP BY rule"
+            ).fetchall()
+        assert_file_identity(build.database, build.database_file_identity, "graph_database")
+    except sqlite3.Error:
+        raise SelectorFailure(
+            "graph_status_unavailable",
+            "owner=graph_database_metadata",
+        ) from None
+    metadata = {str(key): value for key, value in rows}
+    if set(metadata) != {"integration_record", "input_fingerprint", "graph_fingerprint"}:
+        raise SelectorFailure(
+            "graph_status_identity_mismatch",
+            "owner=graph_database_metadata;fields=integration_record,input_fingerprint,graph_fingerprint",
+        )
+    database_counts = {
+        "unresolved_count": 0,
+        "ambiguous_count": 0,
+        "uncovered_count": 0,
+    }
+    for rule, count in diagnostic_count_rows:
+        if type(rule) is not str or type(count) is not int or count < 0:
+            raise SelectorFailure(
+                "graph_status_result_invalid",
+                "owner=graph_database;field=diagnostic_counts;"
+                "expected_type=canonical_rows",
+            )
+        category = {
+            "target-ambiguous": "ambiguous_count",
+            "source-uncovered": "uncovered_count",
+        }.get(rule, "unresolved_count")
+        database_counts[category] += count
+    for field, value in database_counts.items():
+        if counts[field] != value:
+            raise SelectorFailure(
+                "graph_status_counts_mismatch",
+                f"owner=graph_database;field={field};database={value};"
+                f"status={counts[field]}",
+            )
+    try:
+        persisted_integration_value = json.loads(metadata["integration_record"])
+    except (TypeError, ValueError):
+        raise SelectorFailure(
+            "graph_status_identity_mismatch",
+            "owner=graph_database_metadata;field=integration_record;detail=invalid_json",
+        ) from None
+    persisted_integration = validate_integration_identity(
+        persisted_integration_value,
+        "graph_database_metadata.integration_record",
+    )
+    integration_mismatches = integration_identity_mismatches(
+        status_integration,
+        persisted_integration,
+    )
+    if integration_mismatches:
+        raise SelectorFailure(
+            "graph_status_identity_mismatch",
+            "owners=graph_status_result,graph_database_metadata;fields="
+            + ",".join(integration_mismatches),
+        )
+    integration_mismatches = integration_identity_mismatches(
+        persisted_integration,
+        build.integration_identity,
+    )
+    if integration_mismatches:
+        raise SelectorFailure(
+            "graph_status_identity_mismatch",
+            "owners=graph_database_metadata,graph_build_identity;fields="
+            + ",".join(integration_mismatches),
+        )
+    if type(metadata["input_fingerprint"]) is not str or metadata["input_fingerprint"] != input_fingerprint:
+        raise SelectorFailure(
+            "graph_status_identity_mismatch",
+            "field=input_fingerprint",
+        )
+    if metadata["graph_fingerprint"] != graph_fingerprint:
+        raise SelectorFailure(
+            "graph_status_identity_mismatch",
+            "field=graph_fingerprint",
+        )
+    expected_identity = {
+        "root": build.root,
+        "profile": build.profile,
+        "db_path": str(build.database),
+        "input_fingerprint": build.input_fingerprint,
+        "graph_fingerprint": build.graph_fingerprint,
+    }
+    actual_identity = {
+        "root": root,
+        "profile": profile,
+        "db_path": db_path,
+        "input_fingerprint": input_fingerprint,
+        "graph_fingerprint": graph_fingerprint,
+    }
+    mismatches = sorted(
+        field for field, expected in expected_identity.items() if actual_identity[field] != expected
+    )
+    if mismatches:
+        raise SelectorFailure(
+            "graph_status_identity_mismatch",
+            f"fields={','.join(mismatches)}",
+        )
+    return GraphStatusBinding(status_result_path, status_file_identity, status)
 
 
 def read_bound_graph_acceptance_facts(
@@ -1397,45 +2048,53 @@ def read_bound_graph_acceptance_facts(
             str(row[1])
             for row in connection.execute("PRAGMA table_info(diagnostics)").fetchall()
         }
-        if "severity" in diagnostic_columns:
-            diagnostic_rows = cast(
-                list[tuple[str, str, str, str]],
-                connection.execute(
-                    "SELECT rule, message, target_node_id, severity "
-                    "FROM diagnostics WHERE layer='source'"
-                ).fetchall(),
+        required_diagnostic_columns = {
+            "rule",
+            "message",
+            "target_node_id",
+            "severity",
+            "payload_json",
+        }
+        missing_diagnostic_columns = sorted(
+            required_diagnostic_columns.difference(diagnostic_columns)
+        )
+        if missing_diagnostic_columns:
+            raise SelectorFailure(
+                "graph_diagnostic_schema_missing",
+                "owner=diagnostics;fields=" + ",".join(missing_diagnostic_columns),
             )
-        else:
-            legacy_rows = cast(
-                list[tuple[str, str, str]],
-                connection.execute(
-                    "SELECT rule, message, target_node_id "
-                    "FROM diagnostics WHERE layer='source'"
-                ).fetchall(),
-            )
-            diagnostic_rows = [
-                (rule, message, target_node_id, "blocker")
-                for rule, message, target_node_id in legacy_rows
-            ]
-        for rule, message, target_node_id, severity in diagnostic_rows:
-            source_path = diagnostic_source_path(
-                target_node_id,
-                message,
-                node_paths,
-            )
+        diagnostic_rows = cast(
+            list[tuple[object, object, object, object, object]],
+            connection.execute(
+                "SELECT rule, message, target_node_id, severity, payload_json "
+                "FROM diagnostics WHERE layer='source'"
+            ).fetchall(),
+        )
+        for index, (
+            rule,
+            message,
+            target_node_id,
+            severity,
+            payload_json,
+        ) in enumerate(diagnostic_rows):
+            try:
+                payload_value: object = json.loads(payload_json) if type(payload_json) is str else payload_json
+            except (TypeError, json.JSONDecodeError) as error:
+                raise SelectorFailure(
+                    "graph_diagnostic_invalid",
+                    f"owner=diagnostics[{index}].payload_json;json=invalid;"
+                    f"error={type(error).__name__}",
+                ) from error
             diagnostics.append(
-                {
-                    "code": rule,
-                    "message": message,
-                    "source_path": source_path,
-                    "target_path": diagnostic_target_path(
-                        source_path,
-                        rule,
-                        message,
-                    ),
-                    "declaration": diagnostic_declaration(source_path, message),
-                    "severity": severity,
-                }
+                validate_source_diagnostic(
+                    rule=rule,
+                    message=message,
+                    target_node_id=target_node_id,
+                    severity=severity,
+                    payload_value=payload_value,
+                    node_paths=node_paths,
+                    owner=f"diagnostics[{index}]",
+                )
             )
     except SelectorFailure as error:
         pending_error = error
@@ -1955,6 +2614,62 @@ def build_trusted_base_graph(
             allow_complete=True,
             expected_producer_identity=producer_identity,
         )
+        status = subprocess.run(
+            [
+                str(executable),
+                "graph",
+                "status",
+                "--root",
+                str(base_root),
+                "--profile",
+                GRAPH_PROFILE,
+                "--format",
+                "json",
+            ],
+            cwd=base_root,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=os.environ.copy(),
+        )
+        if status.returncode not in {0, 2} or not status.stdout.strip():
+            raise SelectorFailure(
+                "trusted_base_graph_status_unavailable",
+                f"exit={status.returncode};stdout=empty"
+                if not status.stdout.strip()
+                else f"exit={status.returncode}",
+            )
+        try:
+            status_payload: object = json.loads(status.stdout)
+        except ValueError:
+            raise SelectorFailure(
+                "trusted_base_graph_status_invalid",
+                "detail=invalid_json",
+            ) from None
+        if (
+            type(status_payload) is not dict
+            or type(status_payload.get("exit_code")) is not int
+            or status_payload["exit_code"] != status.returncode
+        ):
+            raise SelectorFailure(
+                "trusted_base_graph_status_exit_code_mismatch",
+                f"process={status.returncode}",
+            )
+        status_path = (
+            base_root / ".agent-canon" / "knowledge-graph" / "graph-status.json"
+        )
+        try:
+            status_path.write_text(status.stdout, encoding="utf-8")
+        except OSError:
+            raise SelectorFailure(
+                "trusted_base_graph_status_unavailable",
+                "result_write=failed",
+            ) from None
+        validate_graph_status_binding(
+            status_path,
+            identity,
+            expected_status=identity.build_status,
+        )
         _, _, diagnostics = read_bound_graph_acceptance_facts(
             identity,
             base_sha,
@@ -1979,6 +2694,7 @@ def evaluate_built_graph(
     environment: Mapping[str, str],
     trusted_base_sha: str | None = None,
     source_root: Path | None = None,
+    status_result_path: Path | None = None,
 ) -> GraphAcceptance:
     """Compare head diagnostics with a graph built from the trusted base."""
     diff = load_diff(root, environment, trusted_base_sha)
@@ -1988,10 +2704,17 @@ def evaluate_built_graph(
         graph_result_path,
         expected_producer_identity=producer_identity,
     )
+    status_path = status_result_path or graph_result_path.with_name("graph-status.json")
+    status_binding = validate_graph_status_binding(
+        status_path,
+        build_identity,
+        expected_status="incomplete",
+    )
     node_paths, adjacency, diagnostics = read_bound_graph_acceptance_facts(
         build_identity,
         diff.head_sha,
     )
+    assert_status_result_identity(status_binding.path, status_binding.file_identity)
     full_scope = migration_requested(environment)
     reachable_paths = graph_reachable_paths(
         node_paths,
@@ -2163,11 +2886,11 @@ def main() -> int:
         print(json.dumps(identity.json(), sort_keys=True, separators=(",", ":")))
         return EXIT_REQUIRED
     if args.evaluate_built_graph:
-        if not args.graph_result or not args.report_out:
+        if not args.graph_result or not args.status_result or not args.report_out:
             emit_acceptance(
                 "fail",
                 "graph_acceptance_arguments_missing",
-                "required=graph_result,report_out",
+                "required=graph_result,status_result,report_out",
             )
             return EXIT_FAILURE
         try:
@@ -2177,6 +2900,7 @@ def main() -> int:
                 os.environ,
                 args.trusted_base_sha,
                 Path(args.source_root).resolve(),
+                Path(args.status_result).resolve(),
             )
             report_out = Path(args.report_out)
             report_out.parent.mkdir(parents=True, exist_ok=True)

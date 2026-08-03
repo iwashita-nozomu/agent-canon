@@ -18,6 +18,9 @@
 set -euo pipefail
 
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+# shellcheck source=../lib/repo_paths.sh
+source "${script_dir}/../lib/repo_paths.sh"
 CHECK_BIDIRECTIONAL=0
 CYCLE_REPORT_ONLY=0
 FAIL_MISSING=0
@@ -31,6 +34,7 @@ CHANGED_PATH_PACKET=""
 TRUSTED_BASE_SHA=""
 HEADER_SCAN_ONLY=0
 CHECK_DESIGN_DOC_CLAIMS=0
+ENSURE_GRAPH_ONLY=0
 declare -a DESIGN_DOC_CLAIM_PATHS=()
 
 usage() {
@@ -55,6 +59,8 @@ passed to the canonical scan; unchanged missing headers remain baseline evidence
 With --trusted-base-sha, the packet base is bound to an independent caller authority.
 With --header-scan-only, graph status/query and graph projections are skipped while
 the strict canonical header scan and format check still run.
+With --ensure-graph, the canonical graph status/build/readback operation runs once
+and exits before dependency-header review.
 With --check-design-doc-claims, changed design documents are compared with
 dependency header evidence and implementation-backed claim tokens. Repeat
 --design-doc-claim-path to check explicit design documents instead of changed
@@ -100,6 +106,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --header-scan-only)
       HEADER_SCAN_ONLY=1
+      shift
+      ;;
+    --ensure-graph)
+      ENSURE_GRAPH_ONLY=1
       shift
       ;;
     --list-changed-dependencies)
@@ -148,11 +158,11 @@ if [[ "$HEADER_SCAN_ONLY" -eq 1 && ( -z "$CHANGED_PATH_PACKET" || -z "$TRUSTED_B
 fi
 
 if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
-  if [[ -d "$ROOT_DIR/vendor/agent-canon" ]]; then
-    GRAPH_CLI="$ROOT_DIR/vendor/agent-canon/tools/bin/agent-canon"
-  else
-    GRAPH_CLI="$ROOT_DIR/tools/bin/agent-canon"
-  fi
+  CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")" || {
+    echo "canonical AgentCanon source tools root is unavailable for root: $ROOT_DIR" >&2
+    exit 1
+  }
+  GRAPH_CLI="${CANON_TOOLS_ROOT}/bin/agent-canon"
   if [[ ! -x "$GRAPH_CLI" ]]; then
     echo "canonical graph executable is missing for root: $ROOT_DIR" >&2
     exit 1
@@ -163,14 +173,55 @@ if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
   owner_query_file="$(mktemp)"
   trap 'rm -f "$status_file" "$dependency_query_file" "$owner_query_file"' EXIT
 
-  set +e
-  "$GRAPH_CLI" graph status --root "$ROOT_DIR" --profile default --format json >"$status_file"
-  status_exit=$?
-  set -e
-  if [[ "$status_exit" -ne 0 || "$(jq -r '.status // "invalid"' "$status_file" 2>/dev/null)" != "fresh" ]]; then
+  run_graph_status() {
+    local status_rc=0
+    if "$GRAPH_CLI" graph status --root "$ROOT_DIR" --profile default --format json >"$status_file"; then
+      status_rc=0
+    else
+      status_rc=$?
+    fi
+    printf '%s\n' "GRAPH_STATUS_RC=${status_rc}"
+    cat "$status_file"
+    return "$status_rc"
+  }
+
+  if run_graph_status; then
+    status_exit=0
+  else
+    status_exit=$?
+  fi
+  status_name="$(jq -r '.status // "invalid"' "$status_file" 2>/dev/null || true)"
+  if [[ "$status_exit:$status_name" == "0:fresh" ]]; then
+    echo "GRAPH_REBUILD=not_needed"
+  elif [[ "$status_exit:$status_name" == "2:incomplete" ]]; then
+    echo "GRAPH_REBUILD=not_needed status=incomplete"
+  elif [[ "$status_name" == "stale" || "$status_name" == "unavailable" || "$status_name" == "invalid" ]]; then
+    echo "GRAPH_REBUILD=required status=${status_name}"
+    set +e
+    "$GRAPH_CLI" graph build --root "$ROOT_DIR" --profile default --format json
+    build_exit=$?
+    set -e
+    if [[ "$build_exit" -ne 0 && "$build_exit" -ne 1 ]]; then
+      echo "REPO_DEPENDENCY_REVIEW=fail"
+      echo "GRAPH_REBUILD=failed rc=${build_exit}"
+      exit "$build_exit"
+    fi
+    echo "GRAPH_REBUILD=performed"
+    if run_graph_status; then
+      status_exit=0
+    else
+      status_exit=$?
+    fi
+    status_name="$(jq -r '.status // "invalid"' "$status_file" 2>/dev/null || true)"
+  fi
+  if [[ "$status_exit" -ne 0 || "$status_name" != "fresh" ]]; then
     echo "REPO_DEPENDENCY_REVIEW=fail"
     cat "$status_file"
     exit 1
+  fi
+  if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
+    echo "GRAPH_ENSURE=pass status=fresh"
+    exit 0
   fi
 
   set +e

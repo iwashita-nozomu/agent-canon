@@ -156,6 +156,26 @@ A changed target that makes an unchanged declaration unresolved is therefore a
 new related blocker even when the source file is unchanged. Invalid
 `manifest-grammar` in a changed declaration cannot be hidden by baseline state.
 
+The `ManifestParser` owns the normalized declaration components: direction,
+kind, canonical repository-relative target, and reason. Every source diagnostic
+persists those components, the canonical declaration, and its source span in
+the strict `agent-canon.source-diagnostic.v1` `payload_json` object, together
+with the producer-resolved source and target. Non-source layers retain the
+shared diagnostics table through a valid generic/default payload object; they do
+not require the source identity schema. The graph fingerprint binds each
+typed diagnostic payload and severity, so a semantic identity change cannot
+reuse result or database identity.
+
+Before evaluating the changed-responsibility predicate $S(d)$ or the base
+identity/severity predicates $N(d)$ or $W(d)$, the selector validates the
+current diagnostics columns and typed payload field-for-field. Missing,
+malformed, empty, wrongly typed, span-inconsistent, target-node-inconsistent,
+or declaration-component-inconsistent identity data fails closed. This
+consumer validation does not replace the #513 current-producer and exact
+trusted-base authority: the current producer remains authoritative for head
+semantics, the exact base snapshot remains authoritative for comparison, and
+no base-pinned, message-derived, legacy-schema, or parser fallback is allowed.
+
 The report contains a duplicate-free, lossless partition of all head diagnostic
 identities into `blocking_diagnostics` and `baseline_diagnostics`, together with
 the base graph identity and diagnostic-set fingerprint. If a source identity

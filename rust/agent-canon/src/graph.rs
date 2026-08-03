@@ -8,10 +8,10 @@
 // @dependency-end
 
 use crate::dependency_manifest::{
-    capture_snapshot, current_producer_identity, diagnostic_category, probe_snapshot_identity,
-    snapshot_completeness, validate_persisted_producer_identity, validate_producer_identity,
-    write_snapshot_jsonl, DependencyDeclaration, ManifestSnapshot, ProducerIdentity,
-    SnapshotRequest, SourceIdentity, SourceSpan, SurfaceRelation,
+    capture_snapshot, current_producer_identity, diagnostic_category, diagnostic_identity_json,
+    probe_snapshot_identity, snapshot_completeness, validate_persisted_producer_identity,
+    validate_producer_identity, write_snapshot_jsonl, DependencyDeclaration, ManifestSnapshot,
+    ProducerIdentity, SnapshotRequest, SourceIdentity, SourceSpan, SurfaceRelation,
 };
 use crate::structured_analysis::{initialize_graph_schema, validate_graph_connection};
 use rusqlite::{params, Connection, OpenFlags, OptionalExtension};
@@ -1913,6 +1913,7 @@ fn surface_relation_fact(relation: &SurfaceRelation) -> Value {
 fn graph_fingerprint(
     nodes: &[Value],
     facts: &[Value],
+    diagnostics: &[Value],
     runtime: Option<&RuntimeEvidenceSnapshot>,
     producer_identity: Option<&ProducerIdentity>,
 ) -> String {
@@ -1920,7 +1921,7 @@ fn graph_fingerprint(
     let producer_identity = producer_identity
         .map(|identity| serde_json::to_value(identity).unwrap_or(Value::Null))
         .unwrap_or(Value::Null);
-    let value = json!({"nodes":nodes,"facts":facts,"runtime":runtime,"producer_identity":producer_identity});
+    let value = json!({"nodes":nodes,"facts":facts,"diagnostics":diagnostics,"runtime":runtime,"producer_identity":producer_identity});
     sha256(serde_json::to_string(&value).unwrap_or_default().as_bytes())
 }
 
@@ -2027,6 +2028,20 @@ fn collect_build_material_with_mode(
         .filter_map(|declaration| dependency_fact(&snapshot, declaration))
         .chain(snapshot.surface_relations.iter().map(surface_relation_fact))
         .collect::<Vec<_>>();
+    let diagnostics = snapshot
+        .diagnostics
+        .iter()
+        .map(|diagnostic| {
+            json!({
+                "payload": diagnostic_identity_json(diagnostic),
+                "severity": if diagnostic.severity == "error" {
+                    "blocker"
+                } else {
+                    diagnostic.severity.as_str()
+                },
+            })
+        })
+        .collect::<Vec<_>>();
     let runtime_fp = runtime_evidence.as_ref().map(runtime_evidence_fingerprint);
     let input_fingerprint = graph_input_fingerprint(
         &snapshot.header.source_fingerprint,
@@ -2039,6 +2054,7 @@ fn collect_build_material_with_mode(
     let graph_fingerprint = graph_fingerprint(
         &nodes,
         &facts,
+        &diagnostics,
         runtime_evidence.as_ref(),
         producer_identity.as_ref(),
     );
@@ -2289,13 +2305,12 @@ fn build_graph_staging(
         connection.execute("INSERT INTO edges(id,layer,kind,from_node_id,to_node_id,order_kind,confidence,evidence_node_id,payload_json) VALUES(?1,'source',?2,?3,?4,'none',1.0,NULL,?5)", params![id, kind, from, to, serde_json::to_string(fact).unwrap_or_default()]).map_err(|error| GraphError::Io(error.to_string()))?;
     }
     for diagnostic in &material.snapshot.diagnostics {
-        let target_node = diagnostic
-            .source_span
-            .as_ref()
-            .map(|span| format!("node:source:{}", span.path))
-            .unwrap_or_default();
-        let id = format!("diagnostic:{}", sha256(diagnostic.message.as_bytes()));
-        connection.execute("INSERT INTO diagnostics(id,layer,target_node_id,target_edge_id,severity,rule,message,suggested_action_json) VALUES(?1,'source',?2,'',?3,?4,?5,'{}')", params![id, target_node, if diagnostic.severity == "error" { "blocker" } else { diagnostic.severity.as_str() }, diagnostic.code, diagnostic.message]).map_err(|error| GraphError::Io(error.to_string()))?;
+        let payload = diagnostic_identity_json(diagnostic);
+        let payload_json = serde_json::to_string(&payload)
+            .map_err(|error| GraphError::Validation(error.to_string()))?;
+        let target_node = format!("node:source:{}", diagnostic.source_span.path);
+        let id = format!("diagnostic:{}", sha256(payload_json.as_bytes()));
+        connection.execute("INSERT INTO diagnostics(id,layer,target_node_id,target_edge_id,severity,rule,message,suggested_action_json,payload_json) VALUES(?1,'source',?2,'',?3,?4,?5,'{}',?6)", params![id, target_node, if diagnostic.severity == "error" { "blocker" } else { diagnostic.severity.as_str() }, diagnostic.code, diagnostic.message, payload_json]).map_err(|error| GraphError::Io(error.to_string()))?;
     }
     let runtime_json = material
         .runtime_evidence
@@ -4061,6 +4076,122 @@ mod tests {
         let query = query_graph(&args).expect("incomplete query response");
         assert_eq!(query["status"], "incomplete");
         assert_eq!(query["exit_code"], 2);
+    }
+
+    #[test]
+    fn graph_build_persists_typed_source_diagnostic_payload() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        fs::remove_file(fixture.root.join("reports/agents/.active_run"))
+            .expect("remove active runtime pointer");
+        fs::write(
+            fixture.root.join("src/manifest.md"),
+            "<!--\n@dependency-start\ncontract implementation\nupstream design missing.md missing target\n@dependency-end\n-->\n",
+        )
+        .expect("incomplete manifest");
+
+        let build = build_graph_with_failure(&graph_args(&fixture.root)).expect("graph build");
+        assert_eq!(build["status"], "incomplete");
+        let connection = Connection::open(
+            fixture
+                .root
+                .join(".agent-canon/knowledge-graph/graph.sqlite"),
+        )
+        .expect("published graph database");
+        let (rule, target_node_id, severity, payload_json): (String, String, String, String) =
+            connection
+                .query_row(
+                    "SELECT rule, target_node_id, severity, payload_json FROM diagnostics WHERE layer='source'",
+                    [],
+                    |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+                )
+                .expect("typed source diagnostic row");
+        let payload: Value = serde_json::from_str(&payload_json).expect("payload json");
+        assert_eq!(rule, "target-unresolved");
+        assert_eq!(severity, "blocker");
+        assert_eq!(target_node_id, "node:source:src/manifest.md");
+        assert_eq!(payload["schema"], "agent-canon.source-diagnostic.v1");
+        assert_eq!(payload["code"], rule);
+        assert_eq!(payload["source"], "src/manifest.md");
+        assert_eq!(payload["target"], "src/missing.md");
+        assert_eq!(
+            payload["declaration"],
+            "upstream design src/missing.md missing target"
+        );
+        assert_eq!(payload["source_span"]["path"], payload["source"]);
+        assert_eq!(
+            payload["declaration_components"]["target"],
+            payload["target"]
+        );
+    }
+
+    #[test]
+    fn graph_fingerprint_binds_diagnostic_identity_and_severity() {
+        let payload = json!({
+            "schema": "agent-canon.source-diagnostic.v1",
+            "code": "target-unresolved",
+            "source": "src/manifest.md",
+            "target": "src/missing.md",
+            "declaration": "upstream design src/missing.md missing target",
+            "source_span": {
+                "path": "src/manifest.md",
+                "start_line": 4,
+                "start_column": 1,
+                "end_line": 4,
+                "end_column": 58,
+            },
+            "declaration_components": {
+                "direction": "upstream",
+                "kind": "design",
+                "target": "src/missing.md",
+                "reason": "missing target",
+            },
+        });
+        let base = graph_fingerprint(
+            &[],
+            &[],
+            &[json!({"payload": payload, "severity": "warn"})],
+            None,
+            None,
+        );
+        let semantic_change = graph_fingerprint(
+            &[],
+            &[],
+            &[json!({
+                "payload": {
+                    "schema": "agent-canon.source-diagnostic.v1",
+                    "code": "target-unresolved",
+                    "source": "src/manifest.md",
+                    "target": "src/missing.md",
+                    "declaration": "downstream design src/missing.md missing target",
+                    "source_span": {
+                        "path": "src/manifest.md",
+                        "start_line": 4,
+                        "start_column": 1,
+                        "end_line": 4,
+                        "end_column": 58,
+                    },
+                    "declaration_components": {
+                        "direction": "downstream",
+                        "kind": "design",
+                        "target": "src/missing.md",
+                        "reason": "missing target",
+                    },
+                },
+                "severity": "warn",
+            })],
+            None,
+            None,
+        );
+        let severity_change = graph_fingerprint(
+            &[],
+            &[],
+            &[json!({"payload": payload, "severity": "blocker"})],
+            None,
+            None,
+        );
+        assert_ne!(base, semantic_change);
+        assert_ne!(base, severity_change);
     }
 
     #[test]

@@ -6,6 +6,7 @@
 # upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py validates workflow routing cases
 # upstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report quality checklist cases
 # upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py renders dashboard artifact
+# upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh ensures canonical graph freshness
 # @dependency-end
 
 # Standalone-only workflow. Template and derived repositories should not copy
@@ -18,6 +19,8 @@ on:
     branches:
       - "**"
   workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
 
 permissions:
   contents: read
@@ -46,6 +49,9 @@ jobs:
 
       - name: Prepare runtime log archive
         run: mkdir -p .agent-canon/log-archive
+
+      - name: Ensure canonical graph
+        run: PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec tools/agent_tools/run_repo_dependency_review.sh --root "${GITHUB_WORKSPACE}" --ensure-graph
 
       - name: Run accumulated eval producers
         run: |
