@@ -1,4 +1,12 @@
 #!/usr/bin/env python3
+# @dependency-start
+# contract tool
+# responsibility Owns trusted changed production Python Docstring delta classification and evidence.
+# upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring gate owner
+# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL
+# downstream implementation ../ci/run_python_quality_checks.sh shared Python quality runner
+# downstream implementation ../../tests/agent_tools/test_pydocstyle_changed_scope.py changed-scope unit tests
+# @dependency-end
 """Run pydocstyle only for trusted changed production Python files."""
 
 from __future__ import annotations
