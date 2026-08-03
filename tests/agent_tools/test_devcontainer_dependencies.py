@@ -1318,6 +1318,34 @@ class DependencyModelTests(unittest.TestCase):
             self.assertEqual(
                 installer.verify(active, workspace=root), standalone_commit
             )
+            standalone_resolver_cases = (("standalone-prefix-dot", "."),)
+            for case_name, source_prefix in standalone_resolver_cases:
+                with self.subTest(case=case_name):
+                    resolved = subprocess.run(
+                        [
+                            "bash",
+                            "-c",
+                            "source \"$1\"\n"
+                            "agent_canon_source_identity \"$2\" \"$3\" \"$4\"\n",
+                            "bash",
+                            str(
+                                ROOT
+                                / "tools"
+                                / "lib"
+                                / "agent_canon_source_identity.sh"
+                            ),
+                            str(root),
+                            source_prefix,
+                            str(root),
+                        ],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+                    self.assertEqual(
+                        resolved.returncode, 0, resolved.stdout + resolved.stderr
+                    )
+                    self.assertEqual(resolved.stdout.strip(), standalone_commit)
 
         derived_cases = (
             ("detached-gitlink-match", "match", None),

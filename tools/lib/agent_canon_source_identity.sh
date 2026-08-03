@@ -30,7 +30,8 @@ agent_canon_source_identity() {
     return 1
   fi
   vendor_root="$repository_root/$source_prefix"
-  if [ -d "$vendor_root" ] \
+  if [ "$source_prefix" != "." ] && [ "$source_prefix" != "./" ] \
+    && [ -d "$vendor_root" ] \
     && [ "$(cd "$vendor_root" && pwd -P)" = "$(cd "$source_root" && pwd -P)" ]; then
     if ! provider_sha="$(git -C "$repository_root" rev-parse --verify "HEAD:$source_prefix" 2>/dev/null)"; then
       echo "AgentCanon parent gitlink identity is unavailable: $source_prefix" >&2
