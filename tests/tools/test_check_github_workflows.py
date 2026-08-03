@@ -59,6 +59,10 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             "- [ ] `bash tools/agent_tools/run_repo_dependency_review.sh "
             "--fail-missing`\n"
             "-->\n"
+            "```markdown\n"
+            "- [ ] `bash tools/agent-canon/agent_tools/"
+            "run_repo_dependency_review.sh --fail-missing --historical`\n"
+            "```\n"
         )
         for relative in (
             "templates/documents/github/pull-request/agent_canon.md",
@@ -71,6 +75,38 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 path = root / relative
                 path.write_text(
                     path.read_text(encoding="utf-8") + prose,
+                    encoding="utf-8",
+                )
+
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), "--root", str(root)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
+
+    def test_template_agentcanon_gate_allows_similar_command_with_different_path(
+        self,
+    ) -> None:
+        """A nearby command is not obsolete when its script path token differs."""
+        benign = (
+            "\n- [ ] `bash tools/agent-canon/agent_tools/archive/"
+            "run_repo_dependency_review.sh --fail-missing --explain`\n"
+        )
+        for relative in (
+            "templates/documents/github/pull-request/agent_canon.md",
+            ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+        ):
+            with self.subTest(path=relative), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                self.write_valid_workflow(root)
+                self.copy_required_surfaces(root)
+                path = root / relative
+                path.write_text(
+                    path.read_text(encoding="utf-8") + benign,
                     encoding="utf-8",
                 )
 
@@ -103,6 +139,13 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 + "\n- [ ] `bash tools/agent-canon/agent_tools/"
                 "run_repo_dependency_review.sh\n"
                 "  --fail-missing` was run.\n",
+                "obsolete_internal_pr_gate_authority:",
+            ),
+            "obsolete_internal_extra_args": (
+                lambda text: text
+                + "\n- [ ] `bash tools/agent-canon/agent_tools/"
+                "run_repo_dependency_review.sh --fail-missing "
+                "--cycle-report-only evidence.json`\n",
                 "obsolete_internal_pr_gate_authority:",
             ),
         }

@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shlex
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -48,9 +49,13 @@ AGENT_CANON_CREDENTIALS = (
 AGENT_CANON_PR_READ_CREDENTIAL = "AGENT_CANON_PR_READ_TOKEN"
 GITHUB_TOKEN_EXPRESSION = "${{ github.token }}"
 TEMPLATE_AGENT_CANON_PR_GATE_COMMAND = "make agent-canon-pr-check"
-OBSOLETE_TEMPLATE_AGENT_CANON_INTERNAL_COMMANDS = (
-    "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
-    "bash tools/agent-canon/agent_tools/run_repo_dependency_review.sh --fail-missing",
+OBSOLETE_TEMPLATE_AGENT_CANON_INTERNAL_COMMAND_PREFIXES = (
+    ("bash", "tools/agent_tools/run_repo_dependency_review.sh", "--fail-missing"),
+    (
+        "bash",
+        "tools/agent-canon/agent_tools/run_repo_dependency_review.sh",
+        "--fail-missing",
+    ),
 )
 HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
 MARKDOWN_FENCE_PATTERN = re.compile(r"^[ \t]{0,3}(?P<fence>`{3,}|~{3,})")
@@ -774,6 +779,18 @@ def markdown_checklist_authority_commands(text: str) -> tuple[str, ...]:
     return tuple(commands)
 
 
+def is_obsolete_template_agentcanon_command(command: str) -> bool:
+    """Return whether shell tokens begin with an obsolete internal command."""
+    try:
+        tokens = tuple(shlex.split(command))
+    except ValueError:
+        return False
+    return any(
+        tokens[: len(prefix)] == prefix
+        for prefix in OBSOLETE_TEMPLATE_AGENT_CANON_INTERNAL_COMMAND_PREFIXES
+    )
+
+
 def check_template_agentcanon_pr_gate(path: Path) -> list[Finding]:
     """Require one public parent gate and reject internal command authority."""
     if not path.exists():
@@ -790,8 +807,8 @@ def check_template_agentcanon_pr_gate(path: Path) -> list[Finding]:
                 f"canonical_parent_pr_gate_count:{canonical_count}",
             )
         )
-    for command in OBSOLETE_TEMPLATE_AGENT_CANON_INTERNAL_COMMANDS:
-        if command in checklist_commands:
+    for command in checklist_commands:
+        if is_obsolete_template_agentcanon_command(command):
             findings.append(
                 Finding(
                     "error",
