@@ -53,7 +53,9 @@ modify a parent checkout or pin.
   topic branch を用意して同一トピックの source lane を再開する。
 - Parent pin/root projection is a separate state and passes only with clean
   `main` plus `worktree HEAD == staged index gitlink`; it does not authorize
-  source editing. A clean named topic branch is the source owner.
+  source editing. The intended named topic branch is the source owner; dirty,
+  ahead, and diverged state are evidence, while virtual/existing merge conflict
+  and unpreservable materialization collision are independently typed blockers.
 - Source branch names use `canon/<topic>-YYYYMMDD`.
 - Reuse the current branch/lifecycle while its immutable identity and push
   authority remain valid. A closed head, conflict, identity drift, or unrelated
@@ -176,30 +178,107 @@ Branch push and merged-main push do not rerun the same source candidate gate.
 then invokes `check_agent_canon_pr.py` to materialize G2 from those exact
 passing checks. G3 is materialized afterward by the GitHub publication owner;
 tests consume the production G2 owner and do not claim its owner identity.
-Runtime alignment, prompt/eval, convention, skill-command, GitHub workflow,
-dependency, docs, and quick-CI work are not called through a second standalone
-loop in the same run.
+Runtime alignment, convention, skill-command, GitHub workflow, dependency, docs,
+and quick-CI work are not called through a second standalone loop in the same
+run. AgentCanon development prompt and accumulated eval producers are owned by
+the standalone AgentCanon static-gates route only; a derived parent shared gate
+does not invoke them or apply their diagnostics to parent-owned documents.
+
+### Parent Gate Necessary Conditions
+
+For `template_or_derived` repositories, the PR gate always requires the
+published gitlink to be reachable from the configured AgentCanon remote, the
+staged gitlink to equal the `vendor/agent-canon` worktree `HEAD`, and every
+changed shared/root projection to pass its existing projection check. A local
+parent branch being ahead, behind, diverged, or dirty is preserved as state and
+does not fail this gate by itself. An actual materialization collision remains
+a blocker in the projection and generated-artifact checks.
+
+Parent-root strict dependency graph completeness is conditional. The caller
+sets `AGENT_CANON_PR_PARENT_GRAPH_MIGRATION=yes`, touches a dependency manifest
+or a surface declared by the dependency-manifest design owner's canonical
+dependency header, or selects a profile whose
+`strict_dependency_graph_required` field is true in
+`documents/runtime/runtime-profiles-and-check-matrix.json`. Profile inputs use
+that inventory's exact `id` through `AGENT_CANON_PR_VALIDATION_PROFILE` or the
+comma-separated `AGENT_CANON_PR_VALIDATION_PROFILES`; setting both or providing
+an unknown ID fails with a typed selector verdict.
+Otherwise `check_agent_canon_pr.sh` records
+`AGENT_CANON_PR_DEPENDENCY_GRAPH=skipped` and keeps the matching `skipped`
+receipt inside the shared gate. The shared gate never runs repository project
+tests, type checks, or lint. A derived parent projects those checks with
+`AGENT_CANON_PR_PROJECT_QUALITY=delegated` and owner `parent_ci`; its parent
+workflow must expose that owner marker together with the canonical `make ci`
+command. The existing workflow checker validates this route by owner and
+command semantics, not by a fixed job name. Standalone AgentCanon keeps the
+existing `static-gates` shared-surface owner and introduces no repository-wide
+project-quality job. The PR script does not add a second workflow parser or
+fallback runner.
+
+When selection is required, the parent checker first builds the complete graph.
+A complete result records `prepared` and runs the full strict dependency review.
+For an incomplete parent graph, the checker uses the same validated base diff as
+the selector and traverses persisted dependency/surface edges in both directions
+from changed paths. Diagnostics declared by that closure, diagnostics whose
+target changed, changed `manifest-grammar`, and diagnostics without confirmed
+base source identity fail. Non-reachable diagnostics whose source identity is
+unchanged from the base are written individually to the acceptance report and
+produce a `scoped` receipt. The quick-CI consumer accepts that bound receipt but
+does not treat the incomplete graph as fresh or run graph-query consumers.
+Explicit parent graph migration and standalone source gates remain full-scope;
+no count-only baseline is an acceptance oracle.
+
+The consumer accepts source diagnostics only from the current typed
+`payload_json` identity: producer-resolved source and target, normalized
+declaration, declaration components, and source span. It validates that payload
+against the persisted rule and source node before evaluating changed scope
+$S(d)$ or the base-identity/severity predicates $N(d)$ and $W(d)$. Missing,
+empty, wrongly typed, span-inconsistent, target-node-inconsistent, or
+declaration-inconsistent identity fails closed before a scoped receipt can be
+published. This workflow projection consumes producer-owned identity and does
+not parse message formatting, restore a legacy schema, or provide a selector
+side fallback; current-producer and trusted-base authority remain bound by the
+parent graph contract.
+
+GitHub Actions resolves the comparison base from
+`pull_request.base.sha` in its trusted event payload. Before normal selection,
+`check_agent_canon_pr.sh` invokes `--prepare-ci-base`. The selector first verifies
+that the exact event base object and the merge-base history needed for comparison
+are already available; that state skips fetch and needs no credential. When a
+shallow or incomplete checkout needs fetch, the workflow supplies
+`AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}` only to the static-gate step, and
+the selector applies it through process-local Git configuration for the exact
+event SHA. The credential is not written to checkout or repository Git config,
+and `actions/checkout` retains `persist-credentials: false`. Public, private, and
+fork PRs use this same trusted event-SHA route. The emitted SHA is supplied as
+`--trusted-base-sha`; the selector requires it to equal the event SHA and rejects
+CI `AGENT_CANON_PR_BASE_REF` overrides. Local and test callers provide
+`AGENT_CANON_PR_BASE_REF` explicitly and retain their credential-free route. A
+missing fetch credential, base equal to `HEAD`, unresolvable or
+history-unreachable base, and failed fetch or diff command produce a typed
+selector failure; no fallback base or empty-diff success is inferred.
 
 ### One-Judgment-Owner Check Handoff
 
-Each check family has one execution owner in a source PR gate. The direct agent
-check function owns runtime alignment and prompt/eval checks; it does not call
-the research-perspective smoke test, convention compliance, or skill-command
-checks because `run_all_checks.sh` owns those consumers. The strict dependency
-section owns the dependency-header verdict and the canonical graph producer.
-The standalone source path invokes `tool_drift.py` once after that producer;
-the template/derived path leaves `tool_drift.py` to its single `run_all_checks.sh`
-consumer.
+Each check family has one execution owner in a source PR gate. For a derived
+parent, the direct AgentCanon check function owns only shared runtime,
+convention, skill-command, GitHub workflow, documentation, dependency-header,
+and graph checks; it does not run AgentCanon development prompt or accumulated
+eval producers, and it never enters a repository project's test/type/lint
+route. Standalone AgentCanon owns those eval producers in its existing
+`static-gates` job. The standalone static workflow does not add a repository-wide
+project-quality job. The selected parent CI route owns derived-project quality
+consumers, and the workflow checker validates that route's owner marker and
+canonical command.
 
-After the strict dependency review completes, the PR gate writes a temporary
-receipt containing its owner, root identity, parent PID, and strict
-dependency/graph prepared markers. It passes that receipt to
-`run_all_checks.sh` through the internal `--pr-gate-receipt` argument. The
-consumer accepts the handoff only when the receipt exists, its owner and root
-match, and its recorded parent PID equals the consumer's current PPID. A valid
-receipt sets `CANON_GRAPH_READY=1` and suppresses the three dependency-header
-producers. An absent receipt is the ordinary run_all path; an invalid or
-missing receipt supplied through the internal argument fails closed.
+After the selected dependency review, the PR gate writes a temporary receipt
+containing its owner, root identity, parent PID, matching
+`strict_dependency`/`graph` status (`prepared` or `skipped`), and selector
+reason/evidence. The receipt protects the shared checker-to-consumer process
+handoff; a cryptographic nonce for a hostile local caller is outside this trust
+boundary and would not establish that the caller ran the checker. The selected
+workflow job is the sole blocking project-quality consumer, and an invalid or
+missing receipt supplied to any separate internal consumer fails closed.
 
 The upstream Materializer hook/archive hot-path defect remains an external
 dependency. This workflow records its evidence/blocker and does not implement a
@@ -227,6 +306,11 @@ second report/archive materializer.
 - exact rebind/freeze/review/CAS predecessor chain is valid;
 - one independent exact-candidate APPROVE exists;
 - G1-G3 and source PR CI pass for the same RecordBinding;
+- parent gitlink reachability, gitlink/worktree identity, and changed
+  shared/root projection checks pass;
+- strict parent graph completeness passes when migration, a touched manifest,
+  or a selected profile requires it; otherwise the matching skipped receipt is
+  retained;
 - immutable PullRequestLifecycle and permission authority pass;
 - expected-old merge CAS passes;
 - source-main publication readback matches the authoritative merge commit/tree;

@@ -925,7 +925,6 @@ class CodexHooksTest(unittest.TestCase):
             "./tools/update_agent_canon.sh apply",
             "bash tools/update_agent_canon.sh apply",
             "bash tools/update_agent_canon.sh merge-main-into-current",
-            "bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty",
             "bash tools/sync_agent_canon.sh ensure-latest",
             "./tools/sync_agent_canon.sh ensure-latest",
             "bash --rcfile /tmp/agent-canon-test-rc tools/update_agent_canon.sh latest",
@@ -937,7 +936,6 @@ class CodexHooksTest(unittest.TestCase):
             "exec -a canon -l ./tools/sync_agent_canon.sh ensure-latest",
             "exec -c ./tools/sync_agent_canon.sh ensure-latest",
             "exec -l ./tools/update_agent_canon.sh merge-main-into-current",
-            "exec -cl ./tools/update_agent_canon.sh merge-main-into-current-preserve-dirty",
             "make agent-canon-ensure-latest",
             "make agent-canon-latest",
             "make agent-canon-update",
@@ -955,6 +953,20 @@ class CodexHooksTest(unittest.TestCase):
                     "request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason",
                 )
                 self.assertIsNone(self._run_shared_checkout_guard(f"{approved} {command}"))
+
+    def test_removed_dirty_preservation_wrapper_is_absent_from_active_surfaces(self) -> None:
+        """The deleted stash-based update wrapper must not remain discoverable."""
+        obsolete = "merge-main-into-current-" + "preserve-dirty"
+        active_surfaces = (
+            PROJECT_ROOT / "tools" / "agent_tools" / "hook_safety.py",
+            PROJECT_ROOT / "tools" / "update_agent_canon.sh",
+            PROJECT_ROOT / "tools" / "README.md",
+            PROJECT_ROOT / "documents" / "tools" / "README.md",
+            PROJECT_ROOT / "documents" / "agent-canon" / "agent-canon-subtree-migration.md",
+        )
+        for surface in active_surfaces:
+            with self.subTest(surface=surface.relative_to(PROJECT_ROOT)):
+                self.assertNotIn(obsolete, surface.read_text(encoding="utf-8"))
 
     def test_shared_checkout_guard_wrapper_authority_does_not_leak(self) -> None:
         """Prior segments and ambient variables never authorize an update wrapper."""

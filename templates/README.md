@@ -10,7 +10,7 @@ downstream implementation ./documents/README.md reader-facing document template 
 downstream implementation ./experiments/_template/run.py runnable experiment scaffold source
 downstream implementation ../tools/agent_tools/agent_team.py renders agent templates
 downstream implementation ../tools/experiments/create_experiment_topic.py copies experiment templates
-downstream implementation ../tools/sync_agent_canon.sh projects the root templates view
+downstream implementation ../tools/sync_agent_canon.sh retires the parent-root template view and projects GitHub copies
 @dependency-end
 -->
 
@@ -28,11 +28,12 @@ wrapper、互換コピーも作りません。
 | `templates/documents/` | README、design、experiment、host、remote execution、GitHub template source | GitHub surface は manifest 経由で `.github/` へ copy projection する |
 | `templates/experiments/_template/` | runnable experiment scaffold の frozen source | `create_experiment_topic.py` が新規 `experiments/<topic>/` へ copy する |
 
-親 template / derived repo では、`bash tools/sync_agent_canon.sh link-root` が root の
-`templates -> vendor/agent-canon/templates` managed symlink を materialize します。親側の
-`experiments/_template` は source owner ではないため削除し、親の
-`experiments/registry.toml` から `_template` entry と対応する docs / tests を削除します。
-GitHub Issue / PR projection は `templates/documents/github/` を source として再生成します。
+親 template / derived repo は、この正本を
+`vendor/agent-canon/templates/` から直接解決します。root `templates` symlink
+view は materialize しません。親側の `experiments/_template` は source owner
+ではないため削除し、親の `experiments/registry.toml` から `_template`
+entry と対応する docs / tests を削除します。GitHub Issue / PR projection は
+source-root `templates/documents/github/` から `.github/` へ再生成します。
 
 ## Experiment copy boundary
 
@@ -47,12 +48,16 @@ GitHub Issue / PR projection は `templates/documents/github/` を source とし
 
 この source change を parent repo に反映するときは、次を同じ parent update packet に記録します。
 
-- root managed symlink: `templates -> vendor/agent-canon/templates`
+- in the parent integration commit, run `git rm templates` only after
+  confirming the tracked entry is the former
+  `templates -> vendor/agent-canon/templates` symlink
+- preserve `vendor/agent-canon/templates/` and any parent-owned regular
+  `templates/` directory
 - delete parent `experiments/_template/`
 - delete the parent registry `_template` entry
 - delete parent docs and tests that only exercise the removed scaffold
 - regenerate and check `.github/ISSUE_TEMPLATE/` and `.github/PULL_REQUEST_TEMPLATE/` projections
-- pass `bash tools/sync_agent_canon.sh check` from the parent root after the pin/root-view update
+- pass `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check` from the parent root after the pin/root-view update
 
 Parent `experiments/registry.toml` remains project-owned: only the obsolete `_template` entry is
 removed, and all real topic identities stay intact.

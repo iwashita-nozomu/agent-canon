@@ -522,14 +522,18 @@ def validate_parent_environment(root: Path) -> list[Finding]:
     findings: list[Finding] = []
     script_path = root / PARENT_ENVIRONMENT_SCRIPT
     manifest_path = root / PARENT_ENVIRONMENT_MANIFEST
+    declared = tuple(
+        path.exists() or path.is_symlink() for path in (script_path, manifest_path)
+    )
+    if not any(declared):
+        return []
     for path, relative in (
         (script_path, PARENT_ENVIRONMENT_SCRIPT),
         (manifest_path, PARENT_ENVIRONMENT_MANIFEST),
     ):
         if not path.is_file():
-            findings.append(Finding("missing_file", relative, "missing"))
-        elif path.is_symlink():
-            findings.append(Finding("inconsistency", relative, "must-be-regular-file"))
+            detail = "missing-target" if path.is_symlink() else "missing"
+            findings.append(Finding("missing_file", relative, detail))
     if findings:
         return findings
 
@@ -552,6 +556,13 @@ def validate_parent_environment(root: Path) -> list[Finding]:
             )
         )
     return findings
+
+
+def parent_environment_enabled(root: Path) -> bool:
+    """Return whether both optional parent environment sources resolve to files."""
+    return (root / PARENT_ENVIRONMENT_SCRIPT).is_file() and (
+        root / PARENT_ENVIRONMENT_MANIFEST
+    ).is_file()
 
 
 def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Finding]:
@@ -681,10 +692,9 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
             )
         )
     if parent_layout:
-        required_mounts = (
-            "/etc/project-template/parent-environment.sh",
-            "/etc/project-template/zsh/.zshrc",
-        )
+        required_mounts = ["/etc/project-template/zsh/.zshrc"]
+        if parent_environment_enabled(root):
+            required_mounts.insert(0, "/etc/project-template/parent-environment.sh")
         for target in required_mounts:
             matches = [
                 raw_volume

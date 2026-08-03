@@ -202,6 +202,24 @@ entries:
     tests:
       - tests/agent_tools/test_parent_repo_readiness.py
 
+  - id: surface-manifest-producer
+    summary: Produces canonical shared-runtime surface snapshots consumed by AgentCanon graph builds and root synchronization.
+    path: tools/agent_tools/surface_manifest.py
+    family: agent_tools
+    role: runner
+    status: canonical
+    command: python3 tools/agent_tools/surface_manifest.py --root . --prefix vendor/agent-canon --manifest documents/runtime/shared-runtime-surfaces.toml normalized-snapshot
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/runtime/shared-runtime-surfaces.toml
+    tests:
+      - tests/tools/test_agent_canon_pr_graph_selector.py
+
   - id: visualization-contract
     summary: Validates typed visualization source universes, projection manifests, canonical ToolCalls, and post-format readback coverage.
     path: tools/agent_tools/visualization_contract.py
@@ -1198,7 +1216,7 @@ entries:
     writes: false
     default_wiring:
       ci: false
-      pr_check: true
+      pr_check: false
     docs:
       - tools/README.md
       - documents/tools/README.md
@@ -1223,6 +1241,24 @@ entries:
     tests:
       - tests/tools/test_run_all_checks_script.py
 
+  - id: pydocstyle-review
+    summary: Runs explicit AgentCanon Docstring review with source-root-bound canonical D213 configuration.
+    path: tools/agent_tools/pydocstyle_review.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - documents/conventions/DOCSTRING_GUIDE.md
+      - tools/ci/PRE_REVIEW_GUIDE.md
+      - agents/skills/python-review.md
+    tests:
+      - tests/agent_tools/test_pydocstyle_review.py
+
   - id: check-agent-canon-latest
     summary: Checks whether the AgentCanon pin and source are current and emits the PR-first handoff when shared canon is dirty.
     path: tools/ci/check_agent_canon_latest.sh
@@ -1233,7 +1269,7 @@ entries:
     writes: false
     default_wiring:
       ci: false
-      pr_check: true
+      pr_check: false
     docs:
       - tools/README.md
       - documents/tools/README.md

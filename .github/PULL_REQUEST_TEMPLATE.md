@@ -86,7 +86,7 @@ Authority / blocker notes:
 - [ ] New shared surfaces are listed in `documents/runtime/SHARED_RUNTIME_SURFACES.md` or explicitly documented as standalone-only.
 - [ ] `agentcanon_structure_followup=required` was recorded for this AgentCanon source / synced-surface change.
 - [ ] If parent root sync has not run for this source PR yet, the parent pin/root-view PR or blocker that must later provide `agentcanon_structure_followup=pass` is recorded below.
-- [ ] `agentcanon_structure_followup=pass` is recorded only when `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check` have both passed from the template / derived parent root.
+- [ ] `agentcanon_structure_followup=pass` is recorded only when the source-root resolver runs `tools/sync_agent_canon.sh link-root` and `check` successfully from the template / derived parent root.
 - [ ] No derived-repo project-specific policy leaked into AgentCanon.
 
 ## Plan Mode Evidence
@@ -141,7 +141,8 @@ Issue / edit-scope evidence:
 - [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
 - [ ] Path/risk smoke, when relevant: `python3 tools/agent_tools/classify_path_risk.py --paths-file <changed-paths>`
 - [ ] `tools/bin/agent-canon docs check`
-- [ ] `bash tools/ci/run_all_checks.sh --quick`
+- [ ] Standalone AgentCanon source: existing `static-gates` owns shared AgentCanon surfaces; no repository-wide project-quality job is added
+- [ ] Template/derived parent: `AGENT_CANON_PR_PROJECT_QUALITY=delegated` with owner `parent_ci`; the parent workflow exposes the canonical `make ci` command under that owner, independent of job name
 - [ ] GitHub workflow changes: private AgentCanon submodule checkout uses `.github/scripts/checkout_agent_canon_submodule.sh` in template / derived roots, or `tools/ci/checkout_agent_canon_submodule.sh` in standalone AgentCanon source, instead of automatic `actions/checkout` submodules.
 - [ ] GitHub workflow changes: `AGENT_CANON_REPO_TOKEN`, `AGENT_CANON_REPO_SSH_KEY` from a read-only deploy key, or an equivalent documented GitHub App token covers private AgentCanon reads.
 - [ ] Relevant `pytest` target:
@@ -157,8 +158,8 @@ paste the key pass lines here
 
 - [ ] AgentCanon GitHub `main` will be updated first.
 - [ ] Template `vendor/agent-canon` pin will be updated after AgentCanon merge.
-- [ ] Template / derived repo will bring the change back with `make agent-canon-ensure-latest` and `bash tools/sync_agent_canon.sh link-root`, not by direct `sync_agent_canon.sh push`.
-- [ ] Template / derived repo follow-up will record `agentcanon_structure_followup=pass` only after `bash tools/sync_agent_canon.sh link-root` and `bash tools/sync_agent_canon.sh check` pass from the parent root.
+- [ ] Template / derived repo will bring the change back with `make agent-canon-ensure-latest` and the source-root resolver `exec tools/sync_agent_canon.sh link-root`, not by direct `sync_agent_canon.sh push`.
+- [ ] Template / derived repo follow-up will record `agentcanon_structure_followup=pass` only after the source-root resolver runs `tools/sync_agent_canon.sh link-root` and `check` successfully from the parent root.
 - [ ] Template `.gitmodules` impact was reviewed when URL, branch, or checkout behavior is affected.
 - [ ] Local bare mirror, if used, is compatibility-only and not the latest source of truth.
 - [ ] Derived repos that need the update are listed or intentionally deferred.

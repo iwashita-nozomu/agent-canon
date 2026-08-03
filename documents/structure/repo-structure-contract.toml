@@ -291,7 +291,6 @@ allowed_top_level = [
   "QUICK_START.md",
   "README.md",
   "agents",
-  "templates",
   "cpp",
   "docker",
   "documents",
@@ -342,11 +341,6 @@ kind = "any"
 category = "shared_runtime_view"
 
 [[profile.required]]
-path = "templates"
-kind = "any"
-category = "shared_runtime_view"
-
-[[profile.required]]
 path = ".codex"
 kind = "dir"
 category = "shared_runtime_view"
@@ -356,12 +350,12 @@ path = ".devcontainer"
 kind = "any"
 category = "shared_runtime_view"
 
-[[profile.required]]
+[[profile.optional]]
 path = ".devcontainer/parent-environment.sh"
 kind = "file"
 category = "parent_environment"
 
-[[profile.required]]
+[[profile.optional]]
 path = ".devcontainer/parent-environment.toml"
 kind = "file"
 category = "parent_environment"

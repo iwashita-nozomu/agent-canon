@@ -195,6 +195,7 @@ class RepoStructureContractTest(unittest.TestCase):
             "ROOT_AGENTS.md",
             "AGENTS.md",
             "agents/TASK_WORKFLOWS.md",
+            "templates/README.md",
             "documents/rule/README.md",
             "documents/rule/naming.md",
             "documents/rule/directory-structure.md",
@@ -269,6 +270,11 @@ class RepoStructureContractTest(unittest.TestCase):
                         {"type": "directory", "name": "workflows"},
                         {"type": "directory", "name": "canonical"},
                     ],
+                },
+                {
+                    "type": "directory",
+                    "name": "templates",
+                    "contents": [{"type": "file", "name": "README.md"}],
                 },
                 {
                     "type": "directory",

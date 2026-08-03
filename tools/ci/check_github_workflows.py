@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shlex
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -44,6 +45,22 @@ AGENT_CANON_INDEPENDENT_WORKFLOWS: set[str] = {
 AGENT_CANON_CREDENTIALS = (
     "AGENT_CANON_REPO_TOKEN",
     "AGENT_CANON_REPO_SSH_KEY",
+)
+AGENT_CANON_PR_READ_CREDENTIAL = "AGENT_CANON_PR_READ_TOKEN"
+GITHUB_TOKEN_EXPRESSION = "${{ github.token }}"
+TEMPLATE_AGENT_CANON_PR_GATE_COMMAND = "make agent-canon-pr-check"
+OBSOLETE_TEMPLATE_AGENT_CANON_INTERNAL_COMMAND_PREFIXES = (
+    ("bash", "tools/agent_tools/run_repo_dependency_review.sh", "--fail-missing"),
+    (
+        "bash",
+        "tools/agent-canon/agent_tools/run_repo_dependency_review.sh",
+        "--fail-missing",
+    ),
+)
+HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
+MARKDOWN_FENCE_PATTERN = re.compile(r"^[ \t]{0,3}(?P<fence>`{3,}|~{3,})")
+CHECKLIST_ITEM_PATTERN = re.compile(
+    r"^(?P<indent>[ \t]{0,3})[-+*][ \t]+\[[ xX]\][ \t]*(?P<body>.*)$"
 )
 WORKFLOW_DISPATCH_INPUT_PATTERN = re.compile(
     r"\$\{\{\s*(?:inputs|github\.event\.inputs)"
@@ -74,7 +91,7 @@ TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS = (
     "template submodule SHA:",
 )
 TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
-    "make agent-canon-pr-check",
+    TEMPLATE_AGENT_CANON_PR_GATE_COMMAND,
     "make agent-canon-ensure-latest",
     "Plan Mode Evidence",
     "Agent Orchestration Evidence",
@@ -95,9 +112,7 @@ TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
     "Direct `bash tools/sync_agent_canon.sh push` was not used",
     "agentcanon_structure_followup=required",
     "agentcanon_structure_followup=pass",
-    "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
     "python3 tools/agent_tools/check_agent_runtime_alignment.py",
-    "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",
     "python3 tools/agent_tools/check_convention_compliance.py",
     "Submodule Pin Change",
     "GitHub Mirror / Submodule Evidence",
@@ -198,6 +213,9 @@ AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
     "github.event.pull_request.head.sha || github.sha",
     "bash tools/ci/check_agent_canon_pr.sh",
 )
+PARENT_PROJECT_QUALITY_OWNER_ENV = "AGENT_CANON_PR_PROJECT_QUALITY_OWNER"
+PARENT_PROJECT_QUALITY_OWNER = "parent_ci"
+PARENT_PROJECT_QUALITY_COMMAND = "make ci"
 AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS = (
     "tool_catalog.py",
     "tool_drift.py",
@@ -222,7 +240,9 @@ AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS = (
 
 def is_template_or_derived_repo(root: Path) -> bool:
     """Return whether root is a template or derived repo with AgentCanon vendored."""
-    return (root / "vendor" / "agent-canon").exists() and (root / ".gitmodules").is_file()
+    return (root / "vendor" / "agent-canon").exists() and (
+        root / ".gitmodules"
+    ).is_file()
 
 
 def agent_canon_root(root: Path) -> Path:
@@ -394,7 +414,9 @@ def non_step_credential_env_names(workflow: dict[str, object]) -> set[str]:
     return names
 
 
-def agent_canon_checkout_command_steps(workflow: dict[str, object]) -> list[StepContext]:
+def agent_canon_checkout_command_steps(
+    workflow: dict[str, object],
+) -> list[StepContext]:
     """Return steps that invoke the AgentCanon checkout helper."""
     steps: list[StepContext] = []
     for context in step_contexts(workflow):
@@ -404,16 +426,21 @@ def agent_canon_checkout_command_steps(workflow: dict[str, object]) -> list[Step
     return steps
 
 
-def referenced_agent_canon_checkout_script_available(root: Path, workflow_text: str) -> bool:
+def referenced_agent_canon_checkout_script_available(
+    root: Path, workflow_text: str
+) -> bool:
     """Return whether at least one helper path referenced by the workflow exists."""
     roots = (root, agent_canon_root(root))
     return any(
-        path in workflow_text and any((candidate_root / path).is_file() for candidate_root in roots)
+        path in workflow_text
+        and any((candidate_root / path).is_file() for candidate_root in roots)
         for path in HELPER_PATHS
     )
 
 
-def workflow_declared_findings(path: Path, workflow: dict[str, object]) -> list[Finding]:
+def workflow_declared_findings(
+    path: Path, workflow: dict[str, object]
+) -> list[Finding]:
     """Return findings for workflow-level required declarations."""
     findings: list[Finding] = []
     if not has_permissions(workflow):
@@ -436,15 +463,29 @@ def agent_canon_checkout_policy_findings(
     requires_agent_canon_checkout = path.name not in AGENT_CANON_INDEPENDENT_WORKFLOWS
     if requires_agent_canon_checkout and checkouts and not helpers:
         findings.append(Finding("error", path, "missing_agent_canon_checkout_helper"))
-    if requires_agent_canon_checkout and checkouts and not any(name in workflow_text for name in AGENT_CANON_CREDENTIALS):
-        findings.append(Finding("error", path, "missing_agent_canon_repo_credential_env"))
+    if (
+        requires_agent_canon_checkout
+        and checkouts
+        and not any(name in workflow_text for name in AGENT_CANON_CREDENTIALS)
+    ):
+        findings.append(
+            Finding("error", path, "missing_agent_canon_repo_credential_env")
+        )
     if not requires_agent_canon_checkout:
         if helpers:
-            findings.append(Finding("error", path, "agent_canon_checkout_helper_not_allowed"))
+            findings.append(
+                Finding("error", path, "agent_canon_checkout_helper_not_allowed")
+            )
         if any(name in workflow_text for name in AGENT_CANON_CREDENTIALS):
-            findings.append(Finding("error", path, "agent_canon_credentials_not_allowed"))
-    if helpers and not referenced_agent_canon_checkout_script_available(root, workflow_text):
-        findings.append(Finding("error", path, "missing_referenced_agent_canon_checkout_helper"))
+            findings.append(
+                Finding("error", path, "agent_canon_credentials_not_allowed")
+            )
+    if helpers and not referenced_agent_canon_checkout_script_available(
+        root, workflow_text
+    ):
+        findings.append(
+            Finding("error", path, "missing_referenced_agent_canon_checkout_helper")
+        )
     non_step_credentials = non_step_credential_env_names(workflow)
     if helpers and non_step_credentials:
         findings.append(
@@ -523,11 +564,11 @@ def agent_canon_static_gate_findings(
     findings: list[Finding] = []
     wrapper = "bash tools/ci/check_agent_canon_pr.sh"
     run_steps = [
-        (context.index, run)
+        (context, run)
         for context in step_contexts(workflow)
         if isinstance((run := context.step.get("run")), str)
     ]
-    wrapper_steps = [index for index, run in run_steps if wrapper in run]
+    wrapper_steps = [context for context, run in run_steps if wrapper in run]
     if len(wrapper_steps) != 1:
         findings.append(
             Finding(
@@ -536,9 +577,37 @@ def agent_canon_static_gate_findings(
                 f"canonical_candidate_gate_consumer_count:{len(wrapper_steps)}",
             )
         )
+    non_step_read_credential = AGENT_CANON_PR_READ_CREDENTIAL in (
+        set(as_string_dict(workflow.get("env")) or {})
+        | {
+            name
+            for _job_name, job in job_items(workflow)
+            for name in set(as_string_dict(job.get("env")) or {})
+        }
+    )
+    if non_step_read_credential:
+        findings.append(
+            Finding(
+                "error",
+                path,
+                "canonical_candidate_gate_read_credential_must_be_step_local",
+            )
+        )
+    for context in wrapper_steps:
+        step_env = as_string_dict(context.step.get("env")) or {}
+        if step_env.get(AGENT_CANON_PR_READ_CREDENTIAL) != GITHUB_TOKEN_EXPRESSION:
+            findings.append(
+                Finding(
+                    "error",
+                    path,
+                    f"run_step_{context.index}_missing_step_local_github_read_credential",
+                )
+            )
     if re.search(r"(?m)^  push:\s*$", workflow_text):
-        findings.append(Finding("error", path, "duplicate_push_trigger_for_candidate_gate"))
-    for index, run in run_steps:
+        findings.append(
+            Finding("error", path, "duplicate_push_trigger_for_candidate_gate")
+        )
+    for context, run in run_steps:
         if wrapper in run:
             continue
         for command in AGENT_CANON_STATIC_GATE_DIRECT_COMMANDS:
@@ -547,10 +616,76 @@ def agent_canon_static_gate_findings(
                     Finding(
                         "error",
                         path,
-                        f"run_step_{index}_duplicates_canonical_gate:{command}",
+                        f"run_step_{context.index}_duplicates_canonical_gate:{command}",
                     )
                 )
     return findings
+
+
+def project_quality_owner_value(source: Mapping[str, object]) -> object:
+    """Return the project-quality owner marker from a workflow object."""
+    env = as_string_dict(source.get("env"))
+    if env is None:
+        return None
+    return env.get(PARENT_PROJECT_QUALITY_OWNER_ENV)
+
+
+def has_canonical_project_quality_command(run: str) -> bool:
+    """Return whether a workflow run invokes the canonical parent quality command."""
+    return any(
+        line.strip() == PARENT_PROJECT_QUALITY_COMMAND for line in run.splitlines()
+    )
+
+
+def parent_project_quality_findings(root: Path) -> list[Finding]:
+    """Require a parent-owned quality route in derived repository workflows."""
+    workflow_dir = root / ".github" / "workflows"
+    owner_routes: list[tuple[Path, str | None]] = []
+    declared_owner = False
+    for path in sorted(workflow_dir.glob("*.y*ml")):
+        workflow = load_workflow(path)
+        for _job_name, job in job_items(workflow):
+            job_owner = project_quality_owner_value(job)
+            if job_owner is not None:
+                declared_owner = True
+            job_steps = job.get("steps")
+            steps = cast(list[object], job_steps) if isinstance(job_steps, list) else []
+            for step_object in steps:
+                step = as_string_dict(step_object)
+                if step is None:
+                    continue
+                step_owner = project_quality_owner_value(step)
+                if step_owner is not None:
+                    declared_owner = True
+                owner = step_owner if step_owner is not None else job_owner
+                if owner == PARENT_PROJECT_QUALITY_OWNER:
+                    run = step.get("run")
+                    owner_routes.append(
+                        (
+                            path,
+                            run if isinstance(run, str) else None,
+                        )
+                    )
+    if not owner_routes:
+        message = (
+            "parent_project_quality_owner_must_be_parent_ci"
+            if declared_owner
+            else "missing_parent_project_quality_owner"
+        )
+        return [Finding("error", workflow_dir, message)]
+    if any(
+        run is not None and has_canonical_project_quality_command(run)
+        for _path, run in owner_routes
+    ):
+        return []
+    return [
+        Finding(
+            "error",
+            path,
+            "parent_project_quality_route_missing_canonical_command",
+        )
+        for path, _run in owner_routes[:1]
+    ]
 
 
 def require_text(path: Path, required: Sequence[str]) -> list[Finding]:
@@ -576,7 +711,9 @@ def projected_template_requirements(
         item.replace("tools/agent_tools/", "tools/agent-canon/agent_tools/")
         .replace("tools/ci/", "tools/agent-canon/ci/")
         .replace("tools/sync_agent_canon.sh", "tools/agent-canon/sync_agent_canon.sh")
-        .replace("tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh")
+        .replace(
+            "tools/update_agent_canon.sh", "tools/agent-canon/update_agent_canon.sh"
+        )
         for item in required
     )
 
@@ -584,7 +721,9 @@ def projected_template_requirements(
 def check_root_copy_headers(root: Path) -> list[Finding]:
     """Check synced root-copy workflow source markers."""
     findings: list[Finding] = []
-    stale_template_dashboard = root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+    stale_template_dashboard = (
+        root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+    )
     if is_template_or_derived_repo(root) and stale_template_dashboard.exists():
         findings.append(
             Finding(
@@ -669,7 +808,11 @@ def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]
                 ),
             ),
             (
-                root / "vendor" / "agent-canon" / ".github" / "PULL_REQUEST_TEMPLATE.md",
+                root
+                / "vendor"
+                / "agent-canon"
+                / ".github"
+                / "PULL_REQUEST_TEMPLATE.md",
                 STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS,
             ),
         ]
@@ -685,11 +828,115 @@ def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]
     ]
 
 
+def markdown_checklist_authority_commands(text: str) -> tuple[str, ...]:
+    """Return leading inline-code commands from Markdown checklist items."""
+    without_comments = HTML_COMMENT_PATTERN.sub(
+        lambda match: "\n" * match.group(0).count("\n"),
+        text,
+    )
+    lines = without_comments.splitlines()
+    commands: list[str] = []
+    active_fence: tuple[str, int] | None = None
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        fence_match = MARKDOWN_FENCE_PATTERN.match(line)
+        if fence_match:
+            fence = fence_match.group("fence")
+            if active_fence is None:
+                active_fence = (fence[0], len(fence))
+            elif fence[0] == active_fence[0] and len(fence) >= active_fence[1]:
+                active_fence = None
+            index += 1
+            continue
+        if active_fence is not None:
+            index += 1
+            continue
+
+        item_match = CHECKLIST_ITEM_PATTERN.match(line)
+        if item_match is None:
+            index += 1
+            continue
+        body = item_match.group("body").lstrip()
+        if not body.startswith("`"):
+            index += 1
+            continue
+        delimiter_length = len(body) - len(body.lstrip("`"))
+        delimiter = "`" * delimiter_length
+        command_text = body[delimiter_length:]
+        closing_index = command_text.find(delimiter)
+        item_indent = len(item_match.group("indent").expandtabs(4))
+        while closing_index < 0 and index + 1 < len(lines):
+            continuation = lines[index + 1]
+            continuation_indent = len(continuation) - len(continuation.lstrip(" \t"))
+            if not continuation.strip() or continuation_indent <= item_indent:
+                break
+            index += 1
+            command_text += "\n" + continuation.strip()
+            closing_index = command_text.find(delimiter)
+        if closing_index >= 0:
+            commands.append(" ".join(command_text[:closing_index].split()))
+        index += 1
+    return tuple(commands)
+
+
+def is_obsolete_template_agentcanon_command(command: str) -> bool:
+    """Return whether shell tokens begin with an obsolete internal command."""
+    try:
+        tokens = tuple(shlex.split(command))
+    except ValueError:
+        return False
+    return any(
+        tokens[: len(prefix)] == prefix
+        for prefix in OBSOLETE_TEMPLATE_AGENT_CANON_INTERNAL_COMMAND_PREFIXES
+    )
+
+
+def check_template_agentcanon_pr_gate(path: Path) -> list[Finding]:
+    """Require one public parent gate and reject internal command authority."""
+    if not path.exists():
+        return [Finding("error", path, "missing_file")]
+    text = read_text(path)
+    checklist_commands = markdown_checklist_authority_commands(text)
+    canonical_count = checklist_commands.count(TEMPLATE_AGENT_CANON_PR_GATE_COMMAND)
+    findings: list[Finding] = []
+    if canonical_count != 1:
+        findings.append(
+            Finding(
+                "error",
+                path,
+                f"canonical_parent_pr_gate_count:{canonical_count}",
+            )
+        )
+    for command in checklist_commands:
+        if is_obsolete_template_agentcanon_command(command):
+            findings.append(
+                Finding(
+                    "error",
+                    path,
+                    f"obsolete_internal_pr_gate_authority:{command}",
+                )
+            )
+    return findings
+
+
 def check_pr_templates(root: Path) -> list[Finding]:
     """Check PR template evidence fields."""
     findings: list[Finding] = []
     for path, required in pr_template_requirement_specs(root):
         findings.extend(require_text(path, required))
+    canon_root = agent_canon_root(root)
+    semantic_templates = {
+        canon_root
+        / "templates"
+        / "documents"
+        / "github"
+        / "pull-request"
+        / "agent_canon.md",
+        root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md",
+    }
+    for path in sorted(semantic_templates):
+        findings.extend(check_template_agentcanon_pr_gate(path))
     return findings
 
 
@@ -706,7 +953,9 @@ def submodule_checkout_script_findings(root: Path) -> list[Finding]:
     )
     wrapper_path = root / "tools" / "ci" / "checkout_agent_canon_submodule.sh"
     if not wrapper_path.is_file():
-        wrapper_path = root / "tools" / "agent-canon" / "ci" / "checkout_agent_canon_submodule.sh"
+        wrapper_path = (
+            root / "tools" / "agent-canon" / "ci" / "checkout_agent_canon_submodule.sh"
+        )
     findings.extend(require_text(wrapper_path, SUBMODULE_CHECKOUT_WRAPPER_REQUIREMENTS))
     return findings
 
@@ -786,6 +1035,8 @@ def github_workflow_findings(root: Path) -> tuple[list[Finding], list[Path]]:
     findings: list[Finding] = []
     for path in workflows:
         findings.extend(check_workflow(root, path))
+    if is_template_or_derived_repo(root):
+        findings.extend(parent_project_quality_findings(root))
     findings.extend(check_root_copy_headers(root))
     findings.extend(check_pr_templates(root))
     findings.extend(check_github_support_surfaces(root))

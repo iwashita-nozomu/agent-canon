@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Checks fresh-clone bootstrap, AgentCanon update, and runtime surfaces.
 # upstream design ../README.md shared automation index
+# upstream design ../../documents/agent-canon/agent-canon-update-route.md owns update materialization acceptance
 # upstream environment ../../documents/contracts/linux-wsl-host-requirements.md documents host tool requirements for fresh clone checks
 # upstream implementation ../agent_tools/update_lifecycle_contract.py owns source projection aggregation and validation.
 # upstream implementation ./check_agent_canon_pr.py owns the authoritative G2 materializer API.
@@ -109,6 +110,21 @@ resolve_clone_tools_root_or_fail() {
   printf '%s' "${resolved}"
 }
 
+assert_update_plan_acceptance() {
+  local plan_path="$1"
+  local allowed_routes="$2"
+
+  grep -Eq "agent_canon_plan_route=(${allowed_routes})" "${plan_path}"
+  if grep -q '^agent_canon_plan_prefix_mode=submodule$' "${plan_path}"; then
+    grep -q '^agent_canon_plan_requires_clean=no$' "${plan_path}"
+    grep -q '^agent_canon_plan_unresolved_merge_conflict=no$' "${plan_path}"
+    grep -q '^agent_canon_plan_merge_conflict=no$' "${plan_path}"
+    grep -q '^agent_canon_plan_merge_conflict_type=none$' "${plan_path}"
+    grep -q '^agent_canon_plan_materialization_collision=no$' "${plan_path}"
+    grep -q '^agent_canon_plan_acceptance_predicate=materialization_merge_conflict_or_unpreservable_materialization_collision$' "${plan_path}"
+  fi
+}
+
 git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
 git config --global --add safe.directory "${CLONE_DIR}"
 overlay_current_tree
@@ -143,9 +159,14 @@ AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:${COMMIT_REQUEST_EVIDENCE_DIGEST}"
 echo "fresh-clone commit request evidence: ${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}"
 
 python3 -m json.tool .devcontainer/devcontainer.json >/dev/null
+runtime_compose_generator="${CLONE_DIR}/.devcontainer/generate-runtime-compose.sh"
+if [ ! -f "${runtime_compose_generator}" ]; then
+  runtime_compose_generator="${CLONE_DIR}/vendor/agent-canon/.devcontainer/generate-runtime-compose.sh"
+fi
+test -f "${runtime_compose_generator}"
 AGENT_CANON_DEVCONTAINER_REPO_ROOT=. \
 AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml \
-bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh >/dev/null
+  bash "${runtime_compose_generator}" >/dev/null
 python3 - <<'PY'
 from __future__ import annotations
 
@@ -321,7 +342,9 @@ git config user.name "Fresh Clone Check"
 git config user.email "fresh-clone-check@example.invalid"
 materialize_current_lifecycle_projection
 bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" plan | tee "${TMP_DIR}/agent-canon-plan.txt"
-grep -Eq "agent_canon_plan_route=(already_current_submodule|subtree_pull|submodule_update)" "${TMP_DIR}/agent-canon-plan.txt"
+assert_update_plan_acceptance \
+  "${TMP_DIR}/agent-canon-plan.txt" \
+  "already_current_submodule|deferred_branch_pr|subtree_pull|submodule_update"
 AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
 AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
 AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
@@ -338,7 +361,9 @@ test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
 )
 mkdir -p "${TMP_DIR}/missing-git-exec"
 GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" plan | tee "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
-grep -Eq "agent_canon_plan_route=(snapshot_import_tree_match|snapshot_import_no_subtree|submodule_update)" "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
+assert_update_plan_acceptance \
+  "${TMP_DIR}/agent-canon-no-subtree-plan.txt" \
+  "deferred_branch_pr|snapshot_import_tree_match|snapshot_import_no_subtree|submodule_update"
 AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
 AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
 AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \

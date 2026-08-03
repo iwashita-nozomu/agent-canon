@@ -1,6 +1,7 @@
 # @dependency-start
 # contract test
 # responsibility Tests test update agent canon behavior.
+# upstream design ../../documents/agent-canon/agent-canon-update-route.md owns update materialization acceptance
 # upstream design ../../tools/README.md validated automation surface
 # @dependency-end
 
@@ -140,12 +141,330 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
         ordered_update = (
             '"refs/heads/$branch:refs/remotes/origin/$branch"',
             '"refs/remotes/origin/$branch^{commit}"',
-            'merge --ff-only "origin/$branch"',
+            '"$worktree_commit" "$remote_sha" "$branch" "$materialization_result_tree"',
             'git -C "$ROOT_DIR" add -A -- "$PREFIX"',
         )
         for before, after in zip(ordered_update, ordered_update[1:]):
             self.assertLess(ensure_latest.index(before), ensure_latest.index(after))
         self.assertNotIn("switch -C", ensure_latest)
+
+    def test_fresh_clone_accepts_materializable_local_branch_state(self) -> None:
+        """Fresh-clone acceptance should admit collision-free local branch state."""
+        script = (AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_fresh_clone.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("assert_update_plan_acceptance", script)
+        self.assertIn("deferred_branch_pr|subtree_pull|submodule_update", script)
+        self.assertIn("agent_canon_plan_requires_clean=no", script)
+        self.assertIn("agent_canon_plan_unresolved_merge_conflict=no", script)
+        self.assertIn("agent_canon_plan_merge_conflict=no", script)
+        self.assertIn("agent_canon_plan_merge_conflict_type=none", script)
+        self.assertIn("agent_canon_plan_materialization_collision=no", script)
+        self.assertIn(
+            "materialization_merge_conflict_or_unpreservable_materialization_collision",
+            script,
+        )
+
+    def test_merge_invocations_disable_configured_autostash(self) -> None:
+        """Every AgentCanon update merge must refuse config-driven autostash."""
+        for relative_path in ("tools/sync_agent_canon.sh", "tools/update_agent_canon.sh"):
+            script = (AGENT_CANON_SOURCE_ROOT / relative_path).read_text(encoding="utf-8")
+            merge_lines = [
+                line
+                for line in script.splitlines()
+                if "git -C" in line and " merge " in line and "merge-base" not in line
+            ]
+            self.assertTrue(merge_lines, relative_path)
+            for line in merge_lines:
+                self.assertIn("--no-autostash", line, (relative_path, line))
+
+    def test_parallel_clone_docs_require_occupied_vendor_and_latest_uses_exact_predicate(
+        self,
+    ) -> None:
+        """Parallel eligibility and dirty CI state do not create generic clones."""
+        orchestration = (
+            AGENT_CANON_SOURCE_ROOT / "agents" / "skills" / "agent-orchestration.md"
+        ).read_text(encoding="utf-8")
+        waterfall = (
+            AGENT_CANON_SOURCE_ROOT
+            / "agents"
+            / "workflows"
+            / "implementation-waterfall-workflow.md"
+        ).read_text(encoding="utf-8")
+        dependency = (
+            AGENT_CANON_SOURCE_ROOT / "documents" / "tools" / "dependency_module_change.md"
+        ).read_text(encoding="utf-8")
+        self.assertIn("occupied by a different\nactive topic or branch", orchestration)
+        self.assertIn("Parallel\neligibility alone never triggers clone", orchestration)
+        self.assertIn("vendor checkout が別の active topic/branch", waterfall)
+        self.assertIn("parallel eligibility だけでは clone を作成しません", waterfall)
+        self.assertIn("vendor checkout が別の active topic/branch", dependency)
+        self.assertIn("parallel eligibility だけでは\nclone を作成しません", dependency)
+
+        latest_check = (
+            AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh"
+        ).read_text(encoding="utf-8")
+        self.assertIn("submodule_materialization_collision)", latest_check)
+        self.assertIn("exact_materialization_merge_conflict_or_collision_predicate", latest_check)
+        self.assertNotIn("--placement workspace", latest_check)
+        self.assertNotIn("after cleaning the worktree", latest_check)
+
+    def test_collision_emitter_blocks_current_checkout_without_clone_route(self) -> None:
+        """Typed collision/conflict emission never selects the workspace clone route."""
+        script = (AGENT_CANON_SOURCE_ROOT / "tools" / "update_agent_canon.sh").read_text(
+            encoding="utf-8"
+        )
+        start = script.index("emit_agentcanon_conflict_workflow_route() {")
+        end = script.index("\nroute_requires_agent_workflow()", start)
+        emitter = script[start:end]
+        blocked_emission = emitter[: emitter.index(
+            '\n  echo "AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_required"'
+        )]
+        self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=blocked_current_checkout", emitter)
+        self.assertIn("AGENT_CANON_LATEST_BLOCK_SCOPE=current_checkout", emitter)
+        self.assertNotIn("NEXT_ACTION=prepare_topic_workspace_source_clone", blocked_emission)
+        self.assertNotIn("AGENT_CANON_LATEST_DEPENDENCY_ROUTE=", blocked_emission)
+
+
+class UpdateMaterializationPredicateTest(unittest.TestCase):
+    """Exercise the collision predicate directly in a standalone source checkout."""
+
+    MATERIALIZATION_LIB = AGENT_CANON_SOURCE_ROOT / "tools" / "lib" / "update_materialization.sh"
+
+    def init_repo(self, root: Path, files: dict[str, str]) -> Path:
+        """Create one repository with a committed main branch."""
+        repo = root / "materialization"
+        subprocess.run(["git", "init", "-b", "main", str(repo)], check=True)
+        subprocess.run(["git", "config", "user.name", "Materialization Test"], cwd=repo, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "materialization@example.invalid"],
+            cwd=repo,
+            check=True,
+        )
+        for relative, content in files.items():
+            path = repo / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
+        subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-m", "base"], cwd=repo, check=True)
+        return repo
+
+    def commit(self, repo: Path, message: str) -> str:
+        """Commit the current repository state and return its commit id."""
+        subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
+        subprocess.run(["git", "commit", "-m", message], cwd=repo, check=True)
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=repo,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    def collision(self, repo: Path, current: str, remote: str) -> subprocess.CompletedProcess[str]:
+        """Return the direct helper result for one virtual materialization."""
+        return subprocess.run(
+            [
+                "bash",
+                "-c",
+                (
+                    'source "$1"; '
+                    'result_tree="$(update_materialization_result_tree "$2" "$3" "$4")" '
+                    '|| exit $?; update_materialization_collision_path "$2" "$3" "$result_tree"'
+                ),
+                "materialization-test",
+                str(self.MATERIALIZATION_LIB),
+                str(repo),
+                current,
+                remote,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def result_tree(
+        self,
+        repo: Path,
+        current: str,
+        remote: str,
+    ) -> subprocess.CompletedProcess[str]:
+        """Return the virtual merge-result helper status."""
+        return subprocess.run(
+            [
+                "bash",
+                "-c",
+                'source "$1"; update_materialization_result_tree "$2" "$3" "$4"',
+                "materialization-test",
+                str(self.MATERIALIZATION_LIB),
+                str(repo),
+                current,
+                remote,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def local_paths(self, repo: Path) -> subprocess.CompletedProcess[str]:
+        """Return the complete local materialization path union, including hidden flags."""
+        return subprocess.run(
+            [
+                "bash",
+                "-c",
+                'source "$1"; update_materialization_local_paths "$2"',
+                "materialization-test",
+                str(self.MATERIALIZATION_LIB),
+                str(repo),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def test_ignored_untracked_overwrite_candidate_collides(self) -> None:
+        """Ignored untracked materialization participates in the local path set."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = self.init_repo(Path(tmp_dir), {"README.md": "base\n"})
+            base = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            subprocess.run(["git", "switch", "-c", "remote"], cwd=repo, check=True)
+            (repo / "ignored.txt").write_text("remote\n", encoding="utf-8")
+            remote = self.commit(repo, "remote ignored candidate")
+            subprocess.run(["git", "switch", "main"], cwd=repo, check=True)
+            git_exclude = subprocess.run(
+                ["git", "rev-parse", "--git-path", "info/exclude"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            exclude_path = Path(git_exclude)
+            if not exclude_path.is_absolute():
+                exclude_path = repo / exclude_path
+            exclude_path.write_text("ignored.txt\n", encoding="utf-8")
+            (repo / "ignored.txt").write_text("local ignored\n", encoding="utf-8")
+
+            collision = self.collision(repo, base, remote)
+
+            self.assertEqual(collision.returncode, 0, collision.stderr)
+            self.assertEqual(collision.stdout, "ignored.txt\n")
+
+    def test_virtual_merge_write_set_includes_local_rename_destination(self) -> None:
+        """Git's virtual merge result exposes the dirty local rename destination."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = self.init_repo(Path(tmp_dir), {"a.txt": "one\ntwo\nthree\nfour\n"})
+            subprocess.run(["git", "switch", "-c", "remote"], cwd=repo, check=True)
+            (repo / "a.txt").write_text("one\ntwo remote\nthree\nfour\n", encoding="utf-8")
+            remote = self.commit(repo, "remote edit")
+            subprocess.run(["git", "switch", "main"], cwd=repo, check=True)
+            subprocess.run(["git", "switch", "-c", "local"], cwd=repo, check=True)
+            subprocess.run(["git", "mv", "a.txt", "b.txt"], cwd=repo, check=True)
+            current = self.commit(repo, "local rename")
+            (repo / "b.txt").write_text(
+                "one\ntwo\nthree\nfour\nlocal dirty\n",
+                encoding="utf-8",
+            )
+
+            collision = self.collision(repo, current, remote)
+
+            self.assertEqual(collision.returncode, 0, collision.stderr)
+            self.assertEqual(collision.stdout, "b.txt\n")
+
+    def test_noncolliding_dirty_path_is_accepted(self) -> None:
+        """A dirty path outside the virtual write set does not block materialization."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = self.init_repo(Path(tmp_dir), {"README.md": "base\n"})
+            base = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            subprocess.run(["git", "switch", "-c", "remote"], cwd=repo, check=True)
+            (repo / "remote.txt").write_text("remote\n", encoding="utf-8")
+            remote = self.commit(repo, "remote addition")
+            subprocess.run(["git", "switch", "main"], cwd=repo, check=True)
+            (repo / "local.txt").write_text("local dirty\n", encoding="utf-8")
+
+            collision = self.collision(repo, base, remote)
+
+            self.assertEqual(collision.returncode, 1, collision.stderr)
+            self.assertEqual(collision.stdout, "")
+
+    def test_virtual_merge_conflict_is_typed_separately(self) -> None:
+        """A committed conflict returns the dedicated merge-tree status."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = self.init_repo(Path(tmp_dir), {"README.md": "base\n"})
+            subprocess.run(["git", "switch", "-c", "remote"], cwd=repo, check=True)
+            (repo / "README.md").write_text("remote\n", encoding="utf-8")
+            remote = self.commit(repo, "remote conflict")
+            subprocess.run(["git", "switch", "main"], cwd=repo, check=True)
+            subprocess.run(["git", "switch", "-c", "local"], cwd=repo, check=True)
+            (repo / "README.md").write_text("local\n", encoding="utf-8")
+            current = self.commit(repo, "local conflict")
+
+            result = self.result_tree(repo, current, remote)
+
+            self.assertEqual(result.returncode, 2, result.stderr)
+            self.assertEqual(result.stdout, "")
+
+    def test_assume_unchanged_and_skip_worktree_changes_are_materialized_paths(self) -> None:
+        """Index flags cannot hide changed tracked content from collision detection."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            repo = self.init_repo(
+                Path(tmp_dir),
+                {"assume.txt": "base assume\n", "skip.txt": "base skip\n"},
+            )
+            subprocess.run(
+                ["git", "update-index", "--assume-unchanged", "--", "assume.txt"],
+                cwd=repo,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "update-index", "--skip-worktree", "--", "skip.txt"],
+                cwd=repo,
+                check=True,
+            )
+            flags_before = subprocess.run(
+                ["git", "ls-files", "-v", "--", "assume.txt", "skip.txt"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            (repo / "assume.txt").write_text("hidden assume change\n", encoding="utf-8")
+            (repo / "skip.txt").write_text("hidden skip change\n", encoding="utf-8")
+            status = subprocess.run(
+                ["git", "status", "--short", "--untracked-files=all"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+            paths = self.local_paths(repo)
+
+            self.assertEqual(status.stdout, "")
+            self.assertEqual(paths.returncode, 0, paths.stderr)
+            self.assertEqual(
+                set(filter(None, paths.stdout.split("\0"))),
+                {"assume.txt", "skip.txt"},
+            )
+            flags_after = subprocess.run(
+                ["git", "ls-files", "-v", "--", "assume.txt", "skip.txt"],
+                cwd=repo,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+            self.assertEqual(flags_after, flags_before)
 
 
 @unittest.skipIf(
@@ -1239,7 +1558,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 "latest",
                 "apply",
                 "merge-main-into-current",
-                "merge-main-into-current-preserve-dirty",
             )
             invalid_environments = (
                 self.unauthorized_env(),
@@ -1626,8 +1944,8 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertIn("agent_canon_latest_submodule_local_state_checked=yes", result.stdout)
             self.assertIn("agent_canon_latest=already_current_submodule", result.stdout)
 
-    def test_plan_rejects_non_main_submodule_without_mutation(self) -> None:
-        """Plan should block a non-main submodule without changing Git state."""
+    def test_plan_accepts_named_topic_branch_without_mutation(self) -> None:
+        """Plan should report a named topic branch as deferred state evidence."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
@@ -1648,13 +1966,15 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            self.assertNotEqual(plan.returncode, 0)
-            self.assertIn("agent_canon_plan_route=submodule_non_default_branch", plan.stdout)
-            self.assertIn("agent_canon_plan_status=blocked", plan.stdout)
-            self.assertIn(
-                "NEXT_ACTION=checkout_main_at_staged_gitlink_commit", plan.stdout
-            )
-            self.assertNotIn("agent_canon_plan_apply_command=", plan.stdout)
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertIn("agent_canon_plan_route=deferred_branch_pr", plan.stdout)
+            self.assertIn("agent_canon_plan_submodule_branch=canon-pr/non-main", plan.stdout)
+            self.assertIn("agent_canon_plan_submodule_history_state=equal", plan.stdout)
+            self.assertIn("agent_canon_plan_requires_clean=no", plan.stdout)
+            self.assertIn("agent_canon_plan_unresolved_merge_conflict=no", plan.stdout)
+            self.assertIn("agent_canon_plan_merge_conflict=no", plan.stdout)
+            self.assertIn("agent_canon_plan_materialization_collision=no", plan.stdout)
+            self.assertIn("agent_canon_plan_apply_command=", plan.stdout)
             self.assertEqual(self.protected_state(repo), before)
 
             subprocess.run(["git", "switch", "--detach"], cwd=submodule, check=True)
@@ -2089,6 +2409,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
             subprocess.run(["git", "commit", "-m", "advance remote"], cwd=work_dir, check=True)
             subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+            self.materialize_parent_projection_frontier(repo, work_dir)
 
             latest = subprocess.run(
                 ["bash", "tools/update_agent_canon.sh", "latest"],
@@ -2190,6 +2511,20 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             bare_repo, work_dir = self.make_agent_canon_remote(root)
             repo = self.make_superproject(root, bare_repo)
             submodule = repo / "vendor" / "agent-canon"
+            subprocess.run(
+                ["git", "switch", "-c", "canon-pr/local-work"],
+                cwd=submodule,
+                check=True,
+            )
+            subprocess.run(["git", "config", "user.name", "Submodule Test"], cwd=submodule, check=True)
+            subprocess.run(
+                ["git", "config", "user.email", "submodule-test@example.invalid"],
+                cwd=submodule,
+                check=True,
+            )
+            (submodule / "local-branch-marker.txt").write_text("local\n", encoding="utf-8")
+            subprocess.run(["git", "add", "local-branch-marker.txt"], cwd=submodule, check=True)
+            subprocess.run(["git", "commit", "-m", "local branch work"], cwd=submodule, check=True)
             (submodule / "dirty-marker.txt").write_text("dirty\n", encoding="utf-8")
             (work_dir / "remote-marker.txt").write_text("remote\n", encoding="utf-8")
             subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
@@ -2217,32 +2552,21 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             ).stdout
-            stash_list = subprocess.run(
-                ["git", "stash", "list"],
-                cwd=submodule,
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout
-
             self.assertEqual(latest.returncode, 0, latest.stdout + latest.stderr)
-            self.assertIn("agent_canon_plan_route=submodule_update", latest.stdout)
+            self.assertIn("agent_canon_plan_route=deferred_branch_pr", latest.stdout)
             self.assertIn("agent_canon_plan_submodule_worktree_status=dirty", latest.stdout)
-            self.assertIn("AGENT_CANON_LATEST_DIRTY_PRESERVE=started", latest.stdout)
-            self.assertIn("agent_canon_merge_dirty_preserve_result=started", latest.stdout)
-            self.assertIn("agent_canon_merge_dirty_restore=applied", latest.stdout)
-            self.assertIn("agent_canon_merge_dirty_stash_dropped=yes", latest.stdout)
-            self.assertIn("agent_canon_merge_remote_main_in_post_head=yes", latest.stdout)
-            self.assertIn("AGENT_CANON_LATEST_DIRTY_PRESERVE=pass", latest.stdout)
-            self.assertIn("AGENT_CANON_LATEST_ROOT_VIEW_REPAIR=pass", latest.stdout)
-            self.assertIn("shared surface is in sync", latest.stdout)
-            self.assertIn("AGENT_CANON_LATEST_SHARED_SURFACE_CHECK=pass", latest.stdout)
-            self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_preserved_dirty", latest.stdout)
-            self.assertIn("NEXT_ACTION=continue_agentcanon_branch_PR_flow_with_restored_dirty_state", latest.stdout)
+            self.assertIn("agent_canon_plan_submodule_history_state=diverged", latest.stdout)
+            self.assertIn("agent_canon_plan_requires_clean=no", latest.stdout)
+            self.assertIn("agent_canon_plan_unresolved_merge_conflict=no", latest.stdout)
+            self.assertIn("agent_canon_plan_merge_conflict=no", latest.stdout)
+            self.assertIn("agent_canon_plan_materialization_collision=no", latest.stdout)
+            self.assertIn("agent_canon_materialization_result=merged_remote", latest.stdout)
+            self.assertIn("agent_canon_latest_submodule_applied_status=dirty_preserved", latest.stdout)
+            self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=deferred_branch_pr", latest.stdout)
+            self.assertTrue((submodule / "local-branch-marker.txt").is_file())
             self.assertTrue((submodule / "remote-marker.txt").is_file())
             self.assertTrue((submodule / "dirty-marker.txt").is_file())
             self.assertIn("?? dirty-marker.txt", status)
-            self.assertNotIn("preserve dirty AgentCanon work", stash_list)
             self.assertEqual(
                 subprocess.run(
                     ["git", "merge-base", "--is-ancestor", remote_sha, "HEAD"],
@@ -2252,8 +2576,8 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 0,
             )
 
-    def test_latest_parks_eval_logs_before_submodule_update(self) -> None:
-        """Latest should park accumulated eval logs before applying a safe main update."""
+    def test_latest_preserves_noncolliding_eval_logs_in_place(self) -> None:
+        """Latest should retain non-colliding eval logs in the source worktree."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, work_dir = self.make_agent_canon_remote(root)
@@ -2274,6 +2598,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
             subprocess.run(["git", "commit", "-m", "advance remote"], cwd=work_dir, check=True)
             subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+            self.materialize_parent_projection_frontier(repo, work_dir)
 
             latest = subprocess.run(
                 ["bash", "tools/update_agent_canon.sh", "latest"],
@@ -2282,27 +2607,14 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-            parked_log = subprocess.run(
-                [
-                    "git",
-                    "--git-dir",
-                    str(bare_repo),
-                    "show",
-                    "refs/heads/agent-logs/derived:agents/evals/results/hook-runs/derived-devcontainer/skill_usage.jsonl",
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-
             self.assertEqual(latest.returncode, 0, latest.stdout + latest.stderr)
-            self.assertIn("AGENT_CANON_EVAL_LOG_PARK=committed", latest.stdout)
-            self.assertIn("AGENT_CANON_EVAL_LOG_PARK_BRANCH=agent-logs/derived", latest.stdout)
+            self.assertIn("agent_canon_plan_requires_clean=no", latest.stdout)
+            self.assertIn("agent_canon_plan_materialization_collision=no", latest.stdout)
             self.assertIn("agent_canon_latest=updating_submodule", latest.stdout)
             self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=updated", latest.stdout)
-            self.assertIn('"hook_run_id":"local-log"', parked_log.stdout)
             self.assertTrue((submodule / "remote-marker.txt").is_file())
-            self.assertFalse(log_path.exists())
+            self.assertTrue(log_path.is_file())
+            self.assertIn('"hook_run_id":"local-log"', log_path.read_text(encoding="utf-8"))
 
     def test_plan_ignores_removed_source_repo_override_for_submodule_remote(self) -> None:
         """Submodule plan should keep GitHub-first submodule remote semantics."""
@@ -2566,18 +2878,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 cwd=submodule,
                 check=True,
             )
-            branch_head = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
-                cwd=submodule,
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
-            subprocess.run(
-                ["git", "checkout", "--detach", branch_head],
-                cwd=submodule,
-                check=True,
-            )
             subprocess.run(["git", "add", "vendor/agent-canon"], cwd=repo, check=True)
             subprocess.run(["git", "commit", "-m", "pin pushed proposal"], cwd=repo, check=True)
             subprocess.run(
@@ -2789,6 +3089,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
             subprocess.run(["git", "commit", "-m", "advance remote"], cwd=work_dir, check=True)
             subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+            self.materialize_parent_projection_frontier(repo, work_dir)
             (repo / "UNTRACKED_ROOT_FILE").write_text("root dirty\n", encoding="utf-8")
 
             apply = subprocess.run(
@@ -2867,8 +3168,8 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertEqual(status, " M documents/README.md\n")
             self.assertNotIn("documents/README.md", committed_paths)
 
-    def test_ensure_latest_refuses_unpinned_local_submodule_commits(self) -> None:
-        """Ensure-latest should not overwrite local submodule commits silently."""
+    def test_ensure_latest_defers_unpinned_local_submodule_commits(self) -> None:
+        """Ensure-latest should preserve and defer committed local history."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
@@ -2913,12 +3214,11 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 text=True,
             ).stdout.strip()
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(
-                "agent_canon_latest=local_submodule_worktree_differs_from_parent_pin",
-                result.stdout,
-            )
-            self.assertIn("worktree HEAD differs from parent gitlink", result.stderr)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("agent_canon_latest_submodule_history_state=ahead", result.stdout)
+            self.assertIn("agent_canon_latest_parent_pin_status=stale", result.stdout)
+            self.assertIn("agent_canon_materialization_collision=no", result.stdout)
+            self.assertIn("agent_canon_latest=deferred_branch_pr", result.stdout)
             self.assertEqual(after_head, local_head)
 
     def test_ensure_latest_rejects_origin_main_expected_mismatch(self) -> None:
@@ -2973,7 +3273,11 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             bare_repo, work_dir = self.make_agent_canon_remote(root)
             repo = self.make_superproject(root, bare_repo)
             submodule = repo / "vendor" / "agent-canon"
-            subprocess.run(["git", "switch", "-c", "canon-pr/local-work"], cwd=submodule, check=True)
+            subprocess.run(
+                ["git", "switch", "-c", "canon-pr/local-work"],
+                cwd=submodule,
+                check=True,
+            )
             subprocess.run(["git", "config", "user.name", "Submodule Test"], cwd=submodule, check=True)
             subprocess.run(
                 ["git", "config", "user.email", "submodule-test@example.invalid"],
@@ -3043,8 +3347,8 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 0,
             )
 
-    def test_merge_main_into_current_blocks_dirty_submodule(self) -> None:
-        """Merge-main should not merge over uncommitted AgentCanon work."""
+    def test_merge_main_into_current_preserves_noncolliding_dirty_submodule(self) -> None:
+        """Merge-main should merge around non-colliding uncommitted work."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, work_dir = self.make_agent_canon_remote(root)
@@ -3054,6 +3358,116 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             (submodule / "dirty-marker.txt").write_text("dirty\n", encoding="utf-8")
             (work_dir / "remote-marker.txt").write_text("remote\n", encoding="utf-8")
             subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "advance remote main"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+            merge = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "merge-main-into-current"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(merge.returncode, 0, merge.stdout + merge.stderr)
+            self.assertIn("agent_canon_merge_worktree_status=dirty", merge.stdout)
+            self.assertIn("agent_canon_merge_merge_conflict=no", merge.stdout)
+            self.assertIn("agent_canon_merge_materialization_collision=no", merge.stdout)
+            self.assertIn("agent_canon_merge_result=fast_forwarded", merge.stdout)
+            self.assertIn("agent_canon_merge_local_changes=preserved", merge.stdout)
+            self.assertTrue((submodule / "dirty-marker.txt").is_file())
+            self.assertTrue((submodule / "remote-marker.txt").is_file())
+
+    def test_merge_main_into_current_never_autostashes_when_configured(self) -> None:
+        """The explicit no-autostash merge flag preserves dirty state and stash refs."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            submodule = repo / "vendor" / "agent-canon"
+            subprocess.run(["git", "switch", "-c", "canon-pr/local-work"], cwd=submodule, check=True)
+            subprocess.run(["git", "config", "merge.autoStash", "true"], cwd=submodule, check=True)
+            dirty_readme = "# Dirty local change\n"
+            (submodule / "README.md").write_text(dirty_readme, encoding="utf-8")
+            (work_dir / "remote-marker.txt").write_text("remote\n", encoding="utf-8")
+            subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "advance remote main"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+
+            merge = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "merge-main-into-current"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            stash_list = subprocess.run(
+                ["git", "stash", "list"],
+                cwd=submodule,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout
+
+            self.assertEqual(merge.returncode, 0, merge.stdout + merge.stderr)
+            self.assertIn("agent_canon_merge_result=fast_forwarded", merge.stdout)
+            self.assertEqual((submodule / "README.md").read_text(encoding="utf-8"), dirty_readme)
+            self.assertTrue((submodule / "remote-marker.txt").is_file())
+            self.assertEqual(stash_list, "")
+
+    def test_latest_collision_blocks_current_checkout_without_workspace_clone(self) -> None:
+        """A typed collision blocks the current checkout and never prepares a clone."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            submodule = repo / "vendor" / "agent-canon"
+            subprocess.run(["git", "switch", "-c", "canon-pr/local-work"], cwd=submodule, check=True)
+            git_exclude = subprocess.run(
+                ["git", "rev-parse", "--git-path", "info/exclude"],
+                cwd=submodule,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            exclude_path = Path(git_exclude)
+            if not exclude_path.is_absolute():
+                exclude_path = submodule / exclude_path
+            exclude_path.write_text("collision.txt\n", encoding="utf-8")
+            (submodule / "collision.txt").write_text("local collision\n", encoding="utf-8")
+            (work_dir / "collision.txt").write_text("remote collision\n", encoding="utf-8")
+            subprocess.run(["git", "add", "collision.txt"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "remote collision"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+            self.materialize_parent_projection_frontier(repo, work_dir)
+
+            latest = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "latest"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(latest.returncode, 0)
+            self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=blocked_current_checkout", latest.stdout)
+            self.assertIn(
+                "NEXT_ACTION=resolve_agentcanon_materialization_collision_or_merge_conflict_in_current_checkout_then_rerun_latest",
+                latest.stdout,
+            )
+            self.assertNotIn("NEXT_ACTION=prepare_topic_workspace_source_clone", latest.stdout)
+            self.assertFalse((root / "workspace").exists())
+
+    def test_merge_main_into_current_blocks_materialization_collision(self) -> None:
+        """Merge-main should block an uncommitted path in the remote write set."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            submodule = repo / "vendor" / "agent-canon"
+            subprocess.run(["git", "switch", "-c", "canon-pr/local-work"], cwd=submodule, check=True)
+            local_readme = "# Local uncommitted change\n"
+            (submodule / "README.md").write_text(local_readme, encoding="utf-8")
+            (work_dir / "README.md").write_text("# Remote update\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=work_dir, check=True)
             subprocess.run(["git", "commit", "-m", "advance remote main"], cwd=work_dir, check=True)
             subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
             before_head = subprocess.run(
@@ -3080,83 +3494,230 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             ).stdout.strip()
 
             self.assertNotEqual(merge.returncode, 0)
-            self.assertIn("agent_canon_merge_result=blocked_dirty", merge.stdout)
-            self.assertIn("NEXT_ACTION=commit_agentcanon_artifacts", merge.stdout)
+            self.assertIn("agent_canon_merge_materialization_collision=yes", merge.stdout)
+            self.assertIn("agent_canon_merge_materialization_collision_path=README.md", merge.stdout)
+            self.assertIn("agent_canon_merge_result=blocked_unpreservable_collision", merge.stdout)
             self.assertEqual(after_head, before_head)
+            self.assertEqual((submodule / "README.md").read_text(encoding="utf-8"), local_readme)
 
-    def test_merge_main_preserve_dirty_restores_dirty_submodule_work(self) -> None:
-        """Explicit preserve-dirty merge should stash, merge main, and restore dirt."""
+    def test_merge_main_into_current_blocks_ignored_untracked_collision(self) -> None:
+        """Ignored untracked paths must remain protected from remote materialization."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, work_dir = self.make_agent_canon_remote(root)
             repo = self.make_superproject(root, bare_repo)
             submodule = repo / "vendor" / "agent-canon"
             subprocess.run(["git", "switch", "-c", "canon-pr/local-work"], cwd=submodule, check=True)
-            subprocess.run(["git", "config", "user.name", "Submodule Test"], cwd=submodule, check=True)
-            subprocess.run(
-                ["git", "config", "user.email", "submodule-test@example.invalid"],
+            git_exclude = subprocess.run(
+                ["git", "rev-parse", "--git-path", "info/exclude"],
                 cwd=submodule,
-                check=True,
-            )
-            (submodule / "local-marker.txt").write_text("local\n", encoding="utf-8")
-            subprocess.run(["git", "add", "local-marker.txt"], cwd=submodule, check=True)
-            subprocess.run(["git", "commit", "-m", "local branch work"], cwd=submodule, check=True)
-            (submodule / "dirty-marker.txt").write_text("dirty\n", encoding="utf-8")
-            (work_dir / "remote-marker.txt").write_text("remote\n", encoding="utf-8")
-            subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
-            subprocess.run(["git", "commit", "-m", "advance remote main"], cwd=work_dir, check=True)
-            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
-            remote_sha = subprocess.run(
-                ["git", "rev-parse", "HEAD"],
-                cwd=work_dir,
                 check=True,
                 capture_output=True,
                 text=True,
             ).stdout.strip()
-
-            merge = subprocess.run(
-                [
-                    "bash",
-                    "tools/update_agent_canon.sh",
-                    "merge-main-into-current-preserve-dirty",
-                ],
-                cwd=repo,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            status = subprocess.run(
-                ["git", "status", "--short", "--untracked-files=all"],
-                cwd=submodule,
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout
-            stash_list = subprocess.run(
-                ["git", "stash", "list"],
-                cwd=submodule,
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout
-
-            self.assertEqual(merge.returncode, 0, merge.stderr)
-            self.assertIn("agent_canon_merge_dirty_preserve_result=started", merge.stdout)
-            self.assertIn("agent_canon_merge_dirty_restore=applied", merge.stdout)
-            self.assertIn("agent_canon_merge_dirty_stash_dropped=yes", merge.stdout)
-            self.assertIn("agent_canon_merge_remote_main_in_post_head=yes", merge.stdout)
-            self.assertTrue((submodule / "remote-marker.txt").is_file())
-            self.assertTrue((submodule / "dirty-marker.txt").is_file())
-            self.assertIn("?? dirty-marker.txt", status)
-            self.assertNotIn("preserve dirty AgentCanon work", stash_list)
+            exclude_path = Path(git_exclude)
+            if not exclude_path.is_absolute():
+                exclude_path = submodule / exclude_path
+            exclude_path.write_text("ignored-overwrite.txt\n", encoding="utf-8")
+            local_content = "ignored local materialization\n"
+            (submodule / "ignored-overwrite.txt").write_text(local_content, encoding="utf-8")
             self.assertEqual(
                 subprocess.run(
-                    ["git", "merge-base", "--is-ancestor", remote_sha, "HEAD"],
+                    ["git", "check-ignore", "--quiet", "ignored-overwrite.txt"],
                     cwd=submodule,
                     check=False,
                 ).returncode,
                 0,
             )
+            (work_dir / "ignored-overwrite.txt").write_text(
+                "remote materialization\n",
+                encoding="utf-8",
+            )
+            subprocess.run(["git", "add", "ignored-overwrite.txt"], cwd=work_dir, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "add ignored candidate"],
+                cwd=work_dir,
+                check=True,
+            )
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+
+            plan = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "plan"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertIn("agent_canon_plan_route=submodule_materialization_collision", plan.stdout)
+            self.assertIn("agent_canon_plan_merge_conflict=no", plan.stdout)
+            self.assertIn("agent_canon_plan_materialization_collision=yes", plan.stdout)
+            self.assertIn(
+                "agent_canon_plan_materialization_collision_path=ignored-overwrite.txt",
+                plan.stdout,
+            )
+
+            merge = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "merge-main-into-current"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(merge.returncode, 0)
+            self.assertIn("agent_canon_merge_worktree_status=clean", merge.stdout)
+            self.assertIn("agent_canon_merge_materialization_collision=yes", merge.stdout)
+            self.assertIn(
+                "agent_canon_merge_materialization_collision_path=ignored-overwrite.txt",
+                merge.stdout,
+            )
+            self.assertIn("agent_canon_merge_result=blocked_unpreservable_collision", merge.stdout)
+            self.assertEqual(
+                (submodule / "ignored-overwrite.txt").read_text(encoding="utf-8"),
+                local_content,
+            )
+
+    def test_merge_main_into_current_blocks_dirty_local_rename_destination(self) -> None:
+        """Virtual merge write paths must include a committed local rename destination."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            (work_dir / "a.txt").write_text("one\ntwo\nthree\nfour\n", encoding="utf-8")
+            subprocess.run(["git", "add", "a.txt"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "add rename source"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+            repo = self.make_superproject(root, bare_repo)
+            submodule = repo / "vendor" / "agent-canon"
+            subprocess.run(
+                ["git", "switch", "-c", "canon-pr/local-work"],
+                cwd=submodule,
+                check=True,
+            )
+            subprocess.run(["git", "mv", "a.txt", "b.txt"], cwd=submodule, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Submodule Test",
+                    "-c",
+                    "user.email=submodule-test@example.invalid",
+                    "commit",
+                    "-m",
+                    "rename a to b",
+                ],
+                cwd=submodule,
+                check=True,
+            )
+            local_content = "one\ntwo\nthree\nfour\nlocal dirty destination\n"
+            (submodule / "b.txt").write_text(local_content, encoding="utf-8")
+            (work_dir / "a.txt").write_text("one\ntwo remote\nthree\nfour\n", encoding="utf-8")
+            subprocess.run(["git", "add", "a.txt"], cwd=work_dir, check=True)
+            subprocess.run(
+                ["git", "commit", "-m", "update rename source"],
+                cwd=work_dir,
+                check=True,
+            )
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+
+            plan = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "plan"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertIn("agent_canon_plan_route=submodule_materialization_collision", plan.stdout)
+            self.assertIn("agent_canon_plan_merge_conflict=no", plan.stdout)
+            self.assertIn("agent_canon_plan_materialization_collision_path=b.txt", plan.stdout)
+
+            merge = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "merge-main-into-current"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(merge.returncode, 0)
+            self.assertIn("agent_canon_merge_merge_conflict=no", merge.stdout)
+            self.assertIn("agent_canon_merge_materialization_collision=yes", merge.stdout)
+            self.assertIn("agent_canon_merge_materialization_collision_path=b.txt", merge.stdout)
+            self.assertIn("agent_canon_merge_result=blocked_unpreservable_collision", merge.stdout)
+            self.assertEqual((submodule / "b.txt").read_text(encoding="utf-8"), local_content)
+            self.assertFalse((submodule / "a.txt").exists())
+
+    def test_merge_main_into_current_blocks_virtual_merge_conflict(self) -> None:
+        """Committed divergence should fail with a typed virtual-merge conflict."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+            submodule = repo / "vendor" / "agent-canon"
+            subprocess.run(
+                ["git", "switch", "-c", "canon-pr/local-work"],
+                cwd=submodule,
+                check=True,
+            )
+            (submodule / "README.md").write_text("# Local committed update\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=submodule, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Submodule Test",
+                    "-c",
+                    "user.email=submodule-test@example.invalid",
+                    "commit",
+                    "-m",
+                    "local readme update",
+                ],
+                cwd=submodule,
+                check=True,
+            )
+            (work_dir / "README.md").write_text("# Remote committed update\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "remote readme update"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+
+            plan = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "plan"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(plan.returncode, 0, plan.stderr)
+            self.assertIn("agent_canon_plan_route=submodule_merge_conflict", plan.stdout)
+            self.assertIn("agent_canon_plan_merge_conflict=yes", plan.stdout)
+            self.assertIn(
+                "agent_canon_plan_merge_conflict_type=virtual_merge_result",
+                plan.stdout,
+            )
+            self.assertIn("agent_canon_plan_materialization_collision=no", plan.stdout)
+
+            merge = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "merge-main-into-current"],
+                cwd=repo,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            conflict_paths = subprocess.run(
+                ["git", "diff", "--name-only", "--diff-filter=U"],
+                cwd=submodule,
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.splitlines()
+
+            self.assertNotEqual(merge.returncode, 0)
+            self.assertIn("agent_canon_merge_unresolved_merge_conflict=no", merge.stdout)
+            self.assertIn("agent_canon_merge_merge_conflict=yes", merge.stdout)
+            self.assertIn("agent_canon_merge_conflict_type=virtual_merge_result", merge.stdout)
+            self.assertIn("agent_canon_merge_result=blocked_merge_conflict", merge.stdout)
+            self.assertEqual(conflict_paths, [])
 
     def test_merge_main_into_current_blocks_detached_submodule(self) -> None:
         """Merge-main should require a named AgentCanon branch for PR flow."""
@@ -3232,6 +3793,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             subprocess.run(["git", "add", "proposal-marker.txt"], cwd=work_dir, check=True)
             subprocess.run(["git", "commit", "-m", "merge proposal marker"], cwd=work_dir, check=True)
             subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+            self.materialize_parent_projection_frontier(repo, work_dir)
             remote_sha = subprocess.run(
                 ["git", "-C", str(work_dir), "rev-parse", "HEAD"],
                 check=True,

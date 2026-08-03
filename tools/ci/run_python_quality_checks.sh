@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract tool
-# responsibility Runs shared Python quality checks for CI and pre-review gates.
+# responsibility Runs shared Python syntax and static quality checks for CI and pre-review gates.
 # upstream design ../README.md shared automation index
+# upstream design ../../documents/conventions/DOCSTRING_GUIDE.md explicit Docstring review convention
 # downstream implementation ./run_all_checks.sh calls this runner for Python checks
 # downstream implementation ./pre_review.sh calls this runner before role write-scope enforcement
 # @dependency-end
@@ -125,18 +126,6 @@ if "$PYTHON_BIN" -m pyright "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
   echo "✅ pyright 成功"
 else
   echo "❌ pyright 失敗"
-  EXIT_CODE=1
-fi
-echo ""
-
-echo "5️⃣  pydocstyle を実行中... (Docstring チェック)"
-if [ ${#PYTHON_SOURCE_PATHS[@]} -eq 0 ]; then
-  echo "PYDOCSTYLE=skip"
-  echo "AgentCanon Python source roots are absent in this checkout; skipping pydocstyle"
-elif "$PYTHON_BIN" -m pydocstyle "${PYTHON_SOURCE_PATHS[@]}" 2>&1; then
-  echo "✅ pydocstyle 成功"
-else
-  echo "❌ pydocstyle 失敗（詳細: documents/conventions/DOCSTRING_GUIDE.md を参照）"
   EXIT_CODE=1
 fi
 echo ""

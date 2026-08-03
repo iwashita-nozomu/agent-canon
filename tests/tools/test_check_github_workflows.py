@@ -2,25 +2,261 @@
 # contract test
 # responsibility Tests GitHub workflow convention checker behavior.
 # upstream implementation ../../tools/ci/check_github_workflows.py convention checker
+# upstream implementation ../../.github/workflows/agent-runtime-dashboard.yml scheduled graph producer orchestration
+# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py canonical source-root command execution
 # @dependency-end
 
 """Tests for GitHub workflow convention checks."""
 
 from __future__ import annotations
 
+import hashlib
+import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
+
+import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "tools" / "ci" / "check_github_workflows.py"
+RUNTIME_DASHBOARD_WORKFLOW = (
+    REPO_ROOT / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+)
 
 
 class GitHubWorkflowCheckTest(unittest.TestCase):
     """Exercise the GitHub workflow checker."""
+
+    def scheduled_graph_command(self) -> tuple[str, str]:
+        """Read the producer-owned scheduled graph command from its workflow."""
+        payload = yaml.safe_load(
+            RUNTIME_DASHBOARD_WORKFLOW.read_text(encoding="utf-8")
+        )
+        steps = payload["jobs"]["dashboard"]["steps"]
+        step = next(
+            item
+            for item in steps
+            if item.get("name") == "Build and read back canonical graph"
+        )
+        return str(step["if"]), str(step["run"])
+
+    def scheduled_graph_fixture(self, root: Path) -> tuple[Path, Path]:
+        """Create a fresh source root with a recording canonical Graph CLI."""
+        subprocess.run(
+            ["git", "init", "-b", "main"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.email", "graph@example.invalid"],
+            cwd=root,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "config", "user.name", "Graph Fixture"],
+            cwd=root,
+            check=True,
+        )
+        (root / "README.md").write_text("scheduled graph fixture\n", encoding="utf-8")
+        (root / ".gitignore").write_text(
+            ".agent-canon/\n.scheduled-graph-calls\n",
+            encoding="utf-8",
+        )
+        catalog = root / "agents" / "skills" / "catalog.yaml"
+        catalog.parent.mkdir(parents=True)
+        catalog.write_text("skills: {}\n", encoding="utf-8")
+        module = root / "tools" / "agent_tools" / "agent_canon_source_root.py"
+        module.parent.mkdir(parents=True)
+        shutil.copy2(
+            REPO_ROOT / "tools" / "agent_tools" / "agent_canon_source_root.py",
+            module,
+        )
+        executable = root / "tools" / "bin" / "agent-canon"
+        executable.parent.mkdir(parents=True)
+        executable.write_text(
+            """#!/usr/bin/env python3
+import hashlib
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[sys.argv.index("--root") + 1]).resolve()
+command = sys.argv[1:3]
+calls = root / ".scheduled-graph-calls"
+prior = calls.read_text(encoding="utf-8") if calls.exists() else ""
+calls.write_text(prior + " ".join(command) + "\\n", encoding="utf-8")
+db = root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
+head = subprocess.check_output(
+    ["git", "rev-parse", "HEAD"], cwd=root, text=True
+).strip()
+content_fingerprint = hashlib.sha256(
+    (root / "README.md").read_bytes()
+).hexdigest()
+
+if command == ["graph", "build"]:
+    mode = os.environ.get("GRAPH_BUILD_MODE", "fresh")
+    if mode == "failure":
+        print(json.dumps({
+            "schema": "agent-canon.graph.build.v1",
+            "command": "build",
+            "status": "unavailable",
+            "exit_code": 1,
+        }))
+        raise SystemExit(1)
+    status = "incomplete" if mode == "incomplete" else "fresh"
+    exit_code = 1 if status == "incomplete" else 0
+    record = {
+        "schema": "agent-canon.graph.build.v1",
+        "command": "build",
+        "status": status,
+        "input_fingerprint": content_fingerprint,
+        "integration_record": {
+            "snapshot_head": head,
+            "input_fingerprint": content_fingerprint,
+        },
+        "publication": "published",
+        "durability": "durable",
+        "exit_code": exit_code,
+    }
+    db.parent.mkdir(parents=True, exist_ok=True)
+    db.write_text(json.dumps(record), encoding="utf-8")
+    print(json.dumps(record))
+    raise SystemExit(exit_code)
+
+if command == ["graph", "status"]:
+    if not db.exists():
+        print(json.dumps({
+            "schema": "agent-canon.graph.status.v1",
+            "command": "status",
+            "status": "unavailable",
+            "exit_code": 1,
+        }))
+        raise SystemExit(1)
+    record = json.loads(db.read_text(encoding="utf-8"))
+    integration = record["integration_record"]
+    fresh = (
+        record["status"] == "fresh"
+        and integration["snapshot_head"] == head
+        and integration["input_fingerprint"] == content_fingerprint
+    )
+    status = "fresh" if fresh else "stale"
+    reason = None if fresh else "source_changed"
+    payload = {
+        "schema": "agent-canon.graph.status.v1",
+        "command": "status",
+        "status": status,
+        "input_fingerprint": integration["input_fingerprint"],
+        "integration_record": integration,
+        "reason": reason,
+        "probe_reason": reason,
+        "exit_code": 0 if fresh else 2,
+    }
+    print(json.dumps(payload))
+    raise SystemExit(payload["exit_code"])
+
+raise SystemExit(2)
+""",
+            encoding="utf-8",
+        )
+        executable.chmod(0o755)
+        subprocess.run(
+            ["git", "add", "."],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        subprocess.run(
+            ["git", "commit", "-m", "scheduled graph fixture"],
+            cwd=root,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        db = root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
+        return root / ".scheduled-graph-calls", db
+
+    def run_scheduled_graph_fixture(
+        self,
+        root: Path,
+        *,
+        build_mode: str,
+    ) -> subprocess.CompletedProcess[str]:
+        """Execute the workflow-owned schedule command in a fresh root."""
+        _condition, command = self.scheduled_graph_command()
+        environment = os.environ.copy()
+        environment.update(
+            {
+                "GITHUB_WORKSPACE": str(root),
+                "GRAPH_BUILD_MODE": build_mode,
+            }
+        )
+        return subprocess.run(
+            ["bash", "-c", command],
+            cwd=root,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    def test_scheduled_graph_bootstraps_absent_db_and_reads_fresh(self) -> None:
+        """The schedule owner builds once before fresh identity readback."""
+        condition, _command = self.scheduled_graph_command()
+        self.assertEqual(condition, "github.event_name == 'schedule'")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            calls, db = self.scheduled_graph_fixture(root)
+            self.assertFalse(db.exists())
+
+            result = self.run_scheduled_graph_fixture(root, build_mode="fresh")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(db.is_file())
+            self.assertEqual(
+                calls.read_text(encoding="utf-8").splitlines(),
+                ["graph build", "graph status"],
+            )
+            payload = json.loads(result.stdout.splitlines()[-1])
+            expected_head = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=root, text=True
+            ).strip()
+            expected_fingerprint = hashlib.sha256(
+                (root / "README.md").read_bytes()
+            ).hexdigest()
+            self.assertEqual(payload["status"], "fresh")
+            self.assertEqual(
+                payload["integration_record"]["snapshot_head"], expected_head
+            )
+            self.assertEqual(payload["input_fingerprint"], expected_fingerprint)
+
+    def test_scheduled_graph_build_failure_and_incomplete_stop_readback(self) -> None:
+        """Build failure and incomplete publication fail before status readback."""
+        for build_mode in ("failure", "incomplete"):
+            with self.subTest(build_mode=build_mode), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                calls, _db = self.scheduled_graph_fixture(root)
+
+                result = self.run_scheduled_graph_fixture(
+                    root,
+                    build_mode=build_mode,
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(
+                    calls.read_text(encoding="utf-8").splitlines(),
+                    ["graph build"],
+                )
 
     def test_current_repository_passes(self) -> None:
         """The current repository should satisfy GitHub workflow conventions."""
@@ -33,6 +269,164 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
+
+    def test_template_agentcanon_gate_source_and_projection_have_one_authority(
+        self,
+    ) -> None:
+        """The source and generated checklist expose only the parent PR gate."""
+        canonical = "- [ ] `make agent-canon-pr-check`"
+        derived_boundary = (
+            "Derived parent shared gate owns AgentCanon pin/projection/header/"
+            "graph/workflow/skill-command surfaces only; development prompt and "
+            "accumulated evals run only in the standalone AgentCanon static owner."
+        )
+        stale_eval_commands = (
+            "evaluate_skill_workflow_prompts.py",
+            "eval_accumulation_check.py",
+        )
+        for relative in (
+            "templates/documents/github/pull-request/agent_canon.md",
+            ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+        ):
+            with self.subTest(path=relative):
+                text = (REPO_ROOT / relative).read_text(encoding="utf-8")
+                self.assertEqual(text.count(canonical), 1)
+                self.assertIn(derived_boundary, text)
+                for command in stale_eval_commands:
+                    self.assertNotIn(command, text)
+
+    def test_template_agentcanon_gate_allows_obsolete_command_in_prose(
+        self,
+    ) -> None:
+        """Historical prose and comments do not create checklist authority."""
+        prose = (
+            "\nThe former command "
+            "`bash tools/agent-canon/agent_tools/run_repo_dependency_review.sh "
+            "--fail-missing` was retired.\n"
+            "<!--\n"
+            "- [ ] `bash tools/agent_tools/run_repo_dependency_review.sh "
+            "--fail-missing`\n"
+            "-->\n"
+            "```markdown\n"
+            "- [ ] `bash tools/agent-canon/agent_tools/"
+            "run_repo_dependency_review.sh --fail-missing --historical`\n"
+            "```\n"
+        )
+        for relative in (
+            "templates/documents/github/pull-request/agent_canon.md",
+            ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+        ):
+            with self.subTest(path=relative), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                self.write_valid_workflow(root)
+                self.copy_required_surfaces(root)
+                path = root / relative
+                path.write_text(
+                    path.read_text(encoding="utf-8") + prose,
+                    encoding="utf-8",
+                )
+
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), "--root", str(root)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
+
+    def test_template_agentcanon_gate_allows_similar_command_with_different_path(
+        self,
+    ) -> None:
+        """A nearby command is not obsolete when its script path token differs."""
+        benign = (
+            "\n- [ ] `bash tools/agent-canon/agent_tools/archive/"
+            "run_repo_dependency_review.sh --fail-missing --explain`\n"
+        )
+        for relative in (
+            "templates/documents/github/pull-request/agent_canon.md",
+            ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+        ):
+            with self.subTest(path=relative), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                self.write_valid_workflow(root)
+                self.copy_required_surfaces(root)
+                path = root / relative
+                path.write_text(
+                    path.read_text(encoding="utf-8") + benign,
+                    encoding="utf-8",
+                )
+
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), "--root", str(root)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
+
+    def test_template_agentcanon_gate_rejects_missing_duplicate_or_internal_authority(
+        self,
+    ) -> None:
+        """Semantic checks reject every non-single parent-gate checklist."""
+        canonical = "- [ ] `make agent-canon-pr-check`"
+        variants: dict[str, tuple[Callable[[str], str], str]] = {
+            "missing": (
+                lambda text: text.replace(canonical, ""),
+                "canonical_parent_pr_gate_count:0",
+            ),
+            "duplicate": (
+                lambda text: text + f"\n{canonical}\n",
+                "canonical_parent_pr_gate_count:2",
+            ),
+            "obsolete_internal": (
+                lambda text: (
+                    text + "\n- [ ] `bash tools/agent-canon/agent_tools/"
+                    "run_repo_dependency_review.sh\n"
+                    "  --fail-missing` was run.\n"
+                ),
+                "obsolete_internal_pr_gate_authority:",
+            ),
+            "obsolete_internal_extra_args": (
+                lambda text: (
+                    text + "\n- [ ] `bash tools/agent-canon/agent_tools/"
+                    "run_repo_dependency_review.sh --fail-missing "
+                    "--cycle-report-only evidence.json`\n"
+                ),
+                "obsolete_internal_pr_gate_authority:",
+            ),
+        }
+        targets = (
+            "templates/documents/github/pull-request/agent_canon.md",
+            ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+        )
+        for relative in targets:
+            for variant, (mutate, finding) in variants.items():
+                with (
+                    self.subTest(path=relative, variant=variant),
+                    tempfile.TemporaryDirectory() as tmp_dir,
+                ):
+                    root = Path(tmp_dir)
+                    self.write_valid_workflow(root)
+                    self.copy_required_surfaces(root)
+                    path = root / relative
+                    path.write_text(
+                        mutate(path.read_text(encoding="utf-8")),
+                        encoding="utf-8",
+                    )
+
+                    result = subprocess.run(
+                        [sys.executable, str(SCRIPT), "--root", str(root)],
+                        check=False,
+                        capture_output=True,
+                        text=True,
+                    )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(finding, result.stdout)
 
     def test_agent_canon_candidate_tree_has_one_remote_gate_consumer(self) -> None:
         """PR CI invokes the canonical gate once and has no duplicate push trigger."""
@@ -53,6 +447,8 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             "github.event.pull_request.head.sha || github.sha",
             text,
         )
+        self.assertIn("persist-credentials: false", text)
+        self.assertIn("AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}", text)
         self.assertFalse(
             any(
                 command in "\n".join(run_lines)
@@ -63,6 +459,165 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 )
             )
         )
+
+    def test_standalone_static_gates_have_no_project_quality_job(self) -> None:
+        """Standalone static gates do not create a repository-wide quality owner."""
+        source = (
+            REPO_ROOT / ".github" / "workflows" / "agent-canon-static-gates.yml"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("project-quality:", source)
+        self.assertNotIn("run_python_quality_checks.sh", source)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow = root / ".github" / "workflows" / "agent-canon-static-gates.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(source, encoding="utf-8")
+            self.copy_required_surfaces(root)
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_derived_parent_quality_route_uses_owner_and_command_not_job_name(
+        self,
+    ) -> None:
+        """Derived quality ownership is bound to a parent marker and command."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            self.copy_vendor_surfaces(root)
+            self.write_template_root_pr_template(root)
+            self.copy_template_agent_canon_template(root)
+            (root / ".gitmodules").write_text(
+                '[submodule "vendor/agent-canon"]\n'
+                "\tpath = vendor/agent-canon\n"
+                "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
+                encoding="utf-8",
+            )
+            workflow_path = root / ".github" / "workflows" / "ci.yml"
+            workflow_path.write_text(
+                workflow_path.read_text(encoding="utf-8").replace(
+                    "  test:\n", "  project-quality-owner:\n"
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_derived_parent_quality_route_fails_without_owner_or_command(self) -> None:
+        """Derived quality routes fail closed when owner or canonical command is absent."""
+        variants = {
+            "missing_owner": (
+                "",
+                "        run: make ci\n",
+                "missing_parent_project_quality_owner",
+            ),
+            "missing_command": (
+                "          AGENT_CANON_PR_PROJECT_QUALITY_OWNER: parent_ci\n",
+                "        run: echo no-quality-route\n",
+                "parent_project_quality_route_missing_canonical_command",
+            ),
+            "wrong_owner": (
+                "          AGENT_CANON_PR_PROJECT_QUALITY_OWNER: wrong_owner\n",
+                "        run: make ci\n",
+                "parent_project_quality_owner_must_be_parent_ci",
+            ),
+        }
+        for name, (owner_text, command_text, finding) in variants.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                self.write_valid_workflow(root)
+                self.copy_required_surfaces(root)
+                self.copy_vendor_surfaces(root)
+                self.write_template_root_pr_template(root)
+                self.copy_template_agent_canon_template(root)
+                (root / ".gitmodules").write_text(
+                    '[submodule "vendor/agent-canon"]\n'
+                    "\tpath = vendor/agent-canon\n"
+                    "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
+                    encoding="utf-8",
+                )
+                workflow_path = root / ".github" / "workflows" / "ci.yml"
+                workflow_text = workflow_path.read_text(encoding="utf-8")
+                workflow_text = workflow_text.replace(
+                    "          AGENT_CANON_PR_PROJECT_QUALITY_OWNER: parent_ci\n",
+                    owner_text,
+                )
+                workflow_text = workflow_text.replace(
+                    "        run: make ci\n", command_text
+                )
+                workflow_path.write_text(workflow_text, encoding="utf-8")
+
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), "--root", str(root)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(finding, result.stdout)
+
+    def test_agent_canon_candidate_gate_requires_step_local_read_credential(
+        self,
+    ) -> None:
+        """The trusted-base token cannot be omitted or promoted to job scope."""
+        source = (
+            REPO_ROOT / ".github" / "workflows" / "agent-canon-static-gates.yml"
+        ).read_text(encoding="utf-8")
+        step_local = (
+            "        env:\n          AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}\n"
+        )
+        variants = {
+            "missing": source.replace(step_local, ""),
+            "job_scope": source.replace(
+                "    runs-on: ubuntu-latest\n",
+                "    runs-on: ubuntu-latest\n"
+                "    env:\n"
+                "      AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}\n",
+            ).replace(step_local, ""),
+        }
+        for name, workflow_text in variants.items():
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                workflow = (
+                    root / ".github" / "workflows" / "agent-canon-static-gates.yml"
+                )
+                workflow.parent.mkdir(parents=True)
+                workflow.write_text(workflow_text, encoding="utf-8")
+                self.copy_required_surfaces(root)
+
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), "--root", str(root)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(
+                    "missing_step_local_github_read_credential",
+                    result.stdout,
+                )
+                if name == "job_scope":
+                    self.assertIn(
+                        "canonical_candidate_gate_read_credential_must_be_step_local",
+                        result.stdout,
+                    )
 
     def test_direct_workflow_dispatch_input_in_run_fails(self) -> None:
         """Shell run blocks must not interpolate workflow-dispatch inputs."""
@@ -392,11 +947,22 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         )
 
     def copy_template_agent_canon_template(self, root: Path) -> None:
-        """Copy the template-side AgentCanon PR template."""
-        source = REPO_ROOT / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
+        """Project the temporary root's canonical AgentCanon PR template."""
+        source = (
+            root
+            / "templates"
+            / "documents"
+            / "github"
+            / "pull-request"
+            / "agent_canon.md"
+        )
         destination = root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source, destination)
+        self.assertEqual(
+            source.read_text(encoding="utf-8"),
+            destination.read_text(encoding="utf-8"),
+        )
 
     def test_job_level_permissions_are_accepted(self) -> None:
         """Workflow permissions may be declared on every job."""
@@ -421,7 +987,9 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             root = Path(tmp_dir)
             self.write_valid_workflow(root)
             self.copy_required_surfaces(root)
-            (root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh").unlink()
+            (
+                root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh"
+            ).unlink()
 
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--root", str(root)],
@@ -431,7 +999,9 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             )
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("missing_referenced_agent_canon_checkout_helper", result.stdout)
+            self.assertIn(
+                "missing_referenced_agent_canon_checkout_helper", result.stdout
+            )
 
     def test_helper_step_requires_credential_env(self) -> None:
         """Checkout helper steps need token or SSH credential context."""
@@ -480,8 +1050,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn(
-                "agent_canon_credentials_must_be_step_local:"
-                "AGENT_CANON_REPO_SSH_KEY",
+                "agent_canon_credentials_must_be_step_local:AGENT_CANON_REPO_SSH_KEY",
                 result.stdout,
             )
 
@@ -535,7 +1104,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.copy_required_surfaces(root)
             self.copy_vendor_surfaces(root)
             (root / ".gitmodules").write_text(
-                "[submodule \"vendor/agent-canon\"]\n"
+                '[submodule "vendor/agent-canon"]\n'
                 "\tpath = vendor/agent-canon\n"
                 "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
                 encoding="utf-8",
@@ -565,7 +1134,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.write_template_root_pr_template(root)
             self.copy_template_agent_canon_template(root)
             (root / ".gitmodules").write_text(
-                "[submodule \"vendor/agent-canon\"]\n"
+                '[submodule "vendor/agent-canon"]\n'
                 "\tpath = vendor/agent-canon\n"
                 "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
                 encoding="utf-8",
@@ -596,8 +1165,20 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             self.write_valid_workflow(root)
             self.copy_required_surfaces(root)
             self.copy_vendor_surfaces(root)
+            derived_template = (
+                root
+                / "templates"
+                / "documents"
+                / "github"
+                / "pull-request"
+                / "agent_canon.md"
+            )
+            self.assertIn(
+                "development prompt and accumulated evals run only in the standalone",
+                derived_template.read_text(encoding="utf-8"),
+            )
             (root / ".gitmodules").write_text(
-                "[submodule \"vendor/agent-canon\"]\n"
+                '[submodule "vendor/agent-canon"]\n'
                 "\tpath = vendor/agent-canon\n"
                 "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
                 encoding="utf-8",
@@ -627,10 +1208,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         workflow_dir.mkdir(parents=True, exist_ok=True)
         permissions = "permissions:\n  contents: read\n" if top_permissions else ""
         job_permission_block = (
-            "    permissions:\n"
-            "      contents: read\n"
-            if job_permissions
-            else ""
+            "    permissions:\n      contents: read\n" if job_permissions else ""
         )
         env_block = (
             "        env:\n"
@@ -639,7 +1217,9 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             if helper_env
             else ""
         )
-        helper_command = "        run: bash .github/scripts/checkout_agent_canon_submodule.sh\n"
+        helper_command = (
+            "        run: bash .github/scripts/checkout_agent_canon_submodule.sh\n"
+        )
         (workflow_dir / "ci.yml").write_text(
             "name: CI\n"
             + "on: [push]\n"
@@ -657,7 +1237,11 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             + "          persist-credentials: false\n"
             + "      - name: Checkout AgentCanon submodule\n"
             + env_block
-            + helper_command,
+            + helper_command
+            + "      - name: Parent project quality\n"
+            + "        env:\n"
+            + "          AGENT_CANON_PR_PROJECT_QUALITY_OWNER: parent_ci\n"
+            + "        run: make ci\n",
             encoding="utf-8",
         )
 
@@ -668,7 +1252,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             ".github/scripts/checkout_agent_canon_submodule.sh",
             "tools/ci/checkout_agent_canon_submodule.sh",
             ".github/PULL_REQUEST_TEMPLATE.md",
-            ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",
+            "templates/documents/github/pull-request/agent_canon.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             "issues/README.md",
             "issues/open/AC-20260517-eval-accumulation-gaps.md",
@@ -696,12 +1280,14 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             if source.is_symlink():
                 source = source.resolve()
             shutil.copy2(source, destination)
+        self.copy_template_agent_canon_template(root)
 
     def copy_vendor_surfaces(self, root: Path) -> None:
         """Copy minimal vendor surfaces required by template-mode checks."""
         for relative in [
             "README.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
+            "templates/documents/github/pull-request/agent_canon.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             ".github/workflows/agent-coordination.yml",
             ".github/workflows/agent-runtime-dashboard.yml",
@@ -729,7 +1315,9 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
                 "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
                 encoding="utf-8",
             )
-            stale_dashboard = root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+            stale_dashboard = (
+                root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+            )
             stale_dashboard.parent.mkdir(parents=True, exist_ok=True)
             stale_dashboard.write_text("name: stale dashboard\n", encoding="utf-8")
 

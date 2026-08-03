@@ -90,6 +90,22 @@ class CheckToolCatalogTest(unittest.TestCase):
             1,
         )
 
+    def test_pr_eval_entry_is_wired_through_accumulation_wrapper(self) -> None:
+        """The PR-wired role eval is owned by the accumulation wrapper."""
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
+        )
+        role_eval = next(
+            entry
+            for entry in catalog["entries"]
+            if entry["path"] == "tools/agent_tools/evaluate_codex_agent_roles.py"
+        )
+        wrapper = (
+            PROJECT_ROOT / "tools" / "agent_tools" / "run_accumulated_agent_evals.py"
+        ).read_text(encoding="utf-8")
+        self.assertTrue(role_eval["default_wiring"]["pr_check"])
+        self.assertIn(Path(role_eval["path"]).name, wrapper)
+
     def test_gpu_admission_route(self) -> None:
         """The catalog exposes only the canonical managed GPU admission entrypoint."""
         catalog = yaml.safe_load(
@@ -565,6 +581,7 @@ class CheckToolCatalogTest(unittest.TestCase):
             "documents/tools/repo-local-tool-imports.md",
             "documents/tools/tool_catalog.md",
             "tools/ci/check_agent_canon_pr.sh",
+            "tools/agent_tools/run_accumulated_agent_evals.py",
             "agents/workflows/agent-canon-pr-workflow.md",
             ".github/PULL_REQUEST_TEMPLATE.md",
             ".github/PULL_REQUEST_TEMPLATE/agent_canon.md",

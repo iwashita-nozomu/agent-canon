@@ -58,6 +58,10 @@ projection向きを確認します。
 ## 更新と検証
 
 - source の依存header、Issue taxonomy、eval reference、PR workflow referenceを更新する。
+- template / derived repo の AgentCanon PR checklist は parent gate command
+  `make agent-canon-pr-check` を一つだけ公開する。dependency graph などの internal
+  subcommand は `check_agent_canon_pr.sh` の実行責務であり、checklist authority として
+  重複掲載しない。
 - `documents/runtime/shared-runtime-surfaces.toml` で source→AgentCanon/root target を
   一意に登録する。
 - `python3 tools/agent_tools/surface_manifest.py --manifest documents/runtime/shared-runtime-surfaces.toml copy-specs`

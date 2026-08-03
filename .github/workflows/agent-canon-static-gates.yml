@@ -67,4 +67,6 @@ jobs:
         run: rustup component add rustfmt clippy
 
       - name: Run static gates
+        env:
+          AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}
         run: bash tools/ci/check_agent_canon_pr.sh

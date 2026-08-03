@@ -21,7 +21,7 @@ import re
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
 from urllib.parse import urlparse
@@ -1098,7 +1098,7 @@ def build_pull_request_lifecycle(
         if external_binding is None
         else cast(str, external_binding["snapshot_id"])
     )
-    observed_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    observed_at = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     evidence_seed = {
         "transaction_id": transaction_id,
         "snapshot_id": snapshot_id,

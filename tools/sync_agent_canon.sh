@@ -2,16 +2,20 @@
 # @dependency-start
 # contract tool
 # responsibility Provides sync agent canon repository automation.
+# upstream design ../documents/agent-canon/agent-canon-update-route.md canonical update materialization acceptance
+# upstream design ../documents/rule/dependency-module-changes.md dependency source branch and projection ownership
 # upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../documents/runtime/shared-runtime-surfaces.toml machine-readable surface manifest
-# upstream implementation ./agent_tools/surface_manifest.py renders link, copy, regular, and root-absent specs
+# upstream implementation ./agent_tools/surface_manifest.py renders projection and update-transition specs
 # downstream implementation ../tests/tools/test_update_agent_canon.py verifies sync/update behavior
+# downstream implementation ../tests/tools/test_update_agent_canon_surface_migration.py verifies bounded migration
 # @dependency-end
 set -euo pipefail
 export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_DIR}/lib/git_authority.sh"
+source "${SCRIPT_DIR}/lib/update_materialization.sh"
 SUPERPROJECT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-superproject-working-tree 2>/dev/null || true)"
 if [ -n "$SUPERPROJECT_DIR" ]; then
   ROOT_DIR="$SUPERPROJECT_DIR"
@@ -19,6 +23,11 @@ else
   ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 fi
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
+if [ "$PREFIX" = "." ]; then
+  PUBLIC_SYNC_COMMAND="bash tools/sync_agent_canon.sh"
+else
+  PUBLIC_SYNC_COMMAND="PYTHONPATH=${PREFIX}/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh"
+fi
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 FORCE_RELINK="${AGENT_CANON_FORCE_RELINK:-0}"
@@ -29,16 +38,19 @@ PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_comman
 COMMIT_AUTOMATION_AUTHOR_NAME="AgentCanon Sync Automation"
 COMMIT_AUTOMATION_AUTHOR_EMAIL="agent-canon-sync@automation.invalid"
 COMMIT_PROVENANCE_NEXT_ACTION="set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex> and rerun the same command"
+ACTIVE_ROOT_COPY_TRANSITION_ID=""
+declare -a ROOT_COPY_TRANSITION_CANDIDATES=()
+declare -a ROOT_COPY_TRANSITION_REMOVED_PATHS=()
 
 usage() {
   cat <<EOF
 Usage:
-  bash tools/sync_agent_canon.sh plan [branch]
-  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh link-root
-  bash tools/sync_agent_canon.sh check
-  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh submodule-add <remote-url> [branch]
-  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh ensure-latest [branch]
-  bash tools/sync_agent_canon.sh status
+  $PUBLIC_SYNC_COMMAND plan [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> $PUBLIC_SYNC_COMMAND link-root
+  $PUBLIC_SYNC_COMMAND check
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> $PUBLIC_SYNC_COMMAND submodule-add <remote-url> [branch]
+  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> $PUBLIC_SYNC_COMMAND ensure-latest [branch]
+  $PUBLIC_SYNC_COMMAND status
 
 Legacy subtree / snapshot / direct push routes are compatibility-only and are
 not listed as user-facing commands. Use tools/update_agent_canon.sh for normal
@@ -240,6 +252,96 @@ submodule_checkout_initialized() {
     && git -C "$ROOT_DIR/$PREFIX" rev-parse --is-inside-work-tree >/dev/null 2>&1
 }
 
+submodule_unresolved_merge_conflict() {
+  [ -n "$(git -C "$ROOT_DIR" ls-files --unmerged -- "$PREFIX")" ] \
+    || update_materialization_unresolved_conflict "$ROOT_DIR/$PREFIX"
+}
+
+submodule_materialization_result_tree() {
+  local current_sha="$1"
+  local remote_sha="$2"
+  update_materialization_result_tree "$ROOT_DIR/$PREFIX" "$current_sha" "$remote_sha"
+}
+
+submodule_materialization_collision_path() {
+  local current_sha="$1"
+  local result_tree="$2"
+  update_materialization_collision_path "$ROOT_DIR/$PREFIX" "$current_sha" "$result_tree"
+}
+
+submodule_history_state() {
+  local current_sha="$1"
+  local remote_sha="$2"
+  update_materialization_history_state "$ROOT_DIR/$PREFIX" "$current_sha" "$remote_sha"
+}
+
+materialize_submodule_remote_branch() {
+  local current_sha="$1"
+  local remote_sha="$2"
+  local remote_branch="$3"
+  local result_tree="${4:-}"
+  local collision_path=""
+  local collision_rc=0
+  local merge_log=""
+  local result_tree_rc=0
+
+  if submodule_unresolved_merge_conflict; then
+    echo "agent_canon_materialization_unresolved_merge_conflict=yes"
+    echo "agent_canon_materialization_merge_conflict=yes"
+    echo "agent_canon_materialization_conflict_type=existing_unresolved_index"
+    echo "agent_canon_materialization_result=blocked_unresolved_merge_conflict"
+    return 2
+  fi
+  if [ -z "$result_tree" ]; then
+    result_tree="$(submodule_materialization_result_tree "$current_sha" "$remote_sha")" \
+      || result_tree_rc=$?
+    if [ "$result_tree_rc" -eq 2 ]; then
+      echo "agent_canon_materialization_unresolved_merge_conflict=no"
+      echo "agent_canon_materialization_merge_conflict=yes"
+      echo "agent_canon_materialization_conflict_type=virtual_merge_result"
+      echo "agent_canon_materialization_result=blocked_merge_conflict"
+      return 2
+    fi
+    [ "$result_tree_rc" -eq 0 ] || return "$result_tree_rc"
+  fi
+  echo "agent_canon_materialization_unresolved_merge_conflict=no"
+  echo "agent_canon_materialization_merge_conflict=no"
+  echo "agent_canon_materialization_conflict_type=none"
+  collision_path="$(submodule_materialization_collision_path "$current_sha" "$result_tree")" \
+    || collision_rc=$?
+  if [ "$collision_rc" -eq 0 ]; then
+    echo "agent_canon_materialization_collision=yes"
+    printf 'agent_canon_materialization_collision_path=%q\n' "$collision_path"
+    echo "agent_canon_materialization_result=blocked_unpreservable_collision"
+    return 2
+  fi
+  [ "$collision_rc" -eq 1 ] || return "$collision_rc"
+
+  echo "agent_canon_materialization_collision=no"
+  if git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$current_sha"; then
+    echo "agent_canon_materialization_result=already_contains_remote"
+    return 0
+  fi
+
+  merge_log="$(mktemp)"
+  if git -C "$ROOT_DIR/$PREFIX" merge --no-autostash --no-edit "origin/$remote_branch" >"$merge_log" 2>&1; then
+    cat "$merge_log"
+    rm -f "$merge_log"
+    echo "agent_canon_materialization_result=merged_remote"
+    return 0
+  fi
+
+  cat "$merge_log" >&2
+  rm -f "$merge_log"
+  if submodule_unresolved_merge_conflict; then
+    echo "agent_canon_materialization_unresolved_merge_conflict=yes"
+    echo "agent_canon_materialization_result=blocked_unresolved_merge_conflict"
+    return 2
+  fi
+  echo "agent_canon_materialization_result=failed_without_conflict"
+  return 1
+}
+
 submodule_commit() {
   git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX"
 }
@@ -434,6 +536,162 @@ build_copy_specs() {
     --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" copy-specs
 }
 
+build_update_transition_specs() {
+  python3 "$ROOT_DIR/$PREFIX/tools/agent_tools/surface_manifest.py" \
+    --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" update-transition-specs
+}
+
+active_root_copy_transition_id() {
+  local previous_pin=""
+  local staged_pin=""
+  local source_pin=""
+  local transition_id=""
+  local from_agent_canon_pins=""
+  local unused=""
+
+  is_submodule_prefix || return 1
+  previous_pin="$(git -C "$ROOT_DIR" rev-parse "HEAD:$PREFIX" 2>/dev/null || true)"
+  staged_pin="$(git -C "$ROOT_DIR" rev-parse ":$PREFIX" 2>/dev/null || true)"
+  source_pin="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD 2>/dev/null || true)"
+  [ -n "$previous_pin" ] && [ -n "$staged_pin" ] && [ -n "$source_pin" ] || return 1
+  [ "$staged_pin" = "$source_pin" ] && [ "$previous_pin" != "$source_pin" ] || return 1
+
+  while IFS="$(printf '\t')" read -r transition_id from_agent_canon_pins unused; do
+    [ -n "$transition_id" ] || continue
+    case ",$from_agent_canon_pins," in
+      *",$previous_pin,"*)
+        printf '%s\n' "$transition_id"
+        return 0
+        ;;
+    esac
+  done < <(build_update_transition_specs)
+  return 1
+}
+
+root_copy_transition_identity_matches() {
+  local path="$1"
+  local transition_id="$2"
+  local abs_path="$ROOT_DIR/$path"
+  local actual_blob=""
+  local actual_sha256=""
+  local actual_mode=""
+  local actual_target=""
+  local spec_transition_id=""
+  local from_agent_canon_pins=""
+  local spec_path=""
+  local kind=""
+  local git_blob=""
+  local content_sha256=""
+  local git_mode=""
+  local symlink_target=""
+
+  actual_mode="$(git -C "$ROOT_DIR" ls-files -s -- "$path" | awk 'NR == 1 {print $1}')"
+  if [ -L "$abs_path" ]; then
+    actual_target="$(readlink "$abs_path")"
+    actual_blob="$(printf '%s' "$actual_target" | git -C "$ROOT_DIR" hash-object --stdin)"
+    actual_sha256="$(printf '%s' "$actual_target" | sha256sum | awk '{print $1}')"
+  elif [ -f "$abs_path" ]; then
+    actual_blob="$(git -C "$ROOT_DIR" hash-object --no-filters "$abs_path")"
+    actual_sha256="$(sha256sum "$abs_path" | awk '{print $1}')"
+  else
+    return 1
+  fi
+
+  while IFS="$(printf '\t')" read -r \
+    spec_transition_id from_agent_canon_pins spec_path kind git_blob \
+    content_sha256 git_mode symlink_target; do
+    [ "$spec_transition_id" = "$transition_id" ] || continue
+    [ "$spec_path" = "$path" ] || continue
+    [ "$actual_blob" = "$git_blob" ] || continue
+    [ "$actual_sha256" = "$content_sha256" ] || continue
+    [ "$actual_mode" = "$git_mode" ] || continue
+    if [ "$kind" = "regular" ] && [ -f "$abs_path" ] && [ ! -L "$abs_path" ]; then
+      return 0
+    fi
+    if [ "$kind" = "symlink" ] && [ -L "$abs_path" ] \
+      && [ "$actual_target" = "$symlink_target" ]; then
+      return 0
+    fi
+  done < <(build_update_transition_specs)
+  return 1
+}
+
+preflight_root_copy_transition() {
+  local specs=""
+  local path=""
+
+  ACTIVE_ROOT_COPY_TRANSITION_ID="$(active_root_copy_transition_id || true)"
+  ROOT_COPY_TRANSITION_CANDIDATES=()
+  ROOT_COPY_TRANSITION_REMOVED_PATHS=()
+  [ -n "$ACTIVE_ROOT_COPY_TRANSITION_ID" ] || return 0
+  specs="$(build_update_transition_specs)"
+  while IFS= read -r path; do
+    [ -n "$path" ] || continue
+    if [ ! -e "$ROOT_DIR/$path" ] && [ ! -L "$ROOT_DIR/$path" ]; then
+      continue
+    fi
+    if root_copy_transition_identity_matches "$path" "$ACTIVE_ROOT_COPY_TRANSITION_ID"; then
+      ROOT_COPY_TRANSITION_CANDIDATES+=("$path")
+      echo "update_transition[$ACTIVE_ROOT_COPY_TRANSITION_ID][$path]=known_legacy_identity"
+    else
+      echo "update_transition[$ACTIVE_ROOT_COPY_TRANSITION_ID][$path]=parent_owned_preserved"
+    fi
+  done < <(
+    printf '%s\n' "$specs" \
+      | awk -F "$(printf '\t')" -v transition="$ACTIVE_ROOT_COPY_TRANSITION_ID" \
+          '$1 == transition {print $3}' \
+      | sort -u
+  )
+}
+
+migrate_root_copy_transition() {
+  local transition_state_dir="$ROOT_DIR/.agent-canon/update-lifecycle"
+  local quarantine=""
+  local path=""
+  local moved_path=""
+  local index=0
+  local -a moved_paths=()
+
+  [ -n "$ACTIVE_ROOT_COPY_TRANSITION_ID" ] || return 0
+  [ "${#ROOT_COPY_TRANSITION_CANDIDATES[@]}" -gt 0 ] || return 0
+
+  # Revalidate every candidate before moving the first path. Diverged paths
+  # were already classified as parent-owned and are not part of this set.
+  for path in "${ROOT_COPY_TRANSITION_CANDIDATES[@]}"; do
+    root_copy_transition_identity_matches "$path" "$ACTIVE_ROOT_COPY_TRANSITION_ID" \
+      || die "update transition candidate changed after preflight: $path"
+  done
+
+  mkdir -p "$transition_state_dir"
+  quarantine="$(mktemp -d "$transition_state_dir/root-surface-transition.XXXXXX")"
+  case "$quarantine" in
+    "$transition_state_dir"/root-surface-transition.*) ;;
+    *) die "invalid root-surface transition quarantine path" ;;
+  esac
+
+  for path in "${ROOT_COPY_TRANSITION_CANDIDATES[@]}"; do
+    mkdir -p "$quarantine/$(dirname "$path")"
+    if ! mv "$ROOT_DIR/$path" "$quarantine/$path"; then
+      for ((index = ${#moved_paths[@]} - 1; index >= 0; index--)); do
+        moved_path="${moved_paths[$index]}"
+        mkdir -p "$ROOT_DIR/$(dirname "$moved_path")"
+        mv "$quarantine/$moved_path" "$ROOT_DIR/$moved_path" \
+          || die "update transition rollback failed for $moved_path"
+      done
+      rm -rf "$quarantine"
+      die "update transition move failed for $path; all earlier moves were restored"
+    fi
+    moved_paths+=("$path")
+  done
+
+  rm -rf "$quarantine"
+  for path in "${ROOT_COPY_TRANSITION_CANDIDATES[@]}"; do
+    ROOT_COPY_TRANSITION_REMOVED_PATHS+=("$path")
+    echo "update_transition[$ACTIVE_ROOT_COPY_TRANSITION_ID][$path]=removed_known_legacy_identity"
+    rmdir "$ROOT_DIR/$(dirname "$path")" 2>/dev/null || true
+  done
+}
+
 link_path() {
   local path="$1"
   local target="$2"
@@ -547,13 +805,11 @@ regular_path() {
     return
   fi
   if [ -z "$source" ]; then
-    if [ "$path" = ".devcontainer" ] && [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
-      prune_parent_devcontainer_artifacts
-      return
-    fi
-    rm -rf "$abs_path"
-    mkdir -p "$abs_path"
-    if [ "$path" = ".devcontainer" ] && is_submodule_prefix; then
+    if [ -L "$abs_path" ]; then
+      # Remove legacy whole-directory views before child links materialize.
+      # Do not create an empty parent; the child surface creates it safely.
+      rm -f "$abs_path"
+    elif [ "$path" = ".devcontainer" ] && [ -e "$abs_path" ]; then
       prune_parent_devcontainer_artifacts
     fi
     return
@@ -714,7 +970,9 @@ cmd_link_root() {
     echo "agent_canon_projection_requirements=parent_vendor_named_branch_and_gitlink_match_required"
     echo "AGENT_CANON_LINK_ROOT_PROJECTION_WARNING=${next_action}"
   }
+  preflight_root_copy_transition
   ensure_surface_sync_safe "$force"
+  migrate_root_copy_transition
 
   local spec=""
   # Materialize regular containers before child links. This converts legacy
@@ -757,6 +1015,13 @@ cmd_snapshot() {
 
 cmd_check() {
   ensure_prefix_exists
+
+  if ! is_submodule_prefix && [ "$PREFIX" = "." ]; then
+    python3 "$ROOT_DIR/tools/agent_tools/surface_manifest.py" \
+      --root "$ROOT_DIR" --prefix "." --manifest "$SURFACE_MANIFEST" check-doc
+    echo "shared surface source manifest is valid"
+    return 0
+  fi
 
   local spec=""
   local failed=0
@@ -851,7 +1116,7 @@ cmd_check() {
 
   if [ "$failed" -ne 0 ]; then
     [ "$failed" -ne 0 ] || return 0
-    die "shared surface drift detected; set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and rerun 'bash tools/sync_agent_canon.sh link-root'"
+    die "shared surface drift detected; set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> and rerun '$PUBLIC_SYNC_COMMAND link-root'"
   fi
 
   echo "shared surface is in sync"
@@ -876,6 +1141,11 @@ stage_sync_paths() {
       git -C "$ROOT_DIR" add -A -- "$spec"
     fi
   done < <(build_root_absent_paths)
+  for spec in "${ROOT_COPY_TRANSITION_REMOVED_PATHS[@]}"; do
+    if [ ! -e "$ROOT_DIR/$spec" ] && [ ! -L "$ROOT_DIR/$spec" ]; then
+      git -C "$ROOT_DIR" add -A -- "$spec"
+    fi
+  done
 }
 
 commit_sync_paths_if_needed() {
@@ -901,6 +1171,11 @@ commit_sync_paths_if_needed() {
       owned_paths+=("$spec")
     fi
   done < <(build_root_absent_paths)
+  for spec in "${ROOT_COPY_TRANSITION_REMOVED_PATHS[@]}"; do
+    if [ ! -e "$ROOT_DIR/$spec" ] && [ ! -L "$ROOT_DIR/$spec" ]; then
+      owned_paths+=("$spec")
+    fi
+  done
 
   stage_sync_paths
   if git -C "$ROOT_DIR" diff --cached --quiet -- "${owned_paths[@]}"; then
@@ -1093,9 +1368,9 @@ print_plan_summary() {
   echo "agent_canon_plan_route=$route"
   echo "agent_canon_plan_requires_clean=$requires_clean"
   case "$route" in
-    submodule_detached|submodule_non_default_branch) ;;
+    submodule_detached) ;;
     *)
-      echo "agent_canon_plan_apply_command=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/sync_agent_canon.sh ensure-latest $branch"
+      echo "agent_canon_plan_apply_command=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> $PUBLIC_SYNC_COMMAND ensure-latest $branch"
       ;;
   esac
 }
@@ -1106,6 +1381,12 @@ print_submodule_plan_details() {
   local worktree_status="$3"
   local remote_sha="$4"
   local deferred_ref="${5:-}"
+  local current_branch="${6:-}"
+  local history_state="${7:-unknown}"
+  local unresolved_merge_conflict="${8:-no}"
+  local merge_conflict="${9:-no}"
+  local materialization_collision="${10:-no}"
+  local collision_path="${11:-}"
   local deferred_branch=""
   local deferred_remote_branch=""
 
@@ -1113,12 +1394,34 @@ print_submodule_plan_details() {
   echo "agent_canon_plan_submodule_parent_pin=$parent_pin"
   echo "agent_canon_plan_submodule_worktree_head=${worktree_head:-<unavailable>}"
   echo "agent_canon_plan_submodule_worktree_status=$worktree_status"
+  echo "agent_canon_plan_submodule_branch=${current_branch:-<detached>}"
+  echo "agent_canon_plan_submodule_history_state=$history_state"
+  echo "agent_canon_plan_unresolved_merge_conflict=$unresolved_merge_conflict"
+  echo "agent_canon_plan_merge_conflict=$merge_conflict"
+  if [ "$unresolved_merge_conflict" = "yes" ]; then
+    echo "agent_canon_plan_merge_conflict_type=existing_unresolved_index"
+  elif [ "$merge_conflict" = "yes" ]; then
+    echo "agent_canon_plan_merge_conflict_type=virtual_merge_result"
+  else
+    echo "agent_canon_plan_merge_conflict_type=none"
+  fi
+  echo "agent_canon_plan_materialization_collision=$materialization_collision"
+  echo "agent_canon_plan_acceptance_predicate=materialization_merge_conflict_or_unpreservable_materialization_collision"
+  if [ -n "$collision_path" ]; then
+    printf 'agent_canon_plan_materialization_collision_path=%q\n' "$collision_path"
+  else
+    echo "agent_canon_plan_materialization_collision_path=<none>"
+  fi
   if [ -n "$deferred_ref" ]; then
     deferred_branch="${deferred_ref%%:*}"
     deferred_remote_branch="${deferred_ref#*:}"
     echo "agent_canon_plan_submodule_deferred_branch=$deferred_branch"
     echo "agent_canon_plan_submodule_deferred_remote_branch=$deferred_remote_branch"
     echo "agent_canon_plan_submodule_deferred_remote_branch_match=yes"
+  elif [ -n "$current_branch" ] && [ "$current_branch" != "$DEFAULT_BRANCH" ]; then
+    echo "agent_canon_plan_submodule_deferred_branch=$current_branch"
+    echo "agent_canon_plan_submodule_deferred_remote_branch=<none>"
+    echo "agent_canon_plan_submodule_deferred_remote_branch_match=no"
   else
     echo "agent_canon_plan_submodule_deferred_branch=<none>"
     echo "agent_canon_plan_submodule_deferred_remote_branch=<none>"
@@ -1159,6 +1462,14 @@ cmd_plan() {
   local submodule_worktree_branch=""
   local submodule_worktree_status="not_applicable"
   local submodule_deferred_ref=""
+  local submodule_history="unknown"
+  local unresolved_merge_conflict="no"
+  local merge_conflict="no"
+  local materialization_collision="no"
+  local materialization_collision_path=""
+  local materialization_result_tree=""
+  local materialization_result_tree_rc=0
+  local materialization_collision_rc=0
 
   if is_submodule_prefix; then
     prefix_mode="submodule"
@@ -1225,17 +1536,7 @@ cmd_plan() {
       "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" ""
     echo "agent_canon_plan_status=blocked"
     echo "NEXT_ACTION=select_source_or_pin_owner_then_repair_detached_submodule"
-  elif [ "$prefix_mode" = "submodule" ] \
-    && [ "$submodule_worktree_status" = "clean" ] \
-    && [ "$submodule_worktree_branch" != "$DEFAULT_BRANCH" ]; then
-    route="submodule_non_default_branch"
-    print_plan_summary \
-      "$branch" "$remote_url" "$remote_source" "" "" "$local_tree" \
-      "$local_split" "$subtree_metadata" "$route" "$dirty" "yes" "$prefix_mode" "$dirty_update_surface"
-    print_submodule_plan_details \
-      "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" ""
-    echo "agent_canon_plan_status=blocked"
-    echo "NEXT_ACTION=checkout_${DEFAULT_BRANCH}_at_staged_gitlink_commit"
+    return 2
   fi
 
   if [ -z "$remote_url" ]; then
@@ -1243,7 +1544,9 @@ cmd_plan() {
       "$branch" "$remote_url" "$remote_source" "$remote_sha" "$remote_tree" "$local_tree" \
       "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean" "$prefix_mode" "$dirty_update_surface"
     if [ "$prefix_mode" = "submodule" ]; then
-      print_submodule_plan_details "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" "$remote_sha"
+      print_submodule_plan_details \
+        "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" "$remote_sha" \
+        "" "$submodule_worktree_branch"
     fi
     return
   fi
@@ -1252,6 +1555,29 @@ cmd_plan() {
     remote_sha="$(resolve_remote_branch_sha "$remote_url" "$branch")"
     ensure_remote_commit_object "$ROOT_DIR/$PREFIX" "$remote_url" "$remote_sha"
     remote_tree="$(git -C "$ROOT_DIR/$PREFIX" rev-parse "$remote_sha^{tree}")"
+    submodule_history="$(submodule_history_state "$submodule_worktree_head" "$remote_sha")"
+    if submodule_unresolved_merge_conflict; then
+      unresolved_merge_conflict="yes"
+    else
+      materialization_result_tree="$(
+        submodule_materialization_result_tree "$submodule_worktree_head" "$remote_sha"
+      )" || materialization_result_tree_rc=$?
+      if [ "$materialization_result_tree_rc" -eq 2 ]; then
+        merge_conflict="yes"
+      elif [ "$materialization_result_tree_rc" -ne 0 ]; then
+        die "failed to compute the AgentCanon virtual merge result tree"
+      else
+        materialization_collision_path="$(
+          submodule_materialization_collision_path \
+            "$submodule_worktree_head" "$materialization_result_tree"
+        )" || materialization_collision_rc=$?
+        if [ "$materialization_collision_rc" -eq 0 ]; then
+          materialization_collision="yes"
+        elif [ "$materialization_collision_rc" -ne 1 ]; then
+          die "failed to compute the AgentCanon materialization collision set"
+        fi
+      fi
+    fi
   else
     remote_sha="$(resolve_remote_branch_sha "$remote_url" "$branch")"
     ensure_remote_commit_object "$ROOT_DIR" "$remote_url" "$remote_sha"
@@ -1259,7 +1585,17 @@ cmd_plan() {
   fi
 
   if [ "$prefix_mode" = "submodule" ]; then
-    if [ "$local_tree" != "$submodule_worktree_head" ] \
+    if [ "$unresolved_merge_conflict" = "yes" ]; then
+      route="unresolved_submodule_merge_conflict"
+    elif [ "$merge_conflict" = "yes" ]; then
+      route="submodule_merge_conflict"
+    elif [ "$materialization_collision" = "yes" ]; then
+      route="submodule_materialization_collision"
+    elif [ -n "$submodule_worktree_branch" ] \
+      && [ "$submodule_worktree_branch" != "$DEFAULT_BRANCH" ]; then
+      submodule_deferred_ref="$(submodule_pushed_branch_ref "$submodule_worktree_head" || true)"
+      route="deferred_branch_pr"
+    elif [ "$local_tree" != "$submodule_worktree_head" ] \
       && [ "$submodule_worktree_status" = "clean" ] \
       && [ "$submodule_worktree_head" != "$remote_sha" ] \
       && git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$remote_sha" "$submodule_worktree_head"; then
@@ -1282,10 +1618,8 @@ cmd_plan() {
       fi
     elif git -C "$ROOT_DIR/$PREFIX" merge-base --is-ancestor "$local_tree" "$remote_sha"; then
       route="submodule_update"
-      requires_clean="yes"
     else
       route="diverged_submodule_history"
-      requires_clean="yes"
     fi
   elif [ "$local_tree" = "$remote_tree" ]; then
     route="already_current_tree"
@@ -1318,7 +1652,11 @@ cmd_plan() {
     "$branch" "$remote_url" "$remote_source" "$remote_sha" "$remote_tree" "$local_tree" \
     "$local_split" "$subtree_metadata" "$route" "$dirty" "$requires_clean" "$prefix_mode" "$dirty_update_surface"
   if [ "$prefix_mode" = "submodule" ]; then
-    print_submodule_plan_details "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" "$remote_sha" "$submodule_deferred_ref"
+    print_submodule_plan_details \
+      "$local_tree" "$submodule_worktree_head" "$submodule_worktree_status" "$remote_sha" \
+      "$submodule_deferred_ref" "$submodule_worktree_branch" "$submodule_history" \
+      "$unresolved_merge_conflict" "$merge_conflict" \
+      "$materialization_collision" "$materialization_collision_path"
   fi
 }
 
@@ -1424,16 +1762,26 @@ cmd_ensure_latest() {
   if is_submodule_prefix; then
     local remote_url="" local_commit="" worktree_commit="" origin_sha=""
     local submodule_status="" submodule_remote_branch="" parent_pin_status="current"
+    local current_branch="" history_state="" collision_path=""
+    local materialization_result_tree=""
     local index_entry="" staged_mode="" staged_sha="" staged_stage="" staged_path=""
     local applied_head="" applied_status=""
-    local update_state=""
+    local update_state="" materialization_rc=0
+    local materialization_result_tree_rc=0 materialization_collision_rc=0
 
     submodule_checkout_initialized \
       || die "submodule '$PREFIX' checkout is uninitialized; initialize and attach $branch before updating"
-    [ -z "$(git -C "$ROOT_DIR" ls-files --unmerged -- "$PREFIX")" ] \
-      || die "submodule '$PREFIX' update blocked by an unmerged parent prefix"
+    if submodule_unresolved_merge_conflict; then
+      echo "agent_canon_materialization_unresolved_merge_conflict=yes"
+      echo "agent_canon_materialization_merge_conflict=yes"
+      echo "agent_canon_materialization_conflict_type=existing_unresolved_index"
+      echo "agent_canon_materialization_result=blocked_unresolved_merge_conflict"
+      die "submodule '$PREFIX' update is blocked by an unresolved merge conflict"
+    fi
     submodule_status="$(git -C "$ROOT_DIR/$PREFIX" status --porcelain=v1 --untracked-files=all)"
-    [ -z "$submodule_status" ] || die "submodule '$PREFIX' update requires a clean worktree"
+    current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
+    [ -n "$current_branch" ] \
+      || die "submodule '$PREFIX' update requires a named branch for merge and review"
     remote_url="$(submodule_remote_url)"
     [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
     local_commit="$(submodule_commit)"
@@ -1449,33 +1797,58 @@ cmd_ensure_latest() {
       || die "submodule '$PREFIX' origin/$branch '$origin_sha' does not match expected '$remote_sha'"
     if [ "$local_commit" != "$worktree_commit" ]; then
       parent_pin_status="stale"
-      if [ -z "$submodule_remote_branch" ]; then
-        echo "agent_canon_latest=local_submodule_worktree_differs_from_parent_pin"
-        echo "agent_canon_latest_parent_pin_status=$parent_pin_status"
-        die "submodule '$PREFIX' local HEAD differs from parent gitlink"
-      fi
     fi
+    history_state="$(submodule_history_state "$worktree_commit" "$remote_sha")"
 
     echo "agent_canon_latest_submodule_local_state_checked=yes"
     echo "agent_canon_latest_submodule_local_state_source=$PREFIX"
-    echo "agent_canon_latest_submodule_worktree_status=clean"
+    echo "agent_canon_latest_submodule_worktree_status=$([ -n "$submodule_status" ] && echo dirty || echo clean)"
+    echo "agent_canon_latest_branch=$current_branch"
+    echo "agent_canon_latest_submodule_branch=$current_branch"
+    echo "agent_canon_latest_submodule_history_state=$history_state"
+    echo "agent_canon_latest_acceptance_predicate=materialization_merge_conflict_or_unpreservable_materialization_collision"
     if [ -n "$submodule_remote_branch" ]; then
-      echo "agent_canon_latest_branch=$submodule_remote_branch"
-      echo "agent_canon_latest_submodule_branch=$submodule_remote_branch"
       echo "agent_canon_latest_remote_branch=origin/$submodule_remote_branch"
-    else
-      echo "agent_canon_latest_branch=$branch"
-      echo "agent_canon_latest_submodule_branch=$branch"
     fi
     echo "agent_canon_local_submodule=$local_commit"
     echo "agent_canon_worktree_submodule=$worktree_commit"
     echo "agent_canon_remote=$remote_sha"
     echo "agent_canon_latest_parent_pin_status=$parent_pin_status"
-    if [ "$local_commit" = "$worktree_commit" ] && [ "$worktree_commit" = "$remote_sha" ]; then
+    materialization_result_tree="$(
+      submodule_materialization_result_tree "$worktree_commit" "$remote_sha"
+    )" || materialization_result_tree_rc=$?
+    if [ "$materialization_result_tree_rc" -eq 2 ]; then
+      echo "agent_canon_materialization_unresolved_merge_conflict=no"
+      echo "agent_canon_materialization_merge_conflict=yes"
+      echo "agent_canon_materialization_conflict_type=virtual_merge_result"
+      echo "agent_canon_materialization_result=blocked_merge_conflict"
+      die "submodule '$PREFIX' update has a virtual merge-result conflict"
+    fi
+    [ "$materialization_result_tree_rc" -eq 0 ] \
+      || die "failed to compute the AgentCanon virtual merge result tree"
+    echo "agent_canon_materialization_unresolved_merge_conflict=no"
+    echo "agent_canon_materialization_merge_conflict=no"
+    echo "agent_canon_materialization_conflict_type=none"
+    collision_path="$(
+      submodule_materialization_collision_path "$worktree_commit" "$materialization_result_tree"
+    )" || materialization_collision_rc=$?
+    if [ "$materialization_collision_rc" -eq 0 ]; then
+      echo "agent_canon_materialization_collision=yes"
+      printf 'agent_canon_materialization_collision_path=%q\n' "$collision_path"
+      echo "agent_canon_materialization_result=blocked_unpreservable_collision"
+      die "submodule '$PREFIX' update would overwrite a local materialized path in the exact update write set"
+    fi
+    [ "$materialization_collision_rc" -eq 1 ] \
+      || die "failed to compute the AgentCanon materialization collision set"
+    echo "agent_canon_materialization_collision=no"
+
+    if [ "$current_branch" != "$DEFAULT_BRANCH" ]; then
+      update_state="deferred_branch_pr"
+    elif [ "$local_commit" = "$worktree_commit" ] && [ "$worktree_commit" = "$remote_sha" ]; then
       update_state="already_current_submodule"
     elif [ "$worktree_commit" = "$remote_sha" ]; then
       update_state="parent_pin_pending"
-    elif [ -n "$submodule_remote_branch" ]; then
+    elif [ "$history_state" = "ahead" ] || [ "$history_state" = "diverged" ]; then
       update_state="deferred_branch_pr"
     else
       update_state="updating_submodule"
@@ -1483,25 +1856,37 @@ cmd_ensure_latest() {
     if [ "$update_state" = "updating_submodule" ]; then
       ensure_surface_sync_safe
     fi
-    echo "agent_canon_latest=$update_state"
     if [ "$update_state" = "deferred_branch_pr" ]; then
-      cmd_link_root 1
+      materialize_submodule_remote_branch \
+        "$worktree_commit" "$remote_sha" "$branch" "$materialization_result_tree" \
+        || materialization_rc=$?
+      [ "$materialization_rc" -eq 0 ] || return "$materialization_rc"
+      applied_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
+      applied_status="$(git -C "$ROOT_DIR/$PREFIX" status --porcelain=v1 --untracked-files=all)"
+      echo "agent_canon_latest=deferred_branch_pr"
+      echo "agent_canon_latest_submodule_applied_head=$applied_head"
+      echo "agent_canon_latest_submodule_applied_upstream=origin/$branch"
+      echo "agent_canon_latest_submodule_applied_status=$([ -n "$applied_status" ] && echo dirty_preserved || echo clean)"
       return
     fi
 
-    git -C "$ROOT_DIR/$PREFIX" merge --ff-only "origin/$branch" >/dev/null
+    materialize_submodule_remote_branch \
+      "$worktree_commit" "$remote_sha" "$branch" "$materialization_result_tree" \
+      || materialization_rc=$?
+    [ "$materialization_rc" -eq 0 ] || return "$materialization_rc"
     git -C "$ROOT_DIR" add -A -- "$PREFIX"
     index_entry="$(git -C "$ROOT_DIR" ls-files --stage -- "$PREFIX")"
     read -r staged_mode staged_sha staged_stage staged_path <<<"$index_entry"
     if [ "$(printf '%s\n' "$index_entry" | awk 'NF { count += 1 } END { print count + 0 }')" -ne 1 ] \
       || [ "$staged_mode" != "160000" ] || [ "$staged_stage" != "0" ] \
-      || [ "$staged_path" != "$PREFIX" ] || [ "$staged_sha" != "$remote_sha" ]; then
+      || [ "$staged_path" != "$PREFIX" ]; then
       die "submodule '$PREFIX' update did not produce the expected stage-0 gitlink"
     fi
     applied_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD)"
     applied_status="$(git -C "$ROOT_DIR/$PREFIX" status --porcelain=v1 --untracked-files=all)"
-    [ "$applied_head" = "$staged_sha" ] && [ -z "$applied_status" ] \
+    [ "$applied_head" = "$staged_sha" ] \
       || die "submodule '$PREFIX' staged-pin readback failed"
+    echo "agent_canon_latest=$update_state"
     echo "agent_canon_latest_submodule_origin_main=$origin_sha"
     if [ -n "$submodule_remote_branch" ]; then
       echo "agent_canon_latest_submodule_applied_branch=$submodule_remote_branch"
@@ -1513,7 +1898,7 @@ cmd_ensure_latest() {
     echo "agent_canon_latest_submodule_applied_head=$applied_head"
     echo "agent_canon_latest_submodule_staged_pin=$staged_sha"
     echo "agent_canon_latest_submodule_applied_upstream=origin/${submodule_remote_branch:-$branch}"
-    echo "agent_canon_latest_submodule_applied_status=clean"
+    echo "agent_canon_latest_submodule_applied_status=$([ -n "$applied_status" ] && echo dirty_preserved || echo clean)"
 
     if [ "$update_state" = "already_current_submodule" ]; then
       cmd_link_root 1
@@ -1522,10 +1907,6 @@ cmd_ensure_latest() {
     if [ "$update_state" = "parent_pin_pending" ]; then
       cmd_link_root 1
       commit_sync_paths_if_needed "$remote_sha" "submodule_parent_pin"
-      return
-    fi
-    if [ "$update_state" = "deferred_branch_pr" ]; then
-      cmd_link_root 1
       return
     fi
     cmd_link_root

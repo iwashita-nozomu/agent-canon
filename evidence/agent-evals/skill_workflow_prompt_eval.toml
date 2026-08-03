@@ -2407,8 +2407,8 @@ required_regex = ["make agent-canon-ensure-latest", "make agent-canon-update-pla
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-SHIM-2"
 critical = true
-description = "Separates dirty vendor source work from clean parent pin projection through the managed topic workspace while retaining the standalone source publication route."
-required_regex = ["dirty vendor checkout is a refusal condition", "dependency-module", "prepare --topic", "--module", "--branch", "workspace/<topic-slug>/agent-canon", "clean vendor pin projection", "source branch/PR", "\\$agent-update-branch"]
+description = "Separates another topic's vendor ownership from collision-safe local materialization and clean parent pin projection while retaining the standalone source publication route."
+required_regex = ["Dirty state\\s+remains evidence, not a blocker", "ignored untracked paths", "virtual merge result tree", "independently typed merge conflict", "unpreservable materialization\\s+collision", "exact update write set", "dependency-module", "prepare --topic", "--module", "--branch", "workspace/<topic-slug>/agent-canon", "clean vendor pin projection", "source branch/PR", "\\$agent-update-branch"]
 
 [[evals.checklist]]
 id = "AGENT-CANON-UPDATE-SHIM-3"

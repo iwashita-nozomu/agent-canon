@@ -2,6 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Provides GitHub-first AgentCanon submodule update automation.
+# upstream design ../documents/agent-canon/agent-canon-update-route.md owns update materialization acceptance and publication order.
 # upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md defines GitHub-first module policy.
 # upstream design ../documents/rule/dependency-module-changes.md defines independent source-clone and clean projection policy.
 # upstream design ../documents/agent-canon/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.
@@ -17,6 +18,7 @@ export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_DIR}/lib/repo_paths.sh"
+source "${SCRIPT_DIR}/lib/update_materialization.sh"
 if [ -f "${SCRIPT_DIR}/lib/git_authority.sh" ]; then
   source "${SCRIPT_DIR}/lib/git_authority.sh"
 else
@@ -77,7 +79,6 @@ Usage:
   AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh apply [branch]
   bash tools/update_agent_canon.sh rebuild-tools
   AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current [branch]
-  AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty [branch]
   bash tools/update_agent_canon.sh status
 
 Commands:
@@ -93,11 +94,8 @@ Commands:
   rebuild-tools
       Rebuild compiled AgentCanon tools from the currently checked-out source.
   merge-main-into-current
-      Fetch AgentCanon main and merge it into the current source branch.
-      Parent projection mode uses the parent vendor source owner.
-  merge-main-into-current-preserve-dirty
-      Standalone source mode only. Parent projection mode uses the current
-      parent source owner with dirty-worktree preservation when safe.
+      Fetch AgentCanon main and merge it into the current source branch while
+      preserving non-colliding local uncommitted paths in place.
   status
       Print low-level AgentCanon submodule/root-view status.
 
@@ -331,189 +329,6 @@ sanitize_ref_component() {
   printf '%s\n' "$raw"
 }
 
-parent_repo_log_slug() {
-  local raw="${AGENT_CANON_LOG_REPO_SLUG:-}"
-  if [ -z "$raw" ]; then
-    raw="$(basename "$ROOT_DIR")"
-  fi
-  sanitize_ref_component "$raw"
-}
-
-status_porcelain_path() {
-  local line="$1"
-  local path="${line:3}"
-  case "$path" in
-    *" -> "*)
-      path="${path##* -> }"
-      ;;
-  esac
-  printf '%s\n' "$path"
-}
-
-is_accumulated_eval_result_path() {
-  case "$1" in
-    agents/evals/results/*)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
-is_jsonl_eval_result_path() {
-  case "$1" in
-    agents/evals/results/*.jsonl|agents/evals/results/*/*.jsonl|agents/evals/results/*/*/*.jsonl|agents/evals/results/*/*/*/*.jsonl)
-      return 0
-      ;;
-    *)
-      return 1
-      ;;
-  esac
-}
-
-stash_ref_for_sha() {
-  local stash_sha="$1"
-  git -C "$AGENT_CANON_DIR" stash list --format='%gd %H' \
-    | awk -v sha="$stash_sha" '$2 == sha {print $1; exit}'
-}
-
-drop_stash_sha_if_present() {
-  local stash_sha="$1"
-  local stash_ref=""
-  stash_ref="$(stash_ref_for_sha "$stash_sha")"
-  [ -n "$stash_ref" ] || return 0
-  git -C "$AGENT_CANON_DIR" stash drop "$stash_ref" >/dev/null
-}
-
-remove_eval_log_worktree() {
-  local worktree_path="$1"
-  local branch="$2"
-  if [ -n "$worktree_path" ] && [ -d "$worktree_path" ]; then
-    git -C "$AGENT_CANON_DIR" worktree remove --force "$worktree_path" >/dev/null 2>&1 || true
-  fi
-  if [ -n "$branch" ]; then
-    git -C "$AGENT_CANON_DIR" branch -D "$branch" >/dev/null 2>&1 || true
-  fi
-}
-
-resolve_eval_jsonl_conflicts() {
-  local worktree_root="$1"
-  local conflict_path=""
-  local tmp_dir=""
-  local unresolved=""
-
-  while IFS= read -r conflict_path; do
-    [ -n "$conflict_path" ] || continue
-    if ! is_jsonl_eval_result_path "$conflict_path"; then
-      echo "AGENT_CANON_EVAL_LOG_PARK_CONFLICT_UNSAFE=$conflict_path"
-      return 1
-    fi
-    tmp_dir="$(mktemp -d)"
-    git -C "$worktree_root" show ":2:$conflict_path" >"$tmp_dir/ours.jsonl" 2>/dev/null || true
-    git -C "$worktree_root" show ":3:$conflict_path" >"$tmp_dir/theirs.jsonl" 2>/dev/null || true
-    mkdir -p "$(dirname "$worktree_root/$conflict_path")"
-    awk 'NF && !seen[$0]++ { print }' "$tmp_dir/ours.jsonl" "$tmp_dir/theirs.jsonl" >"$worktree_root/$conflict_path"
-    rm -rf "$tmp_dir"
-    git -C "$worktree_root" add "$conflict_path"
-  done < <(git -C "$worktree_root" diff --name-only --diff-filter=U)
-
-  unresolved="$(git -C "$worktree_root" diff --name-only --diff-filter=U)"
-  [ -z "$unresolved" ]
-}
-
-park_eval_log_dirty_state_if_safe() {
-  local status_output=""
-  local line=""
-  local path=""
-  local current_branch=""
-  local current_head=""
-  local log_branch=""
-  local log_start_ref=""
-  local stash_sha=""
-  local apply_log=""
-  local apply_rc=0
-  local commit_sha=""
-  local tmp_worktree=""
-  local tmp_branch=""
-  local -a paths=()
-
-  ensure_agent_canon_submodule
-  status_output="$(git -C "$AGENT_CANON_DIR" status --porcelain=v1 --untracked-files=all)"
-  if [ -z "$status_output" ]; then
-    echo "AGENT_CANON_EVAL_LOG_PARK=clean"
-    return 0
-  fi
-
-  while IFS= read -r line; do
-    [ -n "$line" ] || continue
-    path="$(status_porcelain_path "$line")"
-    if ! is_accumulated_eval_result_path "$path"; then
-      echo "AGENT_CANON_EVAL_LOG_PARK=skipped_non_log_dirty"
-      echo "AGENT_CANON_EVAL_LOG_PARK_BLOCKING_PATH=$path"
-      return 1
-    fi
-    paths+=("$path")
-  done <<< "$status_output"
-
-  current_branch="$(git -C "$AGENT_CANON_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
-  current_head="$(git -C "$AGENT_CANON_DIR" rev-parse HEAD)"
-  log_branch="${AGENT_CANON_EVAL_LOG_BRANCH:-agent-logs/$(parent_repo_log_slug)}"
-  tmp_branch="agent-log-park/$(parent_repo_log_slug)/$(date -u +%Y%m%dT%H%M%SZ)-$$"
-
-  echo "AGENT_CANON_EVAL_LOG_PARK=started"
-  echo "AGENT_CANON_EVAL_LOG_PARK_BRANCH=$log_branch"
-  git -C "$AGENT_CANON_DIR" stash push -u -m "park eval logs before AgentCanon latest" -- "${paths[@]}" >/dev/null
-  stash_sha="$(git -C "$AGENT_CANON_DIR" rev-parse --verify refs/stash)"
-
-  git -C "$AGENT_CANON_DIR" fetch --no-write-fetch-head origin "$log_branch" >/dev/null 2>&1 || true
-  if git -C "$AGENT_CANON_DIR" show-ref --verify --quiet "refs/remotes/origin/$log_branch"; then
-    log_start_ref="origin/$log_branch"
-  elif git -C "$AGENT_CANON_DIR" show-ref --verify --quiet "refs/heads/$log_branch"; then
-    log_start_ref="$log_branch"
-  else
-    log_start_ref="$current_head"
-  fi
-  tmp_worktree="$(mktemp -d)"
-  git -C "$AGENT_CANON_DIR" worktree add -b "$tmp_branch" "$tmp_worktree" "$log_start_ref" >/dev/null
-
-  apply_log="$(mktemp)"
-  git -C "$tmp_worktree" stash apply "$stash_sha" >"$apply_log" 2>&1 || apply_rc=$?
-  if [ "$apply_rc" -ne 0 ]; then
-    if ! resolve_eval_jsonl_conflicts "$tmp_worktree"; then
-      cat "$apply_log" >&2
-      rm -f "$apply_log"
-      remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
-      return "$apply_rc"
-    fi
-  fi
-  rm -f "$apply_log"
-
-  git -C "$tmp_worktree" add -- "${paths[@]}"
-  if git -C "$tmp_worktree" diff --cached --quiet; then
-    echo "AGENT_CANON_EVAL_LOG_PARK=noop"
-    drop_stash_sha_if_present "$stash_sha"
-    remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
-    return 0
-  fi
-  GIT_AUTHOR_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
-  GIT_AUTHOR_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
-  GIT_COMMITTER_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
-  GIT_COMMITTER_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
-    git -C "$tmp_worktree" commit \
-    -m "Append $(parent_repo_log_slug) AgentCanon eval logs" \
-    --trailer "AgentCanon-Automation-Actor=agent-canon-sync" \
-    --trailer "AgentCanon-Authority-Source=${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY}" \
-    --trailer "AgentCanon-Destructive-Authority=${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY}" \
-    --trailer "AgentCanon-Request-Evidence=${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" >/dev/null
-  commit_sha="$(git -C "$tmp_worktree" rev-parse HEAD)"
-  git -C "$tmp_worktree" push -u origin "HEAD:refs/heads/$log_branch" >/dev/null
-  drop_stash_sha_if_present "$stash_sha"
-  remove_eval_log_worktree "$tmp_worktree" "$tmp_branch"
-  echo "AGENT_CANON_EVAL_LOG_PARK=committed"
-  echo "AGENT_CANON_EVAL_LOG_PARK_COMMIT=$commit_sha"
-}
-
 parent_pin() {
   if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
     git -C "$AGENT_CANON_DIR" rev-parse HEAD
@@ -553,6 +368,23 @@ plan_value() {
 
 emit_agentcanon_conflict_workflow_route() {
   local reason="$1"
+  local current_checkout_block="no"
+
+  case "$reason" in
+    *route=submodule_materialization_collision*|*route=submodule_merge_conflict*|*route=unresolved_submodule_merge_conflict*|*materialization_collision*|*merge_conflict*)
+      current_checkout_block="yes"
+      ;;
+  esac
+
+  if [ "$current_checkout_block" = "yes" ]; then
+    echo "AGENT_CANON_LATEST_TOOL_RESULT=blocked_current_checkout"
+    echo "AGENT_CANON_LATEST_BLOCK_SCOPE=current_checkout"
+    echo "AGENT_CANON_LATEST_BLOCK_REASON=$reason"
+    echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
+    echo "NEXT_ACTION=resolve_agentcanon_materialization_collision_or_merge_conflict_in_current_checkout_then_rerun_latest"
+    return
+  fi
+
   echo "AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_required"
   echo "AGENT_CANON_LATEST_BLOCK_REASON=$reason"
   echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
@@ -560,7 +392,7 @@ emit_agentcanon_conflict_workflow_route() {
     echo "AGENT_CANON_LATEST_DEPENDENCY_ROUTE=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic <topic> --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
     echo "NEXT_ACTION=prepare_topic_workspace_source_clone"
   else
-    echo "AGENT_CANON_LATEST_CONFLICT_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current-preserve-dirty"
+    echo "AGENT_CANON_LATEST_CONFLICT_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> bash tools/update_agent_canon.sh merge-main-into-current"
     echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest"
     echo "NEXT_ACTION=run_agentcanon_conflict_workflow"
   fi
@@ -569,81 +401,25 @@ emit_agentcanon_conflict_workflow_route() {
 route_requires_agent_workflow() {
   local route="$1"
   local prefix_mode="$2"
-  local dirty_update_surface="$3"
-  local submodule_worktree_status="$4"
 
   case "$route" in
-    submodule_detached|submodule_non_default_branch|local_contains_remote|diverged_submodule_history|diverged_local_history|snapshot_import_unsafe_tree_not_in_remote)
+    submodule_detached|submodule_merge_conflict|submodule_materialization_collision|unresolved_submodule_merge_conflict)
       return 0
       ;;
     deferred_branch_pr)
       return 1
       ;;
-  esac
-  if [ "$prefix_mode" = "submodule" ] && [ "$submodule_worktree_status" = "dirty" ]; then
-    return 0
-  fi
-  if [ "$dirty_update_surface" = "yes" ]; then
-    case "$route" in
-      already_current_submodule|submodule_update)
+    local_contains_remote|diverged_submodule_history)
+      if [ "$prefix_mode" = "submodule" ]; then
         return 1
-        ;;
-      *)
-        return 0
-        ;;
-    esac
-  fi
-  return 1
-}
-
-can_preserve_dirty_agentcanon_latest() {
-  local route="$1"
-  local prefix_mode="$2"
-  local submodule_worktree_status="$3"
-
-  [ "$prefix_mode" = "submodule" ] || return 1
-  [ "$submodule_worktree_status" = "dirty" ] || return 1
-  case "$route" in
-    already_current_submodule|submodule_update|local_contains_remote|diverged_submodule_history|diverged_local_history|deferred_branch_pr)
+      fi
+      return 0
+      ;;
+    diverged_local_history|snapshot_import_unsafe_tree_not_in_remote)
       return 0
       ;;
   esac
   return 1
-}
-
-preserve_dirty_agentcanon_latest() {
-  local branch="$1"
-  local route="$2"
-  local preserve_rc=0
-
-  echo "AGENT_CANON_LATEST_DIRTY_PRESERVE=started"
-  echo "AGENT_CANON_LATEST_DIRTY_PRESERVE_ROUTE=${route:-unknown}"
-  cmd_merge_main_into_current_preserve_dirty "$branch" || preserve_rc=$?
-  if [ "$preserve_rc" -ne 0 ]; then
-    echo "AGENT_CANON_LATEST_DIRTY_PRESERVE=failed"
-    echo "AGENT_CANON_LATEST_TOOL_RESULT=dirty_preserve_failed"
-    return "$preserve_rc"
-  fi
-  echo "AGENT_CANON_LATEST_DIRTY_PRESERVE=pass"
-  if ! bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" link-root; then
-    echo "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR=failed"
-    echo "AGENT_CANON_LATEST_TOOL_RESULT=dirty_preserve_root_view_repair_failed"
-    echo "NEXT_ACTION=commit_or_stash_agentcanon_root_view_changes_then_rerun_make_agent-canon-ensure-latest AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>"
-    return 1
-  fi
-  echo "AGENT_CANON_LATEST_ROOT_VIEW_REPAIR=pass"
-  if ! bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" check; then
-    echo "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK=failed"
-    echo "AGENT_CANON_LATEST_TOOL_RESULT=dirty_preserve_shared_surface_check_failed"
-    echo "NEXT_ACTION=repair_shared_surface_with_link-root_then_rerun_make_agent-canon-ensure-latest AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>"
-    return 1
-  fi
-  echo "AGENT_CANON_LATEST_SHARED_SURFACE_CHECK=pass"
-  echo "AGENT_CANON_LATEST_TOOL_RESULT=agent_workflow_preserved_dirty"
-  echo "AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md"
-  echo "AGENT_CANON_LATEST_POST_MERGE_COMMAND=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest"
-  echo "NEXT_ACTION=continue_agentcanon_branch_PR_flow_with_restored_dirty_state"
-  return 0
 }
 
 acknowledge_update_todos_if_available() {
@@ -1173,7 +949,6 @@ cmd_latest() {
   local submodule_worktree_status=""
   local latest_log=""
   local latest_rc=0
-  local park_rc=0
   local todo_rc=0
 
   if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
@@ -1181,14 +956,8 @@ cmd_latest() {
       advance_source_projection
       return
     fi
-    cmd_merge_main_into_current_preserve_dirty "$branch"
+    cmd_merge_main_into_current "$branch"
     return
-  fi
-  park_eval_log_dirty_state_if_safe || park_rc=$?
-  if [ "$park_rc" -gt 1 ]; then
-    echo "AGENT_CANON_LATEST_TOOL_RESULT=eval_log_park_failed"
-    echo "NEXT_ACTION=repair_eval_log_branch_then_rerun_latest"
-    return "$park_rc"
   fi
 
   plan_output="$(cmd_plan "$branch")"
@@ -1202,11 +971,7 @@ cmd_latest() {
     require_accepted_dependency_frontier
   fi
 
-  if route_requires_agent_workflow "$route" "$prefix_mode" "$dirty_update_surface" "$submodule_worktree_status"; then
-    if can_preserve_dirty_agentcanon_latest "$route" "$prefix_mode" "$submodule_worktree_status"; then
-      preserve_dirty_agentcanon_latest "$branch" "$route"
-      return $?
-    fi
+  if route_requires_agent_workflow "$route" "$prefix_mode"; then
     emit_agentcanon_conflict_workflow_route "route=${route:-unknown};dirty_update_surface=${dirty_update_surface:-unknown};submodule_worktree_status=${submodule_worktree_status:-unknown}"
     return 2
   fi
@@ -1215,8 +980,14 @@ cmd_latest() {
   bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
   if [ "$latest_rc" -ne 0 ]; then
     cat "$latest_log"
+    if grep -q '^agent_canon_materialization_collision=yes$' "$latest_log"; then
+      emit_agentcanon_conflict_workflow_route "route=submodule_materialization_collision;ensure_latest_failed=$latest_rc"
+    elif grep -q '^agent_canon_materialization_merge_conflict=yes$' "$latest_log"; then
+      emit_agentcanon_conflict_workflow_route "route=submodule_merge_conflict;ensure_latest_failed=$latest_rc"
+    else
+      emit_agentcanon_conflict_workflow_route "ensure_latest_failed=$latest_rc;route=${route:-unknown}"
+    fi
     rm -f "$latest_log"
-    emit_agentcanon_conflict_workflow_route "ensure_latest_failed=$latest_rc;route=${route:-unknown}"
     return "$latest_rc"
   fi
   cat "$latest_log"
@@ -1227,7 +998,6 @@ cmd_latest() {
   fi
   if grep -q '^agent_canon_latest=deferred_branch_pr$' "$latest_log"; then
     rm -f "$latest_log"
-    bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" check
     echo "AGENT_CANON_LATEST_TOOL_RESULT=deferred_branch_pr"
     echo "NEXT_ACTION=after_agentcanon_PR_merge_rerun_make_agent-canon-ensure-latest"
     return 0
@@ -1251,20 +1021,12 @@ cmd_apply() {
   local branch="${1:-$DEFAULT_BRANCH}"
   local latest_log=""
   local latest_rc=0
-  local park_rc=0
 
   if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
     cmd_merge_main_into_current "$branch"
     return
   fi
   require_accepted_dependency_frontier
-
-  park_eval_log_dirty_state_if_safe || park_rc=$?
-  if [ "$park_rc" -gt 1 ]; then
-    echo "AGENT_CANON_LATEST_TOOL_RESULT=eval_log_park_failed"
-    echo "NEXT_ACTION=repair_eval_log_branch_then_rerun_latest"
-    return "$park_rc"
-  fi
 
   latest_log="$(mktemp)"
   bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
@@ -1306,14 +1068,14 @@ cmd_merge_main_into_current() {
   local post_head=""
   local current_branch=""
   local submodule_status=""
-  local backup_branch=""
-  local backup_ref=""
-  local timestamp=""
+  local collision_path=""
+  local collision_rc=0
+  local materialization_result_tree=""
+  local materialization_result_tree_rc=0
   local merge_log=""
   local result=""
   local conflict_files=""
 
-  classify_parent_vendor_source || return "$?"
   ensure_agent_canon_submodule
   remote_url="$(submodule_remote_url)"
   [ -n "$remote_url" ] || die "submodule '$PREFIX' has no .gitmodules url"
@@ -1330,14 +1092,8 @@ cmd_merge_main_into_current() {
   echo "agent_canon_merge_target_branch=${current_branch:-<detached>}"
   echo "agent_canon_merge_pre_head=$pre_head"
 
-  if [ -n "$submodule_status" ]; then
-    echo "agent_canon_merge_worktree_status=dirty"
-    echo "agent_canon_merge_result=blocked_dirty"
-    echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
-    echo "NEXT_ACTION=commit_agentcanon_artifacts_or_rerun_merge-main-into-current-preserve-dirty"
-    die "submodule '$PREFIX' has uncommitted changes; commit AgentCanon-owned artifacts or use merge-main-into-current-preserve-dirty before merging main"
-  fi
-  echo "agent_canon_merge_worktree_status=clean"
+  echo "agent_canon_merge_worktree_status=$([ -n "$submodule_status" ] && echo dirty || echo clean)"
+  echo "agent_canon_merge_acceptance_predicate=materialization_merge_conflict_or_unpreservable_materialization_collision"
 
   if [ -z "$current_branch" ]; then
     echo "agent_canon_merge_result=blocked_detached_head"
@@ -1345,6 +1101,44 @@ cmd_merge_main_into_current() {
     echo "NEXT_ACTION=request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
     die "submodule '$PREFIX' is detached; create or switch to a branch before merging main"
   fi
+  if update_materialization_unresolved_conflict "$AGENT_CANON_DIR"; then
+    echo "agent_canon_merge_unresolved_merge_conflict=yes"
+    echo "agent_canon_merge_merge_conflict=yes"
+    echo "agent_canon_merge_conflict_type=existing_unresolved_index"
+    echo "agent_canon_merge_result=blocked_unresolved_merge_conflict"
+    echo "NEXT_ACTION=resolve_agentcanon_merge_conflicts_then_rerun_merge-main-into-current"
+    die "current AgentCanon branch has unresolved merge conflicts"
+  fi
+  materialization_result_tree="$(
+    update_materialization_result_tree "$AGENT_CANON_DIR" "$pre_head" "$remote_sha"
+  )" || materialization_result_tree_rc=$?
+  if [ "$materialization_result_tree_rc" -eq 2 ]; then
+    echo "agent_canon_merge_unresolved_merge_conflict=no"
+    echo "agent_canon_merge_merge_conflict=yes"
+    echo "agent_canon_merge_conflict_type=virtual_merge_result"
+    echo "agent_canon_merge_result=blocked_merge_conflict"
+    echo "NEXT_ACTION=resolve_committed_branch_merge_conflict_then_rerun_merge-main-into-current"
+    die "current AgentCanon branch conflicts with the virtual merge result"
+  fi
+  [ "$materialization_result_tree_rc" -eq 0 ] \
+    || die "failed to compute the AgentCanon virtual merge result tree"
+  echo "agent_canon_merge_unresolved_merge_conflict=no"
+  echo "agent_canon_merge_merge_conflict=no"
+  echo "agent_canon_merge_conflict_type=none"
+  collision_path="$(
+    update_materialization_collision_path \
+      "$AGENT_CANON_DIR" "$pre_head" "$materialization_result_tree"
+  )" || collision_rc=$?
+  if [ "$collision_rc" -eq 0 ]; then
+    echo "agent_canon_merge_materialization_collision=yes"
+    printf 'agent_canon_merge_materialization_collision_path=%q\n' "$collision_path"
+    echo "agent_canon_merge_result=blocked_unpreservable_collision"
+    echo "NEXT_ACTION=materialize_or_move_the_colliding_local_path_then_rerun_merge-main-into-current"
+    die "current AgentCanon branch has a local materialized path in the exact update write set"
+  fi
+  [ "$collision_rc" -eq 1 ] \
+    || die "failed to compute the AgentCanon materialization collision set"
+  echo "agent_canon_merge_materialization_collision=no"
 
   if [ "$pre_head" = "$remote_sha" ]; then
     echo "agent_canon_merge_post_head=$pre_head"
@@ -1354,12 +1148,6 @@ cmd_merge_main_into_current() {
     echo "NEXT_ACTION=continue_parent_workflow"
     return
   fi
-
-  timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
-  backup_branch="agent-canon-merge-backup/$(sanitize_ref_component "$current_branch")/$timestamp"
-  backup_ref="refs/heads/$backup_branch"
-  git -C "$AGENT_CANON_DIR" branch "$backup_branch" "$pre_head" >/dev/null
-  echo "agent_canon_merge_backup_ref=$backup_ref"
 
   if git -C "$AGENT_CANON_DIR" merge-base --is-ancestor "$remote_sha" "$pre_head"; then
     echo "agent_canon_merge_post_head=$pre_head"
@@ -1371,7 +1159,7 @@ cmd_merge_main_into_current() {
   fi
 
   merge_log="$(mktemp)"
-  if git -C "$AGENT_CANON_DIR" merge --no-edit "$remote_sha" >"$merge_log" 2>&1; then
+  if git -C "$AGENT_CANON_DIR" merge --no-autostash --no-edit "$remote_sha" >"$merge_log" 2>&1; then
     post_head="$(git -C "$AGENT_CANON_DIR" rev-parse HEAD)"
     if git -C "$AGENT_CANON_DIR" merge-base --is-ancestor "$pre_head" "$remote_sha"; then
       result="fast_forwarded"
@@ -1382,6 +1170,7 @@ cmd_merge_main_into_current() {
     echo "agent_canon_merge_post_head=$post_head"
     emit_remote_main_ancestor_evidence "$remote_sha" "$post_head"
     echo "agent_canon_merge_result=$result"
+    echo "agent_canon_merge_local_changes=$([ -n "$submodule_status" ] && echo preserved || echo none)"
     echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$post_head")"
     echo "NEXT_ACTION=run_validation_then_push_current_agentcanon_branch_and_open_or_update_PR"
     return
@@ -1390,83 +1179,18 @@ cmd_merge_main_into_current() {
   cat "$merge_log" >&2
   rm -f "$merge_log"
   conflict_files="$(git -C "$AGENT_CANON_DIR" diff --name-only --diff-filter=U | paste -sd, -)"
-  echo "agent_canon_merge_result=conflict"
+  echo "agent_canon_merge_unresolved_merge_conflict=$([ -n "$conflict_files" ] && echo yes || echo no)"
+  echo "agent_canon_merge_result=$([ -n "$conflict_files" ] && echo blocked_unresolved_merge_conflict || echo failed_without_conflict)"
   echo "agent_canon_merge_conflict_files=${conflict_files:-<unset>}"
   echo "agent_canon_parent_pin_pending=$(parent_pin_pending "$pre_head")"
   echo "NEXT_ACTION=resolve_agentcanon_merge_conflicts_then_commit_and_push_current_branch"
-  exit 1
-}
-
-cmd_merge_main_into_current_preserve_dirty() {
-  local branch="${1:-$DEFAULT_BRANCH}"
-  local current_branch=""
-  local submodule_status=""
-  local stash_sha=""
-  local stash_ref=""
-  local merge_rc=0
-  local restore_log=""
-  local restore_rc=0
-
-  classify_parent_vendor_source || return "$?"
-  ensure_agent_canon_submodule
-  current_branch="$(git -C "$AGENT_CANON_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
-  submodule_status="$(git -C "$AGENT_CANON_DIR" status --short --untracked-files=all)"
-
-  echo "agent_canon_merge_dirty_preserve_prefix=$PREFIX"
-  echo "agent_canon_merge_dirty_preserve_target_branch=${current_branch:-<detached>}"
-
-  if [ -z "$current_branch" ]; then
-    echo "agent_canon_merge_dirty_preserve_result=blocked_detached_head"
-    echo "agent_canon_merge_dirty_preserve_worktree_status=$([ -n "$submodule_status" ] && echo dirty || echo clean)"
-    echo "NEXT_ACTION=request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
-    die "submodule '$PREFIX' is detached; create or switch to a branch before preserving dirty state and merging main"
-  fi
-
-  if [ -z "$submodule_status" ]; then
-    echo "agent_canon_merge_dirty_preserve_result=clean_passthrough"
-    cmd_merge_main_into_current "$branch"
-    return
-  fi
-
-  echo "agent_canon_merge_dirty_preserve_result=started"
-  echo "agent_canon_merge_dirty_preserve_worktree_status=dirty"
-  git -C "$AGENT_CANON_DIR" stash push -u -m "preserve dirty AgentCanon work before merge-main-into-current" >/dev/null
-  stash_sha="$(git -C "$AGENT_CANON_DIR" rev-parse --verify refs/stash)"
-  stash_ref="$(stash_ref_for_sha "$stash_sha")"
-  echo "agent_canon_merge_dirty_stash_ref=${stash_ref:-<unknown>}"
-  echo "agent_canon_merge_dirty_stash_sha=$stash_sha"
-
-  ( cmd_merge_main_into_current "$branch" ) || merge_rc=$?
-  if [ "$merge_rc" -ne 0 ]; then
-    echo "agent_canon_merge_dirty_restore=skipped_merge_failed"
-    echo "agent_canon_merge_dirty_stash_kept=${stash_ref:-$stash_sha}"
-    echo "NEXT_ACTION=resolve_agentcanon_merge_then_apply_stash_ref_${stash_ref:-$stash_sha}"
-    return "$merge_rc"
-  fi
-
-  restore_log="$(mktemp)"
-  git -C "$AGENT_CANON_DIR" stash apply "$stash_sha" >"$restore_log" 2>&1 || restore_rc=$?
-  if [ "$restore_rc" -eq 0 ]; then
-    rm -f "$restore_log"
-    drop_stash_sha_if_present "$stash_sha"
-    echo "agent_canon_merge_dirty_restore=applied"
-    echo "agent_canon_merge_dirty_stash_dropped=yes"
-    echo "NEXT_ACTION=review_restored_dirty_state_then_continue_agentcanon_PR_flow"
-    return
-  fi
-
-  cat "$restore_log" >&2
-  rm -f "$restore_log"
-  echo "agent_canon_merge_dirty_restore=conflict"
-  echo "agent_canon_merge_dirty_stash_kept=${stash_ref:-$stash_sha}"
-  echo "NEXT_ACTION=resolve_restored_dirty_conflicts_then_drop_stash_ref_${stash_ref:-$stash_sha}"
-  return "$restore_rc"
+  return 1
 }
 
 main() {
   local subcommand="${1:-}"
   case "$subcommand" in
-    latest|apply|merge-main-into-current|merge-main-into-current-preserve-dirty)
+    latest|apply|merge-main-into-current)
       require_commit_provenance "$subcommand"
       ;;
   esac
@@ -1490,10 +1214,6 @@ main() {
     merge-main-into-current)
       shift
       cmd_merge_main_into_current "${1:-$DEFAULT_BRANCH}"
-      ;;
-    merge-main-into-current-preserve-dirty)
-      shift
-      cmd_merge_main_into_current_preserve_dirty "${1:-$DEFAULT_BRANCH}"
       ;;
     status)
       shift

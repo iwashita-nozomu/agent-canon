@@ -21,8 +21,25 @@ from pathlib import Path
 from types import ModuleType
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SYNC = PROJECT_ROOT / "tools" / "sync_agent_canon.sh"
 ROOT_RESOLUTION = PROJECT_ROOT / "tools" / "agent_tools" / "agent_canon_source_root.py"
+LEGACY_AGENT_CANON_PIN = "5ea949c85d74b66427efdc4d2b847c62e547515c"
+LEGACY_ROOT_PROJECTIONS = {
+    "tools/sync_agent_canon.sh": (
+        "tools/sync_agent_canon.sh",
+        "a354e6597b7337a39bc650ff61dd57cab08981e8",
+        "100755",
+    ),
+    "tools/agent_tools/surface_manifest.py": (
+        "tools/agent_tools/surface_manifest.py",
+        "9ebdc1f8198fbe63c037186da81867901f300ef5",
+        "100644",
+    ),
+    "tools/agent_tools/update_agent_canon.sh": (
+        "tools/update_agent_canon.sh",
+        "7c673f9b5b2bddac85d87f14466020acdeb9dd78",
+        "100644",
+    ),
+}
 
 
 def load_root_resolution_module() -> ModuleType:
@@ -54,7 +71,36 @@ class SurfaceMigrationTest(unittest.TestCase):
         self.git(root, "config", "user.email", "agent-canon-test@example.invalid")
         self.git(root, "config", "user.name", "AgentCanon test")
 
-    def clone_parent_fixture(self) -> Path:
+    def historical_file(self, path: str) -> bytes:
+        """Read one exact pre-transition file from the repository history."""
+        result = subprocess.run(
+            ["git", "show", f"{LEGACY_AGENT_CANON_PIN}:{path}"],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr.decode(errors="replace"))
+        return result.stdout
+
+    def materialize_legacy_root_projections(self, parent: Path) -> None:
+        """Write the exact pre-#520 root projection bytes and Git modes."""
+        for destination_path, (source_path, expected_blob, expected_mode) in (
+            LEGACY_ROOT_PROJECTIONS.items()
+        ):
+            destination = parent / destination_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(self.historical_file(source_path))
+            self.git(parent, "add", destination_path)
+            chmod = "+x" if expected_mode == "100755" else "-x"
+            self.git(parent, "update-index", f"--chmod={chmod}", destination_path)
+            index_entry = self.git(parent, "ls-files", "-s", "--", destination_path).stdout
+            self.assertEqual(
+                index_entry.split()[:2],
+                [expected_mode, expected_blob],
+                destination_path,
+            )
+
+    def clone_parent_fixture(self, *, activate_transition: bool = False) -> Path:
         """Return a parent fixture with a real main-branch AgentCanon submodule."""
         tmp_root = Path(tempfile.mkdtemp())
         source = tmp_root / "source"
@@ -76,15 +122,19 @@ class SurfaceMigrationTest(unittest.TestCase):
         self.configure_git(source)
         self.git(source, "branch", "-M", "main")
         self.git(source, "add", "-A")
-        self.git(source, "commit", "-m", "fixture AgentCanon source")
+        self.git(source, "update-index", "--chmod=+x", "tools/sync_agent_canon.sh")
+        self.git(
+            source,
+            "update-index",
+            "--chmod=-x",
+            "tools/agent_tools/surface_manifest.py",
+        )
+        self.git(source, "update-index", "--chmod=-x", "tools/update_agent_canon.sh")
+        self.git(source, "commit", "-m", "fixture current AgentCanon source")
 
         parent.mkdir()
         self.git(parent, "init")
         self.configure_git(parent)
-        (parent / "tools").mkdir()
-        shutil.copy2(SYNC, parent / "tools" / "sync_agent_canon.sh")
-        os.chmod(parent / "tools" / "sync_agent_canon.sh", 0o755)
-
         self.git(
             parent,
             "-c",
@@ -96,28 +146,80 @@ class SurfaceMigrationTest(unittest.TestCase):
             str(source),
             "vendor/agent-canon",
         )
-        self.git(parent / "vendor" / "agent-canon", "checkout", "-B", "main")
-        self.git(parent, "add", ".gitmodules", "tools", "vendor/agent-canon")
+        if activate_transition:
+            self.materialize_legacy_root_projections(parent)
+            self.git(
+                parent,
+                "update-index",
+                "--cacheinfo",
+                f"160000,{LEGACY_AGENT_CANON_PIN},vendor/agent-canon",
+            )
+        else:
+            self.git(parent / "vendor" / "agent-canon", "checkout", "-B", "main")
+            self.git(parent, "add", "vendor/agent-canon")
+        self.git(parent, "add", ".gitmodules")
         self.git(parent, "commit", "-m", "fixture parent submodule")
+        if activate_transition:
+            old_object = self.git(
+                parent / "vendor" / "agent-canon",
+                "cat-file",
+                "-e",
+                f"{LEGACY_AGENT_CANON_PIN}^{{commit}}",
+                check=False,
+            )
+            self.assertNotEqual(old_object.returncode, 0)
+            self.git(parent, "add", "vendor/agent-canon")
         return parent
 
-    def run_sync(self, root: Path, *commands: str) -> subprocess.CompletedProcess[str]:
+    def run_sync(
+        self,
+        root: Path,
+        *commands: str,
+        env_overrides: dict[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
         """Run one sync command in the fixture root."""
+        environment = {
+            **os.environ,
+            "AGENT_CANON_COMMIT_REQUEST_EVIDENCE": "evidence:" + ("0" * 64),
+            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
+            "AGENT_CANON_BRANCH_WORKTREE_REASON": "AgentCanon root surface repair requested by user",
+            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
+            "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "Fixture-only legacy surface pruning",
+            "AGENT_CANON_FORCE_RELINK": "1",
+        }
+        environment.update(env_overrides or {})
         return subprocess.run(
-            ["bash", str(root / "tools" / "sync_agent_canon.sh"), *commands],
+            [
+                "bash",
+                str(root / "vendor" / "agent-canon" / "tools" / "sync_agent_canon.sh"),
+                *commands,
+            ],
             cwd=root,
             check=False,
             capture_output=True,
             text=True,
-            env={
-                **os.environ,
-                "AGENT_CANON_COMMIT_REQUEST_EVIDENCE": "evidence:" + ("0" * 64),
-                "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
-                "AGENT_CANON_BRANCH_WORKTREE_REASON": "AgentCanon root surface repair requested by user",
-                "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
-                "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "Fixture-only legacy surface pruning",
-                "AGENT_CANON_FORCE_RELINK": "1",
-            },
+            env=environment,
+        )
+
+    def run_resolved_sync(
+        self,
+        root: Path,
+        *commands: str,
+    ) -> subprocess.CompletedProcess[str]:
+        """Run sync through the public source-root resolver from a parent."""
+        source = root / "vendor" / "agent-canon"
+        return subprocess.run(
+            [
+                sys.executable,
+                str(source / "tools" / "agent_tools" / "agent_canon_source_root.py"),
+                "exec",
+                "tools/sync_agent_canon.sh",
+                *commands,
+            ],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
         )
 
     def write_file(self, path: Path, text: str) -> None:
@@ -126,8 +228,8 @@ class SurfaceMigrationTest(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
 
     def test_parent_root_resolution_and_devcontainer_migration(self) -> None:
-        """RootResolution and link-root must agree on a ready parent submodule."""
-        root = self.clone_parent_fixture()
+        """RootResolution and link-root preserve parent-owned regular paths."""
+        root = self.clone_parent_fixture(activate_transition=True)
         root_resolution = load_root_resolution_module()
         resolution = root_resolution.resolve_agent_canon_source_root(root)
         self.assertEqual(resolution.layout, root_resolution.LAYOUT_VENDORED)
@@ -136,7 +238,14 @@ class SurfaceMigrationTest(unittest.TestCase):
             resolution.source_root,
             (root / "vendor" / "agent-canon").resolve(),
         )
-
+        parent_templates = root / "templates"
+        parent_templates.mkdir()
+        template_sentinel = parent_templates / "parent-owned.txt"
+        template_sentinel.write_text("keep parent templates\n", encoding="utf-8")
+        parent_tools = root / "tools"
+        parent_tools.mkdir(exist_ok=True)
+        tools_sentinel = parent_tools / "parent-local-tool.sh"
+        tools_sentinel.write_text("keep parent tools\n", encoding="utf-8")
         devcontainer = root / ".devcontainer"
         devcontainer.mkdir()
         custom_hook = devcontainer / "post-create-parent.sh"
@@ -157,6 +266,73 @@ class SurfaceMigrationTest(unittest.TestCase):
         result = self.run_sync(root, "link-root")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("agent_canon_parent_submodule=projection_ready", result.stdout)
+        self.assertTrue(parent_templates.is_dir())
+        self.assertFalse(parent_templates.is_symlink())
+        self.assertEqual(
+            template_sentinel.read_text(encoding="utf-8"),
+            "keep parent templates\n",
+        )
+        self.assertEqual(
+            tools_sentinel.read_text(encoding="utf-8"),
+            "keep parent tools\n",
+        )
+        self.assertIn(
+            "update_transition[retire-shared-root-tool-projections-v1]"
+            "[tools/sync_agent_canon.sh]=removed_known_legacy_identity",
+            result.stdout,
+        )
+        self.assertFalse((root / "tools" / "sync_agent_canon.sh").exists())
+        self.assertFalse((root / "tools" / "agent_tools").exists())
+        self.assertTrue((root / "tools" / "agent-canon").is_symlink())
+        self.assertTrue(
+            (
+                root
+                / "vendor"
+                / "agent-canon"
+                / "templates"
+                / "documents"
+                / "github"
+            ).is_dir()
+        )
+        self.assertTrue(
+            (
+                root
+                / ".github"
+                / "PULL_REQUEST_TEMPLATE"
+                / "agent_canon.md"
+            ).is_file()
+        )
+        consumer = subprocess.run(
+            [
+                sys.executable,
+                str(
+                    root
+                    / "vendor"
+                    / "agent-canon"
+                    / "tools"
+                    / "experiments"
+                    / "create_experiment_topic.py"
+                ),
+                "projection-consumer",
+                "--repo-root",
+                str(root),
+                "--dry-run",
+            ],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(consumer.returncode, 0, consumer.stdout + consumer.stderr)
+        self.assertIn(
+            f"template_dir={root / 'vendor' / 'agent-canon' / 'templates' / 'experiments' / '_template'}",
+            consumer.stdout,
+        )
+        self.assertIn(
+            "canonical_readme_template="
+            f"{root / 'vendor' / 'agent-canon' / 'templates' / 'documents' / 'experiment' / 'README.template.md'}",
+            consumer.stdout,
+        )
         self.assertTrue(devcontainer.is_dir() and not devcontainer.is_symlink())
         self.assertTrue((devcontainer / "devcontainer.json").is_symlink())
         self.assertEqual(
@@ -179,6 +355,139 @@ class SurfaceMigrationTest(unittest.TestCase):
         check = self.run_sync(root, "check")
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
         self.assertIn("shared surface is in sync", check.stdout)
+        self.assertEqual(
+            template_sentinel.read_text(encoding="utf-8"),
+            "keep parent templates\n",
+        )
+        self.assertEqual(
+            tools_sentinel.read_text(encoding="utf-8"),
+            "keep parent tools\n",
+        )
+        resolved_check = self.run_resolved_sync(root, "check")
+        self.assertEqual(
+            resolved_check.returncode,
+            0,
+            resolved_check.stdout + resolved_check.stderr,
+        )
+
+    def test_diverged_transition_path_is_preserved_without_blocking(self) -> None:
+        """Preserve parent-owned divergence while migrating every known identity."""
+        root = self.clone_parent_fixture(activate_transition=True)
+        root_tools = root / "tools"
+        exact_copy = root_tools / "sync_agent_canon.sh"
+        diverged = root_tools / "agent_tools" / "surface_manifest.py"
+        self.write_file(diverged, "# parent-owned implementation\n")
+
+        result = self.run_sync(root, "link-root")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "update_transition[retire-shared-root-tool-projections-v1]"
+            "[tools/agent_tools/surface_manifest.py]=parent_owned_preserved",
+            result.stdout,
+        )
+        self.assertFalse(exact_copy.exists())
+        self.assertFalse((root_tools / "agent_tools" / "update_agent_canon.sh").exists())
+        self.assertEqual(
+            diverged.read_text(encoding="utf-8"),
+            "# parent-owned implementation\n",
+        )
+        self.assertTrue((root_tools / "agent-canon").is_symlink())
+        check = self.run_sync(root, "check")
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+
+    def test_transition_uses_history_bound_git_index_mode(self) -> None:
+        """Preserve byte-identical content whose tracked mode is not historical."""
+        root = self.clone_parent_fixture(activate_transition=True)
+        destination = root / "tools" / "sync_agent_canon.sh"
+        self.git(root, "update-index", "--chmod=-x", "tools/sync_agent_canon.sh")
+
+        result = self.run_sync(root, "link-root")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "update_transition[retire-shared-root-tool-projections-v1]"
+            "[tools/sync_agent_canon.sh]=parent_owned_preserved",
+            result.stdout,
+        )
+        self.assertTrue(destination.is_file())
+
+    def test_unknown_symlink_identity_is_preserved(self) -> None:
+        """Do not widen a regular-file history identity through symlink resolution."""
+        root = self.clone_parent_fixture(activate_transition=True)
+        destination = root / "tools" / "agent_tools" / "update_agent_canon.sh"
+        destination.unlink()
+        target = "../../vendor/agent-canon/tools/update_agent_canon.sh"
+        destination.symlink_to(target)
+        self.git(root, "add", destination.relative_to(root).as_posix())
+
+        result = self.run_sync(root, "link-root")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(destination.is_symlink())
+        self.assertEqual(os.readlink(destination), target)
+        self.assertIn(
+            "update_transition[retire-shared-root-tool-projections-v1]"
+            "[tools/agent_tools/update_agent_canon.sh]=parent_owned_preserved",
+            result.stdout,
+        )
+
+    def test_parent_can_own_retired_names_after_transition(self) -> None:
+        """A completed transition does not create a permanent absent-path gate."""
+        root = self.clone_parent_fixture(activate_transition=True)
+        first = self.run_sync(root, "link-root")
+        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
+        self.git(root, "add", "-A")
+        self.git(root, "commit", "-m", "integrate transition-aware AgentCanon")
+
+        for path in LEGACY_ROOT_PROJECTIONS:
+            self.write_file(root / path, f"parent owns {path}\n")
+        self.git(root, "add", "-A")
+        self.git(root, "commit", "-m", "add parent-owned tool paths")
+
+        second = self.run_sync(root, "link-root")
+        check = self.run_sync(root, "check")
+
+        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+        for path in LEGACY_ROOT_PROJECTIONS:
+            self.assertEqual((root / path).read_text(encoding="utf-8"), f"parent owns {path}\n")
+
+    def test_transition_move_failure_restores_every_candidate(self) -> None:
+        """A failed move rolls back earlier moves instead of partially deleting."""
+        root = self.clone_parent_fixture(activate_transition=True)
+        wrapper_dir = root / "test-bin"
+        wrapper_dir.mkdir()
+        count_path = root / "mv-count"
+        real_mv = shutil.which("mv")
+        self.assertIsNotNone(real_mv)
+        wrapper = wrapper_dir / "mv"
+        self.write_file(
+            wrapper,
+            "#!/usr/bin/env bash\n"
+            "set -euo pipefail\n"
+            'count="$(cat "$TEST_MV_COUNT" 2>/dev/null || printf 0)"\n'
+            'count="$((count + 1))"\n'
+            'printf "%s\\n" "$count" >"$TEST_MV_COUNT"\n'
+            'if [ "$count" -eq 2 ]; then exit 91; fi\n'
+            f'exec "{real_mv}" "$@"\n',
+        )
+        wrapper.chmod(0o755)
+
+        result = self.run_sync(
+            root,
+            "link-root",
+            env_overrides={
+                "PATH": f"{wrapper_dir}{os.pathsep}{os.environ['PATH']}",
+                "TEST_MV_COUNT": str(count_path),
+            },
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("all earlier moves were restored", result.stderr)
+        for path in LEGACY_ROOT_PROJECTIONS:
+            self.assertTrue((root / path).is_file(), path)
+        self.assertFalse((root / "tools" / "agent-canon").exists())
 
     def test_removed_legacy_surface_preserves_unknown_mirror(self) -> None:
         """Known retired mirrors are removed while unknown mirrors remain untouched."""

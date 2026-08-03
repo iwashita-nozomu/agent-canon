@@ -72,9 +72,12 @@ python3 tools/agent_tools/dependency_module_change.py --root <parent-root> clean
 この literal の CLI / ToolCall / receipt shape は変更せず、`CLEANUP` readback と
 typed hold reason を後続の PR processing が消費します。
 
-独立した replaceable responsibility を parallel に実行する場合は、vendor の clean
-状態を理由に停止せず、親の DAG packet が disjoint write scope、依存/merge order、
-validation、reviewer ownership を固定した後で、次の typed route を使います。
+独立した replaceable responsibility を parallel に実行する場合は、vendor の別
+topic/branch 占有があるときのみ `--placement workspace` に切り替えます。vendor
+が同一 topic の場合は vendor branch を source owner として維持し、dirty / ahead
+/ diverged は evidence として保持され、unpreservable collision は current checkout
+の typed fail として扱います。親の DAG packet が disjoint write scope、依存/merge
+order、validation、reviewer ownership を固定した後で、次の typed route を使います。
 
 ```bash
 python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare \
@@ -94,7 +97,9 @@ fresh create し、親 cloneや代替 pathを作りません。local/remote に 
 
 AgentCanon update はこの一般 route の具体例です。
 
-parent pin/root projection、clean named topic の source owner、requested topic
-identity、dirty fallback の typed next action は、同規約の判定表に従います。
+parent pin/root projection、intended named topic の source owner、requested topic
+identity、別 topic occupancy の fallback action は、同規約の判定表に従います。
+intended branch の dirty / ahead / diverged state は evidence として保持し、仮想
+merge conflict または exact update write set との collision だけを block します。
 `main` は topic 作成の起点であり source owner ではありません。runtime shim や
 workflow は `cmd_latest` の更新対象 branch を topic slug に使いません。

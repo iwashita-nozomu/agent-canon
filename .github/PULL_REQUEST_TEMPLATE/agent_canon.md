@@ -153,16 +153,20 @@ Impact notes:
 - [ ] `bash tools/agent-canon/sync_agent_canon.sh link-root`
 - [ ] `bash tools/agent-canon/sync_agent_canon.sh check`
 - [ ] `make agent-canon-pr-check`
-- [ ] `bash tools/agent-canon/agent_tools/run_repo_dependency_review.sh --fail-missing`
+- [ ] Standalone AgentCanon source: existing `static-gates` owns shared AgentCanon surfaces; no repository-wide project-quality job is added.
+- [ ] Derived parent: `AGENT_CANON_PR_PROJECT_QUALITY=delegated` with owner `parent_ci`; the parent workflow exposes the canonical `make ci` command under that owner, independent of job name.
+- [ ] Derived parent shared gate owns AgentCanon pin/projection/header/graph/workflow/skill-command surfaces only; development prompt and accumulated evals run only in the standalone AgentCanon static owner.
+- [ ] Parent gate dependency graph receipt is `prepared` when parent graph
+  migration, a touched canonical dependency surface/manifest, or the selected
+  canonical validation profile requires strict completeness; otherwise it is
+  `skipped` with selector reason/evidence.
 - [ ] `python3 tools/agent-canon/agent_tools/check_agent_runtime_alignment.py`
-- [ ] `python3 tools/agent-canon/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml`
 - [ ] `python3 tools/agent-canon/agent_tools/check_convention_compliance.py`
 - [ ] `python3 tools/agent-canon/agent_tools/tool_catalog.py`
 - [ ] `python3 tools/agent-canon/agent_tools/tool_drift.py`
 - [ ] `python3 tools/agent-canon/agent_tools/responsibility_scope.py`
 - [ ] `python3 tools/agent-canon/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check`
-- [ ] `python3 tools/agent-canon/agent_tools/eval_accumulation_check.py`
-- [ ] fresh `skill_evaluator@gpt-5.4-mini` validation evidence when evaluator review is in scope
+- [ ] Standalone AgentCanon only: prompt/accumulated eval evidence is supplied by the standalone static-gates owner when evaluator review is in scope.
 - [ ] AgentCanon pin/update path: `bash tools/agent-canon/update_agent_canon.sh rebuild-tools` or a documented `AGENT_CANON_TOOL_REBUILD_*` skip reason.
 - [ ] GitHub workflow / PR template changes: `python3 tools/agent-canon/ci/check_github_workflows.py`
 - [ ] GitHub workflow changes: every `actions/checkout` job uses `submodules: false`, then runs `.github/scripts/checkout_agent_canon_submodule.sh` in template / derived roots or `tools/ci/checkout_agent_canon_submodule.sh` in standalone AgentCanon source when AgentCanon is needed.

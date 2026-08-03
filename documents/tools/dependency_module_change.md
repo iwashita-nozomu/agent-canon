@@ -44,9 +44,10 @@ prepare は `PARENT_ROOT`、`SOURCE_CLONE`、`CONTINUE_PATH` を返します。t
 だけを参照します。
 `cleanup --apply` は、同じ command segment の authority/reason 環境変数と
 remote 再構成可能性を要求します。
-`--placement workspace` は独立 parallel stream 用の typed fresh route です。親 cloneを
-作らず、`<repo>/workspace/<topic-slug>/<module-basename>` だけを computed source clone
-として作成し、local/remote に既存の task branch があれば拒否して最新 `origin/main`
+`--placement workspace` は、vendor checkout が別の active topic/branch に占有されている
+場合に限る独立 parallel stream 用の typed fresh route です。parallel eligibility だけでは
+clone を作成しません。親 cloneを作らず、`<repo>/workspace/<topic-slug>/<module-basename>`
+だけを computed source clone として作成し、local/remote に既存の task branch があれば拒否して最新 `origin/main`
 から task branch を作成します。既存 remote branch の継続は
 `--placement workspace-continuation` で明示します。出力の `SOURCE_REMOTE`、
 `SOURCE_BASE_REF`、`SOURCE_BASE_SHA`、`SOURCE_OWNER_EVIDENCE_SHA256`、

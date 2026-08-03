@@ -118,9 +118,11 @@ when shared-canon propagation and contract checks are ready for later layers.
 ### [ ] P6-002: dirty preflight policy
 
 - Target: repository start wrapper.
-- Problem: dirty state can block latest check without clear route.
-- Action: distinguish repo-local dirty from shared-canon dirty.
-- Acceptance: dirty shared-canon state routes to AgentCanon PR/proposal, not silent pin refresh.
+- Problem: path-level overwrite risk can be hidden by a coarse dirty-state gate.
+- Action: preserve dirty state as evidence and compare local materialized paths
+  with the virtual merge result write set.
+- Acceptance: only a typed merge conflict or unpreservable materialization
+  collision blocks; non-colliding dirty state continues.
 
 ### [ ] P6-003: Docker profile split
 

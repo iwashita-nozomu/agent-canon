@@ -24,7 +24,7 @@ import subprocess
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import TypedDict, cast
 from urllib.parse import quote
@@ -473,7 +473,7 @@ def emit_command_stats(args: argparse.Namespace, status_key: str, fields: dict[s
 
 def utc_now() -> str:
     """Return a stable UTC timestamp."""
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def graph_db_path(args: argparse.Namespace, inputs: Sequence[Path]) -> Path:

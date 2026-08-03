@@ -56,9 +56,9 @@ AgentCanon files directly into that container.
 When a change is generic, read `documents/rule/dependency-module-changes.md`,
 edit the managed source clone in the topic workspace, open or merge an
 AgentCanon change, update the parent repo submodule pin, and repair the parent
-view with `bash tools/agent-canon/sync_agent_canon.sh link-root`. In the
-standalone source the equivalent command remains
-`bash tools/sync_agent_canon.sh link-root`. When a parent command or test log
+view through the source-root resolver `exec tools/sync_agent_canon.sh link-root`.
+In the standalone source the resolver uses `AGENT_CANON_PREFIX=.`; in a parent
+it binds the prefix to `vendor/agent-canon`. When a parent command or test log
 mentions `tools/agent-canon/...`, read it as the execution path for
 AgentCanon-owned tooling unless the path is explicitly project-owned elsewhere.
 
@@ -401,12 +401,12 @@ findings for resilient test planning.
   - legacy subtree repo では subtree metadata / snapshot import route を使います。
   - `update_agent_canon.sh`
     - `plan` は derived repo から `agent-canon` だけ更新するときの route を出します。
-    - `latest` は通常の最新化を tool-first に実行する唯一の user-facing 入口です。safe な場合は eval / hook log の所有 route、`ensure-latest`、root view check、compiled AgentCanon tool rebuild、AgentCanon update TODO routing / acknowledge まで進めます。submodule repo の vendor local branch、dirty runtime source、diverged history、merge conflict は parent source surfaceとして継続せず、topic workspace branch clone routeを案内して停止します。
+    - `latest` は通常の最新化を tool-first に実行する唯一の user-facing 入口です。safe な場合は eval / hook log の所有 route、`ensure-latest`、root view check、compiled AgentCanon tool rebuild、AgentCanon update TODO routing / acknowledge まで進めます。submodule repo の intended named vendor branch では ahead / diverged / dirty state を evidence として保持し、Git の仮想 merge conflict または exact update write set と local materialized path の collision だけを typed blocker にします。
     - eval / hook result の producer path は `runtime_log_archive_git.py ensure` 後の stable source branch archive を使います。legacy `agents/evals/results/` の inventory、migration authority、retention は `agent-canon-log` policy repository の owner route に従います。新規 producer は source tree の `agents/evals/results/` を作成せず、non-log dirty state は自動退避しません。
     - `apply` は互換用の低レベル入口です。通常の task 開始、PR merge 後の持ち帰り、手動更新は `make agent-canon-ensure-latest` または `make agent-canon-latest` から `latest` に入ります。
     - `rebuild-tools` は現在 checkout されている AgentCanon source から compiled tool cache を作り直します。
       commit SHA が同じでも Rust source が installed binary より新しければ再ビルドします。
-    - `merge-main-into-current` と `merge-main-into-current-preserve-dirty` は standalone source modeだけの入口です。parent modeはvendor source mutationを拒否し、topic workspace branch clone routeを案内します。
+    - `merge-main-into-current` は standalone source branch または parent submodule の intended named source branch に remote `main` を取り込む入口です。non-colliding local materialized paths はその場に残し、別 topic が current vendor を所有する場合だけ topic workspace clone route を使います。
     - compatibility commands for local remotes, source refresh, and direct main alignment are intentionally not user-facing.
   - `rebuild_agent_tools.sh`
     - AgentCanon pin 更新後に `${AGENT_CANON_TOOLS_HOME:-$HOME/.tools}` 配下の compiled tools を source commit に合わせます。
@@ -419,13 +419,13 @@ findings for resilient test planning.
 
 1. `make agent-canon-update-plan` で route を read-only 確認します。
 1. `make agent-canon-latest` または互換 alias の `make agent-canon-ensure-latest` で通常の AgentCanon `main` 更新、eval / hook log parking、root view check、compiled tool rebuild、親 repo update TODO routing / acknowledge を tool に任せます。
-1. submodule 内に local branch commit、dirty shared-canon 差分、diverged history、merge conflict がある場合、`latest` は parent modeを停止し、`AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md` と topic workspace `dependency-module-change` routeを出します。vendor stateを保存・stash・再開してPRに出す経路はありません。
+1. submodule 内の intended named source branch の branch / ahead / diverged / dirty state は evidence として保持します。`latest` は、全 local uncommitted / ignored materialized paths と `HEAD` から planned result tree への exact update write set の unpreservable collision、または unresolved merge conflict だけで block し、non-colliding state はその場に残して normal merge / review flow を続けます。requested topic が current branch と異なる場合だけ `AGENT_CANON_LATEST_WORKFLOW=agents/workflows/derived-agent-canon-diff-workflow.md` と topic workspace `dependency-module-change` route を出します。
 1. AgentCanon PR が merge された後も `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest` で template / derived repo へ持ち帰ります。この target は `update_agent_canon.sh latest` を通り、pin 更新後に `tools/rebuild_agent_tools.sh` を走らせます。
 1. `python3 tools/agent_tools/agent_canon_update_todos.py plan --write` で、その pin 更新に伴う親 repo TODO を生成します。pending があれば `latest` は成功終了のまま `updated_with_pending_todos` を出し、親 repo の agent が先に適用します。完了なら `complete`、明示的な repo 判断が必要なら `defer --reason ... --owner ...` を記録します。
 1. すべての pending TODO が `completed` または `deferred` になったら `python3 tools/agent_tools/agent_canon_update_todos.py acknowledge` で `.agent-canon/update-state.toml` の `tasks_applied_through` を現在 pin へ進めます。
 1. `make agent-canon-update` は `make agent-canon-latest` と同じ high-level latest route の互換 alias です。
-1. root view が drift した場合だけ `bash tools/sync_agent_canon.sh link-root` を使います。
-1. 派生 repo 側の shared canon 差分を upstream に戻す場合は、`workspace/<topic>/agent-canon/` の managed source clone から AgentCanon PR を使います。親 repo の `vendor/agent-canon/` は clean pin projection のままです。
+1. root view が drift した場合だけ source-root resolver の `exec tools/sync_agent_canon.sh link-root` を使います。
+1. 派生 repo 側の shared canon 差分を upstream に戻す場合は、intended named `vendor/agent-canon/` branch を source owner とし、branch / ahead / diverged / dirty state を evidence として collision-safe merge / review を続けます。vendor checkout が別 topic/branch に占有されている場合だけ、`workspace/<topic>/agent-canon/` の managed source clone から AgentCanon PR を使います。parent pin/root projection は source publication 後に行います。
 
 `sync_agent_canon.sh` は低レベル実装です。
 日常の update 導線では `pull` や `push` を直接選ばず、Make target または `update_agent_canon.sh plan/latest` から入ります。
@@ -987,7 +987,7 @@ For OOP readability, keep the mechanical report as the source of truth and use `
 - template 利用者:
   - root `tools/` から使います
 - shared canon 保守者:
-- `documents/rule/dependency-module-changes.md` を読み、必要な shared tool sourceは topic workspace branch cloneで編集します。`vendor/agent-canon/tools/` は clean pin projectionです。
+- `documents/rule/dependency-module-changes.md` を読み、intended named `vendor/agent-canon/tools/` branch を source owner として shared tool source を編集します。別 topic/branch の vendor 占有時のみ topic workspace branch clone を使い、parent pin/root projection は source publication 後に行います。
 
 ## 関連文書
 
