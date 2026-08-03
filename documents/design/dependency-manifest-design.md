@@ -386,6 +386,23 @@ prepared certificate is present, duplicate, malformed, missing, uncertain, or
 source-mismatched runtime evidence remains a fail-closed runtime boundary.
 `status`, `query`, and `context` are read-only; they never rebuild or fall back
 to a header scan.
+Canonical current-tree consumers let `status` derive the current producer and
+manifest identity. The PR selector's trusted-base readback instead repeats the
+exact current producer identity and exact base-tree manifest used by its
+preceding build. `status` validates those explicit typed inputs, re-probes the
+base snapshot, and compares the resulting HEAD/source/input fingerprints with
+the persisted integration record; a missing, changed, or substituted input
+fails before diagnostic classification.
+
+Freshness recovery remains outside the read-only Graph operations.
+`run_repo_dependency_review.sh` owns the consumer transition: fresh status
+skips production; stale or typed-unavailable status permits exactly one
+canonical build followed by status readback; incomplete, invalid, build-failed,
+or non-fresh readback fails closed. The producer continues to own its existing
+lock, staging, atomic rename, and durability readback. The standalone runtime
+dashboard workflow is the single periodic maintenance owner and invokes this
+same transition only for its scheduled event; its cron value remains owned only
+by that workflow.
 
 source snapshot の候補 path は、解決先の内容ではなく候補 path 自体の
 filesystem object を読む。`dependency_manifest.rs` の単一 source-path

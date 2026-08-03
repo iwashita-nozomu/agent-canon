@@ -3032,35 +3032,18 @@ fn read_graph_status(args: &GraphArgs) -> Result<Value, GraphError> {
         .root
         .canonicalize()
         .map_err(|error| GraphError::Io(error.to_string()))?;
-    let current_identity = current_producer_identity(&root)
-        .map_err(|error| GraphError::Validation(error.to_string()))?;
-    if args
-        .producer_identity
-        .as_ref()
-        .is_some_and(|identity| identity != &current_identity)
+    if args.surface_manifest.is_some()
+        && (args.surface_manifest_producer.is_none() || args.producer_identity.is_none())
     {
         return Err(GraphError::Validation(
-            "graph status producer identity is not current-root bound".to_string(),
+            "graph status surface manifest requires explicit producer identity".to_string(),
         ));
     }
-    if args
-        .surface_manifest_producer
-        .as_ref()
-        .is_some_and(|producer| {
-            fs::canonicalize(producer)
-                .map(|path| path.to_string_lossy() != current_identity.producer_path)
-                .unwrap_or(true)
-        })
-    {
-        return Err(GraphError::Validation(
-            "graph status producer path is not current-root bound".to_string(),
-        ));
-    }
-    if args.surface_manifest.is_some() {
-        return Err(GraphError::Validation(
-            "graph status does not accept a surface manifest override".to_string(),
-        ));
-    }
+    let (probe_producer, probe_identity) = resolve_graph_producer(
+        &root,
+        args.surface_manifest_producer.as_deref(),
+        args.producer_identity.as_ref(),
+    )?;
     let connection = open_db(&root)?;
     let keys = [
         "integration_record",
@@ -3095,9 +3078,9 @@ fn read_graph_status(args: &GraphArgs) -> Result<Value, GraphError> {
     let probe = probe_input_fingerprint(
         &root,
         &args.profile,
-        Some(&current_identity),
-        Some(Path::new(&current_identity.producer_path)),
-        None,
+        Some(&probe_identity),
+        Some(&probe_producer),
+        args.surface_manifest.as_deref(),
     )?;
     let probe_reason = if persisted_mismatch {
         Some("persisted_readback_mismatch".to_string())
@@ -3153,7 +3136,45 @@ fn read_graph_status(args: &GraphArgs) -> Result<Value, GraphError> {
     )
 }
 
+fn require_current_root_graph_reader(args: &GraphArgs) -> Result<(), GraphError> {
+    let root = args
+        .root
+        .canonicalize()
+        .map_err(|error| GraphError::Io(error.to_string()))?;
+    let current_identity = current_producer_identity(&root)
+        .map_err(|error| GraphError::Validation(error.to_string()))?;
+    if args
+        .producer_identity
+        .as_ref()
+        .is_some_and(|identity| identity != &current_identity)
+    {
+        return Err(GraphError::Validation(
+            "graph reader producer identity is not current-root bound".to_string(),
+        ));
+    }
+    if args
+        .surface_manifest_producer
+        .as_ref()
+        .is_some_and(|producer| {
+            fs::canonicalize(producer)
+                .map(|path| path.to_string_lossy() != current_identity.producer_path)
+                .unwrap_or(true)
+        })
+    {
+        return Err(GraphError::Validation(
+            "graph reader producer path is not current-root bound".to_string(),
+        ));
+    }
+    if args.surface_manifest.is_some() {
+        return Err(GraphError::Validation(
+            "graph reader does not accept a surface manifest override".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn query_graph(args: &GraphArgs) -> Result<Value, GraphError> {
+    require_current_root_graph_reader(args)?;
     let status = read_graph_status(args)?;
     if status.get("status").and_then(Value::as_str) != Some("fresh") {
         return Ok(
@@ -3188,6 +3209,7 @@ fn query_graph(args: &GraphArgs) -> Result<Value, GraphError> {
 }
 
 fn context_graph(args: &GraphArgs) -> Result<Value, GraphError> {
+    require_current_root_graph_reader(args)?;
     let status = read_graph_status(args)?;
     if status.get("status").and_then(Value::as_str) != Some("fresh") {
         return Ok(
@@ -4142,6 +4164,61 @@ mod tests {
         let legacy_status = read_graph_status(&legacy_args).expect("legacy status");
         assert_eq!(legacy_status["status"], "stale");
         assert_eq!(legacy_status["probe_reason"], "producer_identity_changed");
+    }
+
+    #[test]
+    fn status_replays_explicit_build_producer_and_manifest_identity() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        let producer_fixture = graph_fixture();
+        let producer_identity =
+            current_producer_identity(&producer_fixture.root).expect("external producer identity");
+        let mut explicit_args = graph_args(&fixture.root);
+        explicit_args.surface_manifest_producer =
+            Some(PathBuf::from(&producer_identity.producer_path));
+        explicit_args.surface_manifest = Some(PathBuf::from(
+            "documents/runtime/shared-runtime-surfaces.toml",
+        ));
+        explicit_args.producer_identity = Some(producer_identity);
+
+        build_graph_with_failure(&explicit_args).expect("explicit identity graph build");
+        let explicit_status =
+            read_graph_status(&explicit_args).expect("explicit identity status readback");
+        assert_eq!(explicit_status["status"], "fresh");
+        assert!(matches!(
+            query_graph(&explicit_args),
+            Err(GraphError::Validation(_))
+        ));
+        assert!(matches!(
+            context_graph(&explicit_args),
+            Err(GraphError::Validation(_))
+        ));
+
+        let mut canonical_args = graph_args(&fixture.root);
+        canonical_args.surface_manifest_producer = None;
+        canonical_args.producer_identity = None;
+        let canonical_status =
+            read_graph_status(&canonical_args).expect("current-root identity status");
+        assert_eq!(canonical_status["status"], "stale");
+        assert_eq!(
+            canonical_status["probe_reason"],
+            "producer_identity_changed"
+        );
+
+        OpenOptions::new()
+            .append(true)
+            .open(
+                producer_fixture
+                    .root
+                    .join("tools/agent_tools/surface_manifest.py"),
+            )
+            .expect("external producer for mutation")
+            .write_all(b"\n# concurrent producer replacement\n")
+            .expect("mutate external producer");
+        assert!(matches!(
+            read_graph_status(&explicit_args),
+            Err(GraphError::Validation(_))
+        ));
     }
 
     #[test]

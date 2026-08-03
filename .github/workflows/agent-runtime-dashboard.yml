@@ -51,6 +51,7 @@ jobs:
         run: mkdir -p .agent-canon/log-archive
 
       - name: Ensure canonical graph
+        if: github.event_name == 'schedule'
         run: PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec tools/agent_tools/run_repo_dependency_review.sh --root "${GITHUB_WORKSPACE}" --ensure-graph
 
       - name: Run accumulated eval producers

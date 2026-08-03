@@ -945,6 +945,14 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             "persisted_fingerprint_int": "graph_identity_invalid",
             "persisted_path_int": "graph_identity_invalid",
             "persisted_profile_int": "graph_identity_invalid",
+            "status_missing": "graph_status_result_unavailable",
+            "status_source_changed": "graph_status_source_changed",
+            "status_stale": "graph_status_stale",
+            "status_mismatch": "graph_status_identity_mismatch",
+            "status_typed_verified_int": "graph_identity_invalid",
+            "status_typed_fingerprint_int": "graph_identity_invalid",
+            "status_typed_path_int": "graph_identity_invalid",
+            "status_typed_profile_int": "graph_identity_invalid",
         }
         for scenario, reason in scenarios.items():
             with self.subTest(scenario=scenario):

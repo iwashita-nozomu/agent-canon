@@ -195,7 +195,7 @@ if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
     echo "GRAPH_REBUILD=not_needed"
   elif [[ "$status_exit:$status_name" == "2:incomplete" ]]; then
     echo "GRAPH_REBUILD=not_needed status=incomplete"
-  elif [[ "$status_name" == "stale" || "$status_name" == "unavailable" || "$status_name" == "invalid" ]]; then
+  elif [[ "$status_name" == "stale" || "$status_name" == "unavailable" ]]; then
     echo "GRAPH_REBUILD=required status=${status_name}"
     set +e
     "$GRAPH_CLI" graph build --root "$ROOT_DIR" --profile default --format json

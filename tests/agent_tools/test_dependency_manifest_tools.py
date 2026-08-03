@@ -2950,20 +2950,23 @@ class DependencyManifestToolTest(unittest.TestCase):
                 )
 
     def test_graph_ensure_fails_closed_for_build_or_readback_failure(self) -> None:
-        """Build failure and stale readback never become a successful ensure."""
+        """Build, readback, completeness, and invalid-status failures stay closed."""
         cases = (
             ([
                 ("stale", 2),
-            ], 3, "GRAPH_REBUILD=failed rc=3"),
+            ], 3, "GRAPH_REBUILD=failed rc=3", True),
             ([
                 ("stale", 2),
                 ("stale", 2),
-            ], 0, "REPO_DEPENDENCY_REVIEW=fail"),
+            ], 0, "REPO_DEPENDENCY_REVIEW=fail", True),
             ([
                 ("incomplete", 2),
-            ], 0, "REPO_DEPENDENCY_REVIEW=fail"),
+            ], 0, "REPO_DEPENDENCY_REVIEW=fail", False),
+            ([
+                ("invalid", 1),
+            ], 0, "REPO_DEPENDENCY_REVIEW=fail", False),
         )
-        for statuses, build_exit, expected in cases:
+        for statuses, build_exit, expected, build_expected in cases:
             with self.subTest(statuses=statuses, build_exit=build_exit), tempfile.TemporaryDirectory() as tmp_dir:
                 result = self.run_graph_ensure_fixture(
                     Path(tmp_dir), statuses, build_exit
@@ -2971,6 +2974,8 @@ class DependencyManifestToolTest(unittest.TestCase):
 
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn(expected, result.stdout)
+                calls = result.calls_path.read_text(encoding="utf-8").splitlines()
+                self.assertEqual("graph build" in calls, build_expected)
 
     def test_repo_review_reports_missing_manifests_by_default(self) -> None:
         """The repo-wide wrapper keeps missing headers report-only during migration."""
