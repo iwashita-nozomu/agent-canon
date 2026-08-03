@@ -159,6 +159,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             assert config["initializeCommand"].startswith(
                 "AGENT_CANON_DEVCONTAINER_REPO_ROOT=."
             )
+            assert "bootstrap-shared-runtime.sh" not in config["initializeCommand"]
             assert config["postCreateCommand"].startswith(
                 "bash vendor/agent-canon/.devcontainer/post-create.sh"
             )

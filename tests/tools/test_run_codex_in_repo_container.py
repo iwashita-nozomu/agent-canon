@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import os
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -153,6 +154,15 @@ def test_runtime_identity(tmp_path: Path) -> None:
         'provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/shared-runtime-provision.json}"'
         in bootstrap
     )
+    assert (
+        'requested_runtime_route="${AGENT_CANON_RUNTIME_ROUTE:-CONTAINER_LOCAL}"'
+        in bootstrap
+    )
+    assert 'optional_mounts="${AGENT_CANON_OPTIONAL_MOUNTS:-}"' in bootstrap
+    assert (
+        "host shared-runtime bootstrap requires explicit shared-runtime profile"
+        in bootstrap
+    )
     assert "read_shared_runtime_provision" in finalize
     assert "write_runtime_receipt_atomic" in bootstrap
     assert "write_runtime_receipt_atomic" in finalize
@@ -176,3 +186,85 @@ def test_runtime_identity(tmp_path: Path) -> None:
     )
     assert "exec codex" in result.stdout
     assert "--platform linux/amd64" in result.stdout
+
+
+def test_print_only_forwards_only_a_valid_ssh_auth_socket(tmp_path: Path) -> None:
+    """A regular SSH_AUTH_SOCK path is not projected into the nested container."""
+    pack = tmp_path / "pack.toml"
+    pack.write_text(
+        "\n".join(
+            [
+                "[pack]",
+                'name = "ssh-socket-validation"',
+                'dockerfile = "docker/Dockerfile"',
+                'context = "."',
+                'image_tag = "agent-canon-ssh-socket:test"',
+                'platform = "linux/amd64"',
+                "",
+                "[smoke]",
+                "commands = []",
+                "",
+                "[runtime]",
+                'shell = "/bin/bash"',
+                'workdir = "/workspace"',
+                'workspace_mount = "/workspace"',
+                'dependency_profile = "full"',
+                "env = []",
+                "mounts = []",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    profiles = tmp_path / "profiles.toml"
+    profiles.write_text(
+        "\n".join(
+            [
+                "[defaults]",
+                'container_home_root = "/workspace/.state/nested-codex"',
+                "use_host_user = false",
+                "tty = false",
+                "mount_host_gitconfig = false",
+                "mount_host_git_credentials = false",
+                "mount_host_ssh_dir = false",
+                "forward_ssh_auth_sock = true",
+                "forward_env = []",
+                "",
+                "[[profile]]",
+                'name = "default"',
+                f'pack = "{pack}"',
+                'description = "socket validation fixture"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    invalid_socket = tmp_path / "not-a-socket"
+    invalid_socket.write_text("regular file\n", encoding="utf-8")
+    result = run_cli(
+        "--print-only",
+        "--profiles",
+        str(profiles),
+        env={"SSH_AUTH_SOCK": str(invalid_socket)},
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "/tmp/host-ssh-agent.sock" not in result.stdout
+    assert "SSH_AUTH_SOCK=/tmp/host-ssh-agent.sock" not in result.stdout
+
+    valid_socket = tmp_path / "valid.sock"
+    listener = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        listener.bind(str(valid_socket))
+        result = run_cli(
+            "--print-only",
+            "--profiles",
+            str(profiles),
+            env={"SSH_AUTH_SOCK": str(valid_socket)},
+        )
+    finally:
+        listener.close()
+
+    assert result.returncode == 0, result.stderr
+    assert f"{valid_socket}:/tmp/host-ssh-agent.sock" in result.stdout
+    assert "SSH_AUTH_SOCK=/tmp/host-ssh-agent.sock" in result.stdout

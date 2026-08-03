@@ -188,7 +188,8 @@ volume_lines=(
   '        target: "/workspace"'
 )
 if [ "$parent_layout" = true ]; then
-  if [ -f "${HOME}/.zshrc" ] && [ ! -L "${HOME}/.zshrc" ]; then
+  host_home="${HOME:-}"
+  if [ -n "$host_home" ] && [ -f "$host_home/.zshrc" ] && [ ! -L "$host_home/.zshrc" ]; then
     volume_lines+=(
       "      - type: bind"
       '        source: "${HOME}/.zshrc"'

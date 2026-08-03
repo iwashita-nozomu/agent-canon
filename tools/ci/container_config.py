@@ -71,6 +71,16 @@ ENVIRONMENT_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 RUNTIME_SHELL_RE = re.compile(r"/[A-Za-z0-9._/-]+\Z")
 DEPENDENCY_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 DEFAULT_DEPENDENCY_PROFILE = "full"
+OPTIONAL_MOUNT_PROFILES = frozenset(
+    {
+        "host-git",
+        "host-secrets",
+        "host-credentials",
+        "ssh-agent",
+        "docker-host",
+        "shared-runtime",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -533,7 +543,7 @@ def parse_parent_environment_manifest(path: Path) -> tuple[tuple[str, ...], list
 
 
 def validate_parent_environment(root: Path) -> list[Finding]:
-    """Validate parent environment sources and their ordered-name agreement."""
+    """Explicitly audit legacy parent environment sources and their agreement."""
     if not (root / "vendor" / "agent-canon").is_dir():
         return []
     findings: list[Finding] = []
@@ -717,6 +727,27 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
     optional_mounts = (
         optional_mounts_value if isinstance(optional_mounts_value, str) else ""
     )
+    optional_tokens_list = [
+        token.strip() for token in optional_mounts.split(",") if token.strip()
+    ]
+    optional_tokens = set(optional_tokens_list)
+    for token in sorted(optional_tokens - OPTIONAL_MOUNT_PROFILES):
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                f"optional-mount-profile-unsupported:{token}",
+            )
+        )
+    if len(optional_tokens_list) != len(optional_tokens):
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "optional-mount-profile-duplicate",
+            )
+        )
+
     if parent_layout:
         zshrc_matches = [
             raw_volume
@@ -828,34 +859,31 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                         "root-home-mount-forbidden",
                     )
                 )
-        optional_tokens = {
-            token.strip()
-            for token in optional_mounts.split(",")
-            if token.strip()
-        }
-        allowed_targets = {"/workspace", repo_target, "/home/project/.zshrc"}
-        if "host-git" in optional_tokens:
-            allowed_targets.add("/mnt/git")
-        if "host-secrets" in optional_tokens:
-            allowed_targets.add("/mnt/agent-canon-secrets")
-        if "host-credentials" in optional_tokens:
-            allowed_targets.update({"/home/project/.config/gh", "/home/project/.ssh"})
-        if "ssh-agent" in optional_tokens:
-            allowed_targets.add("/ssh-agent")
-        if "docker-host" in optional_tokens:
-            allowed_targets.add("/var/run/docker.sock")
-        if "shared-runtime" in optional_tokens:
-            allowed_targets.add("/var/lib/agent-canon/runtime")
-        for raw_volume in volumes:
-            _source, target = volume_fields(raw_volume)
-            if target not in allowed_targets:
-                findings.append(
-                    Finding(
-                        "dependency_contract_violation",
-                        relative,
-                        f"host-mount-target-forbidden-by-default:{target}",
-                    )
+    allowed_targets = {"/workspace", repo_target}
+    if parent_layout:
+        allowed_targets.add("/home/project/.zshrc")
+    if "host-git" in optional_tokens:
+        allowed_targets.add("/mnt/git")
+    if "host-secrets" in optional_tokens:
+        allowed_targets.add("/mnt/agent-canon-secrets")
+    if "host-credentials" in optional_tokens:
+        allowed_targets.update({"/home/project/.config/gh", "/home/project/.ssh"})
+    if "ssh-agent" in optional_tokens:
+        allowed_targets.add("/ssh-agent")
+    if "docker-host" in optional_tokens:
+        allowed_targets.add("/var/run/docker.sock")
+    if "shared-runtime" in optional_tokens:
+        allowed_targets.add("/var/lib/agent-canon/runtime")
+    for raw_volume in volumes:
+        _source, target = volume_fields(raw_volume)
+        if target not in allowed_targets:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    f"host-mount-target-forbidden-by-default:{target}",
                 )
+            )
     required_environment = {
         "AGENT_CANON_DEPENDENCY_PROFILE": (
             pack.dependency_profile if pack is not None else DEFAULT_DEPENDENCY_PROFILE
@@ -910,7 +938,6 @@ def validate_devcontainer(root: Path) -> list[Finding]:
     if not devcontainer_dir.exists():
         return []
     findings: list[Finding] = []
-    findings.extend(validate_parent_environment(root))
     json_path = devcontainer_dir / "devcontainer.json"
     if not json_path.is_file():
         return [Finding("missing_file", ".devcontainer/devcontainer.json", "missing")]

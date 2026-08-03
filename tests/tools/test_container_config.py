@@ -268,10 +268,12 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     )
     (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
     missing_home = tmp_path / "missing-home"
+    env = {**os.environ, "HOME": str(missing_home)}
+    env.pop("HOME")
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,
-        env={**os.environ, "HOME": str(missing_home)},
+        env=env,
         check=False,
         capture_output=True,
         text=True,
@@ -891,6 +893,45 @@ def test_parent_validator_rejects_unprofiled_host_mount_target(tmp_path: Path) -
         finding.detail for finding in module.validate_generated_compose(repo, pack)
     }
     assert "host-mount-target-forbidden-by-default:/var/run/docker.sock" in details
+
+
+def test_standalone_validator_rejects_unprofiled_host_mount_target(
+    tmp_path: Path,
+) -> None:
+    """Standalone Compose obeys the same default host-mount inventory."""
+    repo = write_topic_fixture(tmp_path)
+    compose_path = repo / ".devcontainer/docker-compose.generated.yml"
+    compose_path.write_text(
+        compose_path.read_text(encoding="utf-8").replace(
+            "    volumes:\n",
+            "    volumes:\n      - /var/run/docker.sock:/var/run/docker.sock\n",
+        ),
+        encoding="utf-8",
+    )
+    module = load_container_config_module()
+    details = {
+        finding.detail for finding in module.validate_generated_compose(repo, None)
+    }
+    assert "host-mount-target-forbidden-by-default:/var/run/docker.sock" in details
+
+
+def test_default_validation_ignores_legacy_parent_environment_sources(
+    tmp_path: Path,
+) -> None:
+    """Legacy parent environment files do not affect the default validator route."""
+    repo = write_parent_generator_fixture(tmp_path)
+    write_devcontainer(repo)
+    write_file(repo, "vendor/agent-canon/.devcontainer/post-create.sh", "#!/bin/sh\n")
+    write_file(
+        repo,
+        "vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
+        "#!/bin/sh\n",
+    )
+    write_file(repo, ".devcontainer/parent-environment.sh", "touch /tmp/side-effect\n")
+    write_file(repo, ".devcontainer/parent-environment.toml", "not = [valid\n")
+    module = load_container_config_module()
+
+    assert module.validate_devcontainer(repo) == []
 
 
 
