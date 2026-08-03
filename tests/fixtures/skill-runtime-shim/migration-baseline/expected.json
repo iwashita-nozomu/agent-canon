@@ -521,6 +521,14 @@
       "order": 64,
       "enabled": true,
       "host_config_entry_digest": "ff94391182c533372064a1233f788f4ae42b8bc710796debfd7f8562e80e4bac"
+    },
+    {
+      "skill_id": "repository-topic-clone",
+      "path": "../.agents/skills/repository-topic-clone/SKILL.md",
+      "index": 65,
+      "order": 65,
+      "enabled": true,
+      "host_config_entry_digest": "30b465fd837b6329c8f1d95c3fe67c81a8f0e61792407fc8840467dcfb1a47ec"
     }
   ]
 }

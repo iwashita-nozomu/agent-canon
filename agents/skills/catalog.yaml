@@ -743,8 +743,38 @@ skill_families:
         - ["sync_agent_canon.sh"]
         - ["agent-canon", "pr"]
         - ["agentcanon", "更新"]
+  - id: repository-topic-clone
+    purpose: Prepare, reuse, merge, publish-readback, and reconstructibly clean one generic repository topic clone before repository-kind policy decoration.
+    canonical_doc: agents/skills/repository-topic-clone.md
+    shim: .agents/skills/repository-topic-clone/SKILL.md
+    discovery:
+      name: repository-topic-clone
+      description: "Use for any parent, dependency, or standalone repository topic clone lifecycle under workspace/<topic>/<repo>; repository kind is a post-clone policy decorator."
+    tool_commands:
+      required: []
+      conditional:
+      - python3 tools/agent_tools/repository_topic_clone.py prepare --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/repository_topic_clone.py merge-main --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/repository_topic_clone.py cleanup --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path> --expected-clone <path> --candidate-cas <path> --pr-lifecycle <path>
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: a requested repository clone, branch reuse, origin/main merge, or reconstructibility cleanup operation is in scope
+      triggers:
+        - ["repository", "topic", "clone"]
+        - ["workspace", "topic", "repo", "clone"]
+        - ["existing", "branch", "reuse"]
+        - ["origin/main", "merge", "topic"]
+        - ["reconstructibility", "clone", "cleanup"]
+        - ["repository", "clone", "lifecycle"]
+        - ["repository", "clone", "cleanup"]
+        - ["topic", "clone", "cleanup"]
+        - ["repository", "クローン"]
+        - ["topic", "clone"]
   - id: dependency-module-change
-    purpose: Manage independent dependency source clones and reconstructibility-based cleanup without editing vendored source checkouts.
+    purpose: Decorate the generic repository topic clone lifecycle with .gitmodules, gitlink, pin, and projection policy.
     canonical_doc: agents/skills/dependency-module-change.md
     shim: .agents/skills/dependency-module-change/SKILL.md
     discovery:
@@ -759,7 +789,7 @@ skill_families:
       - python3 tools/agent_tools/skill_tool_commands.py check
     routing:
       stage_policy: active
-      reason: dependency source clone, module lifecycle, or reconstructibility cleanup is in scope
+      reason: dependency module identity, gitlink, pin, or projection policy decorates a generic repository topic clone lifecycle
       triggers:
         - ["dependency", "module", "change"]
         - ["dependency", "source", "clone"]

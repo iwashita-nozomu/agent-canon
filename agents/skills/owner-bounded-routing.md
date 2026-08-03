@@ -31,6 +31,10 @@ spawn budget、risk profile は `agents/task_catalog.yaml` と
 `documents/runtime/runtime-profiles-and-check-matrix.md` に委譲します。
 これらの label も public-surface invariance gate を迂回しません。
 
+この route は repository-topic clone の specialized clone 分岐を扱わず、`dependency-module-change`
+の gitlink/pin/projection scope と新規 `repository-topic-clone` skill を分離して
+使用する。
+
 ## Use When
 
 - owner boundary、差し替え可能な単位、targeted validation route と

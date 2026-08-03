@@ -178,10 +178,10 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
             for line in merge_lines:
                 self.assertIn("--no-autostash", line, (relative_path, line))
 
-    def test_parallel_clone_docs_require_occupied_vendor_and_latest_uses_exact_predicate(
+    def test_clone_docs_route_all_repository_kinds_through_generic_lifecycle(
         self,
     ) -> None:
-        """Parallel eligibility and dirty CI state do not create generic clones."""
+        """Clone mechanics stay generic while repository policies decorate afterward."""
         orchestration = (
             AGENT_CANON_SOURCE_ROOT / "agents" / "skills" / "agent-orchestration.md"
         ).read_text(encoding="utf-8")
@@ -194,12 +194,15 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
         dependency = (
             AGENT_CANON_SOURCE_ROOT / "documents" / "tools" / "dependency_module_change.md"
         ).read_text(encoding="utf-8")
-        self.assertIn("occupied by a different\nactive topic or branch", orchestration)
-        self.assertIn("Parallel\neligibility alone never triggers clone", orchestration)
-        self.assertIn("vendor checkout が別の active topic/branch", waterfall)
-        self.assertIn("parallel eligibility だけでは clone を作成しません", waterfall)
-        self.assertIn("vendor checkout が別の active topic/branch", dependency)
-        self.assertIn("parallel eligibility だけでは\nclone を作成しません", dependency)
+        self.assertIn("repository-topic-clone", orchestration)
+        self.assertIn("repository kind は prepare 後の policy decorator", orchestration)
+        self.assertIn("repository-topic-clone", waterfall)
+        self.assertIn("repository kind は clone 後の decorator", waterfall)
+        self.assertIn("generic `repository_topic_clone.py`", dependency)
+        self.assertIn("fresh/continuation の別 route は持ちません", dependency)
+        for text in (orchestration, waterfall, dependency):
+            self.assertNotIn("--placement workspace", text)
+            self.assertNotIn("workspace-continuation", text)
 
         latest_check = (
             AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_agent_canon_latest.sh"

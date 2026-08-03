@@ -1,16 +1,16 @@
-"""Tests for topic dependency source clone lifecycle semantics."""
+"""Tests for dependency module topic adapter behavior."""
 
 # @dependency-start
 # contract test
-# responsibility Verifies topic naming, clone membership, clone handback, and cleanup gates.
-# upstream design ../../documents/rule/dependency-module-changes.md topic-root policy
-# upstream implementation ../../tools/agent_tools/dependency_module_change.py lifecycle tool
-# downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this test header
+# responsibility Verifies dependency identity decoration over the generic repository topic lifecycle.
+# upstream design ../../documents/rule/repository-topic-clone.md generic repository topic lifecycle
+# upstream design ../../documents/rule/dependency-module-changes.md dependency adapter responsibility
+# downstream implementation ../../tools/agent_tools/dependency_module_change.py applies dependency policy
+# downstream implementation ../../tools/agent_tools/repository_topic_clone.py owns clone lifecycle behavior
 # @dependency-end
 
 from __future__ import annotations
 
-import hashlib
 import os
 import shutil
 import subprocess
@@ -18,29 +18,46 @@ import sys
 from pathlib import Path
 
 import pytest
-from tools.agent_tools import dependency_module_change as lifecycle
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "dependency_module_change.py"
 TOPIC = "dependency-module-change"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "dependency_module_change.py"
+GENERIC_TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "repository_topic_clone.py"
 
 
 def run_git(path: Path, *args: str) -> str:
-    result = subprocess.run(["git", "-C", str(path), *args], check=True, capture_output=True, text=True)
+    """Run a git command in a repository and return stdout."""
+    result = subprocess.run(
+        ["git", "-C", str(path), *args], check=True, capture_output=True, text=True
+    )
     return result.stdout.strip()
 
 
 def create_remote(tmp_path: Path) -> Path:
+    """Create a bare dependency remote and seed it with one commit."""
     remote = tmp_path / "dep.git"
     source = tmp_path / "dependency-source"
-    subprocess.run(["git", "init", "--bare", str(remote)], check=True, capture_output=True)
-    subprocess.run(["git", "init", "-b", "main", str(source)], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "init", "--bare", str(remote)], check=True, capture_output=True
+    )
+    subprocess.run(
+        ["git", "init", "-b", "main", str(source)], check=True, capture_output=True
+    )
     (source / "README.md").write_text("source\n", encoding="utf-8")
     run_git(source, "add", "README.md")
     subprocess.run(
         [
-            "git", "-C", str(source), "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
-            "commit", "-m", "initial",
+            "git",
+            "-C",
+            str(source),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "initial",
         ],
         check=True,
         capture_output=True,
@@ -48,56 +65,51 @@ def create_remote(tmp_path: Path) -> Path:
     )
     run_git(source, "remote", "add", "origin", str(remote))
     run_git(source, "push", "origin", "main")
-    run_git(source, "checkout", "-b", "feature/foo")
-    run_git(source, "push", "origin", "feature/foo")
-    run_git(source, "checkout", "main")
     return remote
-
-
-def advance_remote_main(tmp_path: Path) -> str:
-    source = tmp_path / "dependency-source"
-    (source / "latest.txt").write_text("latest\n", encoding="utf-8")
-    run_git(source, "add", "latest.txt")
-    subprocess.run(
-        [
-            "git", "-C", str(source), "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
-            "commit", "-m", "latest main",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    run_git(source, "push", "origin", "main")
-    return run_git(source, "rev-parse", "HEAD")
 
 
 def create_parent(
     tmp_path: Path,
     remote: Path,
     *,
-    paths: tuple[str, ...] = ("vendor/dep",),
-    manifest_branch: str | None = "main",
+    manifest_branch: str | None = None,
     manifest_url: str | None = None,
 ) -> Path:
+    """Create a parent repository containing a .gitmodules entry for the dependency."""
     parent_source = tmp_path / "parent-source"
     parent_remote = tmp_path / "parent.git"
-    subprocess.run(["git", "init", "--bare", str(parent_remote)], check=True, capture_output=True)
-    subprocess.run(["git", "init", "-b", "main", str(parent_source)], check=True, capture_output=True)
-    lines: list[str] = []
-    for index, path in enumerate(paths):
-        url = manifest_url if manifest_url is not None else str(remote)
-        lines.extend([f'[submodule "dependency-{index}"]', f"\tpath = {path}", f"\turl = {url}"])
-        if manifest_branch is not None:
-            lines.append(f"\tbranch = {manifest_branch}")
-        lines.append("")
-    (parent_source / ".gitmodules").write_text("\n".join(lines), encoding="utf-8")
-    (parent_source / "owner-evidence.md").write_text("source edit required\n", encoding="utf-8")
-    paths_to_stage = [".gitmodules", "owner-evidence.md"]
-    run_git(parent_source, "add", *paths_to_stage)
+    subprocess.run(
+        ["git", "init", "--bare", str(parent_remote)], check=True, capture_output=True
+    )
+    subprocess.run(
+        ["git", "init", "-b", "main", str(parent_source)],
+        check=True,
+        capture_output=True,
+    )
+    manifest = [
+        '[submodule "dependency-0"]',
+        "\tpath = vendor/dep",
+        f"\turl = {manifest_url or remote}",
+    ]
+    if manifest_branch is not None:
+        manifest.append(f"\tbranch = {manifest_branch}")
+    (parent_source / ".gitmodules").write_text("\n".join(manifest), encoding="utf-8")
+    (parent_source / "owner-evidence.md").write_text(
+        "source edit required\n", encoding="utf-8"
+    )
+    run_git(parent_source, "add", ".gitmodules", "owner-evidence.md")
     subprocess.run(
         [
-            "git", "-C", str(parent_source), "-c", "user.name=Test", "-c", "user.email=test@example.invalid",
-            "commit", "-m", "parent",
+            "git",
+            "-C",
+            str(parent_source),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "parent",
         ],
         check=True,
         capture_output=True,
@@ -105,81 +117,164 @@ def create_parent(
     )
     run_git(parent_source, "remote", "add", "origin", str(parent_remote))
     run_git(parent_source, "push", "origin", "main")
-    run_git(parent_remote, "symbolic-ref", "HEAD", "refs/heads/main")
     selected = tmp_path / "host" / "parent"
-    selected.parent.mkdir()
-    subprocess.run(["git", "clone", str(parent_remote), str(selected)], check=True, capture_output=True)
+    selected.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["git", "clone", str(parent_remote), str(selected)],
+        check=True,
+        capture_output=True,
+    )
+    (selected / ".gitmodules").write_text("\n".join(manifest), encoding="utf-8")
+    (selected / "owner-evidence.md").write_text(
+        "source edit required\n", encoding="utf-8"
+    )
     return selected
 
 
-def invoke(root: Path, *args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
-    merged_env = os.environ.copy()
-    if env:
-        merged_env.update(env)
+def invoke(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    """Run the dependency module adapter with provided command arguments."""
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
     return subprocess.run(
         [sys.executable, str(TOOL), "--root", str(root), *args],
         check=False,
         capture_output=True,
         text=True,
-        env=merged_env,
+        env=env,
     )
 
 
-def cleanup_env() -> dict[str, str]:
-    return {
-        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "agent_canon_workflow",
-        "AGENT_CANON_BRANCH_WORKTREE_REASON": "test",
-        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
-        "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "test",
-    }
+def install_public_cli_surface(root: Path, *, derived: bool) -> Path:
+    """Install the canonical CLI/library pair in one fresh source surface."""
+    tools_root = root / "tools"
+    source_tools = root / "vendor" / "agent-canon" / "tools" if derived else tools_root
+    agent_tools = source_tools / "agent_tools"
+    agent_tools.mkdir(parents=True)
+    shutil.copy2(TOOL, agent_tools / TOOL.name)
+    shutil.copy2(GENERIC_TOOL, agent_tools / GENERIC_TOOL.name)
+    if derived:
+        tools_root.mkdir(parents=True)
+        (tools_root / "agent-canon").symlink_to(
+            Path("../vendor/agent-canon/tools"),
+            target_is_directory=True,
+        )
+        source_tools = tools_root / "agent-canon"
+    return source_tools / "agent_tools" / TOOL.name
 
 
-def owner_evidence_sha(parent: Path) -> str:
-    return hashlib.sha256((parent / "owner-evidence.md").read_bytes()).hexdigest()
+@pytest.mark.parametrize("derived", (False, True))
+def test_public_cli_help_and_status_from_fresh_source_surfaces(
+    tmp_path: Path,
+    derived: bool,
+) -> None:
+    """Run public help and status without ambient package context."""
+    root = tmp_path / ("derived" if derived else "standalone")
+    root.mkdir()
+    executable = install_public_cli_surface(root, derived=derived)
+    (root / ".gitmodules").write_text(
+        '[submodule "dependency-0"]\n'
+        "\tpath = vendor/dep\n"
+        "\turl = https://example.invalid/dep.git\n",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
 
-
-def stale_membership_marker(clone: Path, mode: str) -> None:
-    if mode == "stale":
-        run_git(clone, "config", "--local", "agent-canon.topic.topic", "old-topic")
-    elif mode == "missing":
-        run_git(clone, "config", "--local", "--unset", "agent-canon.topic.topic")
-    else:
-        raise AssertionError(f"unsupported marker mode: {mode}")
-
-
-def _commit_staged(repo: Path, message: str) -> str:
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(repo),
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
-            "commit",
-            "-m",
-            message,
-        ],
-        check=True,
+    help_result = subprocess.run(
+        [sys.executable, str(executable), "--help"],
+        cwd=root,
+        check=False,
         capture_output=True,
         text=True,
+        env=env,
     )
-    return run_git(repo, "rev-parse", "HEAD")
+    assert help_result.returncode == 0, help_result.stderr
+    assert "prepare" in help_result.stdout
+    assert "cleanup" in help_result.stdout
+
+    status_result = subprocess.run(
+        [
+            sys.executable,
+            str(executable),
+            "--root",
+            str(root),
+            "status",
+            "--topic",
+            TOPIC,
+            "--module",
+            "vendor/dep",
+        ],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert status_result.returncode == 0, status_result.stderr
+    assert "MODULE=vendor/dep STATE=absent" in status_result.stdout
 
 
-def _commit_file(repo: Path, filename: str, content: str, message: str) -> str:
-    (repo / filename).write_text(content, encoding="utf-8")
-    run_git(repo, "add", filename)
-    return _commit_staged(repo, message)
+def prepare(
+    parent: Path,
+    *,
+    branch: str = "feature/foo",
+    topic: str = TOPIC,
+    owner_evidence: str = "owner-evidence.md",
+) -> subprocess.CompletedProcess[str]:
+    """Invoke prepare command with the current dependency module."""
+    return invoke(
+        parent,
+        "prepare",
+        "--topic",
+        topic,
+        "--module",
+        "vendor/dep",
+        "--branch",
+        branch,
+        "--owner-evidence",
+        owner_evidence,
+    )
 
 
-def _commit_empty(repo: Path, message: str) -> str:
+def module_clone(parent: Path) -> Path:
+    """Return expected module clone path for the selected parent/topic."""
+    return parent / "workspace" / TOPIC / "dep"
+
+
+def test_prepare_reuses_local_existing_module_branch_via_generic_request(
+    tmp_path: Path,
+) -> None:
+    """Existing local branch in clone should be reused through generic prepare."""
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    first = prepare(parent, branch="feature/foo")
+    assert first.returncode == 0, first.stderr
+
+    clone = module_clone(parent)
+    run_git(clone, "checkout", "-b", "feature/local")
+    second = prepare(parent, branch="feature/local")
+    assert second.returncode == 0, second.stderr
+    assert (
+        run_git(clone, "symbolic-ref", "--quiet", "--short", "HEAD") == "feature/local"
+    )
+
+
+def test_prepare_reuses_remote_existing_module_branch_via_generic_request(
+    tmp_path: Path,
+) -> None:
+    """Existing remote branch should be reused via generic prepare path."""
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
+    scratch = tmp_path / "scratch"
+    subprocess.run(
+        ["git", "clone", str(remote), str(scratch)], check=True, capture_output=True
+    )
+    run_git(scratch, "checkout", "-b", "feature/remote")
     subprocess.run(
         [
             "git",
             "-C",
-            str(repo),
+            str(scratch),
             "-c",
             "user.name=Test",
             "-c",
@@ -187,1311 +282,158 @@ def _commit_empty(repo: Path, message: str) -> str:
             "commit",
             "--allow-empty",
             "-m",
-            message,
+            "remote branch",
         ],
         check=True,
         capture_output=True,
         text=True,
     )
-    return run_git(repo, "rev-parse", "HEAD")
+    run_git(scratch, "push", "origin", "feature/remote")
+
+    remote_prepare = prepare(parent, branch="feature/remote")
+    assert remote_prepare.returncode == 0, remote_prepare.stderr
+    assert (
+        run_git(module_clone(parent), "symbolic-ref", "--quiet", "--short", "HEAD")
+        == "feature/remote"
+    )
 
 
-def _integrate_topic(
+def test_relative_module_url_and_merge_main_use_generic_lifecycle(
     tmp_path: Path,
-    remote: Path,
-    topic_branch: str,
-    *,
-    squash: bool,
-    delete_topic_branch: bool,
-) -> str:
-    integration = tmp_path / ("squash-integration" if squash else "merge-integration")
-    subprocess.run(
-        ["git", "clone", "--branch", "main", str(remote), str(integration)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    run_git(integration, "config", "user.name", "Test")
-    run_git(integration, "config", "user.email", "test@example.invalid")
-    run_git(integration, "fetch", "origin", topic_branch)
-    if squash:
-        run_git(integration, "merge", "--squash", f"origin/{topic_branch}")
-        (integration / "integration-only.txt").write_text("unrelated\n", encoding="utf-8")
-        run_git(integration, "add", "integration-only.txt")
-        integrated_commit = _commit_staged(integration, "squash topic")
-    else:
-        run_git(integration, "merge", "--no-ff", "--no-edit", f"origin/{topic_branch}")
-        integrated_commit = run_git(integration, "rev-parse", "HEAD")
-    run_git(integration, "push", "origin", "main")
-    if delete_topic_branch:
-        run_git(integration, "push", "origin", "--delete", topic_branch)
-    return integrated_commit
-
-
-def _delete_topic_branch(
-    tmp_path: Path, remote: Path, topic_branch: str, directory_name: str
 ) -> None:
-    integration = tmp_path / directory_name
-    subprocess.run(
-        ["git", "clone", "--branch", "main", str(remote), str(integration)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    run_git(integration, "push", "origin", "--delete", topic_branch)
+    """Relative module URLs and normal main merge remain adapter decorations."""
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote, manifest_url="./dep.git")
+    prepared = prepare(parent, branch="feature/merge")
+    assert prepared.returncode == 0, prepared.stderr
 
+    clone = module_clone(parent)
+    run_git(clone, "config", "user.name", "Test")
+    run_git(clone, "config", "user.email", "test@example.invalid")
+    (clone / "topic.txt").write_text("topic\n", encoding="utf-8")
+    run_git(clone, "add", "topic.txt")
+    run_git(clone, "commit", "-m", "topic")
 
-def git_submodule_resolved_url(
-    parent: Path, parent_remote: str, dependency_remote: Path, suffix: str
-) -> str:
-    """Ask Git's submodule init to resolve the manifest URL in an oracle clone."""
-    oracle = parent.parent / f"submodule-resolution-oracle-{suffix}"
-    subprocess.run(
-        ["git", "clone", str(parent.parent.parent / "parent.git"), str(oracle)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    run_git(oracle, "remote", "set-url", "origin", parent_remote)
-    dependency_sha = run_git(dependency_remote, "rev-parse", "refs/heads/main")
-    run_git(
-        oracle,
-        "update-index",
-        "--add",
-        "--cacheinfo",
-        f"160000,{dependency_sha},vendor/dep",
-    )
-    run_git(oracle, "submodule", "init", "--", "vendor/dep")
-    return run_git(oracle, "config", "--local", "--get", "submodule.dependency-0.url")
+    source = tmp_path / "dependency-source"
+    (source / "main.txt").write_text("main\n", encoding="utf-8")
+    run_git(source, "add", "main.txt")
+    run_git(source, "commit", "-m", "advance main")
+    run_git(source, "push", "origin", "main")
 
-
-def prepare(
-    parent: Path,
-    branch: str = "feature/foo",
-    parent_branch: str | None = None,
-) -> subprocess.CompletedProcess[str]:
-    args = [
-        "prepare",
+    merged = invoke(
+        parent,
+        "merge-main",
         "--topic",
         TOPIC,
         "--module",
         "vendor/dep",
         "--branch",
-        branch,
+        "feature/merge",
         "--owner-evidence",
         "owner-evidence.md",
-    ]
-    if parent_branch is not None:
-        args.extend(("--parent-branch", parent_branch))
-    return invoke(
-        parent,
-        *args,
     )
+    assert merged.returncode == 0, merged.stderr
+    assert "MERGE_INTEGRATED_SHA=" in merged.stdout
+    assert run_git(clone, "merge-base", "--is-ancestor", "origin/main", "HEAD") == ""
 
 
-def prepare_workspace(
-    parent: Path,
-    *,
-    topic: str = "parallel-clones",
-    branch: str = "feature/parallel-clones",
-    owner_evidence: str = "owner-evidence.md",
-) -> subprocess.CompletedProcess[str]:
-    return invoke(
-        parent,
-        "prepare",
-        "--placement",
-        "workspace",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--branch",
-        branch,
-        "--owner-evidence",
-        owner_evidence,
-    )
-
-
-def prepare_workspace_continuation(
-    parent: Path,
-    *,
-    topic: str = "parallel-clones",
-    branch: str = "feature/foo",
-    owner_evidence: str = "owner-evidence.md",
-) -> subprocess.CompletedProcess[str]:
-    return invoke(
-        parent,
-        "prepare",
-        "--placement",
-        "workspace-continuation",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--branch",
-        branch,
-        "--owner-evidence",
-        owner_evidence,
-    )
-
-
-def topic_root(parent: Path) -> Path:
-    return parent / "workspace" / "dependency-module-change"
-
-
-def topic_parent(parent: Path) -> Path:
-    return topic_root(parent) / parent.name
-
-
-def module_clone(parent: Path) -> Path:
-    return topic_root(parent) / "dep"
-
-
-def workspace_module_clone(parent: Path, topic: str = "parallel-clones") -> Path:
-    return parent / "workspace" / topic / "dep"
-
-
-def test_prepare_creates_topic_parent_and_reuses_matching_branch_clone(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-
-    missing_branch = invoke(parent, "prepare", "--topic", TOPIC, "--module", "vendor/dep", "--owner-evidence", "owner-evidence.md")
-    assert missing_branch.returncode == 2
-
-    prepared = prepare(parent)
-    assert prepared.returncode == 0, prepared.stderr
-    assert topic_parent(parent).is_dir()
-    clone = module_clone(parent)
-    assert clone.is_dir()
-    assert run_git(clone, "symbolic-ref", "--short", "HEAD") == "feature/foo"
-    assert run_git(clone, "rev-parse", "--abbrev-ref", "@{upstream}") == "origin/feature/foo"
-    assert run_git(clone, "config", "--local", "--get", "agent-canon.topic.module") == "vendor/dep"
-    assert f"PARENT_ROOT={topic_parent(parent)}" in prepared.stdout
-    assert f"SOURCE_CLONE={clone}" in prepared.stdout
-    assert f"CONTINUE_PATH={clone}" in prepared.stdout
-    assert len(prepared.stdout.splitlines()) == 3
-
-    reused = prepare(topic_parent(parent))
-    assert reused.returncode == 0, reused.stderr
-    assert reused.stdout == prepared.stdout
-
-
-def test_prepare_creates_task_branch_from_manifest_or_remote_head(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote, manifest_branch=None)
-
-    prepared = prepare(parent, "task/new-source")
-
-    assert prepared.returncode == 0, prepared.stderr
-    clone = module_clone(parent)
-    assert run_git(clone, "symbolic-ref", "--short", "HEAD") == "task/new-source"
-    upstream = subprocess.run(
-        ["git", "-C", str(clone), "rev-parse", "--abbrev-ref", "@{upstream}"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert upstream.returncode != 0
-
-
-def test_workspace_placement_uses_latest_main_and_only_computed_clone(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    latest_main = advance_remote_main(tmp_path)
-
-    prepared = prepare_workspace(parent)
-    clone = workspace_module_clone(parent)
-
-    assert prepared.returncode == 0, prepared.stderr
-    assert clone.is_dir()
-    assert not topic_parent(parent).exists()
-    assert run_git(clone, "symbolic-ref", "--short", "HEAD") == "feature/parallel-clones"
-    assert run_git(clone, "rev-parse", "HEAD") == latest_main
-    assert run_git(clone, "rev-parse", "origin/main") == latest_main
-    assert f"SOURCE_CLONE={clone}" in prepared.stdout
-    assert "SOURCE_BASE_REF=origin/main" in prepared.stdout
-    assert f"SOURCE_BASE_SHA={latest_main}" in prepared.stdout
-    assert f"SOURCE_OWNER_EVIDENCE_SHA256={owner_evidence_sha(parent)}" in prepared.stdout
-    assert "SOURCE_REMOTE=" in prepared.stdout
-
-
-def test_workspace_placement_reuses_exact_identity_and_refuses_changes(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    first = prepare_workspace(parent)
-    assert first.returncode == 0, first.stderr
-
-    reused = prepare_workspace(parent)
-    assert reused.returncode == 2
-    assert "already exists locally" in reused.stderr
-
-    changed_branch = prepare_workspace(parent, branch="feature/other")
-    assert changed_branch.returncode == 2
-    assert "computed clone is occupied" in changed_branch.stderr
-
-    (parent / "owner-evidence.md").write_text("different owner\n", encoding="utf-8")
-    changed_evidence = prepare_workspace(parent, branch="feature/other")
-    assert changed_evidence.returncode == 2
-    assert "owner-evidence-mismatch" in changed_evidence.stderr
-
-
-def test_workspace_fresh_refuses_existing_branch_and_requires_continuation_route(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-
-    fresh = prepare_workspace(parent, branch="feature/foo")
-    assert fresh.returncode == 2
-    assert "already exists remotely" in fresh.stderr
-    assert not workspace_module_clone(parent).exists()
-
-    continuation = prepare_workspace_continuation(parent)
-    assert continuation.returncode == 0, continuation.stderr
-    assert "PLACEMENT=workspace-continuation" in continuation.stdout
-    assert run_git(workspace_module_clone(parent), "symbolic-ref", "--short", "HEAD") == "feature/foo"
-
-    continued_again = prepare_workspace_continuation(parent)
-    assert continued_again.returncode == 0, continued_again.stderr
-    assert continued_again.stdout == continuation.stdout
-
-
-def test_workspace_rejects_symlinked_ancestors_and_external_cleanup_target(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    external = tmp_path / "external"
-    external.mkdir()
-    sentinel = external / "sentinel.txt"
-    sentinel.write_text("external\n", encoding="utf-8")
-
-    (parent / "workspace").symlink_to(external, target_is_directory=True)
-    workspace_link = prepare_workspace(parent)
-    assert workspace_link.returncode == 2
-    assert sentinel.read_text(encoding="utf-8") == "external\n"
-
-    (parent / "workspace").unlink()
-    (parent / "workspace").mkdir()
-    (parent / "workspace" / "parallel-clones").symlink_to(external, target_is_directory=True)
-    topic_link = prepare_workspace(parent)
-    assert topic_link.returncode == 2
-    assert sentinel.read_text(encoding="utf-8") == "external\n"
-
-    (parent / "workspace" / "parallel-clones").unlink()
-    (parent / "workspace" / "parallel-clones").mkdir()
-    module_link = parent / "workspace" / "parallel-clones" / "dep"
-    module_link.symlink_to(external, target_is_directory=True)
-    module_link_result = prepare_workspace(parent)
-    assert module_link_result.returncode == 2
-    assert sentinel.read_text(encoding="utf-8") == "external\n"
-
-    cleanup_link = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        "parallel-clones",
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(module_link),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--apply",
-        env=cleanup_env(),
-    )
-    assert cleanup_link.returncode == 2
-    assert sentinel.read_text(encoding="utf-8") == "external\n"
-
-
-def test_workspace_resolves_relative_gitmodules_url_against_parent_origin(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote, manifest_url="../dep.git")
-
-    prepared = prepare_workspace(parent, topic="relative-url")
-    clone = workspace_module_clone(parent, topic="relative-url")
-
-    assert prepared.returncode == 0, prepared.stderr
-    assert run_git(clone, "config", "--local", "--get", "remote.origin.url") == str(remote)
-    assert run_git(clone, "config", "--local", "--get", "agent-canon.topic.url") == str(remote)[:-4]
-    assert f"SOURCE_REMOTE={remote}" in prepared.stdout
-
-
-def test_relative_gitmodules_url_matches_git_for_filesystem_https_and_scp(
+def test_cleanup_rejects_adapter_path_identity_before_publication(
     tmp_path: Path,
 ) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote, manifest_url="../dep.git")
-    cases = (
-        ("filesystem", str(tmp_path / "repos" / "project.git")),
-        ("https", "https://example.invalid/org/project.git"),
-        ("scp", "git@example.invalid:org/project.git"),
-    )
-
-    for suffix, parent_remote in cases:
-        run_git(parent, "remote", "set-url", "origin", parent_remote)
-        expected = git_submodule_resolved_url(parent, parent_remote, remote, suffix)
-        assert lifecycle._resolve_module_url(parent, "../dep.git") == expected
-
-
-def test_container_layout_status_and_cleanup_use_canonical_topic_root(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    remote = create_remote(tmp_path)
-    create_parent(tmp_path, remote)
-    container_root = tmp_path / "container-workspace"
-    container_root.mkdir()
-    parent_root = container_root / "agent-canon"
-    subprocess.run(
-        ["git", "clone", str(tmp_path / "parent.git"), str(parent_root)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    monkeypatch.setattr(lifecycle, "CONTAINER_WORKSPACE_ROOT", container_root)
-    monkeypatch.setenv("AGENT_CANON_WORKSPACE_ROOT", str(container_root))
-
-    lifecycle._prepare_workspace(
-        parent_root,
-        "container-topic",
-        "vendor/dep",
-        "feature/container",
-        "owner-evidence.md",
-        None,
-        placement="workspace",
-    )
-    clone = container_root / "dep"
-    assert clone.is_dir()
-    assert clone.parent == container_root
-
-    lifecycle._status_workspace(parent_root, "container-topic", "workspace")
-    status_output = capsys.readouterr().out
-    assert f"CLONE={clone}" in status_output
-    assert "STATE=ready" in status_output
-
-    monkeypatch.setenv("AGENT_CANON_BRANCH_WORKTREE_AUTHORITY", "agent_canon_workflow")
-    monkeypatch.setenv("AGENT_CANON_BRANCH_WORKTREE_REASON", "test")
-    monkeypatch.setenv("AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY", "explicit_user_approval")
-    monkeypatch.setenv("AGENT_CANON_DESTRUCTIVE_GIT_REASON", "test")
-    lifecycle._cleanup_workspace(
-        parent_root,
-        "container-topic",
-        lifecycle._parse_gitmodules(parent_root)[0],
-        clone,
-        True,
-        "workspace",
-        owner_evidence_sha(parent_root),
-    )
-    assert not clone.exists()
-
-
-def test_container_layout_rejects_symlinked_sibling_cleanup_target(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    remote = create_remote(tmp_path)
-    create_parent(tmp_path, remote)
-    container_root = tmp_path / "container-workspace"
-    container_root.mkdir()
-    parent_root = container_root / "agent-canon"
-    subprocess.run(
-        ["git", "clone", str(tmp_path / "parent.git"), str(parent_root)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    monkeypatch.setattr(lifecycle, "CONTAINER_WORKSPACE_ROOT", container_root)
-    monkeypatch.setenv("AGENT_CANON_WORKSPACE_ROOT", str(container_root))
-    lifecycle._prepare_workspace(
-        parent_root,
-        "container-topic",
-        "vendor/dep",
-        "feature/container",
-        "owner-evidence.md",
-        None,
-        placement="workspace",
-    )
-    clone = container_root / "dep"
-    shutil.rmtree(clone)
-    external = tmp_path / "external"
-    external.mkdir()
-    sentinel = external / "sentinel.txt"
-    sentinel.write_text("external\n", encoding="utf-8")
-    clone.symlink_to(external, target_is_directory=True)
-    module = lifecycle._parse_gitmodules(parent_root)[0]
-
-    with pytest.raises(lifecycle.DependencyModuleChangeError, match="symlink"):
-        lifecycle._status_workspace(parent_root, "container-topic", "workspace")
-    with pytest.raises(lifecycle.DependencyModuleChangeError, match="symlink"):
-        lifecycle._cleanup_workspace(
-            parent_root,
-            "container-topic",
-            module,
-            clone,
-            True,
-            "workspace",
-            owner_evidence_sha(parent_root),
-        )
-    assert sentinel.read_text(encoding="utf-8") == "external\n"
-
-
-def test_workspace_cleanup_requires_exact_evidence_sha_and_marker(tmp_path: Path) -> None:
+    """Adapter delegates cleanup only for the lifecycle-owned clone path."""
     remote = create_remote(tmp_path)
     parent = create_parent(tmp_path, remote)
-    assert prepare_workspace(parent).returncode == 0
-    clone = workspace_module_clone(parent)
+    prepared = prepare(parent)
+    assert prepared.returncode == 0, prepared.stderr
+    wrong = parent / "workspace" / TOPIC / "other"
+
+    result = invoke(
+        parent,
+        "cleanup",
+        "--topic",
+        TOPIC,
+        "--module",
+        "vendor/dep",
+        "--branch",
+        "feature/foo",
+        "--owner-evidence",
+        "owner-evidence.md",
+        "--expected-clone",
+        str(wrong),
+        "--candidate-cas",
+        str(parent / "missing-cas.json"),
+        "--pr-lifecycle",
+        str(parent / "missing-lifecycle.json"),
+    )
+    assert result.returncode == 2
+    assert "--expected-clone must equal" in result.stderr
+
+
+def test_prepare_requires_owner_evidence_and_returns_typed_topic_identity_error(
+    tmp_path: Path,
+) -> None:
+    """Missing owner-evidence must fail with typed identity-required error."""
+    remote = create_remote(tmp_path)
+    parent = create_parent(tmp_path, remote)
 
     missing = invoke(
         parent,
-        "cleanup",
-        "--placement",
-        "workspace",
+        "prepare",
         "--topic",
-        "parallel-clones",
+        TOPIC,
         "--module",
         "vendor/dep",
-        "--expected-clone",
-        str(clone),
+        "--branch",
+        "feature/foo",
+        "--owner-evidence",
+        "missing.md",
     )
     assert missing.returncode == 2
-    assert clone.exists()
-
-    wrong = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        "parallel-clones",
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        "0" * 64,
-        "--apply",
-        env=cleanup_env(),
-    )
-    assert wrong.returncode == 0
-    assert "owner-evidence-mismatch" in wrong.stdout
-    assert clone.exists()
-
-    run_git(clone, "config", "--local", "agent-canon.topic.owner-evidence-sha256", "0" * 64)
-    marker_mismatch = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        "parallel-clones",
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--apply",
-        env=cleanup_env(),
-    )
-    assert marker_mismatch.returncode == 0
-    assert "owner-evidence-mismatch" in marker_mismatch.stdout
-    assert clone.exists()
+    assert "topic-identity-required" in missing.stderr
 
 
-def test_workspace_placement_cleanup_uses_exact_computed_clone(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    assert prepare_workspace(parent).returncode == 0
-    clone = workspace_module_clone(parent)
-
-    dry_run = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        "parallel-clones",
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-    )
-    assert dry_run.returncode == 0, dry_run.stderr
-    assert "action=would-remove" in dry_run.stdout
-
-    removed = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        "parallel-clones",
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--apply",
-        env=cleanup_env(),
-    )
-    assert removed.returncode == 0, removed.stderr
-    assert not clone.exists()
-    assert not clone.parent.exists()
-
-
-@pytest.mark.parametrize("marker_mode", ("stale", "missing"))
-def test_cleanup_accepts_equivalent_squash_with_stale_membership_marker(
-    tmp_path: Path, marker_mode: str
+@pytest.mark.parametrize("forbidden", ("path", "base", "merge", "cleanup"))
+def test_prepare_rejects_hidden_cli_selector_aliases(
+    tmp_path: Path, forbidden: str
 ) -> None:
+    """Hidden selector aliases should remain unavailable on adapter prepare."""
     remote = create_remote(tmp_path)
     parent = create_parent(tmp_path, remote)
-    topic = f"stale-marker-{marker_mode}"
-    topic_branch = f"feature/stale-marker-{marker_mode}"
-    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
-    clone = workspace_module_clone(parent, topic=topic)
-    _commit_file(clone, "topic.txt", "topic\n", "topic change")
-    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
-    integrated_commit = _integrate_topic(
-        tmp_path,
-        remote,
-        topic_branch,
-        squash=True,
-        delete_topic_branch=True,
-    )
-    stale_membership_marker(clone, marker_mode)
-
-    removed = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--integrated-commit",
-        integrated_commit,
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert removed.returncode == 0, removed.stderr
-    assert "marker-readback=membership-mismatch" in removed.stdout
-    assert "action=removed" in removed.stdout
-    assert not clone.exists()
-    assert not clone.parent.exists()
-
-
-@pytest.mark.parametrize("marker_mode", ("stale", "missing"))
-def test_cleanup_module_accepts_stale_parent_marker_before_integrated_proof(
-    tmp_path: Path, marker_mode: str
-) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    assert prepare(parent).returncode == 0
-    parent_clone = topic_parent(parent)
-    clone = module_clone(parent)
-    _commit_file(clone, "module.txt", "module\n", "module change")
-    run_git(clone, "push", "origin", "HEAD:refs/heads/feature/foo")
-    integrated_commit = _integrate_topic(
-        tmp_path,
-        remote,
-        "feature/foo",
-        squash=False,
-        delete_topic_branch=False,
-    )
-    stale_membership_marker(parent_clone, marker_mode)
-
-    removed = invoke(
-        parent_clone,
-        "cleanup",
-        "--topic",
-        TOPIC,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--integrated-commit",
-        integrated_commit,
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert removed.returncode == 0, removed.stderr
-    assert "marker-readback=membership-mismatch" in removed.stdout
-    assert "action=removed" in removed.stdout
-    assert removed.stdout.index("marker-readback=membership-mismatch") < removed.stdout.index(
-        "action=removed"
-    )
-    assert not clone.exists()
-
-
-def test_prepare_can_create_and_reuse_parent_pin_branch(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-
-    prepared = prepare(parent, parent_branch="pin/topic")
-
-    assert prepared.returncode == 0, prepared.stderr
-    assert run_git(topic_parent(parent), "symbolic-ref", "--short", "HEAD") == "pin/topic"
-    assert run_git(topic_parent(parent), "config", "--local", "--get", "agent-canon.topic.branch") == "pin/topic"
-
-
-def test_same_topic_branch_change_is_refused(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    assert prepare(parent).returncode == 0
-    changed = prepare(topic_parent(parent), "feature-foo")
-    assert changed.returncode == 2
-    assert "different topic" in changed.stderr
-
-
-def test_basename_collision_is_refused(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote, paths=("one/dep", "two/dep"))
-    result = invoke(parent, "prepare", "--topic", TOPIC, "--module", "one/dep", "--branch", "feature/foo", "--owner-evidence", "owner-evidence.md")
-    assert result.returncode == 2
-    assert "basename collision" in result.stderr
-
-
-def test_cleanup_holds_dirty_and_url_mismatch(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    assert prepare(parent).returncode == 0
-    clone = module_clone(parent)
-    (clone / "local.txt").write_text("dirty\n", encoding="utf-8")
-    dirty = invoke(
-        topic_parent(parent), "cleanup", "--topic", TOPIC, "--module", "vendor/dep",
-        "--expected-clone", str(clone), "--apply", env=cleanup_env(),
-    )
-    assert dirty.returncode == 0, dirty.stderr
-    assert "dirty-worktree-index-or-untracked" in dirty.stdout
-    assert clone.exists()
-    (clone / "local.txt").unlink()
-    run_git(clone, "remote", "set-url", "origin", str(tmp_path / "other.git"))
-    mismatch = invoke(topic_parent(parent), "cleanup", "--topic", TOPIC, "--module", "vendor/dep", "--expected-clone", str(clone))
-    assert mismatch.returncode == 0, mismatch.stderr
-    assert "url-mismatch" in mismatch.stdout
-
-
-def test_cleanup_accepts_reachable_ordinary_merge(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    assert prepare(parent).returncode == 0
-    clone = module_clone(parent)
-    _commit_file(clone, "merged.txt", "merged\n", "topic change")
-    run_git(clone, "push", "origin", "HEAD:refs/heads/feature/foo")
-    _integrate_topic(
-        tmp_path,
-        remote,
-        "feature/foo",
-        squash=False,
-        delete_topic_branch=False,
-    )
-
-    removed = invoke(
-        topic_parent(parent),
-        "cleanup",
-        "--topic",
-        TOPIC,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert removed.returncode == 0, removed.stderr
-    assert "action=removed" in removed.stdout
-    assert not clone.exists()
-
-
-def test_cleanup_accepts_squash_merge_with_deleted_branch_and_equivalent_commit(
-    tmp_path: Path,
-) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    topic = "squash-topic"
-    topic_branch = "feature/squash-cleanup"
-    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
-    clone = workspace_module_clone(parent, topic=topic)
-    _commit_file(clone, "squashed.txt", "squashed\n", "topic change")
-    _commit_file(clone, "second-topic-change.txt", "second\n", "second topic change")
-    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
-    integrated_commit = _integrate_topic(
-        tmp_path,
-        remote,
-        topic_branch,
-        squash=True,
-        delete_topic_branch=True,
-    )
-
-    discovered = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-    )
-    assert discovered.returncode == 0, discovered.stderr
-    assert "action=would-remove" in discovered.stdout
-
-    removed = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--integrated-commit",
-        integrated_commit,
-        "--apply",
-        env=cleanup_env(),
-    )
-    assert removed.returncode == 0, removed.stderr
-    assert "action=removed" in removed.stdout
-    assert not clone.exists()
-
-
-def test_cleanup_holds_whitespace_only_integrated_content_mismatch(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    topic = "whitespace-mismatch-topic"
-    topic_branch = "feature/whitespace-mismatch"
-    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
-    clone = workspace_module_clone(parent, topic=topic)
-    _commit_file(clone, "topic.txt", "topic\n", "topic change")
-    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
-
-    integration = tmp_path / "whitespace-mismatch-integration"
-    subprocess.run(
-        ["git", "clone", "--branch", "main", str(remote), str(integration)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    run_git(integration, "config", "user.name", "Test")
-    run_git(integration, "config", "user.email", "test@example.invalid")
-    run_git(integration, "fetch", "origin", topic_branch)
-    run_git(integration, "merge", "--squash", f"origin/{topic_branch}")
-    (integration / "topic.txt").write_text("topic \n", encoding="utf-8")
-    run_git(integration, "add", "topic.txt")
-    integrated_commit = _commit_staged(integration, "whitespace-mismatch squash")
-    run_git(integration, "push", "origin", "main")
-    run_git(integration, "push", "origin", "--delete", topic_branch)
-
-    held = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--integrated-commit",
-        integrated_commit,
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert held.returncode == 0, held.stderr
-    assert "integrated-commit-not-equivalent" in held.stdout
-    assert clone.exists()
-
-
-def test_cleanup_holds_file_directory_tree_path_alias(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    topic = "file-directory-alias-topic"
-    topic_branch = "feature/file-directory-alias"
-    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
-    clone = workspace_module_clone(parent, topic=topic)
-    _commit_file(clone, "foo", "same content\n", "topic file")
-    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
-
-    integration = tmp_path / "file-directory-alias-integration"
-    subprocess.run(
-        ["git", "clone", "--branch", "main", str(remote), str(integration)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    run_git(integration, "config", "user.name", "Test")
-    run_git(integration, "config", "user.email", "test@example.invalid")
-    run_git(integration, "fetch", "origin", topic_branch)
-    run_git(integration, "merge", "--squash", f"origin/{topic_branch}")
-    run_git(integration, "rm", "-f", "foo")
-    (integration / "foo").mkdir()
-    (integration / "foo" / "bar").write_text("same content\n", encoding="utf-8")
-    run_git(integration, "add", "foo/bar")
-    integrated_commit = _commit_staged(integration, "file-directory alias squash")
-    run_git(integration, "push", "origin", "main")
-    run_git(integration, "push", "origin", "--delete", topic_branch)
-
-    held = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--integrated-commit",
-        integrated_commit,
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert held.returncode == 0, held.stderr
-    assert "integrated-commit-not-equivalent" in held.stdout
-    assert clone.exists()
-
-
-def test_cleanup_holds_conflict_resolved_content_different_squash(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    topic = "conflict-resolved-topic"
-    topic_branch = "feature/conflict-resolved"
-    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
-    clone = workspace_module_clone(parent, topic=topic)
-    _commit_file(clone, "topic.txt", "topic\n", "topic change")
-    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
-
-    integration = tmp_path / "conflict-resolved-integration"
-    subprocess.run(
-        ["git", "clone", "--branch", "main", str(remote), str(integration)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    run_git(integration, "config", "user.name", "Test")
-    run_git(integration, "config", "user.email", "test@example.invalid")
-    _commit_file(integration, "topic.txt", "main\n", "main change")
-    run_git(integration, "fetch", "origin", topic_branch)
-    conflict = subprocess.run(
-        ["git", "-C", str(integration), "merge", "--squash", f"origin/{topic_branch}"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    assert conflict.returncode != 0
-    (integration / "topic.txt").write_text("resolved\n", encoding="utf-8")
-    run_git(integration, "add", "topic.txt")
-    integrated_commit = _commit_staged(integration, "conflict-resolved squash")
-    run_git(integration, "push", "origin", "main")
-    run_git(integration, "push", "origin", "--delete", topic_branch)
-
-    held = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--integrated-commit",
-        integrated_commit,
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert held.returncode == 0, held.stderr
-    assert "integrated-commit-not-equivalent" in held.stdout
-    assert clone.exists()
-
-
-def test_cleanup_holds_missing_integrated_commit_oid(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    topic = "missing-oid-topic"
-    topic_branch = "feature/missing-oid"
-    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
-    clone = workspace_module_clone(parent, topic=topic)
-    _commit_file(clone, "topic.txt", "topic\n", "topic change")
-    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
-    _delete_topic_branch(tmp_path, remote, topic_branch, "missing-oid-delete")
-
-    held = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--integrated-commit",
-        "f" * 40,
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert held.returncode == 0, held.stderr
-    assert "integrated-commit-not-found" in held.stdout
-    assert clone.exists()
-
-
-def test_cleanup_holds_unreachable_integrated_commit_oid(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    topic = "unreachable-oid-topic"
-    topic_branch = "feature/unreachable-oid"
-    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
-    clone = workspace_module_clone(parent, topic=topic)
-    topic_tip = _commit_file(clone, "topic.txt", "topic\n", "topic change")
-    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
-    _delete_topic_branch(tmp_path, remote, topic_branch, "unreachable-oid-delete")
-
-    held = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--integrated-commit",
-        topic_tip,
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert held.returncode == 0, held.stderr
-    assert "integrated-commit-not-reachable-from-origin-main" in held.stdout
-    assert clone.exists()
-
-
-def test_cleanup_holds_integrated_commit_before_topic_base(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    advance_remote_main(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    topic = "before-topic-base"
-    topic_branch = "feature/before-topic-base"
-    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
-    clone = workspace_module_clone(parent, topic=topic)
-    _commit_file(clone, "topic.txt", "topic\n", "topic change")
-    integrated_commit = run_git(remote, "rev-parse", "main^")
-
-    held = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--integrated-commit",
-        integrated_commit,
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert held.returncode == 0, held.stderr
-    assert "integrated-commit-not-descendant-of-topic-base" in held.stdout
-    assert clone.exists()
-
-
-def test_cleanup_holds_non_equivalent_integrated_commit(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    topic = "non-equivalent-topic"
-    topic_branch = "feature/non-equivalent-cleanup"
-    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
-    clone = workspace_module_clone(parent, topic=topic)
-    _commit_file(clone, "topic.txt", "topic\n", "topic change")
-    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
-
-    integration = tmp_path / "non-equivalent-integration"
-    subprocess.run(
-        ["git", "clone", "--branch", "main", str(remote), str(integration)],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    integrated_commit = _commit_file(
-        integration,
-        "different.txt",
-        "different\n",
-        "different integration",
-    )
-    run_git(integration, "push", "origin", "main")
-    run_git(integration, "push", "origin", "--delete", topic_branch)
-
-    held = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--integrated-commit",
-        integrated_commit,
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert held.returncode == 0, held.stderr
-    assert "integrated-commit-not-equivalent" in held.stdout
-    assert clone.exists()
-
-
-def test_cleanup_rejects_unpushed_allow_empty_after_same_content_commit(
-    tmp_path: Path,
-) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    topic = "empty-topic-proof"
-    topic_branch = "feature/empty-topic-proof"
-    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
-    clone = workspace_module_clone(parent, topic=topic)
-    _commit_empty(clone, "same content topic commit")
-    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
-    integrated_commit = _integrate_topic(
-        tmp_path,
-        remote,
-        topic_branch,
-        squash=True,
-        delete_topic_branch=True,
-    )
-    _commit_empty(clone, "unpushed allow-empty topic commit")
-
-    held = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--integrated-commit",
-        integrated_commit,
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert held.returncode == 0, held.stderr
-    assert "integrated-commit-empty-topic-without-remote-tip" in held.stdout
-    assert clone.exists()
-
-
-def test_cleanup_holds_dirty_untracked_state_even_with_equivalent_commit(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    topic = "dirty-squash-topic"
-    topic_branch = "feature/dirty-squash-cleanup"
-    assert prepare_workspace(parent, topic=topic, branch=topic_branch).returncode == 0
-    clone = workspace_module_clone(parent, topic=topic)
-    _commit_file(clone, "topic.txt", "topic\n", "topic change")
-    run_git(clone, "push", "origin", f"HEAD:refs/heads/{topic_branch}")
-    integrated_commit = _integrate_topic(
-        tmp_path,
-        remote,
-        topic_branch,
-        squash=True,
-        delete_topic_branch=True,
-    )
-    (clone / "untracked.txt").write_text("must hold\n", encoding="utf-8")
-
-    held = invoke(
-        parent,
-        "cleanup",
-        "--placement",
-        "workspace",
-        "--topic",
-        topic,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--owner-evidence-sha256",
-        owner_evidence_sha(parent),
-        "--integrated-commit",
-        integrated_commit,
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert held.returncode == 0, held.stderr
-    assert "dirty-worktree-index-or-untracked" in held.stdout
-    assert clone.exists()
-
-
-def test_cleanup_removes_reconstructible_module_then_parent_and_topic(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    assert prepare(parent).returncode == 0
-    clone = module_clone(parent)
-    removed = invoke(
-        topic_parent(parent), "cleanup", "--topic", TOPIC, "--module", "vendor/dep",
-        "--expected-clone", str(clone), "--apply", env=cleanup_env(),
-    )
-    assert removed.returncode == 0, removed.stderr
-    assert not clone.exists()
-    parent_removed = invoke(
-        topic_parent(parent), "cleanup", "--topic", TOPIC, "--parent",
-        "--expected-parent", str(topic_parent(parent)), "--apply", env=cleanup_env(),
-    )
-    assert parent_removed.returncode == 0, parent_removed.stderr
-    assert not topic_root(parent).exists()
-
-
-def test_parent_cleanup_reports_stale_marker_before_integrated_proof(
-    tmp_path: Path,
-) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    assert prepare(parent).returncode == 0
-    clone = module_clone(parent)
-    removed = invoke(
-        topic_parent(parent),
-        "cleanup",
-        "--topic",
-        TOPIC,
-        "--module",
-        "vendor/dep",
-        "--expected-clone",
-        str(clone),
-        "--apply",
-        env=cleanup_env(),
-    )
-    assert removed.returncode == 0, removed.stderr
-    parent_clone = topic_parent(parent)
-    run_git(parent_clone, "config", "--local", "--unset", "agent-canon.topic.role")
-    _commit_empty(parent_clone, "unpushed parent allow-empty")
-    integrated_commit = run_git(parent_clone, "rev-parse", "origin/main")
-
-    held = invoke(
-        parent_clone,
-        "cleanup",
-        "--topic",
-        TOPIC,
-        "--parent",
-        "--expected-parent",
-        str(parent_clone),
-        "--integrated-commit",
-        integrated_commit,
-        "--apply",
-        env=cleanup_env(),
-    )
-
-    assert held.returncode == 0, held.stderr
-    marker = "marker-readback=membership-mismatch"
-    proof = "integrated-commit-empty-topic-without-remote-tip"
-    assert marker in held.stdout
-    assert proof in held.stdout
-    assert held.stdout.index(marker) < held.stdout.index(proof)
-    assert parent_clone.exists()
-
-
-def test_parent_cleanup_refuses_identity_invalid_expected_module_path(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    assert prepare(parent).returncode == 0
-    run_git(module_clone(parent), "config", "--local", "agent-canon.topic.branch", "wrong/branch")
-
     result = invoke(
-        topic_parent(parent),
-        "cleanup",
+        parent,
+        "prepare",
         "--topic",
         TOPIC,
-        "--parent",
-        "--expected-parent",
-        str(topic_parent(parent)),
-        "--apply",
-        env=cleanup_env(),
+        "--module",
+        "vendor/dep",
+        "--branch",
+        "feature/foo",
+        "--owner-evidence",
+        "owner-evidence.md",
+        f"--{forbidden}",
+        "x",
     )
-
     assert result.returncode == 2
-    assert "expected module paths exist" in result.stderr
-    assert topic_parent(parent).exists()
+    assert "unrecognized arguments" in result.stderr
 
 
-def test_parent_cleanup_refuses_unknown_topic_entry(tmp_path: Path) -> None:
+def test_prepare_has_no_workspace_continuation_flag(tmp_path: Path) -> None:
+    """workspace-continuation alias/flag must be rejected."""
     remote = create_remote(tmp_path)
     parent = create_parent(tmp_path, remote)
-    assert prepare(parent).returncode == 0
-    shutil.rmtree(module_clone(parent))
-    (topic_root(parent) / "unknown-clone").mkdir()
-
     result = invoke(
-        topic_parent(parent),
-        "cleanup",
+        parent,
+        "prepare",
         "--topic",
         TOPIC,
-        "--parent",
-        "--expected-parent",
-        str(topic_parent(parent)),
-        "--apply",
-        env=cleanup_env(),
+        "--module",
+        "vendor/dep",
+        "--branch",
+        "feature/foo",
+        "--owner-evidence",
+        "owner-evidence.md",
+        "--placement",
+        "workspace-continuation",
     )
-
     assert result.returncode == 2
-    assert "unknown topic entries" in result.stderr
-    assert (topic_root(parent) / "unknown-clone").exists()
-
-
-def test_status_does_not_create_topic_or_clone(tmp_path: Path) -> None:
-    remote = create_remote(tmp_path)
-    parent = create_parent(tmp_path, remote)
-    result = invoke(parent, "status", "--topic", TOPIC)
-    assert result.returncode == 2
-    assert not topic_root(parent).exists()
-    assert not module_clone(parent).exists()
+    assert "unrecognized arguments" in result.stderr

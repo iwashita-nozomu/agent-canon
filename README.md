@@ -285,7 +285,7 @@ template 側で shared canon sourceを直すときは、topic workspace source c
 python3 tools/agent_tools/dependency_module_change.py --root <parent-repo> prepare \
   --topic <topic> --module vendor/agent-canon --branch <source-branch> \
   --owner-evidence <owner-evidence>
-git -C <CONTINUE_PATH> push origin HEAD
+git -C <SOURCE_CLONE> push origin HEAD
 ```
 
 update / branch / PR の詳細は `agents/workflows/agent-canon-pr-workflow.md` を見ます。
