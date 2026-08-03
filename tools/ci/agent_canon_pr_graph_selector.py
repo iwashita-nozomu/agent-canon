@@ -1398,7 +1398,9 @@ def graph_executable(source_root: Path | None) -> Path:
 def surface_manifest_producer(source_root: Path | None) -> Path:
     """Resolve the current source producer injected into trusted-base builds."""
     if source_root is None:
-        candidate = Path(__file__).resolve().parents[1] / "agent_tools" / "surface_manifest.py"
+        candidate = (
+            Path(__file__).resolve().parents[1] / "agent_tools" / "surface_manifest.py"
+        )
     else:
         candidate = source_root / "tools" / "agent_tools" / "surface_manifest.py"
     try:

@@ -163,7 +163,9 @@ def graph_builder_exit_fixture(
     parent.mkdir()
     manifest = parent / "documents" / "runtime" / "shared-runtime-surfaces.toml"
     manifest.parent.mkdir(parents=True)
-    manifest.write_text("version = 1\nprefix = \"vendor/agent-canon\"\n", encoding="utf-8")
+    manifest.write_text(
+        'version = 1\nprefix = "vendor/agent-canon"\n', encoding="utf-8"
+    )
     base = graph_change_fixture(parent, {})
     source_root = root / "builder-source"
     executable = source_root / "tools" / "bin" / "agent-canon"
@@ -439,9 +441,16 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             parent, base = experiment_runner_legacy_base_fixture(Path(tmp_dir))
             legacy_script = (
-                parent / "vendor" / "agent-canon" / "tools" / "agent_tools" / "surface_manifest.py"
+                parent
+                / "vendor"
+                / "agent-canon"
+                / "tools"
+                / "agent_tools"
+                / "surface_manifest.py"
             )
-            self.assertNotIn("normalized-snapshot", legacy_script.read_text(encoding="utf-8"))
+            self.assertNotIn(
+                "normalized-snapshot", legacy_script.read_text(encoding="utf-8")
+            )
             graph_result = write_graph_result(
                 parent,
                 ("changed.py",),
