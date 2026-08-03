@@ -34,6 +34,21 @@ targeted oracle; broad CI/test is regression or packaging evidence only.
 The R5 route has no CPU, integer-index, UUID-prefix, direct-launch, or
 compatibility fallback.
 
+## Default devcontainer boundary
+
+この packet は GPU admission 実験を実行する場合の source authority であり、
+既定 devcontainer の起動要件ではない。default profile は host `sudo`、system
+group、shared lock、`/var/lib/agent-canon/runtime` の bind、provision/readback
+receipt、GPU auto-request を選択しない。`bootstrap-shared-runtime.sh` と
+`finalize-shared-runtime.sh`、scheduler、managed experiment、receipt owner は
+AgentCanon source に保持し、明示 opt-in profile の候補として扱う。
+
+その opt-in profile の命名、host capability、権限境界、Compose projection、
+receipt validation は Issue [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521)
+で follow-up として追跡する。default 境界の authority は linked design/implementation
+であり、default 経路からの非選択は実験機能の wholesale deletion や
+R5 の runner/lifecycle semantics の変更を意味しない。
+
 ## Reviewer responsibility graph
 
 The graph below is the source-review handoff. Each row is one cohesive owner,

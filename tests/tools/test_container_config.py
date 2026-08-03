@@ -57,7 +57,7 @@ def write_devcontainer(root: Path) -> None:
         json.dumps(
             {
                 "name": "${localWorkspaceFolderBasename}-devcontainer",
-                "initializeCommand": "bash vendor/agent-canon/.devcontainer/bootstrap-shared-runtime.sh && AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
+                "initializeCommand": "AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
                 "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
                 "service": "workspace",
                 "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
@@ -81,11 +81,16 @@ def write_compose(
     duplicate_repo_mount: bool = False,
     include_runtime_environment: bool = True,
 ) -> None:
-    """Write a generated Compose projection with a topic-root bind mount."""
+    """Write a generated Compose projection for the fixture's workspace layout."""
     topic_root = root.parent.resolve()
+    direct_repo = topic_root.name == "workspace"
     repo_target = f"/workspace/{root.name}"
     volumes: list[dict[str, str]] = [
-        {"type": "bind", "source": str(topic_root), "target": "/workspace"},
+        {
+            "type": "bind",
+            "source": str(root.resolve() if direct_repo else topic_root),
+            "target": repo_target if direct_repo else "/workspace",
+        },
     ]
     if duplicate_repo_mount:
         volumes.append(
@@ -95,6 +100,8 @@ def write_compose(
         [
             "    environment:",
             "      AGENT_CANON_DEPENDENCY_PROFILE: full",
+            f"      AGENT_CANON_WORKSPACE_LAYOUT: {'direct-repo' if direct_repo else 'managed-topic'}",
+            "      DEVCONTAINER_GPU_MODE: disabled",
             "      AGENT_CANON_WORKSPACE_ROOT: /workspace",
             f"      AGENT_CANON_REPOSITORY_ROOT: {repo_target}",
         ]
@@ -218,6 +225,21 @@ def test_topic_compose_semantics_pass(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_removed_remote_user_contract_is_rejected(tmp_path: Path) -> None:
+    """The default devcontainer does not carry a remote-user contract."""
+    repo = write_topic_fixture(tmp_path)
+    config_path = repo / ".devcontainer/devcontainer.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config.update({"remoteUser": "vscode", "updateRemoteUserUID": True})
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+
+    result = run_validator(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "default-devcontainer-field-forbidden:remoteUser" in result.stdout
+    assert "default-devcontainer-field-forbidden:updateRemoteUserUID" in result.stdout
+
+
 def test_legacy_topic_compose_root_is_rejected(tmp_path: Path) -> None:
     """The checker rejects the removed workspace-<topic-slug> root."""
     repo = write_topic_fixture(tmp_path, topic_root=tmp_path / "workspace-topic")
@@ -282,6 +304,47 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     assert 'ZDOTDIR: "/etc/project-template/zsh"' not in compose
     assert 'SHELL: "/bin/bash"' not in compose
     assert 'command: /bin/bash -lc "sleep infinity"' in compose
+    assert "image: ubuntu:22.04" in compose
+    assert 'DEVCONTAINER_GPU_MODE: "disabled"' in compose
+    assert "DEVCONTAINER_GPU_REQUEST" not in compose
+    assert "NVIDIA_" not in compose
+    assert "gpus: all" not in compose
+    assert "group_add:" not in compose
+    assert "/var/lib/agent-canon/runtime" not in compose
+
+
+def test_generator_direct_repo_mounts_only_repository_root(tmp_path: Path) -> None:
+    """A direct repo layout never exposes sibling repositories under /workspace."""
+    repo = tmp_path / "workspace" / "data_download"
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    home = tmp_path / "home"
+    write_host_zshrc(home)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={"HOME": str(home), **os.environ},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert f'source: "{repo.resolve()}"' in compose
+    assert 'target: "/workspace/data_download"' in compose
+    assert f'source: "{repo.parent.resolve()}"' not in compose
+    assert 'AGENT_CANON_WORKSPACE_LAYOUT: "direct-repo"' in compose
+    assert 'AGENT_CANON_REPOSITORY_ROOT: "/workspace/data_download"' in compose
+    assert compose.count("type: bind") == 1
+    assert load_container_config_module().validate_generated_compose(repo, None) == []
 
 
 def test_generator_accepts_explicit_output_path(tmp_path: Path) -> None:
@@ -494,15 +557,12 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     assert 'target: "/etc/project-template/parent-environment.sh"' in compose
     assert 'target: "/etc/project-template/zsh/.zshrc"' in compose
     assert compose.count("read_only: true") >= 2
-    assert 'HOME: "/tmp/project-template-home"' in compose
+    assert 'HOME: "/tmp/project-template-home"' not in compose
     assert 'ZDOTDIR: "/etc/project-template/zsh"' in compose
     assert 'SHELL: "/bin/zsh"' in compose
     assert 'AGENT_CANON_DEPENDENCY_PROFILE: "full"' in compose
-    assert 'user: "${LOCAL_UID}:${LOCAL_GID}"' in compose
-    assert (
-        "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700"
-        in compose
-    )
+    assert "user:" not in compose
+    assert "tmpfs:" not in compose
     assert 'command: /bin/zsh -lc "sleep infinity"' in compose
     module = load_container_config_module()
     pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
@@ -606,8 +666,8 @@ def test_parent_environment_broken_symlink_fails(tmp_path: Path) -> None:
     assert any(finding.detail == "missing-target" for finding in findings)
 
 
-def test_parent_compose_rejects_malformed_user_and_home_tmpfs(tmp_path: Path) -> None:
-    """Parent Compose requires the exact mapped user and HOME tmpfs scalar."""
+def test_parent_compose_rejects_service_user_and_home_tmpfs(tmp_path: Path) -> None:
+    """Parent Compose keeps the default root runtime free of custom identity mapping."""
     repo = write_parent_generator_fixture(tmp_path)
     (repo / ".agent-canon").mkdir()
     home = tmp_path / "home"
@@ -626,13 +686,13 @@ def test_parent_compose_rejects_malformed_user_and_home_tmpfs(tmp_path: Path) ->
     )
     assert result.returncode == 0, result.stdout + result.stderr
     compose_path = repo / ".agent-canon/docker-compose.generated.yml"
-    malformed = (
-        compose_path.read_text(encoding="utf-8")
-        .replace('user: "${LOCAL_UID}:${LOCAL_GID}"', 'user: "1000:1000"')
-        .replace(
-            "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700",
-            "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=755",
-        )
+    malformed = compose_path.read_text(encoding="utf-8").replace(
+        "    build:\n",
+        '    user: "1000:1000"\n'
+        "    tmpfs:\n"
+        "      - /tmp/project-template-home:uid=1000,gid=1000,mode=700\n"
+        "    build:\n",
+        1,
     )
     compose_path.write_text(malformed, encoding="utf-8")
     module = load_container_config_module()
@@ -642,8 +702,8 @@ def test_parent_compose_rejects_malformed_user_and_home_tmpfs(tmp_path: Path) ->
     details = {
         finding.detail for finding in module.validate_generated_compose(repo, pack)
     }
-    assert "user-mapping-must-be-${LOCAL_UID}:${LOCAL_GID}" in details
-    assert "mapped-uid-home-tmpfs-must-be-exact" in details
+    assert "default-service-user-forbidden" in details
+    assert "default-home-tmpfs-forbidden" in details
 
 
 def test_generator_rejects_runtime_shell_arguments(tmp_path: Path) -> None:

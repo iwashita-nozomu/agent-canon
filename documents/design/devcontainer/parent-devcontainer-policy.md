@@ -11,6 +11,7 @@ downstream implementation ../../../tools/agent_tools/devcontainer_dependencies.p
 downstream implementation ../../../tools/sync_agent_canon.sh materializes AgentCanon root views
 downstream implementation ../../../tools/agent_tools/parent_repo_readiness.py checks the minimum parent structure
 downstream implementation ../../../tools/ci/container_config.py validates parent environment names without shell execution
+downstream implementation ../../../.devcontainer/devcontainer.json selects the default startup profile
 downstream implementation ../../../.devcontainer/generate-runtime-compose.sh mounts parent environment sources and host zshrc
 downstream design parent-dependency-manifest-followup.md declares the parent manifest, pin, and ordering follow-up
 @dependency-end
@@ -58,8 +59,6 @@ startup、host premise の十分条件を証明したことにはなりません
 symlink 先の `devcontainer.json` は、親レポのルートから AgentCanon の実体を
 直接呼び出す。
 
-- bootstrap:
-  `vendor/agent-canon/.devcontainer/bootstrap-shared-runtime.sh`
 - Compose generator:
   `vendor/agent-canon/.devcontainer/generate-runtime-compose.sh`
 - post-create:
@@ -85,14 +84,147 @@ parent script を source します。
 generator は既存の `pack.runtime.shell` を process boundary として使います。親の
 default pack は zsh を選び、明示的な bash pack と smoke shell は bash のままです。
 zsh とその descendants は zsh startup を通じて parent variables を受け取ります。
-Compose が parent variables の値を再定義することはなく、関連する Compose-owned
-environment は `HOME`、`ZDOTDIR`、`SHELL` だけです。mapped UID/GID の `HOME` は
-zsh startup より前に generator が用意する tmpfs（または同等の直接機構）です。
-standalone AgentCanon source layout では host `~/.zshrc`、parent environment mount、
-`HOME`、`ZDOTDIR`、tmpfs を要求せず、pack-derived command だけを生成します。
+Compose が parent variables の値を再定義することはなく、互換性がある場合だけ
+`ZDOTDIR` と `SHELL` を渡します。`HOME` は image の `/home/project` を使い、
+generator は custom HOME tmpfs、service `user`、または AgentCanon-specific group を
+生成せず、repo-docker-pack では host mapped UID/GID を build args として渡します。
+standalone AgentCanon source layout では
+host `~/.zshrc`、parent environment mount、`HOME`、tmpfs を要求せず、pack-derived
+command だけを生成します。
 
 Compose の生成先は親レポの `.agent-canon/docker-compose.generated.yml` とする。
 `.agent-canon/` は親レポの実行状態用であり、生成 Compose を追跡対象にしない。
+
+## 既定起動プロファイルの境界
+
+### 設計フレーム
+
+- audience: AgentCanon maintainer と derived-repo operator
+- decision context: default devcontainer の privilege/runtime boundary
+- first artifact: 本節「既定起動プロファイルの境界」
+- visual plan: default と保持する opt-in candidate の短い列挙（追加図は不要）
+- document split: 同じ owner、reader map、source map、validation route を持つため、この設計文書から分割しない
+- invalid interpretations: experiment framework の wholesale deletion、managed runner semantics の書換え、dependency install-order の変更
+- validation gate: detailed design review と prose/docs check の後に実装 route へ進む
+
+### ユーザー指示による superseding decision
+
+canonical identity は `project` user/group と `PROJECT_UID` / `PROJECT_GID` /
+`PROJECT_USER` で固定する。親の default Dockerfile は digest-pinned plain
+`ubuntu:22.04` base（または同等の標準 Ubuntu 22.04 image）を使い、generator が
+解決した host UID/GID を build args として渡す。公開 caller がこれらの値や user 名を
+override する経路は設けない。linked `devcontainer.json` は #524 canonical contract
+として `containerUser: project` と `remoteUser: project` を設定し、image の
+`USER project` と一致させる。generator は custom HOME tmpfs、AgentCanon-specific
+group、host group mutation を生成しない。
+
+親 Dockerfile は root phase で system package、wgrib2、Python build-time setup と
+`project` user/group、container-local passwordless sudo を準備し、最後に
+`USER project` へ切り替える。post-create の mounted dependency operation は
+container 内 sudo だけを使い、host `sudo` や host group mutation、host password prompt
+は要求しない。bind した workspace 成果物が host の mapped UID/GID owner になることを
+受け入れる。CUDA/GPU image は default に含めず、GPU は既定境界と矛盾しない明示
+opt-in follow-up とする。
+
+### DEV-DEFAULT-001〜DEV-DEFAULT-008: operation -> resulting state -> completion evidence
+
+既定の `devcontainer up` は、利用者の host セッションを変更しない
+unprivileged profile とする。`devcontainer.json` の `initializeCommand` は
+Compose generator だけを呼び、host の `sudo`、system group、または
+`/var/lib/agent-canon/runtime` の事前作成を要求しない。
+default generator は host GPU、`nvidia-smi`、Docker NVIDIA runtime を probe せず、
+生成 environment は `DEVCONTAINER_GPU_MODE=disabled`、`DEVCONTAINER_GPU_REQUEST`
+absent を正本とする。
+
+| clause | operation | resulting state | completion evidence |
+| --- | --- | --- | --- |
+| DEV-DEFAULT-001 | `initializeCommand` から host shared-runtime bootstrap を外し、Compose generator を実行する | 既定起動が `sudo`、`agent-canon-runtime` group、host `/var/lib` に依存しない | `devcontainer.json` の command readback と `devcontainer up` が sudo prompt なしで完了する |
+| DEV-DEFAULT-002 | 既定 Compose の shared-runtime `group_add`、bind、provision/readback receipt environment、custom HOME tmpfs、AgentCanon-specific group を生成せず、host UID/GID を canonical build args として親 image に渡す | generator は host の `id -u`/`id -g` を `PROJECT_UID`/`PROJECT_GID` として渡し、`PROJECT_USER=project` を固定する。公開 caller に override 経路はない。digest-pinned plain `ubuntu:22.04` の親 image は同じ numeric ID の canonical `project` user/group を作り、image の `USER project`、`containerUser: project`、`remoteUser: project` で起動する。container は container-local `/var/lib/agent-canon/runtime` だけを使用し、host の同名 path とは bind/shared しない。host group mutation と host sudo/password prompt は行わない | 生成 Compose/config/image inspection で `PROJECT_UID`/`PROJECT_GID`/`PROJECT_USER`、`project` passwd/group、`USER project`、`containerUser`/`remoteUser` が canonical values を持ち、`group_add`、host runtime bind、shared receipt env、custom HOME tmpfs、AgentCanon group が absent。bind workspace の成果物 owner が host mapped UID/GID と一致し、container 内 runtime path が作成される |
+| DEV-DEFAULT-003 | 既定 generator は host GPU、`nvidia-smi`、Docker NVIDIA runtime の probing を一切行わず、生成 environment に `DEVCONTAINER_GPU_MODE=disabled` を設定し、`DEVCONTAINER_GPU_REQUEST` は absent とする | GPU の有無に関わらず default container creation は GPU admission から独立し、Compose に GPU request を持たない | generator の command/readback に probing が無く、生成 env が `DEVCONTAINER_GPU_MODE=disabled`、`DEVCONTAINER_GPU_REQUEST` absent、`gpus: all` absent である static inspection と no-GPU launch |
+| DEV-DEFAULT-004 | shared post-create から GPU admission finalize、post-attach から shared-runtime readback dependency を default stage として外し、`project` の container-local sudo で通常の dependency/build stages を実行する | dependency manifest、Python installer、AgentCanon build/cache/projection、parent hook が `project` user の mapped UID/GID と passwordless `sudo -n` で system dependency operation を行える順序だけが既定 lifecycle に残る。host sudo/password prompt は要求しない | post-create/post-attach command readback と targeted lifecycle tests が finalize/readback absent を示し、`getent passwd/group project`、`id -u`/`id -g` が `PROJECT_UID/GID` と一致、`sudo -n true`、fixed bootstrap の `gpg` capability、apt dependency bootstrap が pass |
+| DEV-DEFAULT-005 | `bootstrap-shared-runtime.sh`、`finalize-shared-runtime.sh`、scheduler、managed experiment、receipt parser/writer は source に保持し、既定 profile から非選択にする | 実験機能の wholesale deletion は行わず、明示 opt-in profile の候補として再利用可能な状態を保つ | source files が存在し、default path からの reachability test と Issue [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) が follow-up を指す |
+| DEV-DEFAULT-006 | profile boundary、dependency packet、rollback と検証コマンドを owner docs に固定する | 実装者が host bootstrap を復活させずに default/opt-in の責務を判定できる | 本節の DIC trace、dependency-design packet、`container_config.py`/dependency validator/launch smoke の結果を readback する |
+| DEV-DEFAULT-007 | repository path を `managed-topic` または `direct-repo` layout として判定し、layout に対応する mount/status guard を選択する | managed-topic は従来の workspace root bind と topic marker/status guard を保持し、direct-repo は topic marker/status を要求しない | generated env `AGENT_CANON_WORKSPACE_LAYOUT` が layout 名を示し、post-attach が同じ layout を readback する |
+| DEV-DEFAULT-008 | direct-repo では repository root だけを `/workspace/<basename>` に bind し、`devcontainer up --workspace-folder .` を受理する | sibling repository、親 `~/workspace` 全体、topic marker/status を direct default の前提にしない | generated Compose の bind source が exact repo root 一つで、target/env/readback が direct-repo、topic status guard が未実行で起動が完了する |
+
+この変更の不足は、従来の linked config が host provisioning と container runtime
+identity を一つの default lifecycle に結合していた点である。host group の存在や
+現在セッションの supplementary group は、親レポの Python 依存や image build の
+前提ではなく、利用者ごとに異なる privileged host state である。既定起動からこれを
+切り離すことで、権限昇格、固定 GID への依存、host `/var/lib` への永続副作用を除去し、
+GPU を持たない CI/開発 host でも同じ container contract を利用できる。
+
+GPU admission の scheduler、shared lock、runtime receipt そのものは削除しない。
+これらを必要とする実験は、将来の明示的な profile/command が host capability と
+receipt contract を選択したときだけ起動する。既定 profile に opt-in flag を暗黙に
+推測する fallback は設けない。profile の名前、権限境界、lock/receipt の owner、
+validation は本設計の default boundary と矛盾しない別 follow-up として Issue #521
+で追跡する。
+
+## Dependency-design / environment-maintenance packet
+
+| field | decision |
+| --- | --- |
+| requirement | 既定 devcontainer は host `sudo`、system group 作成、host `/var/lib/agent-canon/runtime`、shared-runtime bind/receipt environment、GPU auto-request、finalize、readback receipt に依存せず起動できる |
+| insufficiency | 現在の linked config は Compose 生成前に host bootstrap を呼び、生成 Compose/post-create/post-attach を host group、bind、receipt に結合している。親レポで観測した失敗はこの結合に由来する |
+| rationale | 既定開発は container-local の product/runtime setup とし、GPU admission は異なる host 権限・lifecycle 契約を持つ実験 capability として分離する |
+| security/runtime impact | 既定経路の host privilege escalation、固定 GID/セッション結合、host runtime 永続化を除去する。container-local logs/state と将来の明示 opt-in 実験 capability は保持する |
+| owner / surfaces | AgentCanon は `.devcontainer/devcontainer.json`、`generate-runtime-compose.sh`、`post-create.sh`、`post-attach.sh`、保持する bootstrap/finalize scripts、layout readback を所有する。親は image、`docker/`、parent hook を所有する。Issue #521 は将来の opt-in GPU profile の follow-up を追跡し、既定境界の authority は本設計と実装の clause に置く |
+| dependency/install order | fixed `bootstrap-dependencies.sh`（manifest parser capability と APT repository prerequisite の `gnupg`/`gpg` を先に確立）、親 manifest、vendor manifest、plan validation、topological derived execution、親 Python installer、AgentCanon build/cache/projection の順序を維持する。AgentCanon の package/manifest dependency は追加せず、親 image が digest-pinned Ubuntu 22.04、mapped `project` user/group、container-local sudo を準備する |
+| validation | static `container_config.py`、dependency manifest の validate/dry-run、Docker dependency validator、対象 devcontainer/lifecycle tests、host password prompt なしの親 root `devcontainer up` を実行する。固定 bootstrap は `command -v gpg`/`gpg --version` と `gnupg` capability を確認してから apt repository operation を行い、親 image は base digest、`PROJECT_UID/GID/USER=project`、`USER project`、`containerUser`/`remoteUser`、`sudo -n true`、apt dependency bootstrap、bind workspace owner の host UID/GID 一致を確認する。公開 override が無いこと、managed-topic と direct-repo の layout/mount/readback を検証し、exact command `devcontainer up --workspace-folder .` を direct-repo で実行する。Python/wgrib2 の container smoke は親側 ownership とする |
+| rollback | 旧 linked-command と lifecycle edge は、明示選択された GPU-admission profile の下でのみ復元する。default profile へ host bootstrap を戻さない。rollback evidence は profile selector、host capability contract、receipt readback を含む |
+
+## Design-To-Implementation Trace
+
+| clause | implementation route | reverse evidence / drift block |
+| --- | --- | --- |
+| DEV-DEFAULT-001 | `.devcontainer/devcontainer.json`: select generator-only default initialization | exact command readback; any host bootstrap invocation is a drift blocker |
+| DEV-DEFAULT-002 | `.devcontainer/generate-runtime-compose.sh` / linked config: resolve host UID/GID, pass `PROJECT_UID`/`PROJECT_GID` with fixed `PROJECT_USER=project`, retain canonical `containerUser`/`remoteUser`, omit shared runtime group/bind/receipt env and custom HOME tmpfs; parent image creates `project` and runs as `USER project` | generated Compose/config/image inspection plus `project` ID, `USER`, workspace owner, and container path readback; any missing/mismatched build arg, public override, host runtime source, host bind, custom HOME tmpfs, or AgentCanon group is a drift blocker |
+| DEV-DEFAULT-003 | generator GPU branch: default は host GPU/`nvidia-smi`/Docker NVIDIA runtime を probe せず、`DEVCONTAINER_GPU_MODE=disabled` を出力し、`DEVCONTAINER_GPU_REQUEST` を出力しない | command/env readback と no-GPU launch; probing、`DEVCONTAINER_GPU_REQUEST`、または `gpus: all` が default に現れれば drift blocker |
+| DEV-DEFAULT-004 | `.devcontainer/post-create.sh` and `.devcontainer/post-attach.sh`: remove default finalize/readback edges while retaining ordinary dependency/build stages under `project` with container-local sudo | lifecycle tests, `getent`/`id`/`sudo -n`/apt bootstrap readback, and post-attach output; a default receipt readback dependency, host password prompt, or mismatched workspace owner is a drift blocker |
+| DEV-DEFAULT-005 | retain scripts and experiment owners; record explicit opt-in follow-up in #521 | source existence plus issue link; deletion of scheduler/managed experiment is out of scope and a review blocker |
+| DEV-DEFAULT-006 | update validators/tests and run the packet-selected validation route | command receipts and parent launch readback; missing evidence blocks closeout |
+| DEV-DEFAULT-007 | layout detector and post-attach readback: select managed-topic or direct-repo without changing topic guard semantics | layout env/readback matches source path; a direct repo must not be rejected for missing topic marker, and a managed topic must not bypass its marker/status guard |
+| DEV-DEFAULT-008 | direct-repo mount projection: bind exact repository root to `/workspace/<basename>` and exclude parent workspace/siblings | Compose source/target inspection plus `devcontainer up --workspace-folder .`; any sibling or `~/workspace` bind is a drift blocker |
+
+### Layout selection contract
+
+devcontainer の source path は次の二つだけを持つ。
+
+- `managed-topic`: `workspace/<topic-slug>` lifecycle にある source clone。従来どおり
+  workspace root を `/workspace` に bind し、dependency-module topic marker と status
+  guard を実行する。marker が欠落した managed topic は fail-closed とする。
+- `direct-repo`: `~/workspace/data_download` のように topic lifecycle の外側にある
+  repository root。repository root だけを `/workspace/<basename>` に bind し、親の
+  `~/workspace` 全体、sibling repository、推測した別 root を mount しない。topic
+  marker/status は要求も実行もしない。
+
+generator は `AGENT_CANON_WORKSPACE_LAYOUT=managed-topic|direct-repo` を Compose
+environment に出力する。post-attach は同じ layout を
+`DEPENDENCY_MODULE_CONTAINER_LAYOUT=managed-topic|direct-repo` として readback し、
+`DEPENDENCY_MODULE_CONTAINER_SOURCE` と `DEPENDENCY_MODULE_CONTAINER_TARGET` を
+source/target fields として出力する。direct-repo の readback は topic guard を skip
+した理由と exact repository root/source target を含み、managed-topic の readback は
+marker/status receipt を含む。これらは layout の可視化であり、sibling mount や topic
+guard の weakening を許可する fallback ではない。
+
+### DEV-DEFAULT-002/004 validation-failure-response
+
+ユーザー指示で supersede した root runtime、標準 `vscode`、
+`remoteUser`/`updateRemoteUserUID`、または unresolved `user: ':'` を再導入しない。
+digest-pinned plain Ubuntu 22.04 の `developer` user、host UID/GID build args、
+`USER developer`、container-local sudo を確認する。`dependency bootstrap failed:
+root or sudo is required`、host password prompt、UID/GID mismatch、または workspace
+成果物 owner mismatch を観測した場合は、host privilege の復活ではなく親 image contract
+の failure として扱う。
+
+| field | value |
+| --- | --- |
+| `failing_contract` | `DEV-DEFAULT-002/004 digest-pinned Ubuntu developer identity` |
+| `observation` | `devcontainer up` は container を起動したが、post-create が host UID/GID に対応する `developer` user、container-local sudo、または mapped workspace owner を得られず失敗した |
+| `cause_classification` | `plain Ubuntu 22.04 base, UID/GID build args, developer account, USER developer, or container-local sudo contract missing` |
+| `intent_preservation` | `same-intent owner repair`: parent Dockerfile/devcontainer settings を digest-pinned Ubuntu `developer` contract に戻し、default の host unprivileged boundary、GPU除外、scripts保持を変更しない |
+| `evidence` | base image digest、exact `DEVCONTAINER_USER_UID/GID` build args、`getent passwd/group developer`、`id -u`/`id -g`、`USER developer`、`sudo -n true`、apt bootstrap pass、bind workspace owner が host UID/GID と一致、host sudo/group mutation/password prompt が無いこと |
 
 ## post-create の順序
 
@@ -101,10 +233,13 @@ Compose の生成先は親レポの `.agent-canon/docker-compose.generated.yml` 
 処理へ進まない。親固有処理の失敗も devcontainer 作成の失敗として扱う。
 
 shared post-create の内部順序は
-fixed bootstrap、親 manifest、vendor manifest、全体 validation、
+container-local fixed bootstrap、親 manifest、vendor manifest、全体 validation、
 topological derived execution、親の
 docker/install_python_dependencies.sh、AgentCanon build/cache/projection の順です。
-この shared command の完了後に、devcontainer.json の直接参照が親の
+host shared-runtime bootstrap と GPU admission finalize は既定順序の外側にあり、
+明示 opt-in profile が選択された場合だけ追加されます。その opt-in profile の
+follow-up は Issue #521 で追跡します。この shared command の完了後に、devcontainer.json
+の直接参照が親の
 post-create-parent.sh を最後に実行します。詳細な親側 follow-up は
 parent-dependency-manifest-followup.md に従います。
 

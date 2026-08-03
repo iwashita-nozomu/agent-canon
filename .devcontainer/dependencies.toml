@@ -17,7 +17,7 @@ schema_version = 2
 id = "github-cli"
 package = "gh"
 method = "apt-repository"
-version = "2.93.0"
+version = "2.97.0"
 source = "https://cli.github.com/packages"
 key_url = "https://cli.github.com/packages/githubcli-archive-keyring.gpg"
 key_fingerprint = "2C6106201985B60E6C7AC87323F3D4EA75716059"
@@ -56,7 +56,7 @@ version = "1.61.0"
 source = "https://playwright.dev"
 browser = "chromium"
 browser_cache_path = "/usr/local/share/ms-playwright"
-verification = { kind = "browser-executable", executable_globs = ["chromium-*/chrome-linux/chrome", "chromium-*/chrome-linux64/chrome", "chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell"], args = ["--version"], output_contains = "Chromium" }
+verification = { kind = "browser-executable", executable_globs = ["chromium-*/chrome-linux/chrome", "chromium-*/chrome-linux64/chrome", "chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell"], args = ["--version"], output_contains = "Google Chrome for Testing" }
 deps = ["playwright"]
 provides = ["playwright-chromium"]
 failure_policy = "fail"
@@ -65,8 +65,8 @@ failure_policy = "fail"
 id = "pdflatex"
 package = "texlive-latex-base"
 method = "apt-package"
-version = "2023.20240207-1"
-source = "ubuntu:24.04"
+version = "2021.20220204-1"
+source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = []
 provides = ["pdflatex"]
@@ -76,8 +76,8 @@ failure_policy = "fail"
 id = "latexmk"
 package = "latexmk"
 method = "apt-package"
-version = "1:4.83-1"
-source = "ubuntu:24.04"
+version = "1:4.76-1"
+source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["latexmk"]
@@ -87,8 +87,8 @@ failure_policy = "fail"
 id = "texlive-latex-recommended"
 package = "texlive-latex-recommended"
 method = "apt-package"
-version = "2023.20240207-1"
-source = "ubuntu:24.04"
+version = "2021.20220204-1"
+source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["texlive-latex-recommended"]
@@ -98,8 +98,8 @@ failure_policy = "fail"
 id = "texlive-latex-extra"
 package = "texlive-latex-extra"
 method = "apt-package"
-version = "2023.20240207-1"
-source = "ubuntu:24.04"
+version = "2021.20220204-1"
+source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["texlive-latex-extra"]
@@ -109,8 +109,8 @@ failure_policy = "fail"
 id = "texlive-fonts-recommended"
 package = "texlive-fonts-recommended"
 method = "apt-package"
-version = "2023.20240207-1"
-source = "ubuntu:24.04"
+version = "2021.20220204-1"
+source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["texlive-fonts-recommended"]
@@ -120,8 +120,8 @@ failure_policy = "fail"
 id = "texlive-pictures"
 package = "texlive-pictures"
 method = "apt-package"
-version = "2023.20240207-1"
-source = "ubuntu:24.04"
+version = "2021.20220204-1"
+source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["texlive-pictures"]
@@ -131,8 +131,8 @@ failure_policy = "fail"
 id = "texlive-xetex"
 package = "texlive-xetex"
 method = "apt-package"
-version = "2023.20240207-1"
-source = "ubuntu:24.04"
+version = "2021.20220204-1"
+source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["xelatex"]
@@ -142,8 +142,8 @@ failure_policy = "fail"
 id = "texlive-extra-utils"
 package = "texlive-extra-utils"
 method = "apt-package"
-version = "2023.20240207-1"
-source = "ubuntu:24.04"
+version = "2021.20220204-1"
+source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = ["pdflatex"]
 provides = ["pdfcrop"]
@@ -153,8 +153,8 @@ failure_policy = "fail"
 id = "dvisvgm"
 package = "dvisvgm"
 method = "apt-package"
-version = "3.2.1+ds-1build1"
-source = "ubuntu:24.04"
+version = "2.13.1-1"
+source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = []
 provides = ["dvisvgm"]
@@ -164,8 +164,8 @@ failure_policy = "fail"
 id = "ghostscript"
 package = "ghostscript"
 method = "apt-package"
-version = "10.02.1~dfsg1-0ubuntu7.8"
-source = "ubuntu:24.04"
+version = "9.55.0~dfsg1-0ubuntu5.13"
+source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = []
 provides = ["ghostscript"]
@@ -175,8 +175,8 @@ failure_policy = "fail"
 id = "poppler"
 package = "poppler-utils"
 method = "apt-package"
-version = "24.02.0-1ubuntu9.9"
-source = "ubuntu:24.04"
+version = "22.02.0-2ubuntu0.13"
+source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = []
 provides = ["poppler"]
@@ -186,8 +186,8 @@ failure_policy = "fail"
 id = "jq"
 package = "jq"
 method = "apt-package"
-version = "1.7.1-3build1"
-source = "ubuntu:24.04"
+version = "1.6-2.1ubuntu3.2"
+source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = []
 provides = ["jq"]
@@ -197,8 +197,8 @@ failure_policy = "fail"
 id = "tree"
 package = "tree"
 method = "apt-package"
-version = "2.1.1-2"
-source = "ubuntu:24.04"
+version = "2.0.2-1"
+source = "ubuntu:22.04"
 verification = { kind = "apt-package" }
 deps = []
 provides = ["tree"]
@@ -208,9 +208,9 @@ failure_policy = "fail"
 id = "clang-format"
 package = "clang-format"
 method = "apt-package"
-version = "1:18.0-59~exp2"
-source = "ubuntu:24.04"
-verification = { kind = "apt-package", executable = "clang-format", args = ["--version"], output_contains = "Ubuntu clang-format version 18.1.3" }
+version = "1:14.0-55~exp2"
+source = "ubuntu:22.04"
+verification = { kind = "apt-package", executable = "clang-format", args = ["--version"], output_contains = "Ubuntu clang-format version 14.0.0-1ubuntu1.1" }
 deps = []
 provides = ["clang-format"]
 failure_policy = "fail"
@@ -339,7 +339,7 @@ method = "cargo-source-build"
 version = "0.1.0"
 source = "rust/agent-canon"
 repo = "https://github.com/iwashita-nozomu/agent-canon.git"
-commit = "ec2cae45a57875bfbfcae2148a7d639692fb2934"
+commit = "bf329228968d3d556c378c8a17e4f58d02e03d82"
 locked = true
 verification = { kind = "cargo-binary", path = "target/release/agent-canon", args = ["--version"], output_contains = "agent-canon 0.1.0" }
 deps = ["cargo"]

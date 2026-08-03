@@ -118,6 +118,15 @@ owning them. It reads `docker/packs/default.toml`, builds the repo-local
 Compose service, and runs repo-local `docker/install_python_dependencies.sh`
 after the workspace is mounted.
 
+The default parent image contract is a digest-pinned plain `ubuntu:22.04` base.
+The generator passes host-resolved or explicitly validated numeric
+`DEVCONTAINER_USER_UID` / `DEVCONTAINER_USER_GID` build args to the parent image;
+the image creates the generic `developer` user/group with those IDs, runs as
+`USER developer`, and exposes passwordless container-local `sudo -n` for mounted
+dependency installation. This does not invoke host `sudo`, prompt for a host
+password, mutate host groups, or add an AgentCanon-specific group. Workspace bind
+outputs are expected to carry the host mapped UID/GID owner.
+
 `devcontainer.json` must not use a fixed AgentCanon display name for every
 parent repository. The generated Compose file must also set a top-level project
 `name` derived from the repository path, while allowing an explicit
@@ -140,6 +149,20 @@ root を一度だけ `/workspace` に bind mountし、`AGENT_CANON_WORKSPACE_ROO
 の二重 mount、host absolute path の tracked config への書き込みは行いません。
 `/workspace` mount または dependency tool の欠落は startup design error として
 post-attach と `tools/ci/container_config.py` が報告します。
+
+Topic workspace の外側にある既存 repository checkout は `direct-repo` layout の
+canonical exception として扱います。direct-repo は exact repository root だけを
+`/workspace/<basename>` に bind し、親 `~/workspace` 全体、sibling clone、推測した
+別 path を mount しません。dependency-module topic marker/status guard は
+direct-repo では要求・実行せず、managed-topic では従来どおり必須です。
+
+generator は `AGENT_CANON_WORKSPACE_LAYOUT=managed-topic|direct-repo` を Compose
+environment に出力し、post-attach は `DEPENDENCY_MODULE_CONTAINER_LAYOUT`、
+`DEPENDENCY_MODULE_CONTAINER_SOURCE`、`DEPENDENCY_MODULE_CONTAINER_TARGET` と
+exact source/target を readback します。direct-repo の acceptance command は
+`devcontainer up --workspace-folder .` であり、layout env/readback が一致しない、
+source が repository root 以外、または sibling/parent workspace が bind された場合は
+startup design failure です。
 
 ## VS Code surface の責務境界
 

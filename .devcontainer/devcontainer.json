@@ -12,7 +12,7 @@
     "@dependency-end"
   ],
   "name": "${localWorkspaceFolderBasename}-devcontainer",
-  "initializeCommand": "bash vendor/agent-canon/.devcontainer/bootstrap-shared-runtime.sh && AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
+  "initializeCommand": "AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
   "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
   "service": "workspace",
   "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",

@@ -6,7 +6,8 @@
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable shared runtime surface ownership
 # upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell boundary
-# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md exact runtime identity validation contract
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md opt-in GPU runtime identity contract
 # upstream design ../../documents/design/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
 # upstream design ../../documents/tools/lean_proof_env.md Lean proof environment toolchain boundary
@@ -417,7 +418,7 @@ def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
     findings: list[Finding] = []
     expected_json = {
         "name": "${localWorkspaceFolderBasename}-devcontainer",
-        "initializeCommand": "bash vendor/agent-canon/.devcontainer/bootstrap-shared-runtime.sh && AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
+        "initializeCommand": "AGENT_CANON_DEVCONTAINER_REPO_ROOT=. AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml bash vendor/agent-canon/.devcontainer/generate-runtime-compose.sh",
         "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
         "service": "workspace",
         "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
@@ -431,6 +432,15 @@ def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
                     "inconsistency",
                     ".devcontainer/devcontainer.json",
                     f"{key}-expected:{expected}",
+                )
+            )
+    for key in ("remoteUser", "updateRemoteUserUID"):
+        if key in config:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".devcontainer/devcontainer.json",
+                    f"default-devcontainer-field-forbidden:{key}",
                 )
             )
     return findings
@@ -453,11 +463,67 @@ def validate_devcontainer_workspace(
 
 
 def validate_generate_runtime_compose_script(root: Path) -> list[Finding]:
-    """Require the generator at its AgentCanon source path."""
+    """Require the default generator and reject opt-in-only runtime edges."""
     script_path = shared_devcontainer_dir(root) / "generate-runtime-compose.sh"
     if not script_path.is_file():
         return [Finding("missing_file", f"{script_path.relative_to(root)}", "missing")]
-    return []
+    text = script_path.read_text(encoding="utf-8")
+    forbidden = (
+        "bootstrap-shared-runtime.sh",
+        "finalize-shared-runtime.sh",
+        "DEVCONTAINER_GPU_REQUEST",
+        "nvidia-smi",
+        "/dev/nvidia",
+        "gpus: all",
+        "group_add:",
+        "/var/lib/agent-canon/runtime",
+        "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
+        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT",
+    )
+    return [
+        Finding(
+            "dependency_contract_violation",
+            str(script_path.relative_to(root)),
+            f"default-generator-forbidden:{marker}",
+        )
+        for marker in forbidden
+        if marker in text
+    ]
+
+
+def validate_default_lifecycle_scripts(root: Path) -> list[Finding]:
+    """Reject retained opt-in runtime edges from the default lifecycle scripts."""
+    shared_dir = shared_devcontainer_dir(root)
+    findings: list[Finding] = []
+    post_create = shared_dir / "post-create.sh"
+    if post_create.is_file():
+        text = post_create.read_text(encoding="utf-8")
+        if "finalize-shared-runtime.sh" in text:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    str(post_create.relative_to(root)),
+                    "default-post-create-forbidden:finalize-shared-runtime.sh",
+                )
+            )
+    post_attach = shared_dir / "post-attach.sh"
+    if post_attach.is_file():
+        text = post_attach.read_text(encoding="utf-8")
+        for marker in (
+            "shared-runtime-readback.json",
+            "nvidia-smi",
+            "/dev/nvidia",
+        ):
+            if marker in text:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        str(post_attach.relative_to(root)),
+                        f"default-post-attach-forbidden:{marker}",
+                    )
+                )
+    return findings
 
 
 def parse_parent_environment_exports(path: Path) -> tuple[tuple[str, ...], list[str]]:
@@ -591,8 +657,14 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
     root = root.resolve()
     topic_root = root.parent.resolve()
     repo_target = f"/workspace/{root.name}"
+    if topic_root.name == "workspace":
+        expected_workspace_layout = "direct-repo"
+    elif topic_root.parent.name == "workspace":
+        expected_workspace_layout = "managed-topic"
+    else:
+        expected_workspace_layout = None
     findings: list[Finding] = []
-    if topic_root.parent.name != "workspace":
+    if expected_workspace_layout is None:
         if topic_root.name.startswith("workspace-"):
             findings.append(
                 Finding(
@@ -656,31 +728,88 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         candidate = Path(source)
         return (candidate if candidate.is_absolute() else root / candidate).resolve()
 
+    environment = as_mapping(service.get("environment"))
+    workspace_layout = (
+        environment.get("AGENT_CANON_WORKSPACE_LAYOUT")
+        if environment is not None
+        else None
+    )
+    if not isinstance(workspace_layout, str) or workspace_layout not in {
+        "managed-topic",
+        "direct-repo",
+    }:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "workspace-layout-environment-required",
+            )
+        )
+    elif expected_workspace_layout is not None and (
+        workspace_layout != expected_workspace_layout
+    ):
+        findings.append(
+            Finding(
+                "inconsistency",
+                relative,
+                f"workspace-layout:{workspace_layout}",
+            )
+        )
+
     workspace_mounts: list[tuple[str | None, str | None]] = []
     for raw_volume in volumes:
         source, target = volume_fields(raw_volume)
         if target == "/workspace":
             workspace_mounts.append((source, target))
-    if len(workspace_mounts) != 1:
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                relative,
-                f"workspace-mount-count:{len(workspace_mounts)}",
-            )
-        )
-    elif source_path(workspace_mounts[0][0]) != topic_root:
-        findings.append(
-            Finding("dependency_contract_violation", relative, "workspace-source")
-        )
-    for raw_volume in volumes:
-        source, target = volume_fields(raw_volume)
-        if source_path(source) == root or target == repo_target:
+    if expected_workspace_layout == "managed-topic":
+        if len(workspace_mounts) != 1:
             findings.append(
                 Finding(
-                    "dependency_contract_violation", relative, "repository-double-mount"
+                    "dependency_contract_violation",
+                    relative,
+                    f"workspace-mount-count:{len(workspace_mounts)}",
                 )
             )
+        elif source_path(workspace_mounts[0][0]) != topic_root:
+            findings.append(
+                Finding("dependency_contract_violation", relative, "workspace-source")
+            )
+        for raw_volume in volumes:
+            source, target = volume_fields(raw_volume)
+            if source_path(source) == root or target == repo_target:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation", relative, "repository-double-mount"
+                    )
+                )
+    elif expected_workspace_layout == "direct-repo":
+        direct_mounts = [
+            raw_volume
+            for raw_volume in volumes
+            if volume_fields(raw_volume)[1] == repo_target
+        ]
+        if len(direct_mounts) != 1:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    f"direct-repo-mount-count:{len(direct_mounts)}",
+                )
+            )
+        elif source_path(volume_fields(direct_mounts[0])[0]) != root:
+            findings.append(
+                Finding("dependency_contract_violation", relative, "direct-repo-source")
+            )
+        for raw_volume in volumes:
+            source, target = volume_fields(raw_volume)
+            if source_path(source) == topic_root or target == "/workspace":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "direct-repo-workspace-leak",
+                    )
+                )
     parent_layout = (root / "vendor" / "agent-canon").is_dir()
     expected_shell = pack.shell if pack is not None else "/bin/bash"
     if service.get("command") != f'{expected_shell} -lc "sleep infinity"':
@@ -691,6 +820,48 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                 f"runtime-shell-command:{expected_shell}",
             )
         )
+    if "user" in service:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "default-service-user-forbidden",
+            )
+        )
+    if "tmpfs" in service:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "default-home-tmpfs-forbidden",
+            )
+        )
+    if "group_add" in service:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "default-shared-runtime-field-forbidden:group_add",
+            )
+        )
+    if "gpus" in service:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "default-gpu-field-forbidden:gpus",
+            )
+        )
+    for raw_volume in volumes:
+        _source, target = volume_fields(raw_volume)
+        if target == "/var/lib/agent-canon/runtime":
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "default-shared-runtime-field-forbidden:runtime-bind",
+                )
+            )
     if parent_layout:
         required_mounts = ["/etc/project-template/zsh/.zshrc"]
         if parent_environment_enabled(root):
@@ -736,42 +907,21 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                             "host-zshrc-source-must-be-${HOME}/.zshrc",
                         )
                     )
-        if service.get("user") != "${LOCAL_UID}:${LOCAL_GID}":
-            findings.append(
-                Finding(
-                    "inconsistency",
-                    relative,
-                    "user-mapping-must-be-${LOCAL_UID}:${LOCAL_GID}",
-                )
-            )
-        tmpfs = as_sequence(service.get("tmpfs"))
-        expected_tmpfs = (
-            "/tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700"
-        )
-        if tmpfs is None or expected_tmpfs not in tmpfs:
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    relative,
-                    "mapped-uid-home-tmpfs-must-be-exact",
-                )
-            )
     required_environment = {
         "AGENT_CANON_DEPENDENCY_PROFILE": (
             pack.dependency_profile if pack is not None else DEFAULT_DEPENDENCY_PROFILE
         ),
+        "AGENT_CANON_WORKSPACE_LAYOUT": expected_workspace_layout or "<invalid>",
         "AGENT_CANON_WORKSPACE_ROOT": "/workspace",
         "AGENT_CANON_REPOSITORY_ROOT": repo_target,
     }
     if parent_layout:
         required_environment.update(
             {
-                "HOME": "/tmp/project-template-home",
                 "ZDOTDIR": "/etc/project-template/zsh",
                 "SHELL": pack.shell if pack is not None else "/bin/bash",
             }
         )
-    environment = as_mapping(service.get("environment"))
     if environment is None:
         for name in required_environment:
             findings.append(
@@ -782,6 +932,38 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                 )
             )
     else:
+        if environment.get("DEVCONTAINER_GPU_MODE") != "disabled":
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "default-gpu-mode-must-be-disabled",
+                )
+            )
+        forbidden_environment = (
+            "DEVCONTAINER_GPU_REQUEST",
+            "NVIDIA_VISIBLE_DEVICES",
+            "NVIDIA_DRIVER_CAPABILITIES",
+            "AGENT_CANON_RUNTIME_ROUTE",
+            "AGENT_CANON_RUNTIME_GID",
+            "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT",
+        )
+        for name in forbidden_environment:
+            if name in environment:
+                category = (
+                    "default-gpu-field-forbidden"
+                    if name.startswith(("DEVCONTAINER_GPU", "NVIDIA_"))
+                    else "default-shared-runtime-field-forbidden"
+                )
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"{category}:{name}",
+                    )
+                )
         for name, expected in required_environment.items():
             if name not in environment:
                 findings.append(
@@ -830,6 +1012,7 @@ def validate_devcontainer(root: Path) -> list[Finding]:
     findings.extend(validate_devcontainer_json(config))
     findings.extend(validate_generate_runtime_compose_script(root))
     findings.extend(validate_post_create(root))
+    findings.extend(validate_default_lifecycle_scripts(root))
     dependency_module_change = (
         shared_agent_tools_dir(root) / "dependency_module_change.py"
     )

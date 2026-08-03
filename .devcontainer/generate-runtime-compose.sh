@@ -6,7 +6,8 @@
 # upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract
 # upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell boundary
 # upstream implementation ../tools/agent_tools/dependency_module_change.py topic clone lifecycle tool
-# upstream design ../documents/experiments/gpu-admission-r5-source-packet.md exact Compose runtime identity wiring
+# upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
+# upstream design ../documents/experiments/gpu-admission-r5-source-packet.md opt-in GPU runtime identity wiring
 # upstream environment devcontainer.json initializeCommand entrypoint
 # @dependency-end
 
@@ -20,7 +21,9 @@ workspace_root="$(cd "${repo_root}/.." && pwd -P)"
   exit 1
 }
 workspace_parent="$(cd "${workspace_root}/.." && pwd -P)"
-if [ "$(basename "$workspace_parent")" != "workspace" ]; then
+if [ "$(basename "$workspace_root")" = "workspace" ]; then
+  workspace_layout="direct-repo"
+elif [ "$(basename "$workspace_parent")" != "workspace" ]; then
   case "$(basename "$workspace_root")" in
     workspace-*)
       printf 'devcontainer rejects legacy workspace-<topic-slug> root: %s\n' "$workspace_root" >&2
@@ -30,6 +33,8 @@ if [ "$(basename "$workspace_parent")" != "workspace" ]; then
       ;;
   esac
   exit 1
+else
+  workspace_layout="managed-topic"
 fi
 repo_basename="$(basename "$repo_root")"
 container_repo_root="/workspace/${repo_basename}"
@@ -151,16 +156,17 @@ if [[ "$runtime_shell" != /* || "$runtime_shell" == *[!A-Za-z0-9._/-]* ]]; then
   exit 1
 fi
 
-workspace_root_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$workspace_root")"
+workspace_mount_source="$workspace_root"
+workspace_mount_target="/workspace"
+if [ "$workspace_layout" = "direct-repo" ]; then
+  workspace_mount_source="$repo_root"
+  workspace_mount_target="$container_repo_root"
+fi
+workspace_mount_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$workspace_mount_source")"
 volume_lines=(
   "      - type: bind"
-  "        source: ${workspace_root_yaml}"
-  '        target: "/workspace"'
-)
-volume_lines+=(
-  "      - type: bind"
-  "        source: /var/lib/agent-canon/runtime"
-  "        target: /var/lib/agent-canon/runtime"
+  "        source: ${workspace_mount_source_yaml}"
+  "        target: \"${workspace_mount_target}\""
 )
 if [ "$parent_layout" = true ]; then
   volume_lines+=(
@@ -230,76 +236,23 @@ if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
   volume_lines+=("      - ${SSH_AUTH_SOCK}:/ssh-agent")
 fi
 
-host_gpu_visible() {
-  [ -e /dev/nvidiactl ] && return 0
-  command -v nvidia-smi >/dev/null 2>&1 && nvidia-smi -L >/dev/null 2>&1
-}
-
-docker_gpu_runtime_available() {
-  command -v docker >/dev/null 2>&1 || return 1
-  docker info --format '{{json .Runtimes}}' 2>/dev/null | grep -q '"nvidia"'
-}
-
-gpu_request_raw="${DEVCONTAINER_GPU_REQUEST:-auto}"
-gpu_request="auto"
-gpu_mode="unavailable"
-gpu_notice="host-gpu-not-visible"
-case "$gpu_request_raw" in
-  auto | "")
-    if host_gpu_visible; then
-      if docker_gpu_runtime_available; then
-        gpu_mode="enabled"
-        gpu_notice="docker-nvidia-runtime-available"
-      else
-        gpu_notice="docker-nvidia-runtime-unavailable"
-      fi
-    fi
-    ;;
-  disabled | off | false | FALSE | 0)
-    gpu_request="disabled"
-    gpu_mode="disabled"
-    gpu_notice="disabled-by-request"
-    ;;
-  enabled | on | true | TRUE | 1)
-    gpu_request="enabled"
-    if host_gpu_visible && docker_gpu_runtime_available; then
-      gpu_mode="enabled"
-      gpu_notice="docker-nvidia-runtime-available"
-    elif host_gpu_visible; then
-      gpu_notice="docker-nvidia-runtime-unavailable"
-    fi
-    ;;
-  *)
-    printf 'devcontainer gpu request ignored: DEVCONTAINER_GPU_REQUEST must be auto, enabled, or disabled\n' >&2
-    if host_gpu_visible && docker_gpu_runtime_available; then
-      gpu_mode="enabled"
-      gpu_notice="docker-nvidia-runtime-available"
-    fi
-    ;;
-esac
-
-if [ "$gpu_mode" = "unavailable" ]; then
-  printf 'devcontainer gpu unavailable: %s; continuing without gpus: all\n' "$gpu_notice" >&2
-fi
+gpu_mode="disabled"
+gpu_notice="default-profile-disabled"
 
 environment_lines=(
   "      DEVCONTAINER_RUNTIME_MODE: \"${compose_mode}\""
   "      DEVCONTAINER_GPU_MODE: \"${gpu_mode}\""
   "      DEVCONTAINER_GPU_NOTICE: \"${gpu_notice}\""
-  "      DEVCONTAINER_GPU_REQUEST: \"${gpu_request}\""
   "      AGENT_CANON_SECRET_MOUNT: \"${secret_target}\""
   "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
   "      AGENT_CANON_DEPENDENCY_PROFILE: \"${dependency_profile}\""
-  '      AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"'
+  "      AGENT_CANON_WORKSPACE_LAYOUT: \"${workspace_layout}\""
   '      AGENT_CANON_WORKSPACE_ROOT: "/workspace"'
   "      AGENT_CANON_REPOSITORY_ROOT: \"${container_repo_root}\""
-  '      AGENT_CANON_SHARED_RUNTIME_SOURCE: "/var/lib/agent-canon/runtime"'
-  '      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: "/var/lib/agent-canon/runtime/shared-runtime-provision.json"'
   "${pack_environment_lines[@]}"
 )
 if [ "$parent_layout" = true ]; then
   environment_lines=(
-    '      HOME: "/tmp/project-template-home"'
     '      ZDOTDIR: "/etc/project-template/zsh"'
     "      SHELL: \"${runtime_shell}\""
     "${environment_lines[@]}"
@@ -308,45 +261,28 @@ fi
 if [ -n "${SSH_AUTH_SOCK:-}" ] && [ -S "${SSH_AUTH_SOCK}" ]; then
   environment_lines+=('      SSH_AUTH_SOCK: "/ssh-agent"')
 fi
-if [ "$gpu_mode" = "enabled" ]; then
-  environment_lines+=(
-    "      NVIDIA_VISIBLE_DEVICES: all"
-    '      NVIDIA_DRIVER_CAPABILITIES: "compute,utility"'
-  )
-fi
-
 mkdir -p "$(dirname "$compose_output")"
 
 {
   printf 'name: %s\n' "$compose_project_name"
   printf 'services:\n'
   printf '  workspace:\n'
-  printf '    user: "${LOCAL_UID}:${LOCAL_GID}"\n'
-  printf '    group_add:\n'
-  printf '      - "${AGENT_CANON_RUNTIME_GID}"\n'
   if [ "$compose_mode" = "repo-docker-pack" ]; then
     printf '    build:\n'
     printf '      context: ..\n'
     printf '      dockerfile: %s\n' "$dockerfile"
   else
-    printf '    image: mcr.microsoft.com/devcontainers/base:ubuntu-22.04\n'
+    printf '    image: ubuntu:22.04\n'
   fi
   printf '    working_dir: %s\n' "$container_repo_root"
-  if [ "$parent_layout" = true ]; then
-    printf '    tmpfs:\n'
-    printf '      - /tmp/project-template-home:uid=${LOCAL_UID},gid=${LOCAL_GID},mode=700\n'
-  fi
   printf '    volumes:\n'
   printf '%s\n' "${volume_lines[@]}"
   printf '    command: %s -lc "sleep infinity"\n' "$runtime_shell"
   printf '    tty: true\n'
   printf '    init: true\n'
-  if [ "$gpu_mode" = "enabled" ]; then
-    printf '    gpus: all\n'
-  fi
   printf '    environment:\n'
   printf '%s\n' "${environment_lines[@]}"
 } > "$compose_output"
 
 
-printf 'devcontainer runtime generated: name=%s gpu=%s mode=%s network=auto secret_mount=%s pack=%s\n' "$compose_project_name" "$gpu_mode" "$compose_mode" "$secret_mount_status" "$pack"
+printf 'devcontainer runtime generated: name=%s layout=%s gpu=%s mode=%s network=auto secret_mount=%s pack=%s\n' "$compose_project_name" "$workspace_layout" "$gpu_mode" "$compose_mode" "$secret_mount_status" "$pack"

@@ -200,21 +200,28 @@ decide which repo-specific documents appear in root `documents/`.
 Its minimum shared shape is the symlink
 `.devcontainer/devcontainer.json -> ../vendor/agent-canon/.devcontainer/devcontainer.json`
 and any parent-specific source such as `post-create-parent.sh`. The linked config
-calls shared scripts directly under `vendor/agent-canon/.devcontainer/`; parent
-wrappers and copied shared scripts are not part of the surface. Generated Compose
-is written to the ignored parent state path `.agent-canon/docker-compose.generated.yml`.
+calls the default Compose generator, post-create, and post-attach stages directly
+under `vendor/agent-canon/.devcontainer/`; parent wrappers and copied shared scripts
+are not part of the surface. Generated Compose is written to the ignored parent state
+path `.agent-canon/docker-compose.generated.yml`.
 
 The devcontainer consumes repo-local `docker/Dockerfile`,
 `docker/packs/default.toml`, and `docker/install_python_dependencies.sh`; it does
 not make `docker/` AgentCanon-owned.
 
 GPU admission runtime identity scripts (`bootstrap-shared-runtime.sh`,
-`finalize-shared-runtime.sh`, `post-attach.sh`) remain in AgentCanon source and are
-invoked from the linked config by their direct `vendor/agent-canon/.devcontainer/`
-paths. The exact
-receipt paths and parser/writer ownership are defined by
+`finalize-shared-runtime.sh`) remain in AgentCanon source but are not selected by the
+default linked config. The default profile does not create a host runtime group,
+mount `/var/lib/agent-canon/runtime`, add `group_add`, probe host GPU/NVIDIA runtime,
+request `gpus: all`, or depend on provision/readback receipts. It emits
+`DEVCONTAINER_GPU_MODE=disabled` and leaves `DEVCONTAINER_GPU_REQUEST` absent. Their
+exact receipt paths and parser/writer ownership remain defined by
 `documents/experiments/gpu-admission-r5-source-packet.md` and
-`agent-canon-environment.toml`.
+`agent-canon-environment.toml` for a future explicit opt-in profile tracked in Issue
+[#521](https://github.com/iwashita-nozomu/agent-canon/issues/521); that issue is a
+follow-up tracker, not the authority for this default boundary. Keeping these scripts,
+the experiment scheduler, and managed experiment functionality is intentional; this
+boundary is not a wholesale deletion.
 
 `parent-hook` must not replace AgentCanon shared stages. The linked config runs
 `vendor/agent-canon/.devcontainer/post-create.sh` first, then

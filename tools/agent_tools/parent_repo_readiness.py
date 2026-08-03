@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Checks whether a parent repository satisfies AgentCanon runtime expectations.
+# responsibility Checks whether a parent repository satisfies AgentCanon default runtime expectations.
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml root surface ownership manifest
 # upstream design ../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md parent update checklist
-# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md runtime identity receipt consumer boundary
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
+# upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md opt-in GPU runtime identity boundary
 # upstream implementation ./surface_manifest.py parses shared runtime surface manifests
 # upstream implementation ../ci/container_config.py validates parent Docker/devcontainer surfaces
 # upstream implementation ../../.devcontainer/devcontainer.json selects the shared runtime sources

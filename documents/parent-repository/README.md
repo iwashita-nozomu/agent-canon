@@ -137,6 +137,10 @@ AgentCanon の実体パスを直接呼び出します。
   `vendor/agent-canon/.devcontainer/` を直接呼ぶ。
 - `post-create-parent.sh` は shared post-create の成功後に呼ぶ親固有 source とする。
 - Compose の生成物は親の `.agent-canon/docker-compose.generated.yml` に置く。
+- 親 image は digest-pinned plain `ubuntu:22.04` を基礎とし、host UID/GID build args
+  `DEVCONTAINER_USER_UID` / `DEVCONTAINER_USER_GID` から汎用 `developer` user/group
+  を作る。container-local passwordless sudo は mounted dependency の導入にだけ使い、
+  host sudo、host password prompt、host group mutation は要求しない。
 - 親の default pack が zsh を選ぶ場合、generator は pack の `runtime.shell` を
   process boundary とし、host の `${HOME}/.zshrc` expression を read-only mount
   する。parent environment pair が有効な場合だけ、その shell source も read-only
@@ -162,6 +166,22 @@ devcontainer は topic root を `/workspace` に一度だけ mount します。�
 依存 clone を個別に mount したり、別 topic の clone を runtime に混ぜたり
 しません。作業完了後、再現に不要な clone は削除対象ですが、未統合 commit や
 ユーザー所有差分がある clone は保持してから判断します。
+
+### Direct-repo exception
+
+依存 module の topic lifecycle 外にある既存 checkout（例:
+`~/workspace/data_download`）は `direct-repo` layout として起動できます。この場合、
+devcontainer は exact repository root だけを `/workspace/<basename>` に bind し、親の
+`~/workspace` 全体、sibling repository、推測した別 path を mount しません。direct-repo
+では dependency-module topic marker/status guard を要求・実行しませんが、managed-topic
+の guard を弱める経路にはなりません。
+
+generator は `AGENT_CANON_WORKSPACE_LAYOUT=direct-repo` を出力し、post-attach は
+`DEPENDENCY_MODULE_CONTAINER_LAYOUT=direct-repo`、
+`DEPENDENCY_MODULE_CONTAINER_SOURCE`、`DEPENDENCY_MODULE_CONTAINER_TARGET` を
+readback します。direct path の acceptance command は
+`devcontainer up --workspace-folder .` です。managed-topic は従来どおり topic root
+bind と marker/status guard を使います。
 
 ## 構造確認
 
