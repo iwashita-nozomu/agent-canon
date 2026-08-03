@@ -554,6 +554,21 @@ skill_dependencies:
     successors: []
     order_constraints: []
     parallel_independent: []
+  parent-repository-audit:
+    responsibility_group: delivery
+    required_prerequisites:
+    - agent-orchestration
+    - codex-task-workflow
+    - structure-refactor
+    - dependency-analysis
+    - subagent-bootstrap
+    routing_candidates:
+    - change-review
+    - document-canon-cleanup
+    - tool-finding-report
+    successors: []
+    order_constraints: []
+    parallel_independent: []
   document-canon-cleanup:
     responsibility_group: documents
     required_prerequisites: []

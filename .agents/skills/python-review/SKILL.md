@@ -2,7 +2,7 @@
 name: python-review
 description: "Python 差分を pyright、pytest、ruff、型境界、API 挙動、OOP 可読性根拠で厳密に確認する。"
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"91d437606477bab2dcb9701c9b66d93ac2e25bff7a4356ee5e59f4efb740ef09"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"f260411e9dcd18f6c08388d2a7610e4dd22b695ca80de3ccade58b0c9151ac9b"} -->
 
 <!--
 @dependency-start
