@@ -20,20 +20,20 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from tools.agent_tools.repository_topic_clone import (
+from repository_topic_clone import (
     RepositoryTopicCloneError,
     RepositoryTopicCloneRequest,
     computed_clone_path,
     projected_clone_path,
     topic_slug,
 )
-from tools.agent_tools.repository_topic_clone import (
+from repository_topic_clone import (
     cleanup as generic_cleanup,
 )
-from tools.agent_tools.repository_topic_clone import (
+from repository_topic_clone import (
     merge_main as generic_merge_main,
 )
-from tools.agent_tools.repository_topic_clone import (
+from repository_topic_clone import (
     request as generic_request,
 )
 

@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +23,7 @@ TOPIC = "dependency-module-change"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "dependency_module_change.py"
+GENERIC_TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "repository_topic_clone.py"
 
 
 def run_git(path: Path, *args: str) -> str:
@@ -132,7 +134,7 @@ def create_parent(
 def invoke(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
     """Run the dependency module adapter with provided command arguments."""
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(PROJECT_ROOT)
+    env.pop("PYTHONPATH", None)
     return subprocess.run(
         [sys.executable, str(TOOL), "--root", str(root), *args],
         check=False,
@@ -140,6 +142,76 @@ def invoke(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         text=True,
         env=env,
     )
+
+
+def install_public_cli_surface(root: Path, *, derived: bool) -> Path:
+    """Install the canonical CLI/library pair in one fresh source surface."""
+    tools_root = root / "tools"
+    source_tools = root / "vendor" / "agent-canon" / "tools" if derived else tools_root
+    agent_tools = source_tools / "agent_tools"
+    agent_tools.mkdir(parents=True)
+    shutil.copy2(TOOL, agent_tools / TOOL.name)
+    shutil.copy2(GENERIC_TOOL, agent_tools / GENERIC_TOOL.name)
+    if derived:
+        tools_root.mkdir(parents=True)
+        (tools_root / "agent-canon").symlink_to(
+            Path("../vendor/agent-canon/tools"),
+            target_is_directory=True,
+        )
+        source_tools = tools_root / "agent-canon"
+    return source_tools / "agent_tools" / TOOL.name
+
+
+@pytest.mark.parametrize("derived", (False, True))
+def test_public_cli_help_and_status_from_fresh_source_surfaces(
+    tmp_path: Path,
+    derived: bool,
+) -> None:
+    """Run public help and status without ambient package context."""
+    root = tmp_path / ("derived" if derived else "standalone")
+    root.mkdir()
+    executable = install_public_cli_surface(root, derived=derived)
+    (root / ".gitmodules").write_text(
+        '[submodule "dependency-0"]\n'
+        "\tpath = vendor/dep\n"
+        "\turl = https://example.invalid/dep.git\n",
+        encoding="utf-8",
+    )
+    env = os.environ.copy()
+    env.pop("PYTHONPATH", None)
+
+    help_result = subprocess.run(
+        [sys.executable, str(executable), "--help"],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert help_result.returncode == 0, help_result.stderr
+    assert "prepare" in help_result.stdout
+    assert "cleanup" in help_result.stdout
+
+    status_result = subprocess.run(
+        [
+            sys.executable,
+            str(executable),
+            "--root",
+            str(root),
+            "status",
+            "--topic",
+            TOPIC,
+            "--module",
+            "vendor/dep",
+        ],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert status_result.returncode == 0, status_result.stderr
+    assert "MODULE=vendor/dep STATE=absent" in status_result.stdout
 
 
 def prepare(
