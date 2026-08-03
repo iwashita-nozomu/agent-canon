@@ -84,10 +84,25 @@ remote execution contract が「repo が外部 server から実行される条�
 
 ## Validation
 
+AgentCanon standalone source root では source-root の template を指定します。
+
 ```bash
 python3 tools/ci/check_server_readiness.py
 python3 tools/ci/check_server_readiness.py \
+  --layout templates/documents/server_runtime_layout.template.toml
+```
+
+Template / derived parent root では vendored AgentCanon の template を指定します。
+
+```bash
+python3 vendor/agent-canon/tools/ci/check_server_readiness.py
+python3 vendor/agent-canon/tools/ci/check_server_readiness.py \
   --layout vendor/agent-canon/templates/documents/server_runtime_layout.template.toml
+```
+
+Container runtime は次の command で確認します。
+
+```bash
 make docker-build-check
 make docker-build-check-host-docker
 ```
