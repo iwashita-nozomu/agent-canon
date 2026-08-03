@@ -190,6 +190,7 @@ def complete_template_fixture(topic_dir: Path) -> None:
     provenance_text = provenance_text.replace(
         'status = "selected-or-rejected"', 'status = "rejected"'
     )
+    provenance_text = provenance_text.replace('status = "rejected"', 'status = "selected"', 1)
     provenance_path.write_text(provenance_text, encoding="utf-8")
 
 

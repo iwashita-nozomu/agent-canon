@@ -103,6 +103,51 @@ def _missing_completion_structures(provenance: object) -> list[str]:
                         else f"provenance.{path}.{field}"
                     )
                     missing.append(field_path)
+    missing.extend(_missing_option_selection_invariants(provenance))
+    return missing
+
+
+def _missing_option_selection_invariants(provenance: object) -> list[str]:
+    """plan.options と plan.selection の cross-field invariant を検証します."""
+    options = _completion_value(provenance, "plan.options")
+    selection = _completion_value(provenance, "plan.selection")
+    if not isinstance(options, list) or not all(isinstance(item, dict) for item in options):
+        return []
+    if not isinstance(selection, dict):
+        return []
+
+    records = [item for item in options if isinstance(item, dict)]
+    option_ids = [record.get("id") for record in records]
+    missing: list[str] = []
+    if any(
+        option_ids[left] == option_ids[right]
+        for left in range(len(option_ids))
+        for right in range(left + 1, len(option_ids))
+    ):
+        missing.append("provenance.plan.options.id must be unique")
+
+    selected_option = selection.get("selected_option")
+    if selected_option not in option_ids:
+        missing.append(
+            "provenance.plan.selection.selected_option must reference an option id"
+        )
+
+    selected_records = [record for record in records if record.get("status") == "selected"]
+    if len(selected_records) != 1:
+        missing.append("provenance.plan.options must contain exactly one selected option")
+    elif selected_records[0].get("id") != selected_option:
+        missing.append(
+            "provenance.plan.selection.selected_option must identify the selected option"
+        )
+
+    if selected_option in option_ids:
+        if any(
+            record.get("id") != selected_option and record.get("status") != "rejected"
+            for record in records
+        ):
+            missing.append(
+                "provenance.plan.options must mark every non-selected option as rejected"
+            )
     return missing
 
 
