@@ -3,7 +3,7 @@
 # responsibility Defines the single AgentCanon pydocstyle convention used when a parent has no local policy.
 # upstream design ../README.md shared CI automation index
 # upstream design ../../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring contract
-# downstream implementation ./run_python_quality_checks.sh invokes this configuration
+# downstream design ./PRE_REVIEW_GUIDE.md documents explicit Docstring review usage
 # @dependency-end
 
 [tool.pydocstyle]

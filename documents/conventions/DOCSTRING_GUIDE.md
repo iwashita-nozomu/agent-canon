@@ -13,8 +13,7 @@ downstream design ./coding-conventions-cpp.md projects the contract into C++ doc
 downstream implementation ../../templates/documents/design-document.template.md consumes the semantic skeleton in the reusable design template
 downstream implementation ../../templates/experiments/_template/run.py projects the contract into the Python code template
 downstream implementation ../../templates/experiments/_template/cases.py projects the contract into the Python module template
-downstream implementation ../../tools/ci/run_python_quality_checks.sh checks language-level Python docstring presence and style
-downstream design ../../agents/skills/python-review.md reviews Python semantic projection when its changed-surface route is selected
+downstream design ../../agents/skills/python-review.md routes explicit Docstring review and semantic projection when selected
 downstream design ../../agents/skills/cpp-review.md reviews C++ semantic projection when its changed-surface route is selected
 downstream design ../../agents/skills/oop-type-design.md selects language-neutral responsibility and type boundaries before projection
 @dependency-end
@@ -276,7 +275,7 @@ surface に応じて semantic clause を読み戻します。catalog capability 
 
 ## Validation and review boundary
 
-- `pydocstyle` と Ruff D は、language-level の存在・syntax・format signal を検証する。
+- `pydocstyle` と Ruff D は、明示的な language-level Docstring review の存在・syntax・format signal を検証する。
 - `pyright` と C++ compiler/build は、annotation、signature、namespace、header、ABI の
   static fact を検証する。
 - OOP/readability checker は責務境界の signal を提供するが、clause の意味充足を判定しない。
@@ -286,26 +285,18 @@ surface に応じて semantic clause を読み戻します。catalog capability 
 - 実装 mechanism が存在し、なお未解決の behavior oracle がある場合だけ test design を
   追加する。Docstring prose 自体を test-first の対象にしない。
 
-### PR changed-surface quality gate
+### Explicit Docstring review boundary
 
-PR の pydocstyle は `tools/ci/run_python_quality_checks.sh` が唯一の gate owner です。
-PR entrypoint が作成した trusted changed-path packet と trusted base SHA を同時に受け取り、
-現在の PR で新規または変更された production Python surface だけを head と exact base の双方で
-実行します。`tests/`、fixture、generated artifact、root view、submodule source、deleted path は
-この gate の対象外で、それぞれの owner gate または既存 baseline evidence に戻します。
+`pydocstyle` は compile/runtime/graph/header correctness の必要条件ではなく、
+shared PR/static gate では実行しません。明示的な Docstring review で、対象を限定して
+`python3 -m pydocstyle <python-target>` を実行します。通常の pydocstyle config discovery
+を使い、tool が無い場合または診断がある場合は明示 command が nonzero で終了します。
 
-head の診断は `code + qualified module/class/function` を identity として base と比較します。
-行番号、件数、message の表記は identity に含めません。同じ identity が base にあれば touched
-file 内でも baseline evidence とし、head にだけ存在する診断を blocking とします。packet の
-root、base/head commit/tree、merge-base、changed-path digest、実 diff のいずれかを証明できない
-場合は fail-closed です。ローカル branch の ahead/behind/diverged 状態は、それ自体では failure
-predicate になりません。
-
-AgentCanon の既定 pydocstyle convention は `tools/ci/pydocstyle.toml` で D213 を選択し、
+AgentCanon の既定 review convention は `tools/ci/pydocstyle.toml` で D213 を選択し、
 相反する D212 を無視します。D212 と D213 を同時に要求しません。親 repository に有効な
-pydocstyle / pep257 設定がある場合はその設定を current/base の両方へ適用し、AgentCanon の
-既定 convention を親の全 Python surface へ強制しません。syntax、annotation、signature の
-事実は compiler、pyright、ruff の owner に委譲し、pydocstyle gate で重複検査しません。
+pydocstyle / pep257 設定があれば、明示 review command の通常 discovery を優先します。
+PR の blocking predicate は compiler、runtime、graph、header の owner に限定し、
+pydocstyle の missing/diagnostic を merge gateへ昇格しません。
 
 ### Performance and non-enforcement evaluation
 

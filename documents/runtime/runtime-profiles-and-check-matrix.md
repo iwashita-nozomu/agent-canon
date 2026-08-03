@@ -62,6 +62,10 @@ PR or run bundle must state why that set is sufficient.
 Prompt-only or prose-only edits use the surface-specific docs, prompt, eval,
 and dependency checks selected by the active profile; they do not automatically
 escalate to full `make ci`.
+Pydocstyle is an explicit Docstring review route, not a shared correctness
+requirement. The shared PR/static gate blocks only on compiler/runtime/graph/
+header owners; an unavailable pydocstyle tool or its diagnostics fail only
+the explicit review command.
 
 ## Validation Failure Response
 

@@ -52,6 +52,14 @@ needed:
 bash tools/ci/run_python_quality_checks.sh
 ```
 
+Explicit Docstring review for selected Python targets:
+
+    python3 -m pydocstyle <python-target>
+
+This command uses normal pydocstyle configuration discovery. Missing pydocstyle
+or reported diagnostics fail this explicit review only; the shared PR
+correctness gate is unaffected.
+
 ## Report Evidence
 
 `agent-coordination.yml` sets these variables for verifier jobs:

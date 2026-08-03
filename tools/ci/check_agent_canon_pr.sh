@@ -19,7 +19,7 @@
 # upstream implementation ../agent_tools/update_lifecycle_contract.py owns G1-G3 receipt identity.
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
 # upstream implementation ./run_all_checks.sh quick CI implementation
-# upstream implementation ../ci/run_python_quality_checks.sh owns changed production Python quality scope
+# upstream implementation ../ci/run_python_quality_checks.sh owns shared Python static quality checks
 # @dependency-end
 
 set -euo pipefail
@@ -411,10 +411,6 @@ run_pr_quick_ci() {
     echo "AGENT_CANON_PR_CI_COMMAND=bash ${CANON_TOOLS_ROOT}/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
     set +e
     AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
-      PYDOCSTYLE_REQUIRE_TRUSTED_PACKET=1 \
-      PYDOCSTYLE_SKIP=1 \
-      PYDOCSTYLE_CHANGED_PATH_PACKET="${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
-      PYDOCSTYLE_TRUSTED_BASE_SHA="${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" \
       bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh" "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
     quick_ci_rc=$?
     set -e
@@ -426,10 +422,6 @@ run_pr_quick_ci() {
   echo "AGENT_CANON_PR_CI_COMMAND=bash ${CANON_TOOLS_ROOT}/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
   set +e
   AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
-    PYDOCSTYLE_REQUIRE_TRUSTED_PACKET=1 \
-    PYDOCSTYLE_SKIP=1 \
-    PYDOCSTYLE_CHANGED_PATH_PACKET="${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
-    PYDOCSTYLE_TRUSTED_BASE_SHA="${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" \
     bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh" "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
   quick_ci_rc=$?
   set -e
@@ -534,21 +526,6 @@ run_standalone_static_gate_ci() {
   python3 "${CANON_TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check
   python3 "${CANON_TOOLS_ROOT}/ci/check_github_workflows.py"
   python3 "${CANON_TOOLS_ROOT}/ci/container_config.py"
-}
-
-run_pr_changed_pydocstyle() {
-  if [[ -z "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
-    || -z "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" ]]; then
-    echo "PYDOCSTYLE_CHANGED_SCOPE=fail"
-    echo "PYDOCSTYLE_CHANGED_SCOPE_REASON=trusted_changed_path_packet_required"
-    return 2
-  fi
-  PYDOCSTYLE_REQUIRE_TRUSTED_PACKET=1 \
-    PYDOCSTYLE_REPORT_OUT="${PR_DEPENDENCY_REVIEW_DIR}/pydocstyle-changed-scope.json" \
-    bash "${CANON_TOOLS_ROOT}/ci/run_python_quality_checks.sh" \
-      --pydocstyle-only \
-      --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" \
-      --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}"
 }
 
 github_repo_security_status() {
@@ -663,21 +640,6 @@ else
   fi
 fi
 
-mkdir -p "${PR_DEPENDENCY_REVIEW_DIR}"
-PR_GATE_PYDOCSTYLE_LOG="${PR_DEPENDENCY_REVIEW_DIR}/pydocstyle-changed-scope.log"
-PR_GATE_PYDOCSTYLE_RC=0
-set +e
-run_pr_changed_pydocstyle >"${PR_GATE_PYDOCSTYLE_LOG}" 2>&1
-PR_GATE_PYDOCSTYLE_RC=$?
-set -e
-cat "${PR_GATE_PYDOCSTYLE_LOG}"
-echo "AGENT_CANON_PR_PYDOCSTYLE_EXIT=${PR_GATE_PYDOCSTYLE_RC}"
-if [[ "${PR_GATE_PYDOCSTYLE_RC}" -eq 2 ]]; then
-  echo "AGENT_CANON_PR_PYDOCSTYLE_EVIDENCE=fail_closed"
-else
-  echo "AGENT_CANON_PR_PYDOCSTYLE_EVIDENCE=changed_scope_reported"
-fi
-
 if [[ "${PR_GATE_DEPENDENCY_GRAPH_REQUIRED}" -eq 1 ]]; then
   # This graph build produces either a full strict review or scoped diagnostic
   # evidence for the subsequent quick CI receipt consumer.
@@ -780,10 +742,6 @@ else
     --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" \
     --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"
   echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required"
-fi
-if [[ "${PR_GATE_PYDOCSTYLE_RC}" -ne 0 ]]; then
-  echo "AGENT_CANON_PR_PYDOCSTYLE=fail"
-  exit "${PR_GATE_PYDOCSTYLE_RC}"
 fi
 write_pr_gate_receipt \
   "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" \
