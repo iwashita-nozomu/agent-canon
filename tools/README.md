@@ -56,9 +56,9 @@ AgentCanon files directly into that container.
 When a change is generic, read `documents/rule/dependency-module-changes.md`,
 edit the managed source clone in the topic workspace, open or merge an
 AgentCanon change, update the parent repo submodule pin, and repair the parent
-view with `bash tools/agent-canon/sync_agent_canon.sh link-root`. In the
-standalone source the equivalent command remains
-`bash tools/sync_agent_canon.sh link-root`. When a parent command or test log
+view through the source-root resolver `exec tools/sync_agent_canon.sh link-root`.
+In the standalone source the resolver uses `AGENT_CANON_PREFIX=.`; in a parent
+it binds the prefix to `vendor/agent-canon`. When a parent command or test log
 mentions `tools/agent-canon/...`, read it as the execution path for
 AgentCanon-owned tooling unless the path is explicitly project-owned elsewhere.
 
@@ -424,7 +424,7 @@ findings for resilient test planning.
 1. `python3 tools/agent_tools/agent_canon_update_todos.py plan --write` で、その pin 更新に伴う親 repo TODO を生成します。pending があれば `latest` は成功終了のまま `updated_with_pending_todos` を出し、親 repo の agent が先に適用します。完了なら `complete`、明示的な repo 判断が必要なら `defer --reason ... --owner ...` を記録します。
 1. すべての pending TODO が `completed` または `deferred` になったら `python3 tools/agent_tools/agent_canon_update_todos.py acknowledge` で `.agent-canon/update-state.toml` の `tasks_applied_through` を現在 pin へ進めます。
 1. `make agent-canon-update` は `make agent-canon-latest` と同じ high-level latest route の互換 alias です。
-1. root view が drift した場合だけ `bash tools/sync_agent_canon.sh link-root` を使います。
+1. root view が drift した場合だけ source-root resolver の `exec tools/sync_agent_canon.sh link-root` を使います。
 1. 派生 repo 側の shared canon 差分を upstream に戻す場合は、intended named `vendor/agent-canon/` branch を source owner とし、branch / ahead / diverged / dirty state を evidence として collision-safe merge / review を続けます。vendor checkout が別 topic/branch に占有されている場合だけ、`workspace/<topic>/agent-canon/` の managed source clone から AgentCanon PR を使います。parent pin/root projection は source publication 後に行います。
 
 `sync_agent_canon.sh` は低レベル実装です。

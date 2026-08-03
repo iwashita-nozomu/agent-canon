@@ -7,6 +7,7 @@
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines PR-first shared-canon propagation
 # upstream design ../../agents/workflows/derived-agent-canon-diff-workflow.md defines derived AgentCanon branch routing
 # upstream design ../../documents/agent-canon/agent-canon-parent-repo-latest-checklist.md defines parent update TODO routing
+# upstream implementation ./agent_canon_source_root.py resolves parent sync entrypoints
 # upstream implementation agent_canon_update_todos.py reports AgentCanon update TODO state
 # upstream implementation ./report_artifact_checks.py classifies eval transient captures
 # downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests preflight
@@ -17,7 +18,9 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -39,13 +42,17 @@ SHARED_CANON_DIRTY_PATH_PREFIXES = (
     "agents/",
     "documents/runtime/SHARED_RUNTIME_SURFACES.md",
     "mcp/",
-    "tools/sync_agent_canon.sh",
+    "tools/agent-canon/",
     "vendor/agent-canon",
 )
 LATEST_CHECKLIST = Path("documents/agent-canon/agent-canon-parent-repo-latest-checklist.md")
 UPDATE_TODO_TOOL = Path("tools/agent_tools/agent_canon_update_todos.py")
 SURFACE_MANIFEST = Path("tools/agent_tools/surface_manifest.py")
-SURFACE_SPEC_COMMANDS = ("link-specs", "copy-specs", "removed-legacy-paths")
+SURFACE_SPEC_COMMANDS = (
+    "link-specs",
+    "copy-specs",
+    "removed-legacy-paths",
+)
 
 
 @dataclass(frozen=True)
@@ -237,9 +244,28 @@ def run_agent_canon_preflight(
             checklist_status=checklist_status,
         )
 
+    source_root_entrypoint = (
+        project_root
+        / "vendor"
+        / "agent-canon"
+        / "tools"
+        / "agent_tools"
+        / "agent_canon_source_root.py"
+    )
+    source_pythonpath = str(source_root_entrypoint.parents[1])
+    existing_pythonpath = os.environ.get("PYTHONPATH", "").strip()
+    if existing_pythonpath:
+        source_pythonpath = os.pathsep.join((source_pythonpath, existing_pythonpath))
     check_result = subprocess.run(
-        ["bash", "tools/sync_agent_canon.sh", "check"],
+        [
+            sys.executable,
+            str(source_root_entrypoint),
+            "exec",
+            "tools/sync_agent_canon.sh",
+            "check",
+        ],
         cwd=project_root,
+        env={**os.environ, "PYTHONPATH": source_pythonpath},
         check=False,
         capture_output=True,
         text=True,

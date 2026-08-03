@@ -21,6 +21,7 @@ LAYOUT_VENDORED = "vendored"
 LAYOUT_OVERRIDE = "override"
 SOURCE_ROOT_OVERRIDE_ENV = "AGENT_CANON_SOURCE_ROOT"
 CANON_ROOT_OVERRIDE_ENV = "AGENT_CANON_ROOT"
+SOURCE_PREFIX_ENV = "AGENT_CANON_PREFIX"
 
 VENDOR_OUTSIDE_REPOSITORY = "agent_canon_source_root_vendor_outside_repository"
 ROOT_VIEW_OUTSIDE_REPOSITORY = "agent_canon_source_root_root_view_outside_repository"
@@ -80,6 +81,7 @@ def _run_subcommand(resolution: RootResolution, command: Sequence[str]) -> int:
     executable = _resolve_executable(resolution, command[0])
     env = os.environ.copy()
     env["PYTHONPATH"] = _default_pythonpath(root=resolution.source_root)
+    env[SOURCE_PREFIX_ENV] = _source_prefix(resolution)
     process = subprocess.run(
         (str(executable), *command[1:]),
         cwd=resolution.source_root.as_posix(),
@@ -87,6 +89,18 @@ def _run_subcommand(resolution: RootResolution, command: Sequence[str]) -> int:
         check=False,
     )
     return process.returncode
+
+
+def _source_prefix(resolution: RootResolution) -> str:
+    """Return the source path expected by delegated root-aware commands."""
+    command_root = _find_current_repository_root(resolution.source_root)
+    if not _is_within(resolution.source_root, command_root):
+        raise SourceRootFailure(
+            "agent_canon_source_root_prefix_outside_repository",
+            f"Source root is outside delegated repository root: {resolution.source_root}",
+        )
+    relative = resolution.source_root.relative_to(command_root).as_posix()
+    return relative or "."
 
 
 def build_parser() -> argparse.ArgumentParser:

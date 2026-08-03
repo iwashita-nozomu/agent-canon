@@ -26,8 +26,10 @@ git -C vendor/agent-canon fetch origin main
 git -C vendor/agent-canon checkout <previous-sha>
 git add vendor/agent-canon
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  bash tools/sync_agent_canon.sh link-root
-bash tools/sync_agent_canon.sh check
+  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root \
+    exec tools/sync_agent_canon.sh link-root
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root \
+  exec tools/sync_agent_canon.sh check
 git status --short
 ```
 
@@ -41,7 +43,8 @@ git commit -m "Rollback AgentCanon pin to <previous-sha>"
 
 ```bash
 git submodule status vendor/agent-canon
-bash tools/sync_agent_canon.sh check
+PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root \
+  exec tools/sync_agent_canon.sh check
 python3 tools/agent_tools/classify_path_risk.py --path vendor/agent-canon --format text
 bash tools/ci/check_agent_canon_pr.sh
 ```
@@ -62,4 +65,5 @@ GitHub before normal work resumes.
 Move forward again only after the AgentCanon source issue is fixed on a branch
 or main, the parent pin is updated with the request-evidence-authorized
 `make agent-canon-ensure-latest` route, and root views are rechecked with the
-request-evidence-authorized `bash tools/sync_agent_canon.sh link-root` route.
+request-evidence-authorized source-root resolver
+`exec tools/sync_agent_canon.sh link-root` route.
