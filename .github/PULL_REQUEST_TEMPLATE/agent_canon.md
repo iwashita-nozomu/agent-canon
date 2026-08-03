@@ -153,6 +153,8 @@ Impact notes:
 - [ ] `bash tools/agent-canon/sync_agent_canon.sh link-root`
 - [ ] `bash tools/agent-canon/sync_agent_canon.sh check`
 - [ ] `make agent-canon-pr-check`
+- [ ] Derived parent gate reports `AGENT_CANON_PR_PROJECT_QUALITY=delegated` with owner `parent_ci`; parent project tests/type/lint remain in the selected parent CI job.
+- [ ] Standalone AgentCanon source gate reports `AGENT_CANON_PR_PROJECT_QUALITY=full` and runs full `run_all_checks.sh`.
 - [ ] Parent gate dependency graph receipt is `prepared` when parent graph
   migration, a touched canonical dependency surface/manifest, or the selected
   canonical validation profile requires strict completeness; otherwise it is

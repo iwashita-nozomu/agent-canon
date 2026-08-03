@@ -201,6 +201,12 @@ root runtime views, root-copy surfaces, or sync-control surfaces. Record
    AgentCanon source changes are integrated, or while preparing the parent
    pin/root-view PR.
 
+`make agent-canon-pr-check` keeps this owner boundary: standalone AgentCanon
+source runs the full `run_all_checks.sh` route, while template/derived parents
+emit `AGENT_CANON_PR_PROJECT_QUALITY=delegated` with owner `parent_ci` and leave
+project tests, type checks, and lint to the selected parent CI job. The shared
+gate does not add a parent-project baseline scanner.
+
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
   python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root

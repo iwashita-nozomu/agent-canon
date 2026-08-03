@@ -57,6 +57,11 @@ The PR quick chain intentionally runs pytest and pyright while skipping Ruff;
 the explicit full Python quality command adds Ruff. Neither shared path invokes
 pydocstyle.
 
+For `check_agent_canon_pr.sh`, a standalone AgentCanon source uses the full
+`run_all_checks.sh` route. A template or derived parent emits
+`AGENT_CANON_PR_PROJECT_QUALITY=delegated` with owner `parent_ci`; its project
+tests, type checks, and lint remain in the selected parent CI job.
+
 Explicit Docstring review for selected Python targets:
 
     tools/bin/agent-canon pydocstyle-review --target <repo-relative.py>

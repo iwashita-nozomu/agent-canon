@@ -53,8 +53,8 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertLess(text.index(producer_marker), text.index(checker_marker))
         self.assertNotIn("export AGENT_CANON_HOOK_ARCHIVE_DIR", text)
 
-    def test_pr_gate_reuses_quick_ci_without_repeating_parent_gates(self) -> None:
-        """The PR gate should not rerun AgentCanon checks it already executed directly."""
+    def test_pr_gate_delegates_derived_project_quality(self) -> None:
+        """Derived PR gates delegate project quality to the parent CI owner."""
         ci_text = SCRIPT.read_text(encoding="utf-8")
         pr_text = PR_SCRIPT.read_text(encoding="utf-8")
 
@@ -65,10 +65,9 @@ class RunAllChecksScriptTest(unittest.TestCase):
             "GITHUB_WORKFLOW_CHECKS=skip reason=already_checked_by_parent_gate",
             ci_text,
         )
-        self.assertIn(
-            "PR_QUICK_CI_ARGS=(--quick --skip-docs --skip-github-workflows)",
-            pr_text,
-        )
+        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", pr_text)
+        self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY_OWNER=parent_ci", pr_text)
+        self.assertNotIn("PR_QUICK_CI_ARGS=", pr_text)
 
     def test_pr_gate_has_no_legacy_profile(self) -> None:
         """The PR gate must keep one explicit full maintenance/source route."""

@@ -18,7 +18,7 @@
 # upstream implementation ../agent_tools/skill_tool_commands.py runtime skill command packet gate
 # upstream implementation ../agent_tools/update_lifecycle_contract.py owns G1-G3 receipt identity.
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
-# upstream implementation ./run_all_checks.sh quick CI implementation
+# upstream implementation ./run_all_checks.sh standalone full quality route
 # upstream implementation ../ci/run_python_quality_checks.sh owns shared Python static quality checks
 # @dependency-end
 
@@ -68,7 +68,6 @@ trap cleanup_agent_canon_pr_temp_root EXIT
 PR_DEPENDENCY_REVIEW_DIR="${AGENT_CANON_PR_TEMP_ROOT}/dependency-review/agent-canon-pr"
 PR_AGENT_EVAL_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/agent-canon-pr-gate"
 PR_RUN_ALL_CHECKS_LOG_DIR="${AGENT_CANON_PR_TEMP_ROOT}/agent-eval-runs/run-all-checks"
-PR_QUICK_CI_ARGS=(--quick --skip-docs --skip-github-workflows)
 AGENT_CANON_G1_BUNDLE_ACTIVE=0
 if [[ -d vendor/agent-canon && -f .gitmodules ]]; then
   PR_AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
@@ -376,59 +375,29 @@ run_pr_agent_checks() {
   if agentcanon_pr_branch_pending; then
     echo "AGENT_CANON_PR_LATEST_GATE=deferred_branch_pr"
     echo "AGENT_CANON_PR_LATEST_NEXT=commit_push_agentcanon_branch_then_after_merge_run_make_agent-canon-ensure-latest"
-    run_direct_agent_checks
-    return
   fi
-  if [[ -f Makefile ]] && grep -qE "^[.]?PHONY:.*\\bagent-checks\\b|^agent-checks:" Makefile; then
-    make agent-checks
-  else
-    bash "${CANON_TOOLS_ROOT}/ci/check_agent_canon_latest.sh"
-    run_direct_agent_checks
-  fi
+  # Derived parents delegate project tests/type/lint to the parent's selected
+  # CI job; this route owns only shared AgentCanon surfaces.
+  run_direct_agent_checks
 }
 
-run_pr_quick_ci() {
+run_pr_project_quality_boundary() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
-    echo "AGENT_CANON_PR_QUICK_CI=consumed_standalone_static_gate_receipt"
-    return
-  fi
-  local integrity_rc=0
-  local quick_ci_rc=0
-  local latest_ci_gate="pass"
-  local latest_ci_next="run_all_checks"
-  AGENT_CANON_PR_LATEST_GATE=""
-  AGENT_CANON_PR_LATEST_NEXT=""
-  run_pr_integrity_check
-  integrity_rc=$?
-  if [[ "$integrity_rc" -ne 0 ]]; then
-    echo "AGENT_CANON_PR_CI_LATEST_GATE=${AGENT_CANON_PR_LATEST_GATE:-blocked_submodule_integrity}"
-    echo "AGENT_CANON_PR_CI_LATEST_NEXT=${AGENT_CANON_PR_LATEST_NEXT:-repair_submodule_integrity_and_rerun_agent-canon-pr-check}"
-    return 1
-  fi
-  if agentcanon_pr_branch_pending; then
-    latest_ci_gate="deferred_branch_pr"
-    latest_ci_next="run_all_checks_or_merge_agent-canon-PR"
-    echo "AGENT_CANON_PR_CI_COMMAND=bash ${CANON_TOOLS_ROOT}/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
+    local standalone_ci_rc=0
+    echo "AGENT_CANON_PR_PROJECT_QUALITY=full"
+    echo "AGENT_CANON_PR_PROJECT_QUALITY_OWNER=agent_canon"
+    echo "AGENT_CANON_PR_CI_COMMAND=bash ${CANON_TOOLS_ROOT}/ci/run_all_checks.sh --pr-gate-receipt ${PR_GATE_RECEIPT}"
     set +e
     AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
-      bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh" "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
-    quick_ci_rc=$?
+      bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh" --pr-gate-receipt "${PR_GATE_RECEIPT}"
+    standalone_ci_rc=$?
     set -e
-    echo "AGENT_CANON_PR_CI_LATEST_GATE=${latest_ci_gate}"
-    echo "AGENT_CANON_PR_CI_LATEST_NEXT=${latest_ci_next}"
-    echo "AGENT_CANON_PR_CI_EXIT=${quick_ci_rc}"
-    return "$quick_ci_rc"
+    echo "AGENT_CANON_PR_CI_EXIT=${standalone_ci_rc}"
+    return "${standalone_ci_rc}"
   fi
-  echo "AGENT_CANON_PR_CI_COMMAND=bash ${CANON_TOOLS_ROOT}/ci/run_all_checks.sh ${PR_QUICK_CI_ARGS[*]} --pr-gate-receipt ${PR_GATE_RECEIPT}"
-  set +e
-  AGENT_CANON_CI_EVAL_LOG_DIR="${PR_RUN_ALL_CHECKS_LOG_DIR}" \
-    bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh" "${PR_QUICK_CI_ARGS[@]}" --pr-gate-receipt "${PR_GATE_RECEIPT}"
-  quick_ci_rc=$?
-  set -e
-  echo "AGENT_CANON_PR_CI_LATEST_GATE=${latest_ci_gate}"
-  echo "AGENT_CANON_PR_CI_LATEST_NEXT=${latest_ci_next}"
-  echo "AGENT_CANON_PR_CI_EXIT=${quick_ci_rc}"
-  return "$quick_ci_rc"
+  echo "AGENT_CANON_PR_PROJECT_QUALITY=delegated"
+  echo "AGENT_CANON_PR_PROJECT_QUALITY_OWNER=parent_ci"
+  return 0
 }
 
 write_pr_gate_receipt() {
@@ -642,7 +611,7 @@ fi
 
 if [[ "${PR_GATE_DEPENDENCY_GRAPH_REQUIRED}" -eq 1 ]]; then
   # This graph build produces either a full strict review or scoped diagnostic
-  # evidence for the subsequent quick CI receipt consumer.
+  # evidence for the subsequent project-quality ownership boundary.
   mkdir -p "${PR_DEPENDENCY_REVIEW_DIR}"
   graph_build_result="${PR_DEPENDENCY_REVIEW_DIR}/graph-build.json"
   graph_producer_identity=""
@@ -753,8 +722,8 @@ echo "7️⃣  documentation checks"
 	run_agent_canon docs check
 echo ""
 
-echo "8️⃣  repository quick CI"
-run_pr_quick_ci
+echo "8️⃣  project quality ownership boundary"
+run_pr_project_quality_boundary
 echo ""
 
 echo "8b️⃣  generated artifact guard"
