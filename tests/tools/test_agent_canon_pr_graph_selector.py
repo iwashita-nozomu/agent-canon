@@ -25,7 +25,9 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SELECTOR_PATH = PROJECT_ROOT / "tools" / "ci" / "agent_canon_pr_graph_selector.py"
 CHECKER_PATH = PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_pr.sh"
-SPEC = importlib.util.spec_from_file_location("agent_canon_pr_graph_selector", SELECTOR_PATH)
+SPEC = importlib.util.spec_from_file_location(
+    "agent_canon_pr_graph_selector", SELECTOR_PATH
+)
 assert SPEC is not None and SPEC.loader is not None
 selector = importlib.util.module_from_spec(SPEC)
 sys.modules[SPEC.name] = selector
@@ -148,9 +150,7 @@ def write_graph_result(
     }
     with sqlite3.connect(database) as connection:
         connection.execute("CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT)")
-        connection.execute(
-            "CREATE TABLE nodes(id TEXT, layer TEXT, payload_json TEXT)"
-        )
+        connection.execute("CREATE TABLE nodes(id TEXT, layer TEXT, payload_json TEXT)")
         connection.execute(
             "CREATE TABLE edges(layer TEXT, from_node_id TEXT, to_node_id TEXT)"
         )
@@ -206,6 +206,25 @@ def write_graph_result(
 
 class AgentCanonPrGraphSelectorTest(unittest.TestCase):
     """Exercise required, skipped, and typed failure states."""
+
+    def setUp(self) -> None:
+        """Keep unit fixtures focused on head classification semantics."""
+        self.base_graph_patch = patch.object(
+            selector,
+            "build_trusted_base_graph",
+            return_value=selector.TrustedBaseGraph(
+                "0" * 40,
+                "1" * 64,
+                "2" * 64,
+                "published",
+                "durable",
+                True,
+                "fresh",
+                (),
+            ),
+        )
+        self.base_graph_patch.start()
+        self.addCleanup(self.base_graph_patch.stop)
 
     def test_pr_entrypoint_prepares_and_passes_trusted_base(self) -> None:
         """The parent gate wires shallow preparation to the exact selector argument."""
@@ -480,6 +499,96 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         self.assertEqual(len(blocking), 1)
         self.assertEqual(blocking[0]["classification"], "changed_responsibility")
 
+    def test_reachable_base_identity_is_evidence_not_a_new_blocker(self) -> None:
+        """Reachability alone does not block a diagnostic already in trusted base."""
+        base_diagnostic = {
+            "code": "target-unresolved",
+            "message": "related.py:4:missing.md",
+            "source_path": "related.py",
+            "target_path": "missing.md",
+            "declaration": "missing.md",
+            "severity": "blocker",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {"related.py": "related\n"})
+            graph_result = write_graph_result(
+                root,
+                ("changed.py", "related.py"),
+                (("changed.py", "related.py"),),
+                (("target-unresolved", "related.py:19:missing.md", "related.py"),),
+            )
+            with patch.object(
+                selector,
+                "build_trusted_base_graph",
+                return_value=selector.TrustedBaseGraph(
+                    base,
+                    "1" * 64,
+                    "2" * 64,
+                    "published",
+                    "durable",
+                    True,
+                    "incomplete",
+                    (base_diagnostic,),
+                ),
+            ):
+                acceptance = selector.evaluate_built_graph(
+                    root,
+                    graph_result,
+                    {"AGENT_CANON_PR_BASE_REF": base},
+                )
+
+        self.assertEqual(acceptance.status, "pass")
+        self.assertEqual(acceptance.report["blocking_diagnostics"], [])
+        self.assertEqual(len(acceptance.report["baseline_diagnostics"]), 1)
+        self.assertEqual(
+            acceptance.report["baseline_diagnostics"][0]["declaration"],
+            "missing.md",
+        )
+
+    def test_same_count_replacement_is_a_new_blocker(self) -> None:
+        """Replacing one diagnostic identity cannot be hidden by equal counts."""
+        base_diagnostic = {
+            "code": "target-unresolved",
+            "message": "changed.py:4:old.md",
+            "source_path": "changed.py",
+            "target_path": "old.md",
+            "declaration": "old.md",
+            "severity": "blocker",
+        }
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = graph_change_fixture(root, {})
+            graph_result = write_graph_result(
+                root,
+                ("changed.py",),
+                (),
+                (("target-unresolved", "changed.py:40:new.md", "changed.py"),),
+            )
+            with patch.object(
+                selector,
+                "build_trusted_base_graph",
+                return_value=selector.TrustedBaseGraph(
+                    base,
+                    "1" * 64,
+                    "2" * 64,
+                    "published",
+                    "durable",
+                    True,
+                    "incomplete",
+                    (base_diagnostic,),
+                ),
+            ):
+                acceptance = selector.evaluate_built_graph(
+                    root,
+                    graph_result,
+                    {"AGENT_CANON_PR_BASE_REF": base},
+                )
+
+        self.assertEqual(acceptance.status, "fail")
+        self.assertEqual(len(acceptance.report["blocking_diagnostics"]), 1)
+        self.assertFalse(acceptance.report["blocking_diagnostics"][0]["base_match"])
+
     def test_changed_manifest_grammar_blocks_without_target_node(self) -> None:
         """Invalid grammar in a changed declaration is always in the gate closure."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -631,7 +740,9 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
 
         self.assertEqual(raised.exception.reason, "pr_changed_paths_diff_failed")
 
-    def test_ci_auth_required_fetch_succeeds_without_persisting_credential(self) -> None:
+    def test_ci_auth_required_fetch_succeeds_without_persisting_credential(
+        self,
+    ) -> None:
         """CI authenticates a needed fetch and binds selection to the event base."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
