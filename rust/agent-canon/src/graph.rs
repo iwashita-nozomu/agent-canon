@@ -1938,14 +1938,38 @@ fn collect_build_material(
     surface_manifest: Option<&Path>,
     producer_identity: Option<&ProducerIdentity>,
 ) -> Result<BuildMaterial, GraphError> {
+    let (producer, identity) =
+        resolve_graph_producer(root, surface_manifest_producer, producer_identity)?;
     collect_build_material_with_mode(
         root,
         profile,
         false,
-        surface_manifest_producer,
+        Some(&producer),
         surface_manifest,
-        producer_identity,
+        Some(&identity),
     )
+}
+
+fn resolve_graph_producer(
+    root: &Path,
+    producer: Option<&Path>,
+    identity: Option<&ProducerIdentity>,
+) -> Result<(PathBuf, ProducerIdentity), GraphError> {
+    match (producer, identity) {
+        (None, None) => {
+            let identity = current_producer_identity(root)
+                .map_err(|error| GraphError::Validation(error.to_string()))?;
+            Ok((PathBuf::from(&identity.producer_path), identity))
+        }
+        (Some(producer), Some(identity)) => {
+            validate_producer_identity(identity, Some(producer))
+                .map_err(|error| GraphError::Validation(error.to_string()))?;
+            Ok((producer.to_path_buf(), identity.clone()))
+        }
+        _ => Err(GraphError::Validation(
+            "explicit surface manifest producer and identity must be paired".to_string(),
+        )),
+    }
 }
 
 fn collect_build_material_with_mode(
@@ -3977,6 +4001,39 @@ mod tests {
         let legacy_status = read_graph_status(&legacy_args).expect("legacy status");
         assert_eq!(legacy_status["status"], "stale");
         assert_eq!(legacy_status["probe_reason"], "producer_identity_changed");
+    }
+
+    #[test]
+    fn canonical_cli_default_build_status_query_binds_current_identity() {
+        let _guard = GRAPH_TEST_LOCK.lock().expect("graph test lock");
+        let fixture = graph_fixture();
+        let root = fixture.root.canonicalize().expect("canonical fixture root");
+        let cli_args = |command: &str| {
+            vec![
+                command.to_string(),
+                "--root".to_string(),
+                root.to_string_lossy().into_owned(),
+                "--format".to_string(),
+                "json".to_string(),
+            ]
+        };
+
+        assert_eq!(run(&cli_args("build")), 0);
+        assert_eq!(run(&cli_args("status")), 0);
+        let mut query_args = cli_args("query");
+        query_args.push("--all".to_string());
+        assert_eq!(run(&query_args), 0);
+
+        let connection = Connection::open(root.join(".agent-canon/knowledge-graph/graph.sqlite"))
+            .expect("published graph database");
+        let stored_identity =
+            metadata(&connection, "producer_identity").expect("identity metadata");
+        let stored_identity =
+            serde_json::from_str::<ProducerIdentity>(&stored_identity).expect("stored identity");
+        assert_eq!(
+            stored_identity,
+            current_producer_identity(&root).expect("current producer identity")
+        );
     }
 
     #[test]

@@ -202,6 +202,24 @@ entries:
     tests:
       - tests/agent_tools/test_parent_repo_readiness.py
 
+  - id: surface-manifest-producer
+    summary: Produces canonical shared-runtime surface snapshots consumed by AgentCanon graph builds and root synchronization.
+    path: tools/agent_tools/surface_manifest.py
+    family: agent_tools
+    role: runner
+    status: canonical
+    command: python3 tools/agent_tools/surface_manifest.py --root . --prefix vendor/agent-canon --manifest documents/runtime/shared-runtime-surfaces.toml normalized-snapshot
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: true
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/runtime/shared-runtime-surfaces.toml
+    tests:
+      - tests/tools/test_agent_canon_pr_graph_selector.py
+
   - id: visualization-contract
     summary: Validates typed visualization source universes, projection manifests, canonical ToolCalls, and post-format readback coverage.
     path: tools/agent_tools/visualization_contract.py
