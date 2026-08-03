@@ -367,6 +367,30 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                     "git",
                     "-C",
                     str(script_root),
+                    "config",
+                    "-f",
+                    ".gitmodules",
+                    "submodule.vendor/agent-canon.path",
+                    "vendor/agent-canon",
+                ],
+                check=True,
+            )
+            for key, expected in (
+                ("submodule.vendor/agent-canon.path", "vendor/agent-canon"),
+                ("submodule.vendor/agent-canon.url", str(submodule_remote)),
+            ):
+                readback = subprocess.run(
+                    ["git", "-C", str(script_root), "config", "-f", ".gitmodules", "--get", key],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                ).stdout.strip()
+                self.assertEqual(readback, expected)
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root),
                     "update-index",
                     "--add",
                     "--cacheinfo",
@@ -405,6 +429,35 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            index_entry = subprocess.run(
+                ["git", "-C", str(script_root), "ls-files", "--stage", "--", "vendor/agent-canon"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip().split()
+            self.assertEqual(index_entry[0], "160000")
+            self.assertEqual(index_entry[1], source_head)
+            initialized_head = subprocess.run(
+                ["git", "-C", str(script_root / "vendor/agent-canon"), "rev-parse", "HEAD"],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(initialized_head, source_head)
+            initialized_status = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(script_root / "vendor/agent-canon"),
+                    "status",
+                    "--short",
+                    "--untracked-files=all",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            ).stdout.strip()
+            self.assertEqual(initialized_status, "")
             (script_root / "tools" / "ci").mkdir(parents=True, exist_ok=True)
             (script_root / "tools" / "lib").mkdir(parents=True, exist_ok=True)
             shutil.copy2(
@@ -474,19 +527,26 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                     home_root.mkdir(parents=True)
                     tmpdir.mkdir()
                     sentinel = home_root / ".agent-canon-gitconfig-sentinel"
-                    sentinel.write_bytes(b"")
+                    sentinel.write_bytes(
+                        b"[safe]\n"
+                        b"\tdirectory = /existing/safe-directory\n"
+                        b"[user]\n"
+                        b"\tname = Existing Fixture User\n"
+                        b"\temail = existing-fixture@example.invalid\n"
+                        b"[custom]\n"
+                        b"\tsetting = preserve\n"
+                    )
+                    subprocess.run(
+                        ["git", "config", "--file", str(sentinel), "--list"],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
                     env = os.environ.copy()
                     env["HOME"] = str(home_root)
                     env["GIT_CONFIG_GLOBAL"] = str(sentinel)
+                    env["GIT_CONFIG_NOSYSTEM"] = "1"
                     env["TMPDIR"] = str(tmpdir)
-                    cargo_path = shutil.which("cargo", path=env.get("PATH"))
-                    if cargo_path:
-                        cargo_dir = Path(cargo_path).resolve().parent
-                        env["PATH"] = os.pathsep.join(
-                            entry
-                            for entry in env["PATH"].split(os.pathsep)
-                            if Path(entry or ".").resolve() != cargo_dir
-                        )
 
                     if test_case["name"] == "forced-failure":
                         bin_root = case_root / "bin"
@@ -513,7 +573,10 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                         self.assertIn("FRESH_CLONE_ACCEPTANCE=pass", result.stdout)
                     if "expect_error" in test_case:
                         self.assertIn(test_case["expect_error"], result.stderr)
-                    self.assertEqual(git_config_sentinel_state(sentinel), baseline)
+                    sentinel_bytes, sentinel_hash = git_config_sentinel_state(sentinel)
+                    baseline_bytes, baseline_hash = baseline
+                    self.assertEqual(sentinel_bytes, baseline_bytes)
+                    self.assertEqual(sentinel_hash, baseline_hash)
                     self.assertFalse(
                         any(
                             child.name.startswith("template-fresh-clone-")
