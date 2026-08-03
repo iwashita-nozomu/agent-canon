@@ -83,6 +83,7 @@ class SurfaceMigrationTest(unittest.TestCase):
         self.configure_git(parent)
         (parent / "tools").mkdir()
         shutil.copy2(SYNC, parent / "tools" / "sync_agent_canon.sh")
+        shutil.copytree(PROJECT_ROOT / "tools" / "lib", parent / "tools" / "lib")
         os.chmod(parent / "tools" / "sync_agent_canon.sh", 0o755)
 
         self.git(
@@ -126,7 +127,7 @@ class SurfaceMigrationTest(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
 
     def test_parent_root_resolution_and_devcontainer_migration(self) -> None:
-        """RootResolution and link-root must agree on a ready parent submodule."""
+        """RootResolution and link-root preserve parent-owned regular paths."""
         root = self.clone_parent_fixture()
         root_resolution = load_root_resolution_module()
         resolution = root_resolution.resolve_agent_canon_source_root(root)
@@ -136,6 +137,10 @@ class SurfaceMigrationTest(unittest.TestCase):
             resolution.source_root,
             (root / "vendor" / "agent-canon").resolve(),
         )
+        parent_templates = root / "templates"
+        parent_templates.mkdir()
+        template_sentinel = parent_templates / "parent-owned.txt"
+        template_sentinel.write_text("keep parent templates\n", encoding="utf-8")
 
         devcontainer = root / ".devcontainer"
         devcontainer.mkdir()
@@ -157,6 +162,61 @@ class SurfaceMigrationTest(unittest.TestCase):
         result = self.run_sync(root, "link-root")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("agent_canon_parent_submodule=projection_ready", result.stdout)
+        self.assertTrue(parent_templates.is_dir())
+        self.assertFalse(parent_templates.is_symlink())
+        self.assertEqual(
+            template_sentinel.read_text(encoding="utf-8"),
+            "keep parent templates\n",
+        )
+        self.assertTrue(
+            (
+                root
+                / "vendor"
+                / "agent-canon"
+                / "templates"
+                / "documents"
+                / "github"
+            ).is_dir()
+        )
+        self.assertTrue(
+            (
+                root
+                / ".github"
+                / "PULL_REQUEST_TEMPLATE"
+                / "agent_canon.md"
+            ).is_file()
+        )
+        consumer = subprocess.run(
+            [
+                sys.executable,
+                str(
+                    root
+                    / "vendor"
+                    / "agent-canon"
+                    / "tools"
+                    / "experiments"
+                    / "create_experiment_topic.py"
+                ),
+                "projection-consumer",
+                "--repo-root",
+                str(root),
+                "--dry-run",
+            ],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(consumer.returncode, 0, consumer.stdout + consumer.stderr)
+        self.assertIn(
+            f"template_dir={root / 'vendor' / 'agent-canon' / 'templates' / 'experiments' / '_template'}",
+            consumer.stdout,
+        )
+        self.assertIn(
+            "canonical_readme_template="
+            f"{root / 'vendor' / 'agent-canon' / 'templates' / 'documents' / 'experiment' / 'README.template.md'}",
+            consumer.stdout,
+        )
         self.assertTrue(devcontainer.is_dir() and not devcontainer.is_symlink())
         self.assertTrue((devcontainer / "devcontainer.json").is_symlink())
         self.assertEqual(
@@ -179,6 +239,10 @@ class SurfaceMigrationTest(unittest.TestCase):
         check = self.run_sync(root, "check")
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
         self.assertIn("shared surface is in sync", check.stdout)
+        self.assertEqual(
+            template_sentinel.read_text(encoding="utf-8"),
+            "keep parent templates\n",
+        )
 
     def test_removed_legacy_surface_preserves_unknown_mirror(self) -> None:
         """Known retired mirrors are removed while unknown mirrors remain untouched."""
