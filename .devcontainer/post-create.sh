@@ -28,6 +28,8 @@ workspace="$1"
 workspace="$(cd "$workspace" && pwd)"
 devcontainer_dir="$(cd "$(dirname "$0")" && pwd)"
 agent_canon_root="$(cd -P "$devcontainer_dir/.." && pwd)"
+# shellcheck source=../tools/lib/agent_canon_source_identity.sh
+source "$agent_canon_root/tools/lib/agent_canon_source_identity.sh"
 if [ -n "${AGENT_CANON_CONTAINER_USER:-}" ]; then
   [ "$(id -u)" -ne 0 ] || {
     echo "post-create must execute as the dedicated non-root user" >&2
@@ -123,30 +125,15 @@ agent_canon_source_root() {
   fi
 }
 
-agent_canon_source_identity() {
-  local canon_root="$1"
-  local source_sha
-  local provider_sha
-  local vendor_root="$workspace/vendor/agent-canon"
-  source_sha="$(git -C "$canon_root" rev-parse --verify HEAD)"
-  if [ -d "$vendor_root" ] && [ "$(cd "$canon_root" && pwd -P)" = "$(cd "$vendor_root" && pwd -P)" ]; then
-    provider_sha="$(git -C "$workspace" rev-parse --verify HEAD:vendor/agent-canon)"
-    if [ "$provider_sha" != "$source_sha" ]; then
-      echo "AgentCanon provider identity mismatch: $provider_sha!=$source_sha" >&2
-      return 1
-    fi
-    printf '%s\n' "$provider_sha"
-    return
-  fi
-  printf '%s\n' "$source_sha"
-}
-
 publish_agent_canon_cli() {
   local canon_root
   local binary
   local source_sha
+  local source_prefix="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
+  local receipt_path="$workspace/.agent-canon/dependency-receipts/agent-canon-cli.json"
   canon_root="$(agent_canon_source_root)"
-  source_sha="$(agent_canon_source_identity "$canon_root")"
+  source_sha="$(agent_canon_source_identity "$workspace" "$source_prefix" "$canon_root")"
+  agent_canon_receipt_matches_identity "$receipt_path" "$source_sha"
   binary="$canon_root/rust/agent-canon/target/release/agent-canon"
   [ -x "$binary" ] || {
     echo "AgentCanon cargo-source-build did not produce $binary" >&2

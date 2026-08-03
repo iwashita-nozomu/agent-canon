@@ -2153,7 +2153,9 @@ class Installer:
             )
         elif method is Method.CARGO_SOURCE_BUILD:
             source = self._cargo_source(record, workspace)
-            self._cargo_source_identity(record, workspace, source=source)
+            source_identity_before = self._cargo_source_identity(
+                record, workspace, source=source
+            )
             self._run(
                 [
                     "cargo",
@@ -2166,6 +2168,14 @@ class Installer:
                 workspace=workspace,
                 env=self._with_tool_paths({"CARGO_TARGET_DIR": str(source / "target")}),
             )
+            source_identity_after = self._cargo_source_identity(
+                record, workspace, source=source
+            )
+            if source_identity_before != source_identity_after:
+                raise DependencyError(
+                    f"{record.id}: source identity changed during build "
+                    f"{source_identity_before}!={source_identity_after}"
+                )
         elif method is Method.BROWSER_INSTALL:
             assert record.browser is not None
             assert record.browser_cache_path is not None
@@ -2533,15 +2543,26 @@ class Installer:
         """
         resolved_source = source or self._cargo_source(record, workspace)
         if record.source_identity == ACTIVE_SOURCE_IDENTITY:
+            workspace_root = workspace.resolve()
+            vendor_root = (workspace_root / "vendor" / "agent-canon").resolve()
+            source_root = (
+                vendor_root
+                if vendor_root.is_dir() and vendor_root in resolved_source.parents
+                else workspace_root
+            )
+            source_metadata = source_root / ".git"
+            if not source_metadata.is_file() and not source_metadata.is_dir():
+                raise DependencyError(
+                    f"{record.id}: source-root Git metadata is unavailable: "
+                    f"{source_root}"
+                )
             source_commit = self._git_commit(
-                resolved_source,
+                source_root,
                 "HEAD",
                 workspace=workspace,
                 record_id=record.id,
                 label="source-root",
             )
-            workspace_root = workspace.resolve()
-            vendor_root = (workspace_root / "vendor" / "agent-canon").resolve()
             if vendor_root.is_dir() and (
                 resolved_source == vendor_root or vendor_root in resolved_source.parents
             ):

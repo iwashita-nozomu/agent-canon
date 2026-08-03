@@ -21,6 +21,9 @@ PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 TOOLS_HOME="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
 FORCE_REBUILD="${AGENT_CANON_FORCE_TOOL_REBUILD:-0}"
 
+# shellcheck source=tools/lib/agent_canon_source_identity.sh
+source "$SCRIPT_DIR/lib/agent_canon_source_identity.sh"
+
 agent_canon_source_root() {
   if [ -f "$ROOT_DIR/$PREFIX/rust/agent-canon/Cargo.toml" ]; then
     printf '%s\n' "$ROOT_DIR/$PREFIX"
@@ -34,29 +37,7 @@ agent_canon_source_root() {
 }
 
 source_commit() {
-  local source_root="$1"
-  local source_sha
-  local vendor_root
-  local provider_sha
-
-  if ! source_sha="$(git -C "$source_root" rev-parse --verify HEAD 2>/dev/null)"; then
-    echo "AgentCanon source-root identity is unavailable: $source_root" >&2
-    return 1
-  fi
-  vendor_root="$ROOT_DIR/$PREFIX"
-  if [ -d "$vendor_root" ] && [ "$(cd "$vendor_root" && pwd -P)" = "$(cd "$source_root" && pwd -P)" ]; then
-    if ! provider_sha="$(git -C "$ROOT_DIR" rev-parse --verify "HEAD:$PREFIX" 2>/dev/null)"; then
-      echo "AgentCanon parent gitlink identity is unavailable: $PREFIX" >&2
-      return 1
-    fi
-    if [ "$provider_sha" != "$source_sha" ]; then
-      echo "AgentCanon provider identity mismatch: $provider_sha!=$source_sha" >&2
-      return 1
-    fi
-    printf '%s\n' "$provider_sha"
-    return
-  fi
-  printf '%s\n' "$source_sha"
+  agent_canon_source_identity "$ROOT_DIR" "$PREFIX" "$1"
 }
 
 installed_commit() {
@@ -104,6 +85,7 @@ rebuild_rust_cli() {
   local build_binary
   local install_binary
   local source_newer
+  local source_sha_after
 
   source_root="$(agent_canon_source_root)"
   if [ -z "$source_root" ]; then
@@ -129,6 +111,11 @@ rebuild_rust_cli() {
   fi
 
   cargo build --release --manifest-path "$manifest"
+  source_sha_after="$(source_commit "$source_root")"
+  if [ "$source_sha" != "$source_sha_after" ]; then
+    echo "AgentCanon source identity changed during build: $source_sha!=$source_sha_after" >&2
+    return 1
+  fi
   build_binary="$source_root/rust/agent-canon/target/release/agent-canon"
   install -d -m 755 "$state_dir/bin" "$TOOLS_HOME/bin"
   install -m 755 "$build_binary" "$install_binary"
