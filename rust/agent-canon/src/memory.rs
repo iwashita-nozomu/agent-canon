@@ -14,7 +14,7 @@ use serde::Serialize;
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -760,36 +760,17 @@ fn validate_candidate(root: &Path, path: &Path, text: &str) -> Result<MemoryReco
     validate_record(root, path, text)
 }
 
-fn write_record(
+fn write_record_atomically<R>(
     root: &Path,
     record_id: &str,
+    target: &Path,
     text: &str,
     require_existing: bool,
-) -> Result<(), MemoryError> {
-    let (target, exists) = checked_record_target(root, record_id, require_existing)?;
-    if require_existing && !exists {
-        return Err(MemoryError::new(format!(
-            "record does not exist: {record_id}"
-        )));
-    }
-    if !require_existing && exists {
-        return Err(MemoryError::new(format!(
-            "record already exists: {record_id}"
-        )));
-    }
-    if !require_existing {
-        let mut file = fs::OpenOptions::new()
-            .write(true)
-            .create_new(true)
-            .open(&target)
-            .map_err(|error| MemoryError::new(format!("create {}: {error}", target.display())))?;
-        file.write_all(text.as_bytes())
-            .map_err(|error| MemoryError::new(format!("write {}: {error}", target.display())))?;
-        file.sync_all()
-            .map_err(|error| MemoryError::new(format!("sync {}: {error}", target.display())))?;
-        return Ok(());
-    }
-
+    rename: R,
+) -> Result<(), MemoryError>
+where
+    R: FnOnce(&Path, &Path) -> io::Result<()>,
+{
     let directory = canonical_records_dir(root)?;
     let nonce = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -819,8 +800,15 @@ fn write_record(
                 temporary.display()
             ))
         })?;
-        checked_record_target(root, record_id, true)?;
-        fs::rename(&temporary, &target).map_err(|error| {
+        let (_, exists) = checked_record_target(root, record_id, require_existing)?;
+        if exists != require_existing {
+            return Err(MemoryError::new(if require_existing {
+                format!("record disappeared before replacement: {record_id}")
+            } else {
+                format!("record appeared before creation: {record_id}")
+            }));
+        }
+        rename(&temporary, target).map_err(|error| {
             MemoryError::new(format!("replace record {}: {error}", target.display()))
         })?;
         Ok(())
@@ -829,6 +817,33 @@ fn write_record(
         let _ = fs::remove_file(&temporary);
     }
     write_result
+}
+
+fn write_record(
+    root: &Path,
+    record_id: &str,
+    text: &str,
+    require_existing: bool,
+) -> Result<(), MemoryError> {
+    let (target, exists) = checked_record_target(root, record_id, require_existing)?;
+    if require_existing && !exists {
+        return Err(MemoryError::new(format!(
+            "record does not exist: {record_id}"
+        )));
+    }
+    if !require_existing && exists {
+        return Err(MemoryError::new(format!(
+            "record already exists: {record_id}"
+        )));
+    }
+    write_record_atomically(
+        root,
+        record_id,
+        &target,
+        text,
+        require_existing,
+        |temporary, target| fs::rename(temporary, target),
+    )
 }
 
 fn run_validate(options: &MemoryOptions) -> i32 {
@@ -1346,6 +1361,36 @@ mod tests {
         assert_eq!(run_create(&candidate), 0);
         let records = load_records(&root).unwrap();
         assert_eq!(search_hits(&records, &candidate).len(), 1);
+    }
+
+    #[test]
+    fn failed_atomic_create_cleans_temp_and_leaves_final_path_absent() {
+        let root = fixture_root();
+        let record_id = "runtime--atomic-create";
+        let target = root.join(RECORDS_DIR).join(format!("{record_id}.md"));
+        let mut temporary = None;
+        let result = write_record_atomically(
+            &root,
+            record_id,
+            &target,
+            "# incomplete\n",
+            false,
+            |temporary_path, _target| {
+                temporary = Some(temporary_path.to_owned());
+                Err(io::Error::new(
+                    io::ErrorKind::Other,
+                    "injected rename failure",
+                ))
+            },
+        );
+
+        assert!(result.is_err());
+        assert!(!target.exists());
+        assert!(!temporary.expect("temporary path was not observed").exists());
+        assert!(!fs::read_dir(root.join(RECORDS_DIR))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .any(|name| name.to_string_lossy().starts_with('.')));
     }
 
     #[test]
