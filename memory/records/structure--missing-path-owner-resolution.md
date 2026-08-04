@@ -1,3 +1,14 @@
+<!--
+@dependency-start
+contract data
+responsibility Records missing-path owner-resolution knowledge for repository structure triage.
+upstream design ../README.md memory record contract
+upstream implementation ../../rust/agent-canon/src/memory.rs schema, validation, and search owner
+upstream design ../../agents/canonical/CODEX_WORKFLOW.md canonical missing-path triage owner
+upstream design ../../agents/skills/structure-refactor.md canonical structure repair owner
+@dependency-end
+-->
+
 # Missing path owner resolution
 
 record_id: `structure--missing-path-owner-resolution`

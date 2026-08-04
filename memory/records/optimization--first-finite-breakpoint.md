@@ -1,3 +1,13 @@
+<!--
+@dependency-start
+contract data
+responsibility Records first-finite-breakpoint diagnosis knowledge for iterative numerical failures.
+upstream design ../README.md memory record contract
+upstream implementation ../../rust/agent-canon/src/memory.rs schema, validation, and search owner
+upstream design ../../agents/skills/computational-optimization.md canonical numerical optimization owner
+@dependency-end
+-->
+
 # First finite breakpoint diagnosis
 
 record_id: `optimization--first-finite-breakpoint`

@@ -1,3 +1,13 @@
+<!--
+@dependency-start
+contract data
+responsibility Records remote archive readback knowledge for publication closeout.
+upstream design ../README.md memory record contract
+upstream implementation ../../rust/agent-canon/src/memory.rs schema, validation, and search owner
+upstream design ../../documents/runtime/runtime-log-archive.md canonical runtime archive owner
+@dependency-end
+-->
+
 # Runtime archive readback
 
 record_id: `runtime--archive-readback`

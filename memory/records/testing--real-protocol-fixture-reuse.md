@@ -1,3 +1,13 @@
+<!--
+@dependency-start
+contract data
+responsibility Records real protocol fixture reuse knowledge for test-boundary decisions.
+upstream design ../README.md memory record contract
+upstream implementation ../../rust/agent-canon/src/memory.rs schema, validation, and search owner
+upstream design ../../agents/skills/test-design.md canonical test design owner
+@dependency-end
+-->
+
 # Real protocol fixture reuse
 
 record_id: `testing--real-protocol-fixture-reuse`
