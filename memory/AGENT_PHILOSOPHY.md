@@ -109,11 +109,23 @@ upstream design README.md memory surface index
   - confidence: stable
   - evidence: User corrected a PDIPM/KKT diagnosis that relied on the final failed log state instead of the first divergence point.
 
-- 2026-08-04 | work-principle | Container mount設計では、workspaceから参照するsymlinkとhost shell startup fileを事前にinventoryし、解決先が既存mount外なら用途に応じたread-write/read-only bindを追加し、container内の解決結果まで検証する。
+- 2026-08-04 | work-principle | Container/default-runtime mount設計では、workspaceから参照するsymlinkとsymlink化されたhost shell startup fileを事前にinventoryし、解決先が既存mount外なら用途に応じたread-write/read-only bindを追加し、container内の解決結果まで検証する。
   - source: chat feedback
-  - scope: devcontainer-and-container-runtime
+  - scope: container/default-runtime
   - confidence: stable
-  - evidence: 2026-08-04: link/msm_data_root resolved to /mnt/l/msm_data_root and host ~/.zshrc resolved to ~/.dotfiles/shell/zsh/.zshrc; both were absent from generated Compose.
+  - evidence: 2026-08-04: link/msm_data_root resolved to /mnt/l/msm_data_root and symlinked host ~/.zshrc/.zsh resolved outside the repo; those targets were absent from generated Compose.
+
+- 2026-08-04 | work-principle | Default container runtime では固定 AgentCanon group、host sudo mutation、container sudo capability、`USER vscode` を暗黙の前提にせず、明示した base image から必要 capability と project identity を構成する。
+  - source: chat feedback
+  - scope: container/default-runtime
+  - confidence: stable
+  - evidence: 2026-08-04: devcontainer の runtime group/session failure を受け、Ubuntu 22.04 等の base と project user を明示する方針を確認。
+
+- 2026-08-04 | work-principle | 実験 scheduler・共有 GPU lock・runtime receipt は source に保持して明示 opt-in の owner route だけで起動し、GPU allocation の設計・割り当ては Issue に記録する。default runtime から実験機能を推測して有効化しない。
+  - source: chat feedback
+  - scope: container/default-runtime
+  - confidence: stable
+  - evidence: 2026-08-04: 実験機能の wholesale deletion を避け、opt-in profile と Issue tracking に分離する指示。
 
 ## Interaction Observations
 

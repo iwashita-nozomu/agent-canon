@@ -41,6 +41,18 @@ upstream design README.md memory surface index
   - source: chat
   - rationale: 2026-08-04: repo外を指す link/msm_data_root と symlink化された host .zshrc のmount漏れをユーザーが指摘。
 
+- 2026-08-04 | Default devcontainer runtime は固定 AgentCanon group、host `sudo` による状態変更、container sudo capability、`USER vscode` を前提にせず、Ubuntu 22.04 など明示した base から必要 capability を構成する。
+  - source: chat
+  - scope: container/default-runtime
+  - confidence: stable
+  - rationale: 2026-08-04: devcontainer 起動失敗の原因を host group/session と固定 user の暗黙前提から切り離す方針を確認。
+
+- 2026-08-04 | 実験 scheduler・共有 GPU lock・runtime receipt は全削除せず、明示的な opt-in 経路だけで起動し、GPU 割り当ては Issue で追跡する。
+  - source: chat
+  - scope: container/default-runtime
+  - confidence: stable
+  - rationale: 2026-08-04: default runtime から実験機能を分離し、GPU allocation は Issue に切り出す方針を確認。
+
 ## Provisional Preferences
 
 - 2026-04-10 | agent の作業哲学、知識、対話から得た学習を task / dialogue ごとに更新可能な仕組みにしたい

@@ -16,6 +16,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -69,6 +70,16 @@ def write_host_zsh_directory_symlink(home: Path) -> Path:
     (target / "zsh-syntax-highlighting.zsh").write_text("# fixture\n", encoding="utf-8")
     (home / ".zsh").symlink_to(target)
     return target.resolve()
+
+
+def write_linked_data_root_symlink(repo: Path, tmp_path: Path) -> tuple[str, Path]:
+    """Create one repository symlink and a temporary canonical directory."""
+    target = tmp_path / "linked-data-target"
+    target.mkdir(parents=True, exist_ok=True)
+    link = repo / "link" / "msm_data_root"
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(target)
+    return link.relative_to(repo).as_posix(), target
 
 
 def write_devcontainer(root: Path) -> None:
@@ -423,6 +434,43 @@ def test_generator_direct_repo_mounts_only_repository_root(tmp_path: Path) -> No
     assert load_container_config_module().validate_generated_compose(repo, None) == []
 
 
+def test_generator_standalone_projects_host_zshrc_only_when_profile_selected(
+    tmp_path: Path,
+) -> None:
+    """Standalone layout shares the opt-in host zshrc profile contract."""
+    repo = tmp_path / "workspace" / "data_download"
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
+    write_file(repo, ".devcontainer/Dockerfile", DOCKERFILE.read_text(encoding="utf-8"))
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    home = tmp_path / "home with spaces"
+    target = write_host_zshrc_symlink(home)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "AGENT_CANON_OPTIONAL_MOUNTS": "host-zshrc",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert f'source: "{target}"' in compose
+    assert 'target: "/home/project/.zshrc"' in compose
+    assert load_container_config_module().validate_generated_compose(repo, None) == []
+
+
 def test_generator_accepts_explicit_output_path(tmp_path: Path) -> None:
     """Generator writes compose output to an explicit caller-provided destination."""
     repo = tmp_path / "workspace" / "topic" / "agent-canon"
@@ -512,6 +560,8 @@ def write_parent_generator_fixture(
     runtime_shell: str = "/bin/zsh",
     dependency_profile: str = "full",
     runtime_mounts: tuple[str, ...] = (),
+    optional_mount_profiles: tuple[str, ...] = (),
+    linked_data_roots: tuple[tuple[str, str], ...] = (),
     environment_script: str = "",
     environment_variables: tuple[str, ...] = (),
 ) -> Path:
@@ -527,6 +577,25 @@ def write_parent_generator_fixture(
     variables = ", ".join(json.dumps(item) for item in environment_variables)
     runtime_mounts_line = (
         f"mounts = {json.dumps(list(runtime_mounts))}" if runtime_mounts else ""
+    )
+    optional_mount_profiles_line = (
+        f"optional_mount_profiles = {json.dumps(list(optional_mount_profiles))}"
+        if optional_mount_profiles
+        else ""
+    )
+    linked_data_roots_line = (
+        "linked_data_roots = ["
+        + ", ".join(
+            "{link = "
+            + json.dumps(link)
+            + ", target = "
+            + json.dumps(target)
+            + "}"
+            for link, target in linked_data_roots
+        )
+        + "]"
+        if linked_data_roots
+        else ""
     )
     write_file(
         repo,
@@ -555,6 +624,8 @@ def write_parent_generator_fixture(
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
                 f'dependency_profile = "{dependency_profile}"',
+                optional_mount_profiles_line,
+                linked_data_roots_line,
                 runtime_mounts_line,
                 "",
             ]
@@ -607,6 +678,123 @@ def test_load_pack_reads_optional_platform_when_present_or_omitted(
     assert explicit is not None
     assert explicit.platform == "linux/amd64"
     assert explicit.dependency_profile == "gpu"
+
+
+def test_load_pack_rejects_invalid_optional_profiles(tmp_path: Path) -> None:
+    """Pack optional profiles are typed, known, non-empty, and unique."""
+    cases = (("unknown",), ("",), ("host-git", "host-git"))
+    module = load_container_config_module()
+    for index, profiles in enumerate(cases):
+        repo = write_parent_generator_fixture(
+            tmp_path / str(index), optional_mount_profiles=profiles
+        )
+        pack, findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+        assert pack is None
+        assert findings
+
+    repo = write_parent_generator_fixture(tmp_path / "wrong-type")
+    pack_path = repo / "docker/packs/default.toml"
+    pack_path.write_text(
+        pack_path.read_text(encoding="utf-8")
+        + 'optional_mount_profiles = "host-git"\n',
+        encoding="utf-8",
+    )
+    pack, findings = module.load_pack(repo, pack_path)
+    assert pack is None
+    assert any("optional_mount_profiles" in finding.detail for finding in findings)
+
+
+def test_load_pack_requires_linked_data_profile_and_list_pair(tmp_path: Path) -> None:
+    """Linked data roots require the matching profile in either direction."""
+    module = load_container_config_module()
+    repo = write_parent_generator_fixture(
+        tmp_path / "profile-only", optional_mount_profiles=("linked-data-roots",)
+    )
+    pack, findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack is None
+    assert any("profile-and-list" in finding.detail for finding in findings)
+
+    repo = write_parent_generator_fixture(
+        tmp_path / "empty-list", optional_mount_profiles=("linked-data-roots",)
+    )
+    empty_pack_path = repo / "docker/packs/default.toml"
+    empty_pack_path.write_text(
+        empty_pack_path.read_text(encoding="utf-8")
+        + "linked_data_roots = []\n",
+        encoding="utf-8",
+    )
+    pack, findings = module.load_pack(repo, empty_pack_path)
+    assert pack is None
+    assert any("must-be-non-empty" in finding.detail for finding in findings)
+
+    repo = write_parent_generator_fixture(tmp_path / "list-only")
+    link, target = write_linked_data_root_symlink(repo, tmp_path / "list-only")
+    pack_path = repo / "docker/packs/default.toml"
+    pack_path.write_text(
+        pack_path.read_text(encoding="utf-8")
+        + f'linked_data_roots = [{{link = {json.dumps(link)}, target = "/mnt/l/list-only"}}]\n',
+        encoding="utf-8",
+    )
+    try:
+        pack, findings = module.load_pack(repo, pack_path)
+        assert pack is None
+        assert any("profile-and-list" in finding.detail for finding in findings)
+    finally:
+        shutil.rmtree(target)
+
+
+def test_load_pack_rejects_invalid_linked_data_root_entries(tmp_path: Path) -> None:
+    """Linked root links and targets reject path escapes, broad roots, and duplicates."""
+    module = load_container_config_module()
+    cases = (
+        "absolute-link",
+        "dotdot-link",
+        "regular-file",
+        "broad-target",
+        "punctuated-target",
+        "duplicate",
+    )
+    for case in cases:
+        repo = write_parent_generator_fixture(
+            tmp_path / case, optional_mount_profiles=("linked-data-roots",)
+        )
+        link, target = write_linked_data_root_symlink(repo, tmp_path / case)
+        pack_path = repo / "docker/packs/default.toml"
+        if case == "absolute-link":
+            configured_link = str(repo / link)
+            configured_target = "/mnt/l/absolute"
+            entries = [(configured_link, configured_target)]
+        elif case == "dotdot-link":
+            entries = [("../escape", "/mnt/l/escape")]
+        elif case == "regular-file":
+            (repo / link).unlink()
+            (repo / link).write_text("not a symlink\n", encoding="utf-8")
+            entries = [(link, "/mnt/l/regular")]
+        elif case == "broad-target":
+            entries = [(link, "/mnt/l")]
+        elif case == "punctuated-target":
+            entries = [(link, "/mnt/l/data,part")]
+        else:
+            entries = [(link, "/mnt/l/duplicate"), (link, "/mnt/l/duplicate")]
+        entries_toml = ", ".join(
+            "{link = "
+            + json.dumps(entry_link)
+            + ", target = "
+            + json.dumps(entry_target)
+            + "}"
+            for entry_link, entry_target in entries
+        )
+        pack_path.write_text(
+            pack_path.read_text(encoding="utf-8")
+            + f"linked_data_roots = [{entries_toml}]\n",
+            encoding="utf-8",
+        )
+        try:
+            pack, findings = module.load_pack(repo, pack_path)
+            assert pack is None
+            assert findings
+        finally:
+            shutil.rmtree(target)
 
 
 def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> None:
@@ -694,6 +882,136 @@ def test_parent_generator_resolves_symlink_host_zshrc(tmp_path: Path) -> None:
     assert pack_findings == []
     assert pack is not None
     assert module.validate_generated_compose(repo, pack) == []
+
+
+def test_parent_generator_rejects_linked_data_roots_target_failures(
+    tmp_path: Path,
+) -> None:
+    """Generator fails closed for missing, file, and canonical-target mismatches."""
+    cases = ("missing", "file", "mismatch")
+    for case in cases:
+        case_root = tmp_path / case
+        repo = write_parent_generator_fixture(
+            case_root,
+            optional_mount_profiles=("linked-data-roots",),
+        )
+        (repo / ".agent-canon").mkdir()
+        link, target = write_linked_data_root_symlink(repo, case_root)
+        if case == "missing":
+            target.rmdir()
+            configured_target = "/mnt/l/missing"
+        elif case == "file":
+            target.rmdir()
+            target.write_text("not a directory\n", encoding="utf-8")
+            configured_target = "/mnt/l/file"
+        else:
+            configured_target = "/mnt/l/mismatch"
+        pack_path = repo / "docker/packs/default.toml"
+        pack_path.write_text(
+            pack_path.read_text(encoding="utf-8")
+            + "linked_data_roots = [{link = "
+            + json.dumps(link)
+            + ", target = "
+            + json.dumps(configured_target)
+            + "}]\n",
+            encoding="utf-8",
+        )
+
+        result = subprocess.run(
+            ["bash", ".devcontainer/generate-runtime-compose.sh"],
+            cwd=repo,
+            env={
+                **os.environ,
+                "PROJECT_UID": "1000",
+                "PROJECT_GID": "1000",
+                "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+            },
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 1, result.stdout + result.stderr
+        if case == "missing":
+            assert "must resolve to an existing directory" in result.stderr
+        elif case == "file":
+            assert "must resolve to an existing directory" in result.stderr
+        else:
+            assert "does not match resolved source" in result.stderr
+
+
+def test_generator_rejects_invalid_optional_mount_environment(tmp_path: Path) -> None:
+    """Environment profile input rejects empty, whitespace, unknown, and duplicates."""
+    for index, raw_profiles in enumerate(
+        ("", " ", "host-zshrc,", "host-zshrc, host-git", "unknown", "host-git,host-git")
+    ):
+        repo = write_parent_generator_fixture(tmp_path / str(index))
+        result = subprocess.run(
+            ["bash", ".devcontainer/generate-runtime-compose.sh"],
+            cwd=repo,
+            env={
+                **os.environ,
+                "AGENT_CANON_OPTIONAL_MOUNTS": raw_profiles,
+            },
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+
+
+def test_generator_rejects_empty_selected_linked_data_roots(tmp_path: Path) -> None:
+    """Generator fails closed when linked-data-roots is selected with an empty list."""
+    repo = write_parent_generator_fixture(
+        tmp_path, optional_mount_profiles=("linked-data-roots",)
+    )
+    pack_path = repo / "docker/packs/default.toml"
+    pack_path.write_text(
+        pack_path.read_text(encoding="utf-8") + "linked_data_roots = []\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "AGENT_CANON_OPTIONAL_MOUNTS": "linked-data-roots"},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "non-empty linked_data_roots" in result.stderr
+
+
+def test_validator_requires_pack_for_selected_linked_data_profile(tmp_path: Path) -> None:
+    """A generated linked profile cannot validate without its source pack."""
+    repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".agent-canon").mkdir()
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "PROJECT_UID": "1000",
+            "PROJECT_GID": "1000",
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose_path = repo / ".agent-canon/docker-compose.generated.yml"
+    compose = compose_path.read_text(encoding="utf-8")
+    compose_path.write_text(
+        compose.replace(
+            'AGENT_CANON_OPTIONAL_MOUNTS: ""',
+            'AGENT_CANON_OPTIONAL_MOUNTS: "linked-data-roots"',
+        ),
+        encoding="utf-8",
+    )
+    module = load_container_config_module()
+    findings = module.validate_generated_compose(repo, None)
+    assert any("linked-data-roots-pack-required" in finding.detail for finding in findings)
 
 
 def test_parent_generator_resolves_symlink_host_zsh_directory(tmp_path: Path) -> None:
@@ -1154,7 +1472,15 @@ def test_default_generator_omits_all_optional_host_files_and_sockets(
         encoding="utf-8"
     )
     volume_section = compose.split("    environment:", 1)[0]
-    for marker in (".zshrc", "/mnt/git", ".config/gh", "/.ssh", "/ssh-agent", "/mnt/agent-canon-secrets"):
+    for marker in (
+        ".zshrc",
+        "/home/project/.zsh",
+        "/mnt/git",
+        ".config/gh",
+        "/.ssh",
+        "/ssh-agent",
+        "/mnt/agent-canon-secrets",
+    ):
         assert marker not in volume_section
     assert 'AGENT_CANON_RUNTIME_ROUTE: "CONTAINER_LOCAL"' in compose
     assert 'AGENT_CANON_SECRET_MOUNT: "/mnt/agent-canon-secrets"' in compose
@@ -1178,6 +1504,45 @@ def test_generator_rejects_raw_runtime_mounts_before_compose_output(
     )
     assert result.returncode == 1
     assert "rejects raw runtime.mounts" in result.stderr
+
+
+def test_validator_rejects_raw_runtime_mounts(tmp_path: Path) -> None:
+    """The static pack validator rejects raw runtime.mounts as a contract finding."""
+    repo = write_parent_generator_fixture(
+        tmp_path,
+        runtime_mounts=("/var/run/docker.sock:/var/run/docker.sock",),
+    )
+    module = load_container_config_module()
+    pack, findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack is None
+    assert any("runtime.mounts-unsupported-use-optional-profile" in finding.detail for finding in findings)
+
+
+def test_generator_rejects_delimiter_linked_target(tmp_path: Path) -> None:
+    """Generator linked targets reject delimiters unsafe for short Docker binds."""
+    repo = write_parent_generator_fixture(
+        tmp_path,
+        optional_mount_profiles=("linked-data-roots",),
+    )
+    link, _target = write_linked_data_root_symlink(repo, tmp_path)
+    pack_path = repo / "docker/packs/default.toml"
+    pack_path.write_text(
+        pack_path.read_text(encoding="utf-8")
+        + "linked_data_roots = [{link = "
+        + json.dumps(link)
+        + ', target = "/mnt/l/data,part"}]\n',
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "PROJECT_UID": "1234", "PROJECT_GID": "2345"},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "narrow /mnt/<letter> path" in result.stderr
 
 
 def test_generator_rejects_custom_secret_target(tmp_path: Path) -> None:

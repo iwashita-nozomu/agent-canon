@@ -149,6 +149,17 @@ AgentCanon の実体パスを直接呼び出します。
   symlink・型違いはmountを省略し、validatorはresolved absolute source、bind type、
   non-root target、read-onlyを静的に確認する。zsh startupとfresh CIはhost
   zshrc/zsh directoryの有無に依存せず、代替pathは探索しない。
+- packの `optional_mount_profiles` と環境 `AGENT_CANON_OPTIONAL_MOUNTS` は、pack順を
+  優先したcanonical unionで選択される。`linked-data-roots` は pack-defined inline
+  table の repository symlinkを `realpath -e` で確認し、declared `/mnt/<letter>/...`
+  targetと一致する既存directoryだけを `read_only: false` の structured bindとして
+  投影する。absolute/escape/non-symlink、broad root、重複 source/target、raw
+  `runtime.mounts` は拒否し、plain pack/envではhost mountを生成しない。
+
+直接 pack runner は `linked-data-roots` または `docker-host` を明示選択した pack に限って
+それぞれの bind を適用し、host zshrc/.zsh など generator 専用の profile を暗黙に再現
+しません。`docker-host` の socket が欠落する場合や CLI mount が linked/docker target を
+上書きする場合は fail-closed です。
 
 この分離により、shared runtime の更新と親プロジェクトの hook / build 設定を
 別々に review でき、親固有の変更が AgentCanon source の pin を汚染しません。

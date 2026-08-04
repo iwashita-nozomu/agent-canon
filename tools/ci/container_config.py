@@ -80,8 +80,10 @@ OPTIONAL_MOUNT_PROFILES = frozenset(
         "host-credentials",
         "ssh-agent",
         "docker-host",
+        "linked-data-roots",
     }
 )
+LINKED_DATA_TARGET_RE = re.compile(r"/mnt/[a-z]/[^/].*\Z")
 
 
 @dataclass(frozen=True)
@@ -112,6 +114,17 @@ class PackConfig:
     workspace_mount: str
     platform: str | None
     dependency_profile: str
+    optional_mount_profiles: tuple[str, ...]
+    linked_data_roots: tuple[LinkedDataRoot, ...]
+    linked_data_roots_declared: bool
+
+
+@dataclass(frozen=True)
+class LinkedDataRoot:
+    """One repository symlink projected to its declared host data directory."""
+
+    link: str
+    target: str
 
 
 @dataclass(frozen=True)
@@ -207,6 +220,33 @@ def validate_repo_path(
         findings.append(Finding("missing_file", source, f"{field}-missing:{value}"))
 
 
+def is_normalized_repo_relative_link(value: str) -> bool:
+    """Return whether a configured link is a normalized repository-relative path."""
+    path = Path(value)
+    return (
+        bool(value)
+        and not any(ord(char) < 32 for char in value)
+        and not path.is_absolute()
+        and value != "."
+        and value == path.as_posix()
+        and all(part not in {"", ".", ".."} for part in path.parts)
+    )
+
+
+def is_valid_linked_data_target(value: str) -> bool:
+    """Return whether a linked-data target is a narrow, non-root mount path."""
+    path = Path(value)
+    return bool(
+        LINKED_DATA_TARGET_RE.fullmatch(value)
+        and not any(ord(char) < 32 for char in value)
+        and ":" not in value
+        and "," not in value
+        and value == path.as_posix()
+        and all(part not in {"", ".", ".."} for part in path.parts)
+        and value not in {"/mnt", "/mnt/l"}
+    )
+
+
 def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]:
     """Load and validate one runtime pack TOML file."""
     source = path.relative_to(root).as_posix()
@@ -253,14 +293,171 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             Finding("invalid_manifest", source, "pack.platform-must-be-string")
         )
 
+    optional_mount_profiles_value = runtime.get("optional_mount_profiles", ())
+    optional_mount_profiles: tuple[str, ...] = ()
+    if "optional_mount_profiles" in runtime:
+        profile_sequence = as_sequence(optional_mount_profiles_value)
+        if profile_sequence is None or not all(
+            isinstance(item, str) for item in profile_sequence
+        ):
+            findings.append(
+                Finding(
+                    "invalid_manifest",
+                    source,
+                    "runtime.optional_mount_profiles-must-be-string-list",
+                )
+            )
+        else:
+            profiles = tuple(cast(Sequence[str], profile_sequence))
+            seen_profiles: set[str] = set()
+            for profile in profiles:
+                if not profile or profile != profile.strip():
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            "runtime.optional_mount_profiles-empty-or-whitespace",
+                        )
+                    )
+                elif profile not in OPTIONAL_MOUNT_PROFILES:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.optional_mount_profiles-unknown:{profile}",
+                        )
+                    )
+                if profile in seen_profiles:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.optional_mount_profiles-duplicate:{profile}",
+                        )
+                    )
+                seen_profiles.add(profile)
+            optional_mount_profiles = profiles
+
+    linked_data_roots_value = runtime.get("linked_data_roots")
+    linked_data_roots: tuple[LinkedDataRoot, ...] = ()
+    linked_data_roots_present = "linked_data_roots" in runtime
+    if linked_data_roots_present:
+        root_sequence = as_sequence(linked_data_roots_value)
+        if root_sequence is None:
+            findings.append(
+                Finding(
+                    "invalid_manifest",
+                    source,
+                    "runtime.linked_data_roots-must-be-inline-table-array",
+                )
+            )
+        else:
+            parsed_roots: list[LinkedDataRoot] = []
+            seen_links: set[str] = set()
+            seen_targets: set[str] = set()
+            for index, raw_root in enumerate(root_sequence):
+                root_table = as_mapping(raw_root)
+                if root_table is None or set(root_table) != {"link", "target"}:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-entry-{index}-must-have-link-target",
+                        )
+                    )
+                    continue
+                link = root_table.get("link")
+                linked_target = root_table.get("target")
+                if not isinstance(link, str) or not isinstance(linked_target, str):
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-entry-{index}-strings-required",
+                        )
+                    )
+                    continue
+                if not is_normalized_repo_relative_link(link):
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-link-invalid:{link}",
+                        )
+                    )
+                elif not (root / link).is_symlink():
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-link-must-be-symlink:{link}",
+                        )
+                    )
+                if not is_valid_linked_data_target(linked_target):
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-target-invalid:{linked_target}",
+                        )
+                    )
+                if link in seen_links:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-link-duplicate:{link}",
+                        )
+                    )
+                if linked_target in seen_targets:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-target-duplicate:{linked_target}",
+                        )
+                    )
+                seen_links.add(link)
+                seen_targets.add(linked_target)
+                parsed_roots.append(LinkedDataRoot(link=link, target=linked_target))
+            linked_data_roots = tuple(parsed_roots)
+    if ("linked-data-roots" in optional_mount_profiles) != linked_data_roots_present:
+        findings.append(
+            Finding(
+                "invalid_manifest",
+                source,
+                "runtime.linked-data-roots-profile-and-list-must-match",
+            )
+        )
+    if "linked-data-roots" in optional_mount_profiles and not linked_data_roots:
+        findings.append(
+            Finding(
+                "invalid_manifest",
+                source,
+                "runtime.linked_data_roots-must-be-non-empty-when-selected",
+            )
+        )
+
     for table, key, section in (
         (smoke, "commands", "smoke"),
         (runtime, "env", "runtime"),
-        (runtime, "mounts", "runtime"),
     ):
         _, finding = require_string_list(table, key, source, section)
         if finding is not None:
             findings.append(finding)
+    runtime_mounts, mounts_finding = require_string_list(
+        runtime, "mounts", source, "runtime"
+    )
+    if mounts_finding is not None:
+        findings.append(mounts_finding)
+    elif runtime_mounts:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                source,
+                "runtime.mounts-unsupported-use-optional-profile",
+            )
+        )
     workdir = runtime.get("workdir", "/workspace")
     workspace_mount = runtime.get("workspace_mount", "/workspace")
     shell = runtime.get("shell", "/bin/bash")
@@ -306,6 +503,7 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             )
         )
         dependency_profile = DEFAULT_DEPENDENCY_PROFILE
+    pack_shell = shell if isinstance(shell, str) else "/bin/bash"
 
     validate_repo_path(root, source, "dockerfile", dockerfile, findings)
     validate_repo_path(root, source, "context", context, findings)
@@ -319,11 +517,14 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             context=context,
             image_tag=image_tag,
             target=target,
-            shell=shell,
+            shell=pack_shell,
             workdir=workdir,
             workspace_mount=workspace_mount,
             platform=platform,
             dependency_profile=dependency_profile,
+            optional_mount_profiles=optional_mount_profiles,
+            linked_data_roots=linked_data_roots,
+            linked_data_roots_declared=linked_data_roots_present,
         ),
         [],
     )
@@ -621,16 +822,17 @@ def parse_parent_environment_manifest(path: Path) -> tuple[tuple[str, ...], list
     try:
         with path.open("rb") as handle:
             data = tomllib.load(handle)
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        return (), [f"toml-decode:{exc}"]
+    except (OSError, tomllib.TOMLDecodeError):
+        return (), ["toml-decode:invalid-or-unreadable-file"]
     if set(data) != {"variables"}:
         return (), ["toml-keys-must-be-variables-only"]
     variables = data.get("variables")
-    if not isinstance(variables, list) or not all(
-        isinstance(item, str) for item in variables
-    ):
+    if not isinstance(variables, list):
         return (), ["variables-must-be-string-list"]
-    names = cast(list[str], variables)
+    variable_values = cast(list[object], variables)
+    if not all(isinstance(item, str) for item in variable_values):
+        return (), ["variables-must-be-string-list"]
+    names = cast(list[str], variable_values)
     findings: list[str] = []
     seen: set[str] = set()
     for name in names:
@@ -846,12 +1048,26 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         if environment is not None
         else ""
     )
-    optional_mounts = (
-        optional_mounts_value if isinstance(optional_mounts_value, str) else ""
-    )
-    optional_tokens_list = [
-        token.strip() for token in optional_mounts.split(",") if token.strip()
-    ]
+    optional_mounts = optional_mounts_value if isinstance(optional_mounts_value, str) else ""
+    optional_tokens_list: list[str] = []
+    if not isinstance(optional_mounts_value, str):
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "optional-mount-profile-source-must-be-string",
+            )
+        )
+    elif optional_mounts:
+        optional_tokens_list = optional_mounts.split(",")
+        if any(not token or token != token.strip() or re.search(r"\s", token) for token in optional_tokens_list):
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "optional-mount-profile-empty-or-whitespace",
+                )
+            )
     optional_tokens = set(optional_tokens_list)
     for token in sorted(optional_tokens - OPTIONAL_MOUNT_PROFILES):
         findings.append(
@@ -867,6 +1083,36 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                 "dependency_contract_violation",
                 relative,
                 "optional-mount-profile-duplicate",
+            )
+        )
+    if pack is not None:
+        expected_profiles = list(pack.optional_mount_profiles)
+        expected_profiles.extend(
+            token for token in optional_tokens_list if token not in expected_profiles
+        )
+        if optional_tokens_list != expected_profiles:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "optional-mount-profile-canonical-union",
+                )
+            )
+    linked_profile_selected = "linked-data-roots" in optional_tokens
+    if pack is not None and linked_profile_selected != pack.linked_data_roots_declared:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "linked-data-roots-profile-and-list-must-match",
+            )
+        )
+    elif pack is None and linked_profile_selected:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "linked-data-roots-pack-required",
             )
         )
     workspace_layout = (
@@ -1149,6 +1395,79 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                         "root-home-mount-forbidden",
                     )
                 )
+    linked_targets: set[str] = set()
+    if pack is not None:
+        linked_targets = {linked_root.target for linked_root in pack.linked_data_roots}
+    if linked_profile_selected and pack is not None:
+        linked_mounts = [
+            raw_volume
+            for raw_volume in volumes
+            if volume_fields(raw_volume)[1] in linked_targets
+        ]
+        seen_linked_sources: set[str] = set()
+        seen_linked_targets: set[str] = set()
+        for linked_root in pack.linked_data_roots:
+            matches = [
+                raw_volume
+                for raw_volume in linked_mounts
+                if volume_fields(raw_volume)[1] == linked_root.target
+            ]
+            if len(matches) != 1:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-mount-count:{linked_root.target}",
+                    )
+                )
+                continue
+            linked_mount = matches[0]
+            source, target = volume_fields(linked_mount)
+            if source != linked_root.target or target != linked_root.target:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-source-target-mismatch:{linked_root.target}",
+                    )
+                )
+            if volume_type(linked_mount) != "bind":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-mount-type-must-be-bind:{linked_root.target}",
+                    )
+                )
+            volume = as_mapping(linked_mount)
+            if volume is None or volume.get("read_only") is not False:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-mount-must-be-read-write:{linked_root.target}",
+                    )
+                )
+            if isinstance(source, str) and source in seen_linked_sources:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-source-duplicate:{source}",
+                    )
+                )
+            if isinstance(target, str) and target in seen_linked_targets:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-target-duplicate:{target}",
+                    )
+                )
+            if isinstance(source, str):
+                seen_linked_sources.add(source)
+            if isinstance(target, str):
+                seen_linked_targets.add(target)
     allowed_targets = {"/workspace", repo_target}
     if "host-zshrc" in optional_tokens:
         allowed_targets.add("/home/project/.zshrc")
@@ -1163,6 +1482,8 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         allowed_targets.add("/ssh-agent")
     if "docker-host" in optional_tokens:
         allowed_targets.add("/var/run/docker.sock")
+    if linked_profile_selected:
+        allowed_targets.update(linked_targets)
     for raw_volume in volumes:
         source, target = volume_fields(raw_volume)
         if target not in allowed_targets:
@@ -1358,12 +1679,12 @@ def load_shared_surface_manifest(
         return load_manifest(
             root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml"
         ), []
-    except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
+    except (OSError, ValueError, tomllib.TOMLDecodeError):
         return None, [
             Finding(
                 "invalid_manifest",
                 "documents/runtime/shared-runtime-surfaces.toml",
-                f"load-failed:{exc}",
+                "load-failed:invalid-or-unreadable-file",
             )
         ]
 

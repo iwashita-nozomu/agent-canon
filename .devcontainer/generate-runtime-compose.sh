@@ -78,18 +78,22 @@ compose_project_name="${DEVCONTAINER_PROJECT_NAME:-$default_project_name}"
 
 if [ -f "$pack" ]; then
   pack_values_raw="$(
-    python3 - "$pack" <<'PY'
+    python3 - "$pack" "$repo_root" <<'PY'
 from __future__ import annotations
 
-import sys
+import base64
 import json
+import sys
 import re
+from pathlib import Path
 try:
     import tomllib
 except ModuleNotFoundError:
     import tomli as tomllib  # type: ignore[no-redef]
 
-with open(sys.argv[1], "rb") as handle:
+pack_path = sys.argv[1]
+repo_root = Path(sys.argv[2])
+with open(pack_path, "rb") as handle:
     data = tomllib.load(handle)
 pack = data["pack"]
 runtime = data.get("runtime", {})
@@ -102,6 +106,90 @@ if not isinstance(dependency_profile, str) or re.fullmatch(r"[A-Za-z0-9][A-Za-z0
 runtime_platform = pack.get("platform", "linux/amd64")
 if runtime_platform != "linux/amd64":
     raise SystemExit("pack.platform must be linux/amd64")
+known_optional_profiles = {
+    "host-zshrc",
+    "host-git",
+    "host-secrets",
+    "host-credentials",
+    "ssh-agent",
+    "docker-host",
+    "linked-data-roots",
+}
+optional_mount_profiles = runtime.get("optional_mount_profiles", [])
+if not isinstance(optional_mount_profiles, list) or not all(
+    isinstance(item, str) for item in optional_mount_profiles
+):
+    raise SystemExit("runtime.optional_mount_profiles must be a string array")
+seen_profiles = set()
+for profile in optional_mount_profiles:
+    if not profile or profile != profile.strip():
+        raise SystemExit(
+            "runtime.optional_mount_profiles cannot contain empty or whitespace entries"
+        )
+    if profile not in known_optional_profiles:
+        raise SystemExit(
+            f"runtime.optional_mount_profiles contains unknown profile: {profile}"
+        )
+    if profile in seen_profiles:
+        raise SystemExit(
+            f"runtime.optional_mount_profiles contains duplicate profile: {profile}"
+        )
+    seen_profiles.add(profile)
+linked_data_roots_present = "linked_data_roots" in runtime
+linked_data_roots = runtime.get("linked_data_roots", [])
+if linked_data_roots_present and not isinstance(linked_data_roots, list):
+    raise SystemExit("runtime.linked_data_roots must be an inline table array")
+if ("linked-data-roots" in seen_profiles) != linked_data_roots_present:
+    raise SystemExit(
+        "linked-data-roots profile and linked_data_roots list must both be present or absent"
+    )
+if "linked-data-roots" in seen_profiles and not linked_data_roots:
+    raise SystemExit("linked-data-roots profile requires a non-empty linked_data_roots list")
+seen_links = set()
+seen_targets = set()
+linked_data_values = []
+target_re = re.compile(r"/mnt/[a-z]/[^/].*\Z")
+for index, item in enumerate(linked_data_roots):
+    if not isinstance(item, dict) or set(item) != {"link", "target"}:
+        raise SystemExit(
+            f"runtime.linked_data_roots entry {index} must contain only link and target"
+        )
+    link = item["link"]
+    target = item["target"]
+    if not isinstance(link, str) or not isinstance(target, str):
+        raise SystemExit(
+            f"runtime.linked_data_roots entry {index} requires string link and target"
+        )
+    link_path = Path(link)
+    if (
+        not link
+        or any(ord(char) < 32 for char in link)
+        or link_path.is_absolute()
+        or link != link_path.as_posix()
+        or any(part in {"", ".", ".."} for part in link_path.parts)
+        or not (repo_root / link).is_symlink()
+    ):
+        raise SystemExit(
+            f"runtime.linked_data_roots link is not a normalized repository symlink: {link}"
+        )
+    target_path = Path(target)
+    if (
+        not target_re.fullmatch(target)
+        or any(ord(char) < 32 for char in target)
+        or ":" in target
+        or "," in target
+        or target != target_path.as_posix()
+        or any(part in {"", ".", ".."} for part in target_path.parts)
+        or target in {"/mnt", "/mnt/l"}
+    ):
+        raise SystemExit(
+            f"runtime.linked_data_roots target is not a narrow /mnt/<letter> path: {target}"
+        )
+    if link in seen_links or target in seen_targets:
+        raise SystemExit("runtime.linked_data_roots link and target values must be unique")
+    seen_links.add(link)
+    seen_targets.add(target)
+    linked_data_values.append((link, target))
 reserved_environment = {
     "DEVCONTAINER_RUNTIME_MODE",
     "DEVCONTAINER_GPU_MODE",
@@ -127,6 +215,13 @@ print(f"dependency_profile={dependency_profile}")
 print(f"platform={runtime_platform}")
 print(f"workdir={runtime.get('workdir', '/workspace')}")
 print(f"workspace_mount={runtime.get('workspace_mount', '/workspace')}")
+for profile in optional_mount_profiles:
+    print(f"optional_profile={profile}")
+if linked_data_roots_present:
+    print("linked_data_roots_present=1")
+for link, target in linked_data_values:
+    payload = json.dumps([link, target], separators=(",", ":")).encode("utf-8")
+    print(f"linked_data_root_b64={base64.urlsafe_b64encode(payload).decode('ascii')}")
 for mount in runtime.get("mounts", []):
     print(f"mount={mount}")
 for item in runtime.get("env", []):
@@ -146,6 +241,9 @@ PY
   runtime_platform="linux/amd64"
   workdir="/workspace"
   workspace_mount="/workspace"
+  pack_optional_mount_profiles=()
+  linked_data_root_specs=()
+  linked_data_roots_present=false
   pack_mounts=()
   pack_environment_lines=()
   for pack_value in "${pack_values[@]}"; do
@@ -156,6 +254,9 @@ PY
       platform=*) runtime_platform="${pack_value#platform=}" ;;
       workdir=*) workdir="${pack_value#workdir=}" ;;
       workspace_mount=*) workspace_mount="${pack_value#workspace_mount=}" ;;
+      optional_profile=*) pack_optional_mount_profiles+=("${pack_value#optional_profile=}") ;;
+      linked_data_roots_present=1) linked_data_roots_present=true ;;
+      linked_data_root_b64=*) linked_data_root_specs+=("${pack_value#linked_data_root_b64=}") ;;
       mount=*) pack_mounts+=("${pack_value#mount=}") ;;
       ENV:*) pack_environment_lines+=("      ${pack_value#ENV:}") ;;
     esac
@@ -168,6 +269,9 @@ else
   runtime_platform="linux/amd64"
   workdir="/workspace"
   workspace_mount="/workspace"
+  pack_optional_mount_profiles=()
+  linked_data_root_specs=()
+  linked_data_roots_present=false
   pack_mounts=()
   pack_environment_lines=()
 fi
@@ -178,29 +282,46 @@ if [ -d "${repo_root}/vendor/agent-canon" ]; then
 fi
 
 optional_mounts=""
-optional_mounts_raw="${AGENT_CANON_OPTIONAL_MOUNTS:-}"
-declare -A optional_mount_seen=()
-if [ -n "$optional_mounts_raw" ]; then
+env_optional_mount_profiles=()
+if [[ "${AGENT_CANON_OPTIONAL_MOUNTS+x}" = "x" ]]; then
+  optional_mounts_raw="$AGENT_CANON_OPTIONAL_MOUNTS"
+  if [ -z "$optional_mounts_raw" ] || [[ "$optional_mounts_raw" == ,* ]] \
+    || [[ "$optional_mounts_raw" == *, ]] || [[ "$optional_mounts_raw" == *",,"* ]]; then
+    printf 'devcontainer optional mount profile source cannot be empty\n' >&2
+    exit 1
+  fi
   IFS=',' read -r -a optional_mount_values <<< "$optional_mounts_raw"
+  declare -A env_optional_mount_seen=()
   for optional_mount in "${optional_mount_values[@]}"; do
+    if [ -z "$optional_mount" ] || [[ "$optional_mount" =~ [[:space:]] ]]; then
+      printf 'devcontainer optional mount profile source contains an empty or whitespace entry\n' >&2
+      exit 1
+    fi
     case "$optional_mount" in
-      host-zshrc|host-git|host-secrets|host-credentials|ssh-agent|docker-host) ;;
+      host-zshrc|host-git|host-secrets|host-credentials|ssh-agent|docker-host|linked-data-roots) ;;
       *)
         printf 'devcontainer optional mount profile is unsupported: %s\n' "$optional_mount" >&2
         exit 1
         ;;
     esac
-    if [ -n "${optional_mount_seen[$optional_mount]:-}" ]; then
+    if [ -n "${env_optional_mount_seen[$optional_mount]:-}" ]; then
       printf 'devcontainer optional mount profile is duplicated: %s\n' "$optional_mount" >&2
       exit 1
     fi
+    env_optional_mount_seen["$optional_mount"]=1
+    env_optional_mount_profiles+=("$optional_mount")
+  done
+fi
+declare -A optional_mount_seen=()
+for optional_mount in "${pack_optional_mount_profiles[@]}" "${env_optional_mount_profiles[@]}"; do
+  if [ -z "${optional_mount_seen[$optional_mount]:-}" ]; then
     optional_mount_seen["$optional_mount"]=1
     if [ -n "$optional_mounts" ]; then
       optional_mounts+=","
     fi
     optional_mounts+="$optional_mount"
-  done
-fi
+  fi
+done
 optional_mount_enabled() {
   local requested="$1"
   case ",${optional_mounts}," in
@@ -208,6 +329,14 @@ optional_mount_enabled() {
     *) return 1 ;;
   esac
 }
+if optional_mount_enabled linked-data-roots && [ "$linked_data_roots_present" != true ]; then
+  printf 'devcontainer linked-data-roots profile requires linked_data_roots in the runtime pack\n' >&2
+  exit 1
+fi
+if [ "$linked_data_roots_present" = true ] && ! optional_mount_enabled linked-data-roots; then
+  printf 'devcontainer linked_data_roots requires the linked-data-roots profile\n' >&2
+  exit 1
+fi
 
 if [[ "$runtime_shell" != /* || "$runtime_shell" == *[!A-Za-z0-9._/-]* ]]; then
   printf 'devcontainer runtime.shell must be one absolute executable path: %s\n' "$runtime_shell" >&2
@@ -263,6 +392,50 @@ if [ -n "$host_zsh_source" ]; then
     "        read_only: true"
   )
 fi
+declare -A linked_data_source_seen=()
+declare -A linked_data_target_seen=()
+for linked_data_root_spec in "${linked_data_root_specs[@]}"; do
+  linked_data_pair="$(python3 - "$linked_data_root_spec" <<'PY'
+from __future__ import annotations
+
+import base64
+import json
+import sys
+
+try:
+    link, target = json.loads(
+        base64.urlsafe_b64decode(sys.argv[1]).decode("utf-8")
+    )
+except (ValueError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+    raise SystemExit(f"invalid linked_data_roots payload: {exc}") from exc
+print(f"{link}\t{target}")
+PY
+)"
+  IFS=$'\t' read -r linked_data_link linked_data_target <<< "$linked_data_pair"
+  linked_data_source="$(realpath -e -- "$repo_root/$linked_data_link" 2>/dev/null || true)"
+  if [ -z "$linked_data_source" ] || [ ! -d "$linked_data_source" ]; then
+    printf 'devcontainer linked_data_roots source must resolve to an existing directory: %s\n' "$linked_data_link" >&2
+    exit 1
+  fi
+  if [ "$linked_data_source" != "$linked_data_target" ]; then
+    printf 'devcontainer linked_data_roots target does not match resolved source: %s -> %s\n' "$linked_data_link" "$linked_data_target" >&2
+    exit 1
+  fi
+  if [ -n "${linked_data_source_seen[$linked_data_source]:-}" ] || [ -n "${linked_data_target_seen[$linked_data_target]:-}" ]; then
+    printf 'devcontainer linked_data_roots sources and targets must be unique\n' >&2
+    exit 1
+  fi
+  linked_data_source_seen["$linked_data_source"]=1
+  linked_data_target_seen["$linked_data_target"]=1
+  linked_data_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$linked_data_source")"
+  linked_data_target_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$linked_data_target")"
+  volume_lines+=(
+    "      - type: bind"
+    "        source: ${linked_data_source_yaml}"
+    "        target: ${linked_data_target_yaml}"
+    "        read_only: false"
+  )
+done
 for pack_mount in "${pack_mounts[@]}"; do
   printf 'devcontainer shared generator rejects raw runtime.mounts; use an explicit public mount profile: %s\n' "$pack_mount" >&2
   exit 1

@@ -49,18 +49,36 @@ parent-environment、個別credential/config、SSH agent、previous container st
 `/mnt/git`、Docker socketはdefault create/tool availabilityの入力ではありません。
 
 `AGENT_CANON_OPTIONAL_MOUNTS` の明示profileだけが `host-zshrc`、`host-git`、`host-secrets`,
-`host-credentials`、`ssh-agent`、`docker-host`、`shared-runtime` を有効化できます。
+`host-credentials`、`ssh-agent`、`docker-host`、`linked-data-roots` を有効化できます。
 Docker-in-Docker/host daemonは`docker-host` profileに限定します。zsh startupは
 `.zshenv`、`ZDOTDIR`、parent-environment sourceに依存せず、Docker `ENV`、
 devcontainer `containerEnv`、明示bootstrapからruntime値を受け取ります。
+
+pack は `[runtime] optional_mount_profiles` の順序を選択 profile として宣言でき、環境
+の comma list と union した canonical order（pack順、環境-only順、cross-sourceは
+first-wins）を Compose に read backします。`linked-data-roots` は pack の
+`linked_data_roots = [{link = "...", target = "/mnt/l/..."}]` と相互必須で、resolved
+directoryが declared target に exact 一致する場合だけ `source == target`、
+`read_only: false` の structured bindを生成します。raw `runtime.mounts` は引き続き
+拒否し、短い Docker bind 表記を安全に保つため target の `:` と `,` も拒否します。
+host probe は validator の入力にしません。
+
+直接 pack runner (`tools/ci/run_container_pack.py`) は pack の
+`linked-data-roots` と明示した `docker-host` profile だけをそれぞれの bind contract で
+適用します。host zshrc/.zsh やその他の devcontainer-only profile は直接 runner が暗黙に
+適用せず、`runtime.mounts` の raw bind は拒否します。`docker-host` は既存の
+`/var/run/docker.sock` Unix socketを同じ read-write targetへ bindし、欠落時は fail-closed
+です。runner の CLI mount が declared linked target または docker socket target と衝突する
+場合も fail-closed とし、profile target の上書きを許しません。
 
 ## pack と Compose
 
 generator は既存の `pack.runtime.shell` を interactive process として使います。
 親の default pack は `/bin/zsh` を選び、bash を明示した pack と smoke shell は
 `/bin/bash` を使います。別の shell 設定機構は追加しません。
-standalone AgentCanon source layout では pack-derived command だけを生成し、host
-`~/.zshrc`、parent environment mount、`HOME`、tmpfs は要求しません。
+standalone AgentCanon source layout でも `host-zshrc` profile は同じ optional host
+shell projectionを使えます。profile未選択時は pack-derived command だけを生成し、
+host `~/.zshrc`、parent environment mount、`HOME`、tmpfs は要求しません。
 
 Compose がこの境界で直接所有する environment は次の四つです。
 
