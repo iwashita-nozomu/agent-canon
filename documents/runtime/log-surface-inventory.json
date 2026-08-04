@@ -1747,6 +1747,398 @@
     {
       "certainty": "static",
       "emitter": "rust_key_value_stdout",
+      "field": "MEMORY",
+      "line": 953,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY",
+      "line": 959,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY",
+      "line": 971,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_CREATE",
+      "line": 635,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_CREATE",
+      "line": 641,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_CREATE",
+      "line": 659,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_CREATE",
+      "line": 666,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_CREATE",
+      "line": 671,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_CREATE",
+      "line": 677,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_CREATE",
+      "line": 682,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_CREATE",
+      "line": 688,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_CREATE",
+      "line": 698,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_CREATE",
+      "line": 703,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_CREATE",
+      "line": 706,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_OPERATION",
+      "line": 935,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PLAN",
+      "line": 884,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PLAN",
+      "line": 890,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PLAN",
+      "line": 900,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PLAN",
+      "line": 934,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PROMOTE",
+      "line": 805,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PROMOTE",
+      "line": 810,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PROMOTE",
+      "line": 815,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PROMOTE",
+      "line": 821,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PROMOTE",
+      "line": 828,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PROMOTE",
+      "line": 835,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PROMOTE",
+      "line": 851,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PROMOTE",
+      "line": 862,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PROMOTE",
+      "line": 867,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_PROMOTE",
+      "line": 877,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_RECORD_COUNT",
+      "line": 580,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_RECORD_ERROR",
+      "line": 592,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_RECORD_ID",
+      "line": 707,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_RECORD_ID",
+      "line": 797,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_RECORD_ID",
+      "line": 878,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_RECORD_VALIDATION",
+      "line": 579,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_RECORD_VALIDATION",
+      "line": 591,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_SEARCH",
+      "line": 601,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_SEARCH",
+      "line": 613,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_SEARCH",
+      "line": 627,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_SEARCH_COUNT",
+      "line": 614,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_UPDATE",
+      "line": 749,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_UPDATE",
+      "line": 756,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_UPDATE",
+      "line": 763,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_UPDATE",
+      "line": 770,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_UPDATE",
+      "line": 777,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_UPDATE",
+      "line": 784,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_UPDATE",
+      "line": 789,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_UPDATE",
+      "line": 793,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
+      "field": "MEMORY_UPDATE",
+      "line": 796,
+      "path": "rust/agent-canon/src/memory.rs",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "rust_key_value_stdout",
       "field": "RUST_MIGRATION_AUDIT",
       "line": 52,
       "path": "rust/agent-canon/src/migration_audit.rs",
@@ -10465,30 +10857,6 @@
       "surface": "tool"
     },
     {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_LEARNING_KIND",
-      "line": 176,
-      "path": "tools/agent_tools/log_agent_learning.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_LEARNING_TEXT",
-      "line": 177,
-      "path": "tools/agent_tools/log_agent_learning.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_PHILOSOPHY_NOTE",
-      "line": 175,
-      "path": "tools/agent_tools/log_agent_learning.py",
-      "surface": "tool"
-    },
-    {
       "certainty": "dynamic",
       "emitter": "key_value_literal",
       "field": "<dynamic>",
@@ -10649,30 +11017,6 @@
       "surface": "tool"
     },
     {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PREFERENCE_KIND",
-      "line": 158,
-      "path": "tools/agent_tools/log_user_preference.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PREFERENCE_NOTE",
-      "line": 157,
-      "path": "tools/agent_tools/log_user_preference.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PREFERENCE_TEXT",
-      "line": 159,
-      "path": "tools/agent_tools/log_user_preference.py",
-      "surface": "tool"
-    },
-    {
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
@@ -10822,110 +11166,6 @@
       "field": "PARENT_REPO_READINESS_WARNINGS",
       "line": 658,
       "path": "tools/agent_tools/parent_repo_readiness.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_CANON_ROOT",
-      "line": 260,
-      "path": "tools/agent_tools/persist_agent_memory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_MEMORY_COMMIT",
-      "line": 271,
-      "path": "tools/agent_tools/persist_agent_memory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_MEMORY_COMMIT",
-      "line": 273,
-      "path": "tools/agent_tools/persist_agent_memory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_MEMORY_NEXT",
-      "line": 275,
-      "path": "tools/agent_tools/persist_agent_memory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_MEMORY_PATH",
-      "line": 263,
-      "path": "tools/agent_tools/persist_agent_memory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_MEMORY_PENDING",
-      "line": 261,
-      "path": "tools/agent_tools/persist_agent_memory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_MEMORY_PUSHED",
-      "line": 280,
-      "path": "tools/agent_tools/persist_agent_memory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "AGENT_MEMORY_STATUS",
-      "line": 266,
-      "path": "tools/agent_tools/persist_agent_memory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUPERPROJECT_PIN_COMMITTED",
-      "line": 250,
-      "path": "tools/agent_tools/persist_agent_memory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUPERPROJECT_PIN_STATUS",
-      "line": 222,
-      "path": "tools/agent_tools/persist_agent_memory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUPERPROJECT_PIN_STATUS",
-      "line": 237,
-      "path": "tools/agent_tools/persist_agent_memory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUPERPROJECT_PIN_STATUS",
-      "line": 247,
-      "path": "tools/agent_tools/persist_agent_memory.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SUPERPROJECT_PUSHED",
-      "line": 288,
-      "path": "tools/agent_tools/persist_agent_memory.py",
       "surface": "tool"
     },
     {
@@ -17892,7 +18132,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 273,
+      "line": 502,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -17900,7 +18140,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 275,
+      "line": 504,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -17908,7 +18148,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 279,
+      "line": 508,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -17916,7 +18156,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 280,
+      "line": 509,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -17924,7 +18164,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 282,
+      "line": 511,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -17932,7 +18172,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 286,
+      "line": 515,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -17940,7 +18180,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 288,
+      "line": 517,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -17948,7 +18188,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 291,
+      "line": 520,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -17956,7 +18196,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 293,
+      "line": 522,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -17964,7 +18204,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 296,
+      "line": 525,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -17972,7 +18212,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 298,
+      "line": 527,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -17980,7 +18220,7 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 301,
+      "line": 530,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -17988,7 +18228,23 @@
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
-      "line": 303,
+      "line": 532,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_CLI_BLOCKER",
+      "line": 145,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_CLI_REASON",
+      "line": 146,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -17996,7 +18252,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_G1_RECEIPT",
-      "line": 206,
+      "line": 426,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18004,7 +18260,31 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_G2_RECEIPT",
-      "line": 236,
+      "line": 456,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_MEMORY_CLI_BUILD",
+      "line": 469,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_MEMORY_CLI_BUILD",
+      "line": 473,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_MEMORY_CLI_REASON",
+      "line": 470,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18012,47 +18292,119 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_CHECK",
-      "line": 397,
+      "line": 742,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_CI_COMMAND",
-      "line": 178,
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH",
+      "line": 171,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_CI_COMMAND",
-      "line": 183,
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH",
+      "line": 190,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_CI_LATEST_GATE",
-      "line": 172,
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE",
+      "line": 192,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_CI_LATEST_GATE",
-      "line": 177,
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE",
+      "line": 604,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_CI_NEXT",
-      "line": 173,
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE",
+      "line": 619,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE",
+      "line": 694,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE",
+      "line": 709,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE",
+      "line": 719,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON",
+      "line": 191,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR",
+      "line": 193,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR",
+      "line": 212,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR",
+      "line": 216,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR",
+      "line": 230,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_LATEST_DIRTY_AGENTCANON_WORKTREE",
+      "line": 368,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18060,7 +18412,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_LATEST_GATE",
-      "line": 148,
+      "line": 293,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18068,7 +18420,31 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_LATEST_GATE",
-      "line": 153,
+      "line": 298,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_LATEST_GATE",
+      "line": 304,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_LATEST_GATE",
+      "line": 363,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_LATEST_GATE",
+      "line": 372,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18076,7 +18452,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_LATEST_NEXT",
-      "line": 149,
+      "line": 294,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18084,7 +18460,79 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_LATEST_NEXT",
-      "line": 154,
+      "line": 300,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_LATEST_NEXT",
+      "line": 306,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_LATEST_NEXT",
+      "line": 364,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_LATEST_NEXT",
+      "line": 369,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_LATEST_NEXT",
+      "line": 373,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_LATEST_REASON",
+      "line": 299,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_LATEST_REASON",
+      "line": 305,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_PROJECT_QUALITY",
+      "line": 385,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_PROJECT_QUALITY_OWNER",
+      "line": 386,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_PROJECT_QUALITY_WORKFLOW",
+      "line": 387,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18092,134 +18540,38 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "AGENT_CANON_PR_PROPAGATION_WORKFLOW",
-      "line": 398,
+      "line": 743,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_PR_QUICK_CI",
-      "line": 168,
+      "field": "AGENT_CANON_PR_SOURCE_TOOLS_REASON",
+      "line": 42,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_SUBMODULE_EVIDENCE",
-      "line": 324,
+      "field": "AGENT_CANON_PR_SOURCE_TOOLS_ROOT",
+      "line": 41,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_SUBMODULE_EVIDENCE",
-      "line": 327,
+      "field": "AGENT_CANON_PR_UPDATE_GATE",
+      "line": 326,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "AGENT_CANON_SUBMODULE_EVIDENCE",
-      "line": 333,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "GITHUB_WORKFLOW_CHECK",
-      "line": 349,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "NEXT_ACTION",
-      "line": 399,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "SHARED_SURFACE_DRIFT",
-      "line": 82,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "SHARED_SURFACE_DRIFT",
-      "line": 103,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "SHARED_SURFACE_STATUS",
-      "line": 95,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_gitmodules_url",
-      "line": 320,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_gitmodules_url",
-      "line": 330,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_pr_temp_root",
-      "line": 311,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_remote",
-      "line": 313,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_repository_mode",
-      "line": 312,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_submodule_mode",
-      "line": 321,
-      "path": "tools/ci/check_agent_canon_pr.sh",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_submodule_mode",
+      "field": "AGENT_CANON_PR_UPDATE_GATE",
       "line": 331,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
@@ -18227,15 +18579,47 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_submodule_pin",
-      "line": 322,
+      "field": "AGENT_CANON_PR_UPDATE_GATE",
+      "line": 337,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_submodule_pin",
+      "field": "AGENT_CANON_PR_UPDATE_NEXT",
+      "line": 321,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_UPDATE_NEXT",
+      "line": 327,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_UPDATE_NEXT",
+      "line": 333,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_UPDATE_NEXT",
+      "line": 339,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_UPDATE_REASON",
       "line": 332,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
@@ -18243,8 +18627,152 @@
     {
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
-      "field": "agent_canon_submodule_status",
-      "line": 316,
+      "field": "AGENT_CANON_PR_UPDATE_REASON",
+      "line": 338,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_PR_UPDATE_STATE",
+      "line": 320,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_SUBMODULE_EVIDENCE",
+      "line": 553,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_SUBMODULE_EVIDENCE",
+      "line": 556,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "AGENT_CANON_SUBMODULE_EVIDENCE",
+      "line": 562,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "GITHUB_WORKFLOW_CHECK",
+      "line": 578,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "NEXT_ACTION",
+      "line": 744,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "SHARED_SURFACE_DRIFT",
+      "line": 95,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "SHARED_SURFACE_DRIFT",
+      "line": 118,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "SHARED_SURFACE_STATUS",
+      "line": 110,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_gitmodules_url",
+      "line": 549,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_gitmodules_url",
+      "line": 559,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_pr_temp_root",
+      "line": 540,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_remote",
+      "line": 542,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_repository_mode",
+      "line": 541,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_submodule_mode",
+      "line": 550,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_submodule_mode",
+      "line": 560,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_submodule_pin",
+      "line": 551,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_submodule_pin",
+      "line": 561,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18252,7 +18780,15 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "agent_canon_submodule_status",
-      "line": 329,
+      "line": 545,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "agent_canon_submodule_status",
+      "line": 558,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18260,7 +18796,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "graph",
-      "line": 199,
+      "line": 417,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18268,7 +18804,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "owner",
-      "line": 195,
+      "line": 413,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18276,7 +18812,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "parent_pid",
-      "line": 197,
+      "line": 415,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18284,7 +18820,23 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "root_identity",
-      "line": 196,
+      "line": 414,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "selector_evidence",
+      "line": 419,
+      "path": "tools/ci/check_agent_canon_pr.sh",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "shell_key_value_stdout",
+      "field": "selector_reason",
+      "line": 418,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18292,7 +18844,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "strict_dependency",
-      "line": 198,
+      "line": 416,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -18300,7 +18852,7 @@
       "certainty": "static",
       "emitter": "shell_key_value_stdout",
       "field": "workspace_root",
-      "line": 310,
+      "line": 539,
       "path": "tools/ci/check_agent_canon_pr.sh",
       "surface": "tool"
     },
@@ -22702,7 +23254,6 @@
     ".agents/skills/test-design/SKILL.md",
     ".agents/skills/tool-finding-report/SKILL.md",
     ".agents/skills/user-guided-debugging/SKILL.md",
-    ".agents/skills/user-preference-sync/SKILL.md",
     ".agents/skills/wiki-publication/SKILL.md",
     ".agents/skills/worktree-health/SKILL.md",
     ".agents/skills/worktree-start/SKILL.md",
@@ -22770,7 +23321,6 @@
     "agents/skills/test-design.md",
     "agents/skills/tool-finding-report.md",
     "agents/skills/user-guided-debugging.md",
-    "agents/skills/user-preference-sync.md",
     "agents/skills/wiki-publication.md",
     "agents/skills/worktree-health.md",
     "agents/skills/worktree-start.md",
@@ -22779,6 +23329,7 @@
     "rust/agent-canon/src/graph.rs",
     "rust/agent-canon/src/jit_ir_to_lean.rs",
     "rust/agent-canon/src/main.rs",
+    "rust/agent-canon/src/memory.rs",
     "rust/agent-canon/src/migration_audit.rs",
     "rust/agent-canon/src/python_algorithm_contract.rs",
     "rust/agent-canon/src/python_module_groups.rs",
@@ -22872,15 +23423,13 @@
     "tools/agent_tools/jit_canonical_ir.py",
     "tools/agent_tools/lean_proof_env.py",
     "tools/agent_tools/lean_recursive_proof_search.py",
-    "tools/agent_tools/log_agent_learning.py",
     "tools/agent_tools/log_repository_identity.py",
     "tools/agent_tools/log_surface_inventory.py",
-    "tools/agent_tools/log_user_preference.py",
+    "tools/agent_tools/memory_record.py",
     "tools/agent_tools/mid_task_user_input_policy.py",
     "tools/agent_tools/model_profile_registry.py",
     "tools/agent_tools/operational_ir_to_lean.py",
     "tools/agent_tools/parent_repo_readiness.py",
-    "tools/agent_tools/persist_agent_memory.py",
     "tools/agent_tools/prompt_capture.py",
     "tools/agent_tools/prompt_classifier.py",
     "tools/agent_tools/prose_reasoning_graph.py",

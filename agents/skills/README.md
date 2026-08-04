@@ -167,8 +167,9 @@ in the Codex host runtime.
 - JIT-canonical IR、生成済み Lean 実装定義、theorem graph overlay から、反復法と証明状態を Mermaid block chart にしたいときは `algorithm-flowchart` を使います。図は proof navigation であり、証明済み判定は formal proof checker に戻します。
 - repo-wide な実装・文書・tooling・runtime の統合変更では、上の `comprehensive-development` route を使います。
 - repo-wide な tool 導入や Docker / CI 更新案では `environment-maintenance` と `templates/agents/environment_change_proposal.md` を使います。
-- `memory/USER_PREFERENCES.md` の整理や `AGENTS.md` への昇格では `user-preference-sync` を使います。
-- `memory/AGENT_PHILOSOPHY.md` の更新や agent-side learning の整理では `agent-learning` を使います。
+- `memory/records/*.md` の検索・更新・昇格は既存の `agent-learning` owner と Rust
+  `agent-canon memory` route を使います。stable preference は対象の `AGENTS.md` へ
+  明示変更として直接昇格します。
 
 ## Updating Skills
 

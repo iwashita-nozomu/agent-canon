@@ -63,8 +63,6 @@ Cross-Cutting Packet:
 - `notes/guardrails/README.md`
 - `notes/guardrails/engineering_avoidances.md`
 - `docker/README.md`
-- `memory/USER_PREFERENCES.md`
-- `memory/AGENT_PHILOSOPHY.md`
 
 ## Required Intake Sweep
 
@@ -149,8 +147,9 @@ slice を選ぶ場合は、coverage map に `covered_surfaces`、`deferred_surfa
 - `notes/experiments/`
 - `references/`
 
-user の durable preference を見落とさないため、`memory/USER_PREFERENCES.md` は毎回読む固定 note にします。
-agent の作業哲学と対話から得た学習を見落とさないため、`memory/AGENT_PHILOSOPHY.md` も毎回読む固定 note にします。
+memory は固定 packet/read の対象にしません。owner/path、failure evidence、recurrence
+decision が選択された後、必要な record だけを `agent-canon memory search` で on-demand
+に検索します。stable preference は対象 owner への明示変更として扱います。
 
 raw text search の hit だけで編集対象を決めません。
 検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を直接 materialize する handoff を作ります。空の unresolved-decision set は即時に one-pass materialization へ遷移し、owner gate は完了後だけです。parent repository edits は `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` かつ `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を記録した場合だけ許可します。
@@ -511,10 +510,9 @@ checked and cited.
   - `comprehensive-development`
 - environment and tool rollout:
   - `environment-maintenance`
-- preference note の整理と `AGENTS.md` 昇格:
-  - `user-preference-sync`
-- agent philosophy と対話学習の整理:
-  - `agent-learning`
+- memory record の検索・更新・owner 昇格と agent-side 対話学習:
+  `agent-learning` と Rust `agent-canon memory` を使う。stable preference は対象
+  `AGENTS.md` または canonical owner への明示変更として扱う。
 
 ## Execution Flow
 
@@ -530,8 +528,10 @@ checked and cited.
 - durable user preference は今回 request や repo evidence と結び付いたときだけ task requirement へ昇格する
 - 着手時の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - skill を user-facing に書くときは `$skill-name` を既定にし、`skills=<...>` でも同じ表記を維持する
-- durable な user preference を観測したら、その場で `python3 tools/agent_tools/log_user_preference.py --preference "<...>" --kind provisional --source chat` を実行して `memory/USER_PREFERENCES.md` へ追記する
-- agent-side の作業哲学、対話上の再発防止、task retrospective を観測したら、その場で `python3 tools/agent_tools/log_agent_learning.py --kind interaction-observation --statement "<...>" --source chat --evidence "<...>"` を実行して `memory/AGENT_PHILOSOPHY.md` へ追記する
+- agent-side の再発防止知識を残す必要がある場合は、選択済み context で
+  `python3 tools/agent_tools/memory_record.py search --root . --search-path <owner> --failure-evidence <evidence>`
+  を先に実行し、既存 topic は同じ record を update します。独立 topic の create は
+  `plan` の readback 後に行います。raw chat は memory に追記しません。
 
 ### 2. Workflow Selection
 
@@ -861,8 +861,9 @@ environment, produce resources, or duplicate tests/gates.
 - final report には branch、commit、push の成否を短く残す
 - push が失敗した、または意図的に skip した場合は、その理由を final report に明記する
 - push が自然な完了条件に含まれる場合は、push の許可を取りに戻らず実行する
-- closeout 前に `memory/USER_PREFERENCES.md` を見直し、stable になった preference があれば `user-preference-sync` で `AGENTS.md` への昇格要否を判断する
-- closeout 前に `memory/AGENT_PHILOSOPHY.md` を見直し、task retrospective、interaction observation、promotion candidate を `agent-learning` で残すか判断する
+- closeout 前に今回の観測を既存 record の update、独立 record の create、canonical owner への
+  明示変更、issue/failure/evidence のいずれかに分類する。memory は `agent-learning` owner
+  から on-demand に検索し、stable preference は対象 `AGENTS.md` へ直接変更する。
 - closeout 前に `agent_evaluation.md` の feedback actions を見直し、stable な失敗防止は `agent-learning` で記録し、確定した guardrail 候補は positive operational condition として昇格可否を判断する
 - review-only task や no-change task では、review result と no-change rationale を completion evidence にする
 

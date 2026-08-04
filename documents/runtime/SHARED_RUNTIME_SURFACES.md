@@ -387,16 +387,17 @@ mounted runtime log archive described by `documents/runtime/runtime-log-archive.
 
 ## Memory And Notes Boundary
 
-`memory/USER_PREFERENCES.md` and `memory/AGENT_PHILOSOPHY.md` are AgentCanon
-shared runtime memory. They are global user-agent and agent-operating notes, not
-project-specific design logs.
+`memory/README.md` and flat `memory/records/*.md` are AgentCanon shared runtime
+memory. Each record is one self-contained problem-solving topic, searched on demand
+from selected owner/path/failure evidence/recurrence context. They are not fixed
+packet input, user-preference append logs, or project-specific design logs.
 
 `notes/README.md` is repo-local. Under `notes/`, shared templates and global
 guardrails may be AgentCanon symlinks, while project-specific knowledge,
 themes, failures, branch notes, worktree logs, and experiment notes belong to
-the template or derived repo. If a preference should apply across repositories,
-promote it through the AgentCanon memory workflow instead of burying it in a
-project-local note.
+the template or derived repo. If a stable preference should apply across repositories,
+change its canonical owner directly; memory records keep the recurrence diagnosis and
+link that owner rather than becoming a second policy source.
 
 ## Tests Directory Ownership
 

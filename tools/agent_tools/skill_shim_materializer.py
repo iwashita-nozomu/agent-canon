@@ -865,7 +865,40 @@ def _legacy_generated_schema_matches(candidate: str, expected: str) -> bool:
         r"[0-9a-f]{64}" if SHA256_RE.fullmatch(piece) else re.escape(piece)
         for piece in pieces
     )
-    return re.fullmatch(pattern, candidate) is not None
+    if re.fullmatch(pattern, candidate) is not None:
+        return True
+
+    # Catalog discovery metadata is part of the generated frontmatter, while
+    # the adapter body remains the same canonical projection. Accept a
+    # metadata-only migration so a catalog description change can be rebuilt by
+    # this generator without treating the thin shim as hand-authored prose.
+    frontmatter = re.compile(r"\A---\n(.*?)\n---\n", flags=re.DOTALL)
+    candidate_match = frontmatter.match(candidate)
+    expected_match = frontmatter.match(expected)
+    if candidate_match is None or expected_match is None:
+        return False
+    try:
+        candidate_metadata = yaml.safe_load(candidate_match.group(1))
+        expected_metadata = yaml.safe_load(expected_match.group(1))
+    except yaml.YAMLError:
+        return False
+    if not isinstance(candidate_metadata, Mapping) or not isinstance(expected_metadata, Mapping):
+        return False
+    if candidate_metadata.get("name") != expected_metadata.get("name"):
+        return False
+
+    def stable_body(value: str) -> str:
+        value_match = frontmatter.match(value)
+        if value_match is None:
+            return ""
+        body = value[value_match.end() :]
+        return re.sub(
+            r'("record_digest":")[0-9a-f]{64}',
+            r'\1<record-digest>',
+            body,
+        )
+
+    return stable_body(candidate) == stable_body(expected)
 
 
 def classify_legacy(

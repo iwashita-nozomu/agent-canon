@@ -8,7 +8,7 @@ downstream design AGENTS.md repository runtime instruction entrypoint.
 downstream design ROOT_AGENTS.md root agent instruction source.
 downstream design agents/README.md workflow, skill, and runtime hub.
 downstream design documents/README.md documentation ownership and policy index.
-downstream design memory/AGENT_PHILOSOPHY.md append-first observation log before promotion.
+downstream design memory/README.md on-demand problem-solving memory record contract.
 @dependency-end
 -->
 
@@ -36,7 +36,7 @@ downstream design memory/AGENT_PHILOSOPHY.md append-first observation log before
 - runtime agent には単純な contract を渡す。
 - tool design 文書は実行時 agent ではなく maintainer / reviewer / 設計 agent が読む。
 - 新しい surface は convenience ではなく責務 gap から作る。
-- memory は安定前の観測置き場にし、安定した思想は正本へ昇格する。
+- memory は同じ問題に再遭遇したときに検索して使う知識置き場にし、安定した契約は正本へ昇格する。
 
 ## 境界
 
@@ -44,4 +44,5 @@ downstream design memory/AGENT_PHILOSOPHY.md append-first observation log before
 - skill の実行契約は `agents/skills/` と `.agents/skills/` に置く。
 - workflow の手順は `agents/workflows/` に置く。
 - validation matrix と policy は `documents/` に置く。
-- 対話から得た未昇格の学習は `memory/` に置く。
+- 対話から得た raw observation は runtime logs/evidence/issues/failures の owner に置き、
+  独立した再発防止知識だけを `memory/records/` に self-contained record として置く。

@@ -1397,7 +1397,7 @@ def render_learning_capture_lines() -> list[str]:
         "## Learning Capture",
         "",
         "If this evaluation exposed a durable agent-side lesson, record it with "
-        "`tools/agent_tools/log_agent_learning.py` and cite the evidence. "
+        "`tools/agent_tools/memory_record.py` and cite the evidence. "
         "If the lesson requires a durable process change, update the relevant "
         "skill, config, or workflow "
         "before marking the monitoring decision as applied. Do not copy raw chat.",

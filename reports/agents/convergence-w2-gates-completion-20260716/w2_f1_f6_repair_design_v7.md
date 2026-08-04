@@ -330,7 +330,7 @@ The future direct runtime caller set is closed at exactly seven paths:
 2. `tools/update_agent_canon.sh`
 3. `tools/sync_agent_canon.sh`
 4. `tools/agent_tools/agent_update_branch.sh`
-5. `tools/agent_tools/persist_agent_memory.py`
+5. `tools/agent_tools/memory_record.py`
 6. `tools/experiments/publish_result_branch.py`
 7. `.codex/hooks/branch_worktree_guard.py`
 
@@ -1795,7 +1795,7 @@ Publication owner and callers:
 14. `tools/update_agent_canon.sh`
 15. `tools/sync_agent_canon.sh`
 16. `tools/agent_tools/agent_update_branch.sh`
-17. `tools/agent_tools/persist_agent_memory.py`
+17. `tools/agent_tools/memory_record.py`
 18. `tools/experiments/publish_result_branch.py`
 19. `.codex/hooks/branch_worktree_guard.py`
 20. `tools/agent_tools/check_convention_compliance.py`
@@ -1896,7 +1896,7 @@ Every row below is future implementation scope only. No row is edited in v7.
 | `tools/update_agent_canon.sh` | active endpoint delegates or fails before merge/push; exact reciprocal integrator edge | V6-R1 | shell/tool tests |
 | `tools/sync_agent_canon.sh` | active endpoint delegates or fails before push; exact reciprocal integrator edge | V6-R1 | shell/tool tests |
 | `tools/agent_tools/agent_update_branch.sh` | active endpoint delegates or fails before push; exact reciprocal integrator edge | V6-R1 | shell/tool tests |
-| `tools/agent_tools/persist_agent_memory.py` | active endpoint collision delegates only if operation is in route, otherwise fails; exact reciprocal edge | V6-R1 | tool tests |
+| `tools/agent_tools/memory_record.py` | active endpoint collision delegates only if operation is in route, otherwise fails; exact reciprocal edge | V6-R1 | tool tests |
 | `tools/experiments/publish_result_branch.py` | disjoint namespace retained; active endpoint collision fails before ref update; exact reciprocal edge | V6-R1 | tool tests |
 | `.codex/hooks/branch_worktree_guard.py` | read canonical active route and block raw active-W2 mutation; exact reciprocal edge | V6-R1 | hook tests |
 | `.codex/hooks/hook_dispatcher.py` | invoke the critical guard for active-W2 raw/publish paths; no unconditional skip | V6-R1 | hook tests |
@@ -1957,7 +1957,7 @@ Every row below is future implementation scope only. No row is edited in v7.
 | `tests/agent_tools/test_github_publish.py` | README command route, active-W2 delegation, malformed authority no fallback, ordinary non-W2 preservation |
 | `tests/tools/test_update_agent_canon.py` | update and sync helper delegate/refusal plus reciprocal header fixtures |
 | future `tests/agent_tools/test_agent_update_branch.py` or owner-selected existing shell test | agent-update direct caller delegation and reverse edge |
-| `tests/agent_tools/test_persist_agent_memory.py` | active endpoint delegate-or-fail and reverse edge |
+| `tests/agent_tools/test_memory_record.py` | active endpoint delegate-or-fail and reverse edge |
 | `tests/tools/test_publish_result_branch.py` | active endpoint collision and reverse edge |
 | `tests/agent_tools/test_codex_hooks.py` | raw README/skill command bypass blocked, integrator allowed, hook reverse edge |
 | `tests/agent_tools/test_evaluate_skill_workflow_prompts.py` | exact critical required/forbidden regex, target, ID, and deletion negatives |
@@ -2003,7 +2003,7 @@ directions, as required by the canonical graph checker.
 | `tools/update_agent_canon.sh`: `upstream implementation ./agent_tools/publication_integrator.py guards active-W2 AgentCanon merge and publication` | `tools/agent_tools/publication_integrator.py`: `downstream implementation ../update_agent_canon.sh delegates active-W2 AgentCanon merge and publication` |
 | `tools/sync_agent_canon.sh`: `upstream implementation ./agent_tools/publication_integrator.py guards active-W2 sync publication` | `tools/agent_tools/publication_integrator.py`: `downstream implementation ../sync_agent_canon.sh delegates active-W2 sync publication` |
 | `tools/agent_tools/agent_update_branch.sh`: `upstream implementation ./publication_integrator.py guards active-W2 update-branch publication` | `tools/agent_tools/publication_integrator.py`: `downstream implementation ./agent_update_branch.sh delegates active-W2 update-branch publication` |
-| `tools/agent_tools/persist_agent_memory.py`: `upstream implementation ./publication_integrator.py guards active-W2 memory target collisions` | `tools/agent_tools/publication_integrator.py`: `downstream implementation ./persist_agent_memory.py delegates or rejects active-W2 memory target publication` |
+| `tools/agent_tools/memory_record.py`: `upstream implementation ./publication_integrator.py guards active-W2 memory target collisions` | `tools/agent_tools/publication_integrator.py`: `downstream implementation ./memory_record.py delegates or rejects active-W2 memory target publication` |
 | `tools/experiments/publish_result_branch.py`: `upstream implementation ../agent_tools/publication_integrator.py guards active-W2 experiment-result target collisions` | `tools/agent_tools/publication_integrator.py`: `downstream implementation ../experiments/publish_result_branch.py rejects active-W2 experiment-result target collisions` |
 | `.codex/hooks/branch_worktree_guard.py`: `upstream implementation ../../tools/agent_tools/publication_integrator.py resolves active-W2 publication targets for raw Git mutation guard` | `tools/agent_tools/publication_integrator.py`: `downstream implementation ../../.codex/hooks/branch_worktree_guard.py blocks raw active-W2 mutation before shell execution` |
 

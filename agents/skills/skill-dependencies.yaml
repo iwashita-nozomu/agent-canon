@@ -887,13 +887,6 @@ skill_dependencies:
     parallel_independent:
     - environment-cleanup
     - code-cleanup
-  user-preference-sync:
-    responsibility_group: runtime
-    required_prerequisites: []
-    routing_candidates: []
-    successors: []
-    order_constraints: []
-    parallel_independent: []
   agent-learning:
     responsibility_group: runtime
     required_prerequisites: []

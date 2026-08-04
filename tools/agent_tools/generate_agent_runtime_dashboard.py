@@ -2424,7 +2424,7 @@ def evidence_location_lines(root: Path) -> list[str]:
         "- workflow_selection_eval_reports: `.agent-canon/log-archive/eval-results/workflow-selection/<eval-run-id>-<status>.md`",
         "- report_quality_eval_reports: `.agent-canon/log-archive/eval-results/report-quality/<eval-run-id>-<status>.md`",
         "- durable_issues: `issues/open/AC-*.md` and `issues/closed/AC-*.md`",
-        "- shared_memory: `memory/USER_PREFERENCES.md` and `memory/AGENT_PHILOSOPHY.md`",
+        "- shared_memory: `memory/README.md` and `memory/records/*.md` (on-demand)",
         "- token_comparison_reports: `reports/agents/**/workflow_monitoring.md` or `reports/agents/**/*token*.md`",
         "- reference_capture_hook: `.agent-canon/log-archive/hook-runs/<repo-key>/<runtime-namespace>/reference_capture_guard.jsonl`",
         "- materialized_references: `references/external/*.md` in the parent repository that consulted the source",
