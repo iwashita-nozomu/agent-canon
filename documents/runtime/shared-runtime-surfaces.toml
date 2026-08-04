@@ -239,8 +239,7 @@ owner = "agent-canon"
 class = "durable_state"
 paths = [
   "memory/README.md",
-  "memory/USER_PREFERENCES.md",
-  "memory/AGENT_PHILOSOPHY.md",
+  "memory/records",
 ]
 
 [[group]]
@@ -297,9 +296,6 @@ paths = [
   "tests/agent_tools/test_analyze_refactor_surface.py",
   "tests/agent_tools/test_analyze_oop_readability.py",
   "tests/agent_tools/test_doc_start.py",
-  "tests/agent_tools/test_log_user_preference.py",
-  "tests/agent_tools/test_log_agent_learning.py",
-  "tests/agent_tools/test_persist_agent_memory.py",
   "tests/agent_tools/test_codex_hooks.py",
   "tests/agent_tools/test_log_surface_inventory.py",
   "tests/agent_tools/test_parent_repo_readiness.py",
@@ -501,13 +497,7 @@ paths = [
   "documents/research-workflow.md",
   "documents/tools/TOOLS_DIRECTORY.md",
   "documents/workflow-references.md",
-  "notes/themes/AGENT_PHILOSOPHY.md",
-  "notes/themes/USER_PREFERENCES.md",
   "tests/tools/test_fix_markdown_math.py",
-  "memory/global",
-  "memory/methods",
-  "memory/candidates",
-  "memory/subagent_loadouts.yaml",
   "tests/agent_tools/test_agent_canon_log_management_check.py",
   "tests/agent_tools/test_check_mcp_inventory.py",
   "tests/agent_tools/test_repo_mcp_server.py",

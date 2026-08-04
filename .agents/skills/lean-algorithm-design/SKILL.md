@@ -2,7 +2,7 @@
 name: lean-algorithm-design
 description: "Use when an algorithm should be designed and checked in Lean before production implementation; models candidate algorithms independently of existing code paths, proves or refutes convergence, stopping, certificate, filter/restoration, and inner-solver contracts, then hands a checked design contract to implementation or implementation-derived proof workflows."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"3bc5707d41e7562b57931b8247f029cce327f919ab1837b0d6981e79072f74f4"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"51ed551e063b3362e61405fdda7c2d1053c6231b16bf80f1b0d40cdade0ebc55"} -->
 
 <!--
 @dependency-start

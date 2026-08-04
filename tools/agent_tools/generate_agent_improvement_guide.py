@@ -533,19 +533,9 @@ class AgentImprovementGuide:
         return tuple(sorted(reports))
 
     def memory_entry_counts(self) -> dict[str, int]:
-        """Return bullet-entry counts for shared memory notes."""
-        counts: dict[str, int] = {}
-        for relative in ("memory/USER_PREFERENCES.md", "memory/AGENT_PHILOSOPHY.md"):
-            path = self.root / relative
-            if not path.is_file():
-                counts[relative] = 0
-                continue
-            counts[relative] = sum(
-                1
-                for line in path.read_text(encoding="utf-8").splitlines()
-                if line.startswith("- ") and "まだなし" not in line
-            )
-        return counts
+        """Return the number of self-contained on-demand memory records."""
+        records_dir = self.root / "memory" / "records"
+        return {"memory/records": len(tuple(records_dir.glob("*.md")))}
 
     def skill_eval_failed(self, path: Path) -> bool:
         """Return whether one accumulated skill eval report is failing."""

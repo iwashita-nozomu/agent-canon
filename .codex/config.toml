@@ -253,10 +253,6 @@ path = "../.agents/skills/user-guided-debugging/SKILL.md"
 enabled = true
 
 [[skills.config]]
-path = "../.agents/skills/user-preference-sync/SKILL.md"
-enabled = true
-
-[[skills.config]]
 path = "../.agents/skills/worktree-health/SKILL.md"
 enabled = true
 

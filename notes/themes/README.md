@@ -32,7 +32,6 @@ upstream design ../README.md notes lifecycle index
 ## Template
 
 - [THEME_NOTE_TEMPLATE.md](./THEME_NOTE_TEMPLATE.md)
-- [USER_PREFERENCES.md](../../memory/USER_PREFERENCES.md)
-  - 会話から抽出した user preference の固定入口です。shared canon `memory/` を正本にし、十分に安定した項目だけを `AGENTS.md` へ昇格します。`notes/themes/USER_PREFERENCES.md` は legacy path であり、新規の正本として作りません。
-- [AGENT_PHILOSOPHY.md](../../memory/AGENT_PHILOSOPHY.md)
-  - agent の作業哲学、対話から得た学習、task retrospective の固定入口です。shared canon `memory/` を正本にし、十分に安定した項目だけを workflow、guardrail、`AGENTS.md` へ昇格します。`notes/themes/AGENT_PHILOSOPHY.md` は legacy path であり、新規の正本として作りません。
+- shared canon の recurrence knowledge は [memory/README.md](../../memory/README.md) と
+  [memory/records/](../../memory/records/) を on-demand に検索します。
+  stable preference や permanent rule は record を第二正本にせず、対象 owner へ直接昇格します。

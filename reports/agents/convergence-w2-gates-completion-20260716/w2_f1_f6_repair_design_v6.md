@@ -475,7 +475,7 @@ below.
 | `tools/update_agent_canon.sh` | current-branch ordinary merge and internal pushes | before an active W2 endpoint mutation, delegate or fail; immutable B cannot be merged |
 | `tools/sync_agent_canon.sh push` | direct branch/main remote push | active W2 endpoint delegates or fails before push |
 | `tools/agent_tools/agent_update_branch.sh` | direct update-branch push | active W2 endpoint delegates or fails |
-| `tools/agent_tools/persist_agent_memory.py` | caller-selected branch push | active W2 endpoint delegates or fails; memory persistence cannot publish W2 |
+| `tools/agent_tools/memory_record.py` | caller-selected branch push | active W2 endpoint delegates or fails; memory persistence cannot publish W2 |
 | `tools/experiments/publish_result_branch.py` | local `update-ref` and optional push | `experiment-results/*` remains a separate owner; any collision with an active W2 endpoint fails before update |
 | `.codex/hooks/branch_worktree_guard.py` | interactive Git mutation classification | blocks raw active-W2 merge/push/update and allows only the integrator entrypoint |
 | `.codex/hooks/hook_dispatcher.py` | currently skips simple push/publish tools | active W2 push is no longer an unconditional skip; it routes through the critical guard |
@@ -1200,7 +1200,7 @@ Mandatory primary owner/implementation reads:
 10. `tools/update_agent_canon.sh`
 11. `tools/sync_agent_canon.sh`
 12. `tools/agent_tools/agent_update_branch.sh`
-13. `tools/agent_tools/persist_agent_memory.py`
+13. `tools/agent_tools/memory_record.py`
 14. `tools/experiments/publish_result_branch.py`
 15. `.codex/hooks/branch_worktree_guard.py`
 16. `.codex/hooks/hook_dispatcher.py`
@@ -1261,7 +1261,7 @@ No source begins from this design commit merely because it exists.
 | `tools/update_agent_canon.sh` | Guard current-branch merge and push sites; immutable B fails; active endpoint delegates. | R1 | Shell/tool review |
 | `tools/sync_agent_canon.sh` | Guard `push` action and direct-main exception before mutation. | R1 | Shell/tool review |
 | `tools/agent_tools/agent_update_branch.sh` | Guard direct update-branch push. | R1 | Shell/tool review |
-| `tools/agent_tools/persist_agent_memory.py` | Guard caller-selected branch push against active W2 endpoint. | R1 | Tool review |
+| `tools/agent_tools/memory_record.py` | Guard caller-selected branch push against active W2 endpoint. | R1 | Tool review |
 | `tools/experiments/publish_result_branch.py` | Preserve result owner; reject any active-W2 endpoint collision before local ref update. | R1 | Tool review |
 | `tools/agent_tools/goal_loop.py` | Carry exact GitHub automation publication fields and blocked state. | R1 | Goal tests |
 | `.codex/hooks/branch_worktree_guard.py` | Detect active W2 and block raw merge/push/update-ref/PR merge. | R1 | Hook tests |
@@ -1336,7 +1336,7 @@ Direct caller/reverse pairs:
   edge for its push action.
 - `tools/agent_tools/agent_update_branch.sh` adds
   `upstream implementation publication_integrator.py guards active-W2 branch publication`.
-- `tools/agent_tools/persist_agent_memory.py` adds
+- `tools/agent_tools/memory_record.py` adds
   `upstream implementation ./publication_integrator.py guards active-W2 target collisions`.
 - `tools/experiments/publish_result_branch.py` adds
   `upstream implementation ../agent_tools/publication_integrator.py guards active-W2 target collisions`.

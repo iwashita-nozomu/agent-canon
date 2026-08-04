@@ -133,7 +133,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         ".codex/hooks.json .codex/hooks .devcontainer/ .vscode/ documents/README.md "
         "documents/contracts/template-bootstrap.md "
         "documents/contracts/github-first-module-and-devcontainer-policy.md "
-        "memory/USER_PREFERENCES.md "
+        "memory/README.md memory/records/ "
         "tests/agent_tools/ Root `tools/` is a parent-owned regular container "
         "tools/agent-canon -> ../vendor/agent-canon/tools "
         "vendor/agent-canon/tools/ "

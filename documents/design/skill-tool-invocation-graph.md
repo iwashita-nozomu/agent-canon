@@ -189,8 +189,8 @@ equality/readback は四段で行う。(1) source→materialized IR は catalog 
 | 15 | tool-finding-report | 35 | academic-writing | 55 | comprehensive-development |
 | 16 | issue-finding-report | 36 | paper-writing | 56 | dependency-design |
 | 17 | agent-log-analysis | 37 | md-style-check | 57 | environment-maintenance |
-| 18 | runtime-log-repair | 38 | mvp-skeleton | 58 | user-preference-sync |
-| 19 | agent-eval-accumulation | 39 | document-canon-cleanup | 59 | agent-learning |
+| 18 | runtime-log-repair | 38 | mvp-skeleton | 58 | agent-learning |
+| 19 | agent-eval-accumulation | 39 | document-canon-cleanup |    |    |
 | source order | catalog が定める skill id の順序（`agents/skills/catalog.yaml`） | readback | `tools/agent_tools/check_skill_tool_invocation_graph.py` が同じ source order を検証 |
 
 ## Complete Mermaid Projection Contract

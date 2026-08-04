@@ -2,7 +2,7 @@
 name: agent-learning
 description: "Use when agent-side working philosophy, interaction lessons, task retrospectives, repeated routing misses, missed skill invocation, or recurrence-prevention feedback should be logged without mixing them into user preferences."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"3a2f50b54df63d7c64b32306120d02f3378c0862470f146339acf39a14b39259"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"076ad6d0ec0f6a689e72b18048b20a716ccfe1c096ce4455b7df587c030fb40c"} -->
 
 <!--
 @dependency-start

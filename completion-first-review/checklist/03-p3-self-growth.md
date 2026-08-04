@@ -84,9 +84,11 @@ P3 makes AgentCanon able to improve itself without turning every observation int
 
 - Target: `memory/`, AgentCanon submodule, superproject pin.
 - Problem: memory changes can stay local and fail to propagate.
-- Violation: `memory/AGENT_PHILOSOPHY.md` is edited but AgentCanon upstream is not updated.
-- Action: require AgentCanon commit/push and superproject pin evidence when memory changes.
-- Acceptance: memory dirty state fails self-growth completion.
+- Violation: an on-demand memory record is edited without its Rust validation, owner refs, or
+  AgentCanon branch readback.
+- Action: require `agent-canon memory validate --root .`, record_id/owner-ref evidence, and
+  AgentCanon commit/push evidence when this shared surface changes.
+- Acceptance: the record tree validates and the source branch readback is clean.
 
 ### [ ] P3-009: promotion criteria
 

@@ -17,6 +17,7 @@
 # upstream implementation ../agent_tools/check_convention_compliance.py convention gate wiring eval
 # upstream implementation ../agent_tools/skill_tool_commands.py runtime skill command packet gate
 # upstream implementation ../agent_tools/update_lifecycle_contract.py owns G1-G3 receipt identity.
+# upstream implementation ../../rust/agent-canon/src/memory.rs owns memory CLI validation reused by the Rust build gate.
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
 # upstream implementation ../ci/run_python_quality_checks.sh owns shared Python static quality checks
 # @dependency-end
@@ -462,6 +463,15 @@ emit_generated_completeness_receipt() {
 }
 
 run_standalone_static_gate_ci() {
+  cargo build --manifest-path rust/agent-canon/Cargo.toml
+  local memory_cli="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon"
+  if [[ ! -x "${memory_cli}" ]]; then
+    echo "AGENT_CANON_MEMORY_CLI_BUILD=fail"
+    echo "AGENT_CANON_MEMORY_CLI_REASON=rust build did not produce target/debug/agent-canon" >&2
+    return 1
+  fi
+  echo "AGENT_CANON_MEMORY_CLI_BUILD=${memory_cli}"
+  "${memory_cli}" memory validate --root .
   cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
   cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
   cargo test --manifest-path rust/agent-canon/Cargo.toml
