@@ -41,7 +41,7 @@ diagnostic、invariant、stop/acceptance 条件を記録する。最後の NaN/I
 
 ## Evidence/Source
 
-AgentCanon main base `161a61d72ad5b05d3646010810819b4fa5f37725427` 上の数値診断の作業哲学と、
+AgentCanon main base `161a61d72ad5b05d3646010819b4fa5f37725427` 上の数値診断の作業哲学と、
 computational optimization skill の finite-state / first-breakpoint guidance を評価した結果。
 
 ## Promoted Owner Refs

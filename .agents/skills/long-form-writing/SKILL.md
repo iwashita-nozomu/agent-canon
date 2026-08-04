@@ -2,7 +2,7 @@
 name: long-form-writing
 description: "Use as the general explanatory-doc DSL-to-prose adapter for README, workflow, guide, migration, or specification documents whose file responsibility is reader-facing explanation; do not select this skill by text length alone."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"048b88ba4d74f58a40cdfe978d1ca264044cd29cef560bf20e49ee82784a73b2"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"322365d5581e085dbdf066d040df399ca4851d4db02b51af1d4a0b4f862c969b"} -->
 
 <!--
 @dependency-start

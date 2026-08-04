@@ -2,7 +2,7 @@
 name: save-experiment-results
 description: "Save and publish experiment run results with branch-safe retention. Use when Codex needs to preserve experiments/<topic>/result/<run_name>, create or verify experiment result manifests, write experiment reader reports, publish to experiment-results/<topic>, prevent overwrites, or keep failed/partial experiment runs as durable evidence."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"691e1534749b7711dfab3dab2711277bc025ff9e15597da0c0a9e7a41da43f6b"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"52248fba50febec7af26f46cff5d2605817fce7fda5d43c7c3db6cf023eeb7fa"} -->
 
 <!--
 @dependency-start

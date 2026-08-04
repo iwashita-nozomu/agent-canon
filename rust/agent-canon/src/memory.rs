@@ -14,7 +14,9 @@ use serde::Serialize;
 use serde_json::json;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const SCHEMA: &str = "agent-canon.memory-record.v1";
 const RECORDS_DIR: &str = "memory/records";
@@ -110,8 +112,54 @@ fn records_dir(root: &Path) -> PathBuf {
     root.join(RECORDS_DIR)
 }
 
+fn canonical_root(root: &Path) -> Result<PathBuf, MemoryError> {
+    let canonical = fs::canonicalize(root).map_err(|error| {
+        MemoryError::new(format!("canonicalize root {}: {error}", root.display()))
+    })?;
+    if !canonical.is_dir() {
+        return Err(MemoryError::new(format!(
+            "memory root is not a directory: {}",
+            root.display()
+        )));
+    }
+    Ok(canonical)
+}
+
+fn ensure_within(parent: &Path, path: &Path, label: &str) -> Result<(), MemoryError> {
+    if !path.starts_with(parent) {
+        return Err(MemoryError::new(format!(
+            "{label} escapes canonical root: {}",
+            path.display()
+        )));
+    }
+    Ok(())
+}
+
+fn canonical_records_dir(root: &Path) -> Result<PathBuf, MemoryError> {
+    let canonical_root = canonical_root(root)?;
+    let directory = records_dir(root);
+    let metadata = fs::symlink_metadata(&directory)
+        .map_err(|error| MemoryError::new(format!("inspect {RECORDS_DIR}: {error}")))?;
+    if metadata.file_type().is_symlink() {
+        return Err(MemoryError::new(format!(
+            "symlink records directory refused: {}",
+            directory.display()
+        )));
+    }
+    if !metadata.is_dir() {
+        return Err(MemoryError::new(format!(
+            "{RECORDS_DIR} is not a directory"
+        )));
+    }
+    let canonical = fs::canonicalize(&directory)
+        .map_err(|error| MemoryError::new(format!("canonicalize {RECORDS_DIR}: {error}")))?;
+    ensure_within(&canonical_root, &canonical, "records directory")?;
+    Ok(canonical)
+}
+
 fn relative_path(root: &Path, path: &Path) -> String {
-    path.strip_prefix(root)
+    let canonical_root = fs::canonicalize(root).unwrap_or_else(|_| root.to_owned());
+    path.strip_prefix(&canonical_root)
         .unwrap_or(path)
         .to_string_lossy()
         .replace('\\', "/")
@@ -121,8 +169,11 @@ fn is_record_filename(name: &str) -> bool {
     let Some(stem) = name.strip_suffix(".md") else {
         return false;
     };
-    let separators = stem.matches("--").count();
-    separators == 1
+    let sides = stem.split("--").collect::<Vec<_>>();
+    sides.len() == 2
+        && !sides[0].is_empty()
+        && !sides[1].is_empty()
+        && !stem.contains("---")
         && !stem.chars().any(char::is_uppercase)
         && stem.chars().all(|character| {
             character.is_ascii_lowercase() || character.is_ascii_digit() || character == '-'
@@ -142,6 +193,51 @@ fn record_path(root: &Path, record_id: &str) -> Result<PathBuf, MemoryError> {
         )));
     }
     Ok(records_dir(root).join(filename))
+}
+
+fn checked_record_target(
+    root: &Path,
+    record_id: &str,
+    require_existing: bool,
+) -> Result<(PathBuf, bool), MemoryError> {
+    let lexical = record_path(root, record_id)?;
+    let canonical_directory = canonical_records_dir(root)?;
+    match fs::symlink_metadata(&lexical) {
+        Ok(metadata) => {
+            if metadata.file_type().is_symlink() {
+                return Err(MemoryError::new(format!(
+                    "symlink record target refused: {}",
+                    lexical.display()
+                )));
+            }
+            if !metadata.is_file() {
+                return Err(MemoryError::new(format!(
+                    "record target is not a regular file: {}",
+                    lexical.display()
+                )));
+            }
+            let canonical = fs::canonicalize(&lexical).map_err(|error| {
+                MemoryError::new(format!(
+                    "canonicalize record target {}: {error}",
+                    lexical.display()
+                ))
+            })?;
+            ensure_within(&canonical_directory, &canonical, "record target")?;
+            Ok((canonical, true))
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            if require_existing {
+                return Err(MemoryError::new(format!(
+                    "record does not exist: {record_id}"
+                )));
+            }
+            Ok((canonical_directory.join(format!("{record_id}.md")), false))
+        }
+        Err(error) => Err(MemoryError::new(format!(
+            "inspect record target {}: {error}",
+            lexical.display()
+        ))),
+    }
 }
 
 fn parse_sections(text: &str) -> Result<(String, BTreeMap<String, String>), MemoryError> {
@@ -235,7 +331,12 @@ fn validate_owner_ref(root: &Path, reference: &str) -> Result<(), MemoryError> {
     if path.is_empty() || Path::new(path).is_absolute() || path.contains("..") {
         return Err(MemoryError::new(format!("invalid owner ref: {reference}")));
     }
-    if !root.join(path).exists() {
+    let root = canonical_root(root)?;
+    let target = root.join(path);
+    let canonical = fs::canonicalize(&target)
+        .map_err(|_| MemoryError::new(format!("owner ref does not exist: {reference}")))?;
+    ensure_within(&root, &canonical, "owner ref")?;
+    if !canonical.is_file() {
         return Err(MemoryError::new(format!(
             "owner ref does not exist: {reference}"
         )));
@@ -303,43 +404,75 @@ fn validate_record(root: &Path, path: &Path, text: &str) -> Result<MemoryRecord,
 }
 
 fn load_records(root: &Path) -> Result<Vec<MemoryRecord>, MemoryError> {
-    let directory = records_dir(root);
-    if !directory.is_dir() {
-        return Err(MemoryError::new(format!("missing {RECORDS_DIR}")));
-    }
-    let mut paths = fs::read_dir(&directory)
+    let directory = canonical_records_dir(root)?;
+    let mut paths = Vec::new();
+    for entry in fs::read_dir(&directory)
         .map_err(|error| MemoryError::new(format!("read {RECORDS_DIR}: {error}")))?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .filter(|path| path.extension().and_then(|value| value.to_str()) == Some("md"))
-        .collect::<Vec<_>>();
+    {
+        let entry = entry
+            .map_err(|error| MemoryError::new(format!("read {RECORDS_DIR} entry: {error}")))?;
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path).map_err(|error| {
+            MemoryError::new(format!("inspect record entry {}: {error}", path.display()))
+        })?;
+        if metadata.file_type().is_symlink() {
+            return Err(MemoryError::new(format!(
+                "symlink record entry refused: {}",
+                path.display()
+            )));
+        }
+        if path.extension().and_then(|value| value.to_str()) != Some("md") {
+            continue;
+        }
+        if !metadata.is_file() {
+            return Err(MemoryError::new(format!(
+                "record entry is not a regular file: {}",
+                path.display()
+            )));
+        }
+        let canonical = fs::canonicalize(&path).map_err(|error| {
+            MemoryError::new(format!(
+                "canonicalize record entry {}: {error}",
+                path.display()
+            ))
+        })?;
+        ensure_within(&directory, &canonical, "record entry")?;
+        paths.push(canonical);
+    }
     paths.sort();
     let mut records = Vec::new();
-    let mut ids = BTreeSet::new();
-    let mut problems = BTreeSet::new();
     for path in paths {
         let text = fs::read_to_string(&path)
             .map_err(|error| MemoryError::new(format!("read {}: {error}", path.display())))?;
         let record = validate_record(root, &path, &text)?;
+        records.push(record);
+    }
+    validate_record_set(&records)?;
+    Ok(records)
+}
+
+fn validate_record_set(records: &[MemoryRecord]) -> Result<(), MemoryError> {
+    let mut ids = BTreeSet::new();
+    let mut problems = BTreeSet::new();
+    for record in records {
         if !ids.insert(record.record_id.clone()) {
             return Err(MemoryError::new(format!(
                 "duplicate record_id: {}",
                 record.record_id
             )));
         }
-        if !problems.insert(topic_key(&record)) {
+        if !problems.insert(topic_key(record)) {
             return Err(MemoryError::new(format!(
                 "duplicate problem topic: {}",
                 record.record_id
             )));
         }
-        records.push(record);
     }
     let ids = records
         .iter()
         .map(|record| record.record_id.as_str())
         .collect::<BTreeSet<_>>();
-    for record in &records {
+    for record in records {
         for related in related_refs(record) {
             if !ids.contains(related.as_str()) {
                 return Err(MemoryError::new(format!(
@@ -349,7 +482,7 @@ fn load_records(root: &Path) -> Result<Vec<MemoryRecord>, MemoryError> {
             }
         }
     }
-    Ok(records)
+    Ok(())
 }
 
 fn parse_options(args: &[String]) -> Result<MemoryOptions, MemoryError> {
@@ -412,42 +545,102 @@ fn required(value: &Option<String>, name: &str) -> Result<String, MemoryError> {
         .ok_or_else(|| MemoryError::new(format!("{name} is required")))
 }
 
+fn backtick_values(value: &str) -> Vec<String> {
+    value
+        .split('`')
+        .enumerate()
+        .filter_map(|(index, part)| (index % 2 == 1).then_some(part.trim().to_owned()))
+        .filter(|part| !part.is_empty())
+        .collect()
+}
+
+fn structured_paths(record: &MemoryRecord) -> Vec<String> {
+    let mut paths = owner_refs(record)
+        .into_iter()
+        .map(|reference| reference.split('#').next().unwrap_or(&reference).to_owned())
+        .collect::<Vec<_>>();
+    if let Some(evidence) = record.sections.get("Evidence/Source") {
+        paths.extend(backtick_values(evidence));
+    }
+    paths
+}
+
+fn structured_text(record: &MemoryRecord, sections: &[&str]) -> String {
+    sections
+        .iter()
+        .filter_map(|section| record.sections.get(*section))
+        .map(String::as_str)
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn all_terms_match(value: &str, requested: &[String]) -> bool {
+    let available = terms(value);
+    requested.iter().all(|query| {
+        terms(query)
+            .iter()
+            .all(|term| available.iter().any(|candidate| candidate == term))
+    })
+}
+
 fn search_hits(records: &[MemoryRecord], options: &MemoryOptions) -> Vec<SearchHit> {
     records
         .iter()
         .filter_map(|record| {
             let body = normalize(&render_record_text(record));
             let mut matched_by = Vec::new();
-            if !options.search_owner_refs.is_empty()
-                && options
-                    .search_owner_refs
-                    .iter()
-                    .all(|value| body.contains(&normalize(value)))
-            {
+            if let Some(problem) = options.problem.as_ref() {
+                if normalize(problem) != topic_key(record) {
+                    return None;
+                }
+                matched_by.push("topic".to_owned());
+            }
+            if !options.search_owner_refs.is_empty() {
+                if !options.search_owner_refs.iter().all(|value| {
+                    owner_refs(record)
+                        .iter()
+                        .any(|reference| normalize(reference) == normalize(value))
+                }) {
+                    return None;
+                }
                 matched_by.push("owner_ref".to_owned());
             }
-            if !options.search_paths.is_empty()
-                && options
-                    .search_paths
-                    .iter()
-                    .all(|value| body.contains(&normalize(value)))
-            {
+            if !options.search_paths.is_empty() {
+                if !options.search_paths.iter().all(|value| {
+                    structured_paths(record)
+                        .iter()
+                        .any(|path| normalize(path) == normalize(value))
+                }) {
+                    return None;
+                }
                 matched_by.push("path".to_owned());
             }
-            if !options.failure_evidence.is_empty()
-                && options
-                    .failure_evidence
-                    .iter()
-                    .all(|value| terms(value).iter().all(|term| body.contains(term)))
-            {
+            if !options.failure_evidence.is_empty() {
+                if !all_terms_match(
+                    &structured_text(
+                        record,
+                        &["Root Cause", "Failed Approaches", "Evidence/Source"],
+                    ),
+                    &options.failure_evidence,
+                ) {
+                    return None;
+                }
                 matched_by.push("failure_evidence".to_owned());
             }
-            if !options.recurrence_decisions.is_empty()
-                && options
-                    .recurrence_decisions
-                    .iter()
-                    .all(|value| terms(value).iter().all(|term| body.contains(term)))
-            {
+            if !options.recurrence_decisions.is_empty() {
+                if !all_terms_match(
+                    &structured_text(
+                        record,
+                        &[
+                            "Context/Trigger",
+                            "Effective Resolution",
+                            "Applicability/Limits",
+                        ],
+                    ),
+                    &options.recurrence_decisions,
+                ) {
+                    return None;
+                }
                 matched_by.push("recurrence_decision".to_owned());
             }
             if let Some(query) = options.query.as_ref() {
@@ -567,6 +760,77 @@ fn validate_candidate(root: &Path, path: &Path, text: &str) -> Result<MemoryReco
     validate_record(root, path, text)
 }
 
+fn write_record(
+    root: &Path,
+    record_id: &str,
+    text: &str,
+    require_existing: bool,
+) -> Result<(), MemoryError> {
+    let (target, exists) = checked_record_target(root, record_id, require_existing)?;
+    if require_existing && !exists {
+        return Err(MemoryError::new(format!(
+            "record does not exist: {record_id}"
+        )));
+    }
+    if !require_existing && exists {
+        return Err(MemoryError::new(format!(
+            "record already exists: {record_id}"
+        )));
+    }
+    if !require_existing {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&target)
+            .map_err(|error| MemoryError::new(format!("create {}: {error}", target.display())))?;
+        file.write_all(text.as_bytes())
+            .map_err(|error| MemoryError::new(format!("write {}: {error}", target.display())))?;
+        file.sync_all()
+            .map_err(|error| MemoryError::new(format!("sync {}: {error}", target.display())))?;
+        return Ok(());
+    }
+
+    let directory = canonical_records_dir(root)?;
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| MemoryError::new(format!("temporary record timestamp: {error}")))?
+        .as_nanos();
+    let temporary = directory.join(format!(".{record_id}.tmp-{}-{nonce}", std::process::id()));
+    let write_result = (|| -> Result<(), MemoryError> {
+        let mut file = fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&temporary)
+            .map_err(|error| {
+                MemoryError::new(format!(
+                    "create temporary record {}: {error}",
+                    temporary.display()
+                ))
+            })?;
+        file.write_all(text.as_bytes()).map_err(|error| {
+            MemoryError::new(format!(
+                "write temporary record {}: {error}",
+                temporary.display()
+            ))
+        })?;
+        file.sync_all().map_err(|error| {
+            MemoryError::new(format!(
+                "sync temporary record {}: {error}",
+                temporary.display()
+            ))
+        })?;
+        checked_record_target(root, record_id, true)?;
+        fs::rename(&temporary, &target).map_err(|error| {
+            MemoryError::new(format!("replace record {}: {error}", target.display()))
+        })?;
+        Ok(())
+    })();
+    if write_result.is_err() {
+        let _ = fs::remove_file(&temporary);
+    }
+    write_result
+}
+
 fn run_validate(options: &MemoryOptions) -> i32 {
     match load_records(&options.root) {
         Ok(records) => {
@@ -660,14 +924,14 @@ fn run_create(options: &MemoryOptions) -> i32 {
             return 2;
         }
     };
-    let path = match record_path(&options.root, &record_id) {
+    let (path, exists) = match checked_record_target(&options.root, &record_id, false) {
         Ok(path) => path,
         Err(error) => {
             eprintln!("MEMORY_CREATE=fail error={error}");
             return 2;
         }
     };
-    if records.iter().any(|record| record.record_id == record_id) {
+    if exists || records.iter().any(|record| record.record_id == record_id) {
         eprintln!("MEMORY_CREATE=duplicate existing={record_id}");
         return 2;
     }
@@ -689,18 +953,14 @@ fn run_create(options: &MemoryOptions) -> i32 {
             return 2;
         }
     };
-    let existing_ids = records
-        .iter()
-        .map(|record| record.record_id.as_str())
-        .collect::<BTreeSet<_>>();
-    for related in related_refs(&candidate) {
-        if !existing_ids.contains(related.as_str()) {
-            eprintln!("MEMORY_CREATE=fail error=related record does not exist: {related}");
-            return 2;
-        }
+    let mut candidate_records = records.clone();
+    candidate_records.push(candidate);
+    if let Err(error) = validate_record_set(&candidate_records) {
+        eprintln!("MEMORY_CREATE=fail error={error}");
+        return 2;
     }
-    if let Err(error) = fs::write(&path, text) {
-        eprintln!("MEMORY_CREATE=fail error=write {}: {error}", path.display());
+    if let Err(error) = write_record(&options.root, &record_id, &text, false) {
+        eprintln!("MEMORY_CREATE=fail error={error}");
         return 1;
     }
     println!("MEMORY_CREATE=pass");
@@ -764,7 +1024,14 @@ fn run_update(options: &MemoryOptions) -> i32 {
             return 2;
         }
     };
-    let path = match record_path(&options.root, &record_id) {
+    let records = match load_records(&options.root) {
+        Ok(records) => records,
+        Err(error) => {
+            eprintln!("MEMORY_UPDATE=fail error={error}");
+            return 1;
+        }
+    };
+    let (path, _) = match checked_record_target(&options.root, &record_id, true) {
         Ok(path) => path,
         Err(error) => {
             eprintln!("MEMORY_UPDATE=fail error={error}");
@@ -785,12 +1052,24 @@ fn run_update(options: &MemoryOptions) -> i32 {
             return 2;
         }
     };
-    if let Err(error) = validate_candidate(&options.root, &path, &updated) {
+    let candidate = match validate_candidate(&options.root, &path, &updated) {
+        Ok(candidate) => candidate,
+        Err(error) => {
+            eprintln!("MEMORY_UPDATE=fail error={error}");
+            return 2;
+        }
+    };
+    let mut candidate_records = records
+        .into_iter()
+        .filter(|record| record.record_id != record_id)
+        .collect::<Vec<_>>();
+    candidate_records.push(candidate);
+    if let Err(error) = validate_record_set(&candidate_records) {
         eprintln!("MEMORY_UPDATE=fail error={error}");
         return 2;
     }
-    if let Err(error) = fs::write(&path, updated) {
-        eprintln!("MEMORY_UPDATE=fail error=write {}: {error}", path.display());
+    if let Err(error) = write_record(&options.root, &record_id, &updated, true) {
+        eprintln!("MEMORY_UPDATE=fail error={error}");
         return 1;
     }
     println!("MEMORY_UPDATE=pass");
@@ -815,7 +1094,14 @@ fn run_promote(options: &MemoryOptions) -> i32 {
         eprintln!("MEMORY_PROMOTE=fail error={error}");
         return 2;
     }
-    let path = match record_path(&options.root, &record_id) {
+    let records = match load_records(&options.root) {
+        Ok(records) => records,
+        Err(error) => {
+            eprintln!("MEMORY_PROMOTE=fail error={error}");
+            return 1;
+        }
+    };
+    let (path, _) = match checked_record_target(&options.root, &record_id, true) {
         Ok(path) => path,
         Err(error) => {
             eprintln!("MEMORY_PROMOTE=fail error={error}");
@@ -863,15 +1149,24 @@ fn run_promote(options: &MemoryOptions) -> i32 {
             return 2;
         }
     };
-    if let Err(error) = validate_candidate(&options.root, &path, &updated) {
+    let candidate = match validate_candidate(&options.root, &path, &updated) {
+        Ok(candidate) => candidate,
+        Err(error) => {
+            eprintln!("MEMORY_PROMOTE=fail error={error}");
+            return 2;
+        }
+    };
+    let mut candidate_records = records
+        .into_iter()
+        .filter(|record| record.record_id != record_id)
+        .collect::<Vec<_>>();
+    candidate_records.push(candidate);
+    if let Err(error) = validate_record_set(&candidate_records) {
         eprintln!("MEMORY_PROMOTE=fail error={error}");
         return 2;
     }
-    if let Err(error) = fs::write(&path, updated) {
-        eprintln!(
-            "MEMORY_PROMOTE=fail error=write {}: {error}",
-            path.display()
-        );
+    if let Err(error) = write_record(&options.root, &record_id, &updated, true) {
+        eprintln!("MEMORY_PROMOTE=fail error={error}");
         return 1;
     }
     println!("MEMORY_PROMOTE=pass");
@@ -977,6 +1272,8 @@ pub fn run(args: &[String]) -> i32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn fixture_root() -> PathBuf {
@@ -1000,12 +1297,35 @@ mod tests {
         }
     }
 
+    fn populated_options(root: &Path, record_id: &str, problem: &str) -> MemoryOptions {
+        let mut candidate = options(root);
+        candidate.record_id = Some(record_id.to_owned());
+        candidate.title = Some(format!("Record {record_id}"));
+        candidate.problem = Some(problem.to_owned());
+        candidate.symptom = Some("symptom".to_owned());
+        candidate.context = Some("context".to_owned());
+        candidate.root_cause = Some("cause".to_owned());
+        candidate.effective_resolution = Some("resolution".to_owned());
+        candidate.failed_approaches = Some("failed".to_owned());
+        candidate.applicability_limits = Some("limits".to_owned());
+        candidate.evidence_source = Some("source".to_owned());
+        candidate.owner_refs = vec!["agents/owner.md#contract".to_owned()];
+        candidate
+    }
+
+    fn record_bytes(root: &Path, record_id: &str) -> Vec<u8> {
+        fs::read(root.join(RECORDS_DIR).join(format!("{record_id}.md"))).unwrap()
+    }
+
     #[test]
     fn filename_rejects_dates_and_legacy_shapes() {
         assert!(is_record_filename("runtime--archive-readback.md"));
         assert!(!is_record_filename("runtime--archive-readback-20260804.md"));
         assert!(is_record_filename("runtime--archive-20.md"));
         assert!(!is_record_filename("legacy--Uppercase.md"));
+        assert!(!is_record_filename("domain---problem.md"));
+        assert!(!is_record_filename("domain--.md"));
+        assert!(!is_record_filename("--problem.md"));
     }
 
     #[test]
@@ -1135,5 +1455,78 @@ mod tests {
             .unwrap();
         assert!(text.contains("agents/second-owner.md#contract"));
         assert!(load_records(&root).is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlink_record_entry_and_mutation_target_are_refused() {
+        let root = fixture_root();
+        let outside = root.join("outside.md");
+        fs::write(&outside, "outside content").unwrap();
+        let target = root.join(RECORDS_DIR).join("runtime--archive-readback.md");
+        symlink(&outside, &target).unwrap();
+        let before = fs::read(&outside).unwrap();
+
+        let loaded = load_records(&root).unwrap_err().to_string();
+        assert!(loaded.contains("symlink record entry refused"));
+
+        let mut update = options(&root);
+        update.record_id = Some("runtime--archive-readback".to_owned());
+        update.section = Some("Effective Resolution".to_owned());
+        update.text = Some("must not write through symlink".to_owned());
+        assert_ne!(run_update(&update), 0);
+        assert_eq!(fs::read(&outside).unwrap(), before);
+    }
+
+    #[test]
+    fn create_rejects_missing_related_record_without_tree_change() {
+        let root = fixture_root();
+        let mut candidate = populated_options(&root, "runtime--related", "related problem");
+        candidate.related_records = vec!["runtime--missing".to_owned()];
+        assert_eq!(run_create(&candidate), 2);
+        assert!(!root.join(RECORDS_DIR).join("runtime--related.md").exists());
+        assert!(load_records(&root).unwrap().is_empty());
+    }
+
+    #[test]
+    fn update_rejects_duplicate_topic_and_preserves_tree() {
+        let root = fixture_root();
+        let first = populated_options(&root, "runtime--one", "same problem");
+        let second = populated_options(&root, "runtime--two", "different problem");
+        assert_eq!(run_create(&first), 0);
+        assert_eq!(run_create(&second), 0);
+        let first_before = record_bytes(&root, "runtime--one");
+        let second_before = record_bytes(&root, "runtime--two");
+
+        let mut update = options(&root);
+        update.record_id = Some("runtime--two".to_owned());
+        update.section = Some("Problem/Symptom".to_owned());
+        update.text = Some("same problem\n\nnew symptom".to_owned());
+        assert_eq!(run_update(&update), 2);
+        assert_eq!(record_bytes(&root, "runtime--one"), first_before);
+        assert_eq!(record_bytes(&root, "runtime--two"), second_before);
+    }
+
+    #[test]
+    fn structured_search_does_not_match_unstructured_text() {
+        let root = fixture_root();
+        let candidate = populated_options(&root, "runtime--structured", "decoy/path.md");
+        assert_eq!(run_create(&candidate), 0);
+        let records = load_records(&root).unwrap();
+
+        let mut search = options(&root);
+        search.search_paths = vec!["decoy/path.md".to_owned()];
+        assert!(search_hits(&records, &search).is_empty());
+        search.search_paths = vec!["agents/owner.md".to_owned()];
+        assert_eq!(search_hits(&records, &search).len(), 1);
+        search.search_paths.clear();
+        search.search_owner_refs = vec!["agents/missing.md#contract".to_owned()];
+        assert!(search_hits(&records, &search).is_empty());
+        search.search_owner_refs.clear();
+        search.failure_evidence = vec!["decoy/path.md".to_owned()];
+        assert!(search_hits(&records, &search).is_empty());
+        search.failure_evidence.clear();
+        search.query = Some("decoy/path.md".to_owned());
+        assert_eq!(search_hits(&records, &search).len(), 1);
     }
 }

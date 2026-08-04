@@ -2025,12 +2025,12 @@ skill_families:
         - ["environment-maintenance"]
         - ["環境メンテ"]
   - id: agent-learning
-    purpose: Log agent-side working philosophy, interaction lessons, and task retrospectives with evidence.
+    purpose: Curate searchable problem-solving memory records and learn from runtime agent behavior, interaction lessons, routing misses, and task retrospectives with evidence.
     canonical_doc: agents/skills/agent-learning.md
     shim: .agents/skills/agent-learning/SKILL.md
     discovery:
       name: agent-learning
-      description: "Use when agent-side working philosophy, interaction lessons, task retrospectives, repeated routing misses, missed skill invocation, or recurrence-prevention feedback should be logged without mixing them into user preferences."
+      description: "Use when problem-solving memory curation or runtime agent behavior learning should capture recurrence evidence without mixing it into user preferences."
     tool_commands:
       required: []
       conditional:
@@ -2043,6 +2043,9 @@ skill_families:
         --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write
       - python3 tools/agent_tools/memory_record.py search --root . --search-path <owner> --failure-evidence <evidence>
       - python3 tools/agent_tools/memory_record.py plan --root . --record-id <record-id> --search-path <owner> --recurrence-decision <decision>
+      - python3 tools/agent_tools/memory_record.py create --root . --record-id <record-id> --title <title> --problem <problem> --symptom <symptom> --context <context> --root-cause <cause> --effective-resolution <resolution> --failed-approaches <failed> --applicability-limits <limits> --evidence-source <source> --owner-ref <owner>
+      - python3 tools/agent_tools/memory_record.py update --root . --record-id <record-id> --section <section> --text <replacement>
+      - python3 tools/agent_tools/memory_record.py promote --root . --record-id <record-id> --owner-ref <owner> --reason <reason>
       - python3 tools/agent_tools/memory_record.py validate --root .
       - python3 tools/agent_tools/evaluate_agent_run.py
       - python3 tools/agent_tools/workflow_monitor.py
