@@ -760,16 +760,21 @@ fn validate_candidate(root: &Path, path: &Path, text: &str) -> Result<MemoryReco
     validate_record(root, path, text)
 }
 
-fn write_record_atomically<R>(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TemporaryDisposition {
+    Consumed,
+    Cleanup,
+}
+
+fn write_record_with_temp<P>(
     root: &Path,
     record_id: &str,
     target: &Path,
     text: &str,
-    require_existing: bool,
-    rename: R,
+    publish: P,
 ) -> Result<(), MemoryError>
 where
-    R: FnOnce(&Path, &Path) -> io::Result<()>,
+    P: FnOnce(&Path, &Path) -> Result<TemporaryDisposition, MemoryError>,
 {
     let directory = canonical_records_dir(root)?;
     let nonce = SystemTime::now()
@@ -777,7 +782,7 @@ where
         .map_err(|error| MemoryError::new(format!("temporary record timestamp: {error}")))?
         .as_nanos();
     let temporary = directory.join(format!(".{record_id}.tmp-{}-{nonce}", std::process::id()));
-    let write_result = (|| -> Result<(), MemoryError> {
+    let write_result = (|| -> Result<TemporaryDisposition, MemoryError> {
         let mut file = fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -800,23 +805,54 @@ where
                 temporary.display()
             ))
         })?;
-        let (_, exists) = checked_record_target(root, record_id, require_existing)?;
-        if exists != require_existing {
-            return Err(MemoryError::new(if require_existing {
-                format!("record disappeared before replacement: {record_id}")
-            } else {
-                format!("record appeared before creation: {record_id}")
-            }));
-        }
-        rename(&temporary, target).map_err(|error| {
-            MemoryError::new(format!("replace record {}: {error}", target.display()))
-        })?;
-        Ok(())
+        publish(&temporary, target)
     })();
-    if write_result.is_err() {
+    if !matches!(&write_result, Ok(TemporaryDisposition::Consumed)) {
         let _ = fs::remove_file(&temporary);
     }
-    write_result
+    write_result.map(|_| ())
+}
+
+fn write_record_atomically<R>(
+    root: &Path,
+    record_id: &str,
+    target: &Path,
+    text: &str,
+    rename: R,
+) -> Result<(), MemoryError>
+where
+    R: FnOnce(&Path, &Path) -> io::Result<()>,
+{
+    write_record_with_temp(root, record_id, target, text, |temporary, target| {
+        let (_, exists) = checked_record_target(root, record_id, true)?;
+        if !exists {
+            return Err(MemoryError::new(format!(
+                "record disappeared before replacement: {record_id}"
+            )));
+        }
+        rename(temporary, target).map_err(|error| {
+            MemoryError::new(format!("replace record {}: {error}", target.display()))
+        })?;
+        Ok(TemporaryDisposition::Consumed)
+    })
+}
+
+fn write_record_create_new_with<P>(
+    root: &Path,
+    record_id: &str,
+    target: &Path,
+    text: &str,
+    publish: P,
+) -> Result<(), MemoryError>
+where
+    P: FnOnce(&Path, &Path) -> io::Result<()>,
+{
+    write_record_with_temp(root, record_id, target, text, |temporary, target| {
+        publish(temporary, target).map_err(|error| {
+            MemoryError::new(format!("create record {}: {error}", target.display()))
+        })?;
+        Ok(TemporaryDisposition::Cleanup)
+    })
 }
 
 fn write_record(
@@ -836,14 +872,15 @@ fn write_record(
             "record already exists: {record_id}"
         )));
     }
-    write_record_atomically(
-        root,
-        record_id,
-        &target,
-        text,
-        require_existing,
-        |temporary, target| fs::rename(temporary, target),
-    )
+    if require_existing {
+        write_record_atomically(root, record_id, &target, text, |temporary, target| {
+            fs::rename(temporary, target)
+        })
+    } else {
+        write_record_create_new_with(root, record_id, &target, text, |temporary, target| {
+            fs::hard_link(temporary, target)
+        })
+    }
 }
 
 fn run_validate(options: &MemoryOptions) -> i32 {
@@ -1364,28 +1401,26 @@ mod tests {
     }
 
     #[test]
-    fn failed_atomic_create_cleans_temp_and_leaves_final_path_absent() {
+    fn failed_atomic_create_does_not_replace_target_and_cleans_temp() {
         let root = fixture_root();
         let record_id = "runtime--atomic-create";
         let target = root.join(RECORDS_DIR).join(format!("{record_id}.md"));
+        let existing = b"preexisting bytes\n";
         let mut temporary = None;
-        let result = write_record_atomically(
+        let result = write_record_create_new_with(
             &root,
             record_id,
             &target,
             "# incomplete\n",
-            false,
-            |temporary_path, _target| {
+            |temporary_path, target| {
                 temporary = Some(temporary_path.to_owned());
-                Err(io::Error::new(
-                    io::ErrorKind::Other,
-                    "injected rename failure",
-                ))
+                fs::write(target, existing).unwrap();
+                fs::hard_link(temporary_path, target)
             },
         );
 
         assert!(result.is_err());
-        assert!(!target.exists());
+        assert_eq!(fs::read(&target).unwrap(), existing);
         assert!(!temporary.expect("temporary path was not observed").exists());
         assert!(!fs::read_dir(root.join(RECORDS_DIR))
             .unwrap()
