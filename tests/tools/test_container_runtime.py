@@ -1,5 +1,13 @@
 """Focused tests for the container pack runtime helpers."""
 
+# @dependency-start
+# contract test
+# responsibility Verifies container pack runtime mount resolution and direct-runner command construction.
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent default/opt-in runtime boundary
+# upstream implementation ../../tools/ci/container_runtime.py shared container pack runtime helpers under test
+# upstream implementation ../../tools/ci/run_container_pack.py direct pack runner exercised by the regression suite
+# @dependency-end
+
 from __future__ import annotations
 
 import importlib.util
