@@ -21,7 +21,8 @@ workspace_root="$(cd "${repo_root}/.." && pwd -P)"
   exit 1
 }
 workspace_parent="$(cd "${workspace_root}/.." && pwd -P)"
-if [[ "$(basename "$workspace_root")" == workspace-* ]]; then
+if [[ "$(basename "$workspace_root")" == workspace-* \
+  && "$(basename "$workspace_parent")" != "workspace" ]]; then
   printf 'devcontainer legacy workspace root is rejected: %s\n' "$workspace_root" >&2
   exit 1
 fi

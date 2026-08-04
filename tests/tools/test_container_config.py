@@ -362,6 +362,18 @@ def test_legacy_topic_compose_root_is_rejected(tmp_path: Path) -> None:
     assert "legacy-workspace-root-direct-repo-rejected" in result.stdout
 
 
+def test_workspace_prefixed_topic_root_is_handled_as_managed_topic(tmp_path: Path) -> None:
+    """A canonical workspace/<workspace-*>/<repo> root is treated as managed-topic."""
+    repo = write_topic_fixture(
+        tmp_path,
+        topic_root=tmp_path / "workspace" / "workspace-topic",
+    )
+
+    result = run_validator(repo)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_noncanonical_checkout_compose_root_is_direct_repo(tmp_path: Path) -> None:
     """The checker treats non-canonical path roots as direct-repo."""
     repo = write_topic_fixture(tmp_path, topic_root=tmp_path / "noncanonical" / "checkout")

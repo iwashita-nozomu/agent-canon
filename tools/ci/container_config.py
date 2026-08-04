@@ -607,6 +607,7 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
             )
         )
     orchestrator = shared_devcontainer_dir(root) / "gpu-admission.sh"
+    bootstrap = shared_devcontainer_dir(root) / "bootstrap-shared-runtime.sh"
     orchestrator_relative = orchestrator.relative_to(root).as_posix()
     if not orchestrator.is_file() or orchestrator.stat().st_mode & 0o111 == 0:
         findings.append(
@@ -614,6 +615,15 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
                 "missing_file" if not orchestrator.is_file() else "dependency_contract_violation",
                 orchestrator_relative,
                 "executable-profile-orchestrator-required",
+            )
+        )
+    bootstrap_mode = git_index_mode(root, bootstrap)
+    if bootstrap_mode is not None and bootstrap_mode != "100755":
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                bootstrap.relative_to(root).as_posix(),
+                f"bootstrap-shared-runtime-git-mode:{bootstrap_mode}",
             )
         )
     return findings
@@ -732,7 +742,26 @@ def is_managed_topic_root(root: Path) -> bool:
 
 def is_removed_legacy_topic_root(root: Path) -> bool:
     """Return True when the immediate parent directory is a removed legacy workspace root."""
-    return root.parent.name.startswith("workspace-")
+    return (
+        root.parent.name.startswith("workspace-") and root.parent.parent.name != "workspace"
+    )
+
+
+def git_index_mode(root: Path, path: Path) -> str | None:
+    """Return the git-index mode for one path if it is tracked."""
+    try:
+        relative = path.relative_to(root).as_posix()
+    except ValueError:
+        return None
+    result = subprocess.run(
+        ["git", "-C", str(root), "ls-files", "-s", "--", relative],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    return result.stdout.split(None, 1)[0] or None
 
 
 def validate_generated_compose(
@@ -774,7 +803,10 @@ def validate_generated_compose(
     root = root.resolve()
     topic_root = root.parent
     repo_target = f"/workspace/{root.name}"
-    if is_removed_legacy_topic_root(root):
+    expected_workspace_layout = (
+        "managed-topic" if is_managed_topic_root(root) else "direct-repo"
+    )
+    if is_removed_legacy_topic_root(root) and expected_workspace_layout != "managed-topic":
         return [
             Finding(
                 "dependency_contract_violation",
@@ -782,10 +814,6 @@ def validate_generated_compose(
                 "legacy-workspace-root-direct-repo-rejected",
             )
         ]
-
-    expected_workspace_layout = (
-        "managed-topic" if is_managed_topic_root(root) else "direct-repo"
-    )
     parent_layout = (root / "vendor" / "agent-canon").is_dir()
     findings: list[Finding] = []
     if profile not in {"default", "gpu-admission"}:
