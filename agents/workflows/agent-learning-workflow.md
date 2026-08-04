@@ -73,20 +73,65 @@ Rust `memory` moduleがschema、parser、validator、search、duplicate detectio
 Markdown/JSON serialization と mutation を所有します。Python adapter はその CLI を起動
 するだけで、旧 append route や旧 path compatibility は提供しません。
 
-## 4. Runtime Feedback and Evaluation
+## 4. Runtime Feedback and Behavior Evaluation
 
 利用中の skill invocation、routing、review feedback、hook/tool gate は、必要なら
 `workflow_monitor.py` の behavior/runtime feedback として raw evidence owner に記録します。
 prompt、workflow、eval の修理が必要な feedback はその owner を更新し、memory-only で閉じません。
 result artifact は raw/summary/manifest を分離します。
 
+### Behavior Events
+
+agent behavior は最終結果の要約ではなく、`workflow_monitor.py --behavior-event` で観測可能な
+event として `## Behavior Events` に蓄積します。最低限、skill invocation、stage/subagent routing、
+tool gate、prompt eval run、review feedback、subagent lifecycle、diff-check decision を記録します。
+
 ```bash
 python3 tools/agent_tools/workflow_monitor.py \
   --report-dir reports/agents/<run-id> \
   --behavior-event "skill_invocation=agent-learning status=observed"
+```
+
+### Runtime Feedback Closure Loop
+
+user / reviewer / eval feedback は、次のように `runtime_feedback=observed` を含む structured
+event として記録します。実行経路は `workflow_monitor.py --runtime-feedback` です。prompt、
+workflow、eval、memory、issue、または no-op の反映先を明示します。
+
+```bash
 python3 tools/agent_tools/workflow_monitor.py \
   --report-dir reports/agents/<run-id> \
-  --runtime-feedback "source=user target=agent-learning action=memory_record evidence=<short-observation>"
+  --runtime-feedback "source=user target=<skill-or-workflow-or-eval> action=<prompt_repair|eval_update|memory_record|no_op> runtime_feedback=observed evidence=<short-observation>"
+```
+
+feedback が「利用中の skill 修正が甘い」「skill が弱い」「呼び出しが遅い」「routing が外れた」
+のように active skill の挙動を指す場合は、active skill set を first repair candidate として
+ownerを確認します。promptを固定する前に calibration step で反映の強さを決め、単発feedbackは
+scoped guidance、example、issue、memoryで足りるかを先に見ます。hard ruleは invariant、
+checker-backed、または反復観測された失敗に限ります。
+
+`skill_improvement_decision=applied` は対象 skill/workflow prompt または eval anchor を実際に
+変更し、対応 validation を rerun した場合だけ記録します。memory-only や issue 化だけなら
+`recorded` とし、`action=no_op` なら反映しない理由を evidence に残します。`runtime_feedback=observed`
+があるのに improvement decision がすべて `not_applicable` の run は revise です。
+
+test pass のための simplification、revert、intended behavior deletion、oracle weakening、または
+test planning の過剰重視で owning code repair が止まった feedback は、`test-design` と
+implementation workflow の active skill feedback として `action=prompt_repair|eval_update` で
+解決します。algorithm repair の test/expected value/tolerance/oracle 変更から始めた feedback は、
+algorithm contract と code-side repair route を先に置く prompt repair にします。
+
+### Agent Run Evaluation
+
+behavior eval の rubric は `evidence/agent-evals/agent_behavior_eval.toml` を正本とします。
+closeout 前に `evaluate_agent_run.py` で behavior manifest を指定して評価し、feedback actions を
+解決して `AGENT_EVALUATION_STATUS=pass` になるまで閉じません。
+
+```bash
+python3 tools/agent_tools/evaluate_agent_run.py \
+  --report-dir reports/agents/<run-id> \
+  --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml \
+  --write
 ```
 
 ## 5. Closeout
@@ -101,3 +146,5 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 closeout packet には、分類（record update/create、owner change、issue/failure/evidence）、
 search context、record_id/owner refs、validation result を記録します。raw chronology を
 memory に append したことや、削除済み旧writerで publish したことを成功条件にしません。
+さらに behavior events、runtime feedback、feedback actions、improvement decisions、
+`AGENT_EVALUATION_STATUS=pass` を closeout evidence に含めます。
