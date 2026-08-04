@@ -2,7 +2,7 @@
 name: oop-type-design
 description: "Use before implementation to define language-neutral OOP/type contracts, responsibility boundaries, and explicit capability-owned design packets."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"83f90234190c05d567786fe20fe3749c14d40c4a05b8646d49d6b191e5508f91"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"ade266bbd9546ea3ec1f7d4072b13ae7c1abc19e257e8a084e5232675add5799"} -->
 
 <!--
 @dependency-start

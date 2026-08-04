@@ -2,7 +2,7 @@
 name: user-preference-sync
 description: "Use when memory/USER_PREFERENCES.md should be distilled into stable AGENTS.md preferences without carrying over task-local instructions."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"ee61a196589de57983d10dddf5274dc617d45378a734494315abdc31bfbe6af7"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"51602374e5551b2ae5b7c836361b4461223c4320b1e8ed197752e0737ce081ac"} -->
 
 <!--
 @dependency-start

@@ -1988,6 +1988,36 @@ skill_families:
         - ["agent", "tools", "manifest"]
         - ["依存", "設計"]
         - ["依存", "manifest"]
+  - id: devcontainer-exec
+    purpose: Execute targeted commands inside an existing Dev Container without changing its lifecycle or configuration.
+    canonical_doc: agents/skills/devcontainer-exec.md
+    shim: .agents/skills/devcontainer-exec/SKILL.md
+    discovery:
+      name: devcontainer-exec
+      description: "Use when an existing Dev Container needs targeted execution or validation through devcontainer exec, including a zsh shell, while preserving exact output and exit evidence."
+    tool_commands:
+      required: []
+      conditional:
+      - devcontainer exec --workspace-folder <root> zsh -lc '<command>'
+      - devcontainer exec --workspace-folder <root> zsh -lic '<command>'
+      - devcontainer exec --workspace-folder <root> zsh -l
+      maintenance:
+      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
+      - python3 tools/agent_tools/skill_tool_commands.py check
+    routing:
+      stage_policy: active
+      reason: targeted execution or validation belongs in an existing Dev Container
+      triggers:
+        - ["devcontainer", "exec"]
+        - ["existing container", "zsh"]
+        - ["container-internal", "validation"]
+        - ["container-internal", "testing"]
+        - ["container", "internal", "validation"]
+        - ["container", "internal", "testing"]
+        - ["コンテナ内", "テスト"]
+        - ["コンテナ内", "確認"]
+        - ["既存コンテナ", "zsh"]
+        - ["既存コンテナ", "入る"]
   - id: environment-maintenance
     purpose: Update Docker, CI, dependencies, and runtime guidance coherently.
     canonical_doc: agents/skills/environment-maintenance.md
@@ -2016,7 +2046,11 @@ skill_families:
       reason: Docker, CI, dependency, or runtime environment maintenance is in scope
       triggers:
         - ["docker"]
-        - ["devcontainer"]
+        - ["devcontainer", "config"]
+        - ["devcontainer", "configuration"]
+        - ["devcontainer", "build"]
+        - ["devcontainer", "update"]
+        - ["devcontainer", "dependency"]
         - ["github", "actions"]
         - ["ci"]
         - ["lockfile"]

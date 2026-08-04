@@ -1739,6 +1739,54 @@ class RouteToolTest(unittest.TestCase):
             decision["active_skills"].index("environment-maintenance"),
         )
 
+    def test_devcontainer_exec_routes_existing_container_only(self) -> None:
+        """Existing-container exec prompts must avoid maintenance routes."""
+        result = self.run_route(
+            "--prompt",
+            "devcontainer exec --workspace-folder . zsh これで行けるっしょ？",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("devcontainer-exec", decision["matched_skills"])
+        self.assertIn("devcontainer-exec", decision["active_skills"])
+        self.assertNotIn("environment-maintenance", decision["matched_skills"])
+        self.assertNotIn("environment-maintenance", decision["active_skills"])
+        self.assertNotIn("dependency-design", decision["matched_skills"])
+        self.assertNotIn("dependency-design", decision["active_skills"])
+
+    def test_devcontainer_maintenance_terms_still_route_maintenance(self) -> None:
+        """Devcontainer configuration/build prompts retain maintenance routing."""
+        result = self.run_route(
+            "--prompt",
+            "devcontainer configuration build update",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("environment-maintenance", decision["matched_skills"])
+        self.assertIn("environment-maintenance", decision["active_skills"])
+        self.assertNotIn("devcontainer-exec", decision["matched_skills"])
+
+    def test_japanese_existing_container_test_prompt_routes_exec(self) -> None:
+        """Japanese existing-container test prompts activate devcontainer-exec."""
+        result = self.run_route(
+            "--prompt",
+            "コンテナ内に一時的に入ってテストすれば？",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("devcontainer-exec", decision["matched_skills"])
+        self.assertIn("devcontainer-exec", decision["active_skills"])
+        self.assertNotIn("environment-maintenance", decision["matched_skills"])
+
     def test_prompt_does_not_route_ordinary_url_or_report_text_to_runtime_log_repair(
         self,
     ) -> None:

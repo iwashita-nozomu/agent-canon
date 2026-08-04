@@ -74,6 +74,11 @@ subagent bootstrap は repo-changing task の stage 分離に必要なため pub
 `documents/runtime/skill-dependency-graph.md` に tool 生成します。図を手で編集せず、
 辞書を変更して `skill_dependency_map.py graph` を再実行します。
 
+既存の Dev Container 内で一時的に `devcontainer exec --workspace-folder <root> ...`
+を使う実行・検証は `devcontainer-exec` に渡します。Dockerfile、dependency、devcontainer
+設定の変更、build、起動は `environment-maintenance` / `dependency-design` の owner に戻し、
+GPU profile の admission semantics は `gpu-execution` に残します。
+
 確認入口:
 - public skill の一覧と shim/doc/config の整合: `python3 tools/agent_tools/check_agent_runtime_alignment.py`
 - prompt からの skill 選択: `python3 tools/agent_tools/route.py --prompt "<user request>" --format json`
