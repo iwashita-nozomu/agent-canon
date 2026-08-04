@@ -194,6 +194,10 @@ case "$gpu_profile" in
 esac
 if [ "$gpu_profile" = "gpu-admission" ]; then
   compose_project_name="${compose_project_name}-gpu-admission"
+  [[ "$compose_project_name" =~ ^[a-z0-9][a-z0-9_-]*-gpu-admission$ ]] || {
+    printf 'devcontainer GPU admission project name is invalid: %s\n' "$compose_project_name" >&2
+    exit 1
+  }
 fi
 
 optional_mounts=""

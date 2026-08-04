@@ -29,11 +29,69 @@ if [ -z "$repository_root" ]; then
 fi
 repository_root="$(cd "$repository_root" && pwd -P)"
 profile_config="$repository_root/.devcontainer/gpu-admission/devcontainer.json"
+profile_compose="$repository_root/.agent-canon/gpu-admission-compose.generated.yml"
 [ -f "$profile_config" ] || fail "GPU-admission selector is unavailable: $profile_config"
 
 devcontainer_dir="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 bootstrap_output="$(mktemp)"
-trap 'rm -f "$bootstrap_output"' EXIT
+cleanup_required=0
+
+read_profile_project_name() {
+  local project_name=""
+  [ -f "$profile_compose" ] || return 1
+  project_name="$(awk '/^name: / {print $2; exit}' "$profile_compose")"
+  [[ "$project_name" =~ ^[a-z0-9][a-z0-9_-]*-gpu-admission$ ]] || return 1
+  printf '%s\n' "$project_name"
+}
+
+cleanup_profile() {
+  local original_rc="$1"
+  local project_name=""
+  local cleanup_rc=0
+  if [ ! -f "$profile_compose" ]; then
+    printf 'GPU_ADMISSION_CLEANUP=skipped original_rc=%s reason=compose-missing path=%s\n' \
+      "$original_rc" "$profile_compose" >&2
+    return 0
+  fi
+  project_name="$(read_profile_project_name)" || {
+    printf 'GPU_ADMISSION_CLEANUP=failed original_rc=%s reason=project-name-invalid path=%s\n' \
+      "$original_rc" "$profile_compose" >&2
+    return 1
+  }
+  if ! command -v docker >/dev/null 2>&1; then
+    printf 'GPU_ADMISSION_CLEANUP=failed original_rc=%s reason=docker-cli-unavailable project=%s\n' \
+      "$original_rc" "$project_name" >&2
+    return 1
+  fi
+  docker compose \
+    --project-name "$project_name" \
+    --file "$profile_compose" \
+    down --remove-orphans || cleanup_rc=$?
+  if [ "$cleanup_rc" -ne 0 ]; then
+    printf 'GPU_ADMISSION_CLEANUP=failed original_rc=%s cleanup_rc=%s project=%s compose=%s\n' \
+      "$original_rc" "$cleanup_rc" "$project_name" "$profile_compose" >&2
+    return "$cleanup_rc"
+  fi
+  printf 'GPU_ADMISSION_CLEANUP=pass original_rc=%s project=%s compose=%s\n' \
+    "$original_rc" "$project_name" "$profile_compose" >&2
+}
+
+on_exit() {
+  local original_rc=$?
+  local cleanup_rc=0
+  trap - EXIT
+  set +e
+  rm -f "$bootstrap_output"
+  if [ "$original_rc" -ne 0 ] && [ "$cleanup_required" -eq 1 ]; then
+    cleanup_profile "$original_rc" || cleanup_rc=$?
+    if [ "$cleanup_rc" -ne 0 ]; then
+      printf 'GPU_ADMISSION_CLEANUP_RESULT=failed original_rc=%s cleanup_rc=%s\n' \
+        "$original_rc" "$cleanup_rc" >&2
+    fi
+  fi
+  exit "$original_rc"
+}
+trap on_exit EXIT
 
 if ! AGENT_CANON_GPU_ADMISSION_PROFILE=gpu-admission \
   AGENT_CANON_RUNTIME_ROUTE=MANAGED_CONTAINER \
@@ -71,6 +129,7 @@ export AGENT_CANON_SHARED_RUNTIME_SOURCE="$runtime_source"
 export AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT="$provision_receipt"
 export AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT="${runtime_source}/shared-runtime-readback.json"
 
+cleanup_required=1
 devcontainer up \
   --workspace-folder "$repository_root" \
   --config "$profile_config"
@@ -78,7 +137,10 @@ devcontainer up \
 container_repository_root="/workspace/$(basename "$repository_root")"
 devcontainer exec \
   --workspace-folder "$repository_root" \
-  "$container_repository_root/.devcontainer/finalize-shared-runtime.sh"
+  --config "$profile_config" \
+  python3 "$container_repository_root/tools/agent-canon/agent_tools/agent_canon_source_root.py" \
+  exec .devcontainer/finalize-shared-runtime.sh
+cleanup_required=0
 
 printf 'GPU_ADMISSION_PROFILE=pass selector=%s compose_project_suffix=-gpu-admission runtime=%s\n' \
   "$profile_config" "$runtime_source"

@@ -301,7 +301,9 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   や managed experiment の wholesale deletion を意味しない。
 - GPU admission を使う場合は `.devcontainer/gpu-admission/devcontainer.json` を
   selector とする `.devcontainer/gpu-admission.sh` を明示実行する。derived repository
-  では `python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec
+  には `.devcontainer/gpu-admission ->
+  ../vendor/agent-canon/.devcontainer/gpu-admission` child symlink を投影し、
+  `python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec
   .devcontainer/gpu-admission.sh`、standalone AgentCanon では同じ resolver を
   `tools/agent_tools/agent_canon_source_root.py` から実行する。profile は
   `nvidia-smi -L`、`devcontainer` CLI、active repository、host runtime group/session
@@ -317,12 +319,17 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   Compose はこれらを出力しない。profile output は
   `.agent-canon/gpu-admission-compose.generated.yml`、project identity は
   `-gpu-admission` suffix とし、起動済み default container を再利用しない。
-- `devcontainer up` の成功後、同じ orchestrator が `devcontainer exec` で
-  `finalize-shared-runtime.sh` を一度だけ実行する。finalize は provision receipt、
+- `devcontainer up` の成功後、同じ orchestrator が同じ profile `--config` の
+  `devcontainer exec` と source-root resolver で `finalize-shared-runtime.sh` を一度だけ
+  実行する。finalize は provision receipt、
   bind device/inode、mount namespace、probe、complete group/UID/GID、umask を検証し、
   `shared-runtime-readback.json` を `tools/experiments/execution_resource_plan.py` の
   `read_shared_runtime_provision` / `write_runtime_receipt_atomic` owner 経由で発行する。
   profile script は receipt parser/writer や identity repair を複製しない。
+- up/finalize failure は生成 Compose の検証済み `-gpu-admission` project name と
+  profile-specific Compose file を指定して `docker compose down --remove-orphans` を
+  実行する。cleanup failure は typed evidence として別に報告し、entrypoint は元の
+  up/finalize rc を保持する。
 - GPU-admission profile を選択しない限り、`/var/lib/agent-canon/runtime` の
   `shared-runtime-provision.json` / `shared-runtime-readback.json` を default の
   Compose environment、bind、post-create、post-attach の前提にしてはならない。

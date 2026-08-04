@@ -29,9 +29,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shlex
+import subprocess
 import sys
+import tempfile
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -526,23 +529,52 @@ def validate_devcontainer_workspace(
 
 
 def validate_generate_runtime_compose_script(root: Path) -> list[Finding]:
-    """Require the shared generator executable for both runtime scenarios."""
+    """Require the shared generator executable used by both runtime scenarios."""
     script_path = shared_devcontainer_dir(root) / "generate-runtime-compose.sh"
     if not script_path.is_file():
         return [Finding("missing_file", f"{script_path.relative_to(root)}", "missing")]
+    if script_path.stat().st_mode & 0o111 == 0:
+        return [
+            Finding(
+                "dependency_contract_violation",
+                f"{script_path.relative_to(root)}",
+                "not-executable",
+            )
+        ]
     return []
 
 
 def validate_default_lifecycle_scripts(root: Path) -> list[Finding]:
-    """Keep default lifecycle semantics in the selected devcontainer scenario."""
-    return []
+    """Require the default lifecycle entrypoints selected by devcontainer.json."""
+    shared_dir = shared_devcontainer_dir(root)
+    findings: list[Finding] = []
+    for name in ("post-create.sh", "post-attach.sh"):
+        path = shared_dir / name
+        relative = path.relative_to(root).as_posix()
+        if not path.is_file():
+            findings.append(Finding("missing_file", relative, "missing"))
+        elif path.stat().st_mode & 0o111 == 0:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "not-executable",
+                )
+            )
+    return findings
 
 
 def validate_gpu_admission_selector(root: Path) -> list[Finding]:
     """Validate the explicit GPU-admission selector without inspecting script text."""
     selector_path = root / ".devcontainer" / "gpu-admission" / "devcontainer.json"
-    if not selector_path.exists():
-        return []
+    if not selector_path.is_file():
+        return [
+            Finding(
+                "missing_file",
+                ".devcontainer/gpu-admission/devcontainer.json",
+                "explicit-profile-selector-required",
+            )
+        ]
     config, findings = load_devcontainer_json(selector_path)
     if config is None:
         return findings
@@ -574,12 +606,13 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
                 "profile-lifecycle-fields",
             )
         )
-    orchestrator = root / ".devcontainer" / "gpu-admission.sh"
+    orchestrator = shared_devcontainer_dir(root) / "gpu-admission.sh"
+    orchestrator_relative = orchestrator.relative_to(root).as_posix()
     if not orchestrator.is_file() or orchestrator.stat().st_mode & 0o111 == 0:
         findings.append(
             Finding(
                 "missing_file" if not orchestrator.is_file() else "dependency_contract_violation",
-                ".devcontainer/gpu-admission.sh",
+                orchestrator_relative,
                 "executable-profile-orchestrator-required",
             )
         )
@@ -708,9 +741,12 @@ def validate_generated_compose(
             relative = ".devcontainer/docker-compose.generated.yml"
     else:
         compose_path = compose_path.resolve()
-        relative = compose_path.relative_to(root.resolve()).as_posix()
+        try:
+            relative = compose_path.relative_to(root.resolve()).as_posix()
+        except ValueError:
+            relative = f"<generated-compose:{profile}>"
     if not compose_path.exists():
-        return []
+        return [Finding("missing_file", relative, f"{profile}-scenario-compose-required")]
     if yaml is None:
         return [Finding("invalid_manifest", relative, "yaml-parser-unavailable")]
     try:
@@ -1372,6 +1408,83 @@ def validate_generated_compose(
     return findings
 
 
+def validate_generated_compose_scenarios(
+    root: Path, pack: PackConfig | None
+) -> list[Finding]:
+    """Generate and validate the mandatory default and GPU-admission scenarios."""
+    script_path = shared_devcontainer_dir(root) / "generate-runtime-compose.sh"
+    if not script_path.is_file() or script_path.stat().st_mode & 0o111 == 0:
+        return []
+    findings: list[Finding] = []
+    with tempfile.TemporaryDirectory(prefix="agent-canon-container-config-") as tmp_dir:
+        temporary_root = Path(tmp_dir)
+        base_environment = {
+            name: value
+            for name, value in os.environ.items()
+            if not name.startswith(
+                ("AGENT_CANON_", "DEVCONTAINER_", "NVIDIA_", "PROJECT_")
+            )
+        }
+        base_environment.update(
+            {
+                "HOME": str(temporary_root / "home-without-host-state"),
+                "PROJECT_UID": "1000",
+                "PROJECT_GID": "1000",
+                "AGENT_CANON_DEVCONTAINER_REPO_ROOT": str(root.resolve()),
+            }
+        )
+        scenarios = (
+            ("default", {}),
+            (
+                "gpu-admission",
+                {
+                    "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+                    "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
+                    "AGENT_CANON_RUNTIME_GID": "4242",
+                    "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": "1000 4242 5000",
+                    "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
+                    "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
+                    "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+                },
+            ),
+        )
+        for profile, additions in scenarios:
+            compose_path = temporary_root / f"{profile}.yml"
+            environment = {
+                **base_environment,
+                **additions,
+                "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": str(compose_path),
+            }
+            result = subprocess.run(
+                ["bash", str(script_path)],
+                cwd=root,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode != 0:
+                stderr_lines = result.stderr.strip().splitlines()
+                detail = stderr_lines[-1] if stderr_lines else "no-stderr"
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        script_path.relative_to(root).as_posix(),
+                        f"{profile}-scenario-generation-failed:rc={result.returncode}:{detail}",
+                    )
+                )
+                continue
+            findings.extend(
+                validate_generated_compose(
+                    root,
+                    pack,
+                    profile=profile,
+                    compose_path=compose_path,
+                )
+            )
+    return findings
+
+
 def validate_devcontainer(root: Path) -> list[Finding]:
     """Validate shared devcontainer entrypoint configuration."""
     devcontainer_dir = root / ".devcontainer"
@@ -1427,8 +1540,17 @@ def validate_devcontainer_pack_alignment(
     findings = [
         *json_findings,
         *validate_devcontainer_workspace(config, pack),
-        *validate_generated_compose(root, pack),
+        *validate_generated_compose_scenarios(root, pack),
     ]
+    persisted_compose = (
+        root / ".agent-canon" / "docker-compose.generated.yml"
+        if (root / "vendor" / "agent-canon").is_dir()
+        else root / ".devcontainer" / "docker-compose.generated.yml"
+    )
+    if persisted_compose.exists():
+        findings.extend(
+            validate_generated_compose(root, pack, compose_path=persisted_compose)
+        )
     profile_compose = root / ".agent-canon" / "gpu-admission-compose.generated.yml"
     if profile_compose.exists():
         findings.extend(

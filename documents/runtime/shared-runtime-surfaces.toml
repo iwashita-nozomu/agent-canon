@@ -91,6 +91,13 @@ owner = "agent-canon"
 class = "runtime_surface"
 
 [[surface]]
+path = ".devcontainer/gpu-admission"
+mode = "symlink"
+source = ".devcontainer/gpu-admission"
+owner = "agent-canon"
+class = "runtime_surface"
+
+[[surface]]
 path = ".vscode"
 mode = "regular"
 owner = "template-or-derived-repo"

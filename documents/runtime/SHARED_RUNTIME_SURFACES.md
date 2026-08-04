@@ -217,8 +217,10 @@ decide which repo-specific documents appear in root `documents/`.
 `.devcontainer/` is a parent-owned runtime container directory in derived repos.
 Its minimum shared shape is the symlink
 `.devcontainer/devcontainer.json -> ../vendor/agent-canon/.devcontainer/devcontainer.json`
-and any parent-specific source such as `post-create-parent.sh`. The linked config
-calls initialize, post-create, and post-attach through the single public source-root
+and the child symlink
+`.devcontainer/gpu-admission -> ../vendor/agent-canon/.devcontainer/gpu-admission`,
+plus any parent-specific source such as `post-create-parent.sh`. The linked configs
+call initialize, post-create, and post-attach through the single public source-root
 entry `tools/agent-canon/agent_tools/agent_canon_source_root.py`; the resolver then
 selects the standalone source or the vendored AgentCanon root. Direct parent-root
 `tools/agent_tools` references, fixed `vendor/agent-canon` script paths, parent
@@ -241,7 +243,10 @@ exact receipt paths and parser/writer ownership remain defined by
 `.devcontainer/gpu-admission.sh`, selected by
 `.devcontainer/gpu-admission/devcontainer.json`; its profile output uses a separate
 Compose path/project suffix, preserves the complete host supplementary GID set, and
-executes finalize after `devcontainer up`. Issue
+executes finalize after `devcontainer up` by passing the same selector to
+`devcontainer exec` and invoking the source-root resolver. An up/finalize failure
+tears down that exact profile Compose project while preserving the original failure
+status; cleanup failure is reported separately. Issue
 [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) tracks that owner, not a
 default lifecycle dependency. Keeping these scripts,
 the experiment scheduler, and managed experiment functionality is intentional; this

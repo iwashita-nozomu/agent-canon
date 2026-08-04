@@ -29,6 +29,7 @@ POST_CREATE_ENTRYPOINT = PROJECT_ROOT / ".devcontainer" / "post-create-entrypoin
 GPU_ADMISSION_SELECTOR = (
     PROJECT_ROOT / ".devcontainer" / "gpu-admission" / "devcontainer.json"
 )
+GPU_ADMISSION_ORCHESTRATOR = PROJECT_ROOT / ".devcontainer" / "gpu-admission.sh"
 
 
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
@@ -85,8 +86,22 @@ def write_devcontainer(root: Path) -> None:
         write_file(root, f".devcontainer/{name}", content)
         (root / ".devcontainer" / name).chmod(0o755)
     write_file(
-        root, ".devcontainer/generate-runtime-compose.sh", "#!/usr/bin/env bash\n"
+        root,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
     )
+    (root / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    write_file(
+        root,
+        ".devcontainer/gpu-admission/devcontainer.json",
+        GPU_ADMISSION_SELECTOR.read_text(encoding="utf-8"),
+    )
+    write_file(
+        root,
+        ".devcontainer/gpu-admission.sh",
+        GPU_ADMISSION_ORCHESTRATOR.read_text(encoding="utf-8"),
+    )
+    (root / ".devcontainer/gpu-admission.sh").chmod(0o755)
 
 
 def write_compose(
@@ -259,6 +274,66 @@ def test_gpu_admission_selector_isolated_from_default_selector() -> None:
     assert "gpu-admission" in profile["name"]
     assert profile["dockerComposeFile"] != default["dockerComposeFile"]
     assert load_container_config_module().validate_gpu_admission_selector(PROJECT_ROOT) == []
+
+
+def test_gpu_admission_selector_is_mandatory(tmp_path: Path) -> None:
+    """A parent devcontainer surface cannot silently omit the explicit selector."""
+    repo = write_topic_fixture(tmp_path)
+    (repo / ".devcontainer/gpu-admission/devcontainer.json").unlink()
+
+    findings = load_container_config_module().validate_gpu_admission_selector(repo)
+
+    assert {finding.detail for finding in findings} == {
+        "explicit-profile-selector-required"
+    }
+
+
+def test_default_lifecycle_entrypoints_are_mandatory(tmp_path: Path) -> None:
+    """The exact default lifecycle remains required without source-text bans."""
+    repo = write_topic_fixture(tmp_path)
+    (repo / ".devcontainer/post-attach.sh").unlink()
+
+    findings = load_container_config_module().validate_default_lifecycle_scripts(repo)
+
+    assert {(finding.path, finding.detail) for finding in findings} == {
+        (".devcontainer/post-attach.sh", "missing")
+    }
+
+
+def test_missing_generated_compose_is_a_required_scenario_finding(
+    tmp_path: Path,
+) -> None:
+    """A selected generated-Compose scenario never passes by absence."""
+    repo = write_topic_fixture(tmp_path)
+    missing = repo / ".agent-canon/missing-profile.yml"
+
+    findings = load_container_config_module().validate_generated_compose(
+        repo,
+        None,
+        profile="gpu-admission",
+        compose_path=missing,
+    )
+
+    assert {finding.detail for finding in findings} == {
+        "gpu-admission-scenario-compose-required"
+    }
+
+
+def test_generator_scenarios_require_both_compose_outputs(tmp_path: Path) -> None:
+    """A generator that exits successfully without output fails both scenarios."""
+    repo = write_topic_fixture(tmp_path)
+    generator = repo / ".devcontainer/generate-runtime-compose.sh"
+    generator.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    generator.chmod(0o755)
+
+    findings = load_container_config_module().validate_generated_compose_scenarios(
+        repo, None
+    )
+
+    assert {finding.detail for finding in findings} == {
+        "default-scenario-compose-required",
+        "gpu-admission-scenario-compose-required",
+    }
 
 
 def test_noncanonical_remote_user_contract_is_rejected(tmp_path: Path) -> None:

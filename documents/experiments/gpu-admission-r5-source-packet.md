@@ -48,9 +48,11 @@ container の同じ target に bind し、bootstrap receipt の GID 集合全体
 profile output は `.agent-canon/gpu-admission-compose.generated.yml`、Compose project
 identity は `-gpu-admission` suffix とし、default container/project を profile 起動で
 再利用しません。`devcontainer up` が成功した後だけ entrypoint が
-`devcontainer exec` で `finalize-shared-runtime.sh` を実行します。bootstrap、Compose
-generation、up、finalize のいずれかが失敗した場合は default へ降格せず non-zero で停止
-します。finalize の provision/readback parse と atomic publication は
+同じ profile `--config` の `devcontainer exec` と source-root resolver で
+`finalize-shared-runtime.sh` を実行します。bootstrap、Compose generation、up、finalize
+のいずれかが失敗した場合は default へ降格せず non-zero で停止します。up/finalize
+failure は検証済み profile Compose/project だけを cleanup し、cleanup 結果と独立に元の
+rc を保持します。finalize の provision/readback parse と atomic publication は
 `tools/experiments/execution_resource_plan.py` が唯一の owner です。
 
 default 境界の authority は linked design/implementation であり、default 経路からの
