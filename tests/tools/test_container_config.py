@@ -6,6 +6,7 @@
 # upstream design ../../documents/rule/dependency-module-changes.md topic-root mount policy
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared VS Code surface ownership
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell contract
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission selector and scenario validation
 # upstream implementation ../../tools/ci/container_config.py semantic devcontainer checker
 # upstream implementation ../../tools/agent_tools/requirements_lock.py canonical requirements lock parser and result/error model
 # upstream implementation ../../.devcontainer/devcontainer.json selects the topic-root Compose generator
@@ -25,6 +26,9 @@ SCRIPT = PROJECT_ROOT / "tools" / "ci" / "container_config.py"
 GENERATOR = PROJECT_ROOT / ".devcontainer" / "generate-runtime-compose.sh"
 DOCKERFILE = PROJECT_ROOT / ".devcontainer" / "Dockerfile"
 POST_CREATE_ENTRYPOINT = PROJECT_ROOT / ".devcontainer" / "post-create-entrypoint.sh"
+GPU_ADMISSION_SELECTOR = (
+    PROJECT_ROOT / ".devcontainer" / "gpu-admission" / "devcontainer.json"
+)
 
 
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
@@ -241,6 +245,22 @@ def test_topic_compose_semantics_pass(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_gpu_admission_selector_isolated_from_default_selector() -> None:
+    """The opt-in selector owns a distinct config and generated Compose identity."""
+    default = json.loads(
+        (PROJECT_ROOT / ".devcontainer" / "devcontainer.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    profile = json.loads(GPU_ADMISSION_SELECTOR.read_text(encoding="utf-8"))
+
+    assert "gpu-admission" not in default["name"]
+    assert "gpu-admission" not in default["dockerComposeFile"]
+    assert "gpu-admission" in profile["name"]
+    assert profile["dockerComposeFile"] != default["dockerComposeFile"]
+    assert load_container_config_module().validate_gpu_admission_selector(PROJECT_ROOT) == []
+
+
 def test_noncanonical_remote_user_contract_is_rejected(tmp_path: Path) -> None:
     """The devcontainer runtime identity is fixed to the canonical project user."""
     repo = write_topic_fixture(tmp_path)
@@ -332,6 +352,92 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     assert "gpus: all" not in compose
     assert "group_add:" not in compose
     assert "/var/lib/agent-canon/runtime" not in compose
+
+
+def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
+    tmp_path: Path,
+) -> None:
+    """The explicit profile projects the host identity and GPU runtime fields together."""
+    repo = tmp_path / "workspace" / "topic" / "agent-canon"
+    write_devcontainer(repo)
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
+    write_file(repo, ".devcontainer/Dockerfile", DOCKERFILE.read_text(encoding="utf-8"))
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    output_path = repo / ".agent-canon/gpu-admission-compose.generated.yml"
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(tmp_path / "missing-home"),
+            "PROJECT_UID": "1000",
+            "PROJECT_GID": "1000",
+            "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+            "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
+            "AGENT_CANON_RUNTIME_GID": "4242",
+            "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": "1000 4242 5000",
+            "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/gpu-admission-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = output_path.read_text(encoding="utf-8")
+    assert "name: agent-canon-" in compose
+    assert "-gpu-admission" in compose.splitlines()[0]
+    assert "    gpus: all" in compose
+    assert '        target: "/var/lib/agent-canon/runtime"' in compose
+    assert "    group_add:\n      - \"1000\"\n      - \"4242\"\n      - \"5000\"" in compose
+    assert 'DEVCONTAINER_GPU_MODE: "enabled"' in compose
+    assert 'DEVCONTAINER_GPU_REQUEST: "all"' in compose
+    assert 'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"' in compose
+    assert (
+        load_container_config_module().validate_generated_compose(
+            repo,
+            None,
+            profile="gpu-admission",
+            compose_path=output_path,
+        )
+        == []
+    )
+
+
+def test_default_scenario_rejects_shared_runtime_without_profile_selector(
+    tmp_path: Path,
+) -> None:
+    """The default generator cannot be turned into the opt-in profile by a mount alone."""
+    repo = tmp_path / "workspace" / "topic" / "agent-canon"
+    write_devcontainer(repo)
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(tmp_path / "missing-home"),
+            "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "requires the gpu-admission profile" in result.stderr
 
 
 def test_generator_treats_workspace_topic_slug_as_managed(tmp_path: Path) -> None:

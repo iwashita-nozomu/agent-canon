@@ -7,6 +7,7 @@
 # upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell boundary
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission selector and scenario validation
 # upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md opt-in GPU runtime identity contract
 # upstream design ../../documents/design/rust-agent-tool-migration.md Rust toolchain devcontainer boundary
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
@@ -19,6 +20,8 @@
 # upstream implementation ./run_container_pack.py builds and smokes runtime packs
 # downstream implementation ./run_all_checks.sh runs container configuration validation
 # downstream implementation ../../tests/tools/test_container_config.py tests validator
+# downstream implementation ../../.devcontainer/gpu-admission/devcontainer.json selects the opt-in Compose scenario
+# downstream implementation ../../.devcontainer/gpu-admission.sh owns the opt-in lifecycle scenario
 # @dependency-end
 """Validate Dockerfile, runtime pack, devcontainer, and shared VS Code surfaces."""
 
@@ -80,6 +83,7 @@ OPTIONAL_MOUNT_PROFILES = frozenset(
         "host-credentials",
         "ssh-agent",
         "docker-host",
+        "shared-runtime",
     }
 )
 
@@ -522,68 +526,63 @@ def validate_devcontainer_workspace(
 
 
 def validate_generate_runtime_compose_script(root: Path) -> list[Finding]:
-    """Require the default generator and reject opt-in-only runtime edges."""
+    """Require the shared generator executable for both runtime scenarios."""
     script_path = shared_devcontainer_dir(root) / "generate-runtime-compose.sh"
     if not script_path.is_file():
         return [Finding("missing_file", f"{script_path.relative_to(root)}", "missing")]
-    text = script_path.read_text(encoding="utf-8")
-    forbidden = (
-        "bootstrap-shared-runtime.sh",
-        "finalize-shared-runtime.sh",
-        "DEVCONTAINER_GPU_REQUEST",
-        "nvidia-smi",
-        "/dev/nvidia",
-        "gpus: all",
-        "group_add:",
-        "/var/lib/agent-canon/runtime",
-        "AGENT_CANON_SHARED_RUNTIME_SOURCE",
-        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
-        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT",
-        "ZDOTDIR",
-        "/etc/project-template/parent-environment.sh",
-    )
-    return [
-        Finding(
-            "dependency_contract_violation",
-            str(script_path.relative_to(root)),
-            f"default-generator-forbidden:{marker}",
-        )
-        for marker in forbidden
-        if marker in text
-    ]
+    return []
 
 
 def validate_default_lifecycle_scripts(root: Path) -> list[Finding]:
-    """Reject retained opt-in runtime edges from the default lifecycle scripts."""
-    shared_dir = shared_devcontainer_dir(root)
-    findings: list[Finding] = []
-    post_create = shared_dir / "post-create.sh"
-    if post_create.is_file():
-        text = post_create.read_text(encoding="utf-8")
-        if "finalize-shared-runtime.sh" in text:
+    """Keep default lifecycle semantics in the selected devcontainer scenario."""
+    return []
+
+
+def validate_gpu_admission_selector(root: Path) -> list[Finding]:
+    """Validate the explicit GPU-admission selector without inspecting script text."""
+    selector_path = root / ".devcontainer" / "gpu-admission" / "devcontainer.json"
+    if not selector_path.exists():
+        return []
+    config, findings = load_devcontainer_json(selector_path)
+    if config is None:
+        return findings
+    expected = {
+        "name": "${localWorkspaceFolderBasename}-gpu-admission-devcontainer",
+        "initializeCommand": "AGENT_CANON_GPU_ADMISSION_PROFILE=gpu-admission AGENT_CANON_OPTIONAL_MOUNTS=shared-runtime AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/gpu-admission-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
+        "dockerComposeFile": "../../.agent-canon/gpu-admission-compose.generated.yml",
+        "service": "workspace",
+        "containerUser": "project",
+        "remoteUser": "project",
+        "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
+        "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
+        "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
+    }
+    for key, expected_value in expected.items():
+        if config.get(key) != expected_value:
             findings.append(
                 Finding(
-                    "dependency_contract_violation",
-                    str(post_create.relative_to(root)),
-                    "default-post-create-forbidden:finalize-shared-runtime.sh",
+                    "inconsistency",
+                    ".devcontainer/gpu-admission/devcontainer.json",
+                    f"{key}-expected:{expected_value}",
                 )
             )
-    post_attach = shared_dir / "post-attach.sh"
-    if post_attach.is_file():
-        text = post_attach.read_text(encoding="utf-8")
-        for marker in (
-            "shared-runtime-readback.json",
-            "nvidia-smi",
-            "/dev/nvidia",
-        ):
-            if marker in text:
-                findings.append(
-                    Finding(
-                        "dependency_contract_violation",
-                        str(post_attach.relative_to(root)),
-                        f"default-post-attach-forbidden:{marker}",
-                    )
-                )
+    if config.get("shutdownAction") != "stopCompose" or config.get("overrideCommand") is not False:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                ".devcontainer/gpu-admission/devcontainer.json",
+                "profile-lifecycle-fields",
+            )
+        )
+    orchestrator = root / ".devcontainer" / "gpu-admission.sh"
+    if not orchestrator.is_file() or orchestrator.stat().st_mode & 0o111 == 0:
+        findings.append(
+            Finding(
+                "missing_file" if not orchestrator.is_file() else "dependency_contract_violation",
+                ".devcontainer/gpu-admission.sh",
+                "executable-profile-orchestrator-required",
+            )
+        )
     return findings
 
 
@@ -692,14 +691,24 @@ def parent_environment_enabled(root: Path) -> bool:
     ).is_file()
 
 
-def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Finding]:
+def validate_generated_compose(
+    root: Path,
+    pack: PackConfig | None,
+    *,
+    profile: str = "default",
+    compose_path: Path | None = None,
+) -> list[Finding]:
     """Validate generated Compose meaning rather than generator implementation text."""
-    if (root / "vendor" / "agent-canon").is_dir():
-        compose_path = root / ".agent-canon" / "docker-compose.generated.yml"
-        relative = ".agent-canon/docker-compose.generated.yml"
+    if compose_path is None:
+        if (root / "vendor" / "agent-canon").is_dir():
+            compose_path = root / ".agent-canon" / "docker-compose.generated.yml"
+            relative = ".agent-canon/docker-compose.generated.yml"
+        else:
+            compose_path = root / ".devcontainer" / "docker-compose.generated.yml"
+            relative = ".devcontainer/docker-compose.generated.yml"
     else:
-        compose_path = root / ".devcontainer" / "docker-compose.generated.yml"
-        relative = ".devcontainer/docker-compose.generated.yml"
+        compose_path = compose_path.resolve()
+        relative = compose_path.relative_to(root.resolve()).as_posix()
     if not compose_path.exists():
         return []
     if yaml is None:
@@ -726,6 +735,26 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         expected_workspace_layout = None
     parent_layout = (root / "vendor" / "agent-canon").is_dir()
     findings: list[Finding] = []
+    if profile not in {"default", "gpu-admission"}:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                f"profile-unsupported:{profile}",
+            )
+        )
+    if profile == "gpu-admission":
+        compose_name = compose.get("name")
+        if not isinstance(compose_name, str) or not compose_name.endswith(
+            "-gpu-admission"
+        ):
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "gpu-admission-project-name-suffix-required",
+                )
+            )
     if expected_workspace_layout is None:
         if topic_root.name.startswith("workspace-"):
             findings.append(
@@ -853,7 +882,10 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         token.strip() for token in optional_mounts.split(",") if token.strip()
     ]
     optional_tokens = set(optional_tokens_list)
-    for token in sorted(optional_tokens - OPTIONAL_MOUNT_PROFILES):
+    supported_optional_mounts = OPTIONAL_MOUNT_PROFILES
+    if profile != "gpu-admission":
+        supported_optional_mounts = supported_optional_mounts - {"shared-runtime"}
+    for token in sorted(optional_tokens - supported_optional_mounts):
         findings.append(
             Finding(
                 "dependency_contract_violation",
@@ -979,30 +1011,95 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                 "default-home-tmpfs-forbidden",
             )
         )
-    if "group_add" in service:
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                relative,
-                "default-shared-runtime-field-forbidden:group_add",
+    if profile == "default":
+        if "group_add" in service:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "default-shared-runtime-field-forbidden:group_add",
+                )
             )
-        )
-    if "gpus" in service:
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                relative,
-                "default-gpu-field-forbidden:gpus",
+        if "gpus" in service:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "default-gpu-field-forbidden:gpus",
+                )
             )
-        )
+    else:
+        group_add = as_sequence(service.get("group_add"))
+        if group_add is None or not group_add:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "gpu-admission-group-add-required",
+                )
+            )
+        else:
+            group_values = tuple(str(value) for value in group_add)
+            if any(re.fullmatch(r"[1-9][0-9]*", value) is None for value in group_values):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "gpu-admission-group-add-must-be-positive-integers",
+                    )
+                )
+            host_groups = (
+                environment.get("AGENT_CANON_HOST_SUPPLEMENTARY_GIDS", "")
+                if environment is not None
+                else ""
+            )
+            expected_groups = tuple(str(host_groups).split())
+            if group_values != expected_groups:
+                findings.append(
+                    Finding(
+                        "inconsistency",
+                        relative,
+                        "gpu-admission-group-add-must-preserve-host-groups",
+                    )
+                )
+        if service.get("gpus") != "all":
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "gpu-admission-gpus-all-required",
+                )
+            )
     for raw_volume in volumes:
         _source, target = volume_fields(raw_volume)
-        if target == "/var/lib/agent-canon/runtime":
+        if profile == "default" and target == "/var/lib/agent-canon/runtime":
             findings.append(
                 Finding(
                     "dependency_contract_violation",
                     relative,
                     "default-shared-runtime-field-forbidden:runtime-bind",
+                )
+            )
+    runtime_mounts = [
+        raw_volume
+        for raw_volume in volumes
+        if volume_fields(raw_volume)[1] == "/var/lib/agent-canon/runtime"
+    ]
+    if profile == "gpu-admission":
+        if len(runtime_mounts) != 1:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    f"gpu-admission-runtime-mount-count:{len(runtime_mounts)}",
+                )
+            )
+        elif volume_type(runtime_mounts[0]) != "bind":
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "gpu-admission-runtime-mount-type-must-be-bind",
                 )
             )
     if parent_layout or "host-zshrc" in optional_tokens:
@@ -1116,6 +1213,8 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
     allowed_targets = {"/workspace", repo_target}
     if "host-zshrc" in optional_tokens:
         allowed_targets.add("/home/project/.zshrc")
+    if profile == "gpu-admission":
+        allowed_targets.add("/var/lib/agent-canon/runtime")
     if "host-git" in optional_tokens:
         allowed_targets.add("/mnt/git")
     if "host-secrets" in optional_tokens:
@@ -1157,7 +1256,9 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
         "DEPENDENCY_MODULE_CONTAINER_TARGET": (
             repo_target if expected_workspace_layout == "direct-repo" else "/workspace"
         ),
-        "AGENT_CANON_RUNTIME_ROUTE": "CONTAINER_LOCAL",
+        "AGENT_CANON_RUNTIME_ROUTE": (
+            "MANAGED_CONTAINER" if profile == "gpu-admission" else "CONTAINER_LOCAL"
+        ),
         "AGENT_CANON_CODEX_SESSION_ROOT": "/home/project/.codex/sessions",
         "AGENT_CANON_SECRET_MOUNT": "/mnt/agent-canon-secrets",
     }
@@ -1179,38 +1280,68 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                 )
             )
     else:
-        if environment.get("DEVCONTAINER_GPU_MODE") != "disabled":
+        expected_gpu_mode = "enabled" if profile == "gpu-admission" else "disabled"
+        if environment.get("DEVCONTAINER_GPU_MODE") != expected_gpu_mode:
             findings.append(
                 Finding(
                     "dependency_contract_violation",
                     relative,
-                    "default-gpu-mode-must-be-disabled",
+                    f"{profile}-gpu-mode-mismatch",
                 )
             )
-        forbidden_environment = (
-            "DEVCONTAINER_GPU_REQUEST",
-            "NVIDIA_VISIBLE_DEVICES",
-            "NVIDIA_DRIVER_CAPABILITIES",
-            "AGENT_CANON_RUNTIME_GID",
-            "ZDOTDIR",
-            "AGENT_CANON_SHARED_RUNTIME_SOURCE",
-            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
-            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT",
-        )
-        for name in forbidden_environment:
-            if name in environment:
-                category = (
-                    "default-gpu-field-forbidden"
-                    if name.startswith(("DEVCONTAINER_GPU", "NVIDIA_"))
-                    else "default-shared-runtime-field-forbidden"
-                )
-                findings.append(
-                    Finding(
-                        "dependency_contract_violation",
-                        relative,
-                        f"{category}:{name}",
+        if profile == "default":
+            forbidden_environment = (
+                "DEVCONTAINER_GPU_REQUEST",
+                "NVIDIA_VISIBLE_DEVICES",
+                "NVIDIA_DRIVER_CAPABILITIES",
+                "AGENT_CANON_RUNTIME_GID",
+                "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS",
+                "ZDOTDIR",
+                "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
+                "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT",
+            )
+            for name in forbidden_environment:
+                if name in environment:
+                    category = (
+                        "default-gpu-field-forbidden"
+                        if name.startswith(("DEVCONTAINER_GPU", "NVIDIA_"))
+                        else "default-shared-runtime-field-forbidden"
                     )
-                )
+                    findings.append(
+                        Finding(
+                            "dependency_contract_violation",
+                            relative,
+                            f"{category}:{name}",
+                        )
+                    )
+        else:
+            required_profile_environment = {
+                "DEVCONTAINER_GPU_REQUEST": "all",
+                "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+                "AGENT_CANON_RUNTIME_GID": None,
+                "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": None,
+                "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
+                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
+                "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+            }
+            for name, expected in required_profile_environment.items():
+                if name not in environment:
+                    findings.append(
+                        Finding(
+                            "dependency_contract_violation",
+                            relative,
+                            f"gpu-admission-environment-required:{name}",
+                        )
+                    )
+                elif expected is not None and environment.get(name) != expected:
+                    findings.append(
+                        Finding(
+                            "inconsistency",
+                            relative,
+                            f"gpu-admission-environment:{name}",
+                        )
+                    )
         for name, expected in required_environment.items():
             if name not in environment:
                 findings.append(
@@ -1259,6 +1390,7 @@ def validate_devcontainer(root: Path) -> list[Finding]:
     findings.extend(validate_generate_runtime_compose_script(root))
     findings.extend(validate_post_create(root))
     findings.extend(validate_default_lifecycle_scripts(root))
+    findings.extend(validate_gpu_admission_selector(root))
     dependency_module_change = (
         shared_agent_tools_dir(root) / "dependency_module_change.py"
     )
@@ -1292,11 +1424,22 @@ def validate_devcontainer_pack_alignment(
     config, json_findings = load_devcontainer_json(json_path)
     if config is None:
         return json_findings
-    return [
+    findings = [
         *json_findings,
         *validate_devcontainer_workspace(config, pack),
         *validate_generated_compose(root, pack),
     ]
+    profile_compose = root / ".agent-canon" / "gpu-admission-compose.generated.yml"
+    if profile_compose.exists():
+        findings.extend(
+            validate_generated_compose(
+                root,
+                pack,
+                profile="gpu-admission",
+                compose_path=profile_compose,
+            )
+        )
+    return findings
 
 
 def has_vscode_contract(root: Path) -> bool:

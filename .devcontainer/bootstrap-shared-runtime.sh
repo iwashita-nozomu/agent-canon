@@ -4,16 +4,19 @@
 # responsibility Provisions the host-side shared AgentCanon runtime namespace before Compose creation.
 # upstream design ../CONTAINER_OPERATIONS.md exact shared-runtime identity and namespace contract
 # upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
+# upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission profile boundary
 # upstream design ../documents/experiments/gpu-admission-r5-source-packet.md exact provision receipt path and owner boundary
 # upstream implementation ../tools/experiments/execution_resource_plan.py owns atomic runtime receipt publication
 # downstream implementation finalize-shared-runtime.sh proves the container readback
 # downstream implementation generate-runtime-compose.sh renders the matching bind and identity
+# downstream implementation gpu-admission.sh owns the explicit host lifecycle
 # @dependency-end
 
 set -euo pipefail
 
 requested_runtime_route="${AGENT_CANON_RUNTIME_ROUTE:-CONTAINER_LOCAL}"
 optional_mounts="${AGENT_CANON_OPTIONAL_MOUNTS:-}"
+gpu_profile="${AGENT_CANON_GPU_ADMISSION_PROFILE:-}"
 runtime_root="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-/var/lib/agent-canon/runtime}"
 runtime_group="agent-canon-runtime"
 provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/shared-runtime-provision.json}"
@@ -29,6 +32,7 @@ fail() {
 }
 
 [ "$requested_runtime_route" = "MANAGED_CONTAINER" ] || fail "host shared-runtime bootstrap requires explicit shared-runtime profile"
+[ "$gpu_profile" = "gpu-admission" ] || fail "host shared-runtime bootstrap requires the gpu-admission entrypoint"
 case ",${optional_mounts}," in
   *,shared-runtime,*) ;;
   *) fail "host shared-runtime bootstrap requires AGENT_CANON_OPTIONAL_MOUNTS=shared-runtime" ;;
@@ -190,5 +194,6 @@ PY
 
 printf 'SHARED_RUNTIME_BOOTSTRAP=pass route=%s source=%s provision=%s\n' "$runtime_route" "$runtime_root" "$provision_receipt"
 printf 'AGENT_CANON_RUNTIME_GID=%s\n' "$runtime_gid"
+printf 'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS=%s\n' "$host_supplementary_gids"
 printf 'AGENT_CANON_SHARED_RUNTIME_SOURCE=%s\n' "$runtime_root"
 printf 'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT=%s\n' "$provision_receipt"

@@ -237,9 +237,13 @@ request `gpus: all`, or depend on provision/readback receipts. It emits
 `DEVCONTAINER_GPU_MODE=disabled` and leaves `DEVCONTAINER_GPU_REQUEST` absent. Their
 exact receipt paths and parser/writer ownership remain defined by
 `documents/experiments/gpu-admission-r5-source-packet.md` and
-`agent-canon-environment.toml` for a future explicit opt-in profile tracked in Issue
-[#521](https://github.com/iwashita-nozomu/agent-canon/issues/521); that issue is a
-follow-up tracker, not the authority for this default boundary. Keeping these scripts,
+`agent-canon-environment.toml`. The explicit opt-in owner is
+`.devcontainer/gpu-admission.sh`, selected by
+`.devcontainer/gpu-admission/devcontainer.json`; its profile output uses a separate
+Compose path/project suffix, preserves the complete host supplementary GID set, and
+executes finalize after `devcontainer up`. Issue
+[#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) tracks that owner, not a
+default lifecycle dependency. Keeping these scripts,
 the experiment scheduler, and managed experiment functionality is intentional; this
 boundary is not a wholesale deletion.
 

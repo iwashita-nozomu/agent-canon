@@ -296,12 +296,34 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
 - 既定 devcontainer は GPU admission の host runtime identity を要求しない。
   `bootstrap-shared-runtime.sh`、`finalize-shared-runtime.sh`、shared lock、
   provision/readback receipt、および固定 supplementary group は AgentCanon source
-  に保持するが、linked config の default lifecycle からは非選択とする。これらは
-  Issue [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) で追跡する
-  将来 profile の source 候補であり、今回の public optional profile ではない。既定境界の
+  に保持するが、linked config の default lifecycle からは非選択とする。既定境界の
   authority は本 rulebook と linked implementation に置く。experiment scheduler
   や managed experiment の wholesale deletion を意味しない。
-- Opt-in profile を実装するまでは、`/var/lib/agent-canon/runtime` の
+- GPU admission を使う場合は `.devcontainer/gpu-admission/devcontainer.json` を
+  selector とする `.devcontainer/gpu-admission.sh` を明示実行する。derived repository
+  では `python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec
+  .devcontainer/gpu-admission.sh`、standalone AgentCanon では同じ resolver を
+  `tools/agent_tools/agent_canon_source_root.py` から実行する。profile は
+  `nvidia-smi -L`、`devcontainer` CLI、active repository、host runtime group/session
+  を fail-closed に確認した後でだけ bootstrap を呼ぶ。GPU 不在、host `sudo`/group
+  capability 不在、provision receipt 不一致、Compose/up/finalize failure は default
+  profile へ降格しない。
+- `gpu-admission.sh` は bootstrap の `AGENT_CANON_RUNTIME_GID`、完全な
+  `AGENT_CANON_HOST_SUPPLEMENTARY_GIDS`、canonical source/provision receipt を
+  profile generator へ渡す。profile Compose は host
+  `/var/lib/agent-canon/runtime` を container の同じ target へ bind し、完全な
+  `group_add`、`gpus: all`、`DEVCONTAINER_GPU_MODE=enabled`、
+  `DEVCONTAINER_GPU_REQUEST=all`、`MANAGED_CONTAINER` route を出力する。default
+  Compose はこれらを出力しない。profile output は
+  `.agent-canon/gpu-admission-compose.generated.yml`、project identity は
+  `-gpu-admission` suffix とし、起動済み default container を再利用しない。
+- `devcontainer up` の成功後、同じ orchestrator が `devcontainer exec` で
+  `finalize-shared-runtime.sh` を一度だけ実行する。finalize は provision receipt、
+  bind device/inode、mount namespace、probe、complete group/UID/GID、umask を検証し、
+  `shared-runtime-readback.json` を `tools/experiments/execution_resource_plan.py` の
+  `read_shared_runtime_provision` / `write_runtime_receipt_atomic` owner 経由で発行する。
+  profile script は receipt parser/writer や identity repair を複製しない。
+- GPU-admission profile を選択しない限り、`/var/lib/agent-canon/runtime` の
   `shared-runtime-provision.json` / `shared-runtime-readback.json` を default の
   Compose environment、bind、post-create、post-attach の前提にしてはならない。
   Receipt parsing と atomic publication の owner は引き続き
@@ -321,8 +343,9 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   environment に `DEVCONTAINER_GPU_MODE=disabled` を設定する。`DEVCONTAINER_GPU_REQUEST`
   は absent とし、`gpus: all` も生成しない。GPU が見える host でも default Compose
   は GPU runtime を自動追加せず、GPU 不在を default container creation の分岐条件に
-  しない。GPU を必要とする実験の opt-in profile は #521 で追跡するが、既定境界は
-  本 rulebook と linked implementation が所有する。
+  しない。GPU を必要とする実験の explicit profile owner は
+  `.devcontainer/gpu-admission.sh` と profile selector であり、既定境界は本 rulebook
+  と linked implementation が所有する。
 - Host authentication must stay host-local. The container may reuse mounted
   credentials, but the Docker image must not bake user tokens or auth state.
 - `safe.directory` setup must be dynamic for `/workspace` and

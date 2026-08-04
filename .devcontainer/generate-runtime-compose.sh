@@ -106,11 +106,18 @@ reserved_environment = {
     "DEVCONTAINER_RUNTIME_MODE",
     "DEVCONTAINER_GPU_MODE",
     "DEVCONTAINER_GPU_NOTICE",
+    "DEVCONTAINER_GPU_REQUEST",
+    "AGENT_CANON_GPU_ADMISSION_PROFILE",
     "AGENT_CANON_SECRET_MOUNT",
     "AGENT_CANON_SECRET_DIR_MODE",
     "AGENT_CANON_OPTIONAL_MOUNTS",
     "AGENT_CANON_DEPENDENCY_PROFILE",
     "AGENT_CANON_RUNTIME_ROUTE",
+    "AGENT_CANON_RUNTIME_GID",
+    "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS",
+    "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+    "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
+    "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT",
     "AGENT_CANON_CODEX_SESSION_ROOT",
     "AGENT_CANON_WORKSPACE_LAYOUT",
     "AGENT_CANON_WORKSPACE_ROOT",
@@ -177,6 +184,18 @@ if [ -d "${repo_root}/vendor/agent-canon" ]; then
   parent_layout=true
 fi
 
+gpu_profile="${AGENT_CANON_GPU_ADMISSION_PROFILE:-default}"
+case "$gpu_profile" in
+  default|gpu-admission) ;;
+  *)
+    printf 'devcontainer GPU admission profile is unsupported: %s\n' "$gpu_profile" >&2
+    exit 1
+    ;;
+esac
+if [ "$gpu_profile" = "gpu-admission" ]; then
+  compose_project_name="${compose_project_name}-gpu-admission"
+fi
+
 optional_mounts=""
 optional_mounts_raw="${AGENT_CANON_OPTIONAL_MOUNTS:-}"
 declare -A optional_mount_seen=()
@@ -185,6 +204,12 @@ if [ -n "$optional_mounts_raw" ]; then
   for optional_mount in "${optional_mount_values[@]}"; do
     case "$optional_mount" in
       host-zshrc|host-git|host-secrets|host-credentials|ssh-agent|docker-host) ;;
+      shared-runtime)
+        if [ "$gpu_profile" != "gpu-admission" ]; then
+          printf 'devcontainer shared-runtime mount requires the gpu-admission profile\n' >&2
+          exit 1
+        fi
+        ;;
       *)
         printf 'devcontainer optional mount profile is unsupported: %s\n' "$optional_mount" >&2
         exit 1
@@ -304,6 +329,88 @@ fi
 
 gpu_mode="disabled"
 gpu_notice="default-profile-disabled"
+runtime_route="CONTAINER_LOCAL"
+runtime_source=""
+runtime_gid=""
+host_supplementary_gids=""
+provision_receipt=""
+readback_receipt=""
+if [ "$gpu_profile" = "gpu-admission" ]; then
+  runtime_route="MANAGED_CONTAINER"
+  runtime_source="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-/var/lib/agent-canon/runtime}"
+  runtime_gid="${AGENT_CANON_RUNTIME_GID:-}"
+  host_supplementary_gids="${AGENT_CANON_HOST_SUPPLEMENTARY_GIDS:-}"
+  provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_source}/shared-runtime-provision.json}"
+  readback_receipt="${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-${runtime_source}/shared-runtime-readback.json}"
+  [ "$runtime_source" = "/var/lib/agent-canon/runtime" ] || {
+    printf 'devcontainer GPU admission runtime source must be /var/lib/agent-canon/runtime\n' >&2
+    exit 1
+  }
+  [[ "$runtime_gid" =~ ^[1-9][0-9]*$ ]] || {
+    printf 'devcontainer GPU admission runtime GID must be a positive decimal\n' >&2
+    exit 1
+  }
+  [ -n "$host_supplementary_gids" ] || {
+    printf 'devcontainer GPU admission host supplementary GIDs are required\n' >&2
+    exit 1
+  }
+  read -r -a host_supplementary_gid_values <<< "$host_supplementary_gids"
+  [ "${#host_supplementary_gid_values[@]}" -gt 0 ] || {
+    printf 'devcontainer GPU admission host supplementary GIDs are empty\n' >&2
+    exit 1
+  }
+  declare -A host_supplementary_gid_seen=()
+  for host_gid_value in "${host_supplementary_gid_values[@]}"; do
+    [[ "$host_gid_value" =~ ^[1-9][0-9]*$ ]] || {
+      printf 'devcontainer GPU admission host supplementary GID is invalid: %s\n' "$host_gid_value" >&2
+      exit 1
+    }
+    [ -z "${host_supplementary_gid_seen[$host_gid_value]:-}" ] || {
+      printf 'devcontainer GPU admission host supplementary GIDs contain a duplicate: %s\n' "$host_gid_value" >&2
+      exit 1
+    }
+    host_supplementary_gid_seen["$host_gid_value"]=1
+  done
+  [ -n "${host_supplementary_gid_seen[$runtime_gid]:-}" ] || {
+    printf 'devcontainer GPU admission runtime GID is absent from host supplementary GIDs\n' >&2
+    exit 1
+  }
+  [ "$provision_receipt" = "${runtime_source}/shared-runtime-provision.json" ] || {
+    printf 'devcontainer GPU admission provision receipt path is not canonical\n' >&2
+    exit 1
+  }
+  [ "$readback_receipt" = "${runtime_source}/shared-runtime-readback.json" ] || {
+    printf 'devcontainer GPU admission readback receipt path is not canonical\n' >&2
+    exit 1
+  }
+  optional_mount_enabled shared-runtime || {
+    printf 'devcontainer GPU admission requires AGENT_CANON_OPTIONAL_MOUNTS=shared-runtime\n' >&2
+    exit 1
+  }
+  gpu_mode="enabled"
+  gpu_notice="explicit-gpu-admission-profile"
+else
+  for forbidden_profile_value in \
+    "${DEVCONTAINER_GPU_REQUEST:-}" \
+    "${AGENT_CANON_RUNTIME_GID:-}" \
+    "${AGENT_CANON_SHARED_RUNTIME_SOURCE:-}" \
+    "${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-}" \
+    "${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-}"; do
+    [ -z "$forbidden_profile_value" ] || {
+      printf 'devcontainer GPU admission fields require the gpu-admission profile\n' >&2
+      exit 1
+    }
+  done
+fi
+
+if [ "$gpu_profile" = "gpu-admission" ]; then
+  runtime_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$runtime_source")"
+  volume_lines+=(
+    "      - type: bind"
+    "        source: ${runtime_source_yaml}"
+    '        target: "/var/lib/agent-canon/runtime"'
+  )
+fi
 
 environment_lines=(
   "      DEVCONTAINER_RUNTIME_MODE: \"${compose_mode}\""
@@ -313,7 +420,7 @@ environment_lines=(
   "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
   "      AGENT_CANON_OPTIONAL_MOUNTS: \"${optional_mounts}\""
   "      AGENT_CANON_DEPENDENCY_PROFILE: \"${dependency_profile}\""
-  '      AGENT_CANON_RUNTIME_ROUTE: "CONTAINER_LOCAL"'
+  "      AGENT_CANON_RUNTIME_ROUTE: \"${runtime_route}\""
   "      AGENT_CANON_WORKSPACE_LAYOUT: \"${workspace_layout}\""
   "      AGENT_CANON_CODEX_SESSION_ROOT: \"${project_home}/.codex/sessions\""
   '      AGENT_CANON_WORKSPACE_ROOT: "/workspace"'
@@ -322,6 +429,17 @@ environment_lines=(
   "      DEPENDENCY_MODULE_CONTAINER_TARGET: \"${workspace_mount_target}\""
   "${pack_environment_lines[@]}"
 )
+if [ "$gpu_profile" = "gpu-admission" ]; then
+  environment_lines+=(
+    '      DEVCONTAINER_GPU_REQUEST: "all"'
+    '      AGENT_CANON_GPU_ADMISSION_PROFILE: "gpu-admission"'
+    "      AGENT_CANON_RUNTIME_GID: \"${runtime_gid}\""
+    "      AGENT_CANON_HOST_SUPPLEMENTARY_GIDS: \"${host_supplementary_gids}\""
+    "      AGENT_CANON_SHARED_RUNTIME_SOURCE: \"${runtime_source}\""
+    "      AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT: \"${provision_receipt}\""
+    "      AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT: \"${readback_receipt}\""
+  )
+fi
 if [ "$parent_layout" = true ]; then
   environment_lines=(
     "      HOME: \"${project_home}\""
@@ -343,6 +461,13 @@ mkdir -p "$(dirname "$compose_output")"
   printf '  workspace:\n'
   printf '    platform: %s\n' "$runtime_platform"
   printf '    user: "%s:%s"\n' "$project_uid" "$project_gid"
+  if [ "$gpu_profile" = "gpu-admission" ]; then
+    printf '    gpus: all\n'
+    printf '    group_add:\n'
+    for host_gid_value in "${host_supplementary_gid_values[@]}"; do
+      printf '      - "%s"\n' "$host_gid_value"
+    done
+  fi
   if [ "$compose_mode" = "repo-docker-pack" ]; then
     printf '    build:\n'
     printf '      context: ..\n'
