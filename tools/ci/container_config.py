@@ -724,6 +724,12 @@ def parent_environment_enabled(root: Path) -> bool:
     ).is_file()
 
 
+def is_managed_topic_root(root: Path) -> bool:
+    """Return True when the repo is mounted as a managed topic layout."""
+    topic_root = root.parent
+    return topic_root.parent.name == "workspace"
+
+
 def validate_generated_compose(
     root: Path,
     pack: PackConfig | None,
@@ -761,11 +767,9 @@ def validate_generated_compose(
     if service is None:
         return [Finding("invalid_manifest", relative, "workspace-service-required")]
     root = root.resolve()
-    topic_root = root.parent.resolve()
+    topic_root = root.parent
     repo_target = f"/workspace/{root.name}"
-    expected_workspace_layout = (
-        "managed-topic" if topic_root.parent.name == "workspace" else "direct-repo"
-    )
+    expected_workspace_layout = "managed-topic" if is_managed_topic_root(root) else "direct-repo"
     parent_layout = (root / "vendor" / "agent-canon").is_dir()
     findings: list[Finding] = []
     if profile not in {"default", "gpu-admission"}:

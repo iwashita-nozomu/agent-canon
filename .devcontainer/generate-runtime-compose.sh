@@ -21,7 +21,10 @@ workspace_root="$(cd "${repo_root}/.." && pwd -P)"
   exit 1
 }
 workspace_parent="$(cd "${workspace_root}/.." && pwd -P)"
-if [ "$(basename "$workspace_parent")" = "workspace" ]; then
+is_managed_topic_root() {
+  [ "$(basename "$1")" = "workspace" ]
+}
+if is_managed_topic_root "$workspace_parent"; then
   workspace_layout="managed-topic"
 else
   workspace_layout="direct-repo"

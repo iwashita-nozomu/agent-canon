@@ -361,6 +361,15 @@ def test_legacy_topic_compose_root_is_direct_repo(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_noncanonical_checkout_compose_root_is_direct_repo(tmp_path: Path) -> None:
+    """The checker treats non-canonical path roots as direct-repo."""
+    repo = write_topic_fixture(tmp_path, topic_root=tmp_path / "noncanonical" / "checkout")
+
+    result = run_validator(repo)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
 def test_compose_repo_double_mount_is_rejected(tmp_path: Path) -> None:
     """The selected repository is not mounted a second time below /workspace."""
     repo = write_topic_fixture(tmp_path, duplicate_repo_mount=True)
