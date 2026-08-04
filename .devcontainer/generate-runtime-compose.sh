@@ -21,21 +21,10 @@ workspace_root="$(cd "${repo_root}/.." && pwd -P)"
   exit 1
 }
 workspace_parent="$(cd "${workspace_root}/.." && pwd -P)"
-if [ "$(basename "$workspace_root")" = "workspace" ] \
-  && [ "$(basename "$workspace_parent")" != "workspace" ]; then
-  workspace_layout="direct-repo"
-elif [ "$(basename "$workspace_parent")" != "workspace" ]; then
-  case "$(basename "$workspace_root")" in
-    workspace-*)
-      printf 'devcontainer rejects legacy workspace-<topic-slug> root: %s\n' "$workspace_root" >&2
-      ;;
-    *)
-      printf 'devcontainer requires a topic workspace root under workspace/<topic-slug>: %s\n' "$workspace_root" >&2
-      ;;
-  esac
-  exit 1
-else
+if [ "$(basename "$workspace_parent")" = "workspace" ]; then
   workspace_layout="managed-topic"
+else
+  workspace_layout="direct-repo"
 fi
 repo_basename="$(basename "$repo_root")"
 container_repo_root="/workspace/${repo_basename}"

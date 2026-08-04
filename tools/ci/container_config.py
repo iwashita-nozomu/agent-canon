@@ -763,12 +763,9 @@ def validate_generated_compose(
     root = root.resolve()
     topic_root = root.parent.resolve()
     repo_target = f"/workspace/{root.name}"
-    if topic_root.name == "workspace" and topic_root.parent.name != "workspace":
-        expected_workspace_layout = "direct-repo"
-    elif topic_root.parent.name == "workspace":
-        expected_workspace_layout = "managed-topic"
-    else:
-        expected_workspace_layout = None
+    expected_workspace_layout = (
+        "managed-topic" if topic_root.parent.name == "workspace" else "direct-repo"
+    )
     parent_layout = (root / "vendor" / "agent-canon").is_dir()
     findings: list[Finding] = []
     if profile not in {"default", "gpu-admission"}:
@@ -790,17 +787,6 @@ def validate_generated_compose(
                     relative,
                     "gpu-admission-project-name-suffix-required",
                 )
-            )
-    if expected_workspace_layout is None:
-        if topic_root.name.startswith("workspace-"):
-            findings.append(
-                Finding(
-                    "dependency_contract_violation", relative, "legacy-topic-root-name"
-                )
-            )
-        else:
-            findings.append(
-                Finding("dependency_contract_violation", relative, "topic-root-parent")
             )
     if service.get("working_dir") != repo_target:
         findings.append(

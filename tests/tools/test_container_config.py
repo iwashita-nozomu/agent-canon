@@ -21,6 +21,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "container_config.py"
 GENERATOR = PROJECT_ROOT / ".devcontainer" / "generate-runtime-compose.sh"
@@ -112,7 +114,7 @@ def write_compose(
 ) -> None:
     """Write a generated Compose projection for the fixture's workspace layout."""
     topic_root = root.parent.resolve()
-    direct_repo = topic_root.name == "workspace"
+    direct_repo = topic_root.parent.name != "workspace"
     repo_target = f"/workspace/{root.name}"
     volumes: list[dict[str, str]] = [
         {
@@ -350,14 +352,13 @@ def test_noncanonical_remote_user_contract_is_rejected(tmp_path: Path) -> None:
     assert "remoteUser-expected:project" in result.stdout
 
 
-def test_legacy_topic_compose_root_is_rejected(tmp_path: Path) -> None:
-    """The checker rejects the removed workspace-<topic-slug> root."""
+def test_legacy_topic_compose_root_is_direct_repo(tmp_path: Path) -> None:
+    """The checker treats a workspace-<topic-slug> root as direct-repo."""
     repo = write_topic_fixture(tmp_path, topic_root=tmp_path / "workspace-topic")
 
     result = run_validator(repo)
 
-    assert result.returncode == 1, result.stdout + result.stderr
-    assert "legacy-topic-root-name" in result.stdout
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_compose_repo_double_mount_is_rejected(tmp_path: Path) -> None:
@@ -547,9 +548,26 @@ def test_generator_treats_workspace_topic_slug_as_managed(tmp_path: Path) -> Non
     assert load_container_config_module().validate_generated_compose(repo, None) == []
 
 
-def test_generator_direct_repo_mounts_only_repository_root(tmp_path: Path) -> None:
-    """A direct repo layout never exposes sibling repositories under /workspace."""
-    repo = tmp_path / "workspace" / "data_download"
+@pytest.mark.parametrize(
+    ("relative_repo", "expected_layout"),
+    [
+        ("workspace/topic/agent-canon", "managed-topic"),
+        ("workspace-topic/agent-canon", "direct-repo"),
+        ("home/runner/work/agent-canon/agent-canon", "direct-repo"),
+        ("noncanonical/checkout/agent-canon", "direct-repo"),
+    ],
+    ids=(
+        "canonical-managed-topic",
+        "legacy-workspace-root-direct-repo",
+        "github-actions-direct-repo",
+        "noncanonical-checkout-direct-repo",
+    ),
+)
+def test_generator_classifies_checkout_layouts(
+    tmp_path: Path, relative_repo: str, expected_layout: str
+) -> None:
+    """Shell and Python classifiers agree on managed and direct repository paths."""
+    repo = tmp_path / relative_repo
     write_file(
         repo,
         ".devcontainer/generate-runtime-compose.sh",
@@ -573,13 +591,15 @@ def test_generator_direct_repo_mounts_only_repository_root(tmp_path: Path) -> No
     compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(
         encoding="utf-8"
     )
-    assert f'source: "{repo.resolve()}"' in compose
-    assert 'target: "/workspace/data_download"' in compose
-    assert f'source: "{repo.parent.resolve()}"' not in compose
-    assert 'AGENT_CANON_WORKSPACE_LAYOUT: "direct-repo"' in compose
-    assert 'AGENT_CANON_REPOSITORY_ROOT: "/workspace/data_download"' in compose
-    assert f'DEPENDENCY_MODULE_CONTAINER_SOURCE: "{repo.resolve()}"' in compose
-    assert 'DEPENDENCY_MODULE_CONTAINER_TARGET: "/workspace/data_download"' in compose
+    assert f'AGENT_CANON_WORKSPACE_LAYOUT: "{expected_layout}"' in compose
+    if expected_layout == "managed-topic":
+        assert f'source: "{repo.parent.resolve()}"' in compose
+        assert 'target: "/workspace"' in compose
+        assert f'source: "{repo.resolve()}"' not in compose
+    else:
+        assert f'source: "{repo.resolve()}"' in compose
+        assert f'target: "/workspace/{repo.name}"' in compose
+        assert f'source: "{repo.parent.resolve()}"' not in compose
     assert compose.count("type: bind") == 1
     assert load_container_config_module().validate_generated_compose(repo, None) == []
 
@@ -642,8 +662,8 @@ def test_generator_accepts_explicit_output_path(tmp_path: Path) -> None:
     assert relative_compose.count('target: "/workspace"') == 1
 
 
-def test_generator_rejects_legacy_topic_root(tmp_path: Path) -> None:
-    """The generator rejects the removed workspace-<topic-slug> root."""
+def test_generator_accepts_legacy_topic_root_as_direct_repo(tmp_path: Path) -> None:
+    """The generator treats a workspace-<topic-slug> root as direct-repo."""
     repo = tmp_path / "workspace-topic" / "agent-canon"
     write_devcontainer(repo)
     write_file(
@@ -663,8 +683,28 @@ def test_generator_rejects_legacy_topic_root(tmp_path: Path) -> None:
         text=True,
     )
 
-    assert result.returncode == 1
-    assert "legacy workspace-<topic-slug> root" in result.stderr
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert 'AGENT_CANON_WORKSPACE_LAYOUT: "direct-repo"' in compose
+    assert f'source: "{repo.resolve()}"' in compose
+    assert f'target: "/workspace/{repo.name}"' in compose
+
+
+def test_post_attach_script_is_executable_in_git_index() -> None:
+    """Source-root resolution can execute post-attach from the Git tree."""
+    result = subprocess.run(
+        ["git", "ls-files", "--stage", "--", ".devcontainer/post-attach.sh"],
+        cwd=PROJECT_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    entries = result.stdout.splitlines()
+    assert len(entries) == 1
+    assert entries[0].split(maxsplit=1)[0] == "100755"
 
 
 def write_parent_generator_fixture(
