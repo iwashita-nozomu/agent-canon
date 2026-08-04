@@ -143,11 +143,12 @@ AgentCanon の実体パスを直接呼び出します。
   mounted dependency の導入にだけ使い、host sudo、host password prompt、host group
   mutation は要求しない。
 - 親の default pack が zsh を選ぶ場合、generator は pack の `runtime.shell` を
-  process boundary とし、regular fileであるhost `${HOME}/.zshrc` expressionだけを
-  dedicated non-root homeへread-only mountする。欠落時はmountを省略し、parent
-  environment pairが有効な場合だけそのshell sourceをread-only mountする。validator
-  は各source expression、bind type、non-root target、read-onlyを静的に確認する。
-  zsh startupとfresh CIはhost zshrcの有無に依存せず、代替pathは探索しない。
+  process boundary とし、`host-zshrc` profile が明示された場合だけ、resolved regular
+  fileであるhost `${HOME}/.zshrc` と resolved regular directoryである `${HOME}/.zsh`
+  を canonical sourceからdedicated non-root homeへread-only mountする。欠落・broken
+  symlink・型違いはmountを省略し、validatorはresolved absolute source、bind type、
+  non-root target、read-onlyを静的に確認する。zsh startupとfresh CIはhost
+  zshrc/zsh directoryの有無に依存せず、代替pathは探索しない。
 
 この分離により、shared runtime の更新と親プロジェクトの hook / build 設定を
 別々に review でき、親固有の変更が AgentCanon source の pin を汚染しません。

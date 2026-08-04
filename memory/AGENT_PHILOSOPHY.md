@@ -109,6 +109,12 @@ upstream design README.md memory surface index
   - confidence: stable
   - evidence: User corrected a PDIPM/KKT diagnosis that relied on the final failed log state instead of the first divergence point.
 
+- 2026-08-04 | work-principle | Container mount設計では、workspaceから参照するsymlinkとhost shell startup fileを事前にinventoryし、解決先が既存mount外なら用途に応じたread-write/read-only bindを追加し、container内の解決結果まで検証する。
+  - source: chat feedback
+  - scope: devcontainer-and-container-runtime
+  - confidence: stable
+  - evidence: 2026-08-04: link/msm_data_root resolved to /mnt/l/msm_data_root and host ~/.zshrc resolved to ~/.dotfiles/shell/zsh/.zshrc; both were absent from generated Compose.
+
 ## Interaction Observations
 
 - 2026-04-10 | interaction-observation | agent personality は自由作文ではなく、source/evidence/scope/confidence を持つ作業哲学として repo に蓄積する

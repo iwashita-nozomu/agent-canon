@@ -51,6 +51,26 @@ def write_host_zshrc(home: Path, content: str = "# fixture zshrc\n") -> None:
     (home / ".zshrc").write_text(content, encoding="utf-8")
 
 
+def write_host_zshrc_symlink(home: Path, content: str = "# fixture zshrc\n") -> Path:
+    """Write a host zshrc symlink and return its regular canonical target."""
+    home.mkdir(parents=True, exist_ok=True)
+    target = home / "real-zshrc"
+    target.write_text(content, encoding="utf-8")
+    (home / ".zshrc").symlink_to(target)
+    return target.resolve()
+
+
+def write_host_zsh_directory_symlink(home: Path) -> Path:
+    """Write a host zsh directory symlink and return its canonical target."""
+    home.mkdir(parents=True, exist_ok=True)
+    target = home / "real zsh"
+    target.mkdir()
+    (target / "zsh-autosuggestions.zsh").write_text("# fixture\n", encoding="utf-8")
+    (target / "zsh-syntax-highlighting.zsh").write_text("# fixture\n", encoding="utf-8")
+    (home / ".zsh").symlink_to(target)
+    return target.resolve()
+
+
 def write_devcontainer(root: Path) -> None:
     """Write only the observable devcontainer entrypoint surface."""
     write_file(
@@ -637,6 +657,123 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     assert pack_findings == []
     assert pack is not None
     assert module.validate_generated_compose(repo, pack) == []
+
+
+def test_parent_generator_resolves_symlink_host_zshrc(tmp_path: Path) -> None:
+    """A host zshrc symlink binds its canonical regular target read-only."""
+    repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".agent-canon").mkdir()
+    home = tmp_path / "home with spaces"
+    target = write_host_zshrc_symlink(home)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "PROJECT_UID": "1000",
+            "PROJECT_GID": "1000",
+            "AGENT_CANON_OPTIONAL_MOUNTS": "host-zshrc",
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".agent-canon/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert f'source: "{target}"' in compose
+    assert 'target: "/home/project/.zshrc"' in compose
+    assert 'target: "/home/project/.zsh"' not in compose
+    module = load_container_config_module()
+    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack_findings == []
+    assert pack is not None
+    assert module.validate_generated_compose(repo, pack) == []
+
+
+def test_parent_generator_resolves_symlink_host_zsh_directory(tmp_path: Path) -> None:
+    """A host zsh directory symlink binds its canonical directory read-only."""
+    repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".agent-canon").mkdir()
+    home = tmp_path / "home with spaces"
+    target = write_host_zsh_directory_symlink(home)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "PROJECT_UID": "1000",
+            "PROJECT_GID": "1000",
+            "AGENT_CANON_OPTIONAL_MOUNTS": "host-zshrc",
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".agent-canon/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert f'source: "{target}"' in compose
+    assert 'target: "/home/project/.zsh"' in compose
+    assert 'target: "/home/project/.zshrc"' not in compose
+    module = load_container_config_module()
+    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack_findings == []
+    assert pack is not None
+    assert module.validate_generated_compose(repo, pack) == []
+
+
+def test_parent_generator_skips_invalid_optional_host_zsh_paths(
+    tmp_path: Path,
+) -> None:
+    """Missing, broken, and wrong-type optional zsh paths are omitted."""
+    cases = ("missing", "broken-symlink", "directory", "regular-file")
+    for case in cases:
+        case_root = tmp_path / case
+        repo = write_parent_generator_fixture(case_root)
+        (repo / ".agent-canon").mkdir()
+        home = case_root / "home"
+        home.mkdir(parents=True)
+        if case == "broken-symlink":
+            (home / ".zshrc").symlink_to(home / "missing-zshrc")
+            (home / ".zsh").symlink_to(home / "missing-zsh")
+        elif case == "directory":
+            (home / ".zshrc").mkdir()
+        elif case == "regular-file":
+            (home / ".zsh").write_text("# not a directory\n", encoding="utf-8")
+
+        result = subprocess.run(
+            ["bash", ".devcontainer/generate-runtime-compose.sh"],
+            cwd=repo,
+            env={
+                **os.environ,
+                "HOME": str(home),
+                "PROJECT_UID": "1000",
+                "PROJECT_GID": "1000",
+                "AGENT_CANON_OPTIONAL_MOUNTS": "host-zshrc",
+                "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+            },
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        compose = (repo / ".agent-canon/docker-compose.generated.yml").read_text(
+            encoding="utf-8"
+        )
+        assert 'target: "/home/project/.zshrc"' not in compose
+        assert 'target: "/home/project/.zsh"' not in compose
 
 
 def test_parent_generator_disables_unconfigured_parent_environment(

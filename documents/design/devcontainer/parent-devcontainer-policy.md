@@ -65,18 +65,20 @@ symlink 先の `devcontainer.json` は、親レポのルートから AgentCanon 
 
 default generator は parent environment、host credentials、SSH、Docker socket、
 host runtime state を mount しない。host zshrc は `host-zshrc` optional profile が
-明示され、regular file が存在するときだけ追加する。profile が選択されても欠落時は
-同じ default runtime を生成する。
+明示され、regular file または regular fileへ解決する symlink があるときだけ
+`realpath -e` の canonical absolute source から追加する。profile が選択されても
+欠落・broken symlink・型違いでは同じ default runtime を生成する。
 
-- `host-zshrc`: absolute host `~/.zshrc` -> `/home/project/.zshrc` read-only
+- `host-zshrc`: resolved host `~/.zshrc` -> `/home/project/.zshrc` read-only
+  （resolved regular directory `~/.zsh` がある場合は `/home/project/.zsh` も read-only）
 - `host-git`: existing `/mnt/git` -> `/mnt/git`
 - `host-credentials`: existing `~/.config/gh`/`~/.ssh` -> project home read-only
 - `ssh-agent`: valid socket only -> `/ssh-agent`
 - `host-secrets`: existing `AGENT_CANON_SECRET_DIR` -> fixed `/mnt/agent-canon-secrets`
 - `docker-host`: existing Docker socket -> `/var/run/docker.sock`
 
-validator は profile と target の一致、bind type、read-only、fixed secret target を
-静的に確認する。fresh clone / CI runnerのhost fileは必要条件ではない。
+validator は profile と target の一致、bind type、resolved absolute source、read-only、
+fixed secret target を静的に確認する。fresh clone / CI runnerのhost fileは必要条件ではない。
 `ZDOTDIR`、`.zshenv`、`/etc/project-template/zsh`、parent environment source は
 default shell startup に存在しない。user customization は image-ownedまたは
 `/home/project/.zshrc`だけであり、noninteractive command、sudo、post-create は

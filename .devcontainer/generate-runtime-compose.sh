@@ -227,15 +227,39 @@ volume_lines=(
   "        target: \"${workspace_mount_target}\""
 )
 host_home="${HOME:-}"
+host_zshrc_source=""
 if optional_mount_enabled host-zshrc \
   && [ -n "$host_home" ] \
-  && [ -f "$host_home/.zshrc" ] \
-  && [ ! -L "$host_home/.zshrc" ]; then
-  zshrc_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$host_home/.zshrc")"
+  && { [ -e "$host_home/.zshrc" ] || [ -L "$host_home/.zshrc" ]; }; then
+  resolved_zshrc="$(realpath -e -- "$host_home/.zshrc" 2>/dev/null || true)"
+  if [ -n "$resolved_zshrc" ] && [ -f "$resolved_zshrc" ]; then
+    host_zshrc_source="$resolved_zshrc"
+  fi
+fi
+if [ -n "$host_zshrc_source" ]; then
+  zshrc_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$host_zshrc_source")"
   volume_lines+=(
     "      - type: bind"
     "        source: ${zshrc_source_yaml}"
     "        target: \"${project_home}/.zshrc\""
+    "        read_only: true"
+  )
+fi
+host_zsh_source=""
+if optional_mount_enabled host-zshrc \
+  && [ -n "$host_home" ] \
+  && { [ -e "$host_home/.zsh" ] || [ -L "$host_home/.zsh" ]; }; then
+  resolved_zsh="$(realpath -e -- "$host_home/.zsh" 2>/dev/null || true)"
+  if [ -n "$resolved_zsh" ] && [ -d "$resolved_zsh" ]; then
+    host_zsh_source="$resolved_zsh"
+  fi
+fi
+if [ -n "$host_zsh_source" ]; then
+  zsh_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$host_zsh_source")"
+  volume_lines+=(
+    "      - type: bind"
+    "        source: ${zsh_source_yaml}"
+    "        target: \"${project_home}/.zsh\""
     "        read_only: true"
   )
 fi

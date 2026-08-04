@@ -39,14 +39,16 @@ default Composeのrequired host bindはworkspace repository topic-rootから`/wo
 への一つだけです。GPU device/driver runtime passthroughはhost GPUが利用可能な
 場合のruntime capabilityで、imageへdriverを入れません。
 
-host `${HOME}/.zshrc` は regular file の場合だけ `/home/project/.zshrc` へread-only
-projectionする唯一のoptional user-customizationです。欠落・directory・symlinkの場合
-はmountを省略し、image-owned empty/default `/home/project/.zshrc`で同一機能を成立させ
-ます。host `~/.codex`、parent-environment、個別credential/config、SSH agent、previous
-container state、`/mnt/git`、Docker socketはdefault create/tool availabilityの入力
-ではありません。
+host `${HOME}/.zshrc` と `${HOME}/.zsh` は optional user-customizationです。
+`host-zshrc` profileが明示された場合、regular fileまたはregular fileへ解決するsymlink
+は `realpath -e` のcanonical absolute sourceから `/home/project/.zshrc` へread-only
+projectionし、regular directoryへ解決する `${HOME}/.zsh` も `/home/project/.zsh` へ
+read-only projectionします。欠落・broken symlink・型違いの場合はmountを省略し、
+image-owned empty/default startupで同一機能を成立させます。host `~/.codex`、
+parent-environment、個別credential/config、SSH agent、previous container state、
+`/mnt/git`、Docker socketはdefault create/tool availabilityの入力ではありません。
 
-`AGENT_CANON_OPTIONAL_MOUNTS` の明示profileだけが `host-git`、`host-secrets`,
+`AGENT_CANON_OPTIONAL_MOUNTS` の明示profileだけが `host-zshrc`、`host-git`、`host-secrets`,
 `host-credentials`、`ssh-agent`、`docker-host`、`shared-runtime` を有効化できます。
 Docker-in-Docker/host daemonは`docker-host` profileに限定します。zsh startupは
 `.zshenv`、`ZDOTDIR`、parent-environment sourceに依存せず、Docker `ENV`、

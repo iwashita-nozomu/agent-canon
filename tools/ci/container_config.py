@@ -1033,15 +1033,12 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                     )
                 )
             source, _ = volume_fields(host_zshrc)
-            if not isinstance(source, str) or (
-                source != "${HOME}/.zshrc"
-                and (not source.startswith("/") or not source.endswith("/.zshrc"))
-            ):
+            if not isinstance(source, str) or not Path(source).is_absolute():
                 findings.append(
                     Finding(
                         "dependency_contract_violation",
                         relative,
-                        "host-zshrc-source-must-be-absolute-zshrc",
+                        "host-zshrc-source-must-be-resolved-absolute-file",
                     )
                 )
             if not volume_is_read_only(host_zshrc):
@@ -1050,6 +1047,45 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
                         "dependency_contract_violation",
                         relative,
                         "host-zshrc-mount-read-only",
+                    )
+                )
+        zsh_matches = [
+            raw_volume
+            for raw_volume in volumes
+            if volume_fields(raw_volume)[1] == "/home/project/.zsh"
+        ]
+        for host_zsh in zsh_matches:
+            source, target = volume_fields(host_zsh)
+            if target != "/home/project/.zsh":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zsh-target-must-be-/home/project/.zsh",
+                    )
+                )
+            if volume_type(host_zsh) != "bind":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zsh-mount-type-must-be-bind",
+                    )
+                )
+            if not isinstance(source, str) or not Path(source).is_absolute():
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zsh-source-must-be-resolved-absolute-directory",
+                    )
+                )
+            if not volume_is_read_only(host_zsh):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zsh-mount-read-only",
                     )
                 )
         if not isinstance(service_user, str) or re.fullmatch(r"[1-9][0-9]*:[1-9][0-9]*", service_user) is None:
@@ -1116,6 +1152,7 @@ def validate_generated_compose(root: Path, pack: PackConfig | None) -> list[Find
     allowed_targets = {"/workspace", repo_target}
     if "host-zshrc" in optional_tokens:
         allowed_targets.add("/home/project/.zshrc")
+        allowed_targets.add("/home/project/.zsh")
     if "host-git" in optional_tokens:
         allowed_targets.add("/mnt/git")
     if "host-secrets" in optional_tokens:
