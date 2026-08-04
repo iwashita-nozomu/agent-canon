@@ -67,8 +67,9 @@ upstream design ../README.md notes lifecycle index
 - closeout 時に、再利用知識は `notes/knowledge/`、topic synthesis は `notes/themes/`、再発防止は `notes/failures/` へ昇格させます。
 - どこへ昇格させるか迷うときは `documents/operations/notes-lifecycle.md` を見ます。
 - `notes/` は「書き捨て」ではなく、closeout ごとに再編して太らせる前提です。
-- 会話から抽出した durable preference は shared canon `memory/USER_PREFERENCES.md` に集約します。
-- agent-side の作業哲学、対話から得た学習、task retrospective は shared canon `memory/AGENT_PHILOSOPHY.md` に集約します。
+- stable preference は対象の `AGENTS.md` または canonical owner へ直接昇格します。
+- 同じ問題に再遭遇したときに使う独立した知識だけを shared canon `memory/records/*.md` に残します。
+  raw chat と時系列観測は runtime logs/evidence/issues/failures の owner に置きます。
 
 ## Action Log Rule
 

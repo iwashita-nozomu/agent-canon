@@ -78,6 +78,7 @@ host runtime state を mount しない。host zshrc は `host-zshrc` optional pr
 - `ssh-agent`: valid socket only -> `/ssh-agent`
 - `host-secrets`: existing `AGENT_CANON_SECRET_DIR` -> fixed `/mnt/agent-canon-secrets`
 - `docker-host`: existing Docker socket -> `/var/run/docker.sock`
+- `shared-runtime`: GPU-admission profile only -> canonical shared runtime namespace
 - `linked-data-roots`: pack-defined repository symlinks -> their declared `/mnt/<letter>/<subpath>`
   targets as structured read-write binds
 

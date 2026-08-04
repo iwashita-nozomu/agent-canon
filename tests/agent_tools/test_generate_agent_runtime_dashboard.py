@@ -753,8 +753,10 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "issue_id: AC-20260517-closed\nstatus: resolved\n",
             encoding="utf-8",
         )
-        (root / "memory" / "USER_PREFERENCES.md").write_text("- preference\n", encoding="utf-8")
-        (root / "memory" / "AGENT_PHILOSOPHY.md").write_text("- learning\n", encoding="utf-8")
+        (root / "memory" / "records").mkdir(parents=True)
+        (root / "memory" / "records" / "agent--learning.md").write_text(
+            "# Learning\n", encoding="utf-8"
+        )
 
     def write_eval_report_fixture(
         self,

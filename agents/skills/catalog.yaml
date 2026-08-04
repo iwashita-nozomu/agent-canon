@@ -2058,27 +2058,13 @@ skill_families:
         - ["container", "runtime"]
         - ["environment-maintenance"]
         - ["環境メンテ"]
-  - id: user-preference-sync
-    purpose: Distill durable user preferences from notes into stable AGENTS.md guidance.
-    canonical_doc: agents/skills/user-preference-sync.md
-    shim: .agents/skills/user-preference-sync/SKILL.md
-    discovery:
-      name: user-preference-sync
-      description: "Use when memory/USER_PREFERENCES.md should be distilled into stable AGENTS.md preferences without carrying over task-local instructions."
-    tool_commands:
-      required: []
-      conditional:
-      - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
-      maintenance:
-      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
-      - python3 tools/agent_tools/skill_tool_commands.py check
   - id: agent-learning
-    purpose: Log agent-side working philosophy, interaction lessons, and task retrospectives with evidence.
+    purpose: Curate searchable problem-solving memory records and learn from runtime agent behavior, interaction lessons, routing misses, and task retrospectives with evidence.
     canonical_doc: agents/skills/agent-learning.md
     shim: .agents/skills/agent-learning/SKILL.md
     discovery:
       name: agent-learning
-      description: "Use when agent-side working philosophy, interaction lessons, task retrospectives, repeated routing misses, missed skill invocation, or recurrence-prevention feedback should be logged without mixing them into user preferences."
+      description: "Use when problem-solving memory curation or runtime agent behavior learning should capture recurrence evidence without mixing it into user preferences."
     tool_commands:
       required: []
       conditional:
@@ -2089,11 +2075,14 @@ skill_families:
         action=<prompt_repair|eval_update|memory_record|no_op>"
       - python3 tools/agent_tools/evaluate_agent_run.py --report-dir reports/agents/<run-id>
         --behavior-manifest evidence/agent-evals/agent_behavior_eval.toml --write
-      - python3 tools/agent_tools/persist_agent_memory.py --commit --push
+      - python3 tools/agent_tools/memory_record.py search --root . --search-path <owner> --failure-evidence <evidence>
+      - python3 tools/agent_tools/memory_record.py plan --root . --record-id <record-id> --search-path <owner> --recurrence-decision <decision>
+      - python3 tools/agent_tools/memory_record.py create --root . --record-id <record-id> --title <title> --problem <problem> --symptom <symptom> --context <context> --root-cause <cause> --effective-resolution <resolution> --failed-approaches <failed> --applicability-limits <limits> --evidence-source <source> --owner-ref <owner>
+      - python3 tools/agent_tools/memory_record.py update --root . --record-id <record-id> --section <section> --text <replacement>
+      - python3 tools/agent_tools/memory_record.py promote --root . --record-id <record-id> --owner-ref <owner> --reason <reason>
+      - python3 tools/agent_tools/memory_record.py validate --root .
       - python3 tools/agent_tools/evaluate_agent_run.py
       - python3 tools/agent_tools/workflow_monitor.py
-      - python3 tools/agent_tools/log_agent_learning.py
-      - python3 tools/agent_tools/persist_agent_memory.py
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check

@@ -2,7 +2,7 @@
 name: start-repository
 description: "Use when starting a new GitHub/submodule-first repository from this template after clone, including project slug/display-name setup and AgentCanon submodule validation."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"dc7b841b19a96a127765307c783b3d3cfa44428a46b163e7d2ad3c4a8cec919d"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"ea3a1f45ddcd6cc873a6c46a94ad7f75bf68836b23f9734537f7dfe9da3b10d2"} -->
 
 <!--
 @dependency-start

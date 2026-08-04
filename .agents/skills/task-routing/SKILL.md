@@ -2,7 +2,7 @@
 name: task-routing
 description: "Use when choosing short AgentCanon tool, skill, profile, check, runtime, closeout, or evidence routes from long candidate names, broad workflow text, routing misses, over-constrained related-skill candidates, public/system skill delegation, skill splitting, or skill/tool routing refactors."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"08bc94757a7a5065d7e32c5561aa6ee0c26ea4385631c980dbd9c503705b5bb1"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"c1b05b5cb9152e862a72ac9f2dae187eac077e5f2d395851c16850f89355fb4b"} -->
 
 <!--
 @dependency-start

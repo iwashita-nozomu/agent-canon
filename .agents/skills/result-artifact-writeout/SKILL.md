@@ -2,7 +2,7 @@
 name: result-artifact-writeout
 description: "Use when writing, exporting, saving, accumulating, or reporting tool/checker/hook/skill/eval/experiment results; creates durable raw and summary artifacts with unique IDs and no accidental overwrite."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"f9282e8cfb20c53c1393dd2c2e1399b5df8697fe706d5a42c54bd05d5709f2c4"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"073291704ba21186d206b65faeee13076fde5ab735b614db37cb1ff5ba2a94be"} -->
 
 <!--
 @dependency-start
