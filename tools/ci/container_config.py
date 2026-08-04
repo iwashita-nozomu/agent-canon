@@ -730,6 +730,11 @@ def is_managed_topic_root(root: Path) -> bool:
     return topic_root.parent.name == "workspace"
 
 
+def is_removed_legacy_topic_root(root: Path) -> bool:
+    """Return True when the immediate parent directory is a removed legacy workspace root."""
+    return root.parent.name.startswith("workspace-")
+
+
 def validate_generated_compose(
     root: Path,
     pack: PackConfig | None,
@@ -769,7 +774,18 @@ def validate_generated_compose(
     root = root.resolve()
     topic_root = root.parent
     repo_target = f"/workspace/{root.name}"
-    expected_workspace_layout = "managed-topic" if is_managed_topic_root(root) else "direct-repo"
+    if is_removed_legacy_topic_root(root):
+        return [
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "legacy-workspace-root-direct-repo-rejected",
+            )
+        ]
+
+    expected_workspace_layout = (
+        "managed-topic" if is_managed_topic_root(root) else "direct-repo"
+    )
     parent_layout = (root / "vendor" / "agent-canon").is_dir()
     findings: list[Finding] = []
     if profile not in {"default", "gpu-admission"}:

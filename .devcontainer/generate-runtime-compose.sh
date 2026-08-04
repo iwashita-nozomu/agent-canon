@@ -21,6 +21,10 @@ workspace_root="$(cd "${repo_root}/.." && pwd -P)"
   exit 1
 }
 workspace_parent="$(cd "${workspace_root}/.." && pwd -P)"
+if [[ "$(basename "$workspace_root")" == workspace-* ]]; then
+  printf 'devcontainer legacy workspace root is rejected: %s\n' "$workspace_root" >&2
+  exit 1
+fi
 is_managed_topic_root() {
   [ "$(basename "$1")" = "workspace" ]
 }

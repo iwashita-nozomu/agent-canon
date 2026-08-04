@@ -352,13 +352,14 @@ def test_noncanonical_remote_user_contract_is_rejected(tmp_path: Path) -> None:
     assert "remoteUser-expected:project" in result.stdout
 
 
-def test_legacy_topic_compose_root_is_direct_repo(tmp_path: Path) -> None:
-    """The checker treats a workspace-<topic-slug> root as direct-repo."""
+def test_legacy_topic_compose_root_is_rejected(tmp_path: Path) -> None:
+    """The checker rejects a removed legacy workspace-<topic-slug> root."""
     repo = write_topic_fixture(tmp_path, topic_root=tmp_path / "workspace-topic")
 
     result = run_validator(repo)
 
-    assert result.returncode == 0, result.stdout + result.stderr
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "legacy-workspace-root-direct-repo-rejected" in result.stdout
 
 
 def test_noncanonical_checkout_compose_root_is_direct_repo(tmp_path: Path) -> None:
@@ -561,13 +562,11 @@ def test_generator_treats_workspace_topic_slug_as_managed(tmp_path: Path) -> Non
     ("relative_repo", "expected_layout"),
     [
         ("workspace/topic/agent-canon", "managed-topic"),
-        ("workspace-topic/agent-canon", "direct-repo"),
         ("home/runner/work/agent-canon/agent-canon", "direct-repo"),
         ("noncanonical/checkout/agent-canon", "direct-repo"),
     ],
     ids=(
         "canonical-managed-topic",
-        "legacy-workspace-root-direct-repo",
         "github-actions-direct-repo",
         "noncanonical-checkout-direct-repo",
     ),
@@ -671,8 +670,8 @@ def test_generator_accepts_explicit_output_path(tmp_path: Path) -> None:
     assert relative_compose.count('target: "/workspace"') == 1
 
 
-def test_generator_accepts_legacy_topic_root_as_direct_repo(tmp_path: Path) -> None:
-    """The generator treats a workspace-<topic-slug> root as direct-repo."""
+def test_generator_rejects_legacy_topic_root_as_direct_repo(tmp_path: Path) -> None:
+    """The generator rejects workspace-<topic-slug> roots."""
     repo = tmp_path / "workspace-topic" / "agent-canon"
     write_devcontainer(repo)
     write_file(
@@ -692,13 +691,8 @@ def test_generator_accepts_legacy_topic_root_as_direct_repo(tmp_path: Path) -> N
         text=True,
     )
 
-    assert result.returncode == 0, result.stdout + result.stderr
-    compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(
-        encoding="utf-8"
-    )
-    assert 'AGENT_CANON_WORKSPACE_LAYOUT: "direct-repo"' in compose
-    assert f'source: "{repo.resolve()}"' in compose
-    assert f'target: "/workspace/{repo.name}"' in compose
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "legacy workspace root is rejected" in result.stderr
 
 
 def test_post_attach_script_is_executable_in_git_index() -> None:
