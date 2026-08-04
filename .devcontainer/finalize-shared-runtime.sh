@@ -4,18 +4,21 @@
 # responsibility Reads back the container shared AgentCanon runtime namespace after Compose bind.
 # upstream design ../CONTAINER_OPERATIONS.md exact shared-runtime identity and namespace contract
 # upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
+# upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission profile boundary
 # upstream design ../documents/experiments/gpu-admission-r5-source-packet.md exact readback receipt path and owner boundary
 # upstream implementation bootstrap-shared-runtime.sh publishes the host provision receipt
 # upstream implementation ../tools/experiments/execution_resource_plan.py owns exact receipt parsing and atomic publication
 # downstream implementation post-attach.sh reports the readback receipt observationally
+# downstream implementation gpu-admission.sh owns the explicit container finalize lifecycle
 # @dependency-end
 
 set -euo pipefail
 
 runtime_root="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-/var/lib/agent-canon/runtime}"
 runtime_route="${AGENT_CANON_RUNTIME_ROUTE:-MANAGED_CONTAINER}"
+gpu_profile="${AGENT_CANON_GPU_ADMISSION_PROFILE:-}"
 provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/shared-runtime-provision.json}"
-readback_receipt="${runtime_root}/shared-runtime-readback.json"
+readback_receipt="${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-${runtime_root}/shared-runtime-readback.json}"
 locks_root="${runtime_root}/locks"
 receipts_root="${runtime_root}/receipts"
 probe_path="${locks_root}/bootstrap-probe.lock"
@@ -27,8 +30,10 @@ fail() {
 }
 
 [ "$runtime_route" = "MANAGED_CONTAINER" ] || fail "runtime route is not MANAGED_CONTAINER"
+[ "$gpu_profile" = "gpu-admission" ] || fail "shared runtime finalize requires the gpu-admission entrypoint"
 [ "$runtime_root" = "/var/lib/agent-canon/runtime" ] || fail "shared runtime target is not canonical"
 [ "$provision_receipt" = "${runtime_root}/shared-runtime-provision.json" ] || fail "provision receipt path is not canonical"
+[ "$readback_receipt" = "${runtime_root}/shared-runtime-readback.json" ] || fail "readback receipt path is not canonical"
 [ -f "${agent_canon_root}/tools/experiments/execution_resource_plan.py" ] || fail "canonical runtime receipt owner is unavailable"
 
 container_uid="$(id -u)"

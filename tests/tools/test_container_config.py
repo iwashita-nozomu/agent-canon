@@ -6,6 +6,7 @@
 # upstream design ../../documents/rule/dependency-module-changes.md topic-root mount policy
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared VS Code surface ownership
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell contract
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission selector and scenario validation
 # upstream implementation ../../tools/ci/container_config.py semantic devcontainer checker
 # upstream implementation ../../tools/agent_tools/requirements_lock.py canonical requirements lock parser and result/error model
 # upstream implementation ../../.devcontainer/devcontainer.json selects the topic-root Compose generator
@@ -21,11 +22,17 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "container_config.py"
 GENERATOR = PROJECT_ROOT / ".devcontainer" / "generate-runtime-compose.sh"
 DOCKERFILE = PROJECT_ROOT / ".devcontainer" / "Dockerfile"
 POST_CREATE_ENTRYPOINT = PROJECT_ROOT / ".devcontainer" / "post-create-entrypoint.sh"
+GPU_ADMISSION_SELECTOR = (
+    PROJECT_ROOT / ".devcontainer" / "gpu-admission" / "devcontainer.json"
+)
+GPU_ADMISSION_ORCHESTRATOR = PROJECT_ROOT / ".devcontainer" / "gpu-admission.sh"
 
 
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
@@ -112,8 +119,22 @@ def write_devcontainer(root: Path) -> None:
         write_file(root, f".devcontainer/{name}", content)
         (root / ".devcontainer" / name).chmod(0o755)
     write_file(
-        root, ".devcontainer/generate-runtime-compose.sh", "#!/usr/bin/env bash\n"
+        root,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
     )
+    (root / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    write_file(
+        root,
+        ".devcontainer/gpu-admission/devcontainer.json",
+        GPU_ADMISSION_SELECTOR.read_text(encoding="utf-8"),
+    )
+    write_file(
+        root,
+        ".devcontainer/gpu-admission.sh",
+        GPU_ADMISSION_ORCHESTRATOR.read_text(encoding="utf-8"),
+    )
+    (root / ".devcontainer/gpu-admission.sh").chmod(0o755)
 
 
 def write_compose(
@@ -124,7 +145,7 @@ def write_compose(
 ) -> None:
     """Write a generated Compose projection for the fixture's workspace layout."""
     topic_root = root.parent.resolve()
-    direct_repo = topic_root.name == "workspace"
+    direct_repo = topic_root.parent.name != "workspace"
     repo_target = f"/workspace/{root.name}"
     volumes: list[dict[str, str]] = [
         {
@@ -272,6 +293,119 @@ def test_topic_compose_semantics_pass(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_gpu_admission_selector_isolated_from_default_selector() -> None:
+    """The opt-in selector owns a distinct config and generated Compose identity."""
+    default = json.loads(
+        (PROJECT_ROOT / ".devcontainer" / "devcontainer.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    profile = json.loads(GPU_ADMISSION_SELECTOR.read_text(encoding="utf-8"))
+
+    assert "gpu-admission" not in default["name"]
+    assert "gpu-admission" not in default["dockerComposeFile"]
+    assert "gpu-admission" in profile["name"]
+    assert profile["dockerComposeFile"] != default["dockerComposeFile"]
+    assert load_container_config_module().validate_gpu_admission_selector(PROJECT_ROOT) == []
+
+
+def test_gpu_admission_selector_is_mandatory(tmp_path: Path) -> None:
+    """A parent devcontainer surface cannot silently omit the explicit selector."""
+    repo = write_topic_fixture(tmp_path)
+    (repo / ".devcontainer/gpu-admission/devcontainer.json").unlink()
+
+    findings = load_container_config_module().validate_gpu_admission_selector(repo)
+
+    assert {finding.detail for finding in findings} == {
+        "explicit-profile-selector-required"
+    }
+
+
+def test_default_lifecycle_entrypoints_are_mandatory(tmp_path: Path) -> None:
+    """The exact default lifecycle remains required without source-text bans."""
+    repo = write_topic_fixture(tmp_path)
+    (repo / ".devcontainer/post-attach.sh").unlink()
+
+    findings = load_container_config_module().validate_default_lifecycle_scripts(repo)
+
+    assert {(finding.path, finding.detail) for finding in findings} == {
+        (".devcontainer/post-attach.sh", "missing")
+    }
+
+
+def test_missing_generated_compose_is_a_required_scenario_finding(
+    tmp_path: Path,
+) -> None:
+    """A selected generated-Compose scenario never passes by absence."""
+    repo = write_topic_fixture(tmp_path)
+    missing = repo / ".agent-canon/missing-profile.yml"
+
+    findings = load_container_config_module().validate_generated_compose(
+        repo,
+        None,
+        profile="gpu-admission",
+        compose_path=missing,
+    )
+
+    assert {finding.detail for finding in findings} == {
+        "gpu-admission-scenario-compose-required"
+    }
+
+
+def test_generator_scenarios_require_both_compose_outputs(tmp_path: Path) -> None:
+    """A generator that exits successfully without output fails both scenarios."""
+    repo = write_topic_fixture(tmp_path)
+    generator = repo / ".devcontainer/generate-runtime-compose.sh"
+    generator.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+    generator.chmod(0o755)
+
+    findings = load_container_config_module().validate_generated_compose_scenarios(
+        repo, None
+    )
+
+    assert {finding.detail for finding in findings} == {
+        "default-scenario-compose-required",
+        "gpu-admission-scenario-compose-required",
+    }
+
+
+def generate_gpu_admission_compose(tmp_path: Path) -> tuple[Path, Path]:
+    """Generate one valid GPU-admission Compose fixture for mutation tests."""
+    repo = tmp_path / "workspace" / "topic" / "agent-canon"
+    write_devcontainer(repo)
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
+    write_file(repo, ".devcontainer/Dockerfile", DOCKERFILE.read_text(encoding="utf-8"))
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    output_path = repo / ".agent-canon/gpu-admission-compose.generated.yml"
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(tmp_path / "missing-home"),
+            "PROJECT_UID": "1000",
+            "PROJECT_GID": "1000",
+            "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+            "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
+            "AGENT_CANON_RUNTIME_GID": "4242",
+            "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": "1000 4242 5000",
+            "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/gpu-admission-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    return repo, output_path
+
+
 def test_noncanonical_remote_user_contract_is_rejected(tmp_path: Path) -> None:
     """The devcontainer runtime identity is fixed to the canonical project user."""
     repo = write_topic_fixture(tmp_path)
@@ -287,13 +421,34 @@ def test_noncanonical_remote_user_contract_is_rejected(tmp_path: Path) -> None:
 
 
 def test_legacy_topic_compose_root_is_rejected(tmp_path: Path) -> None:
-    """The checker rejects the removed workspace-<topic-slug> root."""
+    """The checker rejects a removed legacy workspace-<topic-slug> root."""
     repo = write_topic_fixture(tmp_path, topic_root=tmp_path / "workspace-topic")
 
     result = run_validator(repo)
 
     assert result.returncode == 1, result.stdout + result.stderr
-    assert "legacy-topic-root-name" in result.stdout
+    assert "legacy-workspace-root-direct-repo-rejected" in result.stdout
+
+
+def test_workspace_prefixed_topic_root_is_handled_as_managed_topic(tmp_path: Path) -> None:
+    """A canonical workspace/<workspace-*>/<repo> root is treated as managed-topic."""
+    repo = write_topic_fixture(
+        tmp_path,
+        topic_root=tmp_path / "workspace" / "workspace-topic",
+    )
+
+    result = run_validator(repo)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_noncanonical_checkout_compose_root_is_direct_repo(tmp_path: Path) -> None:
+    """The checker treats non-canonical path roots as direct-repo."""
+    repo = write_topic_fixture(tmp_path, topic_root=tmp_path / "noncanonical" / "checkout")
+
+    result = run_validator(repo)
+
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_compose_repo_double_mount_is_rejected(tmp_path: Path) -> None:
@@ -365,6 +520,184 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     assert "/var/lib/agent-canon/runtime" not in compose
 
 
+def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
+    tmp_path: Path,
+) -> None:
+    """The explicit profile projects the host identity and GPU runtime fields together."""
+    repo, output_path = generate_gpu_admission_compose(tmp_path)
+    compose = output_path.read_text(encoding="utf-8")
+    assert "name: agent-canon-" in compose
+    assert "-gpu-admission" in compose.splitlines()[0]
+    assert "    gpus: all" in compose
+    assert '        target: "/var/lib/agent-canon/runtime"' in compose
+    assert "    group_add:\n      - \"1000\"\n      - \"4242\"\n      - \"5000\"" in compose
+    assert 'DEVCONTAINER_GPU_MODE: "enabled"' in compose
+    assert 'DEVCONTAINER_GPU_REQUEST: "all"' in compose
+    assert 'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"' in compose
+    assert (
+        load_container_config_module().validate_generated_compose(
+            repo,
+            None,
+            profile="gpu-admission",
+            compose_path=output_path,
+        )
+        == []
+    )
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_detail"),
+    (
+        (
+            "source",
+            "gpu-admission-runtime-mount-source-must-be-canonical",
+        ),
+        (
+            "read_only",
+            "gpu-admission-runtime-mount-must-be-read-write",
+        ),
+    ),
+)
+def test_gpu_admission_validator_rejects_runtime_bind_mutations(
+    tmp_path: Path, mutation: str, expected_detail: str
+) -> None:
+    """GPU admission runtime binds keep the canonical source and RW contract."""
+    repo, output_path = generate_gpu_admission_compose(tmp_path)
+    compose = output_path.read_text(encoding="utf-8")
+    if mutation == "source":
+        malformed = compose.replace(
+            '        source: "/var/lib/agent-canon/runtime"\n',
+            '        source: "/tmp/evil-runtime"\n',
+            1,
+        )
+    else:
+        malformed = compose.replace(
+            '        target: "/var/lib/agent-canon/runtime"\n',
+            '        target: "/var/lib/agent-canon/runtime"\n        read_only: true\n',
+            1,
+        )
+    output_path.write_text(malformed, encoding="utf-8")
+
+    module = load_container_config_module()
+    findings = module.validate_generated_compose(
+        repo,
+        None,
+        profile="gpu-admission",
+        compose_path=output_path,
+    )
+
+    assert expected_detail in {finding.detail for finding in findings}
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_detail"),
+    (
+        (
+            "runtime-gid-zero",
+            "gpu-admission-runtime-gid-must-be-positive-integer",
+        ),
+        (
+            "host-gid-invalid",
+            "gpu-admission-host-supplementary-gids-must-be-positive-integers",
+        ),
+        (
+            "host-gid-duplicate",
+            "gpu-admission-host-supplementary-gids-must-be-unique",
+        ),
+    ),
+)
+def test_gpu_admission_validator_rejects_malformed_gid_environment(
+    tmp_path: Path, mutation: str, expected_detail: str
+) -> None:
+    """GPU admission validates GID values independently of matching group_add."""
+    repo, output_path = generate_gpu_admission_compose(tmp_path)
+    compose = output_path.read_text(encoding="utf-8")
+    if mutation == "runtime-gid-zero":
+        malformed = compose.replace(
+            'AGENT_CANON_RUNTIME_GID: "4242"',
+            'AGENT_CANON_RUNTIME_GID: "0"',
+            1,
+        )
+    elif mutation == "host-gid-invalid":
+        malformed = compose.replace(
+            'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS: "1000 4242 5000"',
+            'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS: "1000 0 5000"',
+            1,
+        ).replace('      - "5000"\n', '      - "0"\n', 1)
+    else:
+        malformed = compose.replace(
+            'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS: "1000 4242 5000"',
+            'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS: "1000 4242 4242"',
+            1,
+        ).replace('      - "5000"\n', '      - "4242"\n', 1)
+    output_path.write_text(malformed, encoding="utf-8")
+
+    module = load_container_config_module()
+    findings = module.validate_generated_compose(
+        repo,
+        None,
+        profile="gpu-admission",
+        compose_path=output_path,
+    )
+
+    assert expected_detail in {finding.detail for finding in findings}
+
+
+@pytest.mark.parametrize("optional_mounts", ("", "host-git"))
+def test_gpu_admission_validator_requires_shared_runtime_profile(
+    tmp_path: Path, optional_mounts: str
+) -> None:
+    """GPU admission cannot validate without its explicit shared-runtime token."""
+    repo, output_path = generate_gpu_admission_compose(tmp_path)
+    compose = output_path.read_text(encoding="utf-8").replace(
+        'AGENT_CANON_OPTIONAL_MOUNTS: "shared-runtime"',
+        f'AGENT_CANON_OPTIONAL_MOUNTS: "{optional_mounts}"',
+        1,
+    )
+    output_path.write_text(compose, encoding="utf-8")
+
+    module = load_container_config_module()
+    findings = module.validate_generated_compose(
+        repo,
+        None,
+        profile="gpu-admission",
+        compose_path=output_path,
+    )
+
+    assert "gpu-admission-shared-runtime-profile-required" in {
+        finding.detail for finding in findings
+    }
+
+
+def test_default_scenario_rejects_shared_runtime_without_profile_selector(
+    tmp_path: Path,
+) -> None:
+    """The default generator cannot be turned into the opt-in profile by a mount alone."""
+    repo = tmp_path / "workspace" / "topic" / "agent-canon"
+    write_devcontainer(repo)
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(tmp_path / "missing-home"),
+            "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "requires the gpu-admission profile" in result.stderr
+
+
 def test_generator_treats_workspace_topic_slug_as_managed(tmp_path: Path) -> None:
     """A managed topic may itself be named workspace without becoming direct-repo."""
     repo = tmp_path / "workspace" / "workspace" / "agent-canon"
@@ -397,9 +730,24 @@ def test_generator_treats_workspace_topic_slug_as_managed(tmp_path: Path) -> Non
     assert load_container_config_module().validate_generated_compose(repo, None) == []
 
 
-def test_generator_direct_repo_mounts_only_repository_root(tmp_path: Path) -> None:
-    """A direct repo layout never exposes sibling repositories under /workspace."""
-    repo = tmp_path / "workspace" / "data_download"
+@pytest.mark.parametrize(
+    ("relative_repo", "expected_layout"),
+    [
+        ("workspace/topic/agent-canon", "managed-topic"),
+        ("home/runner/work/agent-canon/agent-canon", "direct-repo"),
+        ("noncanonical/checkout/agent-canon", "direct-repo"),
+    ],
+    ids=(
+        "canonical-managed-topic",
+        "github-actions-direct-repo",
+        "noncanonical-checkout-direct-repo",
+    ),
+)
+def test_generator_classifies_checkout_layouts(
+    tmp_path: Path, relative_repo: str, expected_layout: str
+) -> None:
+    """Shell and Python classifiers agree on managed and direct repository paths."""
+    repo = tmp_path / relative_repo
     write_file(
         repo,
         ".devcontainer/generate-runtime-compose.sh",
@@ -423,13 +771,15 @@ def test_generator_direct_repo_mounts_only_repository_root(tmp_path: Path) -> No
     compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(
         encoding="utf-8"
     )
-    assert f'source: "{repo.resolve()}"' in compose
-    assert 'target: "/workspace/data_download"' in compose
-    assert f'source: "{repo.parent.resolve()}"' not in compose
-    assert 'AGENT_CANON_WORKSPACE_LAYOUT: "direct-repo"' in compose
-    assert 'AGENT_CANON_REPOSITORY_ROOT: "/workspace/data_download"' in compose
-    assert f'DEPENDENCY_MODULE_CONTAINER_SOURCE: "{repo.resolve()}"' in compose
-    assert 'DEPENDENCY_MODULE_CONTAINER_TARGET: "/workspace/data_download"' in compose
+    assert f'AGENT_CANON_WORKSPACE_LAYOUT: "{expected_layout}"' in compose
+    if expected_layout == "managed-topic":
+        assert f'source: "{repo.parent.resolve()}"' in compose
+        assert 'target: "/workspace"' in compose
+        assert f'source: "{repo.resolve()}"' not in compose
+    else:
+        assert f'source: "{repo.resolve()}"' in compose
+        assert f'target: "/workspace/{repo.name}"' in compose
+        assert f'source: "{repo.parent.resolve()}"' not in compose
     assert compose.count("type: bind") == 1
     assert load_container_config_module().validate_generated_compose(repo, None) == []
 
@@ -529,8 +879,8 @@ def test_generator_accepts_explicit_output_path(tmp_path: Path) -> None:
     assert relative_compose.count('target: "/workspace"') == 1
 
 
-def test_generator_rejects_legacy_topic_root(tmp_path: Path) -> None:
-    """The generator rejects the removed workspace-<topic-slug> root."""
+def test_generator_rejects_legacy_topic_root_as_direct_repo(tmp_path: Path) -> None:
+    """The generator rejects workspace-<topic-slug> roots."""
     repo = tmp_path / "workspace-topic" / "agent-canon"
     write_devcontainer(repo)
     write_file(
@@ -550,8 +900,23 @@ def test_generator_rejects_legacy_topic_root(tmp_path: Path) -> None:
         text=True,
     )
 
-    assert result.returncode == 1
-    assert "legacy workspace-<topic-slug> root" in result.stderr
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "legacy workspace root is rejected" in result.stderr
+
+
+def test_post_attach_script_is_executable_in_git_index() -> None:
+    """Source-root resolution can execute post-attach from the Git tree."""
+    result = subprocess.run(
+        ["git", "ls-files", "--stage", "--", ".devcontainer/post-attach.sh"],
+        cwd=PROJECT_ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    entries = result.stdout.splitlines()
+    assert len(entries) == 1
+    assert entries[0].split(maxsplit=1)[0] == "100755"
 
 
 def write_parent_generator_fixture(

@@ -68,7 +68,7 @@ upstream design ../design/devcontainer/parent-dependency-manifest-followup.md de
 - host で `make docker-build-check` を実行できることを推奨します
 - default devcontainer は host `sudo`、`agent-canon-runtime` system group、または
   `/var/lib/agent-canon/runtime` の事前作成を要求しません。これらは GPU admission
-  opt-in profile が選択された場合だけの将来 contract です。
+  `gpu-admission` opt-in profile が選択された場合だけの contract です。
 
 補足:
 
@@ -98,11 +98,13 @@ credentials、SSH、Docker socket、secret、host runtime state のどれも既�
   `DEVCONTAINER_GPU_MODE=disabled` を設定し、`DEVCONTAINER_GPU_REQUEST` と
   `gpus: all` を生成しない
 - GPU が必要な場合の device / driver runtime passthrough は明示的に選択した
-  optional profile の責務とし、profile が選択されないか host capability が無い場合は
-  CPU-only の既定起動を継続する。profile の実装と validation の正本は
+  `gpu-admission` profile の責務とし、profile が選択されない場合は CPU-only の既定起動を
+  継続する。profile が選択されて host capability が無い場合は default へ降格せず
+  fail-closed とする。profile の実装と validation の正本は
   [`CONTAINER_OPERATIONS.md`](../../CONTAINER_OPERATIONS.md) と
   [`parent-devcontainer-policy.md`](../design/devcontainer/parent-devcontainer-policy.md)、
-  follow-up は [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) とする
+  selector は `.devcontainer/gpu-admission/devcontainer.json`、orchestrator は
+  `.devcontainer/gpu-admission.sh` とする
 - credentials、SSH agent、Docker socket、secret、host git は、それぞれ明示選択した
   optional profile の対象が存在するときだけ追加する。欠落した host path、socket、
   directory は mount/forward を行わず、既定 runtime を failure にしない
@@ -125,7 +127,8 @@ GPU は必須ではありません。
   - default dev container は GPU を検出しても `gpus: all` を追加せず、`DEVCONTAINER_GPU_MODE=disabled` を出力します
   - device、driver runtime、shared lock、runtime receipt、host runtime group、GPU
     scheduler は default の host requirement ではありません。これらを使う場合は
-    明示 optional profile が全 capability と absence-safe failure semantics を所有します。
+    明示 `gpu-admission` profile が `nvidia-smi -L`、host runtime group、shared bind、
+    complete group projection、receipt lifecycle、absence/failure semantics を所有します。
 
 GPU が無いこと自体を failure 条件にしません。
 

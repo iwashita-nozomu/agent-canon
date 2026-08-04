@@ -132,6 +132,11 @@ class ParentRepoReadinessTest(unittest.TestCase):
             for entry in manifest.entries
             if entry.path == ".devcontainer/devcontainer.json"
         )
+        gpu_admission = next(
+            entry
+            for entry in manifest.entries
+            if entry.path == ".devcontainer/gpu-admission"
+        )
 
         self.assertEqual(devcontainer.mode, "regular")
         self.assertEqual(devcontainer.surface_class, "active_contract")
@@ -140,6 +145,8 @@ class ParentRepoReadinessTest(unittest.TestCase):
             (PROJECT_ROOT / devcontainer_json.source_or_default()).is_file()
         )
         self.assertEqual(devcontainer_json.mode, "symlink")
+        self.assertEqual(gpu_admission.mode, "symlink")
+        self.assertEqual(gpu_admission.source, ".devcontainer/gpu-admission")
 
     def test_materialized_devcontainer_uses_child_symlink(self) -> None:
         """Manifest materialization creates directory and individual symlinks."""
@@ -148,6 +155,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             self.write_parent_fixture(root)
             devcontainer = root / ".devcontainer"
             devcontainer_json = devcontainer / "devcontainer.json"
+            gpu_admission = devcontainer / "gpu-admission"
 
             self.assertTrue(devcontainer.is_dir())
             self.assertFalse(devcontainer.is_symlink())
@@ -155,6 +163,18 @@ class ParentRepoReadinessTest(unittest.TestCase):
             self.assertEqual(
                 os.readlink(devcontainer_json),
                 "../vendor/agent-canon/.devcontainer/devcontainer.json",
+            )
+            self.assertTrue(gpu_admission.is_symlink())
+            self.assertEqual(
+                os.readlink(gpu_admission),
+                "../vendor/agent-canon/.devcontainer/gpu-admission",
+            )
+            profile = json.loads(
+                (gpu_admission / "devcontainer.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                profile["dockerComposeFile"],
+                "../../.agent-canon/gpu-admission-compose.generated.yml",
             )
             config = json.loads(devcontainer_json.read_text(encoding="utf-8"))
             assert config["initializeCommand"] == (
