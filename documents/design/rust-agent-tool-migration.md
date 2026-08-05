@@ -58,13 +58,14 @@ with `/usr/local/bin/agent-canon` as a compatibility symlink. Older containers
 may still have `/opt/agent-canon/bin/agent-canon`; new post-create runs use
 `~/.tools` for compiled agent-tool binaries.
 
-The installed `.build-state` keeps the existing provenance format and stores
-`agent_canon_source_commit` as the selected active-source identity. In a
-derived repository this is the committed `HEAD:vendor/agent-canon` gitlink,
-which must equal the checked-out vendor source-root `HEAD`; in standalone
-AgentCanon it is the checked-out source-root `HEAD`. A mismatch fails the
-rebuild before publishing a binary. The dependency receipt records the same
-resolved identity, so a binary built from another source is not accepted.
+The `cargo-source-build` record selects `source_identity = "active-source"` and
+always invokes `cargo build --release --locked`. Cargo owns incremental/change
+detection for the mounted source tree, and the build input remains independent
+of repository metadata. The published `.build-state` records only
+`agent_canon_source_root`; active-source installation publishes no commit
+provenance or source-identity receipt.
+Records that select an explicit `commit` retain their existing Git commit
+verification and provenance checks.
 
 Repository search uses the deterministic Python `search.py` / `search_index.py`
 surfaces and the Rust `semantic-index` command. No model server, installer,

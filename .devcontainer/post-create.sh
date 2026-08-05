@@ -28,8 +28,6 @@ workspace="$1"
 workspace="$(cd "$workspace" && pwd)"
 devcontainer_dir="$(cd "$(dirname "$0")" && pwd)"
 agent_canon_root="$(cd -P "$devcontainer_dir/.." && pwd)"
-# shellcheck source=../tools/lib/agent_canon_source_identity.sh
-source "$agent_canon_root/tools/lib/agent_canon_source_identity.sh"
 if [ -n "${AGENT_CANON_CONTAINER_USER:-}" ]; then
   [ "$(id -u)" -ne 0 ] || {
     echo "post-create must execute as the dedicated non-root user" >&2
@@ -128,12 +126,7 @@ agent_canon_source_root() {
 publish_agent_canon_cli() {
   local canon_root
   local binary
-  local source_sha
-  local source_prefix="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
-  local receipt_path="$workspace/.agent-canon/dependency-receipts/agent-canon-cli.json"
   canon_root="$(agent_canon_source_root)"
-  source_sha="$(agent_canon_source_identity "$workspace" "$source_prefix" "$canon_root")"
-  agent_canon_receipt_matches_identity "$receipt_path" "$source_sha"
   binary="$canon_root/rust/agent-canon/target/release/agent-canon"
   [ -x "$binary" ] || {
     echo "AgentCanon cargo-source-build did not produce $binary" >&2
@@ -141,10 +134,8 @@ publish_agent_canon_cli() {
   }
   install -d -m 755 "$tools_home/agent-canon/bin" "$tools_home/bin"
   install -m 755 "$binary" "$tools_home/agent-canon/bin/agent-canon"
-  {
-    printf 'agent_canon_source_root=%s\n' "$canon_root"
-    printf 'agent_canon_source_commit=%s\n' "$source_sha"
-  } >"$tools_home/agent-canon/.build-state"
+  printf 'agent_canon_source_root=%s\n' "$canon_root" \
+    >"$tools_home/agent-canon/.build-state"
   ln -sfn "$tools_home/agent-canon/bin/agent-canon" "$tools_home/bin/agent-canon"
   if [ "$(id -u)" -eq 0 ]; then
     ln -sfn "$tools_home/bin/agent-canon" /usr/local/bin/agent-canon

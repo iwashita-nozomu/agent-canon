@@ -59,12 +59,14 @@ record owner の typed verification を毎回実行し、package-owned state、
 apt repository の key/source、exact executable、toolchain/components、
 browser cache executable、または source-local Cargo binary が欠落・不一致
 なら receipt を削除して repair installation と再 verification を行います。
-active-source の receipt は実行時に解決した source identity も記録します。
-derived parent では committed `HEAD:vendor/agent-canon` gitlink と selected
-vendor source-root `HEAD` が同一であることを provider identity とし、standalone
-AgentCanon では checked-out source-root `HEAD` を identity とします。identity または
-binary verification が一致しない場合は receipt を再利用せず fail/repair し、別の
-固定 SHA、stale source、compatibility fallback は選択しません。
+`source_identity = "active-source"` の Cargo record は毎回 `cargo build
+--release --locked` を実行し、mounted source tree の incremental/change detection
+を Cargo に委ねます。Build input は mounted source tree であり、startup state は
+Git metadata、parent gitlink、source SHA から独立しています。active-source install
+は source-identity receipt を発行せず、Cargo binary の typed verification が pass
+した時点で、その起動の install が完了します。
+固定 `commit` を選択する Cargo record は既存の Git commit verification と source
+identity receipt を保持し、選択した commit と異なる source を受け入れません。
 
 ## pin と root projection
 
