@@ -238,8 +238,13 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   carries `repository_packages_sha256`, the installer derives the canonical
   uncompressed Packages URL from source, suite, component, and `platform`,
   downloads it, and fails closed on a missing or mismatched digest before the
-  repository is accepted. Its signed source line and any declared executable
-  verification are read back exactly.
+  repository is accepted. A record may additionally carry the paired
+  `repository_package_url` and `repository_package_sha256` immutable `.deb`
+  identity; the installer downloads that exact artifact, verifies its SHA-256,
+  then installs the local file while retaining dependency resolution through
+  the signed repository. Its signed source line and any declared executable
+  verification are read back exactly; the rolling Packages digest and
+  immutable artifact digest are separate receipt fields.
 - A successful dependency receipt atomically records the plan/record
   fingerprints, verification contract, and `executable_bindings` for every
   provided LSP binary. `resolve_verified_executable(workspace, vendor_root,
@@ -248,8 +253,10 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   verification, the current absolute executable path is resolved, and both
   path and verification-output identity match the receipt. npm records bind
   `pyright` and `pyright-langserver` to the same package; apt binds the
-  declared package executable; Rust binds the pinned toolchain's
-  `rust-analyzer` path. Ambient `PATH` or `shutil.which` never participates.
+  declared package executable and its lexical/resolved paths from the same
+  package's `/usr/bin/dpkg-query --listfiles` ownership output; Rust binds the
+  pinned toolchain's `rust-analyzer` path. Ambient `PATH` or `shutil.which`
+  never participates.
 - Lean theorem-proving tooling used by formal-proof skills, including
   `elan`, Lean, and Lake, belongs in `.devcontainer/post-create.sh` when it is
   only needed for AgentCanon proof tooling and is declared by exact

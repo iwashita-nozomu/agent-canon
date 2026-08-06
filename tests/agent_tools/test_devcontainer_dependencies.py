@@ -37,6 +37,8 @@ from tools.agent_tools.devcontainer_dependencies import (
     ManifestRole,
     ManifestSource,
     RuntimeIdentity,
+    _parse_dpkg_owned_paths,
+    _repository_package_filename,
     _repository_packages_url,
     build_plan,
     install_plan,
@@ -237,6 +239,21 @@ class FakeRunner:
         self.fail_on = fail_on
         self.fail_once_on = fail_once_on
         self.emulate_non_root_sudo = emulate_non_root_sudo
+        self.ownership_lists: dict[str, tuple[str, ...]] = {}
+        self.resolved_paths: dict[str, str] = {}
+        self.virtual_executables: set[str] = set()
+        self.non_executable_paths: set[str] = set()
+
+    def resolve_executable(self, path: Path) -> Path:
+        """Resolve virtual symlink targets for deterministic ownership fixtures."""
+        return Path(self.resolved_paths.get(str(path), str(path)))
+
+    def is_regular_executable(self, path: Path) -> bool:
+        """Model executable file state without touching host `/usr` paths."""
+        path_text = str(path)
+        if path_text in self.non_executable_paths:
+            return False
+        return path_text in self.virtual_executables or path_text.startswith("/usr/bin/")
 
     def run(
         self,
@@ -253,16 +270,21 @@ class FakeRunner:
             command = ("sudo", *command)
         self.calls.append(command)
         self.environments.append(dict(env) if env is not None else None)
-        if self.fail_once_on and command[0] == self.fail_once_on:
+        if self.fail_once_on and (
+            command[0] == self.fail_once_on
+            or Path(command[0]).name == self.fail_once_on
+        ):
             self.fail_once_on = None
             raise subprocess.CalledProcessError(1, command)
-        if self.fail_on and command[0] == self.fail_on:
+        if self.fail_on and (
+            command[0] == self.fail_on or Path(command[0]).name == self.fail_on
+        ):
             raise subprocess.CalledProcessError(1, command)
         if command == (sys.executable, "-c", "import site; print(site.getuserbase())"):
             return subprocess.CompletedProcess(
                 command, 0, "/tmp/fake-python-user-base\n", ""
             )
-        if command[:2] == ("dpkg-query", "--show"):
+        if Path(command[0]).name == "dpkg-query" and command[1:2] == ("--show",):
             package = command[-1]
             return subprocess.CompletedProcess(
                 command,
@@ -270,6 +292,10 @@ class FakeRunner:
                 f"install ok installed\t1.0.0\t{package}\n",
                 "",
             )
+        if command[:2] == ("/usr/bin/dpkg-query", "--listfiles"):
+            package = command[-1]
+            owned = self.ownership_lists.get(package, (f"/usr/bin/{package}",))
+            return subprocess.CompletedProcess(command, 0, "\n".join(owned) + "\n", "")
         if command[:3] == ("npm", "ls", "--global") and "--json" in command:
             package = command[-1]
             return subprocess.CompletedProcess(
@@ -559,6 +585,11 @@ class DependencyModelTests(unittest.TestCase):
         """Repository records derive one signed source and Packages index identity."""
         packages = b"Package: clangd-18\nVersion: pinned\n"
         digest = hashlib.sha256(packages).hexdigest()
+        package_url = (
+            "https://apt.example.test/jammy/pool/main/c/clangd-18/"
+            "clangd-18_1.2.3_amd64.deb"
+        )
+        package_sha = hashlib.sha256(b"immutable deb").hexdigest()
         parsed = parse_record(
             record(
                 "clangd-language-server",
@@ -570,6 +601,8 @@ class DependencyModelTests(unittest.TestCase):
                 repository_suite="llvm-toolchain-jammy-18",
                 repository_components=["main"],
                 repository_packages_sha256=digest,
+                repository_package_url=package_url,
+                repository_package_sha256=package_sha,
                 key_url="https://apt.llvm.org/llvm-snapshot.gpg.key",
                 key_fingerprint="6084F3CF814B57C1CF12EFD515CF4D18AF4F7421",
                 verification={
@@ -585,6 +618,11 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(parsed.repository_suite, "llvm-toolchain-jammy-18")
         self.assertEqual(parsed.repository_components, ("main",))
         self.assertEqual(parsed.repository_packages_sha256, digest)
+        self.assertEqual(parsed.repository_package_url, package_url)
+        self.assertEqual(parsed.repository_package_sha256, package_sha)
+        self.assertEqual(
+            _repository_package_filename(parsed), "clangd-18_1.2.3_amd64.deb"
+        )
         self.assertEqual(
             _repository_packages_url(parsed),
             "https://apt.llvm.org/jammy/dists/llvm-toolchain-jammy-18/main/"
@@ -638,6 +676,278 @@ class DependencyModelTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(DependencyError, "Packages index SHA256 mismatch"):
                 Installer._verify_repository_packages_digest(mismatched)
+
+    def test_apt_repository_artifact_pair_and_url_sha_validation_fail_closed(self) -> None:
+        base = record(
+            "repo",
+            method="apt-repository",
+            key_url="https://example.test/key",
+            key_fingerprint="2C6106201985B60E6C7AC87323F3D4EA75716059",
+        )
+        for field in ("repository_package_url", "repository_package_sha256"):
+            with self.subTest(field=field):
+                incomplete = dict(base)
+                incomplete[field] = (
+                    "https://example.test/repo/tool_1.0.0_amd64.deb"
+                    if field == "repository_package_url"
+                    else "0" * 64
+                )
+                with self.assertRaisesRegex(DependencyError, "provided together"):
+                    parse_record(incomplete, path=Path("fixture.toml"), index=0)
+        invalid_url = dict(base)
+        invalid_url.update(
+            repository_package_url="http://example.test/tool.deb",
+            repository_package_sha256="0" * 64,
+        )
+        with self.assertRaisesRegex(DependencyError, "https"):
+            parse_record(invalid_url, path=Path("fixture.toml"), index=0)
+        invalid_sha = dict(base)
+        invalid_sha.update(
+            repository_package_url="https://example.test/tool.deb",
+            repository_package_sha256="not-a-sha",
+        )
+        with self.assertRaisesRegex(DependencyError, "64-character SHA256"):
+            parse_record(invalid_sha, path=Path("fixture.toml"), index=0)
+
+    def test_apt_repository_installs_verified_immutable_deb_and_separates_rolling_hash(
+        self,
+    ) -> None:
+        rolling = b"rolling Packages index"
+        immutable = b"immutable clangd deb"
+        rolling_sha = hashlib.sha256(rolling).hexdigest()
+        immutable_sha = hashlib.sha256(immutable).hexdigest()
+        package_url = "https://apt.example.test/clangd-18_1.2.3_amd64.deb"
+        fingerprint = "2C6106201985B60E6C7AC87323F3D4EA75716059"
+        parsed = parse_record(
+            record(
+                "clangd-language-server",
+                method="apt-repository",
+                package="clangd-18",
+                version="1.2.3",
+                platform="linux/amd64",
+                source="https://apt.example.test/jammy/",
+                repository_suite="jammy",
+                repository_components=["main"],
+                repository_packages_sha256=rolling_sha,
+                repository_package_url=package_url,
+                repository_package_sha256=immutable_sha,
+                key_url="https://apt.example.test/key",
+                key_fingerprint=fingerprint,
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+
+        def write_download(url: str, destination: Path) -> None:
+            if url == package_url:
+                destination.write_bytes(immutable)
+            elif url.endswith("/Packages"):
+                destination.write_bytes(rolling)
+            else:
+                destination.write_bytes(b"key")
+
+        original_run = runner.run
+
+        def run_with_key_fingerprint(
+            argv: Sequence[str],
+            *,
+            cwd: Path | None = None,
+            privileged: bool = False,
+            capture_output: bool = False,
+            env: Mapping[str, str] | None = None,
+        ) -> subprocess.CompletedProcess[str]:
+            result = original_run(
+                argv,
+                cwd=cwd,
+                privileged=privileged,
+                capture_output=capture_output,
+                env=env,
+            )
+            if tuple(argv[:3]) == ("gpg", "--show-keys", "--with-colons"):
+                return subprocess.CompletedProcess(
+                    argv, 0, f"fpr:::::::::{fingerprint}:\n", ""
+                )
+            return result
+
+        with (
+            mock.patch.object(runner, "run", side_effect=run_with_key_fingerprint),
+            mock.patch(
+                "tools.agent_tools.devcontainer_dependencies._download",
+                side_effect=write_download,
+            ),
+        ):
+            Installer(runner)._install_apt_repository(
+                parsed, Path("/tmp/workspace"), repair=False
+            )
+            successful_calls = tuple(runner.calls)
+            runner.calls.clear()
+            runner.environments.clear()
+            mismatched = replace(
+                parsed,
+                repository_package_sha256=hashlib.sha256(b"different deb").hexdigest(),
+            )
+            with self.assertRaisesRegex(
+                DependencyError, "immutable apt package SHA256 mismatch"
+            ):
+                Installer(runner)._install_apt_repository(
+                    mismatched, Path("/tmp/workspace"), repair=False
+                )
+            self.assertFalse(
+                any(command[:2] == ("apt-get", "install") for command in runner.calls)
+            )
+
+        local_installs = [
+            command
+            for command in successful_calls
+            if command[:2] == ("apt-get", "install")
+        ]
+        self.assertEqual(len(local_installs), 1)
+        self.assertEqual(Path(local_installs[0][-1]).name, "clangd-18_1.2.3_amd64.deb")
+        self.assertNotIn("clangd-18=1.2.3", local_installs[0])
+        self.assertIn(("apt-get", "update"), runner.calls)
+
+    def test_apt_repository_receipt_keeps_immutable_and_rolling_hashes_distinct(self) -> None:
+        rolling_sha = "1" * 64
+        immutable_sha = "2" * 64
+        parsed = parse_record(
+            record(
+                "repo",
+                method="apt-repository",
+                platform="linux/amd64",
+                source="https://apt.example.test/jammy/",
+                repository_suite="jammy",
+                repository_components=["main"],
+                repository_packages_sha256=rolling_sha,
+                repository_package_url="https://apt.example.test/repo_1.0_amd64.deb",
+                repository_package_sha256=immutable_sha,
+                key_url="https://apt.example.test/key",
+                key_fingerprint="2C6106201985B60E6C7AC87323F3D4EA75716059",
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+        with tempfile.TemporaryDirectory() as temporary:
+            receipt = Path(temporary) / "repo.json"
+            Installer._write_receipt(receipt, plan, parsed)
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            self.assertEqual(payload["repository_packages"]["sha256"], rolling_sha)
+            self.assertEqual(payload["repository_package"]["sha256"], immutable_sha)
+            self.assertTrue(Installer._receipt_matches(receipt, plan, parsed))
+            payload["repository_package"]["sha256"] = rolling_sha
+            receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+            self.assertFalse(Installer._receipt_matches(receipt, plan, parsed))
+
+    def test_apt_executable_ownership_resolves_symlink_with_same_package(self) -> None:
+        parsed = parse_record(
+            record(
+                "clangd-language-server",
+                method="apt-repository",
+                package="clangd-18",
+                version="1.2.3",
+                platform="linux/amd64",
+                source="https://apt.example.test/jammy/",
+                repository_suite="jammy",
+                repository_components=["main"],
+                key_url="https://apt.example.test/key",
+                key_fingerprint="2C6106201985B60E6C7AC87323F3D4EA75716059",
+                verification={
+                    "kind": "apt-repository",
+                    "executable": "clangd-18",
+                    "args": ["--version"],
+                    "output_contains": "clangd version 18.1.8",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+        lexical = "/usr/bin/clangd-18"
+        resolved = "/usr/lib/llvm-18/bin/clangd"
+        runner.ownership_lists["clangd-18"] = (lexical, resolved)
+        runner.resolved_paths[lexical] = resolved
+        runner.virtual_executables.add(resolved)
+        lexical_path, resolved_path = Installer(runner)._resolve_executable_binding(
+            parsed, "clangd-18", workspace=Path("/tmp/workspace")
+        )
+        self.assertEqual(lexical_path, Path(lexical))
+        self.assertEqual(resolved_path, Path(resolved))
+        self.assertIn(("/usr/bin/dpkg-query", "--listfiles", "clangd-18"), runner.calls)
+
+    def test_dpkg_owned_paths_normalize_leading_dot_entry(self) -> None:
+        owned = _parse_dpkg_owned_paths("/.\n/usr/bin/jq\n", "jq")
+        self.assertIn("/", owned)
+        self.assertIn("/usr/bin/jq", owned)
+        with self.assertRaisesRegex(DependencyError, "unsafe path"):
+            _parse_dpkg_owned_paths("relative/path\n", "jq")
+        with self.assertRaisesRegex(DependencyError, "unsafe path"):
+            _parse_dpkg_owned_paths("/usr/bin/jq\x00evil\n", "jq")
+
+    def test_strict_apt_verify_uses_absolute_dpkg_query_for_version_and_ownership(self) -> None:
+        parsed = parse_record(
+            record(
+                "tool",
+                method="apt-package",
+                verification={
+                    "kind": "apt-package",
+                    "executable": "tool",
+                    "args": ["--version"],
+                    "output_contains": "1.0.0",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+        Installer(runner).verify(
+            parsed, workspace=Path("/tmp/workspace"), strict_executables=True
+        )
+        dpkg_calls = [
+            command for command in runner.calls if Path(command[0]).name == "dpkg-query"
+        ]
+        self.assertEqual(len(dpkg_calls), 2)
+        self.assertTrue(all(command[0] == "/usr/bin/dpkg-query" for command in dpkg_calls))
+
+    def test_apt_executable_ownership_rejects_unowned_cross_package_target(self) -> None:
+        parsed = parse_record(
+            record(
+                "clangd-language-server",
+                method="apt-repository",
+                package="clangd-18",
+                version="1.2.3",
+                platform="linux/amd64",
+                source="https://apt.example.test/jammy/",
+                repository_suite="jammy",
+                repository_components=["main"],
+                key_url="https://apt.example.test/key",
+                key_fingerprint="2C6106201985B60E6C7AC87323F3D4EA75716059",
+                verification={
+                    "kind": "apt-repository",
+                    "executable": "clangd-18",
+                    "args": ["--version"],
+                    "output_contains": "clangd version 18.1.8",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+        lexical = "/usr/bin/clangd-18"
+        resolved = "/usr/lib/llvm-18/bin/clangd"
+        runner.ownership_lists["clangd-18"] = (lexical, "/usr/lib/other/clangd")
+        runner.resolved_paths[lexical] = resolved
+        runner.virtual_executables.add(resolved)
+        with self.assertRaisesRegex(DependencyError, "not owned"):
+            Installer(runner)._resolve_executable_binding(
+                parsed, "clangd-18", workspace=Path("/tmp/workspace")
+            )
+
+        runner.ownership_lists["clangd-18"] = ("relative/clangd",)
+        with self.assertRaisesRegex(DependencyError, "unsafe path"):
+            Installer(runner)._resolve_executable_binding(
+                parsed, "clangd-18", workspace=Path("/tmp/workspace")
+            )
 
     def test_verified_executable_requires_receipt_binding_and_rejects_path_drift(self) -> None:
         """Manifest executable resolution is receipt-bound and independent of PATH."""
@@ -1463,7 +1773,7 @@ class DependencyModelTests(unittest.TestCase):
                 ("tool",),
             )
             self.assertNotIn(("dpkg", "--verify", "tool"), resumed.calls)
-            self.assertIn(("tool", "--version"), resumed.calls)
+            self.assertIn(("/usr/bin/tool", "--version"), resumed.calls)
             self.assertFalse(any(command[0] == "apt-get" for command in resumed.calls))
 
             rebuilt = FakeRunner(fail_once_on="dpkg-query")
@@ -1476,8 +1786,8 @@ class DependencyModelTests(unittest.TestCase):
                 1,
             )
             self.assertEqual(
-                sum(command[0] == "dpkg-query" for command in rebuilt.calls),
-                2,
+                sum(Path(command[0]).name == "dpkg-query" for command in rebuilt.calls),
+                4,
             )
             apt_install = next(
                 command for command in rebuilt.calls if command[0] == "apt-get"

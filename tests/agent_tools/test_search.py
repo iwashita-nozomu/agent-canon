@@ -16,10 +16,18 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Sequence
 from pathlib import Path
+from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SEARCH = PROJECT_ROOT / "tools" / "agent_tools" / "search.py"
+
+if str(PROJECT_ROOT / "tools" / "agent_tools") not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+
+import lsp_code_analysis as lsp  # noqa: E402
+import search as search_tool  # noqa: E402
 
 
 def write_search_fixture(root: Path) -> None:
@@ -113,6 +121,82 @@ def run_search_with_input(
 
 class CoordinatedSearchTest(unittest.TestCase):
     """Verify purpose-based candidate generation."""
+
+    def test_discover_lsp_files_keeps_code_suffixes_and_boundaries(self) -> None:
+        """LSP discovery includes C++/Rust while retaining search path safety."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "src"
+            (source / "excluded").mkdir(parents=True)
+            (source / ".git" / "objects").mkdir(parents=True)
+            (root / "other").mkdir()
+            (source / "main.py").write_text("def main():\n    pass\n", encoding="utf-8")
+            (source / "main.cpp").write_text("int main() { return 0; }\n", encoding="utf-8")
+            (source / "header.hxx").write_text("int main();\n", encoding="utf-8")
+            (source / "main.rs").write_text("mod helper;\n", encoding="utf-8")
+            (source / "excluded" / "skip.rs").write_text("mod skip;\n", encoding="utf-8")
+            (source / ".git" / "objects" / "leak.rs").write_text("mod leak;\n", encoding="utf-8")
+            (root / "other" / "outside.cpp").write_text("int outside;\n", encoding="utf-8")
+            (source / "link.rs").symlink_to(root / "other" / "outside.cpp")
+
+            discovered = search_tool.discover_lsp_files(
+                root,
+                ("src", "src/main.cpp", "src"),
+                ("excluded",),
+            )
+
+            self.assertEqual(
+                [path.relative_to(root).as_posix() for path in discovered],
+                ["src/header.hxx", "src/main.cpp", "src/main.py", "src/main.rs"],
+            )
+
+    def test_load_corpus_supplies_cpp_and_rust_to_lsp_only(self) -> None:
+        """Code-deps LSP input is broader than the text corpus, deterministically."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "src"
+            (source / "excluded").mkdir(parents=True)
+            (source / "main.py").write_text("def main():\n    pass\n", encoding="utf-8")
+            (source / "main.cpp").write_text("int main() { return 0; }\n", encoding="utf-8")
+            (source / "main.rs").write_text("mod helper;\n", encoding="utf-8")
+            (source / "excluded" / "skip.rs").write_text("mod skip;\n", encoding="utf-8")
+            calls: list[tuple[Path, tuple[Path, ...]]] = []
+
+            def fake_analyze(root_arg: Path, files: Sequence[Path]) -> lsp.CodeAnalysisReport:
+                calls.append((root_arg, tuple(files)))
+                return lsp.CodeAnalysisReport(
+                    root=root_arg.as_posix(),
+                    files=tuple(path.relative_to(root_arg).as_posix() for path in files),
+                    servers=(),
+                    capabilities={},
+                    lexical_candidates=(
+                        lsp.LexicalDependencyCandidate("src/main.rs", "helper", "external:rust:helper"),
+                    ),
+                )
+
+            request = search_tool.SearchRequest(
+                root=root,
+                query=search_tool.query_profile("helper"),
+                providers=("code-deps",),
+                surfaces=("src",),
+                excludes=("excluded",),
+                index_dir=root / "index",
+                top=12,
+                refresh_index=False,
+            )
+            with (
+                mock.patch.object(search_tool.lsp_code_analysis, "analyze", side_effect=fake_analyze),
+                mock.patch.object(search_tool, "load_index_cards", return_value=()),
+            ):
+                corpus = search_tool.load_corpus(request)
+
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(
+                [path.relative_to(root).as_posix() for path in calls[0][1]],
+                ["src/main.cpp", "src/main.py", "src/main.rs"],
+            )
+            self.assertEqual([document.relative_path for document in corpus.documents], ["src/main.py"])
+            self.assertIsNotNone(corpus.lsp_report)
 
     def test_purpose_returns_tool_and_semantic_card_candidate(self) -> None:
         """Tool search and semantic cards should agree on a cataloged tool."""

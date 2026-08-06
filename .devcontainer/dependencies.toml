@@ -260,7 +260,9 @@ platform = "linux/amd64"
 source = "https://apt.llvm.org/jammy/"
 repository_suite = "llvm-toolchain-jammy-18"
 repository_components = ["main"]
-repository_packages_sha256 = "05ba173847cca9a3362155b9b7b59b3a7968195cde17dfa5e26bd777d9558660"
+repository_packages_sha256 = "380ae90b5df8029aca2e30302427949f0a384d4970b156d843eeb0cea7fc4da2"
+repository_package_url = "https://apt.llvm.org/jammy/pool/main/l/llvm-toolchain-18/clangd-18_18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_amd64.deb"
+repository_package_sha256 = "05ba173847cca9a3362155b9b7b59b3a7968195cde17dfa5e26bd777d9558660"
 key_url = "https://apt.llvm.org/llvm-snapshot.gpg.key"
 key_fingerprint = "6084F3CF814B57C1CF12EFD515CF4D18AF4F7421"
 verification = { kind = "apt-repository", executable = "clangd-18", args = ["--version"], output_contains = "clangd version 18.1.8" }
