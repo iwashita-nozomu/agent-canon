@@ -783,7 +783,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare --topic <topic> --module <path> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> merge-main --topic <topic> --module <path> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> status --topic <topic> [--module <path>]
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup --topic <topic> --module <path> --branch <branch> --owner-evidence <path> --expected-clone <path> --candidate-cas <path> --pr-lifecycle <path> [--publication-readback <path>] [--apply]
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check

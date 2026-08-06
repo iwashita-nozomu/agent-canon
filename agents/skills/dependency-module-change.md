@@ -39,6 +39,15 @@ specialized precondition が成立しない場合は dependency decorator だけ
 要求した clone/edit/update operation を generic owner へ戻します。manual clone や
 operation refusal は代替 route ではありません。
 
+`--owner-evidence` が非空で、`.gitmodules` identity と computed
+`workspace/<topic-slug>/<module-basename>` が一致する場合、canonical `prepare` と
+`merge-main` は operation-level の追加承認を要求しません。reuse は `prepare` に含まれます。
+`status` は dependency adapter の read-only command で、owner-evidence を要求せず、
+generic lifecycle または operation-level approval carve-out には含めません。ここで許可される
+のは canonical lifecycle tool が管理する repo-local workspace の作成・再利用・使用だけ
+です。共有 checkout の raw `git checkout`、branch/worktree、reset/restore/clean/stash
+などは従来どおり protected Git route として明示 authority を必要とします。
+
 ```bash
 python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare \
   --topic <topic> --module <path> --branch <branch> \
@@ -58,3 +67,10 @@ python3 tools/agent_tools/dependency_module_change.py --root <parent-root> clean
 
 completion evidence は generic prepare/merge receipt、dependency identity readback、
 pin/projection validation、canonical publication evidence、および `CleanupProof` です。
+
+completion ではこの skill が canonical `cleanup` を dispatch し、candidate CAS、PR
+lifecycle、必要な publication readback、owner evidence、expected clone identity を同じ
+呼び出しで渡します。proof preflight が通るときだけ `CleanupProof` / cleanup receipt を
+closeout に保存して clone/topic root を削除し、衝突・unknown dirty state・proof mismatch
+では typed hold を保存して状態を保持します。CAS/PR/publication/owner evidence が揃わない
+場合に blind deletion や手動 `rm` へ迂回しません。

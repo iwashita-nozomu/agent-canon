@@ -217,7 +217,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "legacy-route drift duplicate implementation canonical owner "
         "caller migration contract-complete implementation acceptance contract "
         "design_issue_blocker implementation shortcut\n"
-        "Branch Reuse Default branch_worktree_guard.py user が別 branch を明示 "
+        "Branch Reuse Default tools/agent_tools/hook_safety.py user が別 branch を明示 "
         "AgentCanon branch / PR workflow "
         "branch_creation_reason=<reason> worktree_creation_reason=<reason> "
         "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
@@ -344,7 +344,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/skills/worktree-health.md": (
         "agents/canonical/CODEX_WORKFLOW.md Branch Reuse Default "
-        "branch_worktree_guard.py "
+        "tools/agent_tools/hook_safety.py "
         "branch_creation_reason=<reason> "
         "worktree_creation_reason=<reason> git worktree list --porcelain "
         "git branch --show-current\n"

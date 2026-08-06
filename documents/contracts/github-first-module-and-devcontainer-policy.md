@@ -147,6 +147,18 @@ allocate the project network automatically.
 `prepare` の前にこの ignore rule を確認し、満たさない親 repository では
 dependency source work を開始しません。
 
+task owner の非空 owner evidence、computed path、remote、branch、module identity が
+一致する場合、canonical `repository_topic_clone.py` / `dependency_module_change.py` の
+repo-local `prepare` と `merge-main` は operation-level の追加承認なしで実行します。
+reuse は `prepare` に含まれます。これはこの管理領域の作成・再利用・使用に限定された
+route です。`dependency_module_change.py status` は adapter-only の read command であり、
+generic lifecycle、owner-evidence、または operation-level approval carve-out ではありません。
+共有 checkout に対する raw Git の checkout/switch、branch/worktree、reset/restore/clean/stash、
+protected update wrapper は既存の明示 authority gate を維持し、canonical lifecycle
+command の carve-out を継承しません。作業完了後の clone/topic root 削除は candidate CAS、
+PR lifecycle、必要な publication readback、owner evidence、expected identity を検証する
+canonical cleanup と `CleanupProof` receipt に限定します。
+
 ここでいう topic workspace は filesystem / lifecycle と devcontainer mount の
 用語です。VS Code workspace を意味しません。devcontainer は topic workspace
 root を一度だけ `/workspace` に bind mountし、`AGENT_CANON_WORKSPACE_ROOT=/workspace`

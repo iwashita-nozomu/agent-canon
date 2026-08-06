@@ -179,6 +179,71 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("realpath=doc.md", result.stdout)
             self.assertIn("owner=product_file", result.stdout)
 
+    def test_code_scan_can_write_lexical_lsp_report(self) -> None:
+        """Compatibility scanner can persist the canonical lexical report."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "main.py"
+            source.write_text("import package\n", encoding="utf-8")
+            analysis = root / "reports" / "analysis.json"
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(CODE_SCAN),
+                    "--root",
+                    str(root),
+                    "--lexical-only",
+                    "--analysis-json",
+                    str(analysis),
+                    "main.py",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CODE_DEPENDENCY_SCAN=pass", result.stdout)
+            payload = json.loads(analysis.read_text(encoding="utf-8"))
+            self.assertEqual(payload["schema_version"], "agent-canon.lsp-code-analysis.v1")
+            self.assertEqual(payload["lifecycle"]["state"], "lexical-only")
+
+    def test_code_scan_rust_is_sidecar_only(self) -> None:
+        """Rust lexical facts stay in the sidecar without fabricated TSV rows."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "main.rs"
+            source.write_text("mod helper;\nuse crate::helper;\n", encoding="utf-8")
+            analysis = root / "reports" / "analysis.json"
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(CODE_SCAN),
+                    "--root",
+                    str(root),
+                    "--lexical-only",
+                    "--analysis-json",
+                    str(analysis),
+                    "main.rs",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(result.stdout.strip(), "CODE_DEPENDENCY_SCAN=pass files=1")
+            legacy_rows = [
+                line for line in result.stdout.splitlines() if line.startswith("CODE_DEPENDENCY\t")
+            ]
+            self.assertFalse(legacy_rows)
+            self.assertTrue(all(len(line.split("\t")) == 7 for line in legacy_rows))
+            payload = json.loads(analysis.read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "complete")
+            self.assertEqual(payload["files"], ["main.rs"])
+            self.assertTrue(payload["lexical_candidates"])
+            self.assertTrue(any(item["token"] == "helper" for item in payload["lexical_candidates"]))
+
     def test_trusted_packet_reports_unchanged_missing_as_baseline(self) -> None:
         """Unchanged missing headers are evidence and do not fail the PR scan."""
         with tempfile.TemporaryDirectory() as tmp_dir:

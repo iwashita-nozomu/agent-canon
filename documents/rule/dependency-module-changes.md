@@ -47,6 +47,10 @@ python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepa
 manifest identity を generic request へ写像し、exact clone/branch を再利用するか、不在
 branch を最新 `origin/main` から作成します。`PrepareReceipt`、module path/URL readback、
 computed clone path の一致が完了証拠です。
+owner evidence、manifest identity、computed path が一致する canonical prepare は
+operation-level の追加承認なしで実行できます。この扱いは repo-local topic workspace
+の lifecycle command にだけ適用し、共有 checkout の protected raw Git route には継承
+されません。
 
 ### Merge main
 
@@ -74,7 +78,11 @@ PR-head cleanup は canonical candidate CAS と PR lifecycle を検証し、loca
 の exact identity を証明します。integration 後は canonical publication readback transition
 を追加し、merge commit/tree と `origin/main` containment を証明します。dry-run も同じ
 authority を検証し、全 preflight 後だけ computed clone を削除します。unknown sibling は
-保持し、topic directory は空の場合だけ削除します。
+保持し、topic directory は空の場合だけ削除します。cleanup dispatch はこの skill の
+closeout operation です。candidate CAS、PR lifecycle、必要な publication readback、owner
+evidence、expected clone identity が揃い、canonical tool が `CleanupProof` を返した場合
+だけ `--apply` を実行します。proof 不一致または unknown dirty/collision は typed hold
+として保持します。
 
 ## Scope と failure
 

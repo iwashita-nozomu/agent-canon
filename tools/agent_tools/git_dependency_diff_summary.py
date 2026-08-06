@@ -19,9 +19,7 @@ import sys
 import tempfile
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
-from datetime import datetime, timezone
-
-UTC = timezone.utc
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypeAlias, cast
 
@@ -40,6 +38,7 @@ CODE_SUFFIXES = {
     ".h",
     ".hpp",
     ".py",
+    ".rs",
     ".sh",
     ".zsh",
 }
@@ -99,6 +98,7 @@ class DependencyArtifacts:
     dependency_dir: Path
     commands: CommandMap
     status_code: int
+    code_analysis_path: Path | None = None
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -514,10 +514,12 @@ def run_code_dependency_scan(
 ) -> tuple[Path, CommandMap, int]:
     """Run the existing code dependency scanner when source files changed."""
     code_dependencies_path = report_dir / "code_dependencies.tsv"
+    code_analysis_path = report_dir / "code_analysis.json"
     commands: CommandMap = {}
     status_code = 0
     if skip:
         write_text(code_dependencies_path, "")
+        write_text(code_analysis_path, json.dumps({"schema_version": "agent-canon.lsp-code-analysis.v1", "status": "skipped"}) + "\n")
     else:
         scan_paths = code_scan_paths(root, rows)
         if scan_paths:
@@ -528,6 +530,8 @@ def run_code_dependency_scan(
                     str(TOOL_DIR / "scan_code_dependencies.sh"),
                     "--root",
                     str(root),
+                    "--analysis-json",
+                    str(code_analysis_path),
                     *scan_paths,
                 ],
                 stdout_path=code_dependencies_path,
@@ -537,6 +541,7 @@ def run_code_dependency_scan(
             status_code = max(status_code, record.returncode)
         else:
             write_text(code_dependencies_path, "")
+            write_text(code_analysis_path, json.dumps({"schema_version": "agent-canon.lsp-code-analysis.v1", "status": "empty"}) + "\n")
     return code_dependencies_path, commands, status_code
 
 
@@ -617,6 +622,10 @@ def build_summary(
             "changed_files": diff_artifacts.changed_files_path.as_posix(),
             "git_stat": diff_artifacts.git_stat_path.as_posix(),
             "code_dependencies": dependency_artifacts.code_dependencies_path.as_posix(),
+            "code_analysis": (
+                dependency_artifacts.code_analysis_path
+                or dependency_artifacts.code_dependencies_path.with_name("code_analysis.json")
+            ).as_posix(),
             "dependency_review_dir": dependency_dir.as_posix(),
             "dependency_graph": (dependency_dir / "dependency_graph.tsv").as_posix(),
             "dependency_edit_scope": (
@@ -677,6 +686,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             rows=diff_artifacts.rows,
             skip=args.skip_code_dependencies,
         )
+        code_analysis_path = report_dir / "code_analysis.json"
         dependency_commands, dependency_status = run_dependency_review(
             root=root,
             report_dir=report_dir,
@@ -688,6 +698,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         status = max(code_status, dependency_status)
         dependency_artifacts = DependencyArtifacts(
             code_dependencies_path=code_path,
+            code_analysis_path=code_analysis_path,
             dependency_dir=dependency_dir,
             commands={**code_commands, **dependency_commands},
             status_code=status,

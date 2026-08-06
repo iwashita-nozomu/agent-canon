@@ -2,7 +2,7 @@
 name: oop-readability-check
 description: "Use when the user asks to run the OOP readability checker, SOLID check, OOP check, readability check, produce a mechanical OOP report table, or interpret/prioritize OOP readability results; keep mechanical tool output separate from agent analysis."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"dcf34a1dabdd2db1820f398abfc5bcf0c3e83ba190b90a085ec143b8ef7b6687"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"6606ba6094896a467cd5053c7b526f750c57b34614e56b6fb438589f39db1e93"} -->
 
 <!--
 @dependency-start

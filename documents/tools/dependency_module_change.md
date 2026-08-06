@@ -39,8 +39,13 @@ python3 tools/agent_tools/dependency_module_change.py --root <parent-root> clean
   [--publication-readback <publication-readback.json>] [--apply]
 ```
 
-`prepare` は exact local/remote branch を generic owner で再利用し、不在 branch を最新
+`prepare` と `merge-main` は owner evidence と module/computed identity が一致する
+repo-local topic workspace に対して operation-level の追加承認なしで実行できます。reuse は
+`prepare` に含まれます。`status` は dependency adapter の read-only command であり、
+owner-evidence を要求せず、generic repository-topic lifecycle またはその approval carve-out
+には含めません。exact local/remote branch を generic owner で再利用し、不在 branch を最新
 `origin/main` から作成します。`merge-main` は通常 merge と ancestor proof を返します。
 `cleanup` は canonical PR-head または merged-publication transition が成立した場合だけ
-computed clone を対象にします。全 command は dependency 固有の module identity と generic
-receipt を出力し、specialized mismatch 時も user-requested operation 自体は拒否しません。
+computed clone を対象にし、candidate CAS、PR lifecycle、owner evidence、必要な publication
+readback を検証します。全 command は dependency 固有の module identity と generic receipt
+を出力し、specialized mismatch 時も user-requested operation 自体は拒否しません。

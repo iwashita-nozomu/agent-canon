@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
+from tools.agent_tools import devcontainer_dependencies as dependency_module
 from tools.agent_tools.devcontainer_dependencies import (
     BASE_CAPABILITIES,
     DependencyError,
@@ -36,6 +37,7 @@ from tools.agent_tools.devcontainer_dependencies import (
     ManifestRole,
     ManifestSource,
     RuntimeIdentity,
+    _repository_packages_url,
     build_plan,
     install_plan,
     load_plan,
@@ -293,6 +295,7 @@ class FakeRunner:
             return subprocess.CompletedProcess(
                 command,
                 0,
+                "rust-src-x86_64-unknown-linux-gnu (installed)\n"
                 "rustfmt-x86_64-unknown-linux-gnu (installed)\n"
                 "clippy-x86_64-unknown-linux-gnu (installed)\n",
                 "",
@@ -551,6 +554,245 @@ class DependencyModelTests(unittest.TestCase):
                 parsed.verification.kind.value,
                 value["verification"]["kind"],
             )
+
+    def test_apt_repository_suite_components_digest_and_executable_are_typed(self) -> None:
+        """Repository records derive one signed source and Packages index identity."""
+        packages = b"Package: clangd-18\nVersion: pinned\n"
+        digest = hashlib.sha256(packages).hexdigest()
+        parsed = parse_record(
+            record(
+                "clangd-language-server",
+                method="apt-repository",
+                package="clangd-18",
+                version="1:18.1.8~exp1",
+                platform="linux/amd64",
+                source="https://apt.llvm.org/jammy/",
+                repository_suite="llvm-toolchain-jammy-18",
+                repository_components=["main"],
+                repository_packages_sha256=digest,
+                key_url="https://apt.llvm.org/llvm-snapshot.gpg.key",
+                key_fingerprint="6084F3CF814B57C1CF12EFD515CF4D18AF4F7421",
+                verification={
+                    "kind": "apt-repository",
+                    "executable": "clangd-18",
+                    "args": ["--version"],
+                    "output_contains": "clangd version 18.1.8",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        self.assertEqual(parsed.repository_suite, "llvm-toolchain-jammy-18")
+        self.assertEqual(parsed.repository_components, ("main",))
+        self.assertEqual(parsed.repository_packages_sha256, digest)
+        self.assertEqual(
+            _repository_packages_url(parsed),
+            "https://apt.llvm.org/jammy/dists/llvm-toolchain-jammy-18/main/"
+            "binary-amd64/Packages",
+        )
+        self.assertEqual(
+            Installer._apt_repository_line(parsed, Path("/etc/apt/keyrings/clangd.gpg")),
+            "deb [signed-by=/etc/apt/keyrings/clangd.gpg] "
+            "https://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main\n",
+        )
+
+    def test_apt_repository_packages_digest_fails_closed(self) -> None:
+        """Derived Packages bytes must match the typed digest before acceptance."""
+        payload = b"signed Packages fixture\n"
+        parsed = parse_record(
+            record(
+                "repo",
+                method="apt-repository",
+                platform="linux/amd64",
+                source="https://apt.example.test/jammy/",
+                repository_suite="jammy",
+                repository_components=["main"],
+                repository_packages_sha256=hashlib.sha256(payload).hexdigest(),
+                key_url="https://apt.example.test/key",
+                key_fingerprint="2C6106201985B60E6C7AC87323F3D4EA75716059",
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+
+        def write_fixture(url: str, destination: Path) -> None:
+            self.assertEqual(
+                url,
+                "https://apt.example.test/jammy/dists/jammy/main/"
+                "binary-amd64/Packages",
+            )
+            destination.write_bytes(payload)
+
+        with mock.patch(
+            "tools.agent_tools.devcontainer_dependencies._download",
+            side_effect=write_fixture,
+        ):
+            Installer._verify_repository_packages_digest(parsed)
+
+        mismatched = replace(
+            parsed, repository_packages_sha256=hashlib.sha256(b"different").hexdigest()
+        )
+        with mock.patch(
+            "tools.agent_tools.devcontainer_dependencies._download",
+            side_effect=write_fixture,
+        ):
+            with self.assertRaisesRegex(DependencyError, "Packages index SHA256 mismatch"):
+                Installer._verify_repository_packages_digest(mismatched)
+
+    def test_verified_executable_requires_receipt_binding_and_rejects_path_drift(self) -> None:
+        """Manifest executable resolution is receipt-bound and independent of PATH."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            prefix = root / "npm"
+            bin_dir = prefix / "bin"
+            bin_dir.mkdir(parents=True)
+            target_dir = prefix / "lib"
+            target_dir.mkdir(parents=True)
+            target_v1 = target_dir / "pyright-v1"
+            target_v2 = target_dir / "pyright-v2"
+            for target in (target_v1, target_v2, bin_dir / "pyright-langserver"):
+                target.write_text("#!/usr/bin/env true\n", encoding="utf-8")
+                target.chmod(0o755)
+            (bin_dir / "pyright").symlink_to(target_v1)
+            manifest = root / ".devcontainer" / "dependencies.toml"
+            write_manifest(
+                manifest,
+                [
+                    record(
+                        "pyright-language-server",
+                        package="pyright",
+                        version="1.0.0",
+                        provides=["pyright", "pyright-langserver"],
+                        verification={
+                            "kind": "npm-package",
+                            "executable": "pyright",
+                            "args": ["--version"],
+                            "output_contains": "1.0.0",
+                        },
+                    )
+                ],
+            )
+            fake = FakeRunner()
+            receipts = root / "receipts"
+            parsed = parse_record(
+                record(
+                    "pyright-language-server",
+                    package="pyright",
+                    version="1.0.0",
+                    provides=["pyright", "pyright-langserver"],
+                    verification={
+                        "kind": "npm-package",
+                        "executable": "pyright",
+                        "args": ["--version"],
+                        "output_contains": "1.0.0",
+                    },
+                ),
+                path=manifest,
+                index=0,
+            )
+            plan = build_plan((loaded_manifest(manifest, (parsed,)),))
+            with mock.patch.object(
+                dependency_module, "NPM_GLOBAL_PREFIX", str(prefix)
+            ):
+                Installer(fake).install(
+                    plan,
+                    workspace=root,
+                    receipts=receipts,
+                )
+                with mock.patch.object(
+                    dependency_module,
+                    "Installer",
+                    lambda: Installer(fake),
+                ):
+                    resolved = dependency_module.resolve_verified_executable(
+                        root, None, receipts, "pyright-language-server", "pyright"
+                    )
+                self.assertEqual(resolved.absolute_path, str(target_v1.resolve()))
+                self.assertEqual(resolved.executable, "pyright")
+                self.assertIn((str(target_v1.resolve()), "--version"), fake.calls)
+                payload = json.loads(
+                    (receipts / "pyright-language-server.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                self.assertEqual(
+                    set(payload["executable_bindings"]),
+                    {"pyright", "pyright-langserver"},
+                )
+                payload["record_fingerprint"] = "0" * 64
+                (receipts / "pyright-language-server.json").write_text(
+                    json.dumps(payload) + "\n", encoding="utf-8"
+                )
+                with mock.patch.object(
+                    dependency_module,
+                    "Installer",
+                    lambda: Installer(fake),
+                ):
+                    with self.assertRaisesRegex(
+                        DependencyError, "executable receipt binding is stale"
+                    ):
+                        dependency_module.resolve_verified_executable(
+                            root,
+                            None,
+                            receipts,
+                            "pyright-language-server",
+                            "pyright",
+                        )
+                payload["record_fingerprint"] = plan.by_id()[
+                    "pyright-language-server"
+                ].fingerprint()
+                (receipts / "pyright-language-server.json").write_text(
+                    json.dumps(payload) + "\n", encoding="utf-8"
+                )
+                (bin_dir / "pyright").unlink()
+                (bin_dir / "pyright").symlink_to(target_v2)
+                with mock.patch.object(
+                    dependency_module,
+                    "Installer",
+                    lambda: Installer(fake),
+                ):
+                    with self.assertRaisesRegex(
+                        DependencyError, "receipt path or output drift"
+                    ):
+                        dependency_module.resolve_verified_executable(
+                            root,
+                            None,
+                            receipts,
+                            "pyright-language-server",
+                            "pyright",
+                        )
+
+    def test_rust_analyzer_binding_uses_cargo_home_not_path(self) -> None:
+        """Rust executable bindings stay inside the pinned Cargo home."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cargo_home = root / "cargo"
+            rust_analyzer = cargo_home / "bin" / "rust-analyzer"
+            rust_analyzer.parent.mkdir(parents=True)
+            rust_analyzer.write_text("#!/usr/bin/env true\n", encoding="utf-8")
+            rust_analyzer.chmod(0o755)
+            parsed = parse_record(
+                record(
+                    "rust-toolchain",
+                    method="rust-toolchain",
+                    version="1.89.0",
+                    source="https://static.rust-lang.org/dist",
+                    components=["rust-analyzer"],
+                    verification={"kind": "rust-toolchain"},
+                    provides=["rust-analyzer"],
+                ),
+                path=Path("fixture.toml"),
+                index=0,
+            )
+            with mock.patch.dict(
+                os.environ,
+                {"CARGO_HOME": str(cargo_home), "PATH": str(root / "ambient-bin")},
+                clear=False,
+            ):
+                self.assertEqual(
+                    dependency_module._current_executable_path(parsed, "rust-analyzer"),
+                    rust_analyzer.resolve(),
+                )
 
     def test_binary_release_asset_accepts_pinned_architecture_paths(self) -> None:
         parsed = parse_record(

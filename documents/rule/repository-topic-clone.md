@@ -41,6 +41,13 @@ gitlink/pin/projection の共有責務を担い、この文書の clone 実装�
   collision として状態を保持する。
 - requested branch が local/remote のどちらにも無い場合だけ、最新 `origin/main` から作る。
 - merge 前に PR/PR head 更新を前倒しせず、`merge-main` は通常 merge を要求する。
+- task owner の非空 `--owner-evidence` と computed path、remote、branch identity が一致
+  する限り、canonical `prepare` と `merge-main` は operation-level の追加承認なしで
+  実行できます。reuse は `prepare` に含まれます。これは repo-local workspace lifecycle
+  にだけ適用し、共有 checkout の raw Git mutation authority を変更しません。
+
+  `dependency_module_change.py status` は adapter-only の read command であり、generic
+  lifecycle、owner-evidence、または operation-level approval carve-out には含めません。
 
 ```bash
 python3 tools/agent_tools/repository_topic_clone.py prepare \
@@ -54,12 +61,16 @@ python3 tools/agent_tools/repository_topic_clone.py merge-main \
 
 ## クリーンアップ
 
-- cleanup は `--expected-clone` に対する既知 identity を受理し、proof が一致しない
-  ものは削除しない。
+- cleanup は closeout の明示 dispatch として canonical tool を呼び、`--expected-clone` に
+  対する既知 identity、owner evidence、candidate CAS、PR lifecycle、必要な publication
+  readback を同時に検証します。proof が一致しないものは削除しません。
 - PR 作成後は canonical candidate CAS と PR lifecycle を読み、local head、remote head、
   PR head の一致を検証する。integration 後は canonical publication readback transition、
   merge commit/tree、`origin/main` containment も検証する。
 - clone と topic root は同一 receipt で扱う。管理外 path へ退避しない。
+- preflight が通った `--apply` だけが `CleanupProof` / cleanup receipt を返して computed
+  clone と空の topic root を削除します。proof 不足、衝突、unknown dirty/staged/untracked
+  state は typed hold として保持し、manual deletion へ迂回しません。
 
 ```bash
 python3 tools/agent_tools/repository_topic_clone.py cleanup \

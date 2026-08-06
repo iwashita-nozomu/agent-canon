@@ -97,6 +97,21 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - destructive Git safety は `tools/agent_tools/hook_safety.py` の pure owner を dispatcher が呼び出します。session 開始時に dispatcher registration を load 済みの session では次の tool call から更新後 script が効きます。hook table 自体が未 load の既存 session は session restart 後に保護対象になります。
 - 衝突時は current branch/worktree を維持し、status を保存して user の指示を待ちます。
 
+- `repository_topic_clone.py` と `dependency_module_change.py` の canonical
+  `prepare` / `merge-main` は、非空 owner evidence と computed
+  `workspace/<topic-slug>/<repo-name>` identity が揃う repo-local topic workspace に限り、
+  operation-level の追加承認なしで dispatch できます。reuse は `prepare` に含まれます。
+  これは lifecycle tool が管理する path の作成・再利用・使用だけを対象とし、shared
+  checkout の raw Git mutation や protected update wrapper の authority を免除しません。
+- `dependency_module_change.py status` は adapter-only の read-only command で、owner
+  evidence を要求せず、generic repository-topic lifecycle または operation-level approval
+  carve-out の権限を持ちません。
+- closeout は `repository-topic-clone` または `dependency-module-change` skill の
+  `cleanup` dispatch を経由します。candidate CAS、PR lifecycle、必要な publication
+  readback、owner evidence、expected clone identity を渡し、`CleanupProof` / receipt が
+  返った場合だけ `--apply` を受理します。proof 不足、collision、unknown dirty state は
+  clone/topic root を保持して typed hold として記録します。
+
 - 通常 task の authority は、user が別 branch を明示した場合の `user_request` です。AgentCanon source update の authority は、AgentCanon branch / PR workflow と canonical update tool が owner の `agent_canon_workflow` です。
 - 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
 - branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。それだけでは実行権限になりません。current-task user approval 後の同じ shell segment に creation authority/reason と destructive authority/reason の全 4 値を置いた場合だけ実行できます。

@@ -276,6 +276,9 @@ class DependencyRecord:
     platform: str | None = None
     key_fingerprint: str | None = None
     key_url: str | None = None
+    repository_suite: str | None = None
+    repository_components: tuple[str, ...] = ()
+    repository_packages_sha256: str | None = None
     checksum: str | None = None
     checksums: tuple[tuple[str, str], ...] = ()
     asset: str | None = None
@@ -334,6 +337,19 @@ class DependencyPlan:
     def providers_for(self, record_id: str) -> tuple[str, ...]:
         """Return the record providers required by one record."""
         return dict(self.dependency_providers).get(record_id, ())
+
+
+@dataclass(frozen=True)
+class VerifiedExecutable:
+    """A manifest-pinned executable whose receipt and live state agree."""
+
+    record_id: str
+    manifest_version: str
+    executable: str
+    absolute_path: str
+    record_fingerprint: str
+    plan_fingerprint: str
+    verification_output: str
 
 
 class CommandRunner(Protocol):
@@ -573,7 +589,11 @@ def _parse_verification(
             "args",
             "output_contains",
         },
-        VerificationKind.APT_REPOSITORY: set(),
+        VerificationKind.APT_REPOSITORY: {
+            "executable",
+            "args",
+            "output_contains",
+        },
         VerificationKind.NPM_PACKAGE: {
             "executable",
             "args",
@@ -635,7 +655,7 @@ def _parse_verification(
         if "executable_globs" in value
         else ()
     )
-    if kind is VerificationKind.APT_PACKAGE:
+    if kind in {VerificationKind.APT_PACKAGE, VerificationKind.APT_REPOSITORY}:
         record_owned_fields = {"executable", "args", "output_contains"}
         provided_record_owned_fields = record_owned_fields & value.keys()
         if provided_record_owned_fields not in (set(), record_owned_fields):
@@ -749,7 +769,13 @@ def _validate_method_fields(
     }
     method_fields = {
         Method.APT_PACKAGE: set(),
-        Method.APT_REPOSITORY: {"key_fingerprint", "key_url"},
+        Method.APT_REPOSITORY: {
+            "key_fingerprint",
+            "key_url",
+            "repository_suite",
+            "repository_components",
+            "repository_packages_sha256",
+        },
         Method.NPM_GLOBAL: set(),
         Method.PIP_USER: set(),
         Method.RELEASE_ASSET: {
@@ -791,6 +817,40 @@ def _validate_method_values(record: DependencyRecord) -> None:
             raise DependencyError(f"{record.id}.version has an unsupported apt value")
         if record.method is Method.APT_REPOSITORY:
             _validate_https_url(record.source, f"{record.id}.source")
+            if record.repository_suite is None:
+                raise DependencyError(
+                    f"{record.id}.repository_suite must be declared"
+                )
+            if re.fullmatch(
+                r"[A-Za-z0-9][A-Za-z0-9.+_-]*", record.repository_suite
+            ) is None:
+                raise DependencyError(
+                    f"{record.id}.repository_suite has an unsupported value"
+                )
+            if not record.repository_components:
+                raise DependencyError(
+                    f"{record.id}.repository_components must not be empty"
+                )
+            for component in record.repository_components:
+                if re.fullmatch(
+                    r"[A-Za-z0-9][A-Za-z0-9.+_-]*", component
+                ) is None:
+                    raise DependencyError(
+                        f"{record.id}.repository_components has an unsupported value"
+                    )
+            if record.repository_packages_sha256 is not None:
+                if SHA256_RE.fullmatch(record.repository_packages_sha256) is None:
+                    raise DependencyError(
+                        f"{record.id}.repository_packages_sha256 must be a 64-character SHA256"
+                    )
+                if record.platform is None:
+                    raise DependencyError(
+                        f"{record.id}: repository_packages_sha256 requires platform"
+                    )
+                if len(record.repository_components) != 1:
+                    raise DependencyError(
+                        f"{record.id}: repository_packages_sha256 requires exactly one repository component"
+                    )
         elif VERSION_TOKEN_RE.fullmatch(
             record.source
         ) is None and not record.source.startswith("https://"):
@@ -831,7 +891,7 @@ def _validate_method_values(record: DependencyRecord) -> None:
             raise DependencyError(f"{record.id}.version must be an exact Rust version")
         _validate_https_url(record.source, f"{record.id}.source")
         if any(
-            component not in {"rustfmt", "clippy", "rust-analyzer"}
+            component not in {"rust-src", "rustfmt", "clippy", "rust-analyzer"}
             for component in record.components
         ):
             raise DependencyError(
@@ -909,6 +969,9 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         "failure_policy",
         "key_fingerprint",
         "key_url",
+        "repository_suite",
+        "repository_components",
+        "repository_packages_sha256",
         "checksum",
         "checksums",
         "asset",
@@ -975,6 +1038,24 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
             raw.get("key_fingerprint"), f"{record_id}.key_fingerprint"
         ),
         key_url=_optional_string(raw.get("key_url"), f"{record_id}.key_url"),
+        repository_suite=(
+            _optional_string(
+                raw.get("repository_suite"), f"{record_id}.repository_suite"
+            )
+            or ("stable" if method_value == Method.APT_REPOSITORY.value else None)
+        ),
+        repository_components=_string_list(
+            raw.get(
+                "repository_components",
+                ["main"] if method_value == Method.APT_REPOSITORY.value else [],
+            ),
+            f"{record_id}.repository_components",
+            allow_empty=method_value != Method.APT_REPOSITORY.value,
+        ),
+        repository_packages_sha256=_optional_string(
+            raw.get("repository_packages_sha256"),
+            f"{record_id}.repository_packages_sha256",
+        ),
         checksum=_optional_string(raw.get("checksum"), f"{record_id}.checksum"),
         checksums=_checksums(raw["checksums"]) if "checksums" in raw else (),
         asset=_optional_string(raw.get("asset"), f"{record_id}.asset"),
@@ -1013,6 +1094,15 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         _validate_url(record.key_url, f"{record.id}.key_url")
     if record.checksum is not None and SHA256_RE.fullmatch(record.checksum) is None:
         raise DependencyError(f"{record.id}.checksum must be a 64-character SHA256")
+    if record.repository_packages_sha256 is not None:
+        if SHA256_RE.fullmatch(record.repository_packages_sha256) is None:
+            raise DependencyError(
+                f"{record.id}.repository_packages_sha256 must be a 64-character SHA256"
+            )
+        record = dataclasses.replace(
+            record,
+            repository_packages_sha256=record.repository_packages_sha256.lower(),
+        )
     if record.method is Method.APT_REPOSITORY and (
         record.key_fingerprint is None or record.key_url is None
     ):
@@ -1172,6 +1262,9 @@ def merge_records(manifests: Sequence[LoadedManifest]) -> tuple[DependencyRecord
                 "failure_policy",
                 "key_fingerprint",
                 "key_url",
+                "repository_suite",
+                "repository_components",
+                "repository_packages_sha256",
                 "checksum",
                 "asset",
                 "archive_format",
@@ -1782,6 +1875,82 @@ def _receipt_path(receipts: Path, record_id: str) -> Path:
     return receipts / f"{record_id}.json"
 
 
+def _executable_binding_names(record: DependencyRecord) -> tuple[str, ...]:
+    """Return manifest-provided executable names requiring receipt bindings."""
+    if record.method is Method.NPM_GLOBAL:
+        names = tuple(
+            name
+            for name in record.provides
+            if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", name)
+        )
+        if record.verification.executable and record.verification.executable not in names:
+            names = (record.verification.executable, *names)
+        return tuple(dict.fromkeys(names))
+    if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}:
+        return (record.verification.executable,) if record.verification.executable else ()
+    if record.method is Method.RUST_TOOLCHAIN and "rust-analyzer" in record.components:
+        return ("rust-analyzer",)
+    return ()
+
+
+def _current_executable_path(record: DependencyRecord, executable: str) -> Path:
+    """Resolve one executable through its typed install method, never PATH."""
+    if executable not in _executable_binding_names(record):
+        raise DependencyError(
+            f"{record.id}: executable is not provided by the manifest record: {executable}"
+        )
+    if record.method is Method.NPM_GLOBAL:
+        candidate = Path(NPM_GLOBAL_PREFIX) / "bin" / executable
+        allowed_root = Path(NPM_GLOBAL_PREFIX).resolve()
+    elif record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}:
+        candidates = (
+            (Path("/usr/bin") / executable, Path("/usr/bin").resolve()),
+            (Path("/usr/local/bin") / executable, Path("/usr/local/bin").resolve()),
+        )
+        candidate, allowed_root = next(
+            ((path, root) for path, root in candidates if path.is_file()), candidates[0]
+        )
+    elif record.method is Method.RUST_TOOLCHAIN:
+        home = Path(os.environ.get("HOME", str(Path.home())))
+        cargo_home = Path(os.environ.get("CARGO_HOME", str(home / ".cargo")))
+        candidate = cargo_home / "bin" / executable
+        allowed_root = cargo_home.resolve()
+    else:  # pragma: no cover - binding names are closed above.
+        raise DependencyError(f"{record.id}: executable binding method is unsupported")
+    try:
+        resolved = candidate.resolve(strict=True)
+    except OSError as exc:
+        raise DependencyError(
+            f"{record.id}: executable is missing: {candidate}"
+        ) from exc
+    if not resolved.is_file() or not os.access(resolved, os.X_OK):
+        raise DependencyError(f"{record.id}: executable is not executable: {candidate}")
+    try:
+        resolved.relative_to(allowed_root)
+    except ValueError as exc:
+        raise DependencyError(
+            f"{record.id}: executable escapes its method-owned root: {resolved}"
+        ) from exc
+    return resolved
+
+
+def _expected_executable_path(record: DependencyRecord, executable: str) -> Path:
+    """Return the deterministic lexical path used by FakeRunner fixtures."""
+    if executable not in _executable_binding_names(record):
+        raise DependencyError(
+            f"{record.id}: executable is not provided by the manifest record: {executable}"
+        )
+    if record.method is Method.NPM_GLOBAL:
+        return Path(NPM_GLOBAL_PREFIX) / "bin" / executable
+    if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}:
+        return Path("/usr/bin") / executable
+    if record.method is Method.RUST_TOOLCHAIN:
+        home = Path(os.environ.get("HOME", str(Path.home())))
+        cargo_home = Path(os.environ.get("CARGO_HOME", str(home / ".cargo")))
+        return cargo_home / "bin" / executable
+    raise DependencyError(f"{record.id}: executable binding method is unsupported")
+
+
 class Installer:
     """Execute a validated plan with per-record receipt semantics."""
 
@@ -1847,7 +2016,15 @@ class Installer:
                         record,
                         workspace=workspace,
                         expected_source_identity=self._receipt_source_identity(receipt),
+                        strict_executables=True,
                     )
+                    if _executable_binding_names(record):
+                        if self._executable_bindings(
+                            record, workspace=workspace
+                        ) != self._receipt_bindings(receipt):
+                            raise DependencyError(
+                                f"{record.id}: executable receipt path or output drift"
+                            )
                 except Exception:
                     receipt.unlink(missing_ok=True)
                     repair = True
@@ -1858,8 +2035,15 @@ class Installer:
                 receipt.unlink(missing_ok=True)
             try:
                 self.install_record(record, workspace=workspace, repair=repair)
-                source_identity = self.verify(record, workspace=workspace)
-                self._write_receipt(receipt, plan, record, source_identity)
+                source_identity = self.verify(
+                    record, workspace=workspace, strict_executables=True
+                )
+                executable_bindings = self._executable_bindings(
+                    record, workspace=workspace
+                )
+                self._write_receipt(
+                    receipt, plan, record, source_identity, executable_bindings
+                )
             except Exception as exc:
                 receipt.unlink(missing_ok=True)
                 unavailable.add(record.id)
@@ -1880,18 +2064,99 @@ class Installer:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (FileNotFoundError, OSError, json.JSONDecodeError):
             return False
+        bindings = payload.get("executable_bindings")
+        if not isinstance(bindings, dict):
+            return False
+        expected_bindings = set(_executable_binding_names(record))
+        if set(bindings) != expected_bindings or any(
+            not isinstance(value, dict)
+            or value.get("provided") != name
+            or not isinstance(value.get("absolute_path"), str)
+            or not isinstance(value.get("verification_output"), str)
+            or not value.get("verification_output")
+            for name, value in bindings.items()
+        ):
+            return False
         return (
             payload.get("schema") == "agent-canon.devcontainer-dependency-receipt"
             and payload.get("record_id") == record.id
             and payload.get("status") == "pass"
+            and payload.get("manifest_version") == record.version
             and payload.get("plan_fingerprint") == plan.fingerprint
             and payload.get("record_fingerprint") == record.fingerprint()
             and payload.get("verification") == record.verification.payload()
+            and set(bindings) == expected_bindings
+            and (
+                record.repository_packages_sha256 is None
+                or payload.get("repository_packages")
+                == {
+                    "url": _repository_packages_url(record),
+                    "sha256": record.repository_packages_sha256,
+                }
+            )
             and (
                 record.method is not Method.CARGO_SOURCE_BUILD
                 or isinstance(payload.get("source_identity"), str)
             )
         )
+
+    def _executable_bindings(
+        self, record: DependencyRecord, *, workspace: Path
+    ) -> dict[str, dict[str, str]]:
+        """Capture canonical absolute paths and live output for provided binaries."""
+        bindings: dict[str, dict[str, str]] = {}
+        for executable in _executable_binding_names(record):
+            try:
+                path = _current_executable_path(record, executable)
+            except DependencyError:
+                if isinstance(self.runner, SubprocessRunner):
+                    raise
+                path = _expected_executable_path(record, executable)
+            args = self._binding_args(record, executable)
+            result = self._capture([str(path), *args], workspace=workspace)
+            output = self._verification_output(result, record.id)
+            if executable == record.verification.executable:
+                if record.verification.output_contains is not None:
+                    self._require_output(
+                        result, record.verification.output_contains, record.id
+                    )
+            bindings[executable] = {
+                "provided": executable,
+                "absolute_path": str(path),
+                "verification_output": output,
+            }
+        return bindings
+
+    @staticmethod
+    def _receipt_bindings(path: Path) -> dict[str, dict[str, str]]:
+        """Read validated executable bindings from one receipt."""
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (FileNotFoundError, OSError, json.JSONDecodeError) as exc:
+            raise DependencyError("executable receipt is unreadable") from exc
+        bindings = payload.get("executable_bindings")
+        if not isinstance(bindings, dict):
+            raise DependencyError("executable receipt bindings are malformed")
+        return bindings
+
+    @staticmethod
+    def _binding_args(record: DependencyRecord, executable: str) -> tuple[str, ...]:
+        """Select a bounded version/help probe for one provided executable."""
+        if executable == record.verification.executable:
+            return record.verification.args
+        if record.method is Method.NPM_GLOBAL and executable == "pyright-langserver":
+            return ("--help",)
+        return ("--version",)
+
+    @staticmethod
+    def _verification_output(
+        result: subprocess.CompletedProcess[str], record_id: str
+    ) -> str:
+        """Normalize live executable output for atomic receipt identity."""
+        output = f"{result.stdout}\n{result.stderr}".strip()
+        if not output:
+            raise DependencyError(f"{record_id}: executable verification output is empty")
+        return output
 
     @staticmethod
     def _receipt_source_identity(path: Path) -> str | None:
@@ -1909,16 +2174,27 @@ class Installer:
         plan: DependencyPlan,
         record: DependencyRecord,
         source_identity: str | None = None,
+        executable_bindings: Mapping[str, Mapping[str, str]] | None = None,
     ) -> None:
         payload = {
             "schema": "agent-canon.devcontainer-dependency-receipt",
             "status": "pass",
             "record_id": record.id,
+            "manifest_version": record.version,
             "record_fingerprint": record.fingerprint(),
             "plan_fingerprint": plan.fingerprint,
             "verification": record.verification.payload(),
             "source_identity": source_identity,
+            "executable_bindings": {
+                key: dict(value)
+                for key, value in (executable_bindings or {}).items()
+            },
         }
+        if record.repository_packages_sha256 is not None:
+            payload["repository_packages"] = {
+                "url": _repository_packages_url(record),
+                "sha256": record.repository_packages_sha256,
+            }
         path.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
             "w", encoding="utf-8", dir=path.parent, delete=False
@@ -2210,6 +2486,7 @@ class Installer:
         *,
         workspace: Path,
         expected_source_identity: str | None = None,
+        strict_executables: bool = False,
     ) -> str | None:
         """Dispatch the record's typed owner-specific live verifier."""
         source_identity = None
@@ -2224,9 +2501,15 @@ class Installer:
                     f"{source_identity}!={expected_source_identity}"
                 )
         verifiers = {
-            VerificationKind.APT_PACKAGE: self._verify_apt_package,
-            VerificationKind.APT_REPOSITORY: self._verify_apt_repository,
-            VerificationKind.NPM_PACKAGE: self._verify_npm_package,
+            VerificationKind.APT_PACKAGE: lambda item, *, workspace: self._verify_apt_package(
+                item, workspace=workspace, strict_executable=strict_executables
+            ),
+            VerificationKind.APT_REPOSITORY: lambda item, *, workspace: self._verify_apt_repository(
+                item, workspace=workspace, strict_executable=strict_executables
+            ),
+            VerificationKind.NPM_PACKAGE: lambda item, *, workspace: self._verify_npm_package(
+                item, workspace=workspace, strict_executable=strict_executables
+            ),
             VerificationKind.PYTHON_DISTRIBUTION: self._verify_python_distribution,
             VerificationKind.ABSOLUTE_EXECUTABLE: self._verify_absolute_executable,
             VerificationKind.RUST_TOOLCHAIN: self._verify_rust_toolchain,
@@ -2266,7 +2549,13 @@ class Installer:
                 f"{record_id}: verification output lacks required token {token!r}"
             )
 
-    def _verify_apt_package(self, record: DependencyRecord, *, workspace: Path) -> None:
+    def _verify_apt_package(
+        self,
+        record: DependencyRecord,
+        *,
+        workspace: Path,
+        strict_executable: bool = False,
+    ) -> None:
         """Verify the dpkg database and any record-owned executable contract.
 
         The installed dpkg database is the container trust boundary. Official
@@ -2290,8 +2579,15 @@ class Installer:
         executable = record.verification.executable
         if executable is not None:
             assert record.verification.output_contains is not None
+            command = [executable, *record.verification.args]
+            if strict_executable:
+                try:
+                    command[0] = str(_current_executable_path(record, executable))
+                except DependencyError:
+                    if isinstance(self.runner, SubprocessRunner):
+                        raise
             result = self._capture(
-                [executable, *record.verification.args],
+                command,
                 workspace=workspace,
             )
             self._require_output(
@@ -2301,9 +2597,15 @@ class Installer:
             )
 
     def _verify_apt_repository(
-        self, record: DependencyRecord, *, workspace: Path
+        self,
+        record: DependencyRecord,
+        *,
+        workspace: Path,
+        strict_executable: bool = False,
     ) -> None:
-        self._verify_apt_package(record, workspace=workspace)
+        self._verify_apt_package(
+            record, workspace=workspace, strict_executable=strict_executable
+        )
         assert record.key_fingerprint is not None
         keyring = Path("/etc/apt/keyrings") / f"{record.id}.gpg"
         source_list = Path("/etc/apt/sources.list.d") / f"{record.id}.list"
@@ -2325,7 +2627,7 @@ class Installer:
         }
         if record.key_fingerprint not in observed:
             raise DependencyError(f"{record.id}: apt repository key is stale")
-        expected_source = f"deb [signed-by={keyring}] {record.source} stable main\n"
+        expected_source = self._apt_repository_line(record, keyring)
         try:
             observed_source = source_list.read_text(encoding="utf-8")
         except OSError as exc:
@@ -2334,8 +2636,57 @@ class Installer:
             ) from exc
         if observed_source != expected_source:
             raise DependencyError(f"{record.id}: apt repository source is stale")
+        self._verify_repository_packages_digest(record)
 
-    def _verify_npm_package(self, record: DependencyRecord, *, workspace: Path) -> None:
+    @staticmethod
+    def _apt_repository_line(record: DependencyRecord, keyring: Path) -> str:
+        """Render the exact signed apt source line owned by one record."""
+        if record.repository_suite is None:
+            raise DependencyError(f"{record.id}: repository suite is not declared")
+        components = " ".join(record.repository_components)
+        return (
+            f"deb [signed-by={keyring}] {record.source} "
+            f"{record.repository_suite} {components}\n"
+        )
+
+    @staticmethod
+    def _verify_repository_packages_digest(record: DependencyRecord) -> None:
+        """Verify a pinned Packages index before accepting an apt repository."""
+        expected = record.repository_packages_sha256
+        if expected is None:
+            return
+        url = _repository_packages_url(record)
+        with tempfile.NamedTemporaryFile(
+            prefix=f"agent-canon-{record.id}-packages-", delete=False
+        ) as stream:
+            temporary = Path(stream.name)
+        try:
+            try:
+                _download(url, temporary)
+            except Exception as exc:
+                raise DependencyError(
+                    f"{record.id}: Packages index download failed: {url}: {exc}"
+                ) from exc
+            observed = hashlib.sha256(temporary.read_bytes()).hexdigest()
+        except OSError as exc:
+            raise DependencyError(
+                f"{record.id}: Packages index read failed: {url}: {exc}"
+            ) from exc
+        finally:
+            temporary.unlink(missing_ok=True)
+        if observed != expected:
+            raise DependencyError(
+                f"{record.id}: Packages index SHA256 mismatch "
+                f"{observed}!={expected} ({url})"
+            )
+
+    def _verify_npm_package(
+        self,
+        record: DependencyRecord,
+        *,
+        workspace: Path,
+        strict_executable: bool = False,
+    ) -> None:
         npm_env = {
             "PATH": os.pathsep.join(
                 [f"{NPM_GLOBAL_PREFIX}/bin", os.environ.get("PATH", "")]
@@ -2368,8 +2719,16 @@ class Installer:
             )
         spec = record.verification
         assert spec.executable is not None and spec.output_contains is not None
+        executable = spec.executable
+        command = [executable, *spec.args]
+        if strict_executable:
+            try:
+                command[0] = str(_current_executable_path(record, executable))
+            except DependencyError:
+                if isinstance(self.runner, SubprocessRunner):
+                    raise
         executable = self._capture(
-            [spec.executable, *spec.args],
+            command,
             workspace=workspace,
             env=npm_env,
         )
@@ -2450,7 +2809,11 @@ class Installer:
         tools = (
             "rustc",
             "cargo",
-            *(component_tools[component] for component in record.components),
+            *(
+                component_tools[component]
+                for component in record.components
+                if component in component_tools
+            ),
         )
         for tool in tools:
             self._capture(
@@ -2705,9 +3068,9 @@ class Installer:
             )
             repo_line = root / "repository.list"
             repo_line.write_text(
-                f"deb [signed-by={key_destination}] {record.source} stable main\n",
-                encoding="utf-8",
+                self._apt_repository_line(record, key_destination), encoding="utf-8"
             )
+            self._verify_repository_packages_digest(record)
             self._run(
                 [
                     "install",
@@ -2790,6 +3153,111 @@ def _download(url: str, destination: Path) -> None:
     """Download a pinned HTTPS asset without invoking a shell command."""
     with urllib.request.urlopen(url) as response, destination.open("wb") as output:
         shutil.copyfileobj(response, output)
+
+
+def _repository_packages_url(record: DependencyRecord) -> str:
+    """Derive the canonical uncompressed Packages index URL for one record."""
+    if record.method is not Method.APT_REPOSITORY:
+        raise DependencyError(
+            f"{record.id}: Packages index URL requires apt-repository method"
+        )
+    if record.platform is None:
+        raise DependencyError(f"{record.id}: Packages index URL requires platform")
+    if record.repository_suite is None:
+        raise DependencyError(f"{record.id}: Packages index URL requires repository suite")
+    if len(record.repository_components) != 1:
+        raise DependencyError(
+            f"{record.id}: Packages index URL requires exactly one repository component"
+        )
+    architecture_name = record.platform.split("/", 1)[1]
+    component = record.repository_components[0]
+    return (
+        f"{record.source.rstrip('/')}/dists/{record.repository_suite}/"
+        f"{component}/binary-{architecture_name}/Packages"
+    )
+
+
+def resolve_verified_executable(
+    workspace: Path,
+    vendor_root: Path | None,
+    receipts: Path,
+    record_id: str,
+    executable: str,
+) -> VerifiedExecutable:
+    """Resolve a receipt-bound executable after strict live verification."""
+    if not executable or Path(executable).name != executable:
+        raise DependencyError(f"requested executable must be one command name: {executable!r}")
+    plan = load_plan(workspace, vendor_root)
+    record = plan.by_id().get(record_id)
+    if record is None:
+        raise DependencyError(f"dependency record is not present: {record_id}")
+    if executable not in _executable_binding_names(record):
+        raise DependencyError(
+            f"{record_id}: requested executable is not manifest-provided: {executable}"
+        )
+    receipt = _receipt_path(receipts, record_id)
+    try:
+        payload = json.loads(receipt.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError) as exc:
+        raise DependencyError(f"{record_id}: executable receipt is unreadable") from exc
+    bindings = payload.get("executable_bindings")
+    binding = bindings.get(executable) if isinstance(bindings, dict) else None
+    expected_bindings = set(_executable_binding_names(record))
+    if (
+        payload.get("schema") != "agent-canon.devcontainer-dependency-receipt"
+        or payload.get("status") != "pass"
+        or payload.get("record_id") != record_id
+        or payload.get("manifest_version") != record.version
+        or payload.get("plan_fingerprint") != plan.fingerprint
+        or payload.get("record_fingerprint") != record.fingerprint()
+        or payload.get("verification") != record.verification.payload()
+        or not isinstance(bindings, dict)
+        or set(bindings) != expected_bindings
+        or any(
+            not isinstance(item, dict)
+            or item.get("provided") != name
+            or not isinstance(item.get("absolute_path"), str)
+            or not Path(item["absolute_path"]).is_absolute()
+            or not isinstance(item.get("verification_output"), str)
+            or not item.get("verification_output")
+            for name, item in bindings.items()
+        )
+        or not isinstance(binding, dict)
+        or binding.get("provided") != executable
+        or not isinstance(binding.get("absolute_path"), str)
+        or not Path(binding["absolute_path"]).is_absolute()
+        or not isinstance(binding.get("verification_output"), str)
+        or not binding.get("verification_output")
+        or (
+            record.repository_packages_sha256 is not None
+            and payload.get("repository_packages")
+            != {
+                "url": _repository_packages_url(record),
+                "sha256": record.repository_packages_sha256,
+            }
+        )
+    ):
+        raise DependencyError(f"{record_id}: executable receipt binding is stale")
+    installer = Installer()
+    installer.verify(record, workspace=workspace, strict_executables=True)
+    live_bindings = installer._executable_bindings(record, workspace=workspace)
+    live = live_bindings.get(executable)
+    if live is None:
+        raise DependencyError(f"{record_id}: executable binding is unavailable: {executable}")
+    if (
+        live["absolute_path"] != binding["absolute_path"]
+        or live["verification_output"] != binding["verification_output"]
+    ):
+        raise DependencyError(f"{record_id}: executable receipt path or output drift")
+    return VerifiedExecutable(
+        record_id=record.id,
+        manifest_version=record.version,
+        executable=executable,
+        absolute_path=live["absolute_path"],
+        record_fingerprint=record.fingerprint(),
+        plan_fingerprint=plan.fingerprint,
+        verification_output=live["verification_output"],
+    )
 
 
 def _cli_plan(args: argparse.Namespace) -> DependencyPlan:

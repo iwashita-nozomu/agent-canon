@@ -33,6 +33,20 @@ file size、diff size で owner route を固定しません。
 - `python3 tools/agent_tools/repository_topic_clone.py cleanup ...`
 
 `--workspace-root` は既存 topic root を再利用し、指定 topic の
-`workspace/<topic-slug>` だけを管理します。exact local/remote branch は同じ prepare で
-再利用し、不一致は state-preserving typed collision とします。specialized adapter が
-適用外でもこの generic operation は継続します。
+`workspace/<topic-slug>` だけを管理します。task owner の非空 `--owner-evidence` と
+computed path / remote / branch identity が検証できる場合、canonical `prepare` と
+`merge-main` は個別操作ごとの追加承認なしで実行します。reuse は `prepare` に含まれます。これはこの
+canonical lifecycle command が workspace 管理と衝突保持を所有するためであり、raw
+shared-checkout Git の承認境界を緩和するものではありません。
+
+`dependency_module_change.py status` は dependency adapter の read-only 状態確認です。
+これは generic lifecycle、owner-evidence、または operation-level approval carve-out の
+対象ではありません。
+
+exact local/remote branch は同じ prepare で再利用し、不一致は
+state-preserving typed collision とします。作業完了時はこの skill が cleanup を
+自動的に `--apply` するのではなく、candidate CAS、PR lifecycle、必要な publication
+readback、owner evidence、local/remote/PR head の一致を canonical tool に渡します。
+preflight が成功した場合だけ `CleanupProof` / cleanup receipt を受け取り、失敗時は
+clone と topic root を保持した typed hold を closeout に記録します。specialized adapter
+が適用外でもこの generic operation は継続します。

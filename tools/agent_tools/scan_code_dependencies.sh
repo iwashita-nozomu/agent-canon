@@ -9,21 +9,25 @@
 set -euo pipefail
 
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
+TOOL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHANGED=0
 PRINT_UNRESOLVED=0
 PATHS_FILE=""
+ANALYSIS_JSON=""
+LEXICAL_ONLY=0
 declare -a INPUT_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  scan_code_dependencies.sh [--root DIR] [--changed] [--print-unresolved] [--paths-file FILE] [paths...]
+  scan_code_dependencies.sh [--root DIR] [--changed] [--print-unresolved] [--paths-file FILE] [--analysis-json FILE] [--lexical-only] [paths...]
 
 Extracts best-effort code dependency edges from source files.
 This is intentionally separate from dependency manifest header tools:
   - Python: import / from import
   - C/C++: local #include "..."
   - shell: source / . relative-file
+  - Rust: LSP/lexical analysis-json sidecar only (no legacy TSV rows)
 
 Output columns:
   CODE_DEPENDENCY<TAB>language<TAB>kind<TAB>source<TAB>target<TAB>symbol<TAB>raw
@@ -48,6 +52,15 @@ while [[ $# -gt 0 ]]; do
       [[ $# -ge 2 ]] || { echo "scan_code_dependencies.sh: --paths-file requires a value" >&2; exit 2; }
       PATHS_FILE="$2"
       shift 2
+      ;;
+    --analysis-json)
+      [[ $# -ge 2 ]] || { echo "scan_code_dependencies.sh: --analysis-json requires a value" >&2; exit 2; }
+      ANALYSIS_JSON="$2"
+      shift 2
+      ;;
+    --lexical-only)
+      LEXICAL_ONLY=1
+      shift
       ;;
     -h|--help)
       usage
@@ -259,24 +272,41 @@ scan_shell() {
 }
 
 count=0
+declare -a SCANNED_PATHS=()
 while IFS= read -r raw_path; do
   [[ -n "$raw_path" ]] || continue
   path="${raw_path#./}"
   [[ -f "$path" && ! -L "$path" ]] || continue
   case "$path" in
     *.py)
+      SCANNED_PATHS+=("$path")
       scan_python "$path"
       count=$((count + 1))
       ;;
     *.c|*.cc|*.cpp|*.h|*.hpp)
+      SCANNED_PATHS+=("$path")
       scan_c_family "$path"
       count=$((count + 1))
       ;;
     *.sh|*.bash|*.zsh)
+      SCANNED_PATHS+=("$path")
       scan_shell "$path"
+      count=$((count + 1))
+      ;;
+    *.rs)
+      SCANNED_PATHS+=("$path")
       count=$((count + 1))
       ;;
   esac
 done < <(collect_paths)
+
+if [[ -n "$ANALYSIS_JSON" ]]; then
+  lsp_args=("$TOOL_DIR/lsp_code_analysis.py" scan-legacy --root "$ROOT_DIR" --analysis-json "$ANALYSIS_JSON")
+  if [[ "$LEXICAL_ONLY" -eq 1 ]]; then
+    lsp_args+=(--lexical-only)
+  fi
+  lsp_args+=(--files "${SCANNED_PATHS[@]}")
+  python3 "${lsp_args[@]}" >/dev/null
+fi
 
 echo "CODE_DEPENDENCY_SCAN=pass files=$count"

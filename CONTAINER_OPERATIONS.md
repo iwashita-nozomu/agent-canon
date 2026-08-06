@@ -225,6 +225,31 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   identity, followed by any typed record-owned executable/version check. Raw
   `dpkg --verify` output is not a blocking oracle because official Ubuntu
   images may intentionally exclude documentation and manpage payloads.
+- LSP language servers used by shared code analysis are mounted
+  developer/agent tools and belong in typed manifest records, never in a
+  product Dockerfile. The canonical records pin Pyright 1.1.411, Bash
+  Language Server 5.6.0, `clangd-18` from the signed Jammy LLVM repository,
+  and Rust 1.89.0 with `rust-src` and `rust-analyzer`. `python`, `c`/`cpp`,
+  `shellscript`, and `rust` resolve to the verified commands
+  `pyright-langserver --stdio`, `clangd-18`, `bash-language-server start`,
+  and `rust-analyzer`; ambient PATH discovery is not a substitute for a
+  manifest record.
+- An `apt-repository` record declares its typed suite and components. When it
+  carries `repository_packages_sha256`, the installer derives the canonical
+  uncompressed Packages URL from source, suite, component, and `platform`,
+  downloads it, and fails closed on a missing or mismatched digest before the
+  repository is accepted. Its signed source line and any declared executable
+  verification are read back exactly.
+- A successful dependency receipt atomically records the plan/record
+  fingerprints, verification contract, and `executable_bindings` for every
+  provided LSP binary. `resolve_verified_executable(workspace, vendor_root,
+  receipts, record_id, executable)` accepts a binary only after the exact
+  record and receipt match, the installer performs live method-specific
+  verification, the current absolute executable path is resolved, and both
+  path and verification-output identity match the receipt. npm records bind
+  `pyright` and `pyright-langserver` to the same package; apt binds the
+  declared package executable; Rust binds the pinned toolchain's
+  `rust-analyzer` path. Ambient `PATH` or `shutil.which` never participates.
 - Lean theorem-proving tooling used by formal-proof skills, including
   `elan`, Lean, and Lake, belongs in `.devcontainer/post-create.sh` when it is
   only needed for AgentCanon proof tooling and is declared by exact

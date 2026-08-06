@@ -66,6 +66,37 @@ questions.
 - すべての generated / binary artifact を同じ manifest で管理しない
 - write-capable subagent の並列数を増やすための設計ではない
 
+## Mounted Language-Server Dependency Contract
+
+共有 code analysis の LSP サーバーは product image の依存ではなく、
+`.devcontainer/dependencies.toml` の mounted developer/agent tool record
+として管理します。各 record は registry/repository の exact version、
+source、provider、typed executable verification、`failure_policy = "fail"`
+を持ち、検証済みの executable 以外を PATH から選択しません。Canonical
+mapping は `python → pyright-langserver --stdio`、`c`/`cpp → clangd-18`、
+`shellscript → bash-language-server start`、`rust → rust-analyzer` です。
+
+`apt-repository` には `repository_suite` と
+`repository_components` を明示します。`repository_packages_sha256` がある
+record は source、suite、単一 component、`platform` から uncompressed
+Packages index URL を決定し、取得 bytes の SHA-256 を source-line/apt
+package の受入れ前に照合します。URL の欠落、取得失敗、digest 不一致、
+署名付き source line の drift、または executable/version の drift は
+warning に降格せず typed failure とします。Rust の `rust-src` は component
+verification の対象ですが、独立 executable probe は持ちません。
+
+依存 receipt の executable identity は manifest の install method が所有します。
+`VerifiedExecutable(record_id, manifest_version, executable, absolute_path,
+record_fingerprint, plan_fingerprint, verification_output)` と
+`resolve_verified_executable(workspace, vendor_root, receipts, record_id,
+executable)` が公開境界です。解決は exact record、receipt schema/fingerprint/
+requested-provided binding、Installer の live verify、method-specific absolute
+path、receipt の absolute path/output readback の順で行い、どれか一つでも
+不一致なら fail closed とします。npm は `pyright` と
+`pyright-langserver` を同一 package の bindings として保存し、apt は宣言
+された package executable、Rust は pinned toolchain の `rust-analyzer` path
+を保存します。ambient `PATH` や `shutil.which` はこの境界に入りません。
+
 ## Design Claim Evidence Contract
 
 Design documents state implementation-facing claims within the evidence exposed

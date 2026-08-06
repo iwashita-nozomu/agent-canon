@@ -35,8 +35,12 @@ python3 tools/agent_tools/repository_topic_clone.py cleanup \
 ```
 
 host は `<parent-root>/workspace/<topic>/<repo>` を想定し、path alias は持ちません。
+owner evidence と computed identity が一致する canonical `prepare` / `merge-main` は
+operation-level の追加承認なしで repo-local workspace を管理します。reuse は `prepare`
+に含まれます。
 `prepare` は既存 clone を marker/evidence/branch/url/upstream で検証し、exact branch を
 再利用します。不一致は state-preserving typed collision です。`merge-main` は
 `origin/main` を通常 merge し、ancestor proof を返します。`cleanup` は canonical
-candidate CAS と PR lifecycle を必須とし、integration 後は publication transition も
-検証します。pass 時だけ `CleanupProof` を返し、unknown sibling を保持します。
+candidate CAS、PR lifecycle、owner evidence を必須とし、integration 後は publication
+transition も検証します。pass 時だけ `CleanupProof` を返し、unknown sibling や dirty
+collision は保持します。

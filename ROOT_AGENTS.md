@@ -148,6 +148,16 @@ Protected Git operations include `git restore`, `git reset`, forced `git clean`,
 mutating `git stash`, checkout/switch, and branch/worktree create, delete, move,
 rename, or prune. Proven exact task ownership only bounds which paths may be
 named in an approval request; explicit destructive approval remains required.
+
+Canonical repo-local lifecycle commands are bounded to a separate workspace route:
+`repository_topic_clone.py` and `dependency_module_change.py` may prepare, reuse, and use
+`<project-root>/workspace/<topic-slug>/<repo-name>` without operation-level approval when
+non-empty owner evidence and exact computed identity are present. This does not authorize raw
+shared-checkout Git mutations or bypass the hook. At closeout, lifecycle skills dispatch proof-
+gated cleanup with candidate CAS, PR lifecycle, required publication readback, owner evidence,
+and expected identity; only `CleanupProof` / cleanup receipt authorizes deletion. Collisions,
+unknown dirty state, and proof mismatch remain preserved typed holds.
+
 A protected mutation proceeds only when the user
 explicitly approves it and the same command segment carries
 `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` plus a nonempty

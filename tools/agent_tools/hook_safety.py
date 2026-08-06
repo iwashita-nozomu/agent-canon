@@ -58,6 +58,12 @@ PROTECTED_UPDATE_MODES = frozenset(
 PROTECTED_MAKE_TARGETS = frozenset(
     {"agent-canon-ensure-latest", "agent-canon-latest", "agent-canon-update"}
 )
+CANONICAL_WORKSPACE_LIFECYCLE_TOOLS = frozenset(
+    {"repository_topic_clone.py", "dependency_module_change.py"}
+)
+CANONICAL_WORKSPACE_LIFECYCLE_OPERATIONS = frozenset(
+    {"prepare", "merge-main", "status", "cleanup"}
+)
 OPAQUE_GIT_OPTIONS_WITH_VALUES = frozenset(
     {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 )
@@ -683,6 +689,26 @@ def opaque_protected_intent(command: str) -> GitIntent | None:
     return None
 
 
+def canonical_workspace_lifecycle_command(command: str) -> bool:
+    """Identify canonical workspace lifecycle calls for hook readback.
+
+    This predicate is informational only.  It documents that canonical lifecycle
+    tools own repo-local workspace preparation and cleanup; it never bypasses the
+    raw shared-checkout Git guard and is not consulted by :func:`first_block`.
+    """
+    tokens = shell_tokens(command)
+    if not tokens:
+        return False
+    tool_seen = any(
+        token.replace("\\", "/").rsplit("/", 1)[-1]
+        in CANONICAL_WORKSPACE_LIFECYCLE_TOOLS
+        for token in tokens
+    )
+    return tool_seen and bool(
+        CANONICAL_WORKSPACE_LIFECYCLE_OPERATIONS.intersection(tokens)
+    )
+
+
 def _first_block_without_backticks(command: str) -> GitIntent | None:
     tokens = shell_tokens(command)
     if not tokens:
@@ -713,7 +739,13 @@ def _first_block_without_backticks(command: str) -> GitIntent | None:
 
 
 def first_block(command: str) -> GitIntent | None:
-    """Return the first unauthorized direct or backtick-substituted Git intent."""
+    """Return the first unauthorized raw Git intent.
+
+    Canonical repo-local workspace lifecycle commands are safe at this boundary
+    because they are lifecycle-tool calls rather than caller-issued raw Git
+    mutations.  Their operation-level approval carve-out is intentionally not a
+    bypass for any Git command parsed from the caller's shell segment.
+    """
     complete, uncertain = backtick_command_substitutions(command)
     for substitution in (*complete, *uncertain):
         if intent := first_block(substitution):

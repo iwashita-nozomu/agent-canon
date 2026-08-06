@@ -78,6 +78,12 @@ SNIPPET_CHARS = 180
 SCORE_DECIMAL_PLACES = 6
 TOKEN_RE = re.compile(r"[0-9A-Za-z_\u0080-\uFFFF]+")
 CAMEL_BOUNDARY_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
+DEPENDENCY_LINE_RE = re.compile(
+    r"^(?P<direction>upstream|downstream)\s+"
+    r"(?P<kind>design|implementation|environment)\s+"
+    r"(?P<target>\S+)(?:\s+(?P<reason>.*))?$"
+)
+SHARED_SURFACE_PARTS = frozenset({"tools", "agents", ".agents", ".codex", "mcp"})
 
 
 @dataclass(frozen=True)
@@ -105,6 +111,17 @@ class SearchHit:
             "score": round(self.score, SCORE_DECIMAL_PLACES),
             "snippet": self.snippet,
         }
+
+
+@dataclass(frozen=True)
+class DependencyEdge:
+    """One dependency-manifest edge parsed from a source file."""
+
+    direction: str
+    kind: str
+    source: str
+    target: str
+    reason: str
 
 
 @dataclass(frozen=True)
@@ -556,6 +573,63 @@ def search(documents: Sequence[Document], query: str, top: int) -> list[SearchHi
                 )
             )
     return sorted(scored, key=lambda hit: (-hit.score, hit.relative_path))[:top]
+
+
+def strip_manifest_line(line: str) -> str:
+    """Strip common comment markers from a dependency-manifest line."""
+    stripped = line.rstrip("\r\n").strip()
+    for prefix in ("<!--", "#", "//", "*"):
+        if stripped.startswith(prefix):
+            stripped = stripped[len(prefix) :].strip()
+    if stripped.endswith("-->"):
+        stripped = stripped[:-3].strip()
+    if stripped.startswith('"') and stripped.endswith('"'):
+        stripped = stripped[1:-1].strip()
+    return stripped.rstrip(",").strip()
+
+
+def resolve_dependency_target(root: Path, source: Document, target: str) -> str:
+    """Resolve a manifest target through root views and vendored canon source."""
+    source_parts = Path(source.relative_path).parts
+    source_context = source.path
+    if source_parts and source_parts[0] in SHARED_SURFACE_PARTS:
+        vendor_source = root / "vendor" / "agent-canon" / source.relative_path
+        if vendor_source.exists():
+            source_context = vendor_source
+    candidate = source_context.parent / target
+    return relative_path(root, candidate.resolve(strict=False))
+
+
+def parse_dependency_edges(root: Path, documents: Sequence[Document]) -> list[DependencyEdge]:
+    """Parse dependency-manifest edges from indexed documents."""
+    edges: list[DependencyEdge] = []
+    for document in documents:
+        in_manifest = False
+        for raw_line in document.text.splitlines()[:HEADER_SCAN_LINES]:
+            line = strip_manifest_line(raw_line)
+            if line == "@dependency-start":
+                in_manifest = True
+                continue
+            if line == "@dependency-end":
+                break
+            if not in_manifest:
+                continue
+            match = DEPENDENCY_LINE_RE.fullmatch(line)
+            if match is None:
+                continue
+            edges.append(
+                DependencyEdge(
+                    direction=match.group("direction"),
+                    kind=match.group("kind"),
+                    source=document.relative_path,
+                    target=resolve_dependency_target(root, document, match.group("target")),
+                    reason=match.group("reason") or "",
+                )
+            )
+    return sorted(
+        set(edges),
+        key=lambda edge: (edge.source, edge.direction, edge.kind, edge.target, edge.reason),
+    )
 
 
 def graph_dependency_edges(root: Path) -> tuple[GraphDependencyFact, ...]:

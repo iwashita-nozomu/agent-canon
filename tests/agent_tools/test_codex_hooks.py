@@ -33,6 +33,9 @@ from prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
     prompt_intake_signals,
 )
+from hook_safety import (  # noqa: E402
+    canonical_workspace_lifecycle_command,
+)
 
 ACTIVE_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse")
 RETIRED_ROUTE_TABLE = (
@@ -724,6 +727,23 @@ class CodexHooksTest(unittest.TestCase):
                     "DESTRUCTIVE_GIT_GUARD=block",
                     cast("str", cast("dict[str, object]", payload)["reason"]),
                 )
+
+    def test_canonical_workspace_lifecycle_has_no_raw_git_authority_requirement(self) -> None:
+        """Canonical lifecycle tools use owner evidence, not raw-Git authority envs."""
+        commands = [
+            "python3 tools/agent_tools/repository_topic_clone.py prepare --url https://example.invalid/repo.git --repo-name repo --workspace-root . --topic topic --branch feature/topic --owner-evidence evidence.md",
+            "python3 tools/agent_tools/repository_topic_clone.py cleanup --url https://example.invalid/repo.git --repo-name repo --workspace-root . --topic topic --branch feature/topic --owner-evidence evidence.md --expected-clone workspace/topic/repo --candidate-cas cas.json --pr-lifecycle pr.json --apply",
+            "python3 tools/agent_tools/dependency_module_change.py --root . status --topic topic --module vendor/dep",
+            "python3 tools/agent_tools/dependency_module_change.py --root . cleanup --topic topic --module vendor/dep --branch feature/topic --owner-evidence evidence.md --expected-clone workspace/topic/dep --candidate-cas cas.json --pr-lifecycle pr.json",
+        ]
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertTrue(canonical_workspace_lifecycle_command(command))
+                self.assertIsNone(self._run_shared_checkout_guard(command))
+
+        self.assertIsNotNone(
+            self._run_shared_checkout_guard("git -C workspace/topic/repo reset --hard HEAD")
+        )
 
     def test_shared_checkout_guard_authority_is_same_segment_and_one_shot(self) -> None:
         """Ambient, incomplete, and earlier-segment authority never leaks to Git."""
