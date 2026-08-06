@@ -111,6 +111,7 @@ BASE_CAPABILITIES = frozenset(
     }
 )
 NPM_GLOBAL_PREFIX = "/usr/local"
+STRUCTURAL_BINDING_OUTPUT_PREFIX = "agent-canon.executable-binding.structural.v1"
 
 
 class DependencyError(ValueError):
@@ -288,6 +289,7 @@ class DependencyRecord:
     archive_format: str | None = None
     extract: str | None = None
     destination: str | None = None
+    executable_owner_packages: tuple[str, ...] = ()
     repo: str | None = None
     commit: str | None = None
     source_identity: str | None = None
@@ -770,7 +772,7 @@ def _validate_method_fields(
         "failure_policy",
     }
     method_fields = {
-        Method.APT_PACKAGE: set(),
+        Method.APT_PACKAGE: {"executable_owner_packages"},
         Method.APT_REPOSITORY: {
             "key_fingerprint",
             "key_url",
@@ -779,6 +781,7 @@ def _validate_method_fields(
             "repository_packages_sha256",
             "repository_package_url",
             "repository_package_sha256",
+            "executable_owner_packages",
         },
         Method.NPM_GLOBAL: set(),
         Method.PIP_USER: set(),
@@ -817,6 +820,14 @@ def _validate_method_values(record: DependencyRecord) -> None:
         )
     _validate_package(record)
     if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}:
+        if not record.executable_owner_packages:
+            raise DependencyError(f"{record.id}.executable_owner_packages is required")
+        for owner_package in record.executable_owner_packages:
+            if APT_PACKAGE_RE.fullmatch(owner_package) is None:
+                raise DependencyError(
+                    f"{record.id}.executable_owner_packages has unsupported package: "
+                    f"{owner_package}"
+                )
         if VERSION_TOKEN_RE.fullmatch(record.version) is None:
             raise DependencyError(f"{record.id}.version has an unsupported apt value")
         if record.method is Method.APT_REPOSITORY:
@@ -1013,6 +1024,7 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         "browser",
         "browser_cache_path",
         "components",
+        "executable_owner_packages",
     }
     unknown = sorted(set(raw) - allowed)
     if unknown:
@@ -1041,14 +1053,19 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
     method_value = _string(raw["method"], f"{record_id}.method")
     if method_value not in METHODS:
         raise DependencyError(f"{path}: {record_id}: unsupported method {method_value}")
+    record_package = _string(raw["package"], f"{record_id}.package")
     failure_policy = _string(raw["failure_policy"], f"{record_id}.failure_policy")
     if failure_policy not in FAILURE_POLICIES:
         raise DependencyError(
             f"{path}: {record_id}: unsupported failure policy {failure_policy}"
         )
+    is_apt_method = method_value in {
+        Method.APT_PACKAGE.value,
+        Method.APT_REPOSITORY.value,
+    }
     record = DependencyRecord(
         id=record_id,
-        package=_string(raw["package"], f"{record_id}.package"),
+        package=record_package,
         method=Method(method_value),
         version=_string(raw["version"], f"{record_id}.version"),
         source=_string(raw["source"], f"{record_id}.source"),
@@ -1103,6 +1120,14 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         extract=_optional_string(raw.get("extract"), f"{record_id}.extract"),
         destination=_optional_string(
             raw.get("destination"), f"{record_id}.destination"
+        ),
+        executable_owner_packages=_string_list(
+            raw.get(
+                "executable_owner_packages",
+                [record_package] if is_apt_method else [],
+            ),
+            f"{record_id}.executable_owner_packages",
+            allow_empty=not is_apt_method,
         ),
         repo=_optional_string(raw.get("repo"), f"{record_id}.repo"),
         commit=_optional_string(raw.get("commit"), f"{record_id}.commit"),
@@ -1312,6 +1337,7 @@ def merge_records(manifests: Sequence[LoadedManifest]) -> tuple[DependencyRecord
                 "repository_package_url",
                 "repository_package_sha256",
                 "checksum",
+                "executable_owner_packages",
                 "asset",
                 "archive_format",
                 "extract",
@@ -2051,31 +2077,39 @@ class Installer:
         *,
         workspace: Path,
     ) -> tuple[Path, Path]:
-        """Resolve apt lexical and real paths through same-package ownership."""
+        """Resolve apt lexical and real paths through declared package ownership."""
         lexical = _configured_executable_path(record, executable)
-        try:
-            result = self.runner.run(
-                ["/usr/bin/dpkg-query", "--listfiles", record.package],
-                cwd=workspace,
-                capture_output=True,
-            )
-        except (OSError, subprocess.CalledProcessError) as exc:
+        owned: set[str] = set()
+        owners = record.executable_owner_packages
+        for owner_package in owners:
+            try:
+                result = self.runner.run(
+                    ["/usr/bin/dpkg-query", "--listfiles", owner_package],
+                    cwd=workspace,
+                    capture_output=True,
+                )
+            except (OSError, subprocess.CalledProcessError) as exc:
+                raise DependencyError(
+                    f"{record.id}: dpkg ownership query failed for {owner_package}"
+                ) from exc
+            if result.returncode != 0:
+                raise DependencyError(
+                    f"{record.id}: dpkg ownership query failed for {owner_package}"
+                )
+            if not isinstance(result.stdout, str):
+                raise DependencyError(
+                    f"{record.id}: dpkg ownership query returned malformed output"
+                )
+            owned.update(_parse_dpkg_owned_paths(result.stdout, record.id))
+        if not owned:
             raise DependencyError(
-                f"{record.id}: dpkg ownership query failed for {record.package}"
-            ) from exc
-        if result.returncode != 0:
-            raise DependencyError(
-                f"{record.id}: dpkg ownership query failed for {record.package}"
+                f"{record.id}: executable ownership union is empty for {', '.join(owners)}"
             )
-        if not isinstance(result.stdout, str):
-            raise DependencyError(
-                f"{record.id}: dpkg ownership query returned malformed output"
-            )
-        owned = _parse_dpkg_owned_paths(result.stdout, record.id)
         lexical_text = str(lexical)
         if lexical_text not in owned:
             raise DependencyError(
-                f"{record.id}: lexical executable is not owned by {record.package}: "
+                f"{record.id}: lexical executable is not owned by declared packages: "
+                f"{', '.join(owners)}: "
                 f"{lexical_text}"
             )
         try:
@@ -2102,7 +2136,8 @@ class Installer:
         resolved_text = str(resolved)
         if resolved_text not in owned:
             raise DependencyError(
-                f"{record.id}: resolved executable is not owned by {record.package}: "
+                f"{record.id}: resolved executable is not owned by declared packages: "
+                f"{', '.join(owners)}: "
                 f"{resolved_text}"
             )
         if not self._path_is_regular_executable(resolved):
@@ -2273,28 +2308,26 @@ class Installer:
     def _executable_bindings(
         self, record: DependencyRecord, *, workspace: Path
     ) -> dict[str, dict[str, str]]:
-        """Capture canonical absolute paths and live output for provided binaries."""
+        """Capture primary probe output and structural secondary bindings."""
         bindings: dict[str, dict[str, str]] = {}
         for executable in _executable_binding_names(record):
-            try:
-                lexical_path, path = self._resolve_executable_binding(
-                    record, executable, workspace=workspace
-                )
-            except DependencyError:
-                if (
-                    isinstance(self.runner, SubprocessRunner)
-                    or record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}
-                ):
-                    raise
-                lexical_path = path = _expected_executable_path(record, executable)
-            args = self._binding_args(record, executable)
-            result = self._capture([str(path), *args], workspace=workspace)
-            output = self._verification_output(result, record.id)
+            lexical_path, path = self._resolve_executable_binding(
+                record, executable, workspace=workspace
+            )
             if executable == record.verification.executable:
+                result = self._capture(
+                    [str(path), *record.verification.args], workspace=workspace
+                )
+                output = self._verification_output(result, record.id)
                 if record.verification.output_contains is not None:
                     self._require_output(
                         result, record.verification.output_contains, record.id
                     )
+            else:
+                output = (
+                    f"{STRUCTURAL_BINDING_OUTPUT_PREFIX}:"
+                    f"{record.method.value}:{executable}"
+                )
             bindings[executable] = {
                 "provided": executable,
                 "lexical_path": str(lexical_path),
@@ -2314,15 +2347,6 @@ class Installer:
         if not isinstance(bindings, dict):
             raise DependencyError("executable receipt bindings are malformed")
         return bindings
-
-    @staticmethod
-    def _binding_args(record: DependencyRecord, executable: str) -> tuple[str, ...]:
-        """Select a bounded version/help probe for one provided executable."""
-        if executable == record.verification.executable:
-            return record.verification.args
-        if record.method is Method.NPM_GLOBAL and executable == "pyright-langserver":
-            return ("--help",)
-        return ("--version",)
 
     @staticmethod
     def _verification_output(

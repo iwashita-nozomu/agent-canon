@@ -32,6 +32,12 @@ GPU_ADMISSION_SELECTOR = (
     PROJECT_ROOT / ".devcontainer" / "gpu-admission" / "devcontainer.json"
 )
 GPU_ADMISSION_ORCHESTRATOR = PROJECT_ROOT / ".devcontainer" / "gpu-admission.sh"
+POST_CREATE_COMMAND = (
+    "bash .devcontainer/bootstrap-dependencies.sh --install && "
+    "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
+    ".devcontainer/post-create-entrypoint.sh "
+    "/workspace/${localWorkspaceFolderBasename}"
+)
 
 
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
@@ -72,7 +78,7 @@ def write_devcontainer(root: Path) -> None:
                 "containerUser": "project",
                 "remoteUser": "project",
                 "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-                "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
+                "postCreateCommand": POST_CREATE_COMMAND,
                 "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
             },
             indent=2,
@@ -276,6 +282,21 @@ def test_gpu_admission_selector_isolated_from_default_selector() -> None:
     assert "gpu-admission" in profile["name"]
     assert profile["dockerComposeFile"] != default["dockerComposeFile"]
     assert load_container_config_module().validate_gpu_admission_selector(PROJECT_ROOT) == []
+
+
+def test_post_create_bootstraps_before_python_source_root_wrapper() -> None:
+    """Both selectors provision shell prerequisites before Python starts."""
+    for config_path in (
+        PROJECT_ROOT / ".devcontainer" / "devcontainer.json",
+        GPU_ADMISSION_SELECTOR,
+    ):
+        config = json.loads(config_path.read_text(encoding="utf-8"))
+        command = config["postCreateCommand"]
+
+        assert command == POST_CREATE_COMMAND
+        assert command.index("bootstrap-dependencies.sh --install") < command.index(
+            "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py"
+        )
 
 
 def test_gpu_admission_selector_is_mandatory(tmp_path: Path) -> None:

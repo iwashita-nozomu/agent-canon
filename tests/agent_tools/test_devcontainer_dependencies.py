@@ -580,6 +580,64 @@ class DependencyModelTests(unittest.TestCase):
                 parsed.verification.kind.value,
                 value["verification"]["kind"],
             )
+        apt_with_owner = parse_record(
+            record(
+                "apt-owner",
+                method="apt-package",
+                executable_owner_packages=["apt", "apt-tools"],
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        self.assertEqual(
+            apt_with_owner.executable_owner_packages, ("apt", "apt-tools")
+        )
+        apt_default_owner = parse_record(
+            record("apt-default", method="apt-package"), path=Path("fixture.toml"), index=1
+        )
+        self.assertEqual(apt_default_owner.executable_owner_packages, ("apt-default",))
+        self.assertEqual(
+            apt_default_owner.payload()["executable_owner_packages"],
+            ("apt-default",),
+        )
+        non_apt_ownerless = parse_record(
+            record("npm-default", method="npm-global"),
+            path=Path("fixture.toml"),
+            index=2,
+        )
+        self.assertEqual(non_apt_ownerless.executable_owner_packages, ())
+        self.assertEqual(non_apt_ownerless.payload()["executable_owner_packages"], ())
+        self.assertNotEqual(
+            non_apt_ownerless.fingerprint(),
+            apt_default_owner.fingerprint(),
+        )
+        explicit_apt_owner = parse_record(
+            record(
+                "apt-default",
+                method="apt-package",
+                executable_owner_packages=["apt-default", "apt-tools"],
+            ),
+            path=Path("fixture.toml"),
+            index=3,
+        )
+        self.assertEqual(
+            explicit_apt_owner.executable_owner_packages,
+            ("apt-default", "apt-tools"),
+        )
+
+    def test_non_apt_executable_owner_packages_is_rejected(self) -> None:
+        with self.assertRaisesRegex(
+            DependencyError, "unsupported fields for npm-global: executable_owner_packages"
+        ):
+            parse_record(
+                record(
+                    "npm-with-owners",
+                    method="npm-global",
+                    executable_owner_packages=["npm", "nodejs"],
+                ),
+                path=Path("fixture.toml"),
+                index=0,
+            )
 
     def test_apt_repository_suite_components_digest_and_executable_are_typed(self) -> None:
         """Repository records derive one signed source and Packages index identity."""
@@ -875,6 +933,46 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(resolved_path, Path(resolved))
         self.assertIn(("/usr/bin/dpkg-query", "--listfiles", "clangd-18"), runner.calls)
 
+    def test_apt_executable_ownership_resolves_symlink_across_owner_union(self) -> None:
+        parsed = parse_record(
+            record(
+                "clang-format",
+                method="apt-package",
+                package="clang-format",
+                version="1.2.3",
+                platform="linux/amd64",
+                source="ubuntu:22.04",
+                verification={
+                    "kind": "apt-package",
+                    "executable": "clang-format",
+                    "args": ["--version"],
+                    "output_contains": "clang-format version 14.0.0",
+                },
+                executable_owner_packages=["clang-format", "clang-format-14"],
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+        lexical = "/usr/bin/clang-format"
+        resolved = "/usr/lib/clang-format-14/bin/clang-format"
+        runner.ownership_lists["clang-format"] = ("/usr/bin/clangd-18",)
+        runner.ownership_lists["clang-format-14"] = (lexical, resolved)
+        runner.resolved_paths[lexical] = resolved
+        runner.virtual_executables.add(resolved)
+        lexical_path, resolved_path = Installer(runner)._resolve_executable_binding(
+            parsed, "clang-format", workspace=Path("/tmp/workspace")
+        )
+        self.assertEqual(lexical_path, Path(lexical))
+        self.assertEqual(resolved_path, Path(resolved))
+        self.assertEqual(
+            [command for command in runner.calls if command[0] == "/usr/bin/dpkg-query"],
+            [
+                ("/usr/bin/dpkg-query", "--listfiles", "clang-format"),
+                ("/usr/bin/dpkg-query", "--listfiles", "clang-format-14"),
+            ],
+        )
+
     def test_dpkg_owned_paths_normalize_leading_dot_entry(self) -> None:
         owned = _parse_dpkg_owned_paths("/.\n/usr/bin/jq\n", "jq")
         self.assertIn("/", owned)
@@ -1072,6 +1170,96 @@ class DependencyModelTests(unittest.TestCase):
                             "pyright",
                         )
 
+    def test_secondary_npm_binding_is_structural_not_a_help_probe(self) -> None:
+        """A secondary provider may reject generic help while remaining bound."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            prefix = root / "npm"
+            bin_dir = prefix / "bin"
+            bin_dir.mkdir(parents=True)
+            primary = bin_dir / "pyright"
+            secondary = bin_dir / "pyright-langserver"
+            marker = root / "secondary-called"
+            primary.write_text("#!/bin/sh\nprintf 'pyright 1.0.0\\n'\n", encoding="utf-8")
+            secondary.write_text(
+                f"#!/bin/sh\ntouch '{marker}'\nprintf 'usage is intentionally nonzero\\n' >&2\nexit 1\n",
+                encoding="utf-8",
+            )
+            primary.chmod(0o755)
+            secondary.chmod(0o755)
+            parsed = parse_record(
+                record(
+                    "pyright-language-server",
+                    package="pyright",
+                    version="1.0.0",
+                    provides=["pyright", "pyright-langserver"],
+                    verification={
+                        "kind": "npm-package",
+                        "executable": "pyright",
+                        "args": ["--version"],
+                        "output_contains": "1.0.0",
+                    },
+                ),
+                path=Path("fixture.toml"),
+                index=0,
+            )
+            plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+            with mock.patch.object(dependency_module, "NPM_GLOBAL_PREFIX", str(prefix)):
+                installer = Installer()
+                bindings = installer._executable_bindings(parsed, workspace=root)
+                receipt = root / "receipts" / "pyright-language-server.json"
+                installer._write_receipt(receipt, plan, parsed, executable_bindings=bindings)
+
+                self.assertEqual(
+                    bindings["pyright-langserver"]["verification_output"],
+                    "agent-canon.executable-binding.structural.v1:npm-global:pyright-langserver",
+                )
+                self.assertFalse(marker.exists())
+                self.assertTrue(installer._receipt_matches(receipt, plan, parsed))
+
+    def test_secondary_npm_binding_rejects_escape_and_missing_provider(self) -> None:
+        """Secondary providers remain fail-closed on escape, missing, or non-exec path."""
+        for case in ("escape", "missing", "non_executable"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                prefix = root / "npm"
+                bin_dir = prefix / "bin"
+                bin_dir.mkdir(parents=True)
+                primary = bin_dir / "pyright"
+                primary.write_text("#!/bin/sh\nprintf 'pyright 1.0.0\\n'\n", encoding="utf-8")
+                primary.chmod(0o755)
+                secondary = bin_dir / "pyright-langserver"
+                if case == "escape":
+                    outside = root / "outside-provider"
+                    outside.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                    outside.chmod(0o755)
+                    secondary.symlink_to(outside)
+                elif case == "non_executable":
+                    secondary.write_text("#!/bin/sh\necho blocked\\n", encoding="utf-8")
+                    secondary.chmod(0o644)
+                parsed = parse_record(
+                    record(
+                        "pyright-language-server",
+                        package="pyright",
+                        version="1.0.0",
+                        provides=["pyright", "pyright-langserver"],
+                        verification={
+                            "kind": "npm-package",
+                            "executable": "pyright",
+                            "args": ["--version"],
+                            "output_contains": "1.0.0",
+                        },
+                    ),
+                    path=Path("fixture.toml"),
+                    index=0,
+                )
+                with mock.patch.object(dependency_module, "NPM_GLOBAL_PREFIX", str(prefix)):
+                    with self.assertRaisesRegex(
+                        DependencyError,
+                        "(escapes its method-owned root|executable is missing|executable is not executable)",
+                    ):
+                        Installer()._executable_bindings(parsed, workspace=root)
+
     def test_rust_analyzer_binding_uses_cargo_home_not_path(self) -> None:
         """Rust executable bindings stay inside the pinned Cargo home."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -1225,6 +1413,39 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(merged.deps, ("node", "ninja-build"))
         self.assertEqual(merged.provides, ("codex", "shared-cli"))
         self.assertEqual(merged.verification.kind.value, "npm-package")
+
+    def test_incompatible_executable_owner_packages_fail_merge(self) -> None:
+        parent = parse_record(
+            record(
+                "shared",
+                method="apt-package",
+                source="ubuntu:22.04",
+                executable_owner_packages=["clang-format", "clang-format-14"],
+            ),
+            path=Path("parent.toml"),
+            index=0,
+        )
+        vendor = parse_record(
+            record(
+                "shared",
+                method="apt-package",
+                source="ubuntu:22.04",
+                executable_owner_packages=["clang-format", "llvm"],
+            ),
+            path=Path("vendor.toml"),
+            index=0,
+        )
+        with self.assertRaisesRegex(DependencyError, "incompatible duplicate"):
+            build_plan(
+                (
+                    loaded_manifest(
+                        Path("parent.toml"),
+                        (parent,),
+                        role=ManifestRole.PARENT_OVERLAY,
+                    ),
+                    loaded_manifest(Path("vendor.toml"), (vendor,)),
+                )
+            )
 
     def test_incompatible_duplicate_provider_missing_and_cycle_fail(self) -> None:
         parent = parse_record(record("shared"), path=Path("parent.toml"), index=0)
@@ -2480,6 +2701,9 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("NODE_X86_64_SHA256", bootstrap)
         self.assertIn("NODE_AARCH64_SHA256", bootstrap)
         self.assertIn("ninja-build", bootstrap)
+        self.assertIn("build-essential", bootstrap)
+        self.assertIn('command -v cc', bootstrap)
+        self.assertIn('command -v gcc', bootstrap)
         self.assertIn("python3-pip", bootstrap)
         self.assertIn("python3-packaging", bootstrap)
         self.assertIn("gnupg", bootstrap)

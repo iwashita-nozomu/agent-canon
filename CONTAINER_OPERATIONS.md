@@ -101,7 +101,9 @@ developer convenience.
 
 The mounted workspace devcontainer contract is separate. The fixed
 `.devcontainer/bootstrap-dependencies.sh` establishes only the base capabilities
-needed to read a manifest: `python3` with `tomllib` or `tomli` and
+needed to read a manifest. `postCreateCommand` invokes this shell-owned bootstrap
+with `--install` before it invokes the Python source-root wrapper, so the
+bootstrap establishes `python3`/`tomllib` or `tomli` and
 `python3-packaging` for structured PEP 508 parsing, pinned Node/npm 22.14.0
 with architecture-specific SHA256 verification, `ninja-build`, and the fixed
 APT-repository prerequisite `gnupg` with a working `gpg` executable. The bootstrap
