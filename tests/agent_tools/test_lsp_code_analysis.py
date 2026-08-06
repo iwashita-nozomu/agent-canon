@@ -1,5 +1,13 @@
 """Golden and protocol tests for the LSP code-analysis adapter."""
 
+# @dependency-start
+# contract test
+# responsibility Tests contract and protocol checks for the LSP 3.17 code-analysis adapter.
+# upstream design ../../documents/structured-analysis/code-analysis.md LSP 3.17 protocol contract and evidence policy
+# upstream design ../../documents/tools/lsp_code_analysis.md tests for tool-owned implementation evidence
+# upstream implementation ../../tools/agent_tools/lsp_code_analysis.py code-analysis protocol implementation
+# @dependency-end
+
 from __future__ import annotations
 
 import json

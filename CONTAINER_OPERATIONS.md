@@ -105,10 +105,10 @@ needed to read a manifest. `postCreateCommand` invokes this shell-owned bootstra
 with `--install` before it invokes the Python source-root wrapper, so the
 bootstrap establishes `python3`/`tomllib` or `tomli` and
 `python3-packaging` for structured PEP 508 parsing, pinned Node/npm 22.14.0
-with architecture-specific SHA256 verification, `ninja-build`, and the fixed
-APT-repository prerequisite `gnupg` with a working `gpg` executable. The bootstrap
-checks `gpg` before any repository-key/source operation and fails closed when the
-capability is absent.
+with architecture-specific SHA256 verification, `ninja-build`, `build-essential`,
+and the fixed APT-repository prerequisite `gnupg` with a working `gpg`
+executable. It also checks `cc` and `gcc` before any repository-key/source
+operation and fails closed when the bootstrap capability is absent.
 `.devcontainer/dependencies.toml` then describes mounted developer/agent tools.
 The shared post-create validates and merges the parent manifest before the
 AgentCanon manifest, validates the complete graph, and executes it only after
@@ -255,10 +255,10 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   verification, the current absolute executable path is resolved, and both
   path and verification-output identity match the receipt. npm records bind
   `pyright` and `pyright-langserver` to the same package; apt binds the
-  declared package executable and its lexical/resolved paths from the same
-  package's `/usr/bin/dpkg-query --listfiles` ownership output; Rust binds the
-  pinned toolchain's `rust-analyzer` path. Ambient `PATH` or `shutil.which`
-  never participates.
+  declared executable owner package set's lexical/resolved paths from
+  `/usr/bin/dpkg-query --listfiles` ownership output; Rust binds the pinned
+  toolchain's `rust-analyzer` path. Ambient `PATH` or `shutil.which` never
+  participates.
 - Lean theorem-proving tooling used by formal-proof skills, including
   `elan`, Lean, and Lake, belongs in `.devcontainer/post-create.sh` when it is
   only needed for AgentCanon proof tooling and is declared by exact

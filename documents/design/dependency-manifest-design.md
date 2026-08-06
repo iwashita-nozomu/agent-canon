@@ -100,11 +100,12 @@ executable)` が公開境界です。解決は exact record、receipt schema/fin
 requested-provided binding、Installer の live verify、method-specific absolute
 path、receipt の absolute path/output readback の順で行い、どれか一つでも
 不一致なら fail closed とします。npm は `pyright` と
-`pyright-langserver` を同一 package の bindings として保存し、apt は宣言
-された package executable の lexical path と resolved path を同一 package の
-`/usr/bin/dpkg-query --listfiles` ownership で照合し、Rust は pinned toolchain の
-`rust-analyzer` path を保存します。ambient `PATH` や `shutil.which` はこの境界に
-入りません。
+`pyright-langserver` を同一 package の bindings として保存し、apt は
+`executable_owner_packages` で宣言された所有者群の lexical path と
+resolved path を `/usr/bin/dpkg-query --listfiles` ownership で照合します。いずれかの
+所有者が所有境界に失敗した場合は fail-closed です。Rust は pinned
+toolchain の `rust-analyzer` path を保存します。ambient `PATH` や `shutil.which`
+はこの境界に入りません。
 
 ## Design Claim Evidence Contract
 
