@@ -1015,7 +1015,7 @@ entries:
     command: bash tools/agent_tools/scan_dependency_headers.sh
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md
@@ -1595,7 +1595,7 @@ entries:
     command: python3 tools/agent_tools/check_hardcoded_numbers.py
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md

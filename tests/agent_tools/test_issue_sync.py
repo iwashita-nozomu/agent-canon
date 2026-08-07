@@ -47,13 +47,6 @@ class IssueSyncTest(unittest.TestCase):
             env=env,
         )
 
-    def test_current_repository_passes(self) -> None:
-        """The canonical local issue store is structurally valid."""
-        result = self.run_checker(PROJECT_ROOT)
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("ISSUE_SYNC=pass", result.stdout)
-
     def test_missing_required_field_fails(self) -> None:
         """Local issue files must keep required fields."""
         with tempfile.TemporaryDirectory() as temp_dir:

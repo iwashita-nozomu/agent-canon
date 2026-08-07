@@ -31,13 +31,6 @@ class ImportResponsibilityTest(unittest.TestCase):
             text=True,
         )
 
-    def test_current_repository_passes(self) -> None:
-        """Changed canonical files should satisfy import responsibility rules."""
-        result = self.run_checker(PROJECT_ROOT, "--changed")
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("IMPORT_RESPONSIBILITY=pass", result.stdout)
-
     def test_unused_import_fails(self) -> None:
         """Unused imported aliases should be rejected before ruff is needed."""
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -928,8 +928,6 @@ def test_parent_generator_disables_unconfigured_parent_environment(
     )
     assert 'target: "/etc/project-template/parent-environment.sh"' not in compose
     assert 'target: "/home/project/.zshrc"' not in compose
-    module = load_container_config_module()
-    assert module.validate_parent_environment(repo) == []
 
 
 def test_parent_environment_symlinks_to_existing_sources_pass(tmp_path: Path) -> None:
@@ -966,8 +964,6 @@ def test_parent_environment_symlinks_to_existing_sources_pass(tmp_path: Path) ->
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    module = load_container_config_module()
-    assert module.validate_parent_environment(repo) == []
 
 
 def test_parent_environment_broken_symlink_does_not_block_default_generation(
@@ -991,9 +987,6 @@ def test_parent_environment_broken_symlink_does_not_block_default_generation(
     )
 
     assert result.returncode == 0, result.stdout + result.stderr
-    module = load_container_config_module()
-    findings = module.validate_parent_environment(repo)
-    assert any(finding.detail == "missing-target" for finding in findings)
 
 
 def test_parent_compose_rejects_root_user_and_missing_build_args(tmp_path: Path) -> None:
@@ -1355,34 +1348,6 @@ def test_generated_compose_platform_is_read_back_exactly(tmp_path: Path) -> None
         finding.detail == "compose-platform-expected:linux/amd64"
         for finding in module.validate_generated_compose(repo, pack)
     )
-
-
-
-def test_parent_environment_validator_is_static_and_ordered(tmp_path: Path) -> None:
-    """Parent environment validation never executes shell lines and preserves order."""
-    module = load_container_config_module()
-    (tmp_path / "vendor" / "agent-canon").mkdir(parents=True)
-    write_file(
-        tmp_path,
-        ".devcontainer/parent-environment.sh",
-        'export PROJECT_REGION="tokyo"\nexport PROJECT_TOKEN=value\n',
-    )
-    write_file(
-        tmp_path,
-        ".devcontainer/parent-environment.toml",
-        'variables = ["PROJECT_REGION", "PROJECT_TOKEN"]\n',
-    )
-    assert module.validate_parent_environment(tmp_path) == []
-
-    marker = tmp_path / "executed"
-    write_file(
-        tmp_path,
-        ".devcontainer/parent-environment.sh",
-        f"touch {marker}\n",
-    )
-    findings = module.validate_parent_environment(tmp_path)
-    assert not marker.exists()
-    assert any("invalid-export-line" in finding.detail for finding in findings)
 
 
 def test_source_vscode_surface_and_shared_files_pass(tmp_path: Path) -> None:

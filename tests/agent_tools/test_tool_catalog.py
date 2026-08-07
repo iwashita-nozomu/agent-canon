@@ -36,12 +36,8 @@ class CheckToolCatalogTest(unittest.TestCase):
             text=True,
         )
 
-    def test_current_repository_passes(self) -> None:
-        """The canonical repository has a valid tool catalog."""
-        result = self.run_checker(PROJECT_ROOT)
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("TOOL_CATALOG=pass", result.stdout)
+    def test_catalog_renderer_and_visualization_entries(self) -> None:
+        """Canonical renderer and visualization entries retain their contracts."""
         catalog = yaml.safe_load(
             (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
         )

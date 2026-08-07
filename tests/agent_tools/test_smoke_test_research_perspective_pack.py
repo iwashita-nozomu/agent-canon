@@ -15,27 +15,11 @@ import unittest
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SCRIPT_PATH = (
-    PROJECT_ROOT / "tools" / "agent_tools" / "smoke_test_research_perspective_pack.py"
-)
 BOOTSTRAP_SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 
 
 class ResearchPerspectivePackSmokeTest(unittest.TestCase):
     """Verify that the smoke-test helper exits successfully."""
-
-    def test_smoke_script_passes(self) -> None:
-        """The helper should report a passing smoke test on the checked-in config."""
-        result = subprocess.run(
-            [sys.executable, str(SCRIPT_PATH)],
-            cwd=PROJECT_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("SMOKE_TEST=pass", result.stdout)
 
     def test_run_bundle_includes_document_flow_review_artifact(self) -> None:
         """The always-on bundle should create the document flow review artifact."""

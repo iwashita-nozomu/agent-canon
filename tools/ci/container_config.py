@@ -31,7 +31,6 @@ import argparse
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 import tempfile
@@ -72,7 +71,6 @@ REQUIRED_REQUIREMENTS = (
     "pyyaml",
 )
 
-PARENT_ENVIRONMENT_SCRIPT = ".devcontainer/parent-environment.sh"
 PARENT_ENVIRONMENT_MANIFEST = ".devcontainer/parent-environment.toml"
 ENVIRONMENT_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 RUNTIME_SHELL_RE = re.compile(r"/[A-Za-z0-9._/-]+\Z")
@@ -629,35 +627,6 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
     return findings
 
 
-def parse_parent_environment_exports(path: Path) -> tuple[tuple[str, ...], list[str]]:
-    """Parse allowed parent-environment export lines without executing shell."""
-    names: list[str] = []
-    findings: list[str] = []
-    for line_number, raw_line in enumerate(
-        path.read_text(encoding="utf-8").splitlines(), 1
-    ):
-        line = raw_line.strip()
-        if not line or line.startswith("#"):
-            continue
-        try:
-            tokens = shlex.split(line, comments=True, posix=True)
-        except ValueError:
-            findings.append(f"invalid-export-line:{line_number}")
-            continue
-        if len(tokens) != 2 or tokens[0] != "export":
-            findings.append(f"invalid-export-line:{line_number}")
-            continue
-        name, separator, _value = tokens[1].partition("=")
-        if not separator or ENVIRONMENT_NAME_RE.fullmatch(name) is None:
-            findings.append(f"invalid-export-line:{line_number}")
-            continue
-        if name in names:
-            findings.append(f"duplicate-export:{name}")
-            continue
-        names.append(name)
-    return tuple(names), findings
-
-
 def parse_parent_environment_manifest(path: Path) -> tuple[tuple[str, ...], list[str]]:
     """Read the ordered parent-environment variable-name manifest."""
     try:
@@ -682,56 +651,6 @@ def parse_parent_environment_manifest(path: Path) -> tuple[tuple[str, ...], list
             findings.append(f"duplicate-variable:{name}")
         seen.add(name)
     return tuple(names), findings
-
-
-def validate_parent_environment(root: Path) -> list[Finding]:
-    """Validate parent environment sources and their ordered-name agreement."""
-    if not (root / "vendor" / "agent-canon").is_dir():
-        return []
-    findings: list[Finding] = []
-    script_path = root / PARENT_ENVIRONMENT_SCRIPT
-    manifest_path = root / PARENT_ENVIRONMENT_MANIFEST
-    declared = tuple(
-        path.exists() or path.is_symlink() for path in (script_path, manifest_path)
-    )
-    if not any(declared):
-        return []
-    for path, relative in (
-        (script_path, PARENT_ENVIRONMENT_SCRIPT),
-        (manifest_path, PARENT_ENVIRONMENT_MANIFEST),
-    ):
-        if not path.is_file():
-            detail = "missing-target" if path.is_symlink() else "missing"
-            findings.append(Finding("missing_file", relative, detail))
-    if findings:
-        return findings
-
-    export_names, export_findings = parse_parent_environment_exports(script_path)
-    findings.extend(
-        Finding("invalid_manifest", PARENT_ENVIRONMENT_SCRIPT, detail)
-        for detail in export_findings
-    )
-    manifest_names, manifest_findings = parse_parent_environment_manifest(manifest_path)
-    findings.extend(
-        Finding("invalid_manifest", PARENT_ENVIRONMENT_MANIFEST, detail)
-        for detail in manifest_findings
-    )
-    if not export_findings and not manifest_findings and export_names != manifest_names:
-        findings.append(
-            Finding(
-                "inconsistency",
-                PARENT_ENVIRONMENT_MANIFEST,
-                f"ordered-variable-names-mismatch:manifest={list(manifest_names)}:exports={list(export_names)}",
-            )
-        )
-    return findings
-
-
-def parent_environment_enabled(root: Path) -> bool:
-    """Return whether both optional parent environment sources resolve to files."""
-    return (root / PARENT_ENVIRONMENT_SCRIPT).is_file() and (
-        root / PARENT_ENVIRONMENT_MANIFEST
-    ).is_file()
 
 
 def is_managed_topic_root(root: Path) -> bool:

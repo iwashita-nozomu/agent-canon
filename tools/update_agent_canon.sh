@@ -172,16 +172,6 @@ submodule_remote_url() {
   git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.url" 2>/dev/null || true
 }
 
-sanitize_ref_component() {
-  local raw="${1:-}"
-  raw="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
-  raw="$(printf '%s' "$raw" | sed -E 's#[^a-z0-9._/-]+#-#g; s#^[./-]+##; s#[./-]+$##; s#/{2,}#/#g; s#-+#-#g')"
-  if [[ -z "$raw" ]]; then
-    raw="detached"
-  fi
-  printf '%s\n' "$raw"
-}
-
 parent_pin() {
   if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
     git -C "$AGENT_CANON_DIR" rev-parse HEAD
