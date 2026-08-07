@@ -203,6 +203,87 @@ def _evidence_sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _require_workspace_ignored(root: Path) -> None:
+    """Require the repository-owned root ``.gitignore`` to own ``workspace/``."""
+    ignore_file = root / ".gitignore"
+    if ignore_file.is_symlink() or not ignore_file.is_file():
+        raise RepositoryTopicCloneError(
+            f"workspace root requires a regular .gitignore: {ignore_file}"
+        )
+    try:
+        _run_git(root, ["ls-files", "--error-unmatch", "--", ".gitignore"])
+    except GitCommandError as exc:
+        raise RepositoryTopicCloneError(
+            f"workspace root requires a tracked .gitignore: {ignore_file}"
+        ) from exc
+
+    probe = "workspace/.agent-canon-workspace-probe"
+    try:
+        output = _run_git(root, ["check-ignore", "-v", "--no-index", "--", probe])
+    except GitCommandError as exc:
+        raise RepositoryTopicCloneError(
+            f"workspace root .gitignore must ignore {probe}"
+        ) from exc
+    line = output.strip().splitlines()
+    if len(line) != 1:
+        raise RepositoryTopicCloneError(
+            f"workspace root .gitignore probe is ambiguous: {probe}"
+        )
+    source_and_pattern, separator, ignored_path = line[0].partition("\t")
+    if not separator:
+        raise RepositoryTopicCloneError(
+            f"workspace root .gitignore probe is malformed: {line[0]}"
+        )
+    source_text = source_and_pattern.rsplit(":", 2)[0]
+    source = Path(source_text)
+    if not source.is_absolute():
+        source = root / source
+    try:
+        source = source.resolve(strict=True)
+        expected = ignore_file.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise RepositoryTopicCloneError(
+            f"workspace root .gitignore probe source is unavailable: {ignore_file}"
+        ) from exc
+    if source != expected or ignored_path.strip() != probe:
+        raise RepositoryTopicCloneError(
+            f"workspace root .gitignore must own the ignore for {probe}"
+        )
+
+
+def _repository_workspace_root(
+    workspace_root: Path | str, *, require_ignore: bool
+) -> Path:
+    """Validate the selected repository root before lifecycle path handling."""
+    root = Path(workspace_root).absolute()
+    _reject_symlink_components(root, "workspace root")
+    _reject_symlink_components(root / "workspace", "workspace directory")
+    if not root.is_dir():
+        raise RepositoryTopicCloneError(
+            f"workspace root must be a directory: {root}"
+        )
+    try:
+        git_root = _run_git(root, ["rev-parse", "--show-toplevel"]).strip()
+    except GitCommandError as exc:
+        raise RepositoryTopicCloneError(
+            f"workspace root must be a Git repository root: {root}"
+        ) from exc
+    try:
+        resolved_git_root = Path(git_root).resolve(strict=True)
+        resolved_root = root.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise RepositoryTopicCloneError(
+            f"workspace root Git toplevel is unavailable: {root}"
+        ) from exc
+    if resolved_git_root != resolved_root:
+        raise RepositoryTopicCloneError(
+            f"workspace root must equal the Git toplevel: {root}"
+        )
+    if require_ignore:
+        _require_workspace_ignored(root)
+    return root
+
+
 def _topic_root(workspace_root: Path, topic: str, *, create: bool) -> Path:
     _reject_symlink_components(workspace_root.absolute(), "workspace root")
     workspace_dir = workspace_root / "workspace"
@@ -438,13 +519,14 @@ def request(
     policy: RepositoryPolicyCallback | None = None,
 ) -> PrepareReceipt:
     """Prepare a topic clone and return a typed receipt."""
+    repository_root = _repository_workspace_root(workspace_root, require_ignore=True)
     request_state = RepositoryTopicCloneRequest(
         url=str(url),
         repository=_repository_name(repository),
-        workspace_root=Path(workspace_root),
+        workspace_root=repository_root,
         topic=topic,
         branch=_normalise_branch(branch),
-        owner_evidence=_require_evidence(owner_evidence, Path(workspace_root)),
+        owner_evidence=_require_evidence(owner_evidence, repository_root),
     )
     owner_sha = _evidence_sha256(request_state.owner_evidence)
     clone = computed_clone_path(request_state, create_topic=True)
@@ -651,6 +733,7 @@ def cleanup(
         raise RepositoryTopicCloneError(
             "cleanup hold: canonical candidate CAS and PR lifecycle evidence required"
         )
+    _repository_workspace_root(request_state.workspace_root, require_ignore=False)
     topic_root = _topic_root(
         request_state.workspace_root, request_state.topic, create=False
     )

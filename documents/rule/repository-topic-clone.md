@@ -27,6 +27,12 @@ gitlink/pin/projection の共有責務を担い、この文書の clone 実装�
 
 - `--url`、`--repo-name`、`--workspace-root`、`--topic`、`--branch`、
   `--owner-evidence` が完全一致する状態。
+- `--workspace-root` は selected repository の Git toplevel と一致し、root の regular な
+  tracked `.gitignore` が `workspace/` を repository-owned boundary として ignore する状態。
+- `prepare` と `merge-main` は workspace/topic directory を作る前に root、symlink、
+  `.gitignore` ownership、ignore probe を検証し、検証 receipt を残した後だけ clone lifecycle
+  に進みます。non-repository、nested root、missing/untracked `.gitignore`、global/info
+  exclude のみの ignore は typed failure として既存 state を保持します。
 - marker が同一 topic/repo/branch/url/evidence で一致し、`git status` が clean かつ
   detached/merge-conflict でないこと。
 - local/remote の branch 不在時のみ fresh 作成に進める。存在する branch は
@@ -61,6 +67,9 @@ python3 tools/agent_tools/repository_topic_clone.py merge-main \
 
 ## クリーンアップ
 
+- `cleanup` は selected Git toplevel と computed clone identity を検証してから proof preflight
+  を開始します。既存 clone の proof-gated removal は root `.gitignore` の後続 drift だけでは
+  停止せず、ignore ownership の create preconditionと cleanup の exact-root gateを分離します。
 - cleanup は closeout の明示 dispatch として canonical tool を呼び、`--expected-clone` に
   対する既知 identity、owner evidence、candidate CAS、PR lifecycle、必要な publication
   readback を同時に検証します。proof が一致しないものは削除しません。
@@ -96,3 +105,10 @@ repository-topic clone は依存モジュールの branch 特化パスを使わ�
 - `documents/rule/dependency-module-changes.md`: gitlink/pin/projection の所有責務
 - `agents/skills/repository-topic-clone.md`: 実行ルート
 - `documents/tools/repository_topic_clone.md`: CLI 参照
+
+## Evidence And Assumption Ledger
+
+| kind | statement | evidence / owner | status |
+| --- | --- | --- | --- |
+| assumption | `workspace/` は selected repository root の regular/tracked `.gitignore` が所有する repository-owned boundary です。 | `tools/agent_tools/repository_topic_clone.py` の root/ignore gate、`tests/agent_tools/test_repository_topic_clone.py` の invalid-root regression | explicit |
+| evidence | `git check-ignore -v --no-index -- workspace/.agent-canon-workspace-probe` の source path が root `.gitignore` と一致します。 | create/merge precondition; global/info exclude source は拒否 | required |

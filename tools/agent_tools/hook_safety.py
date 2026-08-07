@@ -62,8 +62,9 @@ CANONICAL_WORKSPACE_LIFECYCLE_TOOLS = frozenset(
     {"repository_topic_clone.py", "dependency_module_change.py"}
 )
 CANONICAL_WORKSPACE_LIFECYCLE_OPERATIONS = frozenset(
-    {"prepare", "merge-main", "status", "cleanup"}
+    {"prepare", "merge-main", "cleanup"}
 )
+CANONICAL_WORKSPACE_PYTHON = re.compile(r"python3(?:\.\d+)?$")
 OPAQUE_GIT_OPTIONS_WITH_VALUES = frozenset(
     {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--exec-path", "--config-env"}
 )
@@ -689,23 +690,90 @@ def opaque_protected_intent(command: str) -> GitIntent | None:
     return None
 
 
-def canonical_workspace_lifecycle_command(command: str) -> bool:
+def _canonical_workspace_tool_path(source_root: Path, token: str) -> str | None:
+    """Return the owned lifecycle tool name for one exact source-root path."""
+    try:
+        root = source_root.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+    if not root.is_dir():
+        return None
+    candidate = Path(token)
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    try:
+        candidate = candidate.resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+    for relative in (
+        "tools/agent_tools/repository_topic_clone.py",
+        "tools/agent_tools/dependency_module_change.py",
+        "vendor/agent-canon/tools/agent_tools/repository_topic_clone.py",
+        "vendor/agent-canon/tools/agent_tools/dependency_module_change.py",
+    ):
+        expected = root / relative
+        if (
+            candidate == expected
+            and expected.is_file()
+            and not expected.is_symlink()
+        ):
+            return expected.name
+    return None
+
+
+def _canonical_workspace_operation(
+    command_tokens: tuple[str, ...], tool_name: str
+) -> bool:
+    """Read the tool-owned positional lifecycle operation."""
+    operation_index = 2
+    if tool_name == "dependency_module_change.py":
+        if command_tokens[operation_index] == "--root":
+            operation_index += 2
+        elif command_tokens[operation_index].startswith("--root="):
+            operation_index += 1
+    return (
+        operation_index < len(command_tokens)
+        and command_tokens[operation_index] in CANONICAL_WORKSPACE_LIFECYCLE_OPERATIONS
+    )
+
+
+def _canonical_workspace_segment(
+    segment: tuple[str, ...], source_root: Path
+) -> bool:
+    """Match one normalized shell segment to an owned lifecycle operation."""
+    normalized = normalized_shell_command(segment)
+    if normalized is None or not normalized.tokens:
+        return False
+    command_tokens = normalized.tokens
+    if not CANONICAL_WORKSPACE_PYTHON.fullmatch(command_basename(command_tokens[0])):
+        return False
+    if len(command_tokens) < 3:
+        return False
+    tool_name = _canonical_workspace_tool_path(source_root, command_tokens[1])
+    if tool_name not in CANONICAL_WORKSPACE_LIFECYCLE_TOOLS:
+        return False
+    return _canonical_workspace_operation(command_tokens, tool_name)
+
+
+def canonical_workspace_lifecycle_command(
+    command: str, source_root: Path | str
+) -> bool:
     """Identify canonical workspace lifecycle calls for hook readback.
 
     This predicate is informational only.  It documents that canonical lifecycle
     tools own repo-local workspace preparation and cleanup; it never bypasses the
     raw shared-checkout Git guard and is not consulted by :func:`first_block`.
     """
+    try:
+        root = Path(source_root)
+    except TypeError:
+        return False
     tokens = shell_tokens(command)
     if not tokens:
         return False
-    tool_seen = any(
-        token.replace("\\", "/").rsplit("/", 1)[-1]
-        in CANONICAL_WORKSPACE_LIFECYCLE_TOOLS
-        for token in tokens
-    )
-    return tool_seen and bool(
-        CANONICAL_WORKSPACE_LIFECYCLE_OPERATIONS.intersection(tokens)
+    return any(
+        _canonical_workspace_segment(segment, root)
+        for segment in command_segments(tokens)
     )
 
 

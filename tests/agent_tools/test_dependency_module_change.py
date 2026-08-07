@@ -97,7 +97,14 @@ def create_parent(
     (parent_source / "owner-evidence.md").write_text(
         "source edit required\n", encoding="utf-8"
     )
-    run_git(parent_source, "add", ".gitmodules", "owner-evidence.md")
+    (parent_source / ".gitignore").write_text("workspace/\n", encoding="utf-8")
+    run_git(
+        parent_source,
+        "add",
+        ".gitmodules",
+        ".gitignore",
+        "owner-evidence.md",
+    )
     subprocess.run(
         [
             "git",

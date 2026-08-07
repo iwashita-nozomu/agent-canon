@@ -39,6 +39,12 @@ computed path / remote / branch identity が検証できる場合、canonical `p
 canonical lifecycle command が workspace 管理と衝突保持を所有するためであり、raw
 shared-checkout Git の承認境界を緩和するものではありません。
 
+`prepare` と `merge-main` は selected repository root の Git toplevel、既存 symlink component、
+regular/tracked root `.gitignore`、および repository-owned `workspace/` ignore probe を
+clone/topic directory の作成前に検証します。検証を通った request は computed
+`workspace/<topic-slug>/<repo-name>` に到達し、invalid root、nested root、missing/untracked
+`.gitignore`、global/info exclude は typed failure として作成前の state を保持します。
+
 `dependency_module_change.py status` は dependency adapter の read-only 状態確認です。
 これは generic lifecycle、owner-evidence、または operation-level approval carve-out の
 対象ではありません。
@@ -50,3 +56,9 @@ readback、owner evidence、local/remote/PR head の一致を canonical tool に
 preflight が成功した場合だけ `CleanupProof` / cleanup receipt を受け取り、失敗時は
 clone と topic root を保持した typed hold を closeout に記録します。specialized adapter
 が適用外でもこの generic operation は継続します。
+
+`cleanup` は同じ selected Git toplevel と exact clone identity を検証し、candidate CAS、PR
+lifecycle、publication readback の proof を満たした場合だけ `CleanupProof` を返します。
+cleanup の exact-root gate は維持しつつ、既存 clone の proof-gated removal は root ignore の
+後続 driftだけで止めません。`dependency_module_change.py status` と `projected_clone_path`
+は read-only projection のままで directory を作成しません。

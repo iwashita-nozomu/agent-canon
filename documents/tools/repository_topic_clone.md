@@ -38,9 +38,17 @@ host は `<parent-root>/workspace/<topic>/<repo>` を想定し、path alias は�
 owner evidence と computed identity が一致する canonical `prepare` / `merge-main` は
 operation-level の追加承認なしで repo-local workspace を管理します。reuse は `prepare`
 に含まれます。
+`<parent-root>` は selected repository の Git toplevel と一致し、root の regular/tracked
+`.gitignore` が `workspace/` を ignore する必要があります。`prepare` / `merge-main` は
+workspace/topic directory の作成前に symlink component、toplevel、tracked ignore、
+`workspace/.agent-canon-workspace-probe` の ignore source を検証し、global/info exclude
+だけで成立する root や nested/non-repository root を typed error として保持します。
 `prepare` は既存 clone を marker/evidence/branch/url/upstream で検証し、exact branch を
 再利用します。不一致は state-preserving typed collision です。`merge-main` は
 `origin/main` を通常 merge し、ancestor proof を返します。`cleanup` は canonical
 candidate CAS、PR lifecycle、owner evidence を必須とし、integration 後は publication
 transition も検証します。pass 時だけ `CleanupProof` を返し、unknown sibling や dirty
 collision は保持します。
+`cleanup` は exact Git toplevel を検証してから proof preflight を実行し、root ignore の
+後続 driftだけでは既存 clone の proof-gated removalを停止しません。adapter の `status`
+と `projected_clone_path` は directory を作らない read-only projection です。

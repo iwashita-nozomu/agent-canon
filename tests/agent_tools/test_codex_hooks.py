@@ -16,6 +16,7 @@ import ast
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -728,21 +729,78 @@ class CodexHooksTest(unittest.TestCase):
                     cast("str", cast("dict[str, object]", payload)["reason"]),
                 )
 
-    def test_canonical_workspace_lifecycle_has_no_raw_git_authority_requirement(self) -> None:
-        """Canonical lifecycle tools use owner evidence, not raw-Git authority envs."""
-        commands = [
-            "python3 tools/agent_tools/repository_topic_clone.py prepare --url https://example.invalid/repo.git --repo-name repo --workspace-root . --topic topic --branch feature/topic --owner-evidence evidence.md",
-            "python3 tools/agent_tools/repository_topic_clone.py cleanup --url https://example.invalid/repo.git --repo-name repo --workspace-root . --topic topic --branch feature/topic --owner-evidence evidence.md --expected-clone workspace/topic/repo --candidate-cas cas.json --pr-lifecycle pr.json --apply",
-            "python3 tools/agent_tools/dependency_module_change.py --root . status --topic topic --module vendor/dep",
-            "python3 tools/agent_tools/dependency_module_change.py --root . cleanup --topic topic --module vendor/dep --branch feature/topic --owner-evidence evidence.md --expected-clone workspace/topic/dep --candidate-cas cas.json --pr-lifecycle pr.json",
-        ]
-        for command in commands:
-            with self.subTest(command=command):
-                self.assertTrue(canonical_workspace_lifecycle_command(command))
-                self.assertIsNone(self._run_shared_checkout_guard(command))
+    def test_canonical_workspace_lifecycle_command_requires_owned_tool_and_mutating_operation(
+        self,
+    ) -> None:
+        """Only standalone/vendor canonical lifecycle mutations classify true."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            vendor_root = Path(temp_dir)
+            vendor_tools = vendor_root / "vendor" / "agent-canon" / "tools" / "agent_tools"
+            vendor_tools.mkdir(parents=True)
+            for name in ("repository_topic_clone.py", "dependency_module_change.py"):
+                shutil.copy2(PROJECT_ROOT / "tools" / "agent_tools" / name, vendor_tools / name)
+
+            cases = [
+                (
+                    PROJECT_ROOT,
+                    "python3 tools/agent_tools/repository_topic_clone.py prepare --url x",
+                ),
+                (
+                    PROJECT_ROOT,
+                    "python3 tools/agent_tools/repository_topic_clone.py merge-main --url x",
+                ),
+                (
+                    PROJECT_ROOT,
+                    "python3 tools/agent_tools/dependency_module_change.py --root . cleanup --topic x",
+                ),
+                (
+                    vendor_root,
+                    "python3 vendor/agent-canon/tools/agent_tools/repository_topic_clone.py prepare --url x",
+                ),
+                (
+                    vendor_root,
+                    "python3 vendor/agent-canon/tools/agent_tools/dependency_module_change.py --root=. merge-main --topic x",
+                ),
+                (
+                    PROJECT_ROOT,
+                    "FOO=bar time -p command -- env BAR=baz exec python3 tools/agent_tools/repository_topic_clone.py cleanup --apply",
+                ),
+            ]
+            for source_root, command in cases:
+                with self.subTest(command=command):
+                    self.assertTrue(
+                        canonical_workspace_lifecycle_command(command, source_root)
+                    )
+                    self.assertIsNone(self._run_shared_checkout_guard(command))
 
         self.assertIsNotNone(
             self._run_shared_checkout_guard("git -C workspace/topic/repo reset --hard HEAD")
+        )
+
+    def test_canonical_workspace_lifecycle_command_rejects_false_positive_matrix(
+        self,
+    ) -> None:
+        """Status, incidental tokens, wrappers, and wrong paths classify false."""
+        root = PROJECT_ROOT
+        cases = [
+            "python3 tools/agent_tools/dependency_module_change.py --root . status --topic x",
+            "python3 tools/agent_tools/repository_topic_clone.py --operation prepare",
+            "python3 tools/agent_tools/repository_topic_clone.py --topic prepare",
+            "python3 /tmp/repository_topic_clone.py prepare",
+            "python3 tools/agent_tools/not_repository_topic_clone.py prepare",
+            "bash -lc 'python3 tools/agent_tools/repository_topic_clone.py prepare'",
+            "eval 'python3 tools/agent_tools/repository_topic_clone.py prepare'",
+            "tools/agent_tools/repository_topic_clone.py prepare",
+            "echo repository_topic_clone.py prepare",
+        ]
+        for command in cases:
+            with self.subTest(command=command):
+                self.assertFalse(canonical_workspace_lifecycle_command(command, root))
+
+        self.assertFalse(
+            canonical_workspace_lifecycle_command(
+                "python3 tools/agent_tools/repository_topic_clone.py prepare", root / "missing"
+            )
         )
 
     def test_shared_checkout_guard_authority_is_same_segment_and_one_shot(self) -> None:

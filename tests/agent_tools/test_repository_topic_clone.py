@@ -71,6 +71,49 @@ def init_remote(tmp_path: Path) -> tuple[Path, str]:
     return remote, str(remote)
 
 
+def init_workspace_parent(
+    path: Path,
+    *,
+    ignore_content: str = "workspace/\n",
+    tracked_ignore: bool = True,
+    global_ignore: bool = False,
+    info_ignore: bool = False,
+) -> None:
+    """Create a selected parent repository with its workspace ownership evidence."""
+    path.mkdir()
+    subprocess.run(
+        ["git", "init", "-b", "main", str(path)], check=True, capture_output=True
+    )
+    (path / ".gitignore").write_text(ignore_content, encoding="utf-8")
+    (path / "parent.txt").write_text("parent\n", encoding="utf-8")
+    run_git(path, "add", "parent.txt", *(('.gitignore',) if tracked_ignore else ()))
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(path),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "parent",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    if global_ignore:
+        global_file = path / "global-excludes"
+        global_file.write_text("workspace/\n", encoding="utf-8")
+        run_git(path, "config", "core.excludesFile", str(global_file))
+    if info_ignore:
+        (path / ".git" / "info" / "exclude").write_text(
+            "workspace/\n", encoding="utf-8"
+        )
+
+
 def init_file(path: Path, filename: str, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
@@ -215,7 +258,7 @@ def test_request_reuses_local_and_remote_branch(tmp_path: Path) -> None:
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     repo_name = "repo-one"
     topic = "topic-one"
@@ -266,7 +309,7 @@ def test_prepare_rejects_unsafe_repository_name_and_symlink_workspace(
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     with pytest.raises(rtc.RepositoryTopicCloneError, match="safe path component"):
         rtc.request(
@@ -281,11 +324,59 @@ def test_prepare_rejects_unsafe_repository_name_and_symlink_workspace(
     assert list(external.iterdir()) == []
 
 
+@pytest.mark.parametrize(
+    "root_kind",
+    ("non-repository", "nested", "missing-ignore", "untracked-ignore", "global-ignore", "info-ignore"),
+)
+def test_prepare_rejects_invalid_workspace_roots_before_creation(
+    tmp_path: Path, root_kind: str
+) -> None:
+    """Reject every non-canonical parent before creating workspace/topic paths."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    if root_kind == "non-repository":
+        workspace = tmp_path / "non-repository"
+        workspace.mkdir()
+    elif root_kind == "nested":
+        parent = tmp_path / "parent"
+        init_workspace_parent(parent)
+        workspace = parent / "nested"
+        workspace.mkdir()
+    elif root_kind == "missing-ignore":
+        workspace = tmp_path / "parent"
+        init_workspace_parent(workspace)
+        (workspace / ".gitignore").unlink()
+    elif root_kind == "untracked-ignore":
+        workspace = tmp_path / "parent"
+        init_workspace_parent(workspace, tracked_ignore=False)
+    elif root_kind == "global-ignore":
+        workspace = tmp_path / "parent"
+        init_workspace_parent(
+            workspace, ignore_content="# repository has no workspace rule\n", global_ignore=True
+        )
+    else:
+        workspace = tmp_path / "parent"
+        init_workspace_parent(
+            workspace, ignore_content="# repository has no workspace rule\n", info_ignore=True
+        )
+
+    with pytest.raises(rtc.RepositoryTopicCloneError):
+        rtc.request(
+            remote_url,
+            "invalid-root",
+            workspace,
+            f"invalid-{root_kind}",
+            "feature/invalid",
+            evidence,
+        )
+    assert not (workspace / "workspace").exists()
+
+
 def test_merge_main_before_publication_receipt_is_created(tmp_path: Path) -> None:
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     topic = "topic-merge"
     repo_name = "repo-two"
@@ -350,7 +441,7 @@ def test_merge_main_preserves_conflict_with_typed_state(tmp_path: Path) -> None:
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
     source = tmp_path / "source"
 
     receipt = rtc.request(
@@ -385,13 +476,13 @@ def test_merge_main_preserves_conflict_with_typed_state(tmp_path: Path) -> None:
         )
 
 
-def test_cleanup_uses_canonical_pr_and_merged_receipts_and_preserves_siblings(
+def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
     tmp_path: Path,
 ) -> None:
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     repo_name = "repo-three"
     topic = "topic-cleanup"
@@ -409,6 +500,25 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_and_preserves_siblings(
     topic_root = workspace / "workspace" / topic
     sibling = topic_root / "keep.txt"
     sibling.write_text("keep", encoding="utf-8")
+    (workspace / ".gitignore").write_text("# placement ownership drift\n", encoding="utf-8")
+    drift_probe = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(workspace),
+            "-c",
+            "core.excludesFile=/dev/null",
+            "check-ignore",
+            "-v",
+            "--no-index",
+            "--",
+            "workspace/.agent-canon-workspace-probe",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert drift_probe.returncode == 1, drift_probe.stdout + drift_probe.stderr
 
     cas, lifecycle, _ = publication_artifacts(
         request.clone,
@@ -519,7 +629,7 @@ def test_failure_when_receipt_is_arbitrary_mapping_or_missing(tmp_path: Path) ->
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     request = rtc.request(
         remote_url, "repo-four", workspace, "topic-fail", "feature/fail", evidence
@@ -559,7 +669,7 @@ def test_prepare_dirty_collision_and_cleanup_rejects_detached_branch(
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     clone = rtc.request(
         remote_url, "repo-five", workspace, "topic-clean", "feature/clean", evidence
@@ -586,7 +696,7 @@ def test_repository_policy_decorator_runs_for_prepare_merge_only(
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     events: list[str] = []
 
