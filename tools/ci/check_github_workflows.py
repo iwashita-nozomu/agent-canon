@@ -294,11 +294,6 @@ def load_workflow(path: Path) -> dict[str, object]:
     return workflow
 
 
-def is_true(value: object) -> bool:
-    """Return whether a YAML value means true for GitHub action inputs."""
-    return value is True or str(value).lower() == "true"
-
-
 def is_false(value: object) -> bool:
     """Return whether a YAML value means false for GitHub action inputs."""
     return value is False or str(value).lower() == "false"

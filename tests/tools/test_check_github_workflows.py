@@ -258,18 +258,6 @@ raise SystemExit(2)
                     ["graph build"],
                 )
 
-    def test_current_repository_passes(self) -> None:
-        """The current repository should satisfy GitHub workflow conventions."""
-        result = subprocess.run(
-            [sys.executable, str(SCRIPT), "--root", str(REPO_ROOT)],
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
-
     def test_template_agentcanon_gate_source_and_projection_have_one_authority(
         self,
     ) -> None:

@@ -124,7 +124,6 @@ TOOL_GATES = {
     "hardcoded_numbers": (
         "tools/agent_tools/check_hardcoded_numbers.py",
         (
-            "tools/ci/run_all_checks.sh",
             "documents/conventions/common/01_principles.md",
         ),
     ),

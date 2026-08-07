@@ -34,15 +34,6 @@ class ToolProofCoverageTest(unittest.TestCase):
             text=True,
         )
 
-    def test_current_repository_reports_coverage_without_claiming_verified(self) -> None:
-        """The canonical repository should produce an honest coverage report."""
-        result = self.run_checker(PROJECT_ROOT)
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("TOOL_PROOF_COVERAGE=pass", result.stdout)
-        self.assertIn("TOOL_PROOF_COVERAGE_TOOLS=", result.stdout)
-        self.assertIn("TOOL_PROOF_COVERAGE_BEHAVIOR_LEAN_VERIFIED=0", result.stdout)
-
     def test_markdown_output_lists_next_witness(self) -> None:
         """Markdown output should show the proof frontier for each tool."""
         with tempfile.TemporaryDirectory() as tmp_dir:

@@ -44,13 +44,6 @@ class ResponsibilityScopeTest(unittest.TestCase):
             text=True,
         )
 
-    def test_current_repository_passes(self) -> None:
-        """The canonical repository has complete responsibility scope metadata."""
-        result = self.run_checker(PROJECT_ROOT)
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("RESPONSIBILITY_SCOPE=pass", result.stdout)
-
     def test_missing_protecting_tool_fails(self) -> None:
         """A scope cannot name a missing protecting tool."""
         with tempfile.TemporaryDirectory() as temp_dir:

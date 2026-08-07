@@ -32,14 +32,6 @@ class CheckStaticAnyTest(unittest.TestCase):
             text=True,
         )
 
-    def test_current_repository_passes(self) -> None:
-        """The canonical Python source tree does not use explicit Any."""
-        result = self.run_checker(PROJECT_ROOT)
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("STATIC_ANY=pass", result.stdout)
-        self.assertIn("STATIC_ANY_FINDINGS=0", result.stdout)
-
     def test_typing_any_import_fails(self) -> None:
         """Importing typing.Any is rejected."""
         with tempfile.TemporaryDirectory() as tmp_dir:

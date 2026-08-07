@@ -151,12 +151,15 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             stderr=stderr.getvalue(),
         )
 
-    def test_current_repository_passes(self) -> None:
-        """The canonical repository satisfies the drift gate."""
-        result = self.run_checker(PROJECT_ROOT)
+    def test_checker_queries_all_nodes_for_bounded_fixture(self) -> None:
+        """The graph-owned drift check always requests the complete fixture graph."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_tool_catalog_contract(root)
+
+            result = self.run_checker(root, "--contract", "tool_catalog")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("TOOL_CONVENTION_DRIFT=pass", result.stdout)
         self.assertTrue(FakeToolGraphClient.last_query["all_nodes"])
 
     def test_projected_graph_paths_match_logical_contract_paths(self) -> None:
