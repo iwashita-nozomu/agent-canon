@@ -4,6 +4,7 @@
 # responsibility Runs one-shot LSP 3.17 code analysis and emits deterministic code facts.
 # upstream design ../../documents/structured-analysis/code-analysis.md code-analysis boundary
 # upstream design ../../documents/tools/lsp_code_analysis.md LSP adapter contract
+# upstream implementation ./vector_search.py owns bounded LSP discovery and language mapping
 # downstream implementation ../../tests/agent_tools/test_lsp_code_analysis.py verifies protocol and report behavior
 # downstream implementation ./search.py consumes in-memory code-deps facts
 # @dependency-end
@@ -19,6 +20,7 @@ can exercise it in unit tests.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import re
@@ -33,11 +35,16 @@ from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from tools.agent_tools import vector_search
+
 SCHEMA_VERSION = "agent-canon.lsp-code-analysis.v1"
 LSP_VERSION = "3.17"
 DEFAULT_TIMEOUT_SECONDS = 15.0
 DEFAULT_MAX_FRAME_BYTES = 16 * 1024 * 1024
 DEFAULT_STDERR_BYTES = 64 * 1024
+DEFAULT_MAX_HEADER_BYTES = 64 * 1024
 
 
 class LspAnalysisError(RuntimeError):
@@ -360,12 +367,13 @@ class CodeDiagnostic:
 
 @dataclass(frozen=True)
 class LexicalDependencyCandidate:
-    """Best-effort lexical import/include/source candidate."""
+    """Best-effort candidate; ``legacy_kind`` is internal projection metadata."""
 
     source: str
     token: str
     target: str
     position: Mapping[str, Any] | None = None
+    legacy_kind: str | None = None
 
     def as_json(self) -> dict[str, Any]:
         """Serialize a candidate for legacy and search projections."""
@@ -435,6 +443,7 @@ class LspProcessSession:
         self._next_id = 1
         self._stderr = bytearray()
         self._stderr_thread: threading.Thread | None = None
+        self._stdout_buffer = bytearray()
         self.lifecycle: list[str] = []
         self.published_diagnostics: list[Mapping[str, Any]] = []
 
@@ -460,33 +469,65 @@ class LspProcessSession:
         stream = self.process.stderr if self.process is not None else None
         if stream is None:
             return
-        remaining = DEFAULT_STDERR_BYTES
-        while remaining > 0:
+        while True:
             try:
-                chunk = stream.read(min(4096, remaining))
+                chunk = stream.read(4096)
             except OSError:
                 return
             if not chunk:
                 return
-            self._stderr.extend(chunk)
-            remaining -= len(chunk)
+            remaining = DEFAULT_STDERR_BYTES - len(self._stderr)
+            if remaining > 0:
+                self._stderr.extend(chunk[:remaining])
 
-    def _readline_timeout(self, stream: Any) -> bytes:
-        try:
-            ready, _, _ = select.select([stream.fileno()], [], [], self.timeout)
-        except (OSError, ValueError) as exc:
-            raise ProtocolViolation("LSP stdout is not selectable") from exc
-        if not ready:
-            raise RequestTimeout("LSP frame header timed out")
-        try:
-            return stream.readline()
-        except OSError as exc:  # pragma: no cover - platform I/O
-            raise ProtocolViolation("LSP frame header read failed") from exc
+    def _readline_timeout(
+        self,
+        stream: Any,
+        deadline: float,
+        max_bytes: int,
+    ) -> bytes:
+        """Read one header line without blocking on a partial line."""
+        while True:
+            if time.monotonic() >= deadline:
+                raise RequestTimeout("LSP frame header timed out")
+            newline = self._stdout_buffer.find(b"\n")
+            if newline >= 0:
+                if newline + 1 > max_bytes:
+                    raise ProtocolViolation("LSP header exceeds configured limit")
+                line = bytes(self._stdout_buffer[: newline + 1])
+                del self._stdout_buffer[: newline + 1]
+                return line
+            if len(self._stdout_buffer) >= max_bytes:
+                raise ProtocolViolation("LSP header exceeds configured limit")
+            remaining = max(0.0, deadline - time.monotonic())
+            if remaining <= 0:
+                raise RequestTimeout("LSP frame header timed out")
+            try:
+                ready, _, _ = select.select([stream.fileno()], [], [], remaining)
+            except (OSError, ValueError) as exc:
+                raise ProtocolViolation("LSP stdout is not selectable") from exc
+            if not ready:
+                raise RequestTimeout("LSP frame header timed out")
+            try:
+                read_size = min(4096, max_bytes - len(self._stdout_buffer))
+                if read_size <= 0:
+                    raise ProtocolViolation("LSP header exceeds configured limit")
+                chunk = stream.read(read_size)
+            except OSError as exc:  # pragma: no cover - platform I/O
+                raise ProtocolViolation("LSP frame header read failed") from exc
+            if not chunk:
+                raise ProtocolViolation("LSP server closed stdout")
+            self._stdout_buffer.extend(chunk)
 
-    def _read_payload_timeout(self, stream: Any, length: int) -> bytes:
+    def _read_payload_timeout(self, stream: Any, length: int, deadline: float) -> bytes:
         """Read one bounded body without allowing a stalled server to hang."""
+        if time.monotonic() >= deadline:
+            raise RequestTimeout("LSP frame payload timed out")
         payload = bytearray()
-        deadline = time.monotonic() + self.timeout
+        if self._stdout_buffer:
+            take = min(length, len(self._stdout_buffer))
+            payload.extend(self._stdout_buffer[:take])
+            del self._stdout_buffer[:take]
         while len(payload) < length:
             remaining = max(0.0, deadline - time.monotonic())
             if remaining <= 0:
@@ -503,12 +544,18 @@ class LspProcessSession:
             payload.extend(chunk)
         return payload
 
-    def _read_message(self) -> Mapping[str, Any]:
+    def _read_message(self, deadline: float | None = None) -> Mapping[str, Any]:
         if self.process is None or self.process.stdout is None:
             raise ProtocolViolation("LSP process is not running")
+        deadline = deadline if deadline is not None else time.monotonic() + self.timeout
         headers: dict[str, str] = {}
+        header_bytes = 0
         while True:
-            line = self._readline_timeout(self.process.stdout)
+            remaining_header = DEFAULT_MAX_HEADER_BYTES - header_bytes
+            if remaining_header <= 0:
+                raise ProtocolViolation("LSP headers exceed configured limit")
+            line = self._readline_timeout(self.process.stdout, deadline, remaining_header)
+            header_bytes += len(line)
             if not line:
                 raise ProtocolViolation("LSP server closed stdout")
             if line in (b"\r\n", b"\n"):
@@ -530,7 +577,7 @@ class LspProcessSession:
             raise ProtocolViolation("missing Content-Length") from exc
         if length < 0 or length > self.max_frame_bytes:
             raise ProtocolViolation("LSP frame exceeds configured limit")
-        payload = self._read_payload_timeout(self.process.stdout, length)
+        payload = self._read_payload_timeout(self.process.stdout, length, deadline)
         try:
             value = json.loads(payload.decode("utf-8"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -590,7 +637,7 @@ class LspProcessSession:
         try:
             while True:
                 try:
-                    message = self._read_message()
+                    message = self._read_message(time.monotonic() + quiet_seconds)
                 except RequestTimeout:
                     break
                 if self._respond_to_server_request(message):
@@ -609,7 +656,7 @@ class LspProcessSession:
         while True:
             if time.monotonic() > deadline:
                 raise RequestTimeout(f"LSP request timed out: {method}")
-            message = self._read_message()
+            message = self._read_message(deadline)
             if self._respond_to_server_request(message):
                 continue
             # Publish-diagnostics is a notification.  Keep it available to
@@ -672,18 +719,25 @@ class LspProcessSession:
 
 def language_for_path(path: Path) -> str | None:
     """Map a source suffix to its manifest language identifier."""
-    suffix = path.suffix.lower()
-    if suffix in {".py", ".pyi"}:
-        return "python"
-    if suffix in {".c"}:
-        return "c"
-    if suffix in {".cc", ".cpp", ".cxx", ".h", ".hh", ".hpp", ".hxx"}:
-        return "cpp"
-    if suffix in {".sh", ".bash", ".zsh"}:
-        return "shellscript"
-    if suffix == ".rs":
-        return "rust"
-    return None
+    return vector_search.language_for_path(path)
+
+
+def _contains_symlink(path: Path, root: Path) -> bool:
+    """Return whether an input path is noncanonical or has a symlink ancestor."""
+    try:
+        relative = path.absolute().relative_to(root)
+    except ValueError:
+        return False
+    current = root
+    for part in relative.parts:
+        if part == "..":
+            return True
+        if part in ("", "."):
+            continue
+        current /= part
+        if current.is_symlink():
+            return True
+    return False
 
 
 def _symbol_from(raw: Mapping[str, Any], uri: str) -> CodeSymbol:
@@ -743,7 +797,9 @@ def _location(value: Mapping[str, Any], root: Path) -> tuple[str, dict[str, int]
 
 
 def _lexical_candidates(root: Path, files: Sequence[Path]) -> list[LexicalDependencyCandidate]:
+    """Extract bounded lexical candidates with AST precision for Python."""
     patterns = (
+        re.compile(r"^\s*from\s+([.]+)\s+import\s+([A-Za-z_]\w*)"),
         re.compile(r"^\s*(?:from|import)\s+([A-Za-z_][\w.]*)"),
         re.compile(r"^\s*(?:source|\.)\s+([^\s#]+)"),
         re.compile(r'^\s*#\s*include\s*[<"]([^>"]+)[>"]'),
@@ -752,25 +808,40 @@ def _lexical_candidates(root: Path, files: Sequence[Path]) -> list[LexicalDepend
     results: list[LexicalDependencyCandidate] = []
     for path in files:
         try:
-            lines = path.read_text(encoding="utf-8").splitlines()
+            text = path.read_text(encoding="utf-8")
         except (OSError, UnicodeDecodeError):
             continue
         source = path.resolve().relative_to(root.resolve()).as_posix()
+        lines = text.splitlines()
+        if language_for_path(path) == "python":
+            try:
+                tree = ast.parse(text, filename=source)
+            except SyntaxError:
+                tree = None
+            if tree is not None:
+                results.extend(_python_ast_candidates(root, path, source, lines, tree))
+                continue
         for line_no, line in enumerate(lines):
             for pattern in patterns:
                 match = pattern.search(line)
                 if not match:
                     continue
-                token = match.group(1)
+                token = (
+                    f"{match.group(1)}{match.group(2)}"
+                    if match.lastindex == 2
+                    else match.group(1)
+                )
                 target = token
-                if token.startswith((".", "/")):
+                language = language_for_path(path) or "unknown"
+                if token.startswith("/") or (
+                    token.startswith(".") and language != "python"
+                ):
                     candidate = (path.parent / token).resolve(strict=False)
                     try:
                         target = candidate.relative_to(root.resolve()).as_posix()
                     except ValueError:
                         target = f"external:unknown:{token}"
                 else:
-                    language = language_for_path(path) or "unknown"
                     target = _resolve_lexical_target(root, path, language, token)
                 prefix = line[: max(line.find(token), 0)]
                 results.append(
@@ -787,6 +858,79 @@ def _lexical_candidates(root: Path, files: Sequence[Path]) -> list[LexicalDepend
         key = json.dumps(item.as_json(), sort_keys=True, ensure_ascii=False)
         unique.setdefault(key, item)
     return sorted(unique.values(), key=lambda item: (item.source, json.dumps(item.position, sort_keys=True), item.token, item.target))
+
+
+def _utf16_position(lines: Sequence[str], line_no: int, byte_offset: int) -> dict[str, int]:
+    """Convert an AST UTF-8 byte offset to an LSP UTF-16 position."""
+    line = lines[line_no] if 0 <= line_no < len(lines) else ""
+    prefix = line.encode("utf-8")[:byte_offset].decode("utf-8", errors="ignore")
+    return {"line": line_no, "character": len(prefix.encode("utf-16-le")) // 2}
+
+
+def _python_ast_candidates(
+    root: Path,
+    path: Path,
+    source: str,
+    lines: Sequence[str],
+    tree: ast.AST,
+) -> list[LexicalDependencyCandidate]:
+    """Return module and per-symbol candidates for parsed Python imports."""
+    results: list[LexicalDependencyCandidate] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                token = alias.name
+                position = _utf16_position(lines, alias.lineno - 1, alias.col_offset)
+                results.append(
+                    LexicalDependencyCandidate(
+                        source=source,
+                        token=token,
+                        target=_resolve_lexical_target(root, path, "python", token),
+                        position=position,
+                        legacy_kind="import",
+                    )
+                )
+        elif isinstance(node, ast.ImportFrom):
+            if node.level <= 0 and node.module is None:
+                continue
+            module_token = "." * node.level + (node.module or "")
+            module_line = lines[node.lineno - 1] if 0 < node.lineno <= len(lines) else ""
+            from_start = module_line.find("from")
+            module_column = module_line.find(module_token, max(from_start + 4, 0))
+            if module_column < 0:
+                module_column = node.col_offset
+            module_position = _utf16_position(
+                lines,
+                node.lineno - 1,
+                len(module_line[:module_column].encode("utf-8")),
+            )
+            results.append(
+                LexicalDependencyCandidate(
+                    source=source,
+                    token=module_token,
+                    target=_resolve_lexical_target(root, path, "python", module_token),
+                    position=module_position,
+                    legacy_kind="import",
+                )
+            )
+            for alias in node.names:
+                if alias.name == "*":
+                    continue
+                if module_token:
+                    separator = "" if module_token.endswith(".") else "."
+                    token = f"{module_token}{separator}{alias.name}"
+                else:
+                    token = alias.name
+                results.append(
+                    LexicalDependencyCandidate(
+                        source=source,
+                        token=token,
+                        target=_resolve_lexical_target(root, path, "python", token),
+                        position=_utf16_position(lines, alias.lineno - 1, alias.col_offset),
+                        legacy_kind="from-import-symbol",
+                    )
+                )
+    return results
 
 
 def _resolve_lexical_target(root: Path, source: Path, language: str, token: str) -> str:
@@ -911,7 +1055,11 @@ def analyze(
     root = root.resolve()
     resolved_files: list[Path] = []
     for value in files:
-        path = (root / Path(value)).resolve() if not Path(value).is_absolute() else Path(value).resolve()
+        raw_path = Path(value)
+        candidate = raw_path if raw_path.is_absolute() else root / raw_path
+        if candidate.is_symlink() or _contains_symlink(candidate, root):
+            return _failed_report(root, (), PathEscape(f"noncanonical or symlink file path is not allowed: {candidate}"), {})
+        path = candidate.resolve()
         try:
             path.relative_to(root)
         except ValueError:
@@ -994,16 +1142,34 @@ def analyze(
                                 target, position = _location(location, root)
                                 all_relations.append(CodeRelation("definition", candidate.source, target, position))
                     if matrix.references == "supported_facts":
-                        raw_refs = session.request("textDocument/references", {"textDocument": {"uri": uri}, "position": {"line": 0, "character": 0}, "context": {"includeDeclaration": True}})
-                        if raw_refs is None:
-                            raw_refs = []
-                        if not isinstance(raw_refs, list):
-                            raise MalformedResponse("references response must be a location list")
-                        for location in raw_refs:
-                            if not isinstance(location, Mapping):
-                                raise MalformedResponse("references response contains a non-object")
-                            target, position = _location(location, root)
-                            all_relations.append(CodeRelation("reference", path.relative_to(root).as_posix(), target, position))
+                        for symbol in symbols:
+                            selection_start = symbol.selection_range.get(
+                                "start", {"line": 0, "character": 0}
+                            )
+                            raw_refs = session.request(
+                                "textDocument/references",
+                                {
+                                    "textDocument": {"uri": uri},
+                                    "position": _position(selection_start),
+                                    "context": {"includeDeclaration": True},
+                                },
+                            )
+                            if raw_refs is None:
+                                raw_refs = []
+                            if not isinstance(raw_refs, list):
+                                raise MalformedResponse("references response must be a location list")
+                            for location in raw_refs:
+                                if not isinstance(location, Mapping):
+                                    raise MalformedResponse("references response contains a non-object")
+                                target, position = _location(location, root)
+                                all_relations.append(
+                                    CodeRelation(
+                                        "reference",
+                                        path.relative_to(root).as_posix(),
+                                        target,
+                                        position,
+                                    )
+                                )
                     session.drain_notifications()
                     if matrix.diagnostics == "supported_facts" and caps.get("diagnosticProvider"):
                         raw_diag = session.request("textDocument/diagnostic", {"textDocument": {"uri": uri}})
@@ -1112,7 +1278,7 @@ def _parse_server_specs(values: Sequence[str]) -> dict[str, LspServerSpec]:
 def _files_from_args(root: Path, values: Sequence[str] | None) -> list[Path]:
     if values is not None:
         return [Path(value) for value in values]
-    return [path for path in root.rglob("*") if path.is_file() and language_for_path(path) is not None and ".git" not in path.parts]
+    return list(vector_search.discover_lsp_files(root))
 
 
 def _legacy_lines(report: CodeAnalysisReport, root: Path, *, print_unresolved: bool = False) -> list[str]:
@@ -1132,7 +1298,9 @@ def _legacy_lines(report: CodeAnalysisReport, root: Path, *, print_unresolved: b
                 source_line = source_path.read_text(encoding="utf-8").splitlines()[candidate.position.get("line", 0) if candidate.position else 0]
             except (OSError, UnicodeDecodeError, IndexError):
                 source_line = candidate.token
-            kind = "from-import-symbol" if source_line.lstrip().startswith("from ") else "import"
+            kind = candidate.legacy_kind or (
+                "from-import-symbol" if source_line.lstrip().startswith("from ") else "import"
+            )
         else:
             output_language, kind = language, "lexical"
         try:
@@ -1161,7 +1329,11 @@ def _lexical_only_report(root: Path, files: Sequence[Path]) -> CodeAnalysisRepor
     root = root.resolve()
     resolved: list[Path] = []
     for path in files:
-        candidate = path.resolve() if path.is_absolute() else (root / path).resolve()
+        raw_path = path
+        candidate_path = raw_path if raw_path.is_absolute() else root / raw_path
+        if candidate_path.is_symlink() or _contains_symlink(candidate_path, root):
+            return _failed_report(root, (), PathEscape(f"noncanonical or symlink file path is not allowed: {candidate_path}"), {})
+        candidate = candidate_path.resolve()
         try:
             candidate.relative_to(root)
         except ValueError:
@@ -1207,7 +1379,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     """Run the selected analysis command and return its status."""
     args = build_parser().parse_args(argv)
     root = args.root.resolve()
-    files = _files_from_args(root, args.files)
+    files: list[Path]
     if args.command == "scan-legacy" and args.paths_file is not None:
         if args.files or args.changed:
             print("scan-legacy: --paths-file cannot be combined with --changed or --files", file=sys.stderr)
@@ -1221,9 +1393,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             changed = subprocess.run(["git", "diff", "--name-only", "HEAD", "--"], cwd=root, check=False, capture_output=True, text=True).stdout.splitlines()
             untracked = subprocess.run(["git", "ls-files", "--others", "--exclude-standard"], cwd=root, check=False, capture_output=True, text=True).stdout.splitlines()
-            files = [Path(value) for value in [*changed, *untracked] if value]
+            candidates = tuple(value for value in [*changed, *untracked] if value)
+            files = list(vector_search.discover_lsp_files(root, candidates)) if candidates else []
         except OSError:
             files = []
+    else:
+        files = _files_from_args(root, args.files)
     files = [path if path.is_absolute() else root / path for path in files]
     try:
         specs = _parse_server_specs(args.server)

@@ -58,6 +58,15 @@ push diagnostics は capability flag を仮定せず、短い quiet/drain 区間
 `--lexical-only` の場合だけ成功します。`--files` を省略した場合は自動検出し、
 `--files` を値なしで明示した場合は空選択として扱います。
 
+自動検出は search/vector と共有する bounded LSP surface (`tools`、`agents`、
+`.agents`、`documents`、`.codex`、`mcp`、`python`、`src`、`include`、`tests`) に
+限定し、`workspace`、`vendor`、
+`reports`、build/cache、retired legacy path、symlink、root 外 path を除外します。
+明示した file argument は root 内の通常ファイルであることを検証し、symlink は
+`path-escape` として拒否します。references は各 document symbol の
+`selectionRange.start` ごとに問い合わせ、response の全 location を検証してから
+deterministic relation に正規化します。
+
 `scan_code_dependencies.sh --lexical-only --analysis-json` は Rust の `mod`/`use`
 を canonical analysis-json sidecar に保存します。Rust は legacy TSV の行を生成せず、
 scanner の footer では対象ファイル数だけを報告します。

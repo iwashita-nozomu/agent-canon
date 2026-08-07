@@ -905,7 +905,7 @@ Dependency manifest checks live under `tools/agent_tools/` as thin canonical
 graph consumers.
 
 - `lsp_code_analysis.py` is the canonical LSP 3.17 code-analysis entrypoint. It emits the versioned JSON report with symbols, relations, diagnostics, capability coverage, lifecycle, and provenance. Manifest servers are launched only through `resolve_verified_executable`; a caller override must be an absolute executable path.
-- `scan_code_dependencies.sh` extracts compatibility code dependency edges from imports, local includes, and shell `source` statements. Use `--lexical-only` for an exact scanner-only projection; this is not a dependency header tool.
+- `scan_code_dependencies.sh` delegates normal code dependency scans to the canonical LSP `scan-legacy` projection. Use `--lexical-only` for the explicit compatibility extractor over imports, local includes, and shell `source` statements; this is not a dependency header tool.
 - `scan_dependency_headers.sh` reports parser-owned `manifest.present=false` graph evidence.
 - `check_dependency_header_format.sh` validates typed manifest context for selected paths; Rust owns syntax and registry checks.
 - `check_dependency_graph.sh` queries upstream and downstream facts and fails isolated manifests, self references, and cycles by default.

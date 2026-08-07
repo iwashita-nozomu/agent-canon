@@ -693,11 +693,15 @@ Example: A `upstream` B plus B `upstream` A is an upstream cycle and should fail
 
 ## Tool Split
 
-Tools are Bash-first.
-Python is not required for the first implementation because the DSL is line-oriented.
-
 Code dependency extraction is deliberately separate from dependency manifest validation.
-`scan_code_dependencies.sh` reads language syntax such as Python imports, local C/C++ includes, and shell source statements.
+`scan_code_dependencies.sh` is the compatibility command surface, while
+`lsp_code_analysis.py scan-legacy` owns the canonical code-relation projection.
+The shell wrapper delegates normal scans to that LSP command and uses its
+lexical extractor only when `--lexical-only` is explicit.
+The LSP adapter reads language syntax through server capabilities such as
+document symbols, definitions, references, and call hierarchy; the explicit
+lexical route still reads Python imports, local C/C++ includes, and shell source
+statements.
 The manifest tools read only `@dependency-start` / `@dependency-end` blocks.
 Do not combine these outputs into one graph: code dependency evidence answers "what does this code reference", while header dependency evidence answers "which design, implementation, environment, and test context must be read".
 
@@ -705,11 +709,12 @@ Do not combine these outputs into one graph: code dependency evidence answers "w
 
 Responsibilities:
 
-- extract best-effort code edges from import / include / source statements
+- delegate the normal scan to the canonical LSP `scan-legacy` report
 - keep output independent from manifest upstream/downstream edges
 - support explicit path lists and `--changed`
 - provide pre-edit evidence for `agents/workflows/hypothesis-validation-workflow.md`
-- remain Bash-first and lightweight; deeper language-specific precision can be added later without changing the header manifest DSL
+- require `--lexical-only` for the compatibility extractor and fail closed when
+  the canonical LSP server is unavailable
 
 ### `scan_dependency_headers.sh`
 

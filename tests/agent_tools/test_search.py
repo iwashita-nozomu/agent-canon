@@ -150,6 +150,68 @@ class CoordinatedSearchTest(unittest.TestCase):
                 ["src/header.hxx", "src/main.cpp", "src/main.py", "src/main.rs"],
             )
 
+    def test_default_lsp_discovery_is_bounded_and_skips_symlinks(self) -> None:
+        """Default discovery covers bounded code surfaces, not workspace artifacts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            for relative in (
+                "python/app.py",
+                "src/app.cpp",
+                "include/app.hpp",
+                "tests/test_app.py",
+                "tools/app.py",
+                "workspace/leak.py",
+                "vendor/leak.py",
+                "reports/leak.py",
+                "build/leak.py",
+                ".venv/leak.py",
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("x = 1\n", encoding="utf-8")
+            (root / "src" / "linked.py").symlink_to(root / "python" / "app.py")
+            discovered = search_tool.discover_lsp_files(root, (), ())
+            self.assertEqual(
+                [path.relative_to(root).as_posix() for path in discovered],
+                [
+                    "include/app.hpp",
+                    "python/app.py",
+                    "src/app.cpp",
+                    "tests/test_app.py",
+                    "tools/app.py",
+                ],
+            )
+
+    def test_explicit_lsp_file_beneath_symlink_ancestor_is_rejected(self) -> None:
+        """Explicit LSP discovery rejects a file reached through a symlink directory."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            real = root / "real"
+            real.mkdir()
+            (real / "main.py").write_text("x = 1\n", encoding="utf-8")
+            (root / "linked").symlink_to(real, target_is_directory=True)
+
+            discovered = search_tool.discover_lsp_files(root, ("linked/main.py",), ())
+
+            self.assertEqual(discovered, ())
+
+    def test_nonexistent_prefix_cannot_bypass_discovery_symlink_rejection(self) -> None:
+        """Discovery skips ``missing/../linked/file`` before path resolution."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            real = root / "real"
+            real.mkdir()
+            (real / "main.py").write_text("x = 1\n", encoding="utf-8")
+            (root / "linked").symlink_to(real, target_is_directory=True)
+
+            discovered = search_tool.discover_lsp_files(
+                root,
+                ("missing/../linked/main.py",),
+                (),
+            )
+
+            self.assertEqual(discovered, ())
+
     def test_load_corpus_supplies_cpp_and_rust_to_lsp_only(self) -> None:
         """Code-deps LSP input is broader than the text corpus, deterministically."""
         with tempfile.TemporaryDirectory() as tmp_dir:

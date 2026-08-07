@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from collections import defaultdict
 from collections.abc import Callable, Mapping, Sequence
@@ -220,75 +219,8 @@ def discover_lsp_files(
     requested_files: Sequence[str],
     excludes: Sequence[str],
 ) -> tuple[Path, ...]:
-    """Discover safe code files for the code-deps LSP sidecar only.
-
-    This deliberately mirrors the existing search path policy without changing
-    the general text/vector corpus suffix set.  Symlinks, paths escaping the
-    root, excluded parts, retired tool paths, and explicit excludes are all
-    rejected before a file reaches the language server.
-    """
-    root = root.resolve()
-    surfaces = tuple(requested_files) or vector_search.DEFAULT_SURFACES
-    excluded_parts = set(vector_search.EXCLUDED_PARTS)
-    discovered: dict[str, Path] = {}
-
-    def relative_safe(path: Path) -> str | None:
-        try:
-            return path.resolve(strict=False).relative_to(root).as_posix()
-        except ValueError:
-            return None
-
-    def accepted(path: Path) -> bool:
-        if path.is_symlink() or not path.is_file():
-            return False
-        relative = relative_safe(path)
-        if relative is None or lsp_code_analysis.language_for_path(path) is None:
-            return False
-        parts = set(Path(relative).parts)
-        if parts & excluded_parts:
-            return False
-        if vector_search.is_retired_legacy_tool_path(relative):
-            return False
-        return not vector_search.matches_exclude(relative, excludes)
-
-    def walk_surface(surface: Path) -> None:
-        if surface.is_symlink():
-            return
-        if surface.is_file():
-            if accepted(surface):
-                relative = relative_safe(surface)
-                if relative is not None:
-                    discovered[relative] = surface
-            return
-        if not surface.is_dir() or relative_safe(surface) is None:
-            return
-        for current_root, dirnames, filenames in os.walk(surface, followlinks=False):
-            current = Path(current_root)
-            kept_dirs: list[str] = []
-            for dirname in sorted(dirnames):
-                candidate = current / dirname
-                relative = relative_safe(candidate)
-                if (
-                    candidate.is_symlink()
-                    or relative is None
-                    or set(Path(relative).parts) & excluded_parts
-                    or vector_search.is_retired_legacy_tool_path(relative)
-                    or vector_search.matches_exclude(relative, excludes)
-                ):
-                    continue
-                kept_dirs.append(dirname)
-            dirnames[:] = kept_dirs
-            for filename in sorted(filenames):
-                candidate = current / filename
-                if accepted(candidate):
-                    relative = relative_safe(candidate)
-                    if relative is not None:
-                        discovered[relative] = candidate
-
-    for raw_surface in surfaces:
-        surface = Path(raw_surface)
-        walk_surface(surface if surface.is_absolute() else root / surface)
-    return tuple(discovered[key] for key in sorted(discovered))
+    """Delegate LSP discovery to the shared vector/search path policy."""
+    return vector_search.discover_lsp_files(root, requested_files, excludes)
 
 
 def load_corpus(request: SearchRequest) -> SearchCorpus:
