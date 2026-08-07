@@ -38,6 +38,28 @@ provides = ["codex"]
 failure_policy = "fail"
 
 [[records]]
+id = "pyright-language-server"
+package = "pyright"
+method = "npm-global"
+version = "1.1.411"
+source = "https://registry.npmjs.org/pyright"
+verification = { kind = "npm-package", executable = "pyright", args = ["--version"], output_contains = "1.1.411" }
+deps = ["node"]
+provides = ["pyright", "pyright-langserver"]
+failure_policy = "fail"
+
+[[records]]
+id = "bash-language-server"
+package = "bash-language-server"
+method = "npm-global"
+version = "5.6.0"
+source = "https://registry.npmjs.org/bash-language-server"
+verification = { kind = "npm-package", executable = "bash-language-server", args = ["--version"], output_contains = "5.6.0" }
+deps = ["node"]
+provides = ["bash-language-server"]
+failure_policy = "fail"
+
+[[records]]
 id = "playwright"
 package = "playwright"
 method = "npm-global"
@@ -224,9 +246,29 @@ method = "apt-package"
 version = "1:14.0-55~exp2"
 platform = "linux/amd64"
 source = "ubuntu:22.04"
+executable_owner_packages = ["clang-format", "clang-format-14"]
 verification = { kind = "apt-package", executable = "clang-format", args = ["--version"], output_contains = "Ubuntu clang-format version 14.0.0-1ubuntu1.1" }
 deps = []
 provides = ["clang-format"]
+failure_policy = "fail"
+
+[[records]]
+id = "clangd-language-server"
+package = "clangd-18"
+method = "apt-repository"
+version = "1:18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144"
+platform = "linux/amd64"
+source = "https://apt.llvm.org/jammy/"
+repository_suite = "llvm-toolchain-jammy-18"
+repository_components = ["main"]
+repository_packages_sha256 = "380ae90b5df8029aca2e30302427949f0a384d4970b156d843eeb0cea7fc4da2"
+repository_package_url = "https://apt.llvm.org/jammy/pool/main/l/llvm-toolchain-18/clangd-18_18.1.8~++20240731024944+3b5b5c1ec4a3-1~exp1~20240731145000.144_amd64.deb"
+repository_package_sha256 = "05ba173847cca9a3362155b9b7b59b3a7968195cde17dfa5e26bd777d9558660"
+key_url = "https://apt.llvm.org/llvm-snapshot.gpg.key"
+key_fingerprint = "6084F3CF814B57C1CF12EFD515CF4D18AF4F7421"
+verification = { kind = "apt-repository", executable = "clangd-18", args = ["--version"], output_contains = "clangd version 18.1.8" }
+deps = ["ca-certificates"]
+provides = ["clangd-18"]
 failure_policy = "fail"
 
 [[records]]
@@ -329,7 +371,7 @@ package = "rust"
 method = "rust-toolchain"
 version = "1.89.0"
 source = "https://static.rust-lang.org"
-components = ["rustfmt", "clippy", "rust-analyzer"]
+components = ["rust-src", "rustfmt", "clippy", "rust-analyzer"]
 verification = { kind = "rust-toolchain" }
 deps = ["rustup-init", "build-essential", "curl"]
 provides = ["rust", "cargo", "rustfmt", "clippy", "rust-analyzer"]

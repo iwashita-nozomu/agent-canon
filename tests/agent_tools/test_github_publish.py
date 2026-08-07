@@ -338,7 +338,6 @@ class GithubPublishTest(unittest.TestCase):
                 "git",
                 "push",
                 "-u",
-                "--force-with-lease",
                 "origin",
                 f"{CANDIDATE_SHA}:refs/heads/topic",
             ],
@@ -372,7 +371,6 @@ class GithubPublishTest(unittest.TestCase):
                 "git",
                 "push",
                 "-u",
-                "--force-with-lease",
                 "origin",
                 f"{CANDIDATE_SHA}:refs/heads/topic",
             ),
@@ -407,7 +405,6 @@ class GithubPublishTest(unittest.TestCase):
                 "git",
                 "push",
                 "-u",
-                "--force-with-lease",
                 "origin",
                 f"{CANDIDATE_SHA}:refs/heads/topic",
             ],
@@ -442,15 +439,58 @@ class GithubPublishTest(unittest.TestCase):
                 "git",
                 "push",
                 "-u",
-                "--force-with-lease",
                 "origin",
                 f"{CANDIDATE_SHA}:refs/heads/topic",
             ],
             [list(command) for command in runner.commands],
         )
 
-    def test_publish_pr_rejects_missing_packet(self) -> None:
-        """PR mutation retains the sealed publication packet requirement."""
+    def test_https_push_uses_process_local_gh_credential_helper(self) -> None:
+        """HTTPS push uses gh credentials without changing Git config."""
+        runner = FakeRunner()
+        runner.add(["git", "status", "--short", "--untracked-files=all"], stdout="")
+        runner.add_local_identity()
+        push = [
+            "git",
+            "-c",
+            "credential.helper=!gh auth git-credential",
+            "push",
+            "-u",
+            "origin",
+            f"{CANDIDATE_SHA}:refs/heads/topic",
+        ]
+        runner.add(push, stderr="pushed\n")
+        runner.add(
+            ["git", "ls-remote", "origin", "refs/heads/topic"],
+            stdout=f"{CANDIDATE_SHA}\trefs/heads/topic\n",
+        )
+        args = argparse.Namespace(
+            action="push",
+            root=".",
+            user_task="publish topic branch",
+            allow_main=False,
+            summary_out=None,
+        )
+        verification = github_publish.RemoteVerification(
+            repo="owner/repo",
+            remote="origin",
+            remote_url="https://github.com/owner/repo.git",
+            remote_slug="owner/repo",
+        )
+
+        summary = github_publish.perform_push(
+            args,
+            runner,
+            verification,
+            "topic",
+        )
+
+        self.assertEqual(summary["status"], "ok")
+        self.assertIn(tuple(push), runner.commands)
+        self.assertNotIn("--force-with-lease", push)
+
+    def test_publish_pr_without_packet_reaches_body_validation(self) -> None:
+        """PR mutation derives its lifecycle without requiring a packet file."""
         runner = FakeRunner()
         runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
         runner.add(
@@ -466,6 +506,7 @@ class GithubPublishTest(unittest.TestCase):
         )
         runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
         runner.add_verified_actor()
+        runner.add_publication_identity()
         args = argparse.Namespace(
             action="publish-pr",
             root=".",
@@ -485,7 +526,7 @@ class GithubPublishTest(unittest.TestCase):
         with self.assertRaises(github_publish.UserVisibleFailure) as raised:
             github_publish.run(args, runner)
 
-        self.assertIn("publication packet is missing", raised.exception.message)
+        self.assertIn("PR body file does not exist", raised.exception.message)
         self.assertFalse(any(command[1] == "push" for command in runner.commands))
 
     def test_push_rejects_local_candidate_mismatch_without_push_fallback(self) -> None:
@@ -574,7 +615,6 @@ class GithubPublishTest(unittest.TestCase):
                 "git",
                 "push",
                 "-u",
-                "--force-with-lease",
                 "origin",
                 f"{CANDIDATE_SHA}:refs/heads/topic",
             ],
@@ -728,7 +768,6 @@ class GithubPublishTest(unittest.TestCase):
                 "git",
                 "push",
                 "-u",
-                "--force-with-lease",
                 "origin",
                 f"{CANDIDATE_SHA}:refs/heads/topic",
             ],
@@ -832,11 +871,208 @@ class GithubPublishTest(unittest.TestCase):
                 summary_out=None,
             )
 
-            packet = self.publication_packet(args, runner)
-            summary = github_publish.run(args, runner, publication_packet=packet)
+            summary = github_publish.run(args, runner)
 
         self.assertEqual(summary["action"], "pr-create")
         self.assertEqual(summary["pr_url"], "https://github.com/owner/repo/pull/1")
+        self.assertNotIn("g3_gate", summary)
+
+    def test_pr_update_without_packet_uses_direct_lifecycle(self) -> None:
+        """PR update accepts exact local/base evidence without G1/G2/G3."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            body = Path(temp_dir) / "body.md"
+            body.write_text("updated body\n", encoding="utf-8")
+            runner = FakeRunner()
+            runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
+            runner.add(
+                [
+                    "gh",
+                    "repo",
+                    "view",
+                    "owner/repo",
+                    "--json",
+                    "nameWithOwner,url,sshUrl,viewerPermission",
+                ],
+                stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
+            )
+            runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+            runner.add_verified_actor()
+            runner.add_publication_identity()
+            runner.add(
+                [
+                    "gh",
+                    "pr",
+                    "list",
+                    "--repo",
+                    "owner/repo",
+                    "--head",
+                    "topic",
+                    "--state",
+                    "open",
+                    "--json",
+                    "number,url,title,headRefName,baseRefName",
+                ],
+                stdout='[{"number":3,"url":"https://github.com/owner/repo/pull/3","title":"Old","headRefName":"topic","baseRefName":"main"}]',
+            )
+            runner.add(
+                [
+                    "gh",
+                    "pr",
+                    "edit",
+                    "3",
+                    "--repo",
+                    "owner/repo",
+                    "--title",
+                    "Title",
+                    "--body-file",
+                    str(body),
+                ],
+                stdout="updated\n",
+            )
+            runner.add(
+                [
+                    "gh",
+                    "pr",
+                    "view",
+                    "3",
+                    "--repo",
+                    "owner/repo",
+                    "--json",
+                    "number,url,state,isDraft,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
+                ],
+                stdout=(
+                    '{"number":3,"url":"https://github.com/owner/repo/pull/3",'
+                    f'"state":"OPEN","isDraft":false,"baseRefName":"main","baseRefOid":"{BASE_SHA}",'
+                    f'"headRefName":"topic","headRefOid":"{CANDIDATE_SHA}",'
+                    '"headRepository":{"nameWithOwner":"owner/repo"},'
+                    '"reviewDecision":"","reviews":[],"mergeCommit":null}'
+                ),
+            )
+            args = argparse.Namespace(
+                action="pr",
+                root=".",
+                user_task="update PR",
+                repo="owner/repo",
+                remote="origin",
+                branch=None,
+                base="main",
+                title="Title",
+                body_file=str(body),
+                draft=False,
+                update_existing=True,
+                summary_out=None,
+            )
+
+            summary = github_publish.run(args, runner)
+
+        self.assertEqual(summary["action"], "pr-update")
+        self.assertNotIn("g3_gate", summary)
+
+    def test_publish_pr_without_packet_pushes_and_creates_pr(self) -> None:
+        """publish-pr derives lifecycle directly and performs one normal push."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            body = Path(temp_dir) / "body.md"
+            body.write_text("body\n", encoding="utf-8")
+            runner = FakeRunner()
+            runner.add(["git", "symbolic-ref", "--quiet", "--short", "HEAD"], stdout="topic\n")
+            runner.add(
+                [
+                    "gh",
+                    "repo",
+                    "view",
+                    "owner/repo",
+                    "--json",
+                    "nameWithOwner,url,sshUrl,viewerPermission",
+                ],
+                stdout='{"nameWithOwner":"owner/repo","url":"https://github.com/owner/repo","sshUrl":"git@github.com:owner/repo.git","viewerPermission":"WRITE"}',
+            )
+            runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
+            runner.add_verified_actor()
+            runner.add_publication_identity()
+            runner.add(["git", "status", "--short", "--untracked-files=all"], stdout="")
+            runner.add_local_identity()
+            runner.add(
+                ["git", "push", "-u", "origin", f"{CANDIDATE_SHA}:refs/heads/topic"],
+                stderr="pushed\n",
+            )
+            runner.add(
+                ["git", "ls-remote", "origin", "refs/heads/topic"],
+                stdout=f"{CANDIDATE_SHA}\trefs/heads/topic\n",
+            )
+            runner.add(
+                [
+                    "gh",
+                    "pr",
+                    "list",
+                    "--repo",
+                    "owner/repo",
+                    "--head",
+                    "topic",
+                    "--state",
+                    "open",
+                    "--json",
+                    "number,url,title,headRefName,baseRefName",
+                ],
+                stdout="[]",
+            )
+            runner.add(
+                [
+                    "gh",
+                    "pr",
+                    "create",
+                    "--repo",
+                    "owner/repo",
+                    "--base",
+                    "main",
+                    "--head",
+                    "topic",
+                    "--title",
+                    "Title",
+                    "--body-file",
+                    str(body),
+                ],
+                stdout="https://github.com/owner/repo/pull/4\n",
+            )
+            runner.add(
+                [
+                    "gh",
+                    "pr",
+                    "view",
+                    "topic",
+                    "--repo",
+                    "owner/repo",
+                    "--json",
+                    "number,url,state,isDraft,baseRefName,baseRefOid,headRefName,headRefOid,headRepository,reviewDecision,reviews,mergeCommit",
+                ],
+                stdout=(
+                    '{"number":4,"url":"https://github.com/owner/repo/pull/4",'
+                    f'"state":"OPEN","isDraft":false,"baseRefName":"main","baseRefOid":"{BASE_SHA}",'
+                    f'"headRefName":"topic","headRefOid":"{CANDIDATE_SHA}",'
+                    '"headRepository":{"nameWithOwner":"owner/repo"},'
+                    '"reviewDecision":"","reviews":[],"mergeCommit":null}'
+                ),
+            )
+            args = argparse.Namespace(
+                action="publish-pr",
+                root=".",
+                user_task="publish PR",
+                repo="owner/repo",
+                remote="origin",
+                branch=None,
+                base="main",
+                title="Title",
+                body_file=str(body),
+                draft=False,
+                update_existing=False,
+                allow_main=False,
+                summary_out=None,
+            )
+
+            summary = github_publish.run(args, runner)
+
+        self.assertEqual(summary["action"], "publish-pr")
+        self.assertEqual(summary["push"]["publication_boundary"], "verified_lifecycle")
+        self.assertNotIn("g3_gate", summary)
 
     def test_checks_reports_pending_without_failure(self) -> None:
         """Pending GitHub checks should be a state, not a tool failure."""
@@ -848,7 +1084,6 @@ class GithubPublishTest(unittest.TestCase):
         )
         runner.add(["git", "remote", "get-url", "origin"], stdout="git@github.com:owner/repo.git\n")
         runner.add_verified_actor()
-        runner.add_publication_identity()
         runner.add(
             ["gh", "pr", "checks", "1", "--repo", "owner/repo", "--watch=false"],
             stdout="static-gates\tpending\t0\turl\t\n",
@@ -866,11 +1101,12 @@ class GithubPublishTest(unittest.TestCase):
             summary_out=None,
         )
 
-        packet = self.publication_packet(args, runner)
-        summary = github_publish.run(args, runner, publication_packet=packet)
+        summary = github_publish.run(args, runner)
 
         self.assertEqual(summary["status"], "pending")
         self.assertEqual(summary["next_action"], "wait_for_github_checks_or_rerun_with_--watch")
+        self.assertNotIn("pull_request_lifecycle", summary)
+        self.assertNotIn("g3_gate", summary)
 
     def test_mutation_adapter_rejects_unsealed_publication_authority(self) -> None:
         """Direct mutation calls cannot fabricate lifecycle or G3 authority."""

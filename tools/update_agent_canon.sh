@@ -20,32 +20,7 @@ export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_DIR}/lib/repo_paths.sh"
 source "${SCRIPT_DIR}/lib/update_materialization.sh"
-if [ -f "${SCRIPT_DIR}/lib/git_authority.sh" ]; then
-  source "${SCRIPT_DIR}/lib/git_authority.sh"
-else
-  git_authority_check_protected_git_authority() {
-    case "${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY:-}" in
-      explicit_user_approval|agent_canon_workflow|agent_update_route|workflow_authorized)
-        case "${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY:-}" in
-          explicit_user_approval|agent_canon_workflow|agent_update_route|agent_branch_authorized)
-            return 0
-            ;;
-        esac
-        ;;
-    esac
-    return 1
-  }
-
-  git_authority_check_commit_request_evidence() {
-    echo "$AGENT_CANON_COMMIT_REQUEST_EVIDENCE" | grep -Eq '^evidence:[0-9a-f]{64}$' && return 0
-    return 1
-  }
-
-  git_authority_check_commit_provenance() {
-    git_authority_check_protected_git_authority "$@" && return 0
-    return 1
-  }
-fi
+source "${SCRIPT_DIR}/lib/git_authority.sh"
 ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")"
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
@@ -56,6 +31,7 @@ if [ "$(git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.path
 fi
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
+BRANCH_WORKTREE_NEXT_ACTION="request_branch_or_worktree_creation_authority_then_rerun_same_command_with_inline_git_authority_and_reason"
 COMMIT_AUTOMATION_AUTHOR_NAME="AgentCanon Sync Automation"
 COMMIT_AUTOMATION_AUTHOR_EMAIL="agent-canon-sync@automation.invalid"
 COMMIT_PROVENANCE_NEXT_ACTION="set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex> and rerun the same command"
@@ -112,134 +88,12 @@ die() {
   exit 1
 }
 
-classify_parent_vendor_source() {
-  local requested_topic="${1:-${AGENT_CANON_TOPIC_SLUG:-}}"
-  local current_branch=""
-  local source_head=""
-  local parent_prefix_head=""
-  local source_status=""
-  local fallback_topic=""
-  local workspace_root=""
-
-  if [ "$AGENT_CANON_SOURCE_MODE" != "parent_projection" ]; then
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=standalone_source"
-    return 0
-  fi
-
-  current_branch="$(git -C "$ROOT_DIR/$PREFIX" symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
-  source_head="$(git -C "$ROOT_DIR/$PREFIX" rev-parse HEAD 2>/dev/null || true)"
-  source_status="$(git -C "$ROOT_DIR/$PREFIX" status --short --untracked-files=all 2>/dev/null || true)"
-  parent_prefix_head="$(git -C "$ROOT_DIR" rev-parse ":$PREFIX" 2>/dev/null || true)"
-
-  if [ -n "$source_status" ]; then
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=dirty_worktree"
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=${current_branch:-<detached>}"
-    echo "AGENT_CANON_PARENT_PREFIX_HEAD=$parent_prefix_head"
-    if [ -z "$requested_topic" ]; then
-      echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=required"
-      echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-      echo "NEXT_ACTION=topic_identity_required"
-      return 2
-    fi
-
-    if [ "$requested_topic" = "$DEFAULT_BRANCH" ] || [ "$requested_topic" = "main" ]; then
-      echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=invalid_default_branch"
-      echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-      echo "NEXT_ACTION=topic_identity_required"
-      return 2
-    fi
-
-    if [ -n "$current_branch" ] && [ "$requested_topic" = "$current_branch" ]; then
-      echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=$requested_topic"
-      echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-      echo "NEXT_ACTION=materialize_current_vendor_topic_commit_push_pr_then_resume"
-      return 2
-    fi
-
-    fallback_topic="$(sanitize_ref_component "$requested_topic")"
-    if [ "$fallback_topic" = "$DEFAULT_BRANCH" ] || [ "$fallback_topic" = "main" ]; then
-      echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=invalid_default_branch"
-      echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-      echo "NEXT_ACTION=topic_identity_required"
-      return 2
-    fi
-    workspace_root="$(dirname "$ROOT_DIR")/workspace/$fallback_topic/agent-canon"
-    echo "AGENT_CANON_PARENT_TOPIC_IDENTITY=$requested_topic"
-    echo "AGENT_CANON_PARENT_BRANCH_SOURCE_CLONE_PATH=$workspace_root"
-    echo "AGENT_CANON_REPOSITORY_TOPIC_CLONE_OWNER=tools/agent_tools/repository_topic_clone.py"
-    echo "AGENT_CANON_DEPENDENCY_MODULE_ROUTE=documents/rule/dependency-module-changes.md"
-    echo "AGENT_CANON_DEPENDENCY_MODULE_TOOL=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic $fallback_topic --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
-    echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-    echo "NEXT_ACTION=prepare_generic_repository_topic_clone_via_dependency_decorator"
-    return 2
-  fi
-
-  if [ -z "$source_head" ] || [ -z "$current_branch" ]; then
-    if [ -n "$source_head" ]; then
-      echo "AGENT_CANON_PARENT_VENDOR_SOURCE_HEAD=$source_head"
-    else
-      echo "AGENT_CANON_PARENT_VENDOR_SOURCE_HEAD=<unknown>"
-    fi
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=detached_head"
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=<detached>"
-    echo "AGENT_CANON_PARENT_PIN_STATUS=unusable_state"
-    echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-    echo "NEXT_ACTION=request_user_direction_preserve_current_checkout_then_rerun_with_inline_git_authority_and_reason"
-    return 3
-  fi
-
-  if [ "$current_branch" = "$DEFAULT_BRANCH" ]; then
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=default_branch"
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=$current_branch"
-    echo "AGENT_CANON_PARENT_PIN_STATUS=needs_topic_branch"
-    echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-    echo "NEXT_ACTION=checkout_or_create_topic_branch_from_$DEFAULT_BRANCH"
-    return 1
-  fi
-
-  if [ -z "$parent_prefix_head" ] || [ "$source_head" != "$parent_prefix_head" ]; then
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=pin_mismatch"
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=$current_branch"
-    echo "AGENT_CANON_PARENT_VENDOR_PIN=$parent_prefix_head"
-    echo "AGENT_CANON_PARENT_VENDOR_SOURCE_HEAD=$source_head"
-    echo "AGENT_CANON_REPOSITORY_TOPIC_CLONE_OWNER=tools/agent_tools/repository_topic_clone.py"
-    echo "AGENT_CANON_DEPENDENCY_MODULE_ROUTE=documents/rule/dependency-module-changes.md"
-    echo "AGENT_CANON_DEPENDENCY_MODULE_TOOL=python3 tools/agent_tools/dependency_module_change.py --root . prepare --topic ${current_branch} --module $PREFIX --branch <source-branch> --owner-evidence <owner-evidence>"
-    echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=forbidden"
-    echo "NEXT_ACTION=prepare_generic_repository_topic_clone_via_dependency_decorator"
-    return 2
-  fi
-
-  echo "AGENT_CANON_PARENT_VENDOR_SOURCE_STATE=clean_topic_branch"
-  echo "AGENT_CANON_PARENT_VENDOR_SOURCE_BRANCH=$current_branch"
-  echo "AGENT_CANON_PARENT_PREFIX_HEAD=$parent_prefix_head"
-  echo "AGENT_CANON_PARENT_VENDOR_STATE_PRESERVATION=allowed"
-  return 0
-}
-
-require_protected_git_authority() {
+protected_git_authority_failure() {
   local mode="$1"
-  if git_authority_check_protected_git_authority "$mode"; then
-    return 0
-  fi
-
-  echo "DESTRUCTIVE_GIT_GUARD=block"
-  echo "BRANCH_WORKTREE_CREATION_GUARD=block"
-  echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
-  echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
-  die "protected AgentCanon update requires same-command branch/worktree and explicit destructive approval authority"
-}
-
-require_commit_request_evidence() {
-  local mode="$1"
-  if git_authority_check_commit_request_evidence; then
-    return 0
-  fi
-
-  echo "COMMIT_PROVENANCE_GUARD=block"
-  echo "AGENT_CANON_COMMIT_PROVENANCE_SUBCOMMAND=$mode"
-  echo "NEXT_ACTION=$COMMIT_PROVENANCE_NEXT_ACTION"
-  die "auto-commit requires AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>"
+  git_authority_emit_failure \
+    "$mode" "$PROTECTED_GIT_NEXT_ACTION" "$BRANCH_WORKTREE_NEXT_ACTION" \
+    "protected AgentCanon update requires same-command"
+  die "$GIT_AUTHORITY_FAILURE_DETAIL"
 }
 
 require_commit_provenance() {
@@ -249,11 +103,7 @@ require_commit_provenance() {
   fi
 
   if ! git_authority_check_protected_git_authority "$mode"; then
-    echo "DESTRUCTIVE_GIT_GUARD=block"
-    echo "BRANCH_WORKTREE_CREATION_GUARD=block"
-    echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
-    echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
-    die "protected AgentCanon update requires same-command branch/worktree and explicit destructive approval authority"
+    protected_git_authority_failure "$mode"
   fi
 
   echo "COMMIT_PROVENANCE_GUARD=block"

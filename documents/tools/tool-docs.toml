@@ -227,3 +227,10 @@ tool = "tools/agent_tools/check_proof_trace_alignment.py"
 doc = "documents/tools/check_proof_trace_alignment.md"
 language = "python"
 summary = "Proof trace code-path and proposition alignment checker documentation."
+
+[[tool]]
+id = "lsp-code-analysis"
+tool = "tools/agent_tools/lsp_code_analysis.py"
+doc = "documents/tools/lsp_code_analysis.md"
+language = "python"
+summary = "Canonical LSP 3.17 code-analysis protocol, report schema, and legacy adapter documentation."

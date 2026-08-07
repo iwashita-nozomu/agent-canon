@@ -33,6 +33,42 @@ file size、diff size で owner route を固定しません。
 - `python3 tools/agent_tools/repository_topic_clone.py cleanup ...`
 
 `--workspace-root` は既存 topic root を再利用し、指定 topic の
-`workspace/<topic-slug>` だけを管理します。exact local/remote branch は同じ prepare で
-再利用し、不一致は state-preserving typed collision とします。specialized adapter が
-適用外でもこの generic operation は継続します。
+`workspace/<topic-slug>` だけを管理します。task owner の非空 `--owner-evidence` と
+computed path / remote / branch identity が検証できる場合、canonical `prepare` と
+`merge-main` は個別操作ごとの追加承認なしで実行します。reuse は `prepare` に含まれます。これはこの
+canonical lifecycle command が workspace 管理と衝突保持を所有するためであり、raw
+shared-checkout Git の承認境界を緩和するものではありません。
+
+`prepare` と `merge-main` は selected repository root の Git toplevel、既存 symlink component、
+regular/tracked root `.gitignore`、および repository-owned `workspace/` ignore probe を
+clone/topic directory の作成前に検証します。検証を通った request は computed
+`workspace/<topic-slug>/<repo-name>` に到達し、invalid root、nested root、missing/untracked
+`.gitignore`、global/info exclude は typed failure として作成前の state を保持します。
+
+`dependency_module_change.py status` は dependency adapter の read-only 状態確認です。
+これは generic lifecycle、owner-evidence、または operation-level approval carve-out の
+対象ではありません。
+
+exact local/remote branch は同じ prepare で再利用し、不一致は
+state-preserving typed collision とします。作業完了時はこの skill が computed clone path を
+canonical tool に渡し、selected Git toplevel、owner evidence/marker、URL、branch、clean
+non-detached state、および fetch した `origin/<branch>` の commit/tree と local head/tree の
+一致を preflight します。通常の closeout は workspace packet artifact を作らず、preflight が
+成功した場合だけ `CleanupProof` / cleanup receipt を受け取ります。失敗時は clone と topic
+root を保持した typed hold にします。specialized adapter が適用外でもこの generic operation
+は継続します。
+
+marker は canonical `repository-topic-clone.*` namespace を優先します。canonical marker が
+完全に欠ける既存 dependency clone だけは、legacy `agent-canon.topic.*` の topic、
+role=`module`、module basename、normalized URL、branch、placement=`workspace-continuation`、
+owner-evidence SHA が全て一致する場合に限り read-only compatibility として扱います。
+partial/mismatch/unknown role・placement は typed hold で、cleanup dry-run は Git config marker
+を書き換えません。
+
+candidate CAS、PR lifecycle、publication readback は任意の追加 evidence です。いずれかを
+渡す場合だけ candidate CAS と PR lifecycle の coherent set を検証し、merged state では
+strict publication readback、merge tree、`origin/main` containment を追加確認します。
+publication evidence は proof を enrich しますが、通常の cleanup のために materialize しません。
+cleanup の exact-root gate は維持しつつ、既存 clone の proof-gated removal は root ignore の
+後続 driftだけで止めません。`dependency_module_change.py status` と `projected_clone_path`
+は read-only projection のままで directory を作成しません。

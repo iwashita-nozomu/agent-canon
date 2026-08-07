@@ -2,7 +2,7 @@
 name: paper-writing
 description: "Use when drafting a submission paper, thesis chapter, or other paper-style manuscript that needs section contracts, citation-evidence review, notation review, and logic-gap review."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"4fbd6a152881002c592ffc999bb1f1d027575088653db9d67fe616845c7a4e2c"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"eb0925a60009bfaa87c16f54292059c1bf6f6d399355f3e23cde967aaabebcb5"} -->
 
 <!--
 @dependency-start

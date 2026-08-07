@@ -316,8 +316,6 @@ PY
 
 (
   cd "${AGENT_CANON_TEST_WORK}"
-  AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
-  AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance materializes the canonical source lifecycle" \
   AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
   AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
   AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
@@ -386,8 +384,6 @@ bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" plan | tee "${TMP_DIR}/agent-ca
 assert_update_plan_acceptance \
   "${TMP_DIR}/agent-canon-plan.txt" \
   "already_current_submodule|deferred_branch_pr|subtree_pull|submodule_update"
-AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
-AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
 AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
 AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
@@ -405,8 +401,6 @@ GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash "${CLONE_TOOLS_ROOT}/update_age
 assert_update_plan_acceptance \
   "${TMP_DIR}/agent-canon-no-subtree-plan.txt" \
   "deferred_branch_pr|snapshot_import_tree_match|snapshot_import_no_subtree|submodule_update"
-AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow \
-AGENT_CANON_BRANCH_WORKTREE_REASON="fresh clone acceptance exercises the canonical submodule update workflow" \
 AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
 AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \

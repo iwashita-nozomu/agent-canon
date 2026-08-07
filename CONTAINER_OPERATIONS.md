@@ -101,12 +101,14 @@ developer convenience.
 
 The mounted workspace devcontainer contract is separate. The fixed
 `.devcontainer/bootstrap-dependencies.sh` establishes only the base capabilities
-needed to read a manifest: `python3` with `tomllib` or `tomli` and
+needed to read a manifest. `postCreateCommand` invokes this shell-owned bootstrap
+with `--install` before it invokes the Python source-root wrapper, so the
+bootstrap establishes `python3`/`tomllib` or `tomli` and
 `python3-packaging` for structured PEP 508 parsing, pinned Node/npm 22.14.0
-with architecture-specific SHA256 verification, `ninja-build`, and the fixed
-APT-repository prerequisite `gnupg` with a working `gpg` executable. The bootstrap
-checks `gpg` before any repository-key/source operation and fails closed when the
-capability is absent.
+with architecture-specific SHA256 verification, `ninja-build`, `build-essential`,
+and the fixed APT-repository prerequisite `gnupg` with a working `gpg`
+executable. It also checks `cc` and `gcc` before any repository-key/source
+operation and fails closed when the bootstrap capability is absent.
 `.devcontainer/dependencies.toml` then describes mounted developer/agent tools.
 The shared post-create validates and merges the parent manifest before the
 AgentCanon manifest, validates the complete graph, and executes it only after
@@ -225,6 +227,38 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   identity, followed by any typed record-owned executable/version check. Raw
   `dpkg --verify` output is not a blocking oracle because official Ubuntu
   images may intentionally exclude documentation and manpage payloads.
+- LSP language servers used by shared code analysis are mounted
+  developer/agent tools and belong in typed manifest records, never in a
+  product Dockerfile. The canonical records pin Pyright 1.1.411, Bash
+  Language Server 5.6.0, `clangd-18` from the signed Jammy LLVM repository,
+  and Rust 1.89.0 with `rust-src` and `rust-analyzer`. `python`, `c`/`cpp`,
+  `shellscript`, and `rust` resolve to the verified commands
+  `pyright-langserver --stdio`, `clangd-18`, `bash-language-server start`,
+  and `rust-analyzer`; ambient PATH discovery is not a substitute for a
+  manifest record.
+- An `apt-repository` record declares its typed suite and components. When it
+  carries `repository_packages_sha256`, the installer derives the canonical
+  uncompressed Packages URL from source, suite, component, and `platform`,
+  downloads it, and fails closed on a missing or mismatched digest before the
+  repository is accepted. A record may additionally carry the paired
+  `repository_package_url` and `repository_package_sha256` immutable `.deb`
+  identity; the installer downloads that exact artifact, verifies its SHA-256,
+  then installs the local file while retaining dependency resolution through
+  the signed repository. Its signed source line and any declared executable
+  verification are read back exactly; the rolling Packages digest and
+  immutable artifact digest are separate receipt fields.
+- A successful dependency receipt atomically records the plan/record
+  fingerprints, verification contract, and `executable_bindings` for every
+  provided LSP binary. `resolve_verified_executable(workspace, vendor_root,
+  receipts, record_id, executable)` accepts a binary only after the exact
+  record and receipt match, the installer performs live method-specific
+  verification, the current absolute executable path is resolved, and both
+  path and verification-output identity match the receipt. npm records bind
+  `pyright` and `pyright-langserver` to the same package; apt binds the
+  declared executable owner package set's lexical/resolved paths from
+  `/usr/bin/dpkg-query --listfiles` ownership output; Rust binds the pinned
+  toolchain's `rust-analyzer` path. Ambient `PATH` or `shutil.which` never
+  participates.
 - Lean theorem-proving tooling used by formal-proof skills, including
   `elan`, Lean, and Lake, belongs in `.devcontainer/post-create.sh` when it is
   only needed for AgentCanon proof tooling and is declared by exact

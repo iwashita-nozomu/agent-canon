@@ -22,7 +22,7 @@ downstream implementation ../../../tools/sync_agent_canon.sh pin and root projec
 developer/agent tool record だけを置きます。schema は
 `agent-canon.devcontainer-dependencies` version `2`、record は
 `id/package/method/version/source/verification/deps/provides/failure_policy` を
-必須とし、method-specific な key fingerprint、checksum、
+必須とし、method-specific な key fingerprint、checksum、`executable_owner_packages`、
 repo/commit/source_identity/locked、browser fields も型付きで記録します。
 `verification` は method と一致する
 closed kind と owner-specific fields を持ち、generic command 配列や
@@ -38,6 +38,9 @@ SHA を manifest に複製しません。
 standalone AgentCanon では `.devcontainer/dependencies.toml` 自身を一度だけ
 読みます。親 record の値は常に保持し、vendor は欠落値を補い、互換な
 `deps/provides/components/checksums/assets` だけを union します。
+`apt-package` と `apt-repository` は `executable_owner_packages` を必須とします。
+`receipt` 上の executable binding に対する所有境界検証は `tools/agent_tools/devcontainer_dependencies.py` で行います。
+検証対象は所有者集合を列挙する `.devcontainer/dependencies.toml` です。
 `verification` は同一でなければ incompatible duplicate として fail します。
 scalar の不一致、重複 provider、missing dependency、cycle は fail です。
 manifest の全体 validation が pass するまで、derived install に進めません。

@@ -53,6 +53,7 @@ class SelectorFailure(RuntimeError):
     """One typed selector failure."""
 
     def __init__(self, reason: str, evidence: str) -> None:
+        """Bind a typed failure reason and evidence string."""
         super().__init__(reason)
         self.reason = reason
         self.evidence = evidence
@@ -390,12 +391,6 @@ def git_output(
 
 def github_event_base(environment: Mapping[str, str]) -> tuple[str, str]:
     """Resolve the trusted base SHA from one GitHub pull request event."""
-    override = environment.get("AGENT_CANON_PR_BASE_REF", "").strip()
-    if override:
-        raise SelectorFailure(
-            "ci_base_override_forbidden",
-            "source=AGENT_CANON_PR_BASE_REF",
-        )
     if environment.get("GITHUB_ACTIONS", "").lower() != "true":
         raise SelectorFailure(
             "trusted_pr_base_unavailable",
@@ -437,11 +432,11 @@ def trusted_base_ref(
     environment: Mapping[str, str],
     trusted_base_sha: str | None = None,
 ) -> tuple[str, str]:
-    """Resolve a prepared CI base or an explicit validated local/test override."""
+    """Consume the owner-selected trusted base without selecting a fallback."""
     github_actions = environment.get("GITHUB_ACTIONS", "").lower() == "true"
     if github_actions:
         event_base, source = github_event_base(environment)
-        prepared = (trusted_base_sha or "").strip()
+        prepared = trusted_base_sha.strip() if isinstance(trusted_base_sha, str) else ""
         if not HEX_SHA_RE.fullmatch(prepared):
             raise SelectorFailure(
                 "trusted_pr_base_argument_invalid",
@@ -454,28 +449,18 @@ def trusted_base_ref(
             )
         return event_base, source
 
-    if trusted_base_sha is not None:
+    if trusted_base_sha is None:
         raise SelectorFailure(
-            "local_trusted_base_argument_forbidden",
+            "local_trusted_base_argument_required",
             "argument=trusted_base_sha",
         )
-    override = environment.get("AGENT_CANON_PR_BASE_REF", "").strip()
-
-    if not override:
+    prepared = trusted_base_sha.strip()
+    if not HEX_SHA_RE.fullmatch(prepared):
         raise SelectorFailure(
-            "local_base_override_required",
-            "source=AGENT_CANON_PR_BASE_REF",
+            "local_trusted_base_argument_invalid",
+            "argument=trusted_base_sha",
         )
-    if (
-        override.startswith("-")
-        or any(character.isspace() for character in override)
-        or "\x00" in override
-    ):
-        raise SelectorFailure(
-            "local_base_override_invalid",
-            "source=AGENT_CANON_PR_BASE_REF",
-        )
-    return override, "explicit_local_base_override"
+    return prepared.lower(), "owner_trusted_base_sha"
 
 
 def base_history_ready(root: Path, base_sha: str, head_sha: str) -> bool:
@@ -987,7 +972,6 @@ def validate_source_diagnostic(
         f"{owner}.declaration_components",
         frozenset({"direction", "kind", "target", "reason"}),
     )
-    components = cast(DiagnosticDeclarationComponents, components_payload)
     direction = diagnostic_payload_string(
         components_payload,
         "direction",

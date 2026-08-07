@@ -280,6 +280,13 @@ PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_sou
 ## upstream sync
 
 template 側で shared canon sourceを直すときは、topic workspace source cloneを使います。
+`dependency_module_change.py prepare` は task owner の非空 owner evidence と
+`workspace/<topic-slug>/<repo-name>` の exact identity を検証したうえで実行します。
+この repo-local lifecycle command の作成・再利用・使用には operation-level の追加承認を
+要求しません。作業完了時は同じ canonical lifecycle の `cleanup` に candidate CAS、PR
+lifecycle、必要な publication readback を渡し、`CleanupProof` receipt が返った場合だけ
+`--apply` を使います。proof 不一致や unknown dirty/collision は保持します。共有 checkout
+の raw Git mutation は引き続き protected authority route です。
 
 ```bash
 python3 tools/agent_tools/dependency_module_change.py --root <parent-repo> prepare \

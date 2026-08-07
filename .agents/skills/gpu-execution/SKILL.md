@@ -2,7 +2,7 @@
 name: gpu-execution
 description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX/XLA/IREE backend execution, GPU validation blockers, nvidia-smi evidence, CUDA_VISIBLE_DEVICES handling, ExperimentRunner-based Python runs, or JAX/XLA preallocation-disabled execution."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"069c4dd651f29b794a28eb7ae75b1227b7dbc54af45b3f4ae0115ac9eb1afcc3"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"a67510b4ed6b1302e2043b37f524c365f264691eb5cdbc69d9c9f6c2b6519229"} -->
 
 <!--
 @dependency-start

@@ -80,10 +80,13 @@ downstream implementation ../../tools/update_agent_canon.sh derived repo update 
 template repo 側では submodule-first の入口を使います。
 
 Run `make agent-canon-update-plan` first. A mutating latest route requires
-current-task user approval, all four inline Git authority/reason fields, and
+current-task user approval, inline destructive authority/reason fields, and
 `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` in the same
 command segment. The digest is the SHA-256 of the exact bytes of the user
-request record or canonical workflow authorization packet.
+request evidence. Add creation authority/reason only when the route creates a
+branch or worktree; force-create or ref-overwrite routes require both pairs.
+The request record or canonical workflow authorization packet supplies the
+evidence bytes.
 After an approved update, repair and check root views.
 
 - `plan`:
@@ -227,7 +230,9 @@ PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_sou
 ### 7.4 upstream から更新取得
 
 Run `make agent-canon-update-plan` first. Invoke protected latest only after
-current-task user approval and with all four inline Git authority/reason fields.
+current-task user approval and with inline destructive authority/reason fields.
+Add the creation pair only when the route creates a branch or worktree; force-
+create or ref-overwrite routes require both pairs.
 
 derived repo で `agent-canon` だけ更新したい場合の既定入口は `update_agent_canon.sh` です。
 通常の動線は high-level `plan -> latest` です。
@@ -260,8 +265,10 @@ current branch は intended named `vendor/agent-canon/` branch で明示し、Gi
 占有されている場合のみ、workspace-root 管理 clone へ移して PR ルートへ進みます。
 
 Invoke protected `merge-main-into-current` on the intended named source branch
-after current-task user approval and with all four inline Git authority/reason
-fields. The same operation preserves non-colliding local materialized paths in
+after current-task user approval and with inline destructive authority/reason
+fields. Add the creation pair only when the route creates a branch or
+worktree; force-create or ref-overwrite routes require both pairs. The same
+operation preserves non-colliding local materialized paths in
 standalone and parent-submodule source lanes. Another topic's vendor ownership
 routes to the workspace-root branch clone.
 
@@ -287,8 +294,10 @@ source-root resolver の `exec tools/sync_agent_canon.sh link-root` と
 
 Reuse the current AgentCanon branch. Detached or colliding checkout state
 returns to the user; it never triggers an implicit branch creation or switch.
-After approval, invoke the protected merge wrapper with all four inline Git
-authority/reason fields, then push the already-current branch.
+After approval, invoke the protected merge wrapper with inline destructive
+authority/reason fields, then push the already-current branch. Add the
+creation pair only when the route creates a branch or worktree; force-create or
+ref-overwrite routes require both pairs.
 
 通常は AgentCanon branch と AgentCanon PR 経由で戻します。AgentCanon main に取り込まれた後、template / 派生 repo 側で request-evidence-authorized `make agent-canon-ensure-latest` と request-evidence-authorized source-root resolver の `exec tools/sync_agent_canon.sh link-root` を再実行して差分を持ち帰ります。`sync_agent_canon.sh push` は maintainer が direct upstream push を選ぶ場合だけ使います。
 
@@ -359,7 +368,7 @@ exit 条件:
 
 抑止:
 - `vendor/agent-canon/` の変更は専用 commit に分ける
-- current-task user approval と全 4 inline Git authority/reason field を得た protected merge route で GitHub main を取り込む
+- current-task user approval と operation risk に応じた inline Git authority/reason field を得た protected merge route で GitHub main を取り込む。通常の update wrapper は destructive authority/reason のみを要求し、branch/worktree を作成する場合だけ creation authority/reason を追加します
 - current AgentCanon branch を GitHub に push し、AgentCanon PR を開く
 - AgentCanon main に取り込まれたら `make agent-canon-ensure-latest` で pin を main に揃える
 

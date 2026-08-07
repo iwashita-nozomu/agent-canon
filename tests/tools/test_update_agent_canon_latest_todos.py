@@ -197,10 +197,10 @@ def _build_base_parent_fixture(tmp_root: Path) -> tuple[Path, Path, SubmoduleUpd
     root.mkdir(parents=True, exist_ok=True)
     parent_dir = root
     bare_repo, source = SubmoduleUpdateAgentCanonTest(
-        "test_update_modes_require_all_inline_git_authority_before_side_effects"
+        "test_update_modes_require_destructive_authority_before_side_effects"
     ).make_agent_canon_remote(tmp_root / "agent-canon")
     helper = SubmoduleUpdateAgentCanonTest(
-        "test_update_modes_require_all_inline_git_authority_before_side_effects"
+        "test_update_modes_require_destructive_authority_before_side_effects"
     )
     repo = helper.make_superproject(parent_dir, bare_repo)
     return repo, source, helper

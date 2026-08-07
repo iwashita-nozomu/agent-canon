@@ -39,8 +39,9 @@ DEFAULT_EXIT_CRITERIA = (
     ),
     (
         "G2",
-        "Code dependency extraction is reviewed with "
-        "`bash tools/agent_tools/scan_code_dependencies.sh` for the affected surface.",
+        "Canonical LSP code analysis is reviewed with "
+        "`python3 tools/agent_tools/lsp_code_analysis.py analyze --format json`; "
+        "`scan_code_dependencies.sh` remains the explicit compatibility fallback.",
     ),
     (
         "G3",
@@ -549,8 +550,8 @@ def render_work_plan(state: GoalState, max_items: int, dependency_path: str) -> 
 def evidence_hint(item: CheckboxItem) -> str:
     """Return a concise evidence hint for one goal item."""
     text = item.text.lower()
-    if "code dependency" in text or "scan_code_dependencies" in text:
-        return "`scan_code_dependencies.sh` output"
+    if "code dependency" in text or "scan_code_dependencies" in text or "lsp code analysis" in text:
+        return "`scan_code_dependencies.sh` output plus canonical LSP analysis JSON"
     if "oop" in text or "readability" in text:
         return "`tools/oop/*/readability.py` report"
     if "hardcoded numeric" in text or "check_hardcoded_numbers" in text:

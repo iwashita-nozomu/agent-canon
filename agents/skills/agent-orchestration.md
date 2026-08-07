@@ -271,6 +271,29 @@ clone と一致すれば named branch を再利用し、branch が無ければ�
 であり、specialized skill の前提が合わない場合はその decorator だけを外して generic
 operation を続けます。
 
+canonical `repository_topic_clone.py` / `dependency_module_change.py` の
+`prepare` と `merge-main` は、task owner の非空 owner evidence、computed path、
+remote、branch、module identity が一致する repo-local workspace に対して、operation-level
+の追加承認なしで dispatch します。この carve-out は `<project-root>/workspace/<topic>/`
+の canonical lifecycle tool に限定されます。hook が保護する shared-checkout の raw Git
+mutation（checkout/switch、branch/worktree、reset/restore/clean/stash、protected update
+wrapper）は同じ command でも既存の明示 authority gate を通します。canonical tool の
+内部で必要な Git 操作を理由に、caller が raw Git authority を付けたり、manual clone、
+別 path、`rm -rf` を選んだりしてはいけません。
+
+`dependency_module_change.py status` は adapter-only の read command です。generic
+lifecycle、owner-evidence、または operation-level approval carve-out には含めません。
+
+task closeout では `repository-topic-clone` または `dependency-module-change` skill に
+`cleanup` dispatch を必ず割り当てます。canonical cleanup は request から computed clone を
+解決し、selected Git toplevel、owner evidence/marker、URL、branch、clean non-detached state、
+および fetch した `origin/<branch>` の local HEAD/tree 一致を preflight します。candidate CAS、
+PR lifecycle、publication readback は任意の追加 evidence であり、指定時だけ coherent set と
+merged publication readback を検証します。preflight が成功して `CleanupProof` / cleanup
+receipt を返したときだけ `--apply` の削除を受理し、未達・衝突・unknown dirty state・proof
+mismatch は clone/topic root を保持した typed hold として closeout packet に記録します。
+通常 cleanup に workspace packet artifact は不要で、proof-free deletion は完了状態になりません。
+
 workstream の scope は repository 構造、依存 edge、差し替え可能な責務単位、validation
 route から形成します。`.gitignore`、単一 file、行数、diff 件数は clone lifecycle や
 owner-bounded route の選択根拠になりません。複数 workstream は disjoint write scope、
