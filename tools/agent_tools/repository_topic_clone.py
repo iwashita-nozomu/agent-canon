@@ -22,6 +22,23 @@ from pathlib import Path
 from typing import Protocol, cast, runtime_checkable
 
 MARKER_PREFIX = "repository-topic-clone"
+LEGACY_MARKER_PREFIX = "agent-canon.topic"
+CANONICAL_MARKER_FIELDS = (
+    "repository",
+    "topic",
+    "branch",
+    "url",
+    "owner-evidence-sha256",
+)
+LEGACY_MARKER_FIELDS = (
+    "topic",
+    "role",
+    "module",
+    "url",
+    "branch",
+    "placement",
+    "owner-evidence-sha256",
+)
 TOPIC_RE = re.compile(r"[^A-Za-z0-9]+")
 
 
@@ -378,13 +395,51 @@ def _remote_url(path: Path) -> str:
     return _run_git(path, ["config", "--get", "remote.origin.url"]).strip()
 
 
-def _marker(path: Path, field: str) -> str:
+def _marker(path: Path, field: str, *, prefix: str = MARKER_PREFIX) -> str:
     try:
-        return _run_git(
-            path, ["config", "--local", "--get", f"{MARKER_PREFIX}.{field}"]
-        ).strip()
+        return _run_git(path, ["config", "--local", "--get", f"{prefix}.{field}"]).strip()
     except GitCommandError:
         return ""
+
+
+def _marker_values(path: Path, prefix: str, fields: Sequence[str]) -> dict[str, str]:
+    """Read a marker namespace without mutating local Git configuration."""
+    return {field: _marker(path, field, prefix=prefix) for field in fields}
+
+
+def _marker_namespace_present(path: Path, prefix: str) -> bool:
+    """Return whether any local config key exists in a marker namespace."""
+    try:
+        output = _run_git(
+            path,
+            [
+                "config",
+                "--local",
+                "--name-only",
+                "--get-regexp",
+                rf"^{re.escape(prefix)}\.",
+            ],
+        )
+    except GitCommandError:
+        return False
+    return bool(output.strip())
+
+
+def _legacy_marker_matches(
+    values: Mapping[str, str], request: RepositoryTopicCloneRequest, owner_sha: str
+) -> bool:
+    """Return whether the historical AgentCanon module marker is exact."""
+    module = values["module"]
+    return (
+        values["topic"] == topic_slug(request.topic)
+        and values["role"] == "module"
+        and bool(module)
+        and Path(module).name == request.repository
+        and values["url"] == _normalise_url(request.url)
+        and values["branch"] == request.branch
+        and values["placement"] == "workspace-continuation"
+        and values["owner-evidence-sha256"] == owner_sha
+    )
 
 
 def _set_marker(
@@ -424,21 +479,39 @@ def _inspect(
         return CloneState(path, "missing-remote")
     if remote != _normalise_url(request.url):
         return CloneState(path, "url-mismatch")
-    if _marker(path, "url") != _normalise_url(request.url):
-        return CloneState(path, "url-mismatch")
-    if _marker(path, "repository") != request.repository:
-        return CloneState(path, "repository-mismatch")
-    if _marker(path, "topic") != topic_slug(request.topic):
-        return CloneState(path, "topic-mismatch")
-    if _marker(path, "owner-evidence-sha256") != owner_sha:
-        return CloneState(path, "owner-evidence-mismatch")
+    canonical = _marker_values(path, MARKER_PREFIX, CANONICAL_MARKER_FIELDS)
+    canonical_present = any(canonical.values()) or _marker_namespace_present(
+        path, MARKER_PREFIX
+    )
+    marker_branch = ""
+    if canonical_present:
+        if not all(canonical.values()):
+            return CloneState(path, "marker-incomplete")
+        if canonical["url"] != _normalise_url(request.url):
+            return CloneState(path, "url-mismatch")
+        if canonical["repository"] != request.repository:
+            return CloneState(path, "repository-mismatch")
+        if canonical["topic"] != topic_slug(request.topic):
+            return CloneState(path, "topic-mismatch")
+        if canonical["owner-evidence-sha256"] != owner_sha:
+            return CloneState(path, "owner-evidence-mismatch")
+        marker_branch = canonical["branch"]
+    else:
+        legacy = _marker_values(path, LEGACY_MARKER_PREFIX, LEGACY_MARKER_FIELDS)
+        if any(legacy.values()):
+            if not all(legacy.values()):
+                return CloneState(path, "legacy-marker-incomplete")
+            if not _legacy_marker_matches(legacy, request, owner_sha):
+                return CloneState(path, "legacy-marker-mismatch")
+            marker_branch = legacy["branch"]
+        else:
+            return CloneState(path, "repository-mismatch")
     try:
         actual_branch = _run_git(
             path, ["symbolic-ref", "--quiet", "--short", "HEAD"]
         ).strip()
     except GitCommandError:
         return CloneState(path, "detached")
-    marker_branch = _marker(path, "branch")
     if marker_branch != actual_branch:
         return CloneState(path, "actual-branch-mismatch")
     if actual_branch != request.branch:

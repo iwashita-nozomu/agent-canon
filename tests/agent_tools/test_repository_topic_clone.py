@@ -254,6 +254,50 @@ def publication_artifacts(
     return cas, lifecycle, readback
 
 
+def install_legacy_module_markers(
+    clone: Path,
+    request: rtc.RepositoryTopicCloneRequest,
+    owner_sha: str,
+    *,
+    role: str = "module",
+    module: str | None = None,
+    placement: str = "workspace-continuation",
+) -> None:
+    """Replace canonical markers with the historical module marker namespace."""
+    for field in (*rtc.CANONICAL_MARKER_FIELDS, "branch-source"):
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(clone),
+                "config",
+                "--local",
+                "--unset-all",
+                f"{rtc.MARKER_PREFIX}.{field}",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    values = {
+        "topic": rtc.topic_slug(request.topic),
+        "role": role,
+        "module": module or f"vendor/{request.repository}",
+        "url": request.url.removesuffix(".git"),
+        "branch": request.branch,
+        "placement": placement,
+        "owner-evidence-sha256": owner_sha,
+    }
+    for field, value in values.items():
+        run_git(
+            clone,
+            "config",
+            "--local",
+            f"{rtc.LEGACY_MARKER_PREFIX}.{field}",
+            value,
+        )
+
+
 def test_request_reuses_local_and_remote_branch(tmp_path: Path) -> None:
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
@@ -528,6 +572,77 @@ def test_cleanup_without_publication_packet_matches_remote_head(tmp_path: Path) 
     assert removed.removed
     assert removed.evidence == "remote-head"
     assert not request.clone.exists()
+
+
+def test_cleanup_accepts_exact_legacy_module_markers_read_only(
+    tmp_path: Path,
+) -> None:
+    """Historical module markers authorize cleanup without being rewritten."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    request = rtc.request(
+        remote_url, "repo-legacy", workspace, "topic-legacy", "feature/cleanup", evidence
+    )
+    run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
+    owner_sha = rtc._evidence_sha256(evidence)
+    install_legacy_module_markers(request.clone, request.request, owner_sha)
+    before = run_git(request.clone, "config", "--local", "--list")
+
+    dry_run = rtc.cleanup(request.request, apply=False)
+    assert not dry_run.removed
+    assert dry_run.evidence == "remote-head"
+    assert run_git(request.clone, "config", "--local", "--list") == before
+
+    removed = rtc.cleanup(request.request, apply=True)
+    assert removed.removed
+    assert not request.clone.exists()
+
+
+def test_cleanup_rejects_partial_or_mismatched_legacy_module_markers(
+    tmp_path: Path,
+) -> None:
+    """Legacy compatibility is exact and never accepts unknown role/placement."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    request = rtc.request(
+        remote_url, "repo-legacy-invalid", workspace, "topic-legacy-invalid", "feature/cleanup", evidence
+    )
+    owner_sha = rtc._evidence_sha256(evidence)
+
+    install_legacy_module_markers(
+        request.clone, request.request, owner_sha, role="unknown"
+    )
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-mismatch"):
+        rtc.cleanup(request.request, apply=False)
+
+    install_legacy_module_markers(
+        request.clone, request.request, owner_sha, placement="unknown"
+    )
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-mismatch"):
+        rtc.cleanup(request.request, apply=False)
+
+    install_legacy_module_markers(
+        request.clone, request.request, owner_sha, module="vendor/other"
+    )
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-mismatch"):
+        rtc.cleanup(request.request, apply=False)
+
+    install_legacy_module_markers(request.clone, request.request, owner_sha)
+    run_git(
+        request.clone,
+        "config",
+        "--local",
+        "--unset-all",
+        f"{rtc.LEGACY_MARKER_PREFIX}.placement",
+    )
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-incomplete"):
+        rtc.cleanup(request.request, apply=False)
 
 
 def test_cleanup_rejects_remote_head_mismatch_without_publication_packet(

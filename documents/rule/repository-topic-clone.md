@@ -70,6 +70,12 @@ python3 tools/agent_tools/repository_topic_clone.py merge-main \
 - `cleanup` は selected Git toplevel と computed clone identity を検証してから proof preflight
   を開始します。既存 clone の proof-gated removal は root `.gitignore` の後続 drift だけでは
   停止せず、ignore ownership の create preconditionと cleanup の exact-root gateを分離します。
+- marker は canonical `repository-topic-clone.*` namespace の全項目が一致する状態を優先します。
+  canonical marker が完全に欠ける既存 dependency clone に限り、legacy
+  `agent-canon.topic.*` の topic、role=`module`、module basename、normalized URL、branch、
+  placement=`workspace-continuation`、owner-evidence SHA がすべて一致する場合だけ read-only
+  compatibility として ready を認めます。partial/mismatch/unknown role・placement は typed
+  hold とし、dry-run は Git config marker を書き換えません。
 - cleanup は closeout の明示 dispatch として canonical tool を呼び、request から計算した
   exact clone path、owner evidence/marker、URL、branch、clean non-detached state を検証します。
   通常の cleanup は publication packet を作らず、fetch した `origin/<branch>` の commit/tree と

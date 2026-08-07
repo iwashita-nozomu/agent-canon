@@ -58,6 +58,13 @@ non-detached state、および fetch した `origin/<branch>` の commit/tree �
 root を保持した typed hold にします。specialized adapter が適用外でもこの generic operation
 は継続します。
 
+marker は canonical `repository-topic-clone.*` namespace を優先します。canonical marker が
+完全に欠ける既存 dependency clone だけは、legacy `agent-canon.topic.*` の topic、
+role=`module`、module basename、normalized URL、branch、placement=`workspace-continuation`、
+owner-evidence SHA が全て一致する場合に限り read-only compatibility として扱います。
+partial/mismatch/unknown role・placement は typed hold で、cleanup dry-run は Git config marker
+を書き換えません。
+
 candidate CAS、PR lifecycle、publication readback は任意の追加 evidence です。いずれかを
 渡す場合だけ candidate CAS と PR lifecycle の coherent set を検証し、merged state では
 strict publication readback、merge tree、`origin/main` containment を追加確認します。
