@@ -149,11 +149,14 @@ body artifact and remote PR body.
 ## GitHub Adapter Boundary
 
 `github_publish.py` is an internal adapter selected by the update transaction.
-It verifies `gh` repository identity against the selected Git remote and reads
-viewer permission evidence. `publish-pr` materializes candidate/base/head and
-G3 once, reuses them for branch push and PR creation/update, then reads the PR
-head/base/review state back. `checks` consumes G3 and, after publication, G5;
-it does not create another candidate verdict.
+It verifies `gh` repository identity against the selected Git remote, reads
+viewer permission evidence, and binds the current user task, remote/topology,
+and exact head/base identities. Ordinary branch transport, PR creation/update,
+and check readback use those owner facts and their exact remote/API readback;
+they do not require workspace-packet materialization or G1/G2/G3. A sealed
+packet may add candidate matching as optional enrichment. Merge remains the
+G3-bound operation, and post-publication checks may consume its own G5 readback;
+the adapter does not create another candidate verdict.
 
 Push authority is never inferred from authentication success, branch name,
 repository naming, PR context, or a configured URL. Literal URL push and
@@ -164,8 +167,10 @@ it verifies remote identity/permission, requires a named current branch,
 captures local commit/tree, pushes `<commit-sha>:refs/heads/<branch>`, reads
 back the exact SHA with `git ls-remote`, and requires branch/HEAD/tree
 invariance. It does not generate or claim G1/G2/G3 or PR lifecycle evidence.
-When a sealed packet is supplied, candidate matching is retained; PR mutation
-and merge remain packet/G1/G2/G3-bound. CI fresh-clone fixtures are
+When a sealed packet is supplied, candidate matching is retained as optional
+enrichment; PR mutation and check readback still consume current task,
+verified remote/permission/topology, and exact identities. Merge remains
+G3-bound. CI fresh-clone fixtures are
 bootstrap/update evidence, not ordinary publication evidence.
 
 ## Source PR Gate
@@ -251,12 +256,21 @@ the selector applies it through process-local Git configuration for the exact
 event SHA. The credential is not written to checkout or repository Git config,
 and `actions/checkout` retains `persist-credentials: false`. Public, private, and
 fork PRs use this same trusted event-SHA route. The emitted SHA is supplied as
-`--trusted-base-sha`; the selector requires it to equal the event SHA and rejects
-CI `AGENT_CANON_PR_BASE_REF` overrides. Local and test callers provide
-`AGENT_CANON_PR_BASE_REF` explicitly and retain their credential-free route. A
-missing fetch credential, base equal to `HEAD`, unresolvable or
-history-unreachable base, and failed fetch or diff command produce a typed
-selector failure; no fallback base or empty-diff success is inferred.
+`--trusted-base-sha`; the selector requires it to equal the event SHA. The normal
+local `check_agent_canon_pr.sh` owner reads the verified `origin` `refs/heads/main`
+SHA and passes that immutable value through `--trusted-base-sha`; the lower
+selector consumes it and does not choose or re-read a comparison base. A missing
+remote SHA, base equal to `HEAD`, unresolvable or history-unreachable base, and
+failed fetch or diff command produce a typed selector failure; no environment
+fallback, parent fallback, or empty-diff success is inferred.
+
+The accepted GitHub publication boundary is a separate owner route: ordinary
+branch transport uses non-force fast-forward push plus exact remote readback, and
+PR create/update and check readback consume the current user task, verified
+remote/permission, and exact head/base identities. Those operations do not
+require G1/G2/G3 or workspace-packet materialization. G1-G3 remain candidate
+validation and merge authority, not PR-opening, metadata-read, or check-read
+authority.
 
 ### One-Judgment-Owner Check Handoff
 

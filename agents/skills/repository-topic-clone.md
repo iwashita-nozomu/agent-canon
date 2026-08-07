@@ -50,15 +50,18 @@ clone/topic directory の作成前に検証します。検証を通った reques
 対象ではありません。
 
 exact local/remote branch は同じ prepare で再利用し、不一致は
-state-preserving typed collision とします。作業完了時はこの skill が cleanup を
-自動的に `--apply` するのではなく、candidate CAS、PR lifecycle、必要な publication
-readback、owner evidence、local/remote/PR head の一致を canonical tool に渡します。
-preflight が成功した場合だけ `CleanupProof` / cleanup receipt を受け取り、失敗時は
-clone と topic root を保持した typed hold を closeout に記録します。specialized adapter
-が適用外でもこの generic operation は継続します。
+state-preserving typed collision とします。作業完了時はこの skill が computed clone path を
+canonical tool に渡し、selected Git toplevel、owner evidence/marker、URL、branch、clean
+non-detached state、および fetch した `origin/<branch>` の commit/tree と local head/tree の
+一致を preflight します。通常の closeout は workspace packet artifact を作らず、preflight が
+成功した場合だけ `CleanupProof` / cleanup receipt を受け取ります。失敗時は clone と topic
+root を保持した typed hold にします。specialized adapter が適用外でもこの generic operation
+は継続します。
 
-`cleanup` は同じ selected Git toplevel と exact clone identity を検証し、candidate CAS、PR
-lifecycle、publication readback の proof を満たした場合だけ `CleanupProof` を返します。
+candidate CAS、PR lifecycle、publication readback は任意の追加 evidence です。いずれかを
+渡す場合だけ candidate CAS と PR lifecycle の coherent set を検証し、merged state では
+strict publication readback、merge tree、`origin/main` containment を追加確認します。
+publication evidence は proof を enrich しますが、通常の cleanup のために materialize しません。
 cleanup の exact-root gate は維持しつつ、既存 clone の proof-gated removal は root ignore の
 後続 driftだけで止めません。`dependency_module_change.py status` と `projected_clone_path`
 は read-only projection のままで directory を作成しません。

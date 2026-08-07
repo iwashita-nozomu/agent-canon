@@ -194,6 +194,22 @@ agentcanon_pr_dependency_graph_required() {
       return 2
     fi
     selector_args+=(--trusted-base-sha "${trusted_base_sha}")
+  else
+    if ! trusted_base_sha="$(
+      git rev-parse --verify --end-of-options 'origin/main^{commit}' 2>/dev/null
+    )"; then
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=fail"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON=local_trusted_base_tracking_ref_unavailable"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE=source=origin/main"
+      return 2
+    fi
+    if [[ ! "${trusted_base_sha}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=fail"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON=local_trusted_base_tracking_ref_invalid"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE=source=origin/main"
+      return 2
+    fi
+    selector_args+=(--trusted-base-sha "${trusted_base_sha}")
   fi
   if selector_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
     "${selector_args[@]}")"; then
@@ -674,9 +690,7 @@ if [[ "${PR_GATE_DEPENDENCY_GRAPH_REQUIRED}" -eq 1 ]]; then
       --status-result "${graph_status_result}"
       --report-out "${PR_DEPENDENCY_REVIEW_DIR}/changed-responsibility-acceptance.json"
     )
-    if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
-      graph_acceptance_args+=(--trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}")
-    fi
+    graph_acceptance_args+=(--trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}")
     if graph_acceptance_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
       "${graph_acceptance_args[@]}")"; then
       graph_acceptance_rc=0

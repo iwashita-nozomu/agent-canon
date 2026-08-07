@@ -146,25 +146,35 @@ unknown dirty, staged, untracked, branch, and worktree state as owned by the
 user or another chat, and preserve that state across routing and repair.
 Protected Git operations include `git restore`, `git reset`, forced `git clean`,
 mutating `git stash`, checkout/switch, and branch/worktree create, delete, move,
-rename, or prune. Proven exact task ownership only bounds which paths may be
-named in an approval request; explicit destructive approval remains required.
+rename, or prune. Normal branch/worktree creation records creation authority and
+reason; force-create/ref overwrite additionally requires destructive authority and
+reason. Existing checkout/switch, delete/rename/reset, and other history/ref
+mutations require destructive authority and reason. Reversible tracking metadata
+and `git worktree lock/unlock` do not mutate refs, history, or worktrees and are
+not destructive. Proven exact task ownership only bounds which paths may be
+named in an approval request; explicit destructive approval remains required for
+destructive operations.
 
 Canonical repo-local lifecycle commands are bounded to a separate workspace route:
 `repository_topic_clone.py` and `dependency_module_change.py` may prepare, reuse, and use
 `<project-root>/workspace/<topic-slug>/<repo-name>` without operation-level approval when
 non-empty owner evidence and exact computed identity are present. This does not authorize raw
 shared-checkout Git mutations or bypass the hook. At closeout, lifecycle skills dispatch proof-
-gated cleanup with candidate CAS, PR lifecycle, required publication readback, owner evidence,
-and expected identity; only `CleanupProof` / cleanup receipt authorizes deletion. Collisions,
+gated cleanup with computed clone identity, owner/marker evidence, clean state, and remote
+head/tree readback; publication artifacts are optional coherent enrichment. Only ordinary
+`CleanupProof` / cleanup receipt authorizes deletion. Collisions,
 unknown dirty state, and proof mismatch remain preserved typed holds.
 
-A protected mutation proceeds only when the user
-explicitly approves it and the same command segment carries
+A protected destructive mutation proceeds only when the user explicitly approves
+it and the same command segment carries
 `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` plus a nonempty
-`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Branch/worktree creation additionally
-requires same-segment `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` or
+`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Normal branch/worktree creation instead
+requires same-segment
+`AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` or
 `agent_canon_workflow` plus a nonempty `AGENT_CANON_BRANCH_WORKTREE_REASON`;
-the creation and destructive requirements are an AND gate. Collision handling keeps the current
+force-create/ref overwrite requires both authority pairs. `latest` / `apply` /
+merge wrappers require destructive authority only unless their owner route
+actually creates a branch/worktree. Collision handling keeps the current
 branch/worktree and requests user direction.
 
 ## Structure-First Scope Formation
@@ -330,7 +340,7 @@ proof obligation, or replacement unit together even when the chunk is long.
 | implementation flow graph and source packet | run bundle design packet; `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`; `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` | design review; dependency review |
 | search, read scope, and reuse survey | semantic-index, deterministic `search.py` / `search_index.py`, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
 | repo structure and root views | `vendor/agent-canon/documents/structure/repo-structure-contract.toml`; `responsibility-scope.toml`; `vendor/agent-canon/documents/runtime/shared-runtime-surfaces.toml` | structure/scope/import tools; `vendor/agent-canon/tools/sync_agent_canon.sh` |
-| shared-checkout Git mutation and branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/tools/agent_tools/hook_safety.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
+| shared-checkout Git mutation and branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/tools/agent_tools/hook_safety.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | operation-risk Git authority matrix; critical PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation route | `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md` | profile-selected validation |
 | report and closeout structure | `task_close.py`; `report_artifact_checks.py`; run bundle `closeout_gate.md` | profile-selected closeout gate |
 | shared AgentCanon update | `vendor/agent-canon/tools/update_agent_canon.sh`; `vendor/agent-canon/tools/sync_agent_canon.sh`; AgentCanon PR workflow | submodule pin and PR evidence |

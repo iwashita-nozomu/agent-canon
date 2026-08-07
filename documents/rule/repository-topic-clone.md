@@ -70,12 +70,15 @@ python3 tools/agent_tools/repository_topic_clone.py merge-main \
 - `cleanup` は selected Git toplevel と computed clone identity を検証してから proof preflight
   を開始します。既存 clone の proof-gated removal は root `.gitignore` の後続 drift だけでは
   停止せず、ignore ownership の create preconditionと cleanup の exact-root gateを分離します。
-- cleanup は closeout の明示 dispatch として canonical tool を呼び、`--expected-clone` に
-  対する既知 identity、owner evidence、candidate CAS、PR lifecycle、必要な publication
-  readback を同時に検証します。proof が一致しないものは削除しません。
-- PR 作成後は canonical candidate CAS と PR lifecycle を読み、local head、remote head、
-  PR head の一致を検証する。integration 後は canonical publication readback transition、
-  merge commit/tree、`origin/main` containment も検証する。
+- cleanup は closeout の明示 dispatch として canonical tool を呼び、request から計算した
+  exact clone path、owner evidence/marker、URL、branch、clean non-detached state を検証します。
+  通常の cleanup は publication packet を作らず、fetch した `origin/<branch>` の commit/tree と
+  local `HEAD` の commit/tree が一致する reconstructibility proof だけで dry-run/apply できます。
+  proof が一致しないものは削除しません。
+- candidate CAS、PR lifecycle、publication readback は任意の追加 evidence です。いずれかを
+  渡す場合は candidate CAS と PR lifecycle を一組で渡し、merged state の publication readback
+  を含む coherent transition を検証します。integration 後は canonical publication readback
+  transition、merge commit/tree、`origin/main` containment を追加検証します。
 - clone と topic root は同一 receipt で扱う。管理外 path へ退避しない。
 - preflight が通った `--apply` だけが `CleanupProof` / cleanup receipt を返して computed
   clone と空の topic root を削除します。proof 不足、衝突、unknown dirty/staged/untracked
@@ -85,9 +88,8 @@ python3 tools/agent_tools/repository_topic_clone.py merge-main \
 python3 tools/agent_tools/repository_topic_clone.py cleanup \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
-  --expected-clone <absolute-clone> \
-  --candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
-  [--publication-readback <publication-readback.json>] [--apply]
+  [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
+  [--publication-readback <publication-readback.json>]] [--apply]
 ```
 
 ## 例外/フォールバック

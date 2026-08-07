@@ -2,7 +2,7 @@
 name: agent-orchestration
 description: "Mandatory routing skill for repository tasks. Use before selecting workflow family, skills, review roles, subagents, model/team policy, runtime entrypoints, or run bundles for Codex routing."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"40faff34773e7dcf86d5b372368b05699d5c2d71493fbfcc6c5f384275f2332d"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"16437deab51dd745e89c0dd7b2394cf5cfaa430d8972276bfe20c0b2adcf0cc9"} -->
 
 <!--
 @dependency-start

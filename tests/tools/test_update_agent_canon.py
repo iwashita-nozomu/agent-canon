@@ -116,6 +116,150 @@ def authorized_test_env() -> dict[str, str]:
     return env
 
 
+class GitAuthorityPredicateTest(unittest.TestCase):
+    """Exercise the shared mode-aware authority matrix without side effects."""
+
+    def run_predicate(self, mode: str, authority: str) -> subprocess.CompletedProcess[str]:
+        """Run the shared shell predicate with one authority profile."""
+        env = dict(os.environ)
+        for name in (
+            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY",
+            "AGENT_CANON_BRANCH_WORKTREE_REASON",
+            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY",
+            "AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+        ):
+            env.pop(name, None)
+        if authority in {"creation", "both"}:
+            env.update(
+                {
+                    "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
+                    "AGENT_CANON_BRANCH_WORKTREE_REASON": "test-creation",
+                }
+            )
+        elif authority == "destructive_wrong_branch":
+            env.update(
+                {
+                    "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "wrong",
+                    "AGENT_CANON_BRANCH_WORKTREE_REASON": "irrelevant-to-update",
+                }
+            )
+        if authority in {"destructive", "destructive_wrong_branch", "both"}:
+            env.update(
+                {
+                    "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
+                    "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "test-destructive",
+                }
+            )
+        return subprocess.run(
+            [
+                "bash",
+                "-c",
+                "source tools/lib/git_authority.sh; "
+                "git_authority_check_protected_git_authority \"$1\"",
+                "git-authority-test",
+                mode,
+            ],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+
+    def test_mode_aware_authority_matrix(self) -> None:
+        """Update modes are destructive-only; creation and force routes are scoped."""
+        expected = {
+            ("latest", "destructive"): True,
+            ("latest", "destructive_wrong_branch"): True,
+            ("latest", "both"): True,
+            ("latest", "creation"): False,
+            ("submodule-add", "creation"): True,
+            ("submodule-add", "both"): True,
+            ("submodule-add", "destructive"): False,
+            ("force-create", "both"): True,
+            ("force-create", "creation"): False,
+            ("force-create", "destructive"): False,
+        }
+        for (mode, authority), should_pass in expected.items():
+            with self.subTest(mode=mode, authority=authority):
+                result = self.run_predicate(mode, authority)
+                self.assertEqual(result.returncode == 0, should_pass, result.stderr)
+
+    def test_public_diagnostics_match_mode_requirements(self) -> None:
+        """Wrapper failures expose only the guard markers required by each mode."""
+        env = dict(os.environ)
+        for name in (
+            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY",
+            "AGENT_CANON_BRANCH_WORKTREE_REASON",
+            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY",
+            "AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+        ):
+            env.pop(name, None)
+        update = subprocess.run(
+            ["bash", "tools/update_agent_canon.sh", "latest"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        self.assertNotEqual(update.returncode, 0)
+        self.assertIn("DESTRUCTIVE_GIT_GUARD=block", update.stdout)
+        self.assertNotIn("BRANCH_WORKTREE_CREATION_GUARD=block", update.stdout)
+
+        creation = subprocess.run(
+            ["bash", "tools/sync_agent_canon.sh", "submodule-add"],
+            cwd=REPO_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        self.assertNotEqual(creation.returncode, 0)
+        self.assertIn("BRANCH_WORKTREE_CREATION_GUARD=block", creation.stdout)
+        self.assertNotIn("DESTRUCTIVE_GIT_GUARD=block", creation.stdout)
+
+    def test_update_wrapper_fallback_keeps_mode_matrix(self) -> None:
+        """A source checkout without the helper keeps the same update guard."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            # The fallback guard runs before the update side effects. Copy only
+            # the wrapper, resolver, materialization, and authority helpers it
+            # can source; copying the full tools tree follows root-view links.
+            tools_root = root / "tools"
+            (tools_root / "lib").mkdir(parents=True)
+            for relative_path in (
+                "update_agent_canon.sh",
+                "sync_agent_canon.sh",
+                "lib/repo_paths.sh",
+                "lib/update_materialization.sh",
+                "lib/git_authority.sh",
+            ):
+                source_path = REPO_ROOT / "tools" / relative_path
+                shutil.copy2(source_path, tools_root / relative_path)
+            (tools_root / "lib" / "git_authority.sh").unlink()
+            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
+            env = dict(os.environ)
+            for name in (
+                "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY",
+                "AGENT_CANON_BRANCH_WORKTREE_REASON",
+                "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY",
+                "AGENT_CANON_DESTRUCTIVE_GIT_REASON",
+            ):
+                env.pop(name, None)
+            result = subprocess.run(
+                ["bash", "tools/update_agent_canon.sh", "latest"],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("DESTRUCTIVE_GIT_GUARD=block", result.stdout)
+            self.assertNotIn("BRANCH_WORKTREE_CREATION_GUARD=block", result.stdout)
+
+
 def git_global_safe_directory_snapshot() -> tuple[int, tuple[str, ...]]:
     """Capture global safe.directory lines and git exit status."""
     result = subprocess.run(
@@ -1528,8 +1672,6 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
     """Exercise submodule-specific update routes."""
 
     PROTECTED_GIT_ENV = {
-        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
-        "AGENT_CANON_BRANCH_WORKTREE_REASON": "test-approved-update",
         "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
         "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "test-approved-update",
         "AGENT_CANON_COMMIT_REQUEST_EVIDENCE": COMMIT_REQUEST_EVIDENCE,
@@ -1785,6 +1927,8 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             subprocess.run(["git", "commit", "-m", "initial parent"], cwd=repo, check=True)
             env = dict(os.environ)
             env["GIT_ALLOW_PROTOCOL"] = "file"
+            env["AGENT_CANON_BRANCH_WORKTREE_AUTHORITY"] = "user_request"
+            env["AGENT_CANON_BRANCH_WORKTREE_REASON"] = "test submodule creation"
             subprocess.run(
                 [
                     "bash",
@@ -1932,8 +2076,8 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-    def test_update_modes_require_all_inline_git_authority_before_side_effects(self) -> None:
-        """Missing, wrong, or empty authority blocks every mutating update mode."""
+    def test_update_modes_require_destructive_authority_before_side_effects(self) -> None:
+        """Update modes require destructive authority, without a creation gate."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
@@ -1946,21 +2090,11 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             invalid_environments = (
                 self.unauthorized_env(),
                 self.unauthorized_env(
-                    AGENT_CANON_BRANCH_WORKTREE_AUTHORITY="wrong",
-                    AGENT_CANON_BRANCH_WORKTREE_REASON="reason",
-                    AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY="explicit_user_approval",
-                    AGENT_CANON_DESTRUCTIVE_GIT_REASON="reason",
-                ),
-                self.unauthorized_env(
-                    AGENT_CANON_BRANCH_WORKTREE_AUTHORITY="user_request",
-                    AGENT_CANON_BRANCH_WORKTREE_REASON="",
-                    AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY="explicit_user_approval",
-                    AGENT_CANON_DESTRUCTIVE_GIT_REASON="reason",
-                ),
-                self.unauthorized_env(
-                    AGENT_CANON_BRANCH_WORKTREE_AUTHORITY="user_request",
-                    AGENT_CANON_BRANCH_WORKTREE_REASON="reason",
                     AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY="wrong",
+                    AGENT_CANON_DESTRUCTIVE_GIT_REASON="reason",
+                ),
+                self.unauthorized_env(
+                    AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY="explicit_user_approval",
                     AGENT_CANON_DESTRUCTIVE_GIT_REASON="",
                 ),
             )
@@ -1978,7 +2112,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                         )
                         self.assertNotEqual(result.returncode, 0)
                         self.assertIn("DESTRUCTIVE_GIT_GUARD=block", result.stdout)
-                        self.assertIn("BRANCH_WORKTREE_CREATION_GUARD=block", result.stdout)
+                        self.assertNotIn("BRANCH_WORKTREE_CREATION_GUARD=block", result.stdout)
                         self.assertIn(
                             f"AGENT_CANON_PROTECTED_GIT_SUBCOMMAND={mode}", result.stdout
                         )
@@ -1989,8 +2123,8 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                         self.assertNotIn("AGENT_CANON_EVAL_LOG_PARK=", result.stdout)
                         self.assertEqual(self.protected_state(repo), before)
 
-    def test_sync_ensure_latest_requires_symmetric_authority(self) -> None:
-        """The low-level direct mutation boundary fails closed before checkout work."""
+    def test_sync_ensure_latest_requires_destructive_authority(self) -> None:
+        """The low-level update boundary requires destructive authority only."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
@@ -2006,7 +2140,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             )
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("DESTRUCTIVE_GIT_GUARD=block", result.stdout)
-            self.assertIn("BRANCH_WORKTREE_CREATION_GUARD=block", result.stdout)
+            self.assertNotIn("BRANCH_WORKTREE_CREATION_GUARD=block", result.stdout)
             self.assertIn(
                 "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=ensure-latest", result.stdout
             )
@@ -2137,7 +2271,7 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             ).stdout.strip()
             for trailer in (
                 "AgentCanon-Automation-Actor: agent-canon-sync",
-                "AgentCanon-Authority-Source: user_request",
+                "AgentCanon-Authority-Source: not-required",
                 "AgentCanon-Destructive-Authority: explicit_user_approval",
                 f"AgentCanon-Request-Evidence: {COMMIT_REQUEST_EVIDENCE}",
                 f"AgentCanon-Remote: {remote_sha}",
@@ -4264,6 +4398,14 @@ class StandaloneUpdateLifecycleTest(unittest.TestCase):
         for name in ("artifact_identity.py", "update_lifecycle_contract.py"):
             shutil.copy2(AGENT_CANON_SOURCE_ROOT / "tools" / "agent_tools" / name, tool_dir / name)
         shutil.copy2(AGENT_CANON_SOURCE_ROOT / "tools" / "lib" / "repo_paths.sh", repo_lib_dir / "repo_paths.sh")
+        shutil.copy2(
+            AGENT_CANON_SOURCE_ROOT / "tools" / "lib" / "update_materialization.sh",
+            repo_lib_dir / "update_materialization.sh",
+        )
+        shutil.copy2(
+            AGENT_CANON_SOURCE_ROOT / "tools" / "sync_agent_canon.sh",
+            source / "tools" / "sync_agent_canon.sh",
+        )
         (source / "ROOT_AGENTS.md").write_text("# fixture\n", encoding="utf-8")
         subprocess.run(["git", "add", "-A"], cwd=source, check=True)
         subprocess.run(["git", "commit", "-m", "fixture source"], cwd=source, check=True)

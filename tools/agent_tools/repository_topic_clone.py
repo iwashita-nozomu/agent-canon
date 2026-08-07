@@ -424,6 +424,8 @@ def _inspect(
         return CloneState(path, "missing-remote")
     if remote != _normalise_url(request.url):
         return CloneState(path, "url-mismatch")
+    if _marker(path, "url") != _normalise_url(request.url):
+        return CloneState(path, "url-mismatch")
     if _marker(path, "repository") != request.repository:
         return CloneState(path, "repository-mismatch")
     if _marker(path, "topic") != topic_slug(request.topic):
@@ -437,7 +439,7 @@ def _inspect(
     except GitCommandError:
         return CloneState(path, "detached")
     marker_branch = _marker(path, "branch")
-    if marker_branch and marker_branch != actual_branch:
+    if marker_branch != actual_branch:
         return CloneState(path, "actual-branch-mismatch")
     if actual_branch != request.branch:
         return CloneState(path, "branch-mismatch")
@@ -478,31 +480,25 @@ def _upstream(path: Path, branch: str) -> str:
 
 def _ensure_branch(path: Path, remote: str, branch: str) -> str:
     """Select the exact branch and return its verified source identity."""
-    _run_git(path, ["fetch", "origin", "main"])
-    remote_exists = _remote_branch_exists(remote, branch)
     if _has_local_branch(path, branch):
         _run_git(path, ["checkout", branch])
         upstream = _upstream(path, branch)
-        if remote_exists:
-            _run_git(path, ["fetch", "origin", branch])
-            if upstream and upstream != f"origin/{branch}":
-                raise RepositoryTopicCloneError(
-                    f"prepare collision: branch-upstream-mismatch ({upstream})"
-                )
-            if not upstream:
-                _run_git(
-                    path, ["branch", "--set-upstream-to", f"origin/{branch}", branch]
-                )
-            return f"origin/{branch}"
-        if upstream and upstream != "origin/main":
+        if upstream and upstream != f"origin/{branch}":
             raise RepositoryTopicCloneError(
                 f"prepare collision: branch-upstream-mismatch ({upstream})"
             )
-        return f"local:{_run_git(path, ['rev-parse', branch]).strip()}"
+        return (
+            f"origin/{branch}"
+            if upstream == f"origin/{branch}"
+            else f"local:{_run_git(path, ['rev-parse', branch]).strip()}"
+        )
+
+    remote_exists = _remote_branch_exists(remote, branch)
     if remote_exists:
         _run_git(path, ["fetch", "origin", branch])
         _run_git(path, ["checkout", "--track", "-b", branch, f"origin/{branch}"])
         return f"origin/{branch}"
+    _run_git(path, ["fetch", "origin", "main"])
     base_sha = _run_git(path, ["rev-parse", "origin/main"]).strip()
     _run_git(path, ["checkout", "-b", branch, base_sha])
     return f"origin/main@{base_sha}"
@@ -722,22 +718,31 @@ def verify_publication(
 def cleanup(
     request_state: RepositoryTopicCloneRequest,
     *,
-    expected_clone: Path | str,
     candidate_cas: Path | str | None = None,
     pr_lifecycle: Path | str | None = None,
     publication_readback: Path | str | None = None,
     apply: bool,
 ) -> CleanupProof:
-    """Validate evidence and remove the prepared clone if authorized."""
-    if candidate_cas is None or pr_lifecycle is None:
+    """Validate reconstructibility evidence and remove the clone if authorized.
+
+    A clean, identity-matched clone whose local head exactly matches the fetched
+    topic branch is sufficient for ordinary cleanup. Publication receipts are
+    optional enrichment; when one is supplied, the complete coherent lifecycle
+    receipt set is validated before it can authorize cleanup.
+    """
+    has_lifecycle_evidence = any(
+        artifact is not None
+        for artifact in (candidate_cas, pr_lifecycle, publication_readback)
+    )
+    if has_lifecycle_evidence and (candidate_cas is None or pr_lifecycle is None):
         raise RepositoryTopicCloneError(
-            "cleanup hold: canonical candidate CAS and PR lifecycle evidence required"
+            "cleanup hold: candidate CAS and PR lifecycle evidence must be provided together"
         )
     _repository_workspace_root(request_state.workspace_root, require_ignore=False)
     topic_root = _topic_root(
         request_state.workspace_root, request_state.topic, create=False
     )
-    clone = _safe_under(topic_root, Path(expected_clone), "expected clone")
+    clone = computed_clone_path(request_state, create_topic=False)
     owner_sha = _evidence_sha256(
         _require_evidence(request_state.owner_evidence, request_state.workspace_root)
     )
@@ -745,40 +750,49 @@ def cleanup(
     if state.state != "ready":
         raise RepositoryTopicCloneError(f"cleanup hold: {state.state}")
 
-    _run_git(clone, ["fetch", "origin", "main"])
     branch = _run_git(clone, ["symbolic-ref", "--quiet", "--short", "HEAD"]).strip()
     if branch != request_state.branch:
         raise RepositoryTopicCloneError(f"cleanup hold: branch-mismatch ({branch})")
 
     candidate_sha = _run_git(clone, ["rev-parse", "HEAD"]).strip()
     candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
-    origin_main_sha = _run_git(clone, ["rev-parse", "origin/main"]).strip()
-
-    evidence = verify_publication(
-        request_state,
-        candidate_cas=candidate_cas,
-        pr_lifecycle=pr_lifecycle,
-        publication_readback=publication_readback,
-    )
-    lifecycle = cast(Mapping[str, object], evidence["pr_lifecycle"])
-    head = cast(Mapping[str, object], lifecycle["head_identity"])
-    if (
-        head.get("commit_sha") != candidate_sha
-        or head.get("tree_sha") != candidate_tree
-    ):
-        raise RepositoryTopicCloneError(
-            "cleanup hold: local candidate identity mismatch"
+    evidence = None
+    if has_lifecycle_evidence:
+        evidence = verify_publication(
+            request_state,
+            candidate_cas=cast(Path | str, candidate_cas),
+            pr_lifecycle=cast(Path | str, pr_lifecycle),
+            publication_readback=publication_readback,
         )
+        lifecycle = cast(Mapping[str, object], evidence["pr_lifecycle"])
+        head = cast(Mapping[str, object], lifecycle["head_identity"])
+        if (
+            head.get("commit_sha") != candidate_sha
+            or head.get("tree_sha") != candidate_tree
+        ):
+            raise RepositoryTopicCloneError(
+                "cleanup hold: local candidate identity mismatch"
+            )
 
     if publication_readback is None:
-        _run_git(clone, ["fetch", "origin", request_state.branch])
-        remote_head = _run_git(
-            clone, ["rev-parse", f"refs/remotes/origin/{request_state.branch}"]
-        ).strip()
-        if remote_head != candidate_sha:
-            raise RepositoryTopicCloneError("cleanup hold: remote PR head mismatch")
-        evidence_kind = "publication-head"
+        try:
+            _run_git(clone, ["fetch", "origin", request_state.branch])
+            remote_head = _run_git(
+                clone, ["rev-parse", f"refs/remotes/origin/{request_state.branch}"]
+            ).strip()
+            remote_tree = _run_git(
+                clone, ["rev-parse", f"{remote_head}^{{tree}}"]
+            ).strip()
+        except GitCommandError as exc:
+            raise RepositoryTopicCloneError(
+                f"cleanup hold: remote branch unavailable ({request_state.branch})"
+            ) from exc
+        if remote_head != candidate_sha or remote_tree != candidate_tree:
+            raise RepositoryTopicCloneError("cleanup hold: remote branch head mismatch")
+        evidence_kind = "publication-head" if has_lifecycle_evidence else "remote-head"
     else:
+        _run_git(clone, ["fetch", "origin", "main"])
+        origin_main_sha = _run_git(clone, ["rev-parse", "origin/main"]).strip()
         readback = cast(Mapping[str, object], evidence["publication_readback"])
         pr_identity = cast(Mapping[str, object], readback["pr_identity"])
         merge_sha = cast(str, pr_identity["merge_commit_sha"])
@@ -835,9 +849,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     clean.add_argument("--topic", required=True)
     clean.add_argument("--branch", required=True)
     clean.add_argument("--owner-evidence", required=True)
-    clean.add_argument("--expected-clone", required=True)
-    clean.add_argument("--candidate-cas", required=True)
-    clean.add_argument("--pr-lifecycle", required=True)
+    clean.add_argument("--candidate-cas")
+    clean.add_argument("--pr-lifecycle")
     clean.add_argument("--publication-readback")
     clean.add_argument("--apply", action="store_true")
 
@@ -886,7 +899,6 @@ def main(argv: list[str] | None = None) -> None:
         else:
             proof = cleanup(
                 request_state,
-                expected_clone=Path(args.expected_clone),
                 candidate_cas=args.candidate_cas,
                 pr_lifecycle=args.pr_lifecycle,
                 publication_readback=args.publication_readback,

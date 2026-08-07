@@ -2,7 +2,7 @@
 name: code-visualization
 description: "Sole public visualization owner for code, repository structure, runtime behavior, state, data movement, dependencies, types, proof state, interactive graphs, and document diagrams; builds the complete typed universe and coverage manifest before delegating renderer-only projection."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"96ed4636302bf2ec33a1563b563b6497e4e087c3f9fb31ba5bfc59b948a94354"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"0596d6ffe457574151829eb7a46b3c1b7f56f7c66064b7507db595f57e9c480f"} -->
 
 <!--
 @dependency-start

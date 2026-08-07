@@ -716,8 +716,6 @@ class CodexHooksTest(unittest.TestCase):
             "true && git clean --force -d",
             "git branch -Dtopic",
             "git branch -mtopic",
-            "git branch --edit-description topic",
-            "git worktree lock ../topic",
         ]
         for command in commands:
             with self.subTest(command=command):
@@ -920,7 +918,17 @@ class CodexHooksTest(unittest.TestCase):
             "git branch",
             "git branch --show-current",
             "git branch --list 'topic/*'",
+            "git branch --edit-description topic",
+            "git branch --set-upstream-to=origin/main topic",
+            "git branch --set-upstream-to origin/main topic",
+            "git branch --unset-upstream topic",
+            "git branch -u origin/main topic",
+            "git branch -uorigin/main topic",
             "git worktree list --porcelain",
+            "git worktree lock ../topic",
+            "git worktree lock --reason maintenance ../topic",
+            "git worktree lock --reason=maintenance ../topic",
+            "git worktree unlock ../topic",
             "git stash list",
             "git stash show stash@{0}",
             "git clean -n",
@@ -935,7 +943,7 @@ class CodexHooksTest(unittest.TestCase):
                 self.assertIsNone(self._run_shared_checkout_guard(command))
 
     def test_shared_checkout_guard_enforces_overlap_authority_matrix(self) -> None:
-        """Creation and destructive-overwrite intents require their full authority sets."""
+        """Creation and destructive-overwrite intents use their distinct authority sets."""
         creation = (
             "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
             "AGENT_CANON_BRANCH_WORKTREE_REASON=requested"
@@ -973,8 +981,9 @@ class CodexHooksTest(unittest.TestCase):
         for command in normal_create:
             with self.subTest(command=command, route="normal"):
                 self.assertIsNotNone(self._run_shared_checkout_guard(command))
-                self.assertIsNotNone(self._run_shared_checkout_guard(f"{creation} {command}"))
-                self.assertIsNotNone(self._run_shared_checkout_guard(f"{workflow} {command}"))
+                self.assertIsNone(self._run_shared_checkout_guard(f"{creation} {command}"))
+                self.assertIsNone(self._run_shared_checkout_guard(f"{workflow} {command}"))
+                self.assertIsNotNone(self._run_shared_checkout_guard(f"{destructive} {command}"))
                 self.assertIsNone(
                     self._run_shared_checkout_guard(f"{creation} {destructive} {command}")
                 )
@@ -990,7 +999,7 @@ class CodexHooksTest(unittest.TestCase):
                 )
 
     def test_shared_checkout_guard_protects_agent_canon_update_wrappers(self) -> None:
-        """Update wrappers inherit the creation plus destructive authority profile."""
+        """Update wrappers require destructive authority, not branch/worktree creation authority."""
         approved = (
             "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
             "AGENT_CANON_BRANCH_WORKTREE_REASON=approved-update "
@@ -1025,10 +1034,24 @@ class CodexHooksTest(unittest.TestCase):
                 assert payload is not None
                 reason = cast("str", payload["reason"])
                 self.assertIn("DESTRUCTIVE_GIT_GUARD=block", reason)
-                self.assertIn("BRANCH_WORKTREE_CREATION_GUARD=block", reason)
+                self.assertNotIn("BRANCH_WORKTREE_CREATION_GUARD=block", reason)
                 self.assertEqual(
                     payload["next_action"],
-                    "request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason",
+                    "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval",
+                )
+                self.assertIsNotNone(
+                    self._run_shared_checkout_guard(
+                        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
+                        "AGENT_CANON_BRANCH_WORKTREE_REASON=creation-only "
+                        f"{command}"
+                    )
+                )
+                self.assertIsNone(
+                    self._run_shared_checkout_guard(
+                        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
+                        "AGENT_CANON_DESTRUCTIVE_GIT_REASON=approved-update "
+                        f"{command}"
+                    )
                 )
                 self.assertIsNone(self._run_shared_checkout_guard(f"{approved} {command}"))
 
@@ -1091,13 +1114,13 @@ class CodexHooksTest(unittest.TestCase):
     def test_shared_checkout_guard_blocks_generic_branch_worktree_mutation(self) -> None:
         """Only explicit branch/worktree read-only allowlists stay quiet."""
         commands = [
-            "git branch --set-upstream-to=origin/main topic",
-            "git branch --unset-upstream topic",
             "git branch -Mtopic",
+            "git branch --set-upstream-to --delete topic",
             "git worktree remove ../topic",
             "git worktree move ../old ../new",
             "git worktree repair ../topic",
-            "git worktree unlock ../topic",
+            "git worktree lock --reason --force ../topic",
+            "git worktree unlock --force ../topic",
         ]
         for command in commands:
             with self.subTest(command=command):

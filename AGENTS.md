@@ -120,15 +120,24 @@ unknown dirty, staged, untracked, branch, and worktree state as owned by the
 user or another chat, and preserve that state across routing and repair.
 Protected Git operations include `git restore`, `git reset`, forced `git clean`,
 mutating `git stash`, checkout/switch, and branch/worktree create, delete, move,
-rename, or prune. Proven exact task ownership only bounds which paths may be
-named in an approval request; explicit destructive approval remains required.
-A protected mutation proceeds only when the user
-explicitly approves it and the same command segment carries
+rename, or prune. Normal branch/worktree creation records creation authority and
+reason; force-create/ref overwrite additionally requires destructive authority and
+reason. Existing checkout/switch, delete/rename/reset, and other history/ref
+mutations require destructive authority and reason. Reversible tracking metadata
+and `git worktree lock/unlock` do not mutate refs, history, or worktrees and are
+not destructive. Proven exact task ownership only bounds which paths may be
+named in an approval request; explicit destructive approval remains required for
+destructive operations.
+A protected destructive mutation proceeds only when the user explicitly approves
+it and the same command segment carries
 `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` plus a nonempty
-`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Branch/worktree creation additionally
-requires same-segment `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` or
+`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Normal branch/worktree creation instead
+requires same-segment
+`AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` or
 `agent_canon_workflow` plus a nonempty `AGENT_CANON_BRANCH_WORKTREE_REASON`;
-the creation and destructive requirements are an AND gate. Collision handling keeps the current
+force-create/ref overwrite requires both authority pairs. `latest` / `apply` /
+merge wrappers require destructive authority only unless their owner route
+actually creates a branch/worktree. Collision handling keeps the current
 branch/worktree and requests user direction.
 
 Canonical repo-local lifecycle commands are bounded to a separate workspace route:
@@ -136,8 +145,9 @@ Canonical repo-local lifecycle commands are bounded to a separate workspace rout
 `<project-root>/workspace/<topic-slug>/<repo-name>` without operation-level approval when
 non-empty owner evidence and exact computed identity are present. This does not authorize raw
 shared-checkout Git mutations or bypass the hook. At closeout, lifecycle skills dispatch proof-
-gated cleanup with candidate CAS, PR lifecycle, required publication readback, owner evidence,
-and expected identity; only `CleanupProof` / cleanup receipt authorizes deletion. Collisions,
+gated cleanup with computed clone identity, owner/marker evidence, clean state, and remote
+head/tree readback; publication artifacts are optional coherent enrichment. Only ordinary
+`CleanupProof` / cleanup receipt authorizes deletion. Collisions,
 unknown dirty state, and proof mismatch remain preserved typed holds.
 
 ## Runtime Owner Map
@@ -151,7 +161,7 @@ unknown dirty state, and proof mismatch remain preserved typed holds.
 | internal routine placement | `agents/internal-routines/README.md`; `documents/structure/repo-structure-contract.toml` | `repo_structure_contract.py` |
 | design-to-implementation correspondence | `agents/internal-routines/design-implementation-correspondence.md`; `documents/design/*.md` | `check_design_doc_claims.py`; design/review readback |
 | implementation flow and handoff packet | `agents/workflows/implementation-waterfall-workflow.md`; `agents/COMMUNICATION_PROTOCOL.md` | task run bundle review |
-| shared-checkout Git mutation and branch/worktree creation route | `agents/canonical/CODEX_WORKFLOW.md`; `tools/agent_tools/hook_safety.py`; `agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
+| shared-checkout Git mutation and branch/worktree creation route | `agents/canonical/CODEX_WORKFLOW.md`; `tools/agent_tools/hook_safety.py`; `agents/skills/worktree-health.md` | operation-risk Git authority matrix; critical PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation routing | `documents/runtime/runtime-profiles-and-check-matrix.md` | profile-specific checks |
 | closeout evidence | `tools/agent_tools/task_close.py`; `tools/agent_tools/report_artifact_checks.py` | closeout artifact gate |
 | AgentCanon update transaction | `documents/agent-canon/agent-canon-update-route.md`; `tools/agent_tools/update_lifecycle_contract.py` | boundary-owned G1-G6 receipts; `tools/agent_tools/task_close.py` |

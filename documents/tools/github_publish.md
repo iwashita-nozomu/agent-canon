@@ -19,14 +19,15 @@ only after `gh repo view` and `git remote get-url origin` agree on the same
 `owner/name`.
 
 The standalone `push` action is reversible branch transport, not correctness,
-review, or PR publication. With no packet file, it requires the verified remote
-identity/permission and a named current branch, captures local `HEAD`/tree,
-sends that commit with
-`git push -u --force-with-lease <remote> <commit-sha>:refs/heads/<branch>`, reads exactly one
+review, or PR publication. It requires the verified remote identity/permission
+and a named current branch, captures local `HEAD`/tree, sends that commit with
+the normal non-forced
+`git push -u <remote> <commit-sha>:refs/heads/<branch>` (using a process-local
+`gh auth git-credential` helper for HTTPS remotes), reads exactly one
 `git ls-remote <remote> refs/heads/<branch>` result, and verifies the remote SHA
 and unchanged local branch/HEAD/tree. It does not generate or claim G1/G2/G3 or
 PR lifecycle evidence; summaries use `publication_boundary=branch_transport_only`.
-If a sealed packet is supplied, its candidate identity is additionally checked
+If a sealed packet is supplied programmatically, its candidate identity is additionally checked
 and the summary retains the sealed publication evidence. A sealed packet may
 also carry `predecessor_graph_materialization`; when present, the publisher
 requires the closed materialization schema, packet SHA, predecessor source OID,
@@ -112,8 +113,13 @@ before the main publication transport/CAS boundary, while remote readback still
 proves the exact pushed branch SHA. CI fresh-clone fixtures validate clone/bootstrap or update behavior only. They
 are not ordinary publication evidence; publication evidence comes from the
 sealed lifecycle identity, the exact SHA ref push, and the remote readback.
-`publish-pr`, PR mutation, and merge remain packet/G1/G2/G3-bound operations;
-they reject a missing sealed packet.
+`pr` and `publish-pr` derive a direct lifecycle from the user task, verified
+repository/permission, exact local candidate and base identities, and PR body;
+they do not require a packet file or materialize `.agent-canon/update-lifecycle`
+state. A sealed packet remains an optional programmatic evidence input and is
+fully validated when supplied. `checks` is read-only and works without a packet;
+when packet/G5 evidence is supplied, the exact evidence is retained in the
+summary.
 
 ## Hook Boundary
 

@@ -45,6 +45,8 @@ READ_ONLY_BRANCH_VALUE_OPTIONS = {
     "--color", "--contains", "--format", "--merged", "--no-contains",
     "--no-merged", "--points-at", "--sort",
 }
+BENIGN_BRANCH_OPTIONS = {"--edit-description", "--unset-upstream", "-u"}
+BENIGN_BRANCH_VALUE_OPTIONS = {"--set-upstream-to", "-u"}
 BRANCH_NORMAL_CREATE_SHORTS = {"c"}
 BRANCH_FORCE_SHORTS = {"C", "f"}
 BRANCH_DESTRUCTIVE_SHORTS = {"D", "M", "d", "m"}
@@ -512,14 +514,14 @@ def protected_update_intent(command: GitCommand) -> GitIntent | None:
     if script.endswith("tools/update_agent_canon.sh") and script_arguments:
         mode = script_arguments[0]
         if mode in PROTECTED_UPDATE_MODES:
-            return GitIntent("protected_agent_canon_update", mode, "protected update wrapper", True, True)
+            return GitIntent("protected_agent_canon_update", mode, "protected update wrapper", False, True)
     if script.endswith("tools/sync_agent_canon.sh") and script_arguments and script_arguments[0] == "ensure-latest":
-        return GitIntent("protected_agent_canon_update", "ensure-latest", "protected sync wrapper", True, True)
+        return GitIntent("protected_agent_canon_update", "ensure-latest", "protected sync wrapper", False, True)
     if executable in {"make", "gmake"}:
         targets = PROTECTED_MAKE_TARGETS.intersection(arguments)
         if targets:
             target = sorted(targets)[0]
-            return GitIntent("protected_agent_canon_update", target, "protected make target", True, True)
+            return GitIntent("protected_agent_canon_update", target, "protected make target", False, True)
     return None
 
 
@@ -559,6 +561,7 @@ def branch_is_read_only(arguments: tuple[str, ...]) -> bool:
         return True
     index = 0
     saw_list = False
+    saw_benign_metadata = False
     while index < len(arguments):
         argument = arguments[index]
         if argument == "--":
@@ -573,10 +576,28 @@ def branch_is_read_only(arguments: tuple[str, ...]) -> bool:
         if any(argument.startswith(f"{option}=") for option in READ_ONLY_BRANCH_VALUE_OPTIONS):
             index += 1
             continue
+        if argument.startswith("-u") and not argument.startswith("--") and argument != "-u":
+            saw_benign_metadata = True
+            index += 1
+            continue
+        if argument in BENIGN_BRANCH_VALUE_OPTIONS:
+            if index + 1 >= len(arguments) or arguments[index + 1].startswith("-"):
+                return False
+            saw_benign_metadata = True
+            index += 2
+            continue
+        if any(argument.startswith(f"{option}=") for option in BENIGN_BRANCH_VALUE_OPTIONS if option.startswith("--")):
+            saw_benign_metadata = True
+            index += 1
+            continue
+        if argument in BENIGN_BRANCH_OPTIONS:
+            saw_benign_metadata = True
+            index += 1
+            continue
         if argument in READ_ONLY_BRANCH_OPTIONS:
             index += 1
             continue
-        if saw_list and not argument.startswith("-"):
+        if (saw_list or saw_benign_metadata) and not argument.startswith("-"):
             index += 1
             continue
         return False
@@ -610,6 +631,32 @@ def worktree_intent(arguments: tuple[str, ...]) -> GitIntent | None:
     rest = arguments[index + 1 :]
     if subcommand == "list":
         return None
+    if subcommand == "lock":
+        index = 0
+        saw_path = False
+        while index < len(rest):
+            argument = rest[index]
+            if argument == "--reason":
+                if index + 1 >= len(rest) or rest[index + 1].startswith("-"):
+                    return GitIntent("destructive_git", "worktree", "worktree lock mutation", False, True)
+                index += 2
+                continue
+            if argument.startswith("--reason="):
+                index += 1
+                continue
+            if argument == "--":
+                if not saw_path and len(rest[index + 1 :]) == 1:
+                    return None
+                return GitIntent("destructive_git", "worktree", "worktree lock mutation", False, True)
+            if argument.startswith("-") or saw_path:
+                return GitIntent("destructive_git", "worktree", "worktree lock mutation", False, True)
+            saw_path = True
+            index += 1
+        if saw_path:
+            return None
+    if subcommand == "unlock":
+        if rest and all(not argument.startswith("-") for argument in rest):
+            return None
     if subcommand == "add":
         force_overwrite = bool(short_option_letters(rest) & {"B", "f"}) or has_long_option(rest, "--force")
         if force_overwrite:
@@ -667,7 +714,9 @@ def destructive_authorized(command: GitCommand) -> bool:
 
 
 def intent_authorized(command: GitCommand, intent: GitIntent) -> bool:
-    return (not intent.requires_creation or (creation_authorized(command) and destructive_authorized(command))) and (not intent.requires_destructive or destructive_authorized(command))
+    return (not intent.requires_creation or creation_authorized(command)) and (
+        not intent.requires_destructive or destructive_authorized(command)
+    )
 
 
 def opaque_protected_intent(command: str) -> GitIntent | None:
@@ -830,25 +879,24 @@ def branch_block_payload(command: str, intent: GitIntent) -> dict[str, object]:
         markers.append("BRANCH_WORKTREE_CREATION_GUARD=block")
     requirements: list[str] = []
     if intent.requires_creation:
-        requirements.extend(
-            [
-                f"same-segment {BRANCH_AUTHORITY_ENV}=user_request|agent_canon_workflow and nonempty {BRANCH_REASON_ENV}",
-                f"same-segment {DESTRUCTIVE_AUTHORITY_ENV}=explicit_user_approval and nonempty {DESTRUCTIVE_REASON_ENV}",
-            ]
+        requirements.append(
+            f"same-segment {BRANCH_AUTHORITY_ENV}=user_request|agent_canon_workflow and nonempty {BRANCH_REASON_ENV}"
         )
-    elif intent.requires_destructive:
+    if intent.requires_destructive:
         requirements.append(f"same-segment {DESTRUCTIVE_AUTHORITY_ENV}=explicit_user_approval and nonempty {DESTRUCTIVE_REASON_ENV}")
+    if intent.requires_creation and intent.requires_destructive:
+        next_action = "request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
+    elif intent.requires_creation:
+        next_action = "request_branch_or_worktree_creation_authority_then_rerun_same_command_with_inline_git_authority_and_reason"
+    else:
+        next_action = "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval"
     return {
         "decision": "block",
         "reason": (
             f"{'; '.join(markers)}: protected shared-checkout Git intent lacks required authority. "
             f"operation={intent.kind}:{intent.subcommand}; requires={'; '.join(requirements)}"
         ),
-        "next_action": (
-            "request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
-            if intent.requires_creation
-            else "inspect_status_preserve_other_task_changes_or_record_explicit_user_approval"
-        ),
+        "next_action": next_action,
         "remediation": [
             "Inspect status and preserve changes owned by the user or another concurrent chat.",
             "Continue only on proven task-owned exact paths; that evidence bounds an approval request and never bypasses explicit destructive approval.",

@@ -35,7 +35,7 @@ downstream implementation ../../tools/agent_tools/task_close.py enforces closeou
 1. `agents/skills/README.md` と `$agent-orchestration` skill を読み、routing mode と skill set を先に決める
 1. `agents/TASK_WORKFLOWS.md` で task family を決める
 1. Runtime profile と implementation owner がまだ固定されていない repo-changing task では、広い packet 読解より先に canonical router / semantic-index / dependency review の structured output を取る
-1. `make agent-canon-update-plan` と read-only worktree check で AgentCanon freshness を分類する。更新が必要なら current checkout を保持し、current-task user の explicit approval を得てから、同じ command segment に creation authority/reason と destructive authority/reason の全 4 field を置いた protected wrapper / Make target を実行する。intended named source branch の dirty / unpushed / divergent state は evidence として保持し、Git の仮想 merge conflict または exact update write set と local materialized path の collision だけを typed blocker にする。detached state は source owner identity repair へ route する
+1. `make agent-canon-update-plan` と read-only worktree check で AgentCanon freshness を分類する。更新が必要なら current checkout を保持し、current-task user の explicit approval を得てから、操作リスクに対応した creation または destructive authority/reason を同じ command segment に置いた protected wrapper / Make target を実行する。intended named source branch の dirty / unpushed / divergent state は evidence として保持し、Git の仮想 merge conflict または exact update write set と local materialized path の collision だけを typed blocker にする。detached state は source owner identity repair へ route する
 1. 選択された workflow/profile が必要とする Base Runtime Packet だけを読む。inactive profile の packet は `not_applicable` として記録する
 1. Cross-Cutting Packet は選択 route、review gate、または structured tool finding が必要にした slice を読む
 1. 実装を伴う task では `agents/workflows/implementation-waterfall-workflow.md` を読む
@@ -68,15 +68,15 @@ Cross-Cutting Packet:
 
 ### Agent Canon Freshness
 
-task 開始時は `make agent-canon-update-plan` と read-only worktree check で、parent repo の `vendor/agent-canon` submodule pin と worktree の freshness を分類します。preflight の contract は checkout-preserving read-only classification です。更新が必要な場合だけ current-task user approval と全 4 inline Git authority/reason field を得て protected update route に入ります。
+task 開始時は `make agent-canon-update-plan` と read-only worktree check で、parent repo の `vendor/agent-canon` submodule pin と worktree の freshness を分類します。preflight の contract は checkout-preserving read-only classification です。更新が必要な場合だけ current-task user approval と、操作に対応する inline Git authority/reason field を得て protected update route に入ります。
 
 - submodule repo では、read-only plan の判断対象を AgentCanon update surface に限定します。
 - AgentCanon update surface は `vendor/agent-canon/` submodule worktree、parent gitlink、`.gitmodules`、および `link-root` が触る AgentCanon-owned root symlink / copy view です。
 - clean な submodule worktree が remote main を指していて parent gitlink だけ古い場合も、preflight は checkout-preserving `approval_required` route を返します。承認後の protected update が parent gitlink の stage / commit を所有します。
-- clean な submodule worktree が non-default branch を指し、その branch head が remote branch に push 済みで fetched remote main を含み、parent gitlink だけが古い場合は `deferred_branch_pr` evidence として記録し、routing / planning / review を続けます。AgentCanon PR merge 後は再度 read-only plan を行い、mutation が必要なら approval、全 4 inline field、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route を実行します。
+- clean な submodule worktree が non-default branch を指し、その branch head が remote branch に push 済みで fetched remote main を含み、parent gitlink だけが古い場合は `deferred_branch_pr` evidence として記録し、routing / planning / review を続けます。AgentCanon PR merge 後は再度 read-only plan を行い、mutation が必要なら operation risk に応じた approval/authority fields と同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route を実行します。
 - intended named `vendor/agent-canon/` source branch を source owner とし、branch / ahead / diverged / dirty state は evidence として保持します。全 local uncommitted / ignored materialized paths と `HEAD` から planned result tree への exact update write set の unpreservable collision、または unresolved merge conflict だけを block します。
 - requested topic が current branch と異なる場合だけ `documents/rule/dependency-module-changes.md` の topic workspace branch clone route を使います。parent pin/root projection は引き続き clean `main` と staged gitlink の一致を要求します。
-- update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon branch / PR に出します。merge 後も read-only plan を先に行い、必要な approval、全 4 inline field、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route の後で root view と parent pin を同期します。
+- update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon branch / PR に出します。merge 後も read-only plan を先に行い、必要な approval/authority fields と同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route の後で root view と parent pin を同期します。
 - AgentCanon source change、parent submodule pin change、`.gitmodules`
   change、AgentCanon-owned root runtime view / root-copy surface change、parent
   root sync PR は `agentcanon_structure_followup=required` です。template /
@@ -84,16 +84,16 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
   `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` check が pass した後だけ
   `agentcanon_structure_followup=pass` として closeout に使えます。
 - 承認済み protected `ensure-latest` は `.gitmodules` の URL と immutable remote branch SHA を見て、parent gitlink と submodule worktree HEAD が remote main と一致するかを判定し、必要な pin と root shared surface を同期します。
-- local submodule commit が remote main に含まれている場合も、read-only plan の後に current-task user approval、全 4 inline field、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected `apply` / latest route で parent pin を remote main へ揃えます。
+- local submodule commit が remote main に含まれている場合も、read-only plan の後に current-task user approval、destructive authority/reason、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected `apply` / latest route で parent pin を remote main へ揃えます。route が branch/worktree を作成する場合だけ creation authority/reason も要求します。
 - local submodule history が remote main と diverge している場合は fail-closed とし、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って AgentCanon branch push、AgentCanon PR / merge、派生 repo submodule pin 再同期を完了してから実装へ戻ります。
 - `task_start.py` と `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。template の root symlink view から起動したときに `skipped_source_canon` が出る場合は misconfiguration として扱い、workspace root、`.gitmodules`、`vendor/agent-canon` の状態を確認します。`skipped_source_canon` は standalone AgentCanon source checkout でだけ妥当です。
 
 ### Branch Reuse Default
 
-既存 branch / PR が現在の task、追加 user instruction、または follow-up と同じ ownership surface を担える場合は、その branch / PR を継続します。branch / worktree 作成 route は、作成前に route authority と理由を記録し、さらに current-task user の explicit destructive approval を得る AND gate に集約します。
+既存 branch / PR が現在の task、追加 user instruction、または follow-up と同じ ownership surface を担える場合は、その branch / PR を継続します。通常の branch / worktree 作成 route は、作成前に creation authority と理由を記録します。force-create または ref overwrite を含む route だけが、creation と destructive の両方を要求します。
 
 - 同じ checkout は複数 chat/session が同時に使う場合があります。unknown dirty/staged/untracked state と branch/worktree state は user または別 chat 所有として保存します。`git restore`、`git reset`、forced `git clean`、mutating `git stash`、checkout/switch、branch/worktree create/delete/move/rename/prune は protected Git mutation として扱います。proven exact task ownership は approval request に含める path を限定し、explicit destructive approval は引き続き必須です。
-- protected Git mutation の実行条件は、user の操作明示承認と、同じ command segment で Git または protected AgentCanon update wrapper の直前に置く `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` および非空の `AGENT_CANON_DESTRUCTIVE_GIT_REASON=<reason>` です。branch/worktree creation と `latest` / `apply` / merge update route は、同じ segment の `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` または `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow` と、非空の `AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>` も同時に要求します。ambient 変数や prior segment は authority になりません。
+- Git authority は操作リスクで分けます。通常の branch create / worktree add は同じ command segment の creation authority/reason のみを要求し、force-create または ref overwrite は creation と destructive authority/reason の両方を要求します。既存 branch の checkout/switch、branch/worktree の delete/rename/prune、reset、restore、forced clean、mutating stash、およびその他の履歴/参照破壊操作は destructive authority/reason を要求します。`latest` / `apply` / merge update wrapper は実際に branch/worktree を作成する owner route でない限り destructive authority/reason のみを要求します。`branch --set-upstream-to`、`branch --unset-upstream`、`branch --edit-description` などの tracking/description metadata 操作と、reversible な `worktree lock/unlock` は ref、履歴、worktree を変更しないため protected destructive Git mutation ではありません。worktree の remove/move/repair/prune/force-add は protected operation です。ambient 変数や prior segment は authority になりません。
 - destructive Git safety は `tools/agent_tools/hook_safety.py` の pure owner を dispatcher が呼び出します。session 開始時に dispatcher registration を load 済みの session では次の tool call から更新後 script が効きます。hook table 自体が未 load の既存 session は session restart 後に保護対象になります。
 - 衝突時は current branch/worktree を維持し、status を保存して user の指示を待ちます。
 
@@ -107,14 +107,15 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
   evidence を要求せず、generic repository-topic lifecycle または operation-level approval
   carve-out の権限を持ちません。
 - closeout は `repository-topic-clone` または `dependency-module-change` skill の
-  `cleanup` dispatch を経由します。candidate CAS、PR lifecycle、必要な publication
-  readback、owner evidence、expected clone identity を渡し、`CleanupProof` / receipt が
-  返った場合だけ `--apply` を受理します。proof 不足、collision、unknown dirty state は
+  `cleanup` dispatch を経由します。computed clone identity、owner/marker evidence、
+  clean state、remote head/tree readback を渡し、ordinary `CleanupProof` / receipt が
+  返った場合だけ `--apply` を受理します。publication artifacts は存在する場合だけ
+  coherent enrichment として保持します。proof 不足、collision、unknown dirty state は
   clone/topic root を保持して typed hold として記録します。
 
 - 通常 task の authority は、user が別 branch を明示した場合の `user_request` です。AgentCanon source update の authority は、AgentCanon branch / PR workflow と canonical update tool が owner の `agent_canon_workflow` です。
 - 「fresh start」「dirty state 回避」「追記の分離」「task 途中の追加指示」「既存 PR の checklist 追記」は、既存 branch / PR 継続の理由として扱います。
-- branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。それだけでは実行権限になりません。current-task user approval 後の同じ shell segment に creation authority/reason と destructive authority/reason の全 4 値を置いた場合だけ実行できます。
+- branch / worktree 作成前に run bundle、work log、または PR body へ `branch_creation_reason=<reason>` または `worktree_creation_reason=<reason>` と authority 対応箇所を記録します。それだけでは実行権限になりません。current-task user approval 後の同じ shell segment に、通常作成なら creation authority/reason、force-create/ref overwrite なら creation と destructive の両 authority pair を置いた場合だけ実行できます。
 - AgentCanon source 変更は intended named `vendor/agent-canon/` branch を source owner とし、branch / ahead / diverged / dirty state を evidence として collision-safe merge / review を続けます。vendor checkout が別 topic/branch に占有されている場合だけ、`dependency-module-change` で topic workspace clone を prepare/reuse します。parent pin/root projection は source publication 後に行います。
 - vendor-first は非並列 single-stream の既定です。独立 stream の workspace placement も、vendor checkout の別 topic/branch 占有時のみ、replaceable responsibility unit、disjoint write scope、依存/merge order、validation route、reviewer ownership を固定して選択します。parent は ready な全 stream を launch し、全 descendant を monitor し、同一責任・同一 worker context を再利用します。細粒度の fresh-agent fan-out は独立 stream とみなしません。
 - repository source は `repository-topic-clone` の一つの prepare route で扱います。exact identity の既存 clone と named local/remote branch は再利用し、branch が無い場合だけ最新 `origin/main` から作成します。parent、dependency、standalone の区別は prepare 後の policy decorator です。各 source branch は candidate review / PR 前に最新 `origin/main` を通常 merge し、conflict は状態を保持して意図的に解消します。`origin/main` の read/CAS だけでは merge 済みの代替になりません。

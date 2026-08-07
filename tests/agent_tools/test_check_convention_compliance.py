@@ -220,12 +220,17 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "Branch Reuse Default tools/agent_tools/hook_safety.py user が別 branch を明示 "
         "AgentCanon branch / PR workflow "
         "branch_creation_reason=<reason> worktree_creation_reason=<reason> "
-        "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval "
-        "AGENT_CANON_DESTRUCTIVE_GIT_REASON=<reason> proven exact task ownership "
-        "session restart "
-        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request "
-        "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=agent_canon_workflow "
-        "AGENT_CANON_BRANCH_WORKTREE_REASON=<reason>\n"
+        "proven exact task ownership session restart "
+        "Git authority は操作リスクで分けます。 "
+        "通常の branch create / worktree add "
+        "creation authority/reason のみを要求し "
+        "force-create または ref overwrite "
+        "creation と destructive authority/reason の両方を要求 "
+        "既存 branch の checkout/switch "
+        "destructive authority/reason を要求します "
+        "`latest` / `apply` / merge update wrapper "
+        "worktree の remove/move/repair/prune/force-add "
+        "ambient 変数や prior segment は authority になりません。\n"
     ),
     "agents/canonical/CODEX_SUBAGENTS.md": "subagents\n",
     "agents/workflows/example-workflow.md": (

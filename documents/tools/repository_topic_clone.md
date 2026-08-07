@@ -29,9 +29,8 @@ python3 tools/agent_tools/repository_topic_clone.py merge-main \
 python3 tools/agent_tools/repository_topic_clone.py cleanup \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
-  --expected-clone <absolute-clone> \
-  --candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
-  [--publication-readback <publication-readback.json>] [--apply]
+  [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
+  [--publication-readback <publication-readback.json>]] [--apply]
 ```
 
 host は `<parent-root>/workspace/<topic>/<repo>` を想定し、path alias は持ちません。
@@ -45,10 +44,11 @@ workspace/topic directory の作成前に symlink component、toplevel、tracked
 だけで成立する root や nested/non-repository root を typed error として保持します。
 `prepare` は既存 clone を marker/evidence/branch/url/upstream で検証し、exact branch を
 再利用します。不一致は state-preserving typed collision です。`merge-main` は
-`origin/main` を通常 merge し、ancestor proof を返します。`cleanup` は canonical
-candidate CAS、PR lifecycle、owner evidence を必須とし、integration 後は publication
-transition も検証します。pass 時だけ `CleanupProof` を返し、unknown sibling や dirty
-collision は保持します。
+`origin/main` を通常 merge し、ancestor proof を返します。`cleanup` は computed clone の
+identity、owner evidence、clean branch、fetch した `origin/<branch>` の commit/tree と local
+head/tree の一致を検証します。candidate CAS、PR lifecycle、publication transition は任意の
+追加 evidence であり、merged state の場合だけ strict publication readback を要求します。
+pass 時だけ `CleanupProof` を返し、unknown sibling や dirty collision は保持します。
 `cleanup` は exact Git toplevel を検証してから proof preflight を実行し、root ignore の
 後続 driftだけでは既存 clone の proof-gated removalを停止しません。adapter の `status`
 と `projected_clone_path` は directory を作らない read-only projection です。

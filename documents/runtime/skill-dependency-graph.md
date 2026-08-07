@@ -11,7 +11,7 @@ downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py c
 <!-- Generated from the typed skill/tool invocation graph; do not edit by hand. -->
 # Public Skill/Tool Invocation Graph
 
-<!-- graph_digest=446b522f694dc5bf81ddd80a3ef9fc20bca7e0af881db4ad57f7186a05ec8bf0 coverage_digest=90981f8ecb56728b98049114e6cbf3bf81fc9776f90203cf161ec9e60e0b38d6 -->
+<!-- graph_digest=098e22c1e4a57bfe591620e046b2559ec7f98f8e48554faafa11b5dcbda1b966 coverage_digest=0b8d041f34c7132b3c0c45ba49ed189248af1e9bbcc49fae95b9ca4bf87af8b1 -->
 ```mermaid
 graph LR
   subgraph responsibility_n_analysis["Responsibility: analysis"]
@@ -629,16 +629,16 @@ graph LR
     n_command_repository_topic_clone_conditional_0000["python3 tools/agent_tools/repository_topic_clone.py prepare --url '<url>' --repo-name '<repo>' --workspace-root '<root>' --topic '<topic>' --branch '<branch>' --owner-evidence '<path>' (order=0; ref=633414061ff412e4e07207e12aeb610b00ead8a3763aa81d1e9881e1ec08070b)"]
     %% node kind=command id=command:repository-topic-clone:conditional:0001 digest=477a3e3a6e3c8d6fc9dd919ecfb2e9c0b8972ed5b2191040a985a1bd1d6f6946 order=1
     n_command_repository_topic_clone_conditional_0001["python3 tools/agent_tools/repository_topic_clone.py merge-main --url '<url>' --repo-name '<repo>' --workspace-root '<root>' --topic '<topic>' --branch '<branch>' --owner-evidence '<path>' (order=1; ref=477a3e3a6e3c8d6fc9dd919ecfb2e9c0b8972ed5b2191040a985a1bd1d6f6946)"]
-    %% node kind=command id=command:repository-topic-clone:conditional:0002 digest=38a7b61a37e2792f2526ae0c1eb77c4e319a105be93b2ef9ba5fc9ee3b42243c order=2
-    n_command_repository_topic_clone_conditional_0002["python3 tools/agent_tools/repository_topic_clone.py cleanup --url '<url>' --repo-name '<repo>' --workspace-root '<root>' --topic '<topic>' --branch '<branch>' --owner-evidence '<path>' --expected-clone '<path>' --candidate-cas '<path>' --pr-lifecycle '<path>' (order=2; ref=38a7b61a37e2792f2526ae0c1eb77c4e319a105be93b2ef9ba5fc9ee3b42243c)"]
+    %% node kind=command id=command:repository-topic-clone:conditional:0002 digest=0361662727bc2cb01598149703aca440e9f6da7d906d5ce145f252877e998674 order=2
+    n_command_repository_topic_clone_conditional_0002["python3 tools/agent_tools/repository_topic_clone.py cleanup --url '<url>' --repo-name '<repo>' --workspace-root '<root>' --topic '<topic>' --branch '<branch>' --owner-evidence '<path>' '(--candidate-cas' '<path>' --pr-lifecycle '<path>' '(--publication-readback' '<path>))' '(--apply)' (order=2; ref=0361662727bc2cb01598149703aca440e9f6da7d906d5ce145f252877e998674)"]
     %% node kind=command id=command:dependency-module-change:conditional:0000 digest=7c2ce927470e9a2a47a1df3d033b9684886d5d357577718728f076275a6775c6 order=0
     n_command_dependency_module_change_conditional_0000["python3 tools/agent_tools/dependency_module_change.py --root '<parent-root>' prepare --topic '<topic>' --module '<path>' --branch '<branch>' --owner-evidence '<path>' (order=0; ref=7c2ce927470e9a2a47a1df3d033b9684886d5d357577718728f076275a6775c6)"]
     %% node kind=command id=command:dependency-module-change:conditional:0001 digest=512d183d592ad6ce6911dce2db3d5e0d07f3bff519c15134a5196ae7cef26dbb order=1
     n_command_dependency_module_change_conditional_0001["python3 tools/agent_tools/dependency_module_change.py --root '<parent-root>' merge-main --topic '<topic>' --module '<path>' --branch '<branch>' --owner-evidence '<path>' (order=1; ref=512d183d592ad6ce6911dce2db3d5e0d07f3bff519c15134a5196ae7cef26dbb)"]
     %% node kind=command id=command:dependency-module-change:conditional:0002 digest=47c041d97f793b621081f6bd8335483c466c3de75e8a9ce112ab630b63156223 order=2
     n_command_dependency_module_change_conditional_0002["python3 tools/agent_tools/dependency_module_change.py --root '<parent-root>' status --topic '<topic>' '(--module' '<path>)' (order=2; ref=47c041d97f793b621081f6bd8335483c466c3de75e8a9ce112ab630b63156223)"]
-    %% node kind=command id=command:dependency-module-change:conditional:0003 digest=df2b3e45be44d1c9ebb99f85cb71ed40869feb8458c1f65f27a4fcdadadb6f29 order=3
-    n_command_dependency_module_change_conditional_0003["python3 tools/agent_tools/dependency_module_change.py --root '<parent-root>' cleanup --topic '<topic>' --module '<path>' --branch '<branch>' --owner-evidence '<path>' --expected-clone '<path>' --candidate-cas '<path>' --pr-lifecycle '<path>' '(--publication-readback' '<path>)' '(--apply)' (order=3; ref=df2b3e45be44d1c9ebb99f85cb71ed40869feb8458c1f65f27a4fcdadadb6f29)"]
+    %% node kind=command id=command:dependency-module-change:conditional:0003 digest=7b4fcc3e59a64d627c2b18c27e19f211e592006162528b61a9cd6100b164a87a order=3
+    n_command_dependency_module_change_conditional_0003["python3 tools/agent_tools/dependency_module_change.py --root '<parent-root>' cleanup --topic '<topic>' --module '<path>' --branch '<branch>' --owner-evidence '<path>' '(--candidate-cas' '<path>' --pr-lifecycle '<path>' '(--publication-readback' '<path>))' '(--apply)' (order=3; ref=7b4fcc3e59a64d627c2b18c27e19f211e592006162528b61a9cd6100b164a87a)"]
     %% node kind=command id=command:pr-processing:conditional:0000 digest=0bfe2e087f8d16ee8e18dcf48c7d0ed6ba050137e8cfea32236ef63b910c8ea9 order=0
     n_command_pr_processing_conditional_0000["gh pr list --state open --json number,title,headRefName,baseRefName,isDraft,mergeable,reviewDecision,statusCheckRollup,updatedAt (order=0; ref=0bfe2e087f8d16ee8e18dcf48c7d0ed6ba050137e8cfea32236ef63b910c8ea9)"]
     %% node kind=command id=command:pr-processing:conditional:0001 digest=6cfd1ea7d364aa5aa53de60969f05158b07b3ffbfa0c1ecde426be05547102be order=1
@@ -2012,8 +2012,8 @@ graph LR
   %% source kind=module id=source:module:00028:655fe7f56ab12079 digest=16895624ef0e3244c308c534386ee0211259d42122fa4788e7cf0c4f52da5d66 locator=tools/catalog.yaml#tool:repository-topic-clone ordinal=28
   %% source kind=identity id=source:identity:00001:e81055e8aa5b5840 digest=a39ac7ef28f0b081f7702152e3a8ac6331ea0fac62d4b9c86bf02d94f0159b95 locator=agents/skills/catalog.yaml#skill:repository-topic-clone.tool_commands.conditional[1] ordinal=1
   %% source kind=field id=source:field:00001:de1a0e829c2fa149 digest=75b48d4656d67fca826347f99cbece5dfd4fdedc093c90d63960398cdd1b4258 locator=tools/agent_tools/skill_tool_commands.py#repository-topic-clone:conditional:1 ordinal=1
-  %% source kind=identity id=source:identity:00002:4f49e5af4b4e5d1b digest=24366468b8409915d0c680857c4e32fab78244a83eed4e5d7003d314788f7868 locator=agents/skills/catalog.yaml#skill:repository-topic-clone.tool_commands.conditional[2] ordinal=2
-  %% source kind=field id=source:field:00002:e7c30f77e5e773eb digest=8d8195a2abe55b7ccb889cb76e2f8d551e296b7dc7de814ef55a47be8e250732 locator=tools/agent_tools/skill_tool_commands.py#repository-topic-clone:conditional:2 ordinal=2
+  %% source kind=identity id=source:identity:00002:e64216db488827a9 digest=f676a248c30b098bb0d383d8b4e6fafbca4be27e49e7daa2bb212c9b15252d9c locator=agents/skills/catalog.yaml#skill:repository-topic-clone.tool_commands.conditional[2] ordinal=2
+  %% source kind=field id=source:field:00002:e2abbf0fc5a44170 digest=1a714983925733dde10c08f3f4a1aebc3cb1de90fbbcf195285e4d9889f83e5c locator=tools/agent_tools/skill_tool_commands.py#repository-topic-clone:conditional:2 ordinal=2
   %% source kind=phase id=source:phase:00002:27285cfba4f46270 digest=b0122804d32886e7fafa06220c43e89abe11eda94e5d134cec80e43628f9a86b locator=agents/skills/catalog.yaml#skill:repository-topic-clone.tool_commands.maintenance ordinal=2
   %% source kind=identity id=source:identity:00000:80b7546be9343fae digest=ea316e9bf4adfa282be1f7f670c5a41f7f26f907643997ee9fe4821966badb9e locator=agents/skills/catalog.yaml#skill:repository-topic-clone.tool_commands.maintenance[0] ordinal=0
   %% source kind=field id=source:field:00000:82cbff4e67e0366c digest=708c2767bc845ecb04b2b8e3be6bc3017eee846d47535943983db74bfd982de3 locator=tools/agent_tools/skill_tool_commands.py#repository-topic-clone:maintenance:0 ordinal=0
@@ -2028,8 +2028,8 @@ graph LR
   %% source kind=field id=source:field:00001:f324b4fb4c97d25f digest=894f4b4b14ffa7c32db1884486d885bf55ebe2f557b5e5efe8b1eee464bde49e locator=tools/agent_tools/skill_tool_commands.py#dependency-module-change:conditional:1 ordinal=1
   %% source kind=identity id=source:identity:00002:692c2e1842bec05d digest=960e21c83351a2e23f753a0ef3fd69feb82721f4e64954379f8c507eba252133 locator=agents/skills/catalog.yaml#skill:dependency-module-change.tool_commands.conditional[2] ordinal=2
   %% source kind=field id=source:field:00002:044a5af2919a093e digest=e29d3708492c86fca967da73b70fc6abc938fab74c31473deaf7159e20b116aa locator=tools/agent_tools/skill_tool_commands.py#dependency-module-change:conditional:2 ordinal=2
-  %% source kind=identity id=source:identity:00003:5addb9e89a6247ea digest=a3ce9f7119c434e62eb8f3bf0866717374b723ecc96443865949e82fefe95900 locator=agents/skills/catalog.yaml#skill:dependency-module-change.tool_commands.conditional[3] ordinal=3
-  %% source kind=field id=source:field:00003:5b722581338d219c digest=85a0346f718f2ceaf2d60fd4ac15e9fc331ebb35b22d0f96afda8c6b27b13074 locator=tools/agent_tools/skill_tool_commands.py#dependency-module-change:conditional:3 ordinal=3
+  %% source kind=identity id=source:identity:00003:092a20b7b816f3ef digest=634ccb01cf8fd534537ede278288197d88ef9eab5cd83d8a98d39d34f297ffde locator=agents/skills/catalog.yaml#skill:dependency-module-change.tool_commands.conditional[3] ordinal=3
+  %% source kind=field id=source:field:00003:0b0fe70baddad424 digest=406816f1df9b7ae1e369a84d0ea7e2b1f36c7ad0ac107858008bbcbd249b03b0 locator=tools/agent_tools/skill_tool_commands.py#dependency-module-change:conditional:3 ordinal=3
   %% source kind=phase id=source:phase:00002:8035674e700175a3 digest=5e4ec8fa3c084170879ce7c3ea4003c6b3bddaadf6d60b7420a6e32918bd231e locator=agents/skills/catalog.yaml#skill:dependency-module-change.tool_commands.maintenance ordinal=2
   %% source kind=identity id=source:identity:00000:f43e081f8d158456 digest=bf7193250ab28580f64ebcad5801d418ea75ba6756f90774749034bcabc5633e locator=agents/skills/catalog.yaml#skill:dependency-module-change.tool_commands.maintenance[0] ordinal=0
   %% source kind=field id=source:field:00000:8b208ab76fdb5860 digest=aaa2ed2d5f58056cf15d60f229bdcc82f8da35d2e82292c4d68bfa34fd29c0b8 locator=tools/agent_tools/skill_tool_commands.py#dependency-module-change:maintenance:0 ordinal=0
@@ -2729,11 +2729,11 @@ graph LR
   %% source kind=field id=source:field:00004:223dcdaa3baf12ed digest=aec681624a1f36ff10838531f6486f9ad0640154a1f416b3c199323e11b91ab1 locator=tools/agent_tools/skill_tool_commands.py#skill-cleanup:conditional:4 ordinal=4
   %% source kind=phase id=source:phase:00002:61a912619cf9ec2e digest=5a15b0c459a6d82aa0fd513841b62ad9256c7ce85328f9a7231b57efaea9ed12 locator=agents/skills/catalog.yaml#skill:skill-cleanup.tool_commands.maintenance ordinal=2
   %% source kind=module id=source:module:00000:efcc8c1d91224b3c digest=929389bbc1c9cd97297a6137e33d39eafb83ad7ccb941f49da39bd7d31bbd642 locator=agents/skills/code-visualization.md ordinal=0
-  %% source kind=evidence id=source:evidence:01211:d5e5d4de7f26aabc digest=6334d2317bb8c39c626f12649796c0082e3b3f073fc396a666f6acf85e74cdc2 locator=agents/skills/catalog.yaml ordinal=1211
+  %% source kind=evidence id=source:evidence:01211:89209a3c9adde2ef digest=b52bef8ea650eba463d8887d99b591b4327d6796a419724ff7317afece51fef1 locator=agents/skills/catalog.yaml ordinal=1211
   %% source kind=evidence id=source:evidence:01212:4cf3367e057c2e1a digest=64858638d870d7fdfa7ee52d93272cca82d96ab9a1b501f8cd74a7270fd3e2f0 locator=agents/skills/skill-dependencies.yaml ordinal=1212
   %% source kind=evidence id=source:evidence:01213:c52cdc893dd85eb4 digest=dc6e9f976c8570ece709450a118e04aa1f83e7f0e0a7d115ef418c9cc5f2c90f locator=agents/canonical/skills.md ordinal=1213
   %% source kind=evidence id=source:evidence:01214:9b20aeb668d8de2b digest=0d477b8545cc97097b68cc6e9acab78418bf603d3db860e56088087b2fd124b5 locator=agents/skills/catalog.yaml#routing ordinal=1214
-  %% source kind=evidence id=source:evidence:01215:07d70d807f92784b digest=e55f58d494197013245680bb346b7f4fcdd20ac0bd7b395a59fe94aa31a10993 locator=tools/agent_tools/skill_tool_commands.py#canonical-resolution ordinal=1215
+  %% source kind=evidence id=source:evidence:01215:93e7b241b2ceff66 digest=9378380120b41df2763e201ca29c2fda0e9052e1c4c7c3d146028a3468c67071 locator=tools/agent_tools/skill_tool_commands.py#canonical-resolution ordinal=1215
   %% source kind=evidence id=source:evidence:01216:1d8bb947a9982fad digest=d2470568113248ae89ef2c187d9f943bde61255bd2377e645374c823875a7769 locator=agents/skills/catalog.yaml#typed-visualization-toolcalls ordinal=1216
   %% source kind=edge id=source:edge:00000:fc6e388d1a034763 digest=4caf05610f97ddedb2b303961308da403f7e2584df7eafeba152bc11b136a9ad locator=graph:edge:00000 ordinal=0
   %% source kind=edge id=source:edge:00001:393efbc033d17a1f digest=a4edc37be2840ecbec90abb3f94b178c30e71666802659057a798bb4c967dc9c locator=graph:edge:00001 ordinal=1
@@ -2933,7 +2933,7 @@ graph LR
   %% source kind=edge id=source:edge:00195:b11c1baa3b9d26b8 digest=9b1a3e46c403b8d913a87cb43b61f4308cf01763c62f3991e458c87195b084b7 locator=graph:edge:00195 ordinal=195
   %% source kind=edge id=source:edge:00196:83c22850bef45400 digest=fe2c62cf641e6f4946ccd49e150b67569740efd5917b9cc4651c022fc06e9448 locator=graph:edge:00196 ordinal=196
   %% source kind=edge id=source:edge:00197:e3fc88175679fc69 digest=8e2a45fc3c3d799c6e9c285379fc4154072ce1afa23ac672ee61e3d1768365a1 locator=graph:edge:00197 ordinal=197
-  %% source kind=edge id=source:edge:00198:a9d9fe08cddcc3e7 digest=f63a2fdeab76dee6bbc0ba93ffe2052980a852114bce7a48aad7b5105a03412b locator=graph:edge:00198 ordinal=198
+  %% source kind=edge id=source:edge:00198:e037a3722d169d7f digest=20137fd2afbdcac82e46922bf2057743dc01bddd4b9fbd46b44d973b225ef253 locator=graph:edge:00198 ordinal=198
   %% source kind=edge id=source:edge:00199:f2824aa2c1c0a976 digest=765ff10ffcea80b434e8a156555dc0fd3b47c3f9d9a60d72481f765066b92d56 locator=graph:edge:00199 ordinal=199
   %% source kind=edge id=source:edge:00200:2d3d7ca5aab137b8 digest=1d506f42e34669bf5e8806598f46e8d31e4a652b445f0ba91928324cbaed2e65 locator=graph:edge:00200 ordinal=200
   %% source kind=edge id=source:edge:00201:9dadd19de70e62d2 digest=0df0cb221ef35de9d607d53cd3b50a472e5b2fe1ac3b04bfaaa7580e1d80bebe locator=graph:edge:00201 ordinal=201
@@ -2942,7 +2942,7 @@ graph LR
   %% source kind=edge id=source:edge:00204:61afb7d44027165c digest=24d1661f297c755e687408f6dd94c54759e929b5af249ebc1aa410b72388a9b0 locator=graph:edge:00204 ordinal=204
   %% source kind=edge id=source:edge:00205:fa4ba51af7ffa79b digest=cdd29bba3049bd3be81cc094f9e41430ddbd5ef0fe792e371397a3b568ff9715 locator=graph:edge:00205 ordinal=205
   %% source kind=edge id=source:edge:00206:f4eff4923935ba09 digest=6736028a04dac038c44bbb983d1e65ec9600ac1e9313844aac24e671c22fa3d4 locator=graph:edge:00206 ordinal=206
-  %% source kind=edge id=source:edge:00207:ac31e21668ca0054 digest=c2ca9eb9b9eb521d1a34ec1bcf5d6f1f681821161ffcc0c2a4839383fcd76574 locator=graph:edge:00207 ordinal=207
+  %% source kind=edge id=source:edge:00207:bebbfb73e49bbcd8 digest=61c054d6c75054c63401ad4441565870c2e5333bd62b64f25fe1f9e9e2444578 locator=graph:edge:00207 ordinal=207
   %% source kind=edge id=source:edge:00208:d71f9faada29fcb4 digest=65b21a72853236da5cced1585292e6e8c8238a489f892afe5fd167ea80266ce9 locator=graph:edge:00208 ordinal=208
   %% source kind=edge id=source:edge:00209:144b726ade7241c1 digest=9c96d5eb139f6432991b8cf08fe132967ec63ecdc168d6307e7575bbc3314feb locator=graph:edge:00209 ordinal=209
   %% source kind=edge id=source:edge:00210:617587a5e6c47879 digest=984250959a5c92f207560e0e4f2f5fb24f8f21f0c25dd88543e9055f00c4c272 locator=graph:edge:00210 ordinal=210
@@ -3793,13 +3793,13 @@ graph LR
   %% source kind=edge id=source:edge:01055:6541ce913f3989a8 digest=240fec878bb82baf70f1807f500411e5372d373e640769c8841794140ac3a91c locator=graph:edge:01055 ordinal=1055
   %% source kind=edge id=source:edge:01056:d411daa211f921b4 digest=8b0b7f68606f01b2d7c6fab1e3448a411f31d0124239f6d08f610050011422f2 locator=graph:edge:01056 ordinal=1056
   %% source kind=edge id=source:edge:01057:8278937bad74a88f digest=3577dfa86eb555f9a4d786e971403e1b8b351c232dce41c7c8e7d10e187771c0 locator=graph:edge:01057 ordinal=1057
-  %% source kind=edge id=source:edge:01058:130b611a3cdeb972 digest=b52f792cbd4709cbdb0fcd44ec805f59dd7274221c8636389b3d2e48403e8909 locator=graph:edge:01058 ordinal=1058
+  %% source kind=edge id=source:edge:01058:1ef7731146e3ccc5 digest=eacee5f9cdd326b795d8e805a32896ce9a106c0dc0e67f21ec954fca8aa22603 locator=graph:edge:01058 ordinal=1058
   %% source kind=edge id=source:edge:01059:68d7cd6604eedca3 digest=860edc8aad6d91121aa20475c0e63195130e113ae1112e4c709ccec273f8ce33 locator=graph:edge:01059 ordinal=1059
   %% source kind=edge id=source:edge:01060:dc5cb12650f9d66d digest=3af8b9b30639ecfce8fd34d0e39264e86178c486703a5e5712e4ff83caae9b8e locator=graph:edge:01060 ordinal=1060
   %% source kind=edge id=source:edge:01061:4fe5196077cd37be digest=6c3319ae331ca2a02efadca34e325caec624ae03083972e4c5aca178cb10b30d locator=graph:edge:01061 ordinal=1061
   %% source kind=edge id=source:edge:01062:25057ca9a8991fc4 digest=52df1eac6c0a5c4df98baed70c92fce4c6c298faba966dd897889dd15c5ecec7 locator=graph:edge:01062 ordinal=1062
   %% source kind=edge id=source:edge:01063:2de80476b007de51 digest=614135e84c31e00c623d14e466500f3ca88b8ff63b8e94bf77088c6e865e0f20 locator=graph:edge:01063 ordinal=1063
-  %% source kind=edge id=source:edge:01064:5ba72f0afe4dd840 digest=d64f26c06a9c1548bda7647e091c92d272e94179ada01cd1050d3032b173a3bd locator=graph:edge:01064 ordinal=1064
+  %% source kind=edge id=source:edge:01064:60148ca316f4c560 digest=00c7c537e38522014bae269806a871fa7a8974cc2fd7f4dc1a75edb42f4973bf locator=graph:edge:01064 ordinal=1064
   %% source kind=edge id=source:edge:01065:a76f58f5972724f6 digest=9b1207450b6032ce7c37531c8154e0d95c01697999e3f0b1d3fb53c5b1afbfa0 locator=graph:edge:01065 ordinal=1065
   %% source kind=edge id=source:edge:01066:1ebae205ef84e681 digest=e1dc3423145370f24a008b194497ee12d915c474b06aed30c734ce84cc64e6fa locator=graph:edge:01066 ordinal=1066
   %% source kind=edge id=source:edge:01067:cf13082a4a23a58b digest=35c61d531bf7cf764206ab6d9306a171eb6882b7bc6200c66479a3d63394b5b3 locator=graph:edge:01067 ordinal=1067
@@ -4409,7 +4409,7 @@ graph LR
   n_phase_repository_topic_clone_conditional -->|"invocation (order=196; ref=db16823e82b9295fe8d8c276dc6d814d363e957d350ac1e60008f43cf0c9ee78)"| n_command_repository_topic_clone_conditional_0000
   %% edge id=edge:00197 digest=4d810f9a930b0aa6810feb5d590324819a0eca0b8ede442233e7861ab49f8ff4 type=invocation source=phase:repository-topic-clone:conditional source_digest=c86652097aa7d47aa3bb4a65ff41f5e7ebc62f3ba03a570b1ad29a81ae85e404 target=command:repository-topic-clone:conditional:0001 target_digest=477a3e3a6e3c8d6fc9dd919ecfb2e9c0b8972ed5b2191040a985a1bd1d6f6946 order=197
   n_phase_repository_topic_clone_conditional -->|"invocation (order=197; ref=4d810f9a930b0aa6810feb5d590324819a0eca0b8ede442233e7861ab49f8ff4)"| n_command_repository_topic_clone_conditional_0001
-  %% edge id=edge:00198 digest=68b6e053f05af944759e2aa10ad333506cfc24da4b985ecf93ba9ab8f5f483a5 type=invocation source=phase:repository-topic-clone:conditional source_digest=c86652097aa7d47aa3bb4a65ff41f5e7ebc62f3ba03a570b1ad29a81ae85e404 target=command:repository-topic-clone:conditional:0002 target_digest=38a7b61a37e2792f2526ae0c1eb77c4e319a105be93b2ef9ba5fc9ee3b42243c order=198
+  %% edge id=edge:00198 digest=68b6e053f05af944759e2aa10ad333506cfc24da4b985ecf93ba9ab8f5f483a5 type=invocation source=phase:repository-topic-clone:conditional source_digest=c86652097aa7d47aa3bb4a65ff41f5e7ebc62f3ba03a570b1ad29a81ae85e404 target=command:repository-topic-clone:conditional:0002 target_digest=0361662727bc2cb01598149703aca440e9f6da7d906d5ce145f252877e998674 order=198
   n_phase_repository_topic_clone_conditional -->|"invocation (order=198; ref=68b6e053f05af944759e2aa10ad333506cfc24da4b985ecf93ba9ab8f5f483a5)"| n_command_repository_topic_clone_conditional_0002
   %% edge id=edge:00199 digest=95663725f042b16b7558ba781307d587d95fb1b420662305c29cb09fef08e8d5 type=invocation source=skill:repository-topic-clone source_digest=74c590509376d7a59dc844b5cd16b9fded798949682e06496834cc719ac98a13 target=phase:repository-topic-clone:maintenance target_digest=2c0e9d15ea359a48ae0cf5d72c43d493aa8ae65037a4914decce263d5262c9b6 order=199
   n_skill_repository_topic_clone -->|"invocation (order=199; ref=95663725f042b16b7558ba781307d587d95fb1b420662305c29cb09fef08e8d5)"| n_phase_repository_topic_clone_maintenance
@@ -4427,7 +4427,7 @@ graph LR
   n_phase_dependency_module_change_conditional -->|"invocation (order=205; ref=2530c898d8240b3a496bd50aef1ccd85ec9329620956791ed0061dd73a0c5583)"| n_command_dependency_module_change_conditional_0001
   %% edge id=edge:00206 digest=3bf2f33b087b91d10a255c045abbf1bd7dadb90b27d4b06a41bc1da161fd8d05 type=invocation source=phase:dependency-module-change:conditional source_digest=49848c792230a019bf8a24327f3f7abb0f066e589e2551b235b6f62c67ce1d69 target=command:dependency-module-change:conditional:0002 target_digest=47c041d97f793b621081f6bd8335483c466c3de75e8a9ce112ab630b63156223 order=206
   n_phase_dependency_module_change_conditional -->|"invocation (order=206; ref=3bf2f33b087b91d10a255c045abbf1bd7dadb90b27d4b06a41bc1da161fd8d05)"| n_command_dependency_module_change_conditional_0002
-  %% edge id=edge:00207 digest=8a3d68e939a1550de844a9234d78e81215f4b12c3365f6a8d252807830073b6b type=invocation source=phase:dependency-module-change:conditional source_digest=49848c792230a019bf8a24327f3f7abb0f066e589e2551b235b6f62c67ce1d69 target=command:dependency-module-change:conditional:0003 target_digest=df2b3e45be44d1c9ebb99f85cb71ed40869feb8458c1f65f27a4fcdadadb6f29 order=207
+  %% edge id=edge:00207 digest=8a3d68e939a1550de844a9234d78e81215f4b12c3365f6a8d252807830073b6b type=invocation source=phase:dependency-module-change:conditional source_digest=49848c792230a019bf8a24327f3f7abb0f066e589e2551b235b6f62c67ce1d69 target=command:dependency-module-change:conditional:0003 target_digest=7b4fcc3e59a64d627c2b18c27e19f211e592006162528b61a9cd6100b164a87a order=207
   n_phase_dependency_module_change_conditional -->|"invocation (order=207; ref=8a3d68e939a1550de844a9234d78e81215f4b12c3365f6a8d252807830073b6b)"| n_command_dependency_module_change_conditional_0003
   %% edge id=edge:00208 digest=8b0104543e2115465a95632df9737b7cd3dcee8854ef45bcb16c8123f9b28bff type=invocation source=skill:dependency-module-change source_digest=ed2d1592c49d2e1ef5c75f2c177c49a3bcd7f825798fd7034c28f771e640dff8 target=phase:dependency-module-change:maintenance target_digest=c7bd222fdf6e54e8aa3f0a2c1572d9a303d721e3fcffe4197463fa6ec5754905 order=208
   n_skill_dependency_module_change -->|"invocation (order=208; ref=8b0104543e2115465a95632df9737b7cd3dcee8854ef45bcb16c8123f9b28bff)"| n_phase_dependency_module_change_maintenance
@@ -6129,7 +6129,7 @@ graph LR
   n_command_repository_topic_clone_conditional_0000 -->|"tool-resolution (order=1056; ref=5d999abe960096a398f903942b2ca4b6831d9724d60c8aa0d2086f9ce08228f2)"| n_tool_repository_topic_clone
   %% edge id=edge:01057 digest=c6345b58ffc7cfa86f89d269864879015c6919bfe81131fbcf63b90a93e3bb43 type=tool-resolution source=command:repository-topic-clone:conditional:0001 source_digest=477a3e3a6e3c8d6fc9dd919ecfb2e9c0b8972ed5b2191040a985a1bd1d6f6946 target=tool:repository-topic-clone target_digest=f7ed17fde7e71f85620ab121a908e1480f1a0a638264120dc6c9f1d8d7a01d0b order=1057
   n_command_repository_topic_clone_conditional_0001 -->|"tool-resolution (order=1057; ref=c6345b58ffc7cfa86f89d269864879015c6919bfe81131fbcf63b90a93e3bb43)"| n_tool_repository_topic_clone
-  %% edge id=edge:01058 digest=8742a696a66f15517762558da1d10feb22b7e8bfcdaeb89236a7847edca50b4e type=tool-resolution source=command:repository-topic-clone:conditional:0002 source_digest=38a7b61a37e2792f2526ae0c1eb77c4e319a105be93b2ef9ba5fc9ee3b42243c target=tool:repository-topic-clone target_digest=f7ed17fde7e71f85620ab121a908e1480f1a0a638264120dc6c9f1d8d7a01d0b order=1058
+  %% edge id=edge:01058 digest=8742a696a66f15517762558da1d10feb22b7e8bfcdaeb89236a7847edca50b4e type=tool-resolution source=command:repository-topic-clone:conditional:0002 source_digest=0361662727bc2cb01598149703aca440e9f6da7d906d5ce145f252877e998674 target=tool:repository-topic-clone target_digest=f7ed17fde7e71f85620ab121a908e1480f1a0a638264120dc6c9f1d8d7a01d0b order=1058
   n_command_repository_topic_clone_conditional_0002 -->|"tool-resolution (order=1058; ref=8742a696a66f15517762558da1d10feb22b7e8bfcdaeb89236a7847edca50b4e)"| n_tool_repository_topic_clone
   %% edge id=edge:01059 digest=98d489182af99a484715e2f84e0386444a382b7f85f978e8e11185d57c6d387c type=tool-resolution source=command:repository-topic-clone:maintenance:0000 source_digest=497e9dad3c44ff91deca626e53504d610e36dd4ccfab0d1f85296e933fddb96c target=tool:check-skill-frontmatter target_digest=aa558b4e47b21b27209ff475cb000204983fe50f087d9418d801a4141979cd23 order=1059
   n_command_repository_topic_clone_maintenance_0000 -->|"tool-resolution (order=1059; ref=98d489182af99a484715e2f84e0386444a382b7f85f978e8e11185d57c6d387c)"| n_tool_check_skill_frontmatter
@@ -6141,7 +6141,7 @@ graph LR
   n_command_dependency_module_change_conditional_0001 -->|"tool-resolution (order=1062; ref=e2185a8ae4437fe7a9840834c0bedd76eff14494dae10a761d1689dec45ea2c9)"| n_tool_dependency_module_change
   %% edge id=edge:01063 digest=1daea99ece12592667c58791667ecadbc69335e87c016ff13f76e7ab75b1d314 type=tool-resolution source=command:dependency-module-change:conditional:0002 source_digest=47c041d97f793b621081f6bd8335483c466c3de75e8a9ce112ab630b63156223 target=tool:dependency-module-change target_digest=c52b14c9d86704ac35019a6a9e7d22579b6bb8de85174b24118467d023a13480 order=1063
   n_command_dependency_module_change_conditional_0002 -->|"tool-resolution (order=1063; ref=1daea99ece12592667c58791667ecadbc69335e87c016ff13f76e7ab75b1d314)"| n_tool_dependency_module_change
-  %% edge id=edge:01064 digest=e30f149f48b62a7ba5f19566fe84feec433312d37e5a1c57b0718ae63c572bcd type=tool-resolution source=command:dependency-module-change:conditional:0003 source_digest=df2b3e45be44d1c9ebb99f85cb71ed40869feb8458c1f65f27a4fcdadadb6f29 target=tool:dependency-module-change target_digest=c52b14c9d86704ac35019a6a9e7d22579b6bb8de85174b24118467d023a13480 order=1064
+  %% edge id=edge:01064 digest=e30f149f48b62a7ba5f19566fe84feec433312d37e5a1c57b0718ae63c572bcd type=tool-resolution source=command:dependency-module-change:conditional:0003 source_digest=7b4fcc3e59a64d627c2b18c27e19f211e592006162528b61a9cd6100b164a87a target=tool:dependency-module-change target_digest=c52b14c9d86704ac35019a6a9e7d22579b6bb8de85174b24118467d023a13480 order=1064
   n_command_dependency_module_change_conditional_0003 -->|"tool-resolution (order=1064; ref=e30f149f48b62a7ba5f19566fe84feec433312d37e5a1c57b0718ae63c572bcd)"| n_tool_dependency_module_change
   %% edge id=edge:01065 digest=c10c66b5d8f0b1049d20e37a6b1db0ce212d85aba13af30221bec019bafd1f1c type=tool-resolution source=command:dependency-module-change:maintenance:0000 source_digest=914dec44423e27883e594d1308f4d29382f93fe7c0d4bb78ffdbbdc2e6f9f84e target=tool:check-skill-frontmatter target_digest=aa558b4e47b21b27209ff475cb000204983fe50f087d9418d801a4141979cd23 order=1065
   n_command_dependency_module_change_maintenance_0000 -->|"tool-resolution (order=1065; ref=c10c66b5d8f0b1049d20e37a6b1db0ce212d85aba13af30221bec019bafd1f1c)"| n_tool_check_skill_frontmatter
@@ -6577,5 +6577,5 @@ graph LR
 - `prerequisite`, `successor`, `order`, `invocation`, and `tool-resolution`: solid directed edges.
 - `routing` and `parallel`: dashed directed edges.
 
-Coverage digest: `90981f8ecb56728b98049114e6cbf3bf81fc9776f90203cf161ec9e60e0b38d6`.
-Graph digest: `446b522f694dc5bf81ddd80a3ef9fc20bca7e0af881db4ad57f7186a05ec8bf0`.
+Coverage digest: `0b8d041f34c7132b3c0c45ba49ed189248af1e9bbcc49fae95b9ca4bf87af8b1`.
+Graph digest: `098e22c1e4a57bfe591620e046b2559ec7f98f8e48554faafa11b5dcbda1b966`.

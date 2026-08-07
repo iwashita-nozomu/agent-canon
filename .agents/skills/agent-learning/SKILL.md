@@ -2,7 +2,7 @@
 name: agent-learning
 description: "Use when problem-solving memory curation or runtime agent behavior learning should capture recurrence evidence without mixing it into user preferences."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"a059ea4b3652dc2964c1a00c1820cc7ae985e1f72bdeadb933e2b9dcc09c0403"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"2363a8ce04111aeb8da21d11af0631f9fee3c2fa58365eb739de2923a7fd9617"} -->
 
 <!--
 @dependency-start

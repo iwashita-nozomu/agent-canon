@@ -23,27 +23,69 @@ source "${SCRIPT_DIR}/lib/update_materialization.sh"
 if [ -f "${SCRIPT_DIR}/lib/git_authority.sh" ]; then
   source "${SCRIPT_DIR}/lib/git_authority.sh"
 else
-  git_authority_check_protected_git_authority() {
-    case "${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY:-}" in
-      explicit_user_approval|agent_canon_workflow|agent_update_route|workflow_authorized)
-        case "${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY:-}" in
-          explicit_user_approval|agent_canon_workflow|agent_update_route|agent_branch_authorized)
-            return 0
-            ;;
-        esac
+  git_authority_requires_creation() {
+    case "${1:-}" in
+      branch-create|branch-copy|create|submodule-add|worktree-add|worktree-create|force-add|force-create|ref-overwrite)
+        return 0
         ;;
     esac
     return 1
   }
 
+  git_authority_requires_destructive() {
+    case "${1:-}" in
+      branch-create|branch-copy|create|submodule-add|worktree-add|worktree-create)
+        return 1
+        ;;
+      *)
+        return 0
+        ;;
+    esac
+  }
+
+  git_authority_check_creation_authority() {
+    if { [ "${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY:-}" = "user_request" ] \
+      || [ "${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY:-}" = "agent_canon_workflow" ]; } \
+      && [ -n "${AGENT_CANON_BRANCH_WORKTREE_REASON:-}" ]; then
+      return 0
+    fi
+    return 1
+  }
+
+  git_authority_check_destructive_authority() {
+    if [ "${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY:-}" = "explicit_user_approval" ] \
+      && [ -n "${AGENT_CANON_DESTRUCTIVE_GIT_REASON:-}" ]; then
+      return 0
+    fi
+    return 1
+  }
+
+  git_authority_check_protected_git_authority() {
+    local mode="$1"
+    if git_authority_requires_creation "$mode" \
+      && ! git_authority_check_creation_authority; then
+      return 1
+    fi
+    if git_authority_requires_destructive "$mode" \
+      && ! git_authority_check_destructive_authority; then
+      return 1
+    fi
+    return 0
+  }
+
   git_authority_check_commit_request_evidence() {
-    echo "$AGENT_CANON_COMMIT_REQUEST_EVIDENCE" | grep -Eq '^evidence:[0-9a-f]{64}$' && return 0
+    local evidence="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE:-}"
+    if [[ "$evidence" =~ ^evidence:[0-9a-f]{64}$ ]]; then
+      return 0
+    fi
     return 1
   }
 
   git_authority_check_commit_provenance() {
-    git_authority_check_protected_git_authority "$@" && return 0
-    return 1
+    local mode="$1"
+    git_authority_check_protected_git_authority "$mode" || return 1
+    git_authority_check_commit_request_evidence || return 2
+    return 0
   }
 fi
 ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
@@ -56,6 +98,7 @@ if [ "$(git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.path
 fi
 DEFAULT_BRANCH="${AGENT_CANON_BRANCH:-main}"
 PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
+BRANCH_WORKTREE_NEXT_ACTION="request_branch_or_worktree_creation_authority_then_rerun_same_command_with_inline_git_authority_and_reason"
 COMMIT_AUTOMATION_AUTHOR_NAME="AgentCanon Sync Automation"
 COMMIT_AUTOMATION_AUTHOR_EMAIL="agent-canon-sync@automation.invalid"
 COMMIT_PROVENANCE_NEXT_ACTION="set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex> and rerun the same command"
@@ -217,17 +260,43 @@ classify_parent_vendor_source() {
   return 0
 }
 
+protected_git_authority_failure() {
+  local mode="$1"
+  local requires_creation=0
+  local requires_destructive=0
+  local next_action="$PROTECTED_GIT_NEXT_ACTION"
+  local detail="protected AgentCanon update requires same-command explicit destructive approval authority"
+
+  if git_authority_requires_creation "$mode"; then
+    requires_creation=1
+  fi
+  if git_authority_requires_destructive "$mode"; then
+    requires_destructive=1
+  fi
+  if [ "$requires_creation" -eq 1 ]; then
+    echo "BRANCH_WORKTREE_CREATION_GUARD=block"
+  fi
+  if [ "$requires_destructive" -eq 1 ]; then
+    echo "DESTRUCTIVE_GIT_GUARD=block"
+  fi
+  if [ "$requires_creation" -eq 1 ] && [ "$requires_destructive" -eq 0 ]; then
+    next_action="$BRANCH_WORKTREE_NEXT_ACTION"
+    detail="protected AgentCanon update requires same-command branch/worktree creation authority"
+  elif [ "$requires_creation" -eq 1 ]; then
+    detail="protected AgentCanon update requires same-command branch/worktree and explicit destructive approval authority"
+  fi
+  echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
+  echo "NEXT_ACTION=$next_action"
+  die "$detail"
+}
+
 require_protected_git_authority() {
   local mode="$1"
   if git_authority_check_protected_git_authority "$mode"; then
     return 0
   fi
 
-  echo "DESTRUCTIVE_GIT_GUARD=block"
-  echo "BRANCH_WORKTREE_CREATION_GUARD=block"
-  echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
-  echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
-  die "protected AgentCanon update requires same-command branch/worktree and explicit destructive approval authority"
+  protected_git_authority_failure "$mode"
 }
 
 require_commit_request_evidence() {
@@ -249,11 +318,7 @@ require_commit_provenance() {
   fi
 
   if ! git_authority_check_protected_git_authority "$mode"; then
-    echo "DESTRUCTIVE_GIT_GUARD=block"
-    echo "BRANCH_WORKTREE_CREATION_GUARD=block"
-    echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
-    echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
-    die "protected AgentCanon update requires same-command branch/worktree and explicit destructive approval authority"
+    protected_git_authority_failure "$mode"
   fi
 
   echo "COMMIT_PROVENANCE_GUARD=block"

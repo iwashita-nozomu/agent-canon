@@ -285,12 +285,14 @@ wrapper）は同じ command でも既存の明示 authority gate を通します
 lifecycle、owner-evidence、または operation-level approval carve-out には含めません。
 
 task closeout では `repository-topic-clone` または `dependency-module-change` skill に
-`cleanup` dispatch を必ず割り当てます。candidate CAS、PR lifecycle、必要な merged
-publication readback、owner evidence、expected clone identity の全てを canonical cleanup
-preflight に渡し、local/remote/PR head の一致を確認します。preflight が成功して
-`CleanupProof` / cleanup receipt を返したときだけ `--apply` の削除を受理し、未達・衝突・
-unknown dirty state・proof mismatch は clone/topic root を保持した typed hold として
-closeout packet に記録します。proof-free deletion は完了状態になりません。
+`cleanup` dispatch を必ず割り当てます。canonical cleanup は request から computed clone を
+解決し、selected Git toplevel、owner evidence/marker、URL、branch、clean non-detached state、
+および fetch した `origin/<branch>` の local HEAD/tree 一致を preflight します。candidate CAS、
+PR lifecycle、publication readback は任意の追加 evidence であり、指定時だけ coherent set と
+merged publication readback を検証します。preflight が成功して `CleanupProof` / cleanup
+receipt を返したときだけ `--apply` の削除を受理し、未達・衝突・unknown dirty state・proof
+mismatch は clone/topic root を保持した typed hold として closeout packet に記録します。
+通常 cleanup に workspace packet artifact は不要で、proof-free deletion は完了状態になりません。
 
 workstream の scope は repository 構造、依存 edge、差し替え可能な責務単位、validation
 route から形成します。`.gitignore`、単一 file、行数、diff 件数は clone lifecycle や

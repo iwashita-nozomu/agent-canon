@@ -54,23 +54,27 @@ python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepa
   --owner-evidence <file>
 ```
 
-PR 作成時または merge/readback 後の cleanup は canonical lifecycle artifacts を同じ
-call に渡します。dry-run も全 authority を検証し、pass 後だけ `--apply` します。
+通常の closeout cleanup は canonical lifecycle artifact を materialize せず、manifest から
+計算した clone path と Git remote-head の reconstructibility proof だけを使います。publication
+後または merge/readback 後に追加 evidence を渡す場合だけ、coherent lifecycle artifact を
+同じ call に渡します。dry-run も同じ選択された proof を検証し、pass 後だけ `--apply` します。
 
 ```bash
 python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
   --topic <topic> --module <path> --branch <branch> \
-  --owner-evidence <file> --expected-clone <absolute-clone> \
-  --candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
-  [--publication-readback <publication-readback.json>] [--apply]
+  --owner-evidence <file> \
+  [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
+  [--publication-readback <publication-readback.json>]] [--apply]
 ```
 
 completion evidence は generic prepare/merge receipt、dependency identity readback、
-pin/projection validation、canonical publication evidence、および `CleanupProof` です。
+pin/projection validation、および必要に応じた canonical publication evidence と `CleanupProof`
+です。
 
-completion ではこの skill が canonical `cleanup` を dispatch し、candidate CAS、PR
-lifecycle、必要な publication readback、owner evidence、expected clone identity を同じ
-呼び出しで渡します。proof preflight が通るときだけ `CleanupProof` / cleanup receipt を
-closeout に保存して clone/topic root を削除し、衝突・unknown dirty state・proof mismatch
-では typed hold を保存して状態を保持します。CAS/PR/publication/owner evidence が揃わない
-場合に blind deletion や手動 `rm` へ迂回しません。
+completion ではこの skill が canonical `cleanup` を dispatch し、computed clone path、owner
+evidence/marker、clean branch、および fetch した `origin/<branch>` の head/tree 一致を検証
+します。proof preflight が通るときだけ `CleanupProof` / cleanup receipt を closeout に保存
+して clone/topic root を削除し、衝突・unknown dirty state・remote mismatch では typed hold
+を保存して状態を保持します。candidate CAS、PR lifecycle、publication readback は任意の
+追加 evidence ですが、いずれかを指定する場合は candidate CAS と PR lifecycle を一組で
+指定します。proof 不足時に blind deletion や手動 `rm` へ迂回しません。

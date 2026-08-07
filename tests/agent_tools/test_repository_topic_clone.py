@@ -303,6 +303,37 @@ def test_request_reuses_local_and_remote_branch(tmp_path: Path) -> None:
     )
 
 
+def test_local_branch_reuse_does_not_fetch_main_when_main_is_unavailable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Existing clean local branches remain reusable without an origin/main fetch."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    initial = rtc.request(
+        remote_url, "repo-offline", workspace, "topic-offline", "feature/local", evidence
+    )
+    original_run_git = rtc._run_git
+
+    def fail_main_fetch(path: Path, args: list[str]) -> str:
+        if list(args) == ["fetch", "origin", "main"]:
+            raise rtc.GitCommandError(path, args, "offline")
+        return original_run_git(path, args)
+
+    monkeypatch.setattr(rtc, "_run_git", fail_main_fetch)
+    reused = rtc.request(
+        remote_url, "repo-offline", workspace, "topic-offline", "feature/local", evidence
+    )
+    assert reused.clone == initial.clone
+
+    with pytest.raises(rtc.GitCommandError, match="offline"):
+        rtc.request(
+            remote_url, "repo-offline", workspace, "topic-offline", "feature/new", evidence
+        )
+
+
 def test_prepare_rejects_unsafe_repository_name_and_symlink_workspace(
     tmp_path: Path,
 ) -> None:
@@ -476,6 +507,75 @@ def test_merge_main_preserves_conflict_with_typed_state(tmp_path: Path) -> None:
         )
 
 
+def test_cleanup_without_publication_packet_matches_remote_head(tmp_path: Path) -> None:
+    """A clean pushed topic head is sufficient for dry-run and apply cleanup."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    request = rtc.request(
+        remote_url, "repo-no-packet", workspace, "topic-no-packet", "feature/cleanup", evidence
+    )
+    run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
+
+    dry_run = rtc.cleanup(request.request, apply=False)
+    assert not dry_run.removed
+    assert dry_run.evidence == "remote-head"
+    assert request.clone.exists()
+
+    removed = rtc.cleanup(request.request, apply=True)
+    assert removed.removed
+    assert removed.evidence == "remote-head"
+    assert not request.clone.exists()
+
+
+def test_cleanup_rejects_remote_head_mismatch_without_publication_packet(
+    tmp_path: Path,
+) -> None:
+    """A remote branch advance is a reconstructibility hold, not a delete signal."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    request = rtc.request(
+        remote_url, "repo-remote-mismatch", workspace, "topic-remote-mismatch", "feature/cleanup", evidence
+    )
+    run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
+
+    source = tmp_path / "source"
+    run_git(source, "fetch", "origin", "feature/cleanup")
+    run_git(source, "checkout", "-B", "feature/cleanup", "origin/feature/cleanup")
+    run_git(source, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "remote advance")
+    run_git(source, "push", "origin", "feature/cleanup")
+
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="remote branch head mismatch"):
+        rtc.cleanup(request.request, apply=False)
+    assert request.clone.exists()
+
+
+def test_cleanup_rejects_partial_optional_publication_packet(tmp_path: Path) -> None:
+    """Lifecycle packet fields are optional together, never as an invented half-set."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    request = rtc.request(
+        remote_url, "repo-partial", workspace, "topic-partial", "feature/cleanup", evidence
+    )
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError,
+        match="candidate CAS and PR lifecycle evidence must be provided together",
+    ):
+        rtc.cleanup(
+            request.request,
+            candidate_cas=tmp_path / "missing-cas.json",
+            apply=False,
+        )
+
+
 def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
     tmp_path: Path,
 ) -> None:
@@ -533,7 +633,6 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
 
     proof = rtc.cleanup(
         request.request,
-        expected_clone=request.clone,
         candidate_cas=cas_path,
         pr_lifecycle=lifecycle_path,
         apply=False,
@@ -550,7 +649,6 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
     with pytest.raises(rtc.RepositoryTopicCloneError, match="repository-mismatch"):
         rtc.cleanup(
             request.request,
-            expected_clone=request.clone,
             candidate_cas=cas_path,
             pr_lifecycle=lifecycle_path,
             apply=False,
@@ -605,7 +703,6 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
     ):
         rtc.cleanup(
             request.request,
-            expected_clone=request.clone,
             candidate_cas=cas_path,
             pr_lifecycle=lifecycle_path,
             apply=False,
@@ -613,7 +710,6 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
 
     proof = rtc.cleanup(
         request.request,
-        expected_clone=request.clone,
         candidate_cas=cas_path,
         pr_lifecycle=lifecycle_path,
         publication_readback=readback_path,
@@ -625,7 +721,9 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
     assert sibling.exists()
 
 
-def test_failure_when_receipt_is_arbitrary_mapping_or_missing(tmp_path: Path) -> None:
+def test_failure_when_receipt_is_arbitrary_mapping_or_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
@@ -639,6 +737,15 @@ def test_failure_when_receipt_is_arbitrary_mapping_or_missing(tmp_path: Path) ->
     invalid = tmp_path / "invalid.json"
     invalid.write_text("{}", encoding="utf-8")
 
+    original_run_git = rtc._run_git
+    calls: list[tuple[str, ...]] = []
+
+    def track_git(path: Path, args: list[str]) -> str:
+        calls.append(tuple(args))
+        return original_run_git(path, args)
+
+    monkeypatch.setattr(rtc, "_run_git", track_git)
+
     with pytest.raises(rtc.RepositoryTopicCloneError):
         rtc.verify_publication(
             request.request,
@@ -649,16 +756,15 @@ def test_failure_when_receipt_is_arbitrary_mapping_or_missing(tmp_path: Path) ->
     with pytest.raises(rtc.RepositoryTopicCloneError):
         rtc.cleanup(
             request.request,
-            expected_clone=request.clone,
             candidate_cas=invalid,
             pr_lifecycle=invalid,
             apply=False,
         )
+    assert not any(call[:2] == ("fetch", "origin") for call in calls)
 
     with pytest.raises(rtc.RepositoryTopicCloneError):
         rtc.cleanup(
             request.request,
-            expected_clone=request.clone,
             apply=False,
         )
 

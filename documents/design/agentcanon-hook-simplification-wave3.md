@@ -704,7 +704,7 @@ Reverse trace: every deleted filename maps to exactly one tombstone owner and on
 | boundary | fail-open | fail-closed |
 | --- | --- | --- |
 | UserPromptSubmit | malformed/empty payload, spool failure | high-confidence secret |
-| PreToolUse | malformed/empty payload, spool failure | unauthorized protected Git; creation requires both creation and destructive authority |
+| PreToolUse | malformed/empty payload, spool failure | unauthorized protected Git; normal creation requires creation authority, while force-create/ref overwrite requires creation and destructive authority |
 | PostToolUse | malformed input, non-Bash, nonzero response, invalid projection, spool failure | no hook transport block; producer owns execution failure |
 | Stop | inactive no-op | none |
 | behavior-event dashboard | no event rows report `missing`; malformed JSON/field/timestamp rows aggregate as `malformed` without aborting valid rows | never convert missing/malformed into `present` |
@@ -716,7 +716,7 @@ Reverse trace: every deleted filename maps to exactly one tombstone owner and on
 Exact fixture and test corpus:
 
 - active contract: 3 registrations, inactive Stop, aliases, official schema, no subprocess/Git/network; each `UserPromptSubmit`/`PreToolUse`/`PostToolUse` handler calls `record_hook_invocation(parts)` exactly once after the finalized result, and `Stop` calls it zero times;
-- safety: four secret classes, benign/malformed prompt, protected/read-only/authorized Git, same-segment creation AND gate, shell wrapper/backtick/opaque cases, exact redaction and hash;
+- safety: four secret classes, benign/malformed prompt, protected/read-only/authorized Git, operation-risk authority matrix (normal creation versus force-create/ref overwrite), shell wrapper/backtick/opaque cases, exact redaction and hash;
 - projection: raw six-key normalization, exact nine-key projection, nested nullable admission/error, duplicate/extra/nonfinite/schema/path/byte/LF/unsuccessful matrices;
 - skill replacement: frozen workflow manifest, immutable injected `repo_root`/catalog/routing-rules classifier inputs, all eight `PromptIntakeSignals` fields, prompt capture/tool/feedback/candidate-reason/subagent/workflow-attribution fields with current empty-string/list/bool/int domains, structural lane observed/candidate/unmatched, one-snapshot-per-invocation cardinality, exact event-id preimage, canonical behavior-event JSON parse, duplicate/order/timestamp/escaping/malformed aggregation, historical `skill_usage.jsonl` read-only parsing, and missing/malformed dashboard readback against `oracle.json`;
 - dispatcher-to-assembly: three event-specific parts fixtures, finalized pass/block/projection/unsuccessful results, explicit cardinality oracle (`blocked_secret=1 append/0 projection`, `blocked_destructive_git=1 append/0 projection`, `malformed_payload=1 append/0 projection`, `eligible behavior=1 merged append/spooled=>1 projection`, `ineligible normal=1 append/0 projection`, `duplicate/failed=1 append attempt/0 projection`), eligible and `should_log` truth table, exactly-once post-result call assertions, merged-append policy with one transport write, and `record_hook_invocation_oracle.json`;

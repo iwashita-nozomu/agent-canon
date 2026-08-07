@@ -146,8 +146,10 @@ TODO state up to date.
    branch, captures local `HEAD`/tree, pushes the exact SHA refspec, reads back
    the remote SHA, and requires local identity invariance across push. It does
    not generate or claim G1/G2/G3 or PR lifecycle evidence. A supplied sealed
-   packet may add candidate matching; `publish-pr`, PR mutation, and merge keep
-   their sealed packet/G1/G2/G3 requirements.
+   packet may add candidate matching as optional enrichment. PR create/update
+   and check readback consume the current user task, verified
+   remote/permission/topology, and exact head/base identities; only merge keeps
+   the G3 authority requirement.
 1. After G5, materialize `DurableHandback`, close every declared descendant,
    release every reservation, prove task-owned cleanup and unchanged unknown
    shared state, pass G6, and execute only the canonical `close_agent` ToolCall
@@ -190,7 +192,9 @@ The runtime discovery adapter delegates these required operating clauses to this
 Run `make agent-canon-update-plan` first. If it reports an update, request
 current-task user approval and rerun
 `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest`
-with all four inline Git authority/reason fields in the same command segment.
+with inline destructive authority/reason fields in the same command segment.
+Add creation authority/reason only when the route creates a branch or
+worktree; force-create or ref-overwrite routes require both pairs.
 
 Treat this as the mandatory `agentcanon_structure_followup` gate when this
 owner route reports the parent sync trigger is active for source, submodule pin,
@@ -247,9 +251,11 @@ python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh ch
 - Standalone local source-branch publication follows the canonical transport
   contract in `documents/tools/github_publish.md`: verified remote identity/
   permission, named branch, captured local identity, exact SHA ref push, remote
-  readback, and local invariance. It does not generate G1/G2/G3; packet-bound
-  push and PR operations retain the sealed publication requirements. CI
-  fresh-clone fixtures are not publication evidence.
+  readback, and local invariance. It does not generate G1/G2/G3; a packet may
+  optionally enrich push/PR evidence, while PR create/update and checks consume
+  the current task, verified topology/permission, and exact identities. Merge
+  alone retains the G3 publication authority. CI fresh-clone fixtures are not
+  publication evidence.
 
 1. If `vendor/agent-canon/` belongs to a source branch other than the intended
    source working branch, stop and leave that state unchanged.

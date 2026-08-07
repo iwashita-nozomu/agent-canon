@@ -36,6 +36,7 @@ PLAN_REMOTE_OVERRIDE_URL="${AGENT_CANON_PLAN_REMOTE_URL:-}"
 CANONICAL_AGENT_CANON_REMOTE_URL="${AGENT_CANON_GITHUB_REMOTE_URL:-https://github.com/iwashita-nozomu/agent-canon.git}"
 SURFACE_MANIFEST="${AGENT_CANON_SURFACE_MANIFEST:-documents/runtime/shared-runtime-surfaces.toml}"
 PROTECTED_GIT_NEXT_ACTION="request_explicit_user_approval_then_rerun_same_command_with_inline_git_authority_and_reason"
+BRANCH_WORKTREE_NEXT_ACTION="request_branch_or_worktree_creation_authority_then_rerun_same_command_with_inline_git_authority_and_reason"
 COMMIT_AUTOMATION_AUTHOR_NAME="AgentCanon Sync Automation"
 COMMIT_AUTOMATION_AUTHOR_EMAIL="agent-canon-sync@automation.invalid"
 COMMIT_PROVENANCE_NEXT_ACTION="set AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex> and rerun the same command"
@@ -78,11 +79,37 @@ require_protected_git_authority() {
     return 0
   fi
 
-  echo "DESTRUCTIVE_GIT_GUARD=block"
-  echo "BRANCH_WORKTREE_CREATION_GUARD=block"
+  protected_git_authority_failure "$mode"
+}
+
+protected_git_authority_failure() {
+  local mode="$1"
+  local requires_creation=0
+  local requires_destructive=0
+  local next_action="$PROTECTED_GIT_NEXT_ACTION"
+  local detail="protected AgentCanon update requires inherited explicit destructive approval authority"
+
+  if git_authority_requires_creation "$mode"; then
+    requires_creation=1
+  fi
+  if git_authority_requires_destructive "$mode"; then
+    requires_destructive=1
+  fi
+  if [ "$requires_creation" -eq 1 ]; then
+    echo "BRANCH_WORKTREE_CREATION_GUARD=block"
+  fi
+  if [ "$requires_destructive" -eq 1 ]; then
+    echo "DESTRUCTIVE_GIT_GUARD=block"
+  fi
+  if [ "$requires_creation" -eq 1 ] && [ "$requires_destructive" -eq 0 ]; then
+    next_action="$BRANCH_WORKTREE_NEXT_ACTION"
+    detail="protected AgentCanon update requires inherited branch/worktree creation authority"
+  elif [ "$requires_creation" -eq 1 ]; then
+    detail="protected AgentCanon update requires inherited branch/worktree and explicit destructive approval authority"
+  fi
   echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
-  echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
-  die "protected AgentCanon update requires inherited branch/worktree and explicit destructive approval authority"
+  echo "NEXT_ACTION=$next_action"
+  die "$detail"
 }
 
 require_commit_request_evidence() {
@@ -104,11 +131,7 @@ require_commit_provenance() {
   fi
 
   if ! git_authority_check_protected_git_authority "$mode"; then
-    echo "DESTRUCTIVE_GIT_GUARD=block"
-    echo "BRANCH_WORKTREE_CREATION_GUARD=block"
-    echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
-    echo "NEXT_ACTION=$PROTECTED_GIT_NEXT_ACTION"
-    die "protected AgentCanon update requires inherited branch/worktree and explicit destructive approval authority"
+    protected_git_authority_failure "$mode"
   fi
 
   echo "COMMIT_PROVENANCE_GUARD=block"
@@ -1190,7 +1213,7 @@ commit_sync_paths_if_needed() {
   git -C "$ROOT_DIR" commit --only \
     -m "chore: sync agent-canon snapshot" \
     --trailer "AgentCanon-Automation-Actor=agent-canon-sync" \
-    --trailer "AgentCanon-Authority-Source=${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY}" \
+    --trailer "AgentCanon-Authority-Source=${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY:-not-required}" \
     --trailer "AgentCanon-Destructive-Authority=${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY}" \
     --trailer "AgentCanon-Request-Evidence=${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
     --trailer "AgentCanon-Remote=$remote_sha" \
@@ -1206,7 +1229,7 @@ automation_commit_message() {
 chore: sync agent-canon snapshot
 
 AgentCanon-Automation-Actor: agent-canon-sync
-AgentCanon-Authority-Source: ${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY}
+AgentCanon-Authority-Source: ${AGENT_CANON_BRANCH_WORKTREE_AUTHORITY:-not-required}
 AgentCanon-Destructive-Authority: ${AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY}
 AgentCanon-Request-Evidence: ${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}
 AgentCanon-Remote: ${remote_sha}

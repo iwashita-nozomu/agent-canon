@@ -63,8 +63,9 @@ git -C vendor/agent-canon status --short --branch --untracked-files=all 2>/dev/n
    dirty-state avoidance, small addendum, or mid-task user instruction. If a new
    branch is required, record `branch_creation_reason=<reason>` and why the
    existing branch cannot continue before requesting current-task user
-   approval. Creation requires both creation and destructive authority/reason
-   fields in the same command segment.
+   approval. Normal creation requires creation authority/reason in the same
+   command segment; force-create or ref overwrite additionally requires
+   destructive authority/reason.
 
 1. If `vendor/agent-canon/` is a submodule, unrelated parent dirty state does not block an AgentCanon update. `make agent-canon-ensure-latest` classifies the update surface directly using the [`AgentCanon parent state decision table`](../rule/dependency-module-changes.md#agentcanon-parent-state-decision-table):
 
@@ -85,8 +86,10 @@ Template-owned active contracts such as `documents/README.md`, bootstrap docs, h
 1. Update AgentCanon before planning or implementation.
 
 If the read-only update plan reports a mutation, request current-task user
-approval, then invoke `make agent-canon-ensure-latest` with all four inline Git
-authority/reason fields in the same command segment.
+approval, then invoke `make agent-canon-ensure-latest` with inline destructive
+authority/reason fields in the same command segment. Add the creation pair
+only when the route creates a branch or worktree; force-create or
+ref-overwrite routes require both pairs.
 
 The same command segment must also set
 `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>`. The digest

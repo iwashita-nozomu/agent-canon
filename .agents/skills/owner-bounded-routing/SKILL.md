@@ -2,7 +2,7 @@
 name: owner-bounded-routing
 description: "Use for owner-bounded repository edits only after routing evidence shows a bounded owner, replaceable unit, targeted validation route, and `external public API/behavior/schema unchanged`; route every public-surface addition, contraction, removal, rename, restriction, deprecation, or semantic change to `scoped_change` or a broader route with dependency/consumer/migration/docs closure. Also use for typo/link/format-only edits and Owner-Bounded Change work where Codex should run existing tools directly and record owner/tool/validation evidence."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"a05dfdeb34ccae597fc95abba0b825f98b5e5ea65b5858a60a652f40054cb1bd"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"823b4c5252b3c6ddb141cb7361681b019db5d6bf19e260dfa43083e0290dd4ee"} -->
 
 <!--
 @dependency-start

@@ -560,6 +560,17 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         run(parent, "git", "add", ".")
         run(parent, "git", "commit", "-m", "base")
         base = run(parent, "git", "rev-parse", "HEAD").stdout.strip()
+        origin = root / "parent-origin.git"
+        run(root, "git", "init", "--bare", str(origin))
+        run(parent, "git", "remote", "add", "origin", str(origin))
+        run(parent, "git", "push", "origin", "HEAD:refs/heads/main")
+        run(
+            parent,
+            "git",
+            "fetch",
+            "origin",
+            "refs/heads/main:refs/remotes/origin/main",
+        )
         if include_manifest:
             changed_content = textwrap.dedent(
                 """
@@ -586,13 +597,13 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         return parent, base
 
     def run_pr_check(
-        self, scenario: str
+        self, scenario: str, *, fail_ls_remote: bool = False
     ) -> tuple[subprocess.CompletedProcess[str], Path]:
         """Run the production PR check with only unrelated gates stubbed."""
         fixture_root = Path(tempfile.mkdtemp(prefix=f"graph-gate-{scenario}-"))
         self.addCleanup(shutil.rmtree, fixture_root)
         source = self.create_source_repo(fixture_root)
-        parent, base = self.create_parent_repo(
+        parent, _base = self.create_parent_repo(
             fixture_root,
             source,
             include_manifest=scenario != "no_manifest",
@@ -637,11 +648,26 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             exit 1
             """,
         )
+        if fail_ls_remote:
+            real_git = shutil.which("git")
+            assert real_git is not None
+            origin_url = str(fixture_root / "parent-origin.git")
+            ls_remote_marker = temp_root / "origin-ls-remote-called"
+            write_executable(
+                fake_bin / "git",
+                f"""
+                #!/usr/bin/env bash
+                if [[ \"$1\" == \"ls-remote\" && \"$2\" == \"{origin_url}\" ]]; then
+                    touch \"{ls_remote_marker}\"
+                    exit 99
+                fi
+                exec {real_git} \"$@\"
+                """,
+            )
         environment = os.environ.copy()
         environment.update(
             {
                 "PATH": f"{fake_bin}:{environment['PATH']}",
-                "AGENT_CANON_PR_BASE_REF": base,
                 "AGENT_CANON_PR_TEMP_ROOT": str(temp_root),
                 "GRAPH_GATE_FIXTURE_SCENARIO": scenario,
                 "PYTHON_BIN": str(fake_bin / "python-recorder"),
@@ -661,6 +687,13 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             environment=environment,
         )
         return result, temp_root
+
+    def test_local_route_consumes_existing_tracking_base_without_network(self) -> None:
+        """Local graph selection uses the verified origin/main tracking SHA."""
+        result, state = self.run_pr_check("valid_binding", fail_ls_remote=True)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("AGENT_CANON_PR_GRAPH_ACCEPTANCE=pass", result.stdout)
+        self.assertFalse((state / "origin-ls-remote-called").exists())
 
     def test_real_pr_check_routes_incomplete_graph_to_scoped_or_blocking_selector(
         self,
@@ -777,10 +810,22 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             "tools/lib/repo_paths.sh",
         )
         run(source, "git", "commit", "-m", "standalone base")
-        base = run(source, "git", "rev-parse", "HEAD").stdout.strip()
+        _base = run(source, "git", "rev-parse", "HEAD").stdout.strip()
         ordinary.write_text("after\n", encoding="utf-8")
         run(source, "git", "add", "changed.py")
         run(source, "git", "commit", "-m", "ordinary change")
+
+        origin = fixture_root / "standalone-origin.git"
+        run(fixture_root, "git", "init", "--bare", str(origin))
+        run(source, "git", "remote", "add", "origin", str(origin))
+        run(source, "git", "push", "origin", "HEAD~1:refs/heads/main")
+        run(
+            source,
+            "git",
+            "fetch",
+            "origin",
+            "refs/heads/main:refs/remotes/origin/main",
+        )
 
         fake_bin = fixture_root / "bin"
         fake_home = fixture_root / "agent-canon-home"
@@ -794,6 +839,9 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             fake_bin / "cargo",
             """
             #!/usr/bin/env bash
+            mkdir -p rust/agent-canon/target/debug
+            cp tools/bin/agent-canon rust/agent-canon/target/debug/agent-canon
+            chmod +x rust/agent-canon/target/debug/agent-canon
             exit 0
             """,
         )
@@ -810,7 +858,6 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         environment.update(
             {
                 "PATH": f"{fake_bin}:{environment['PATH']}",
-                "AGENT_CANON_PR_BASE_REF": base,
                 "AGENT_CANON_PR_TEMP_ROOT": str(temp_root),
                 "GRAPH_GATE_FIXTURE_SCENARIO": "standalone",
                 "AGENT_CANON_TOOLS_HOME": str(fake_home),

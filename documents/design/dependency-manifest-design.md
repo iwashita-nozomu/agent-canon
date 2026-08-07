@@ -243,9 +243,10 @@ history. It does not persist the credential in checkout or repository Git config
 and `actions/checkout` keeps `persist-credentials: false`. Public, private, and
 fork PRs all use that same trusted event-SHA route. The emitted SHA is passed back
 through `--trusted-base-sha`, and normal selection accepts the argument only when
-it exactly matches the event SHA. CI `AGENT_CANON_PR_BASE_REF` overrides and local
-trusted-base arguments are typed failures. Local and fixture selection supplies
-an explicit, credential-free `AGENT_CANON_PR_BASE_REF`. Equal-to-HEAD, unresolved,
+it exactly matches the event SHA. The normal local `check_agent_canon_pr.sh` owner
+reads the verified `origin` `refs/heads/main` SHA and passes that immutable value
+through `--trusted-base-sha`; the lower selector consumes that value without
+selecting or re-reading a comparison base. Equal-to-HEAD, unresolved,
 history-unreachable, missing-fetch-credential, fetch, or diff failures do not
 become an empty change set. Unknown profile IDs and malformed canonical
 profile/surface owners fail by the same rule.

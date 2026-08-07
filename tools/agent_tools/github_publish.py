@@ -935,6 +935,21 @@ def _remote_head_readback(
     return remote_sha
 
 
+def _git_push_command(
+    verification: RemoteVerification,
+    *,
+    candidate_sha: str,
+    ref: str,
+) -> list[str]:
+    """Build a normal non-forced push, using gh credentials for HTTPS remotes."""
+    command = ["git"]
+    parsed = urlparse(verification.remote_url)
+    if parsed.scheme == "https":
+        command.extend(["-c", "credential.helper=!gh auth git-credential"])
+    command.extend(["push", "-u", verification.remote, f"{candidate_sha}:{ref}"])
+    return command
+
+
 def _permission_identity(verification: RemoteVerification) -> dict[str, object]:
     """Return verified or explicitly unknown push authority evidence."""
     evidence_id = verification.permission_evidence_id
@@ -1541,21 +1556,24 @@ def perform_push(
     verification: RemoteVerification,
     branch: str,
     *,
-    authority: GithubPublicationAuthority | None,
+    authority: GithubPublicationAuthority | None = None,
+    lifecycle: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
-    """Transport one local branch, optionally bound to a sealed packet."""
+    """Transport one local branch with optional packet or direct lifecycle evidence."""
     if branch == "main" and not getattr(args, "allow_main", False):
         raise UserVisibleFailure(
             message="refusing to push main without --allow-main",
             next_action="publish_a_topic_branch_or_pass_--allow-main_with_explicit_authority",
         )
-    lifecycle: dict[str, object] | None = None
     gate: dict[str, object] | None = None
     expected_ref = f"refs/heads/{branch}"
     sealed_candidate_sha: str | None = None
     sealed_candidate_tree_sha: str | None = None
     if authority is not None:
         lifecycle, gate = consume_publication_authority(authority)
+    elif lifecycle is not None:
+        lifecycle = validate_pull_request_lifecycle(lifecycle)
+    if lifecycle is not None:
         if lifecycle["state"] not in {
             "draft",
             "ready",
@@ -1579,27 +1597,25 @@ def perform_push(
             message="current local branch/ref differs from the selected branch",
             next_action="checkout_the_selected_named_branch_before_publication",
         )
-    if authority is not None and (
+    if lifecycle is not None and (
         local_before["commit_sha"] != sealed_candidate_sha
         or local_before["tree_sha"] != sealed_candidate_tree_sha
     ):
+        lifecycle_label = "sealed" if authority is not None else "verified"
         raise UserVisibleFailure(
             message=(
-                "local branch/ref/commit/tree differs from the sealed lifecycle "
-                "head identity"
+                "local branch/ref/commit/tree differs from the "
+                f"{lifecycle_label} lifecycle head identity"
             ),
             next_action="materialize_a_successor_lifecycle_for_the_current_local_commit",
         )
     candidate_sha = local_before["commit_sha"]
     candidate_tree_sha = local_before["tree_sha"]
-    command = [
-        "git",
-        "push",
-        "-u",
-        "--force-with-lease",
-        verification.remote,
-        f"{candidate_sha}:{expected_ref}",
-    ]
+    command = _git_push_command(
+        verification,
+        candidate_sha=candidate_sha,
+        ref=expected_ref,
+    )
     result = run_command(
         runner,
         command,
@@ -1622,7 +1638,11 @@ def perform_push(
         {
             "action": "push",
             "publication_boundary": (
-                "sealed_publication" if authority is not None else "branch_transport_only"
+                "sealed_publication"
+                if authority is not None
+                else "verified_lifecycle"
+                if lifecycle is not None
+                else "branch_transport_only"
             ),
             "worktree_dirty": dirty,
             "command": command,
@@ -1637,8 +1657,9 @@ def perform_push(
             "status": "ok",
         }
     )
-    if lifecycle is not None and gate is not None:
+    if lifecycle is not None:
         summary["pull_request_lifecycle"] = lifecycle
+    if gate is not None:
         summary["g3_gate"] = gate
     return summary
 
@@ -1649,11 +1670,21 @@ def perform_pr(
     verification: RemoteVerification,
     branch: str,
     *,
-    authority: GithubPublicationAuthority,
+    authority: GithubPublicationAuthority | None = None,
+    lifecycle: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Create or update a pull request for the verified branch."""
     body_file = require_body_file(args.body_file)
-    lifecycle, gate = consume_publication_authority(authority)
+    gate: dict[str, object] | None = None
+    if authority is not None:
+        lifecycle, gate = consume_publication_authority(authority)
+    elif lifecycle is not None:
+        lifecycle = validate_pull_request_lifecycle(lifecycle)
+    else:
+        raise UserVisibleFailure(
+            message="PR mutation requires a verified direct lifecycle or sealed packet",
+            next_action="derive_the_local_candidate_and_verified_base_lifecycle",
+        )
     if lifecycle["state"] not in {
         "draft",
         "ready",
@@ -1699,9 +1730,10 @@ def perform_pr(
                     "command": command,
                     "gh_stdout": result.stdout.strip(),
                     "pull_request_lifecycle": lifecycle,
-                    "g3_gate": gate,
                 }
             )
+            if gate is not None:
+                summary["g3_gate"] = gate
             return summary
         readback = pull_request_readback(
             runner,
@@ -1717,9 +1749,10 @@ def perform_pr(
                 "pr_url": string_field(existing, "url"),
                 "next_action": "use_existing_pr_or_pass_--update-existing",
                 "pull_request_lifecycle": lifecycle,
-                "g3_gate": gate,
             }
         )
+        if gate is not None:
+            summary["g3_gate"] = gate
         return summary
 
     command = [
@@ -1758,9 +1791,10 @@ def perform_pr(
             "command": command,
             "pr_number": int_field(readback, "number"),
             "pull_request_lifecycle": lifecycle,
-            "g3_gate": gate,
         }
     )
+    if gate is not None:
+        summary["g3_gate"] = gate
     return summary
 
 
@@ -1770,19 +1804,20 @@ def perform_checks(
     verification: RemoteVerification,
     branch: str,
     *,
-    authority: GithubPublicationAuthority | GithubPostPublicationChecksAuthority,
+    authority: GithubPublicationAuthority | GithubPostPublicationChecksAuthority | None = None,
 ) -> dict[str, object]:
     """Show pull-request checks through gh."""
-    checked_g5: dict[str, object] | None
+    checked_g5: dict[str, object] | None = None
+    lifecycle: dict[str, object] | None = None
+    gate: dict[str, object] | None = None
     if type(authority) is GithubPostPublicationChecksAuthority:
         packet, checked_g5 = authority.consume()
         lifecycle = cast(dict[str, object], packet["pull_request_lifecycle"])
         gate = cast(dict[str, object], packet["g3_gate"])
-    else:
+    elif authority is not None:
         lifecycle, gate = consume_publication_authority(
             cast(GithubPublicationAuthority, authority)
         )
-        checked_g5 = None
     pr_selector = args.pr or branch
     command = ["gh", "pr", "checks", pr_selector, "--repo", verification.repo]
     if args.watch:
@@ -1803,11 +1838,14 @@ def perform_checks(
             "pr_selector": pr_selector,
             "command": command,
             "checks_stdout": result.stdout.strip(),
-            "pull_request_lifecycle": lifecycle,
-            "g3_gate": gate,
-            "g5_gate": checked_g5,
         }
     )
+    if lifecycle is not None:
+        summary["pull_request_lifecycle"] = lifecycle
+    if gate is not None:
+        summary["g3_gate"] = gate
+    if checked_g5 is not None:
+        summary["g5_gate"] = checked_g5
     if result.returncode == 8:
         summary["next_action"] = "wait_for_github_checks_or_rerun_with_--watch"
     return summary
@@ -1902,19 +1940,8 @@ def run(
     os.chdir(args.root)
     branch = selected_branch(runner, args.branch)
     verification = verify_remote(runner, repo=args.repo, remote=args.remote)
-    if publication_packet is None:
-        packet_path = Path(
-            ".agent-canon/update-lifecycle/state/github-publication.json"
-        )
-        if packet_path.is_file():
-            loaded = json.loads(packet_path.read_text(encoding="utf-8"))
-            publication_packet = cast(Mapping[str, object], loaded)
-        elif args.action != "push":
-            raise UserVisibleFailure(
-                message="canonical GitHub publication packet is missing",
-                next_action="materialize_reviewed_CAS_and_G1_G2_G3_before_mutation",
-            )
     authority: GithubPublicationAuthority | None = None
+    lifecycle: dict[str, object] | None = None
     if publication_packet is not None:
         authority = GithubPublicationAuthority.from_packet(publication_packet)
         packet = authority.consume()
@@ -1938,6 +1965,13 @@ def run(
                 message="publication packet differs from verified immutable GitHub topology",
                 next_action="materialize_a_successor_publication_packet",
             )
+    elif args.action in {"pr", "publish-pr"}:
+        lifecycle = build_pull_request_lifecycle(
+            args,
+            runner,
+            verification,
+            branch,
+        )
     if args.action == "push":
         return perform_push(
             args,
@@ -1945,11 +1979,7 @@ def run(
             verification,
             branch,
             authority=authority,
-        )
-    if authority is None:
-        raise UserVisibleFailure(
-            message="PR and checks actions require a sealed publication packet",
-            next_action="materialize_reviewed_CAS_and_G1_G2_G3_before_mutation",
+            lifecycle=lifecycle,
         )
     if args.action == "pr":
         return perform_pr(
@@ -1958,6 +1988,7 @@ def run(
             verification,
             branch,
             authority=authority,
+            lifecycle=lifecycle,
         )
     if args.action == "publish-pr":
         push_summary = perform_push(
@@ -1966,6 +1997,7 @@ def run(
             verification,
             branch,
             authority=authority,
+            lifecycle=lifecycle,
         )
         pr_summary = perform_pr(
             args,
@@ -1973,6 +2005,7 @@ def run(
             verification,
             branch,
             authority=authority,
+            lifecycle=lifecycle,
         )
         summary = dict(pr_summary)
         summary["action"] = "publish-pr"
