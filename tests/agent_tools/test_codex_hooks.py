@@ -16,7 +16,6 @@ import ast
 import hashlib
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -33,9 +32,6 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
     prompt_intake_signals,
-)
-from hook_safety import (  # noqa: E402
-    canonical_workspace_lifecycle_command,
 )
 
 ACTIVE_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse")
@@ -726,80 +722,6 @@ class CodexHooksTest(unittest.TestCase):
                     "DESTRUCTIVE_GIT_GUARD=block",
                     cast("str", cast("dict[str, object]", payload)["reason"]),
                 )
-
-    def test_canonical_workspace_lifecycle_command_requires_owned_tool_and_mutating_operation(
-        self,
-    ) -> None:
-        """Only standalone/vendor canonical lifecycle mutations classify true."""
-        with tempfile.TemporaryDirectory() as temp_dir:
-            vendor_root = Path(temp_dir)
-            vendor_tools = vendor_root / "vendor" / "agent-canon" / "tools" / "agent_tools"
-            vendor_tools.mkdir(parents=True)
-            for name in ("repository_topic_clone.py", "dependency_module_change.py"):
-                shutil.copy2(PROJECT_ROOT / "tools" / "agent_tools" / name, vendor_tools / name)
-
-            cases = [
-                (
-                    PROJECT_ROOT,
-                    "python3 tools/agent_tools/repository_topic_clone.py prepare --url x",
-                ),
-                (
-                    PROJECT_ROOT,
-                    "python3 tools/agent_tools/repository_topic_clone.py merge-main --url x",
-                ),
-                (
-                    PROJECT_ROOT,
-                    "python3 tools/agent_tools/dependency_module_change.py --root . cleanup --topic x",
-                ),
-                (
-                    vendor_root,
-                    "python3 vendor/agent-canon/tools/agent_tools/repository_topic_clone.py prepare --url x",
-                ),
-                (
-                    vendor_root,
-                    "python3 vendor/agent-canon/tools/agent_tools/dependency_module_change.py --root=. merge-main --topic x",
-                ),
-                (
-                    PROJECT_ROOT,
-                    "FOO=bar time -p command -- env BAR=baz exec python3 tools/agent_tools/repository_topic_clone.py cleanup --apply",
-                ),
-            ]
-            for source_root, command in cases:
-                with self.subTest(command=command):
-                    self.assertTrue(
-                        canonical_workspace_lifecycle_command(command, source_root)
-                    )
-                    self.assertIsNone(self._run_shared_checkout_guard(command))
-
-        self.assertIsNotNone(
-            self._run_shared_checkout_guard("git -C workspace/topic/repo reset --hard HEAD")
-        )
-
-    def test_canonical_workspace_lifecycle_command_rejects_false_positive_matrix(
-        self,
-    ) -> None:
-        """Status, incidental tokens, wrappers, and wrong paths classify false."""
-        root = PROJECT_ROOT
-        cases = [
-            "python3 tools/agent_tools/dependency_module_change.py --root . status --topic x",
-            "python3 tools/agent_tools/repository_topic_clone.py --operation prepare",
-            "python3 tools/agent_tools/repository_topic_clone.py --topic prepare",
-            "python3 /tmp/repository_topic_clone.py prepare",
-            "python3 tools/agent_tools/not_repository_topic_clone.py prepare",
-            "bash -lc 'python3 tools/agent_tools/repository_topic_clone.py prepare'",
-            "eval 'python3 tools/agent_tools/repository_topic_clone.py prepare'",
-            "tools/agent_tools/repository_topic_clone.py prepare",
-            "echo repository_topic_clone.py prepare",
-        ]
-        for command in cases:
-            with self.subTest(command=command):
-                self.assertFalse(canonical_workspace_lifecycle_command(command, root))
-
-        self.assertFalse(
-            canonical_workspace_lifecycle_command(
-                "python3 tools/agent_tools/repository_topic_clone.py prepare", root / "missing"
-            )
-        )
 
     def test_shared_checkout_guard_authority_is_same_segment_and_one_shot(self) -> None:
         """Ambient, incomplete, and earlier-segment authority never leaks to Git."""

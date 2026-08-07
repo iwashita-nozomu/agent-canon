@@ -219,47 +219,6 @@ class GitAuthorityPredicateTest(unittest.TestCase):
         self.assertIn("BRANCH_WORKTREE_CREATION_GUARD=block", creation.stdout)
         self.assertNotIn("DESTRUCTIVE_GIT_GUARD=block", creation.stdout)
 
-    def test_update_wrapper_fallback_keeps_mode_matrix(self) -> None:
-        """A source checkout without the helper keeps the same update guard."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            # The fallback guard runs before the update side effects. Copy only
-            # the wrapper, resolver, materialization, and authority helpers it
-            # can source; copying the full tools tree follows root-view links.
-            tools_root = root / "tools"
-            (tools_root / "lib").mkdir(parents=True)
-            for relative_path in (
-                "update_agent_canon.sh",
-                "sync_agent_canon.sh",
-                "lib/repo_paths.sh",
-                "lib/update_materialization.sh",
-                "lib/git_authority.sh",
-            ):
-                source_path = REPO_ROOT / "tools" / relative_path
-                shutil.copy2(source_path, tools_root / relative_path)
-            (tools_root / "lib" / "git_authority.sh").unlink()
-            subprocess.run(["git", "init", "-q"], cwd=root, check=True)
-            env = dict(os.environ)
-            for name in (
-                "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY",
-                "AGENT_CANON_BRANCH_WORKTREE_REASON",
-                "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY",
-                "AGENT_CANON_DESTRUCTIVE_GIT_REASON",
-            ):
-                env.pop(name, None)
-            result = subprocess.run(
-                ["bash", "tools/update_agent_canon.sh", "latest"],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-                env=env,
-            )
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("DESTRUCTIVE_GIT_GUARD=block", result.stdout)
-            self.assertNotIn("BRANCH_WORKTREE_CREATION_GUARD=block", result.stdout)
-
-
 def git_global_safe_directory_snapshot() -> tuple[int, tuple[str, ...]]:
     """Capture global safe.directory lines and git exit status."""
     result = subprocess.run(
@@ -4401,6 +4360,10 @@ class StandaloneUpdateLifecycleTest(unittest.TestCase):
         shutil.copy2(
             AGENT_CANON_SOURCE_ROOT / "tools" / "lib" / "update_materialization.sh",
             repo_lib_dir / "update_materialization.sh",
+        )
+        shutil.copy2(
+            AGENT_CANON_SOURCE_ROOT / "tools" / "lib" / "git_authority.sh",
+            repo_lib_dir / "git_authority.sh",
         )
         shutil.copy2(
             AGENT_CANON_SOURCE_ROOT / "tools" / "sync_agent_canon.sh",

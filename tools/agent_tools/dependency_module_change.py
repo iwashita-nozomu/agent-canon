@@ -192,14 +192,6 @@ def _prepare(args: argparse.Namespace, *, command: str) -> int:
     """Handle prepare and merge-main by deferring to generic owner implementation."""
     workspace_root = Path(args.root).absolute()
     owner_evidence = workspace_root / args.owner_evidence
-    if not owner_evidence:
-        raise DependencyModuleChangeError(
-            "topic-identity-required: owner evidence required"
-        )
-    if not owner_evidence.is_file() or owner_evidence.stat().st_size == 0:
-        raise DependencyModuleChangeError(
-            f"topic-identity-required: owner evidence must be a non-empty file: {owner_evidence}"
-        )
     request = _topic_request_from_args(
         workspace_root,
         args.topic,
@@ -216,15 +208,10 @@ def _prepare(args: argparse.Namespace, *, command: str) -> int:
             request.branch,
             request.owner_evidence,
         )
-        clone = receipt.clone
-        topic_root = clone.parent
+        topic_root = receipt.clone.parent
         print(f"TOPIC_ROOT={topic_root}")
         print(f"SOURCE_CLONE={receipt.clone}")
         print(f"SOURCE_BRANCH={receipt.branch}")
-        if clone != receipt.clone:
-            raise DependencyModuleChangeError(
-                f"topic-identity-required: clone projection mismatch requested {clone}, prepared {receipt.clone}"
-            )
     elif command == "merge-main":
         merged = generic_merge_main(request)
         print(f"MERGE_CANDIDATE_SHA={merged.candidate_sha}")
@@ -258,10 +245,6 @@ def _cleanup(args: argparse.Namespace) -> int:
     """Handle cleanup by delegating to generic cleanup."""
     workspace_root = Path(args.root).absolute()
     owner_evidence = workspace_root / args.owner_evidence
-    if not owner_evidence.is_file() or owner_evidence.stat().st_size == 0:
-        raise DependencyModuleChangeError(
-            f"topic-identity-required: owner evidence must be a non-empty file: {owner_evidence}"
-        )
     request = _topic_request_from_args(
         workspace_root,
         args.topic,

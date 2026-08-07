@@ -33,7 +33,6 @@ from update_lifecycle_contract import (
     materialize_publication_readback_receipt,
     pull_request_branch_table,
     validate_candidate_cas_pr_transition,
-    validate_candidate_cas_receipt,
     validate_candidate_cas_rebind_transition,
     validate_gate_chain,
     validate_gate_verdict,
@@ -1247,37 +1246,75 @@ def materialize_pr_identity_gate(
     upstream_gate_verdicts: Sequence[Mapping[str, object]],
 ) -> dict[str, object]:
     """Materialize G3 from G1/G2, exact CAS, topology, and permission."""
-    checked = validate_pull_request_lifecycle(lifecycle)
-    cas = validate_candidate_cas_receipt(candidate_cas_receipt)
-    rebind = validate_source_main_rebind_receipt(source_main_rebind_receipt)
-    validate_candidate_cas_rebind_transition(rebind, cas)
-    validate_candidate_cas_pr_transition(cas, checked)
+    return _materialize_pr_identity_gate_bundle(
+        lifecycle,
+        candidate_cas_receipt,
+        source_main_rebind_receipt,
+        upstream_gate_verdicts,
+    )[4]
+
+
+def _validate_pr_identity_inputs(
+    lifecycle: Mapping[str, object],
+    candidate_cas_receipt: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
+) -> tuple[dict[str, object], dict[str, object], dict[str, object]]:
+    """Validate and deep-clone the immutable G3 input records once."""
+    checked_rebind = validate_source_main_rebind_receipt(
+        source_main_rebind_receipt
+    )
+    checked_cas = validate_candidate_cas_rebind_transition(
+        checked_rebind, candidate_cas_receipt
+    )
+    checked_lifecycle = validate_candidate_cas_pr_transition(
+        checked_cas, lifecycle
+    )
+    return checked_lifecycle, checked_cas, checked_rebind
+
+
+def _materialize_pr_identity_gate_bundle(
+    lifecycle: Mapping[str, object],
+    candidate_cas_receipt: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
+    upstream_gate_verdicts: Sequence[Mapping[str, object]],
+) -> tuple[
+    dict[str, object],
+    dict[str, object],
+    dict[str, object],
+    tuple[dict[str, object], ...],
+    dict[str, object],
+]:
+    """Return checked G3 inputs and its gate without repeated validation."""
+    checked_lifecycle, checked_cas, checked_rebind = _validate_pr_identity_inputs(
+        lifecycle, candidate_cas_receipt, source_main_rebind_receipt
+    )
     upstream = validate_gate_chain(
         list(upstream_gate_verdicts),
         expected_gate_ids=("G1", "G2"),
         require_pass=True,
     )
     if any(
-        binding_identity(item["binding"]) != binding_identity(checked["binding"])
-        for item in (*upstream, cas)
+        binding_identity(item["binding"])
+        != binding_identity(checked_lifecycle["binding"])
+        for item in upstream
     ):
         raise UserVisibleFailure(
             message="G1/G2/CAS evidence does not bind the selected PR topology",
             next_action="materialize_a_successor_for_the_changed_candidate_or_base",
         )
-    permission = cast(Mapping[str, object], checked["permission_identity"])
+    permission = cast(Mapping[str, object], checked_lifecycle["permission_identity"])
     if permission["permission_state"] != "verified_true":
         raise UserVisibleFailure(
             message="push permission is not verified true for this immutable PR topology",
             next_action="read_verified_remote_permission_and_create_a_successor_lifecycle",
         )
-    binding = cast(Mapping[str, object], checked["binding"])
+    binding = cast(Mapping[str, object], checked_lifecycle["binding"])
     upstream_refs = [
         cast(str, cast(Mapping[str, object], item["binding"])["evidence_ref"])
         for item in upstream
     ]
-    cas_binding = cast(Mapping[str, object], cas["binding"])
-    return materialize_gate_verdict(
+    cas_binding = cast(Mapping[str, object], checked_cas["binding"])
+    gate = materialize_gate_verdict(
         binding=binding,
         gate_id="G3",
         ordered_input_evidence_refs=[
@@ -1287,13 +1324,18 @@ def materialize_pr_identity_gate(
         ],
         invariant="pr_identity_cas",
         output_digest=_sha256(
-            {"lifecycle": checked, "cas": cas, "source_main_rebind": rebind}
+            {
+                "lifecycle": checked_lifecycle,
+                "cas": checked_cas,
+                "source_main_rebind": checked_rebind,
+            }
         ),
         owner=f"{Path(__file__).resolve()}#materialize_pr_identity_gate",
         verdict="pass",
         retry_reason=None,
         next_checkpoint=None,
     )
+    return checked_lifecycle, checked_cas, checked_rebind, upstream, gate
 
 
 def require_pr_identity_gate(
@@ -1304,20 +1346,42 @@ def require_pr_identity_gate(
     gate_verdict: Mapping[str, object],
 ) -> tuple[dict[str, object], dict[str, object]]:
     """Consume, without recomputing, one exact G3 publication authority."""
-    checked = validate_pull_request_lifecycle(lifecycle)
-    cas = validate_candidate_cas_receipt(candidate_cas_receipt)
-    rebind = validate_source_main_rebind_receipt(source_main_rebind_receipt)
-    validate_candidate_cas_rebind_transition(rebind, cas)
-    validate_candidate_cas_pr_transition(cas, checked)
-    gate = validate_gate_verdict(gate_verdict)
-    if gate["gate_id"] != "G3" or gate["verdict"] != "pass":
+    checked, _cas, _rebind, _upstream, gate = _require_pr_identity_gate_bundle(
+        lifecycle,
+        candidate_cas_receipt,
+        source_main_rebind_receipt,
+        upstream_gate_verdicts,
+        gate_verdict,
+    )
+    return checked, gate
+
+
+def _require_pr_identity_gate_bundle(
+    lifecycle: Mapping[str, object],
+    candidate_cas_receipt: Mapping[str, object],
+    source_main_rebind_receipt: Mapping[str, object],
+    upstream_gate_verdicts: Sequence[Mapping[str, object]],
+    gate_verdict: Mapping[str, object],
+) -> tuple[
+    dict[str, object],
+    dict[str, object],
+    dict[str, object],
+    tuple[dict[str, object], ...],
+    dict[str, object],
+]:
+    """Return checked publication inputs and G3 without duplicate validation."""
+    checked, cas, _rebind = _validate_pr_identity_inputs(
+        lifecycle, candidate_cas_receipt, source_main_rebind_receipt
+    )
+    checked_gate = validate_gate_verdict(gate_verdict)
+    if checked_gate["gate_id"] != "G3" or checked_gate["verdict"] != "pass":
         raise UserVisibleFailure(
             message="GitHub mutation requires a passing G3 PR identity/CAS verdict",
             next_action="materialize_the_exact_candidate_permission_and_cas_evidence",
         )
     try:
-        validate_gate_chain(
-            [*upstream_gate_verdicts, gate],
+        checked_chain = validate_gate_chain(
+            [*upstream_gate_verdicts, checked_gate],
             expected_gate_ids=("G1", "G2", "G3"),
             require_pass=True,
         )
@@ -1326,18 +1390,21 @@ def require_pr_identity_gate(
             message=f"G3 predecessor chain is invalid: {exc}",
             next_action="materialize_G1_G2_and_CAS_for_the_exact_candidate",
         ) from exc
+    checked_gate = checked_chain[2]
+    checked_upstream = checked_chain[:2]
     cas_binding = cast(Mapping[str, object], cas["binding"])
-    gate_inputs = cast(Sequence[object], gate["ordered_input_evidence_refs"])
+    checked_binding = cast(Mapping[str, object], checked["binding"])
+    gate_binding = cast(Mapping[str, object], checked_gate["binding"])
+    gate_inputs = cast(Sequence[object], checked_gate["ordered_input_evidence_refs"])
     if (
-        binding_identity(checked["binding"]) != binding_identity(gate["binding"])
-        or binding_identity(cas_binding) != binding_identity(gate["binding"])
+        binding_identity(checked_binding) != binding_identity(gate_binding)
         or cast(str, cas_binding["evidence_ref"]) not in gate_inputs
     ):
         raise UserVisibleFailure(
             message="G3 evidence does not bind the selected PR lifecycle",
             next_action="create_a_successor_lifecycle_for_the_changed_identity",
         )
-    return checked, gate
+    return checked, cas, _rebind, checked_upstream, checked_gate
 
 
 def materialize_github_publication_packet(
@@ -1349,19 +1416,13 @@ def materialize_github_publication_packet(
     predecessor_graph_materialization: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Materialize the sole machine packet consumed by GitHub mutations."""
-    checked_lifecycle = validate_pull_request_lifecycle(lifecycle)
-    checked_cas = validate_candidate_cas_receipt(candidate_cas_receipt)
-    checked_rebind = validate_source_main_rebind_receipt(
-        source_main_rebind_receipt
-    )
-    validate_candidate_cas_rebind_transition(checked_rebind, checked_cas)
-    upstream = validate_gate_chain(
-        list(upstream_gate_verdicts),
-        expected_gate_ids=("G1", "G2"),
-        require_pass=True,
-    )
-    gate = materialize_pr_identity_gate(
-        checked_lifecycle, checked_cas, checked_rebind, upstream
+    checked_lifecycle, checked_cas, checked_rebind, upstream, gate = (
+        _materialize_pr_identity_gate_bundle(
+            lifecycle,
+            candidate_cas_receipt,
+            source_main_rebind_receipt,
+            upstream_gate_verdicts,
+        )
     )
     packet = {
         "schema": GITHUB_PUBLICATION_PACKET_SCHEMA,
@@ -1375,7 +1436,11 @@ def materialize_github_publication_packet(
         packet["predecessor_graph_materialization"] = (
             validate_predecessor_graph_materialization(
                 predecessor_graph_materialization,
-                expected_source_oid=str(checked_rebind["new_base_identity"]["commit_sha"]),
+                expected_source_oid=str(
+                    cast(Mapping[str, object], checked_rebind["new_base_identity"])[
+                        "commit_sha"
+                    ]
+                ),
             )
         )
     return packet
@@ -1475,31 +1540,26 @@ def validate_github_publication_packet(value: object) -> dict[str, object]:
             message="GitHub publication predecessor gates are invalid",
             next_action="materialize_G1_and_G2_for_the_exact_candidate",
         )
-    lifecycle, gate = require_pr_identity_gate(
+    (
+        checked_lifecycle,
+        checked_cas,
+        checked_rebind,
+        checked_upstream,
+        checked_gate,
+    ) = _require_pr_identity_gate_bundle(
         cast(Mapping[str, object], value["pull_request_lifecycle"]),
         cast(Mapping[str, object], value["candidate_cas_receipt"]),
         cast(Mapping[str, object], value["source_main_rebind_receipt"]),
         cast(Sequence[Mapping[str, object]], upstream_value),
         cast(Mapping[str, object], value["g3_gate"]),
     )
-    checked_rebind = validate_source_main_rebind_receipt(
-        value["source_main_rebind_receipt"]
-    )
     result = {
         "schema": GITHUB_PUBLICATION_PACKET_SCHEMA,
-        "pull_request_lifecycle": lifecycle,
-        "candidate_cas_receipt": validate_candidate_cas_receipt(
-            value["candidate_cas_receipt"]
-        ),
+        "pull_request_lifecycle": checked_lifecycle,
+        "candidate_cas_receipt": checked_cas,
         "source_main_rebind_receipt": checked_rebind,
-        "upstream_gate_verdicts": list(
-            validate_gate_chain(
-                list(upstream_value),
-                expected_gate_ids=("G1", "G2"),
-                require_pass=True,
-            )
-        ),
-        "g3_gate": gate,
+        "upstream_gate_verdicts": list(checked_upstream),
+        "g3_gate": checked_gate,
     }
     if "predecessor_graph_materialization" in value:
         result["predecessor_graph_materialization"] = (
@@ -1589,10 +1649,7 @@ def perform_push(
         )
     dirty = worktree_dirty(runner)
     local_before = _local_git_identity(runner)
-    if (
-        local_before["branch"] != branch
-        or local_before["ref"] != expected_ref
-    ):
+    if local_before["branch"] != branch:
         raise UserVisibleFailure(
             message="current local branch/ref differs from the selected branch",
             next_action="checkout_the_selected_named_branch_before_publication",

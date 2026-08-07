@@ -73,55 +73,12 @@ die() {
   exit 1
 }
 
-require_protected_git_authority() {
-  local mode="$1"
-  if git_authority_check_protected_git_authority "$mode"; then
-    return 0
-  fi
-
-  protected_git_authority_failure "$mode"
-}
-
 protected_git_authority_failure() {
   local mode="$1"
-  local requires_creation=0
-  local requires_destructive=0
-  local next_action="$PROTECTED_GIT_NEXT_ACTION"
-  local detail="protected AgentCanon update requires inherited explicit destructive approval authority"
-
-  if git_authority_requires_creation "$mode"; then
-    requires_creation=1
-  fi
-  if git_authority_requires_destructive "$mode"; then
-    requires_destructive=1
-  fi
-  if [ "$requires_creation" -eq 1 ]; then
-    echo "BRANCH_WORKTREE_CREATION_GUARD=block"
-  fi
-  if [ "$requires_destructive" -eq 1 ]; then
-    echo "DESTRUCTIVE_GIT_GUARD=block"
-  fi
-  if [ "$requires_creation" -eq 1 ] && [ "$requires_destructive" -eq 0 ]; then
-    next_action="$BRANCH_WORKTREE_NEXT_ACTION"
-    detail="protected AgentCanon update requires inherited branch/worktree creation authority"
-  elif [ "$requires_creation" -eq 1 ]; then
-    detail="protected AgentCanon update requires inherited branch/worktree and explicit destructive approval authority"
-  fi
-  echo "AGENT_CANON_PROTECTED_GIT_SUBCOMMAND=$mode"
-  echo "NEXT_ACTION=$next_action"
-  die "$detail"
-}
-
-require_commit_request_evidence() {
-  local mode="$1"
-  if git_authority_check_commit_request_evidence; then
-    return 0
-  fi
-
-  echo "COMMIT_PROVENANCE_GUARD=block"
-  echo "AGENT_CANON_COMMIT_PROVENANCE_SUBCOMMAND=$mode"
-  echo "NEXT_ACTION=$COMMIT_PROVENANCE_NEXT_ACTION"
-  die "auto-commit requires AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>"
+  git_authority_emit_failure \
+    "$mode" "$PROTECTED_GIT_NEXT_ACTION" "$BRANCH_WORKTREE_NEXT_ACTION" \
+    "protected AgentCanon update requires inherited"
+  die "$GIT_AUTHORITY_FAILURE_DETAIL"
 }
 
 require_commit_provenance() {

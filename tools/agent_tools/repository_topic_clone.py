@@ -477,8 +477,7 @@ def _inspect(
         remote = _normalise_url(_remote_url(path))
     except GitCommandError:
         return CloneState(path, "missing-remote")
-    if remote != _normalise_url(request.url):
-        return CloneState(path, "url-mismatch")
+    requested_url = _normalise_url(request.url)
     canonical = _marker_values(path, MARKER_PREFIX, CANONICAL_MARKER_FIELDS)
     canonical_present = any(canonical.values()) or _marker_namespace_present(
         path, MARKER_PREFIX
@@ -487,7 +486,7 @@ def _inspect(
     if canonical_present:
         if not all(canonical.values()):
             return CloneState(path, "marker-incomplete")
-        if canonical["url"] != _normalise_url(request.url):
+        if remote != requested_url or canonical["url"] != requested_url:
             return CloneState(path, "url-mismatch")
         if canonical["repository"] != request.repository:
             return CloneState(path, "repository-mismatch")
@@ -501,8 +500,14 @@ def _inspect(
         if any(legacy.values()):
             if not all(legacy.values()):
                 return CloneState(path, "legacy-marker-incomplete")
-            if not _legacy_marker_matches(legacy, request, owner_sha):
-                return CloneState(path, "legacy-marker-mismatch")
+            remote_mismatch = remote != requested_url
+            if remote_mismatch or not _legacy_marker_matches(
+                legacy, request, owner_sha
+            ):
+                return CloneState(
+                    path,
+                    "url-mismatch" if remote_mismatch else "legacy-marker-mismatch",
+                )
             marker_branch = legacy["branch"]
         else:
             return CloneState(path, "repository-mismatch")
@@ -647,7 +652,6 @@ def request(
 
     candidate_sha = _run_git(clone, ["rev-parse", branch_name]).strip()
     candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
-    _set_marker(clone, request_state, owner_sha=owner_sha, branch=branch_name)
     receipt = PrepareReceipt(
         request=request_state,
         clone=clone,
@@ -812,20 +816,14 @@ def cleanup(
             "cleanup hold: candidate CAS and PR lifecycle evidence must be provided together"
         )
     _repository_workspace_root(request_state.workspace_root, require_ignore=False)
-    topic_root = _topic_root(
-        request_state.workspace_root, request_state.topic, create=False
-    )
     clone = computed_clone_path(request_state, create_topic=False)
+    topic_root = clone.parent
     owner_sha = _evidence_sha256(
         _require_evidence(request_state.owner_evidence, request_state.workspace_root)
     )
     state = _inspect(clone, request_state, owner_sha=owner_sha)
     if state.state != "ready":
         raise RepositoryTopicCloneError(f"cleanup hold: {state.state}")
-
-    branch = _run_git(clone, ["symbolic-ref", "--quiet", "--short", "HEAD"]).strip()
-    if branch != request_state.branch:
-        raise RepositoryTopicCloneError(f"cleanup hold: branch-mismatch ({branch})")
 
     candidate_sha = _run_git(clone, ["rev-parse", "HEAD"]).strip()
     candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()

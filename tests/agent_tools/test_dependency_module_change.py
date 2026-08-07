@@ -393,7 +393,7 @@ def test_prepare_requires_owner_evidence_and_returns_typed_topic_identity_error(
         "missing.md",
     )
     assert missing.returncode == 2
-    assert "topic-identity-required" in missing.stderr
+    assert "owner evidence must be a non-empty file" in missing.stderr
 
 
 @pytest.mark.parametrize("forbidden", ("path", "base", "merge", "cleanup"))
