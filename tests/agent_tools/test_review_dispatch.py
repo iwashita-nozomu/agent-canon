@@ -82,6 +82,7 @@ class ReviewDispatchTest(unittest.TestCase):
         self.assertFalse(
             self.project(decision("CHANGES-REQUIRED"))["publication_unlocked"]
         )
+        self.assertFalse(self.project(decision("ESCALATE"))["publication_unlocked"])
 
     def test_nonblocking_findings_are_accepted(self) -> None:
         """Non-blocking findings do not force a changes-required outcome."""
@@ -213,6 +214,22 @@ class ReviewDispatchTest(unittest.TestCase):
             "\nDecision: ACCEPT\n"
         )
         self.assertEqual(accepted["decision"], "APPROVE")
+
+        escalated_question = record(
+            "| Chunk | Finding | Severity | Status | Evidence |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| docs | clarification | style | question | docs.md |\n"
+            "\nDecision: ESCALATE\n"
+        )
+        self.assertEqual(escalated_question["decision"], "ESCALATE")
+
+        revise_normalized_to_approve = record(
+            "| Chunk | Finding | Severity | Status | Evidence |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| docs | style note | style | non-blocking | docs.md |\n"
+            "\nDecision: REVISE\n"
+        )
+        self.assertEqual(revise_normalized_to_approve["decision"], "APPROVE")
 
         required = record(
             "| File | Finding | Severity | Status | Evidence |\n"

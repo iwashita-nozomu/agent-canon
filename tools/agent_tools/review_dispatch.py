@@ -913,12 +913,12 @@ def record_current_review_decision(
     if decisions and len({decision.upper() for decision in decisions}) != 1:
         raise AutomaticReviewError("automatic_review:decision_ambiguous")
     decision = decisions[-1].upper() if decisions else derived_outcome.upper()
+    explicit_escalate_decision = "ESCALATE" in {decision.upper() for decision in decisions}
     if derived_outcome == "changes-required" and decision in {"APPROVE", "ACCEPT"}:
         raise AutomaticReviewError("automatic_review:approve_with_blocking_finding")
     if derived_outcome == "accept" and decision in {"REVISE", "ESCALATE"}:
-        # A reviewer may still explicitly escalate a question, but a plain
-        # non-blocking finding must not silently become a required change.
-        if not re.search(r"(?im)^\s*(?:escalate|question)\b", text):
+        # A reviewer may still explicitly escalate a question.
+        if not explicit_escalate_decision:
             decision = "ACCEPT"
     decision = canonicalize_review_decision(decision)
     if decision == "APPROVE" and re.search(
