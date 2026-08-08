@@ -21,6 +21,7 @@ resolved_at: 2026-08-08
 source: user
 severity: S2
 evidence: tests/tools/test_check_markdown_math.py, evidence/agent-evals/skill_workflow_prompt_eval.toml, documents/structured-analysis/graph-dsl.md, references/gpt-5.6-benchmark-report-ja.md
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/586
 affected_surfaces: agents/skills/md-style-check.md, .agents/skills/md-style-check/SKILL.md, documents/conventions/common/05_docs.md, rust/agent-canon/src/docs.rs, tests/tools/test_check_markdown_math.py, evidence/agent-evals/skill_workflow_prompt_eval.toml, documents/structured-analysis/graph-dsl.md, references/gpt-5.6-benchmark-report-ja.md
 edit_scope: agents/skills/md-style-check.md, .agents/skills/md-style-check/SKILL.md, documents/conventions/common/05_docs.md, rust/agent-canon/src/docs.rs, tests/tools/test_check_markdown_math.py, evidence/agent-evals/skill_workflow_prompt_eval.toml, documents/structured-analysis/graph-dsl.md, references/gpt-5.6-benchmark-report-ja.md, issues/open/AC-20260715-markdown-math-fence-lint-gap.md
 required_action: Update the markdown math checker and md-style contract so text-like and math-like fenced blocks are consistently validated, with deterministic math detection and no fuzzy classification.

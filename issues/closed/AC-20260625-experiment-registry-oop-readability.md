@@ -17,6 +17,7 @@ severity: follow-up
 owner: AgentCanon
 source: OOP readability validation during managed experiment reproducibility log work
 evidence: `python3 tools/oop/python/readability.py --root . --format text tools/ci/check_experiment_registry.py tests/tools/test_run_managed_experiment.py`
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/585
 affected_surfaces: tools/ci/check_experiment_registry.py, tests/tools/test_run_managed_experiment.py
 edit_scope: tools/ci/check_experiment_registry.py validation helper extraction and topic orchestration split
 required_action: Split registry value extraction, finding construction, and topic-level validation orchestration while preserving registry behavior.
