@@ -205,9 +205,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("CODE_DEPENDENCY_SCAN=pass", result.stdout)
             payload = json.loads(analysis.read_text(encoding="utf-8"))
-            self.assertEqual(
-                payload["schema_version"], "agent-canon.lsp-code-analysis.v1"
-            )
+            self.assertEqual(payload["schema_version"], "agent-canon.lsp-code-analysis.v1")
             self.assertEqual(payload["lifecycle"]["state"], "lexical-only")
 
     def test_code_scan_default_uses_lsp_and_fails_closed(self) -> None:
@@ -293,7 +291,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             args_file = root / "lsp-args.txt"
             fake_python = fake_bin / "python3"
             fake_python.write_text(
-                '#!/bin/sh\nprintf \'%s\\n\' "$@" > "$SCAN_ARGS_FILE"\n',
+                "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$SCAN_ARGS_FILE\"\n",
                 encoding="utf-8",
             )
             os.chmod(fake_python, 0o755)
@@ -347,9 +345,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(result.stdout.strip(), "CODE_DEPENDENCY_SCAN=pass files=1")
             legacy_rows = [
-                line
-                for line in result.stdout.splitlines()
-                if line.startswith("CODE_DEPENDENCY\t")
+                line for line in result.stdout.splitlines() if line.startswith("CODE_DEPENDENCY\t")
             ]
             self.assertFalse(legacy_rows)
             self.assertTrue(all(len(line.split("\t")) == 7 for line in legacy_rows))
@@ -357,9 +353,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(payload["status"], "complete")
             self.assertEqual(payload["files"], ["main.rs"])
             self.assertTrue(payload["lexical_candidates"])
-            self.assertTrue(
-                any(item["token"] == "helper" for item in payload["lexical_candidates"])
-            )
+            self.assertTrue(any(item["token"] == "helper" for item in payload["lexical_candidates"]))
 
     def test_trusted_packet_reports_unchanged_missing_as_baseline(self) -> None:
         """Unchanged missing headers are evidence and do not fail the PR scan."""
@@ -1356,14 +1350,9 @@ class DependencyManifestToolTest(unittest.TestCase):
             (root / "vendor" / "agent-canon" / ".github" / "workflows").mkdir(
                 parents=True
             )
-            (
-                root
-                / "vendor"
-                / "agent-canon"
-                / ".github"
-                / "workflows"
-                / "agent-improvement-guide.yml"
-            ).write_text("name: Agent Improvement Guide\n", encoding="utf-8")
+            (root / "vendor" / "agent-canon" / ".github" / "workflows" / "agent-improvement-guide.yml").write_text(
+                "name: Agent Improvement Guide\n", encoding="utf-8"
+            )
             workflow.write_text(
                 "\n".join(
                     [
@@ -1379,9 +1368,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = run_tool(
-                str(FORMAT), "--root", str(root), str(workflow), root=root
-            )
+            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
 
@@ -1408,19 +1395,12 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = run_tool(
-                str(FORMAT), "--root", str(root), str(workflow), root=root
-            )
+            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
             self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn(
-                "dependency target escapes repository root",
-                result.stdout,
-            )
+            self.assertIn("dependency target escapes repository root", result.stdout)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
 
-    def test_format_falls_back_to_template_source_context_when_direct_missing(
-        self,
-    ) -> None:
+    def test_format_falls_back_to_template_source_context_when_direct_missing(self) -> None:
         """Fallback context is still used when direct dependency target does not exist."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -1433,12 +1413,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "# Vendor AGENTS\n", encoding="utf-8"
             )
             (
-                root
-                / "vendor"
-                / "agent-canon"
-                / ".github"
-                / "workflows"
-                / "agent-improvement-guide.yml"
+                root / "vendor" / "agent-canon" / ".github" / "workflows" / "agent-improvement-guide.yml"
             ).write_text("name: Agent Improvement Guide\n", encoding="utf-8")
             workflow.write_text(
                 "\n".join(
@@ -1455,9 +1430,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            result = run_tool(
-                str(FORMAT), "--root", str(root), str(workflow), root=root
-            )
+            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
 
@@ -3289,43 +3262,25 @@ class DependencyManifestToolTest(unittest.TestCase):
     def test_graph_ensure_fails_closed_for_build_or_readback_failure(self) -> None:
         """Build failure and non-fresh readback stay closed."""
         cases = (
-            (
-                [
-                    ("stale", 2, "source_changed", "source_changed"),
-                ],
-                3,
-                "GRAPH_REBUILD=failed rc=3",
-                True,
-            ),
-            (
-                [
-                    ("stale", 2, "source_changed", "source_changed"),
-                    ("stale", 2, "source_changed", "source_changed"),
-                ],
-                0,
-                "REPO_DEPENDENCY_REVIEW=fail",
-                True,
-            ),
-            (
-                [
-                    ("stale", 2, "source_changed", "source_changed"),
-                    (
-                        "stale",
-                        2,
-                        "persisted_readback_mismatch",
-                        "persisted_readback_mismatch",
-                    ),
-                ],
-                0,
-                "REPO_DEPENDENCY_REVIEW=fail",
-                True,
-            ),
+            ([
+                ("stale", 2, "source_changed", "source_changed"),
+            ], 3, "GRAPH_REBUILD=failed rc=3", True),
+            ([
+                ("stale", 2, "source_changed", "source_changed"),
+                ("stale", 2, "source_changed", "source_changed"),
+            ], 0, "REPO_DEPENDENCY_REVIEW=fail", True),
+            ([
+                ("stale", 2, "source_changed", "source_changed"),
+                (
+                    "stale",
+                    2,
+                    "persisted_readback_mismatch",
+                    "persisted_readback_mismatch",
+                ),
+            ], 0, "REPO_DEPENDENCY_REVIEW=fail", True),
         )
         for statuses, build_exit, expected, build_expected in cases:
-            with (
-                self.subTest(statuses=statuses, build_exit=build_exit),
-                tempfile.TemporaryDirectory() as tmp_dir,
-            ):
+            with self.subTest(statuses=statuses, build_exit=build_exit), tempfile.TemporaryDirectory() as tmp_dir:
                 result = self.run_graph_ensure_fixture(
                     Path(tmp_dir), statuses, build_exit
                 )
