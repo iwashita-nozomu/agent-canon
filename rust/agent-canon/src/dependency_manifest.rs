@@ -641,8 +641,7 @@ fn load_surface_manifest_snapshot(
                 ))
             })?
             .to_string();
-        let projection_producer =
-            required_json_string(entry, "projection_producer", &owner)?;
+        let projection_producer = required_json_string(entry, "projection_producer", &owner)?;
         let projection_kind = required_json_string(entry, "projection_kind", &owner)?;
         if matches!(mode.as_str(), "symlink" | "copy") && source.is_empty() {
             return Err(ManifestError::SurfaceManifest(format!(
