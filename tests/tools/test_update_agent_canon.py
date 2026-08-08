@@ -1728,8 +1728,17 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     'projection_kind = "github_copy"',
                     'local_override_allowed = false',
                     'paths = [',
-                    '  ".github/workflows/agent-coordination.yml",',
                     *(f'  "{path}",' for path in github_template_paths),
+                    ']',
+                    '',
+                    '[[group]]',
+                    'mode = "removed_legacy"',
+                    'projection_producer = "legacy"',
+                    'projection_kind = "removed_legacy"',
+                    'local_override_allowed = false',
+                    'paths = [',
+                    '  ".github/workflows/agent-improvement-guide.yml",',
+                    '  ".github/workflows/agent-coordination.yml",',
                     ']',
                     '',
                     '[[group]]',
@@ -1815,6 +1824,10 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         )
         (work_dir / ".github" / "workflows" / "agent-coordination.yml").write_text(
             "name: agent coordination\n",
+            encoding="utf-8",
+        )
+        (work_dir / ".github" / "workflows" / "agent-improvement-guide.yml").write_text(
+            "name: agent improvement guide\non:\n  workflow_dispatch:\n",
             encoding="utf-8",
         )
         for template_path in github_template_paths:
@@ -2613,14 +2626,32 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("agent_canon_snapshot_alias=deprecated_use_link_root", result.stdout)
 
-    def test_link_root_keeps_goal_local_and_syncs_copy_surfaces(self) -> None:
-        """Link-root should restore root views and project GitHub copy surfaces."""
+    def test_link_root_keeps_goal_local_and_excludes_agentcanon_workflows(self) -> None:
+        """Link-root keeps local state and leaves AgentCanon workflows source-only."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
             repo = self.make_superproject(root, bare_repo)
             goal_path = repo / "goal.md"
             os.symlink("vendor/agent-canon/goal.md", goal_path)
+            workflow_root = repo / ".github" / "workflows"
+            workflow_root.mkdir(parents=True, exist_ok=True)
+            workflow_paths = {
+                workflow: workflow_root / workflow
+                for workflow in (
+                    "agent-improvement-guide.yml",
+                    "agent-coordination.yml",
+                )
+            }
+            os.symlink(
+                "missing-agentcanon-workflow",
+                workflow_paths["agent-improvement-guide.yml"],
+            )
+            regular_sentinel = "name: parent-owned workflow\n"
+            workflow_paths["agent-coordination.yml"].write_text(
+                regular_sentinel,
+                encoding="utf-8",
+            )
 
             result = subprocess.run(
                 ["bash", "tools/sync_agent_canon.sh", "link-root"],
@@ -2633,19 +2664,26 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertFalse(goal_path.is_symlink())
             self.assertIn("repo-local goal", goal_path.read_text(encoding="utf-8"))
+            self.assertFalse(
+                os.path.lexists(workflow_paths["agent-improvement-guide.yml"])
+            )
+            regular_workflow = workflow_paths["agent-coordination.yml"]
+            self.assertTrue(os.path.lexists(regular_workflow))
+            self.assertTrue(regular_workflow.is_file())
             self.assertEqual(
-                (repo / ".github" / "workflows" / "agent-coordination.yml").read_text(
-                    encoding="utf-8"
-                ),
-                (
+                regular_workflow.read_text(encoding="utf-8"),
+                regular_sentinel,
+            )
+            for workflow, path in workflow_paths.items():
+                source = (
                     repo
                     / "vendor"
                     / "agent-canon"
                     / ".github"
                     / "workflows"
-                    / "agent-coordination.yml"
-                ).read_text(encoding="utf-8"),
-            )
+                    / workflow
+                )
+                self.assertTrue(source.is_file(), workflow)
             issue_templates = sorted(
                 path
                 for path in (repo / ".github" / "ISSUE_TEMPLATE").iterdir()

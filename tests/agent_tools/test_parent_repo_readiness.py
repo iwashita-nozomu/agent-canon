@@ -28,6 +28,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from surface_manifest import (  # noqa: E402
     load_manifest,
+    render_copy_specs,
     render_regular_specs,
     render_root_absent_paths,
     target_for_entry,
@@ -279,6 +280,26 @@ class ParentRepoReadinessTest(unittest.TestCase):
         )
         self.assertIn(".agents", root_absent_specs)
         self.assertIn(".vscode", root_absent_specs)
+
+    def test_agentcanon_workflow_sources_stay_standalone_only(self) -> None:
+        """AgentCanon workflows remain source-owned but are never root copies."""
+        manifest = load_manifest(
+            PROJECT_ROOT,
+            ".",
+            "documents/runtime/shared-runtime-surfaces.toml",
+        )
+        root_absent_paths = set(render_root_absent_paths(manifest.entries).splitlines())
+        copy_specs = render_copy_specs(manifest.entries, manifest.prefix)
+
+        for workflow in (
+            ".github/workflows/agent-improvement-guide.yml",
+            ".github/workflows/agent-coordination.yml",
+        ):
+            self.assertIn(workflow, root_absent_paths)
+            self.assertNotIn(f"{workflow}:", copy_specs)
+            source = PROJECT_ROOT / workflow
+            self.assertTrue(source.is_file(), workflow)
+            self.assertIn("workflow_dispatch:", source.read_text(encoding="utf-8"))
 
     def write_parent_fixture(self, root: Path) -> None:
         """Create a synthetic template-derived parent repo."""
