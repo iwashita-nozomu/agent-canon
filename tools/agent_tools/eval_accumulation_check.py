@@ -7,6 +7,7 @@
 # upstream design ../../documents/runtime/runtime-log-archive.md eval and hook result archive contract
 # upstream design ../../documents/runtime/runtime-log-archive-migration.md legacy in-tree result migration contract
 # upstream implementation ./runtime_log_paths.py resolves mounted archive result paths
+# upstream implementation ./prompt_capture.py owns prompt secret redaction patterns
 # upstream design ../../tools/README.md tool entrypoint index
 # upstream design ../../documents/tools/README.md user-facing tool index
 # downstream implementation ../../tools/ci/run_all_checks.sh runs eval accumulation checks
@@ -35,6 +36,7 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
+from prompt_capture import redact_sensitive_text  # noqa: E402
 from runtime_log_paths import (  # noqa: E402
     eval_result_search_dirs,
     hook_result_search_dirs,
@@ -46,6 +48,37 @@ HOOK_REQUIRED_FIELDS = (
     "timestamp",
     "status",
     "payload_fingerprint",
+)
+BEHAVIOR_EVENT_SCHEMA = "agent-canon.behavior-event.v1"
+BEHAVIOR_EVENT_KIND = "behavior_snapshot"
+BEHAVIOR_HOOK_EVENTS = frozenset({"UserPromptSubmit", "PreToolUse", "PostToolUse"})
+WORKFLOW_ATTRIBUTION_KINDS = frozenset({"owner", "context", "missing"})
+PROMPT_CAPTURE_STATUSES = frozenset({"present", "missing"})
+PROMPT_FINGERPRINT_RE = re.compile(r"^[0-9a-f]{16}$")
+PROMPT_CAPTURE_CAUSE_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
+BEHAVIOR_HINT_FIELDS = frozenset(
+    {
+        "event_kind",
+        "workflow_attribution_kind",
+        "selected_workflow",
+        "selected_workflows",
+        "workflow",
+        "workflow_family",
+        "workflow_selection_kind",
+        "workflow_owner",
+        "workflow_owner_workflows",
+        "workflow_context_kind",
+        "workflow_context_source",
+        "workflow_context_workflows",
+        "workflow_context_timestamp",
+        "workflow_context_source_event",
+        "selected_workflow_count",
+        "candidate_workflows",
+        "prompt_capture_status",
+        "prompt_excerpt_redacted",
+        "prompt_fingerprint",
+        "prompt_char_count",
+    }
 )
 SKILL_REPORT_RE = re.compile(
     r"^skill-eval-\d{8}T\d{12}Z-[0-9a-f]{10}-(?:pass|fail)-[a-z0-9-]+(?:-[a-z0-9-]+)*\.md$"
@@ -112,6 +145,9 @@ def is_warning_finding(finding: Finding) -> bool:
     return (
         finding.detail == "missing-eval-run-id"
         and finding.path.startswith(".agent-canon/log-archive/eval-results/legacy-import/")
+    ) or (
+        finding.check == "behavior_event"
+        and finding.detail == "legacy-behavior-schema"
     )
 
 
@@ -190,6 +226,279 @@ def intentionally_ignored_archive_path(path: Path) -> bool:
     return ".agent-canon" in parts and "log-archive" in parts
 
 
+def _nonnegative_int(value: object) -> bool:
+    """Return whether a value is an integer counter (not a boolean)."""
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 0
+
+
+def _string_list(value: object) -> bool:
+    """Return whether a value is a JSON list of strings."""
+    return isinstance(value, list) and all(isinstance(item, str) for item in value)
+
+
+def _behavior_envelope_findings(label: str, entry: dict[str, object]) -> list[Finding]:
+    """Validate canonical behavior-event identity and transport fields."""
+    findings: list[Finding] = []
+    required_nonempty = (
+        "event_id",
+        "hook_invocation_id",
+        "hook_event_name",
+        "event_kind",
+        "timestamp",
+        "source",
+        "workflow_attribution_kind",
+        "prompt_capture_status",
+    )
+    for field in required_nonempty:
+        value = entry.get(field)
+        valid = isinstance(value, str) and bool(value.strip())
+        if not valid:
+            findings.append(Finding("behavior_event", label, f"missing-field:{field}"))
+
+    for field, value, valid in (
+        ("prompt_excerpt_redacted", entry.get("prompt_excerpt_redacted"), isinstance(entry.get("prompt_excerpt_redacted"), str)),
+        ("prompt_fingerprint", entry.get("prompt_fingerprint"), isinstance(entry.get("prompt_fingerprint"), str)),
+        ("prompt_char_count", entry.get("prompt_char_count"), _nonnegative_int(entry.get("prompt_char_count"))),
+        ("prompt_excerpt_truncated", entry.get("prompt_excerpt_truncated"), isinstance(entry.get("prompt_excerpt_truncated"), bool)),
+    ):
+        if not valid:
+            findings.append(Finding("behavior_event", label, f"missing-field:{field}"))
+
+    event_id = entry.get("event_id")
+    if isinstance(event_id, str) and not re.fullmatch(r"[0-9a-f]{64}", event_id):
+        findings.append(Finding("behavior_event", label, "invalid-event-id"))
+    if entry.get("hook_event_name") not in BEHAVIOR_HOOK_EVENTS:
+        findings.append(Finding("behavior_event", label, "invalid-hook-event-name"))
+    if entry.get("event_kind") != BEHAVIOR_EVENT_KIND:
+        findings.append(Finding("behavior_event", label, "invalid-event-kind"))
+
+    return findings
+
+
+def _behavior_workflow_findings(label: str, entry: dict[str, object]) -> list[Finding]:
+    """Validate owner/context/missing workflow attribution coherence."""
+    selected = entry.get("selected_workflows", [])
+    owner_workflows = entry.get("workflow_owner_workflows", [])
+    context_workflows = entry.get("workflow_context_workflows", [])
+    findings = _workflow_list_findings(label, selected, owner_workflows, context_workflows)
+    findings.extend(_workflow_kind_findings(label, entry))
+    return findings
+
+
+def _workflow_list_findings(
+    label: str,
+    selected: object,
+    owner_workflows: object,
+    context_workflows: object,
+) -> list[Finding]:
+    """Validate the three workflow list fields."""
+    findings: list[Finding] = []
+    for field, value in (
+        ("selected_workflows", selected),
+        ("workflow_owner_workflows", owner_workflows),
+        ("workflow_context_workflows", context_workflows),
+    ):
+        if not _string_list(value):
+            findings.append(Finding("behavior_event", label, f"invalid-list:{field}"))
+    return findings
+
+
+def _workflow_kind_findings(
+    label: str,
+    entry: dict[str, object],
+) -> list[Finding]:
+    """Validate fields conditioned on the selected attribution kind."""
+    findings: list[Finding] = []
+    attribution = entry.get("workflow_attribution_kind")
+    if attribution not in WORKFLOW_ATTRIBUTION_KINDS:
+        findings.append(Finding("behavior_event", label, "invalid-workflow-attribution-kind"))
+    if attribution == "owner":
+        findings.extend(_workflow_owner_findings(label, entry))
+    elif attribution == "context":
+        findings.extend(_workflow_context_findings(label, entry))
+    elif attribution == "missing":
+        findings.extend(_workflow_missing_findings(label, entry))
+
+    return findings
+
+
+def _workflow_owner_findings(label: str, entry: dict[str, object]) -> list[Finding]:
+    """Validate direct owner attribution fields."""
+    owner = entry.get("workflow_owner", "")
+    selected = entry.get("selected_workflows", [])
+    owner_workflows = entry.get("workflow_owner_workflows", [])
+    if (
+        isinstance(owner, str)
+        and owner.strip()
+        and isinstance(selected, list)
+        and selected
+        and isinstance(owner_workflows, list)
+        and owner_workflows
+    ):
+        if owner != selected[0] or owner_workflows != selected:
+            return [Finding("behavior_event", label, "workflow-owner-fields-incoherent")]
+        if _workflow_owner_optional_mismatch(entry, owner, selected):
+            return [Finding("behavior_event", label, "workflow-owner-fields-incoherent")]
+        if any(
+            _workflow_value_present(entry.get(field, default))
+            for field, default in (
+                ("workflow_context_kind", ""),
+                ("workflow_context_source", ""),
+                ("workflow_context_workflows", []),
+                ("workflow_context_timestamp", ""),
+                ("workflow_context_source_event", ""),
+            )
+        ):
+            return [Finding("behavior_event", label, "workflow-owner-fields-incoherent")]
+        return []
+    return [Finding("behavior_event", label, "workflow-owner-fields-incoherent")]
+
+
+def _workflow_owner_optional_mismatch(
+    entry: dict[str, object],
+    owner: str,
+    selected: list[object],
+) -> bool:
+    """Return whether optional owner carriers disagree with selected workflows."""
+    expected_count = len(selected)
+    mismatches = (
+        "selected_workflow" in entry and entry["selected_workflow"] != owner,
+        "workflow" in entry and entry["workflow"] != selected,
+        "workflow_family" in entry and entry["workflow_family"] != owner,
+        "workflow_selection_kind" in entry
+        and entry["workflow_selection_kind"] != "declared_workflow",
+        "selected_workflow_count" in entry
+        and entry["selected_workflow_count"] != expected_count,
+    )
+    return any(mismatches)
+
+
+def _workflow_context_findings(label: str, entry: dict[str, object]) -> list[Finding]:
+    """Validate inherited context attribution fields."""
+    workflows = entry.get("workflow_context_workflows", [])
+    kind = entry.get("workflow_context_kind", "")
+    source = entry.get("workflow_context_source", "")
+    timestamp = entry.get("workflow_context_timestamp", "")
+    source_event = entry.get("workflow_context_source_event", "")
+    owner_carriers = (
+        ("selected_workflow", entry.get("selected_workflow", "")),
+        ("selected_workflows", entry.get("selected_workflows", [])),
+        ("workflow", entry.get("workflow", [])),
+        ("workflow_family", entry.get("workflow_family", "")),
+        ("workflow_owner", entry.get("workflow_owner", "")),
+        ("workflow_owner_workflows", entry.get("workflow_owner_workflows", [])),
+        ("selected_workflow_count", entry.get("selected_workflow_count", 0)),
+    )
+    selection_kind = entry.get("workflow_selection_kind", "")
+    coherent_context = (
+        isinstance(workflows, list)
+        and bool(workflows)
+        and isinstance(kind, str)
+        and bool(kind.strip())
+        and isinstance(source, str)
+        and bool(source.strip())
+        and isinstance(timestamp, str)
+        and bool(timestamp.strip())
+        and isinstance(source_event, str)
+        and bool(source_event.strip())
+        and selection_kind == "context_workflow"
+    )
+    if coherent_context and not any(_workflow_value_present(value) for _field, value in owner_carriers):
+        return []
+    return [Finding("behavior_event", label, "workflow-context-fields-incoherent")]
+
+
+def _workflow_missing_findings(label: str, entry: dict[str, object]) -> list[Finding]:
+    """Validate explicit empty sentinels for missing attribution."""
+    fields = (
+        ("selected_workflow", entry.get("selected_workflow", "")),
+        ("selected_workflows", entry.get("selected_workflows", [])),
+        ("workflow", entry.get("workflow", [])),
+        ("workflow_family", entry.get("workflow_family", "")),
+        ("workflow_selection_kind", entry.get("workflow_selection_kind", "")),
+        ("workflow_owner", entry.get("workflow_owner", "")),
+        ("workflow_owner_workflows", entry.get("workflow_owner_workflows", [])),
+        ("workflow_context_kind", entry.get("workflow_context_kind", "")),
+        ("workflow_context_source", entry.get("workflow_context_source", "")),
+        ("workflow_context_workflows", entry.get("workflow_context_workflows", [])),
+        ("workflow_context_timestamp", entry.get("workflow_context_timestamp", "")),
+        ("workflow_context_source_event", entry.get("workflow_context_source_event", "")),
+        ("selected_workflow_count", entry.get("selected_workflow_count", 0)),
+    )
+    return [] if all(not _workflow_value_present(value) for _field, value in fields) else [
+        Finding("behavior_event", label, "workflow-missing-fields-incoherent")
+    ]
+
+
+def _workflow_value_present(value: object) -> bool:
+    """Return whether an attribution carrier contains a nonempty value."""
+    if value is None or value is False or value == "" or value == [] or value == 0:
+        return False
+    return True
+
+
+def _behavior_prompt_findings(label: str, entry: dict[str, object]) -> list[Finding]:
+    """Validate redacted prompt evidence and typed missing sentinels."""
+    findings: list[Finding] = []
+    prompt_status = entry.get("prompt_capture_status")
+    excerpt = entry.get("prompt_excerpt_redacted")
+    fingerprint = entry.get("prompt_fingerprint")
+    char_count = entry.get("prompt_char_count")
+    truncated = entry.get("prompt_excerpt_truncated")
+    if prompt_status not in PROMPT_CAPTURE_STATUSES:
+        findings.append(Finding("behavior_event", label, "invalid-prompt-capture-status"))
+    if not isinstance(excerpt, str) or len(excerpt) > 600:
+        findings.append(Finding("behavior_event", label, "invalid-prompt-excerpt"))
+    if not isinstance(fingerprint, str):
+        findings.append(Finding("behavior_event", label, "invalid-prompt-fingerprint"))
+    if not _nonnegative_int(char_count):
+        findings.append(Finding("behavior_event", label, "invalid-prompt-char-count"))
+    if not isinstance(truncated, bool):
+        findings.append(Finding("behavior_event", label, "invalid-prompt-truncated"))
+    if prompt_status == "present":
+        findings.extend(_prompt_present_findings(label, excerpt, fingerprint, char_count))
+    elif prompt_status == "missing":
+        if (excerpt, fingerprint, char_count, truncated) != ("", "", 0, False):
+            findings.append(Finding("behavior_event", label, "prompt-missing-fields-incoherent"))
+    cause = entry.get("prompt_capture_reason")
+    if cause is not None and (not isinstance(cause, str) or not PROMPT_CAPTURE_CAUSE_RE.fullmatch(cause)):
+        findings.append(Finding("behavior_event", label, "invalid-prompt-capture-reason"))
+    return findings
+
+
+def _prompt_present_findings(
+    label: str,
+    excerpt: object,
+    fingerprint: object,
+    char_count: object,
+) -> list[Finding]:
+    """Validate present-prompt identity fields and conservative redaction."""
+    findings: list[Finding] = []
+    if (
+        not isinstance(fingerprint, str)
+        or PROMPT_FINGERPRINT_RE.fullmatch(fingerprint) is None
+        or not isinstance(char_count, int)
+        or char_count <= 0
+    ):
+        findings.append(Finding("behavior_event", label, "prompt-present-fields-incoherent"))
+    if isinstance(excerpt, str) and redact_sensitive_text(excerpt) != excerpt:
+        findings.append(Finding("behavior_event", label, "prompt-excerpt-secret-material"))
+    return findings
+
+
+def behavior_event_findings(label: str, entry: dict[str, object]) -> list[Finding]:
+    """Validate the bounded attribution and prompt fields of a new behavior event."""
+    if entry.get("schema") != BEHAVIOR_EVENT_SCHEMA:
+        if BEHAVIOR_HINT_FIELDS.intersection(entry):
+            return [Finding("behavior_event", label, "legacy-behavior-schema")]
+        return []
+    return [
+        *_behavior_envelope_findings(label, entry),
+        *_behavior_workflow_findings(label, entry),
+        *_behavior_prompt_findings(label, entry),
+    ]
+
+
 def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tuple[str, int, list[Finding]]:
     """Parse one hook JSONL line and return its run id plus findings."""
     label = f"{relative(root, path)}:{line_no}"
@@ -214,6 +523,7 @@ def parse_hook_line(root: Path, path: Path, line_no: int, raw_line: str) -> tupl
     legacy_missing_namespace = 0
     if namespaced and not isinstance(entry.get("hook_log_namespace"), str):
         legacy_missing_namespace = 1
+    findings.extend(behavior_event_findings(label, entry))
     run_id = entry.get("hook_run_id")
     return (run_id if isinstance(run_id, str) else ""), legacy_missing_namespace, findings
 

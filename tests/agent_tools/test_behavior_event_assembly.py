@@ -59,6 +59,50 @@ class BehaviorEventAssemblyTest(unittest.TestCase):
             "/run-bundle",
         )
 
+    def test_missing_prompt_has_typed_empty_capture_fields(self) -> None:
+        """An eligible tool event still records a coherent missing prompt."""
+        parts = HookInvocationParts(
+            hook_event_name="PostToolUse",
+            hook_invocation_id="missing-prompt",
+            hook_payload={"tool_name": "Bash"},
+            classifier_rules=PromptClassifierInputs("", Path("."), {}, {}),
+            tool_selection=select_tools({"tool_name": "Bash"}),
+            payload_fingerprint="f" * 64,
+            timestamp="2026-01-01T00:00:00Z",
+            root=Path("."),
+        )
+
+        event = record_hook_invocation(parts)
+
+        self.assertIsNotNone(event)
+        data = event.as_dict() if event is not None else {}
+        self.assertEqual(data["prompt_capture_status"], "missing")
+        self.assertEqual(data["prompt_excerpt_redacted"], "")
+        self.assertEqual(data["prompt_fingerprint"], "")
+        self.assertEqual(data["prompt_char_count"], 0)
+        self.assertFalse(data["prompt_excerpt_truncated"])
+
+    def test_context_workflow_attribution_is_explicit(self) -> None:
+        """Inherited workflow evidence is represented by context fields."""
+        parts = HookInvocationParts(
+            hook_event_name="PostToolUse",
+            hook_invocation_id="context-workflow",
+            hook_payload={"tool_name": "Bash"},
+            classifier_rules=PromptClassifierInputs("", Path("."), {}, {}),
+            workflow_context=WorkflowContext(("scoped-change",), "2026-01-01T00:00:00Z", "UserPromptSubmit"),
+            payload_fingerprint="f" * 64,
+            timestamp="2026-01-01T00:00:01Z",
+            root=Path("."),
+        )
+
+        event = record_hook_invocation(parts)
+
+        self.assertIsNotNone(event)
+        data = event.as_dict() if event is not None else {}
+        self.assertEqual(data["workflow_attribution_kind"], "context")
+        self.assertEqual(data["workflow_context_workflows"], ["scoped-change"])
+        self.assertEqual(data["workflow_owner_workflows"], [])
+
 
 if __name__ == "__main__":
     unittest.main()

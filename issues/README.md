@@ -63,13 +63,19 @@ done: <one sentence>
 
 The extended issue form may add `affected_surfaces`, `edit_scope`,
 `required_action`, and `close_condition`. Existing issues may retain those
-fields; they are optional when the compact form is complete. The compact issue
-form may use `problem`, `evidence`, and `done` instead of
-the extended `affected_surfaces`, `edit_scope`, `required_action`, and
-`close_condition` fields. The extended fields remain optional when the compact
-form is complete. `evidence` is always required. New finding intake defaults
-to changed-surface, user-request, or owner-bounded scope; `repo-wide` must be
+fields; they are optional when `required_action` and `close_condition`
+are not needed. `evidence` is always required. New finding intake defaults to
+changed-surface, user-request, or owner-bounded scope; `repo-wide` must be
 selected explicitly.
+
+Extended operational examples (optional, but recommended when available):
+
+```text
+affected_surfaces: <repo paths covered by the finding>
+edit_scope: changed|user|owner-bounded|repo-wide
+required_action: <required action or follow-up>
+close_condition: <condition for closure>
+```
 
 Issue text must summarize the behavior and cite evidence.
 Do not paste raw chat logs or long run-bundle transcripts.
@@ -79,7 +85,11 @@ When an issue is mirrored to GitHub, add this optional field:
 github_issue: https://github.com/<owner>/<repo>/issues/<number>
 ```
 
-Use `github_issue: pending` only while a branch is preparing the GitHub mirror.
+Use `github_issue: pending` or `github_issue: not-created` only while a branch
+is preparing the GitHub mirror. These markers and an empty field are
+unresolved: ordinary validation may plan or apply them, but
+`--require-github-link` and `--github-check` require a real
+`https://github.com/<owner>/<repo>/issues/<n>` URL.
 Closed issue files must additionally include:
 
 ```text
@@ -145,14 +155,18 @@ python3 tools/agent_tools/issue_sync.py \
 
 `.github/workflows/issue-mirror.yml` runs the read-only check on PRs and branch
 pushes and writes the mirror status, drift, and planned sync commands to the
-GitHub Step Summary. Missing `github_issue:` links generate deterministic
-`ISSUE_SYNC_PLAN=` lines; they do not fail PRs unless the local issue schema,
-status, duplicate IDs, or linked GitHub mirror state is inconsistent.
+GitHub Step Summary. Missing, pending, and not-created `github_issue:` values
+generate deterministic `ISSUE_SYNC_PLAN=` lines; ordinary validation accepts
+these temporary states, but `--github-check` reports them as unresolved and
+`--require-github-link` fails until a real URL exists.
 
-Apply mode may create GitHub Issues and insert `github_issue:` fields, but it
-must be an explicit operator action. GitHub Actions sync mode updates already
-linked GitHub Issues on `main` pushes or manual dispatch; it does not commit
-new `github_issue:` fields back to the repository.
+Apply mode may create GitHub Issues and replace empty, pending, or not-created
+markers with one real `github_issue:` field, then synchronizes the updated local
+body to the newly created remote issue. It must be an explicit operator action;
+creation or post-create synchronization failures are nonzero actionable errors.
+GitHub Actions sync mode updates already linked GitHub Issues on `main` pushes or
+manual dispatch; it does not commit new `github_issue:` fields back to the
+repository.
 
 ```bash
 python3 tools/agent_tools/issue_sync.py \

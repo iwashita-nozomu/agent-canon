@@ -24,7 +24,7 @@ affected_surfaces: agents/canonical/CODEX_SUBAGENTS.md, agents/TASK_WORKFLOWS.md
 edit_scope: reports/dependency-review/agent-selection-routing-20260519/dependency_edit_scope.txt
 required_action: Add a routing evidence step that makes Codex cite why implementation delegation selected spark_worker or worker before spawning the implementation agent.
 close_condition: A workflow, skill, or eval gate fails or flags implementation delegation when a narrow design-traced slice skips the configured spark_worker role without an explicit alternate route reason.
-github_issue: pending
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/579
 
 ## Reader Map
 

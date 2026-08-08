@@ -19,8 +19,8 @@ evidence: User feedback on 2026-05-17: eval collection is still not reliably acc
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/242
 affected_surfaces: evidence/agent-evals/README.md, documents/runtime-log-archive.md, .codex/hooks/hook_event_log.py, .codex/hooks/skill_usage_logger.py, tools/agent_tools/evaluate_skill_workflow_prompts.py, tools/agent_tools/generate_agent_improvement_guide.py, tools/agent_tools/generate_agent_runtime_dashboard.py
 edit_scope: tools/agent_tools/eval_accumulation_check.py, tests/agent_tools/test_eval_accumulation_check.py, tools/catalog.yaml, tools/README.md, documents/tools/README.md, tools/ci/run_all_checks.sh, .github/workflows/agent-canon-static-gates.yml
-required_action: Add a gate that verifies AgentCanon-owned hook and skill eval result directories are append-only, tracked, and structurally readable.
-close_condition: The gate passes on current accumulated evidence and fails on missing result directories, duplicate hook run ids, malformed JSONL, or ignored result paths.
+required_action: Add a structural gate for AgentCanon-owned hook and skill eval result accumulation, with canonical agent-canon.behavior-event.v1 workflow attribution and prompt-capture validation. Preserve legacy rows as warning-compatible evidence, and apply token comparison checks only when a token-reduction objective is selected.
+close_condition: The gate passes on current accumulated evidence and fails on missing result directories, duplicate hook run ids, malformed JSONL, ignored result paths, or structurally invalid new behavior-event fields. Legacy behavior-shaped rows remain readable as warnings. Token comparison is required only when the run selects a token-reduction objective; no global count, ratio, or improvement threshold is imposed.
 
 ## Reader Map
 
@@ -91,4 +91,13 @@ branch moves eval source manifests to `evidence/agent-evals/`, keeps
 tests. The residual close condition is not only source-manifest placement:
 dashboard workflow attribution, prompt capture coverage, and token-footprint
 comparison evidence still need a branch that proves the accumulated archive is
-complete enough for improvement tooling.
+complete enough for improvement tooling. New `agent-canon.behavior-event.v1`
+rows provide typed workflow attribution and prompt-capture fields that the
+accumulation checker and dashboard read back directly. Owner/context/missing
+attribution and prompt present/missing fields are validated structurally;
+legacy rows remain warning-compatible. Token footprint evidence is reported as
+`present` only when structurally observed and the token-reduction objective is
+selected, `missing` when that selected objective lacks evidence, and
+`not-selected` otherwise. The issue closes when the canonical archive is
+readable and these residual states are truthful; it does not require a global
+token count or ratio threshold.

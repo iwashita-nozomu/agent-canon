@@ -35,6 +35,7 @@ REQUIRED_FIELDS = (
 MINIMUM_ISSUE_FIELDS = ("issue_id", "status", "source", "severity", "evidence")
 MINIMUM_ISSUE_CONTENT_FIELDS = ("problem", "done")
 FINDING_SCOPES = frozenset({"changed", "user", "owner-bounded", "repo-wide"})
+GITHUB_ISSUE_MARKERS = frozenset({"pending", "not-created"})
 OPEN_STATUSES = {"open", "in_progress", "deferred"}
 CLOSED_STATUSES = {"resolved", "wontfix", "deferred"}
 ISSUE_ID_RE = re.compile(r"^AC-\d{8}-[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -137,6 +138,7 @@ class IssueRecord:
     directory_state: str
     fields: dict[str, str]
     body: str = ""
+    github_issue_values: tuple[str, ...] = ()
 
     @property
     def issue_id(self) -> str:
@@ -146,6 +148,8 @@ class IssueRecord:
     @property
     def github_issue(self) -> str:
         """Return the linked GitHub Issue URL or marker."""
+        if self.github_issue_values:
+            return canonical_github_issue(self.github_issue_values)
         return self.fields.get("github_issue", "")
 
 
@@ -192,7 +196,7 @@ class GitHubIssueCreator:
         """Create one GitHub Issue from a local issue file."""
         if not self.repo:
             raise ValueError("--repo is required with --apply")
-        title = issue.path.read_text(encoding="utf-8").splitlines()[0].lstrip("# ").strip()
+        title = issue_title(issue.path)
         body = issue.path.read_text(encoding="utf-8")
         result = subprocess.run(
             ["gh", "issue", "create", "--repo", self.repo, "--title", title, "--body", body],
@@ -358,12 +362,14 @@ def read_issues(root: Path) -> tuple[IssueRecord, ...]:
     records: list[IssueRecord] = []
     for path in issue_files(root):
         directory_state = path.parent.name
+        body = path.read_text(encoding="utf-8")
         records.append(
             IssueRecord(
                 path=path,
                 directory_state=directory_state,
-                fields=parse_fields(path.read_text(encoding="utf-8")),
-                body=path.read_text(encoding="utf-8"),
+                fields=parse_fields(body),
+                body=body,
+                github_issue_values=parse_github_issue_values(body),
             )
         )
     return tuple(records)
@@ -432,11 +438,11 @@ def validate_issue_identity(root: Path, issue: IssueRecord) -> list[Finding]:
 def github_link_findings(root: Path, issue: IssueRecord, required: bool) -> list[Finding]:
     """Validate optional GitHub Issue link fields."""
     value = issue.github_issue
-    if value and value not in {"pending", "not-created"} and github_issue_reference(value, "") is None:
+    if value and value not in GITHUB_ISSUE_MARKERS and github_issue_reference(value, "") is None:
         return [Finding("github", relative(root, issue.path), "invalid-github_issue")]
     if not required:
         return []
-    if value.startswith("https://github.com/") or value in {"pending", "not-created"}:
+    if github_issue_reference(value, "") is not None:
         return []
     return [Finding("github", relative(root, issue.path), "missing-github_issue")]
 
@@ -466,9 +472,9 @@ def plan_lines(root: Path, issues: Sequence[IssueRecord], repo: str) -> tuple[st
     """Return a deterministic GitHub sync plan for unlinked issues."""
     lines: list[str] = []
     for issue in issues:
-        if issue.github_issue:
+        if issue.github_issue and issue.github_issue not in GITHUB_ISSUE_MARKERS:
             continue
-        title = issue.path.read_text(encoding="utf-8").splitlines()[0].lstrip("# ").strip()
+        title = issue_title(issue.path)
         command = f"gh issue create --repo {repo or '<owner/name>'} --title {json.dumps(title)} --body-file {relative(root, issue.path)}"
         lines.append(f"{issue.issue_id}:{command}")
     return tuple(lines)
@@ -482,9 +488,31 @@ def issue_title(path: Path) -> str:
     return path.stem
 
 
+def parse_github_issue_values(text: str) -> tuple[str, ...]:
+    """Parse all github_issue values from issue text."""
+    values: list[str] = []
+    for line in text.splitlines():
+        if line.startswith("github_issue:"):
+            value = line.split(":", 1)[1].strip()
+            if value:
+                values.append(value)
+    return tuple(values)
+
+
+def canonical_github_issue(values: Sequence[str]) -> str:
+    """Return canonical github_issue value preferring a resolvable URL."""
+    for value in values:
+        if github_issue_reference(value, "") is not None:
+            return value
+    for value in values:
+        if value:
+            return value
+    return ""
+
+
 def github_issue_reference(value: str, default_repo: str) -> GitHubIssueReference | None:
     """Parse a GitHub Issue URL or issue number."""
-    if not value or value in {"pending", "not-created"}:
+    if not value or value in GITHUB_ISSUE_MARKERS:
         return None
     url_match = re.fullmatch(r"https://github\.com/([^/]+/[^/]+)/issues/(\d+)", value)
     if url_match is not None:
@@ -521,8 +549,15 @@ def github_mirror_findings(
     unavailable = 0
     client = GitHubIssueClient(repo)
     for issue in issues:
-        reference = github_issue_reference(issue.github_issue, repo)
+        # Read-only checks require a canonical URL. Numeric shorthand remains
+        # available only to the explicit sync client compatibility path.
+        reference = github_issue_reference(issue.github_issue, "")
         if reference is None:
+            marker = issue.github_issue or "empty"
+            findings.append(
+                Finding("github", relative(root, issue.path), f"unresolved-github_issue:{marker}")
+            )
+            drift += 1
             continue
         rel_path = relative(root, issue.path)
         try:
@@ -558,12 +593,29 @@ def github_mirror_findings(
 
 def github_missing_link_count(issues: Sequence[IssueRecord]) -> int:
     """Return how many local issue files have no GitHub mirror link."""
-    return sum(1 for issue in issues if not issue.github_issue)
+    return sum(
+        1
+        for issue in issues
+        if not issue.github_issue or issue.github_issue in GITHUB_ISSUE_MARKERS
+    )
 
 
-def insert_github_issue(path: Path, url: str) -> None:
-    """Insert a github_issue field into one local issue file."""
+def replace_github_issue(path: Path, url: str) -> None:
+    """Replace any marker/link with one canonical GitHub Issue field."""
     lines = path.read_text(encoding="utf-8").splitlines()
+    replaced = False
+    filtered: list[str] = []
+    for line in lines:
+        if line.startswith("github_issue:"):
+            if not replaced:
+                filtered.append(f"github_issue: {url}")
+                replaced = True
+            continue
+        filtered.append(line)
+    lines = filtered
+    if replaced:
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        return
     for index, line in enumerate(lines):
         if line.startswith("evidence:"):
             lines.insert(index + 1, f"github_issue: {url}")
@@ -573,14 +625,24 @@ def insert_github_issue(path: Path, url: str) -> None:
 
 
 def apply_missing_links(issues: Sequence[IssueRecord], repo: str) -> tuple[str, ...]:
-    """Create GitHub Issues for unlinked local issues."""
+    """Create GitHub Issues for empty or temporary-marker local issues."""
     creator = GitHubIssueCreator(repo)
     created: list[str] = []
     for issue in issues:
-        if issue.github_issue:
+        canonical = canonical_github_issue(issue.github_issue_values)
+        has_multiple_links = len(issue.github_issue_values) > 1
+        if canonical and canonical not in GITHUB_ISSUE_MARKERS:
+            if canonical != issue.github_issue or has_multiple_links:
+                replace_github_issue(issue.path, canonical)
             continue
+        if issue.github_issue != canonical:
+            replace_github_issue(issue.path, canonical or "pending")
         creator.create(issue)
-        insert_github_issue(issue.path, creator.created_url)
+        if github_issue_reference(creator.created_url, "") is None:
+            raise RuntimeError(
+                f"gh issue create returned a non-URL for {issue.issue_id}: {creator.created_url!r}"
+            )
+        replace_github_issue(issue.path, creator.created_url)
         created.append(f"{issue.issue_id}:{creator.created_url}")
     return tuple(created)
 
@@ -720,18 +782,36 @@ def append_summary(path: Path, report: IssueSyncReport) -> None:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run issue validation and optional GitHub sync planning."""
     args = build_parser().parse_args(argv)
-    report = validate(args.root, args.require_github_link, args.repo, github_check=False)
-    if args.apply and not report.findings:
-        created = apply_missing_links(report.issues, args.repo)
-        print(f"ISSUE_SYNC_CREATED={len(created)}")
-        for item in created:
-            print(f"ISSUE_SYNC_CREATED_ITEM={item}")
-        report = validate(args.root, args.require_github_link, args.repo, github_check=False)
-    if args.sync_github and not report.findings:
-        synced = sync_linked_github_issues(report.issues, args.repo)
-        print(f"ISSUE_SYNC_GITHUB_SYNCED={len(synced)}")
-        for item in synced:
-            print(f"ISSUE_SYNC_GITHUB_SYNCED_ITEM={item}")
+    report = validate(
+        args.root,
+        args.require_github_link and not args.apply,
+        args.repo,
+        github_check=False,
+    )
+    try:
+        if args.apply and not report.findings:
+            created = apply_missing_links(report.issues, args.repo)
+            print(f"ISSUE_SYNC_CREATED={len(created)}")
+            for item in created:
+                print(f"ISSUE_SYNC_CREATED_ITEM={item}")
+            report = validate(args.root, args.require_github_link, args.repo, github_check=False)
+            if created and not report.findings:
+                created_ids = {item.split(":", 1)[0] for item in created if ":" in item}
+                synced = sync_linked_github_issues(
+                    tuple(issue for issue in report.issues if issue.issue_id in created_ids),
+                    args.repo,
+                )
+                print(f"ISSUE_SYNC_GITHUB_SYNCED={len(synced)}")
+                for item in synced:
+                    print(f"ISSUE_SYNC_GITHUB_SYNCED_ITEM={item}")
+        if args.sync_github and not report.findings:
+            synced = sync_linked_github_issues(report.issues, args.repo)
+            print(f"ISSUE_SYNC_GITHUB_SYNCED={len(synced)}")
+            for item in synced:
+                print(f"ISSUE_SYNC_GITHUB_SYNCED_ITEM={item}")
+    except (RuntimeError, ValueError, OSError) as error:
+        print(f"ISSUE_SYNC_APPLY_ERROR={error}")
+        return 1
     report = validate(
         args.root,
         args.require_github_link,

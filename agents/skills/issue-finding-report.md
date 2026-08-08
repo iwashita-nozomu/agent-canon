@@ -153,8 +153,10 @@ Before writing a new issue:
 1. Populate the minimum issue form from `issues/README.md`: `problem`,
    `evidence`, and `done`, plus identity fields. Add extended fields only when
    they carry actionable scope or ownership detail.
-1. Use `github_issue: pending` for a GitHub mirror created in the same branch
-   or explicit follow-up.
+1. Use `github_issue: pending` or `github_issue: not-created` only for a mirror
+   being prepared in the same branch or explicit follow-up. These markers are
+   unresolved until `--apply` replaces them with one real GitHub Issue URL;
+   `--github-check` must report them and `--require-github-link` must fail.
 
 Issue body sections:
 
