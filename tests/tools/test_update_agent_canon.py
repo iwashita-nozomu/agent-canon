@@ -302,9 +302,20 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
             script,
         )
         self.assertIn(
-            'COMMIT_REQUEST_EVIDENCE_DIGEST="$(sha256sum agents/workflows/agent-canon-pr-workflow.md',
+            "AGENT_CANON_COMMIT_REQUEST_WORKFLOW_PATH=vendor/agent-canon/agents/workflows/agent-canon-pr-workflow.md",
             script,
         )
+        self.assertIn(
+            "AGENT_CANON_COMMIT_REQUEST_WORKFLOW_PATH=agents/workflows/agent-canon-pr-workflow.md",
+            script,
+        )
+        self.assertIn(
+            'COMMIT_REQUEST_EVIDENCE_DIGEST="$(sha256sum "${AGENT_CANON_COMMIT_REQUEST_WORKFLOW_PATH}"',
+            script,
+        )
+        self.assertNotIn('sync_agent_canon.sh" check || true', script)
+        self.assertIn('make -C "${CLONE_DIR}" agent-canon-check', script)
+        self.assertNotIn('make -C "${CLONE_DIR}" agent-checks', script)
         self.assertLess(
             script.index('attach_submodule_main_to_staged_pin "vendor/agent-canon"'),
             script.index('bash "${CLONE_TOOLS_ROOT}/sync_agent_canon.sh" check'),
