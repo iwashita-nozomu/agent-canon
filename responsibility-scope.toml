@@ -57,6 +57,28 @@ required_coverage = [
   "ROOT_AGENTS.md",
 ]
 
+# Dependency headers are required only on architecture, public-entrypoint,
+# build/dependency, and explicit ownership-boundary surfaces.  Ordinary prose,
+# generated evidence, and local state remain out of scope unless a caller
+# selects a path explicitly.
+dependency_header_surfaces = [
+  "AGENTS.md",
+  "ROOT_AGENTS.md",
+  "responsibility-scope.toml",
+  "agent-canon-environment.toml",
+  "agents/canonical/**",
+  "agents/workflows/**",
+  "documents/design/**",
+  "documents/runtime/**",
+  "tools/agent_tools/**",
+  "tools/ci/**",
+  "tools/sync_agent_canon.sh",
+  "rust/**",
+  ".devcontainer/**",
+  ".github/workflows/**",
+  ".github/scripts/**",
+]
+
 [[import_rule]]
 source = "runtime-entrypoints"
 targets = [

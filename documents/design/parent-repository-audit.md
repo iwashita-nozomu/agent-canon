@@ -166,12 +166,15 @@ closure record を残して次の unit へ進みますが、全体を `pass` に
 | AgentCanon source root が見つからない | `agent_canon_source_root_missing` | `blocked`、編集なし |
 | unit file の required section/field が不正 | `parent_repository_audit_unit_invalid` | `failed`、該当 unit を選択しない |
 | unit path/scope が source root または parent root 外へ escape | `parent_repository_audit_path_escape` | `failed`、編集なし |
-| tracked tree に未割当 path がある | `parent_repository_audit_uncovered_tracked_path` | `failed`、監査開始前に停止 |
+| 明示 selected scope に未割当 path がある | `parent_repository_audit_uncovered_tracked_path` | `failed`、選択 scope の readback を失敗 |
 | owner skill/worker の修正が blocked | `parent_repository_audit_repair_blocked` | unit を閉じず次 unit、全体 `blocked` |
 
-`uncovered_tracked_path` は親 Git の `git ls-files -z` と unit の `Scope Patterns` の照合で
-判定し、submodule 内部 tree は parent tracked universe に含めません。overlap は failure
-ではなく、unit の primary invariant/cross-reference を output する証拠です。
+`uncovered_tracked_path` は `--scope` で明示された親 Git path と unit の `Scope Patterns`
+の照合でだけ判定します（`python3 tools/agent_tools/parent_repository_audit.py check --scope`）。scope なしの check は tracked tree を read-only evidence として
+読みますが、全 tree を audit unit の ownership universe にはしません。submodule 内部 tree
+は parent tracked universe に含めません。unit の scope pattern は選択用 evidence であり、
+一般 path owner/class の判定や overlap の source ではありません。owner/class は
+`responsibility-scope.toml` を唯一の正本とします。
 
 ## Canonical audit unit map
 
@@ -182,29 +185,26 @@ unit を同じ変更で更新しません。
 
 | Unit file | owner responsibility | 主対象 |
 | --- | --- | --- |
-| `audit-unit/repository-structure.md` | tracked tree と directory responsibility | 全 tracked tree、README、AGENTS、scope |
+| `audit-unit/repository-structure.md` | structure required path kind | `documents/structure/**` と責務 scope の存在/kind |
 | `audit-unit/ownership-root-views.md` | AgentCanon pin と source/view ownership | `vendor/agent-canon`、root views、`.codex`、`.agents` |
 | `audit-unit/environment-containers.md` | Docker/devcontainer と環境境界 | `docker/`、`.devcontainer/`、environment manifests |
 | `audit-unit/dependency-integrity.md` | dependency header/graph と import boundary | headers、manifests、dependency tools |
 | `audit-unit/code-type-boundaries.md` | code API/type/runtime boundary | implementation、public APIs、static type tools |
-| `audit-unit/oop-responsibility.md` | OOP responsibility と reuse boundary | class/module/helper、OOP evidence |
 | `audit-unit/tests-and-oracles.md` | tests の必要十分性と oracle | tests、fixtures、test commands |
 | `audit-unit/docs-design-trace.md` | docs、design、DIC trace | README、documents、design/implementation trace |
 | `audit-unit/ci-hooks-skills.md` | CI execution、hooks、public skill capability routing | `.github/workflows/`、`.codex/hooks`、`agents/skills/` |
 | `audit-unit/templates-generated-boundaries.md` | templates と generated/evidence boundary | `templates/`、reports、inventories、run artifacts |
-| `audit-unit/git-pr-lifecycle.md` | Git remote、branch、PR authority、commit/push lifecycle | `.git` state、remote、`.github/PULL_REQUEST_TEMPLATE*` |
-| `audit-unit/audit-evidence-closeout.md` | audit state、finding closure、handoff evidence | parent-specific audit records、closeout/readback |
+| `audit-unit/ownership-root-views.md` | Git remote、branch、PR authority、commit/push lifecycle | `.git` state、remote、parent integration receipt |
+| `audit-unit/templates-generated-boundaries.md` | audit state、finding closure、handoff evidence | parent-specific audit records、closeout/readback |
 
-### 全 tracked tree の coverage
+### Structure と selected-scope coverage
 
-`repository-structure.md` は親 Git の `git ls-files -z` の全結果を最初の evidence universe
-として記録します。親が `vendor/agent-canon` submodule を持つ場合、その entry は親の
-tracked gitlink として扱い、submodule 内部の file を親 tree に混ぜません。tool は全 tracked
-path を unit の `Scope Patterns` に照合し、`uncovered_paths` が一つでもあれば failure を
-返します。複数 unit に一致する path は許可しますが、各 unit の `Related Change Surfaces`
-に primary invariant と cross-reference を書き、`overlap_paths` と owner を output します。
-ignored/generated file は tracked tree の代替にせず、対象に含める場合は
-`templates-generated-boundaries.md` が evidence boundary を明示します。
+`repository-structure.md` は required path の存在と kind を確認します。
+`responsibility-scope.toml` が一般 path owner/class の唯一の source であり、`python3 tools/agent_tools/parent_repository_audit.py check` は親 Git の
+tracked tree を別の ownership map に変換しません（`python3 tools/agent_tools/parent_repository_audit.py check`）。tool は scope なしでは tracked tree を
+証拠として readback するだけです。`--scope` を明示した場合だけ、その selected paths を
+unit の `Scope Patterns` に照合し、`uncovered_paths` があれば failure を返します。
+unit pattern の重なりは ownership evidence ではなく、`python3 tools/agent_tools/parent_repository_audit.py check --scope` でも owner map の二重判定を行いません。
 
 ## 既存 checklist の移行 map
 
@@ -216,22 +216,22 @@ reader route `documents/parent-repository-audit/README.md` への薄い参照ま
 | legacy section | 移行先 unit | 判定 |
 | --- | --- | --- |
 | `この文書の読み方` | `README.md` | unit の列挙順、source/evidence 境界、finding closure の reader route |
-| `監査メタ情報` | `audit-evidence-closeout.md` | 日付、監査者、対象 root/branch/commit、結果、block 理由を親 evidence に保持 |
-| `1. Git と Remote` の各 checkbox/command | `git-pr-lifecycle.md` | remote、branch、HEAD、push の primary invariant |
+| `監査メタ情報` | `templates-generated-boundaries.md` | 日付、監査者、対象 root/branch/commit、結果、block 理由を親 evidence に保持 |
+| `1. Git と Remote` の各 checkbox/command | `ownership-root-views.md` | remote、branch、HEAD、push の primary invariant |
 | `2. AgentCanon Latest と Submodule` | `ownership-root-views.md` | source/view invariant へ移行 |
 | `3. MCP と Codex Runtime` | `ownership-root-views.md` | root runtime ownership へ移行 |
 | `4. Runtime Surface と Link 構成` | `ownership-root-views.md` | root-view readback へ移行 |
 | `5. Dependency Header と Graph` | `dependency-integrity.md` | header/graph invariant へ移行 |
 | `6. 文書と README 導線` | `docs-design-trace.md` | reader/design trace へ移行 |
-| `7. Workflow、Skill、Eval、Goal` | `ci-hooks-skills.md` と `audit-evidence-closeout.md` | route と evidence lifecycle を分離 |
+| `7. Workflow、Skill、Eval、Goal` | `ci-hooks-skills.md` と `templates-generated-boundaries.md` | route と evidence lifecycle を分離 |
 | `8. Tooling と静的解析` | `code-type-boundaries.md`、`tests-and-oracles.md` | code/static と test oracle を分離 |
 | `9. Docker、Dev Container、Jupyter` | `environment-containers.md` | image差分buildを除外し静的契約へ移行 |
-| `10. 再利用、OOP、数理と実装境界` | `oop-responsibility.md` と `code-type-boundaries.md` | owner boundary と code contract を分離 |
-| `11. 結果ログ、可視化、Artifact` | `templates-generated-boundaries.md` と `audit-evidence-closeout.md` | generated と parent evidence を分離 |
-| `12. 派生 Repo 監査` | `ownership-root-views.md`、`git-pr-lifecycle.md` | pin と publication lifecycle を分離 |
+| `10. 再利用、OOP、数理と実装境界` | `code-type-boundaries.md` | one implementation/verification path for type, OOP, and code contract |
+| `11. 結果ログ、可視化、Artifact` | `templates-generated-boundaries.md` と `templates-generated-boundaries.md` | generated と parent evidence を分離 |
+| `12. 派生 Repo 監査` | `ownership-root-views.md`、`ownership-root-views.md` | pin と publication lifecycle を分離 |
 | `13. GitHub Actions` の各 checkbox/command | `ci-hooks-skills.md` | workflow YAML、permissions、concurrency、checkout、CI readback |
-| `13. PR Checklist` の各 checkbox/command | `git-pr-lifecycle.md` | PR template、authority、review、merge/push evidence |
-| `14. Push と完了判定`、`最終監査判定` | `audit-evidence-closeout.md`、`git-pr-lifecycle.md` | close condition と push evidence を分離 |
+| `13. PR Checklist` の各 checkbox/command | `ownership-root-views.md` | PR template、authority、review、merge/push evidence |
+| `14. Push と完了判定`、`最終監査判定` | `templates-generated-boundaries.md`、`ownership-root-views.md` | close condition と push evidence を分離 |
 
 移行後に legacy checklist `documents/repository-audit-checklist.md` と canonical unit が同じ invariant の正本にならないよう、親側
 の legacy file は unit path `documents/parent-repository-audit/README.md` の reader route だけを持ちます。親固有の未移行項目が見つかった
@@ -241,16 +241,16 @@ reader route `documents/parent-repository-audit/README.md` への薄い参照ま
 
 | legacy command family | 移行先の Validation | 親側 evidence |
 | --- | --- | --- |
-| `git status`、`git remote`、`git rev-parse`、`git log`、`git push` | `git-pr-lifecycle.md` | branch/HEAD/remote/push receipt |
+| `git status`、`git remote`、`git rev-parse`、`git log`、`git push` | `ownership-root-views.md` | branch/HEAD/remote/push receipt |
 | `git submodule status`、`ls-remote`、`sync_agent_canon.sh check` | `ownership-root-views.md` | pin/root-view readback |
 | `surface_manifest.py`、root `mcp` absence | `ownership-root-views.md` | forbidden legacy path receipt |
 | `run_repo_dependency_review.sh`、`check_dependency_headers.py`、graph checks | `dependency-integrity.md` | header/edge/graph receipt |
 | `make docs-check`、Markdown lint/math/link checks、README grep | `docs-design-trace.md` | docs checker and link readback |
-| workflow/eval/goal/convention commands | `ci-hooks-skills.md`、`audit-evidence-closeout.md` | route/lifecycle receipt |
-| pyright、ruff、pytest、static/OOP tools、vector search | `code-type-boundaries.md`、`oop-responsibility.md`、`tests-and-oracles.md` | targeted tool output and oracle receipt |
+| workflow/eval/goal/convention commands | `ci-hooks-skills.md`、`templates-generated-boundaries.md` | route/lifecycle receipt |
+| pyright、ruff、pytest、static/OOP tools、vector search | `code-type-boundaries.md`、`tests-and-oracles.md` | targeted tool output and oracle receipt |
 | Docker dependency validator、container config、pack print-only | `environment-containers.md` | static environment receipt; image差分build is excluded |
-| artifact/run-bundle/findings/visualization commands | `templates-generated-boundaries.md`、`audit-evidence-closeout.md` | parent-specific evidence path |
-| GitHub workflow YAML parse、PR template/AgentCanon workflow grep | `ci-hooks-skills.md`、`git-pr-lifecycle.md` | source PR / parent PR lane evidence |
+| artifact/run-bundle/findings/visualization commands | `templates-generated-boundaries.md`、`templates-generated-boundaries.md` | parent-specific evidence path |
+| GitHub workflow YAML parse、PR template/AgentCanon workflow grep | `ci-hooks-skills.md`、`ownership-root-views.md` | source PR / parent PR lane evidence |
 
 各 legacy checkbox は上表の unit file に同じ意味の invariant と close condition として移し、
 unit file に移せない親固有値は parent evidence の `deferred_with_issue` として closeout
@@ -268,25 +268,25 @@ unit が owner/理由を保持します。単に section 名だけをリンク�
 
 | Stable item ID | Legacy line | Exact legacy item | Exact audit unit |
 | --- | ---: | --- | --- |
-| PRA-M01 | 26 | 監査日: | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-M02 | 27 | 監査者: | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-M03 | 28 | 対象 repo: | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-M04 | 29 | 対象 branch: | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-M05 | 30 | 対象 commit: | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-M06 | 31 | 比較対象 remote: | `documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md` |
-| PRA-M07 | 32 | 監査結果: \\`pass\\` / \\`revise\\` / \\`blocked\\` | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-M08 | 33 | block 理由: | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
+| PRA-M01 | 26 | 監査日: | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-M02 | 27 | 監査者: | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-M03 | 28 | 対象 repo: | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-M04 | 29 | 対象 branch: | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-M05 | 30 | 対象 commit: | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-M06 | 31 | 比較対象 remote: | `documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md` |
+| PRA-M07 | 32 | 監査結果: \\`pass\\` / \\`revise\\` / \\`blocked\\` | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-M08 | 33 | block 理由: | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
 
 ### Checkbox items
 
 | Stable item ID | Legacy line | Exact legacy item | Exact audit unit |
 | --- | ---: | --- | --- |
-| PRA-C001 | 37 | \\`git status --short --branch --untracked-files=all\\` を確認した | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-C002 | 38 | 作業開始時点の dirty file を user 変更、生成物、今回変更に分類した | `documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md` |
-| PRA-C003 | 39 | \\`origin\\` が GitHub canonical repo を向いている | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-C004 | 40 | \\`main\\` が \\`origin/main\\` と意図通り一致している | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-C005 | 41 | push 先が GitHub canonical であることを確認した | `documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md` |
-| PRA-C006 | 42 | commit message に remote migration や AgentCanon pin 変更の理由が残っている | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
+| PRA-C001 | 37 | \\`git status --short --branch --untracked-files=all\\` を確認した | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-C002 | 38 | 作業開始時点の dirty file を user 変更、生成物、今回変更に分類した | `documents/parent-repository-audit/audit-unit/ownership-root-views.md` |
+| PRA-C003 | 39 | \\`origin\\` が GitHub canonical repo を向いている | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-C004 | 40 | \\`main\\` が \\`origin/main\\` と意図通り一致している | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-C005 | 41 | push 先が GitHub canonical であることを確認した | `documents/parent-repository-audit/audit-unit/ownership-root-views.md` |
+| PRA-C006 | 42 | commit message に remote migration や AgentCanon pin 変更の理由が残っている | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
 | PRA-C007 | 55 | \\`make agent-canon-ensure-latest\\` が pass している | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
 | PRA-C008 | 56 | \\`vendor/agent-canon\\` の pin が AgentCanon GitHub \\`main\\` と一致している | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
 | PRA-C009 | 57 | \\`.gitmodules\\` の \\`vendor/agent-canon.url\\` が GitHub canonical repo を向いている | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
@@ -323,17 +323,17 @@ unit が owner/理由を保持します。単に section 名だけをリンク�
 | PRA-C040 | 150 | \\`$agent-orchestration\\` が repo task の最初に呼ばれる構成になっている | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
 | PRA-C041 | 151 | task workflow が requirements、research、plan、design、implementation、review、closeout に分離されている | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
 | PRA-C042 | 152 | eval は skill、workflow、subagent prompt、config、memory の改善判断を対象にしている | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
-| PRA-C043 | 153 | eval 結果が artifacts または memory に蓄積される導線がある | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-C044 | 154 | \\`/goal\\` または \\`goal.md\\` 利用時に初期目標、default criteria、repo 固有 criteria が分離されている | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-C045 | 155 | adaptive improvement loop が反復ごとに評価、逸脱検出、prompt 修正、再評価を残す | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-C046 | 156 | subagent lifecycle が fresh task ごとに再起動され、closeout 前に close される | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
+| PRA-C043 | 153 | eval 結果が artifacts または memory に蓄積される導線がある | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-C044 | 154 | \\`/goal\\` または \\`goal.md\\` 利用時に初期目標、default criteria、repo 固有 criteria が分離されている | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-C045 | 155 | adaptive improvement loop が反復ごとに評価、逸脱検出、prompt 修正、再評価を残す | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-C046 | 156 | subagent lifecycle が fresh task ごとに再起動され、closeout 前に close される | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
 | PRA-C047 | 157 | 明示依頼なしの spawn を runtime 上位制約で強制しようとしていない | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
 | PRA-C048 | 170 | \\`make agent-checks\\` が pass している | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
 | PRA-C049 | 171 | \\`make ci\\` が pass している | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
 | PRA-C050 | 172 | Python 変更では \\`pyright\\`、\\`ruff\\`、\\`pytest\\` が pass している | documents/parent-repository-audit/audit-unit/tests-and-oracles.md |
 | PRA-C051 | 173 | C / C++ 変更では project-native configure、build、test が pass している | documents/parent-repository-audit/audit-unit/tests-and-oracles.md |
 | PRA-C052 | 174 | hardcoded number、static \\`Any\\`、log helper naming、OOP readability の tool が必要範囲で pass している | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
-| PRA-C053 | 175 | tool の重複実装や legacy 配置が OOP check 用など責務別に整理されている | `documents/parent-repository-audit/audit-unit/oop-responsibility.md` |
+| PRA-C053 | 175 | tool の重複実装や legacy 配置が OOP check 用など責務別に整理されている | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
 | PRA-C054 | 176 | 新規 tool は既存 tool の option 追加や薄い adapter で済まない理由が記録されている | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
 | PRA-C055 | 177 | vector search smoke で tool discovery が機能している | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
 | PRA-C056 | 192 | \\`gh\\` CLI は Docker image に焼かれず、\\`vendor/agent-canon/.devcontainer/post-create.sh\\` が workspace mount 後に導入している | documents/parent-repository-audit/audit-unit/environment-containers.md |
@@ -351,24 +351,24 @@ unit が owner/理由を保持します。単に section 名だけをリンク�
 | PRA-C068 | 204 | Dockerfile に Template / AgentCanon の machine-local remote path が焼き込まれていない | documents/parent-repository-audit/audit-unit/environment-containers.md |
 | PRA-C069 | 205 | \\`docker/requirements.txt\\`、\\`docker/README.md\\`、\\`.devcontainer/\\` が矛盾していない | documents/parent-repository-audit/audit-unit/environment-containers.md |
 | PRA-C070 | 206 | Docker dependency validator が pass している | documents/parent-repository-audit/audit-unit/environment-containers.md |
-| PRA-C071 | 219 | 新規実装前に既存 helper、既存 tool、既存 workflow、既存 fixture を探索している | documents/parent-repository-audit/audit-unit/oop-responsibility.md |
-| PRA-C072 | 220 | \\`Reuse Survey\\` に見た path、再利用した path、不採用候補、不足理由が残っている | documents/parent-repository-audit/audit-unit/oop-responsibility.md |
-| PRA-C073 | 221 | OOP 的に不要な state、member、helper、wrapper、整形関数を増やしていない | documents/parent-repository-audit/audit-unit/oop-responsibility.md |
+| PRA-C071 | 219 | 新規実装前に既存 helper、既存 tool、既存 workflow、既存 fixture を探索している | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
+| PRA-C072 | 220 | \\`Reuse Survey\\` に見た path、再利用した path、不採用候補、不足理由が残っている | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
+| PRA-C073 | 221 | OOP 的に不要な state、member、helper、wrapper、整形関数を増やしていない | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
 | PRA-C074 | 222 | \\`None\\` runtime 判定で曖昧にせず、型で静的解析へ渡している | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
 | PRA-C075 | 223 | \\`Any\\` が public boundary や新規 code path に増えていない | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
 | PRA-C076 | 224 | 数理上の object、algorithm、implementation boundary が一致している | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
 | PRA-C077 | 225 | hardcoded number が定数、設定、または根拠付き literal として整理されている | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
-| PRA-C078 | 226 | 可読性評価は tool 出力と reviewer judgement を分けて扱っている | `documents/parent-repository-audit/audit-unit/oop-responsibility.md` |
+| PRA-C078 | 226 | 可読性評価は tool 出力と reviewer judgement を分けて扱っている | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
 | PRA-C079 | 240 | run bundle は \\`reports/agents/<run-id>/\\` に保存されている | `documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md` |
-| PRA-C080 | 241 | \\`user_request_contract.md\\` に must-do、must-not-do、completion-evidence clause がある | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-C081 | 242 | \\`schedule.md\\` が空でない | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-C082 | 243 | \\`work_log.md\\` が作業開始から closeout まで更新されている | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-C083 | 244 | \\`verification.txt\\` が \\`status=pass\\` になっている | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-C084 | 245 | \\`closeout_gate.md\\` が user completion unlocked になっている | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-C085 | 246 | eval、monitoring、feedback、改善判断の保存先が明示されている | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
+| PRA-C080 | 241 | \\`user_request_contract.md\\` に must-do、must-not-do、completion-evidence clause がある | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-C081 | 242 | \\`schedule.md\\` が空でない | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-C082 | 243 | \\`work_log.md\\` が作業開始から closeout まで更新されている | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-C083 | 244 | \\`verification.txt\\` が \\`status=pass\\` になっている | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-C084 | 245 | \\`closeout_gate.md\\` が user completion unlocked になっている | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-C085 | 246 | eval、monitoring、feedback、改善判断の保存先が明示されている | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
 | PRA-C086 | 247 | 可視化対象の結果ログが \\`reports/\\`、\\`notes/\\`、\\`memory/\\` のどこにあるか説明できる | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
 | PRA-C087 | 258 | 派生 repo の \\`vendor/agent-canon\\` pin が GitHub AgentCanon \\`main\\` と一致している | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
-| PRA-C088 | 259 | 派生 repo 固有の AgentCanon 差分がある場合、dedicated GitHub branch と AgentCanon PR に分離されている | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
+| PRA-C088 | 259 | 派生 repo 固有の AgentCanon 差分がある場合、dedicated GitHub branch と AgentCanon PR に分離されている | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
 | PRA-C089 | 260 | Template 由来 repo では root surface が Template と構造的に一致している | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
 | PRA-C090 | 261 | repo 固有の差分は \\`documents/\\`、project code、config に限定され、shared canon に混入していない | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
 | PRA-C091 | 262 | \\`make agent-canon-ensure-latest\\` と \\`bash tools/agent-canon/sync_agent_canon.sh check\\` が派生 repo でも pass している | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
@@ -377,28 +377,28 @@ unit が owner/理由を保持します。単に section 名だけをリンク�
 | PRA-C094 | 275 | \\`.github/workflows/docker-build.yml\\` が submodule-aware checkout、最小権限、concurrency を持つ | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
 | PRA-C095 | 276 | \\`.github/workflows/agent-coordination.yml\\` は AgentCanon 正本から root copy へ同期されている | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
 | PRA-C096 | 277 | Agent coordination workflow の各 job が AgentCanon submodule を checkout する | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
-| PRA-C097 | 278 | Template default PR checklist が repo-local 変更、AgentCanon pin、Docker、GitHub workflow、validation evidence を分けている | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-C098 | 279 | Template 側 AgentCanon PR checklist が shared canon source、root surface sync、GitHub evidence を要求している | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-C099 | 280 | Standalone AgentCanon repo 用の独立 PR checklist が \\`vendor/agent-canon/.github/PULL_REQUEST_TEMPLATE.md\\` にある | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-C100 | 281 | GitHub automation と PR checklist が Codex workflow から辿れる | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-C101 | 282 | PR checklist が未実行 command を pass と書かない運用になっている | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-C102 | 299 | 変更を commit 済み | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-C103 | 300 | GitHub canonical remote へ push 済み | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-C104 | 301 | \\`git status --short --branch --untracked-files=all\\` が clean | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-C105 | 302 | \\`git log --oneline --decorate -5\\` で対象 commit が確認できる | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-C106 | 303 | 未完了の planned work、review finding、validation、commit、push、follow-up 判断が残っていない | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-C107 | 304 | user-facing completion report に未実行 check を pass と書いていない | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-C108 | 316 | \\`pass\\`: 監査対象は現行規約、latest pin、検証、文書導線を満たしている | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-C109 | 317 | \\`revise\\`: 修正すれば pass にできる項目がある | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
-| PRA-C110 | 318 | \\`blocked\\`: auth、network、toolchain、未解決 conflict など監査を完了できない blocker がある | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
+| PRA-C097 | 278 | Template default PR checklist が repo-local 変更、AgentCanon pin、Docker、GitHub workflow、validation evidence を分けている | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-C098 | 279 | Template 側 AgentCanon PR checklist が shared canon source、root surface sync、GitHub evidence を要求している | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-C099 | 280 | Standalone AgentCanon repo 用の独立 PR checklist が \\`vendor/agent-canon/.github/PULL_REQUEST_TEMPLATE.md\\` にある | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-C100 | 281 | GitHub automation と PR checklist が Codex workflow から辿れる | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-C101 | 282 | PR checklist が未実行 command を pass と書かない運用になっている | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-C102 | 299 | 変更を commit 済み | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-C103 | 300 | GitHub canonical remote へ push 済み | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-C104 | 301 | \\`git status --short --branch --untracked-files=all\\` が clean | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-C105 | 302 | \\`git log --oneline --decorate -5\\` で対象 commit が確認できる | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-C106 | 303 | 未完了の planned work、review finding、validation、commit、push、follow-up 判断が残っていない | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-C107 | 304 | user-facing completion report に未実行 check を pass と書いていない | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-C108 | 316 | \\`pass\\`: 監査対象は現行規約、latest pin、検証、文書導線を満たしている | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-C109 | 317 | \\`revise\\`: 修正すれば pass にできる項目がある | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
+| PRA-C110 | 318 | \\`blocked\\`: auth、network、toolchain、未解決 conflict など監査を完了できない blocker がある | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
 ### Command items
 
 | Stable item ID | Legacy line | Exact legacy command | Exact audit unit |
 | --- | ---: | --- | --- |
-| PRA-X001 | 47 | git status --short --branch --untracked-files=all | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-X002 | 48 | git remote -v | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-X003 | 49 | git rev-parse HEAD | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-X004 | 50 | git rev-parse origin/main | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
+| PRA-X001 | 47 | git status --short --branch --untracked-files=all | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-X002 | 48 | git remote -v | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-X003 | 49 | git rev-parse HEAD | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-X004 | 50 | git rev-parse origin/main | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
 | PRA-X005 | 66 | `make agent-canon-ensure-latest` | `documents/parent-repository-audit/audit-unit/ownership-root-views.md` |
 | PRA-X006 | 67 | git submodule status vendor/agent-canon | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
 | PRA-X007 | 68 | git config -f .gitmodules submodule.vendor/agent-canon.url | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
@@ -421,7 +421,7 @@ unit が owner/理由を保持します。単に section 名だけをリンク�
 | PRA-X024 | 144 | python3 tools/agent-canon/docs/check_markdown_math.py documents/repository-audit-checklist.md | documents/parent-repository-audit/audit-unit/docs-design-trace.md |
 | PRA-X025 | 145 | git grep -n -E "TODO\|FIXME\|old\|legacy\|subtree" -- README.md documents agents tools \|\| true | documents/parent-repository-audit/audit-unit/docs-design-trace.md |
 | PRA-X026 | 162 | python3 tools/agent-canon/agent_tools/evaluate_skill_workflow_prompts.py --help | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
-| PRA-X027 | 163 | python3 tools/agent-canon/agent_tools/goal_loop.py --help | documents/parent-repository-audit/audit-unit/audit-evidence-closeout.md |
+| PRA-X027 | 163 | python3 tools/agent-canon/agent_tools/goal_loop.py --help | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
 | PRA-X028 | 164 | python3 tools/agent-canon/agent_tools/check_convention_compliance.py | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
 | PRA-X029 | 165 | git grep -n -E "agent-orchestration\|adaptive-improvement-loop\|goal\|eval\|subagent_lifecycle" -- agents documents tools AGENTS.md \|\| true | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
 | PRA-X030 | 182 | make agent-checks | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
@@ -436,18 +436,18 @@ unit が owner/理由を保持します。単に section 名だけをリンク�
 | PRA-X039 | 214 | python3 tools/agent-canon/ci/run_container_pack.py --pack docker/packs/default.toml --print-only | documents/parent-repository-audit/audit-unit/environment-containers.md |
 | PRA-X040 | 231 | python3 tools/agent-canon/agent_tools/check_static_any.py --help | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
 | PRA-X041 | 232 | python3 tools/agent-canon/agent_tools/check_hardcoded_numbers.py --help | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
-| PRA-X042 | 233 | python3 tools/agent-canon/oop/python/readability.py --help | documents/parent-repository-audit/audit-unit/oop-responsibility.md |
-| PRA-X043 | 234 | python3 tools/agent-canon/agent_tools/oop_rule_inventory.py --help | documents/parent-repository-audit/audit-unit/oop-responsibility.md |
+| PRA-X042 | 233 | python3 tools/agent-canon/oop/python/readability.py --help | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
+| PRA-X043 | 234 | python3 tools/agent-canon/agent_tools/oop_rule_inventory.py --help | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
 | PRA-X044 | 235 | git grep -n -E "Any\|None\|TODO\|FIXME\|_log\|hardcoded" -- python tests tools \|\| true | documents/parent-repository-audit/audit-unit/code-type-boundaries.md |
 | PRA-X045 | 252 | find reports/agents -maxdepth 2 -type f \| sort \| tail -50 | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
 | PRA-X046 | 253 | git grep -n -E "status=pass\|user_completion_report=unlocked\|eval\|feedback\|monitoring" -- notes memory agents documents \|\| true | documents/parent-repository-audit/audit-unit/templates-generated-boundaries.md |
-| PRA-X047 | 267 | git remote -v | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
+| PRA-X047 | 267 | git remote -v | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
 | PRA-X048 | 268 | git submodule status vendor/agent-canon | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
 | PRA-X049 | 287 | python3 - <<'PY' <br> from pathlib import Path <br> import yaml <br> for path in sorted(Path('.github/workflows').glob('*.yml')): <br> yaml.safe_load(path.read_text()) <br> print(f'{path}: yaml=pass') <br> PY | documents/parent-repository-audit/audit-unit/ci-hooks-skills.md |
-| PRA-X050 | 294 | git grep -n -E "submodules: false\|checkout_agent_canon_submodule\|permissions:\|concurrency:\|PULL_REQUEST_TEMPLATE\|agent-canon-pr-workflow" -- .github vendor/agent-canon/.github agents documents \|\| true | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-X051 | 309 | git log --oneline --decorate -5 | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-X052 | 310 | git status --short --branch --untracked-files=all | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
-| PRA-X053 | 311 | git push origin main | documents/parent-repository-audit/audit-unit/git-pr-lifecycle.md |
+| PRA-X050 | 294 | git grep -n -E "submodules: false\|checkout_agent_canon_submodule\|permissions:\|concurrency:\|PULL_REQUEST_TEMPLATE\|agent-canon-pr-workflow" -- .github vendor/agent-canon/.github agents documents \|\| true | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-X051 | 309 | git log --oneline --decorate -5 | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-X052 | 310 | git status --short --branch --untracked-files=all | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
+| PRA-X053 | 311 | git push origin main | documents/parent-repository-audit/audit-unit/ownership-root-views.md |
 
 移行 coverage: metadata=8, checkbox=110, command=53, total=171。
 
@@ -484,8 +484,8 @@ review し、実装を行いません。
 初回の targeted validation は次です。
 
 1. `python3 tools/agent_tools/parent_repository_audit.py check --root <parent-root>` で unit
-   path、required sections、scope patterns、tracked path coverage、overlap、source-root
-   resolution `tools/agent_tools/parent_repository_audit.py` を確認する。
+   path、required sections、selected-scope coverage、source-root resolution
+   `tools/agent_tools/parent_repository_audit.py` を確認する。
 2. `python3 -m pytest tests/agent_tools/test_parent_repository_audit.py -q` で enumeration と
    contract failure semantics `tests/agent_tools/test_parent_repository_audit.py` を確認する。
 3. `python3 tools/agent_tools/check_dependency_headers.py --changed` と

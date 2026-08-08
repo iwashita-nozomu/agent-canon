@@ -27,6 +27,7 @@ from agent_canon_source_root import SourceRootFailure, resolve_agent_canon_sourc
 UNIT_ROOT: Final = Path("documents/parent-repository-audit/audit-unit")
 SCHEMA: Final = "agent_canon.parent_repository_audit.v1"
 AuditStatus = Literal["pass", "failed", "blocked"]
+UnitStatus = Literal["pass", "closed", "failed", "deferred", "blocked"]
 REQUIRED_SECTIONS: Final = (
     "Owner Responsibility",
     "Invariant",
@@ -66,6 +67,17 @@ class AuditUnit:
 
 
 @dataclass(frozen=True)
+class AuditCoverage:
+    """Own tracked-path evidence without making it an ownership map."""
+
+    tracked_path_count: int | None = None
+    uncovered_paths: tuple[str, ...] = ()
+    uncovered_path_count: int = 0
+    overlap_path_count: int = 0
+    unit_statuses: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class AuditPayload:
     """Own the audit result fields and their text/JSON projections."""
 
@@ -77,11 +89,7 @@ class AuditPayload:
     unit_paths: tuple[str, ...] | None = None
     unit_records: tuple[AuditUnit, ...] | None = None
     scope_paths: tuple[str, ...] | None = None
-    tracked_path_count: int | None = None
-    uncovered_paths: tuple[str, ...] | None = None
-    overlap_paths: tuple[tuple[str, tuple[str, ...]], ...] | None = None
-    uncovered_path_count: int | None = None
-    overlap_path_count: int | None = None
+    coverage: AuditCoverage = AuditCoverage()
 
     def to_json_dict(self) -> dict[str, object]:
         """Convert the owned result into the stable JSON packet shape."""
@@ -94,9 +102,9 @@ class AuditPayload:
             ("failure_detail", self.failure_detail),
             ("source_root", self.source_root),
             ("parent_root", self.parent_root),
-            ("tracked_path_count", self.tracked_path_count),
-            ("uncovered_path_count", self.uncovered_path_count),
-            ("overlap_path_count", self.overlap_path_count),
+            ("tracked_path_count", self.coverage.tracked_path_count),
+            ("uncovered_path_count", self.coverage.uncovered_path_count),
+            ("overlap_path_count", self.coverage.overlap_path_count),
         )
         for key, value in optional_values:
             if value is not None:
@@ -107,12 +115,11 @@ class AuditPayload:
             payload["unit_records"] = [asdict(unit) for unit in self.unit_records]
         if self.scope_paths is not None:
             payload["scope_paths"] = list(self.scope_paths)
-        if self.uncovered_paths is not None:
-            payload["uncovered_paths"] = list(self.uncovered_paths)
-        if self.overlap_paths is not None:
-            payload["overlap_paths"] = {
-                path: list(unit_ids) for path, unit_ids in self.overlap_paths
-            }
+        payload["uncovered_paths"] = list(self.coverage.uncovered_paths)
+        # Deprecated compatibility shape; ownership overlap is no longer
+        # classified here and responsibility-scope is the sole owner map.
+        payload["overlap_paths"] = {}
+        payload["unit_statuses"] = list(self.coverage.unit_statuses)
         return payload
 
 
@@ -149,6 +156,11 @@ def _parse_patterns(section: str, *, path: Path) -> tuple[str, ...]:
             f"missing scope pattern: {path}",
         )
     for pattern in patterns:
+        if pattern == "all-tracked":
+            raise AuditFailure(
+                "parent_repository_audit_unit_invalid",
+                f"retired all-tracked fallback pattern: {path}",
+            )
         pattern_path = Path(pattern)
         if pattern.startswith("/") or pattern.startswith("~") or ".." in pattern_path.parts:
             raise AuditFailure(
@@ -156,6 +168,24 @@ def _parse_patterns(section: str, *, path: Path) -> tuple[str, ...]:
                 f"pattern={pattern} unit={path}",
             )
     return patterns
+
+
+def final_audit_status(unit_statuses: Sequence[str]) -> str:
+    """Aggregate unit receipts without promoting failed work to ``closed``.
+
+    ``closed`` is a positive receipt for units whose checks completed.  A
+    failed or deferred check is always the final failure state, even if a
+    caller also supplied a closed receipt for another unit.  Blocked work is
+    kept distinct so the parent can route the next owner action.
+    """
+    statuses = {status for status in unit_statuses if status}
+    if statuses & {"failed", "deferred"}:
+        return "failed"
+    if "blocked" in statuses:
+        return "blocked"
+    if statuses and statuses <= {"pass", "closed"}:
+        return "closed"
+    return "failed"
 
 
 def _load_units(source_root: Path) -> tuple[AuditUnit, ...]:
@@ -217,8 +247,8 @@ def _load_units(source_root: Path) -> tuple[AuditUnit, ...]:
     return tuple(units)
 
 
-def _tracked_paths(parent_root: Path) -> tuple[str, ...]:
-    """Read the parent Git tracked tree without entering a submodule."""
+def git_tracked_bytes(parent_root: Path) -> bytes:
+    """Read raw parent Git path evidence without entering a submodule."""
     result = subprocess.run(
         ["git", "-C", str(parent_root), "ls-files", "-z"],
         check=False,
@@ -230,8 +260,13 @@ def _tracked_paths(parent_root: Path) -> tuple[str, ...]:
             "parent_repository_audit_parent_git_missing",
             detail or f"git ls-files failed: {parent_root}",
         )
+    return result.stdout
+
+
+def _decode_tracked_paths(raw_output: bytes, parent_root: Path) -> tuple[str, ...]:
+    """Decode NUL-separated Git path evidence into stable parent-relative paths."""
     try:
-        decoded = result.stdout.decode("utf-8")
+        decoded = raw_output.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise AuditFailure(
             "parent_repository_audit_parent_git_invalid",
@@ -270,13 +305,6 @@ def _scope_paths(parent_root: Path, tracked: Sequence[str], scopes: Sequence[str
     return tuple(sorted(selected))
 
 
-def _matches(pattern: str, tracked_path: str) -> bool:
-    """Match one unit pattern against one parent-relative tracked path."""
-    if pattern == "all-tracked":
-        return True
-    return fnmatch.fnmatchcase(tracked_path, pattern)
-
-
 def _unit_matches(units: Iterable[AuditUnit], paths: Sequence[str]) -> dict[str, tuple[str, ...]]:
     """Return stable unit IDs matched by each tracked path."""
     matches: dict[str, tuple[str, ...]] = {}
@@ -284,7 +312,9 @@ def _unit_matches(units: Iterable[AuditUnit], paths: Sequence[str]) -> dict[str,
         matching = tuple(
             unit.unit_id
             for unit in units
-            if any(_matches(pattern, path) for pattern in unit.scope_patterns)
+            if any(
+                fnmatch.fnmatchcase(path, pattern) for pattern in unit.scope_patterns
+            )
         )
         matches[path] = matching
     return matches
@@ -315,17 +345,22 @@ def _payload_text(payload: AuditPayload) -> str:
         ("failure_code", payload.failure_code),
         ("source_root", payload.source_root),
         ("parent_root", payload.parent_root),
-        ("tracked_path_count", payload.tracked_path_count),
-        ("uncovered_path_count", payload.uncovered_path_count),
-        ("overlap_path_count", payload.overlap_path_count),
+        ("tracked_path_count", payload.coverage.tracked_path_count),
+        ("uncovered_path_count", payload.coverage.uncovered_path_count),
+        ("overlap_path_count", payload.coverage.overlap_path_count),
     )
     for key, value in optional_values:
         if value is not None:
             lines.append(f"PARENT_REPOSITORY_AUDIT_{key.upper()}={value}")
     for path in payload.unit_paths or ():
         lines.append(f"PARENT_REPOSITORY_AUDIT_UNIT={path}")
-    for path in payload.uncovered_paths or ():
+    for path in payload.coverage.uncovered_paths:
         lines.append(f"PARENT_REPOSITORY_AUDIT_UNCOVERED={path}")
+    if payload.coverage.unit_statuses:
+        lines.append(
+            "PARENT_REPOSITORY_AUDIT_UNIT_STATUSES="
+            + ",".join(payload.coverage.unit_statuses)
+        )
     return "\n".join(lines)
 
 
@@ -352,13 +387,13 @@ def _run_list(args: argparse.Namespace) -> AuditPayload:
     """Enumerate selected units without auditing their parent tree."""
     source_root, units = _resolution_and_units()
     parent_root = Path(args.root).expanduser().resolve()
-    tracked = _tracked_paths(parent_root)
+    tracked = _decode_tracked_paths(git_tracked_bytes(parent_root), parent_root)
     scope_paths = _scope_paths(parent_root, tracked, args.scope)
     selected = _select_units(units, scope_paths, bool(args.scope))
     return replace(
         _base_payload(source_root, parent_root, selected),
         scope_paths=tuple(scope_paths),
-        tracked_path_count=len(tracked),
+        coverage=AuditCoverage(tracked_path_count=len(tracked)),
     )
 
 
@@ -366,27 +401,48 @@ def _run_check(args: argparse.Namespace) -> AuditPayload:
     """Validate unit contracts and tracked-tree coverage."""
     source_root, units = _resolution_and_units()
     parent_root = Path(args.root).expanduser().resolve()
-    tracked = _tracked_paths(parent_root)
+    tracked = _decode_tracked_paths(git_tracked_bytes(parent_root), parent_root)
     scope_paths = _scope_paths(parent_root, tracked, args.scope)
     selected = _select_units(units, scope_paths, bool(args.scope))
-    matches = _unit_matches(selected, scope_paths)
-    uncovered = tuple(path for path, values in matches.items() if not values)
-    overlaps = {
-        path: list(values) for path, values in matches.items() if len(values) > 1
-    }
+    matches = _unit_matches(selected, scope_paths) if args.scope else {}
+    # A full audit reads the parent tracked tree as evidence, but structure
+    # ownership is supplied by the parent's responsibility-scope manifest.
+    # Only an explicitly selected scope has a closed-world coverage oracle;
+    # the retired all-tracked audit fallback never classifies the whole tree.
+    uncovered = (
+        tuple(path for path, values in matches.items() if not values)
+        if args.scope
+        else ()
+    )
+    requested_statuses = tuple(args.unit_status)
+    aggregate_status = (
+        final_audit_status(requested_statuses) if requested_statuses else "closed"
+    )
+    audit_status: AuditStatus
+    if uncovered or aggregate_status == "failed":
+        audit_status = "failed"
+    elif aggregate_status == "blocked":
+        audit_status = "blocked"
+    else:
+        audit_status = "pass"
     return replace(
         _base_payload(source_root, parent_root, selected),
-        status="failed" if uncovered else "pass",
+        status=audit_status,
         scope_paths=tuple(scope_paths),
-        tracked_path_count=len(scope_paths),
-        uncovered_paths=tuple(uncovered),
-        overlap_paths=tuple(
-            (path, tuple(unit_ids)) for path, unit_ids in overlaps.items()
+        coverage=AuditCoverage(
+            tracked_path_count=len(scope_paths),
+            uncovered_paths=tuple(uncovered),
+            uncovered_path_count=len(uncovered),
+            unit_statuses=requested_statuses,
         ),
-        uncovered_path_count=len(uncovered),
-        overlap_path_count=len(overlaps),
         failure_code=(
-            "parent_repository_audit_uncovered_tracked_path" if uncovered else None
+            "parent_repository_audit_uncovered_tracked_path"
+            if uncovered
+            else (
+                "parent_repository_audit_unit_status_failed"
+                if aggregate_status == "failed"
+                else None
+            )
         ),
     )
 
@@ -403,6 +459,13 @@ def build_parser() -> argparse.ArgumentParser:
             action="append",
             default=[],
             help="Parent-relative file or directory scope; repeatable.",
+        )
+        command_parser.add_argument(
+            "--unit-status",
+            action="append",
+            choices=("pass", "closed", "failed", "deferred", "blocked"),
+            default=[],
+            help="Record a unit receipt for final status aggregation; repeatable.",
         )
         command_parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser

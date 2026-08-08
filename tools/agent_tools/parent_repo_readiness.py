@@ -300,7 +300,7 @@ class SurfaceReadinessChecker:
         path = self.root / entry.path
         if entry.optional and not path.exists():
             return ()
-        if entry.surface_class == "project_content":
+        if entry.projection_kind == "project_content":
             if not path.is_dir():
                 return (
                     Finding(ERROR, "project_content", entry.path, "missing-directory"),

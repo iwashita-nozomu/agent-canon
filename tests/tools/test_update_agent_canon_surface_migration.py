@@ -228,7 +228,7 @@ class SurfaceMigrationTest(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
 
     def test_parent_root_resolution_and_devcontainer_migration(self) -> None:
-        """RootResolution and link-root preserve parent-owned regular paths."""
+        """RootResolution and the minimal projection preserve parent content."""
         root = self.clone_parent_fixture(activate_transition=True)
         root_resolution = load_root_resolution_module()
         resolution = root_resolution.resolve_agent_canon_source_root(root)
@@ -266,6 +266,7 @@ class SurfaceMigrationTest(unittest.TestCase):
         result = self.run_sync(root, "link-root")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("agent_canon_parent_submodule=projection_ready", result.stdout)
+        self.assertNotIn("update_transition[", result.stdout)
         self.assertTrue(parent_templates.is_dir())
         self.assertFalse(parent_templates.is_symlink())
         self.assertEqual(
@@ -276,72 +277,13 @@ class SurfaceMigrationTest(unittest.TestCase):
             tools_sentinel.read_text(encoding="utf-8"),
             "keep parent tools\n",
         )
-        self.assertIn(
-            "update_transition[retire-shared-root-tool-projections-v1]"
-            "[tools/sync_agent_canon.sh]=removed_known_legacy_identity",
-            result.stdout,
-        )
-        self.assertFalse((root / "tools" / "sync_agent_canon.sh").exists())
-        self.assertFalse((root / "tools" / "agent_tools").exists())
+        # Legacy tool files are parent-owned regular content and remain intact.
+        self.assertTrue((root / "tools" / "sync_agent_canon.sh").is_file())
+        self.assertTrue((root / "tools" / "agent_tools" / "surface_manifest.py").is_file())
+        self.assertTrue((root / "tools" / "agent_tools" / "update_agent_canon.sh").is_file())
         self.assertTrue((root / "tools" / "agent-canon").is_symlink())
-        self.assertTrue(
-            (
-                root
-                / "vendor"
-                / "agent-canon"
-                / "templates"
-                / "documents"
-                / "github"
-            ).is_dir()
-        )
-        projected_pr_template = (
-            root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md"
-        )
-        self.assertTrue(projected_pr_template.is_file())
-        projected_pr_template_text = projected_pr_template.read_text(encoding="utf-8")
-        for path_family in (
-            "tools/agent-canon",
-            "vendor/agent-canon/documents",
-            "issues",
-        ):
-            self.assertNotIn(f"{path_family}//", projected_pr_template_text)
-        consumer = subprocess.run(
-            [
-                sys.executable,
-                str(
-                    root
-                    / "vendor"
-                    / "agent-canon"
-                    / "tools"
-                    / "experiments"
-                    / "create_experiment_topic.py"
-                ),
-                "projection-consumer",
-                "--repo-root",
-                str(root),
-                "--dry-run",
-            ],
-            cwd=root,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
-        self.assertEqual(consumer.returncode, 0, consumer.stdout + consumer.stderr)
-        self.assertIn(
-            f"template_dir={root / 'vendor' / 'agent-canon' / 'templates' / 'experiments' / '_template'}",
-            consumer.stdout,
-        )
-        self.assertIn(
-            "canonical_readme_template="
-            f"{root / 'vendor' / 'agent-canon' / 'templates' / 'documents' / 'experiment' / 'README.template.md'}",
-            consumer.stdout,
-        )
         self.assertTrue(devcontainer.is_dir() and not devcontainer.is_symlink())
-        self.assertTrue((devcontainer / "devcontainer.json").is_symlink())
-        self.assertEqual(
-            os.readlink(devcontainer / "devcontainer.json"),
-            "../vendor/agent-canon/.devcontainer/devcontainer.json",
-        )
+        self.assertFalse((devcontainer / "devcontainer.json").exists())
         self.assertEqual(custom_hook.read_text(encoding="utf-8"), "#!/usr/bin/env bash\necho parent hook\n")
         self.assertTrue(os.access(custom_hook, os.X_OK))
         self.assertEqual(unknown_file.read_text(encoding="utf-8"), "keep this parent-owned file\n")
@@ -373,6 +315,19 @@ class SurfaceMigrationTest(unittest.TestCase):
             resolved_check.stdout + resolved_check.stderr,
         )
 
+    def test_empty_copy_and_regular_specs_preserve_parent_root(self) -> None:
+        """Zero copy/regular specs never resolve a blank target to the fixture root."""
+        root = self.clone_parent_fixture()
+        sentinel = root / "parent-sentinel.txt"
+        sentinel.write_text("preserve parent root\n", encoding="utf-8")
+
+        result = self.run_sync(root, "link-root")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(root.is_dir())
+        self.assertEqual(sentinel.read_text(encoding="utf-8"), "preserve parent root\n")
+        self.assertTrue((root / "vendor" / "agent-canon").is_dir())
+
     def test_diverged_transition_path_is_preserved_without_blocking(self) -> None:
         """Preserve parent-owned divergence while migrating every known identity."""
         root = self.clone_parent_fixture(activate_transition=True)
@@ -384,13 +339,9 @@ class SurfaceMigrationTest(unittest.TestCase):
         result = self.run_sync(root, "link-root")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(
-            "update_transition[retire-shared-root-tool-projections-v1]"
-            "[tools/agent_tools/surface_manifest.py]=parent_owned_preserved",
-            result.stdout,
-        )
-        self.assertFalse(exact_copy.exists())
-        self.assertFalse((root_tools / "agent_tools" / "update_agent_canon.sh").exists())
+        self.assertNotIn("update_transition[", result.stdout)
+        self.assertTrue(exact_copy.exists())
+        self.assertTrue((root_tools / "agent_tools" / "update_agent_canon.sh").exists())
         self.assertEqual(
             diverged.read_text(encoding="utf-8"),
             "# parent-owned implementation\n",
@@ -408,11 +359,7 @@ class SurfaceMigrationTest(unittest.TestCase):
         result = self.run_sync(root, "link-root")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn(
-            "update_transition[retire-shared-root-tool-projections-v1]"
-            "[tools/sync_agent_canon.sh]=parent_owned_preserved",
-            result.stdout,
-        )
+        self.assertNotIn("update_transition[", result.stdout)
         self.assertTrue(destination.is_file())
 
     def test_unknown_symlink_identity_is_preserved(self) -> None:
@@ -429,11 +376,7 @@ class SurfaceMigrationTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertTrue(destination.is_symlink())
         self.assertEqual(os.readlink(destination), target)
-        self.assertIn(
-            "update_transition[retire-shared-root-tool-projections-v1]"
-            "[tools/agent_tools/update_agent_canon.sh]=parent_owned_preserved",
-            result.stdout,
-        )
+        self.assertNotIn("update_transition[", result.stdout)
 
     def test_parent_can_own_retired_names_after_transition(self) -> None:
         """A completed transition does not create a permanent absent-path gate."""
@@ -486,11 +429,11 @@ class SurfaceMigrationTest(unittest.TestCase):
             },
         )
 
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn("all earlier moves were restored", result.stderr)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(count_path.exists())
         for path in LEGACY_ROOT_PROJECTIONS:
             self.assertTrue((root / path).is_file(), path)
-        self.assertFalse((root / "tools" / "agent-canon").exists())
+        self.assertTrue((root / "tools" / "agent-canon").is_symlink())
 
     def test_removed_legacy_surface_preserves_unknown_mirror(self) -> None:
         """Known retired mirrors are removed while unknown mirrors remain untouched."""
@@ -507,7 +450,9 @@ class SurfaceMigrationTest(unittest.TestCase):
 
         result = self.run_sync(root, "link-root")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertFalse(retired.exists(), "retired mirror must be removed")
+        # The retired group names a parent directory.  A regular parent-owned
+        # directory is preserved as a unit, including nested symlinks.
+        self.assertTrue(retired.is_symlink(), "nested parent content must be preserved")
         self.assertTrue(unknown.is_symlink(), "unknown mirror must not be removed")
 
         check = self.run_sync(root, "check")

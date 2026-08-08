@@ -1590,13 +1590,13 @@ def validate_vscode_manifest(
     findings: list[Finding] = []
     expected = {
         "mode": "regular",
-        "owner": "template-or-derived-repo",
-        "surface_class": "active_contract",
+        "projection_producer": "template-or-derived-repo",
+        "projection_kind": "active_contract",
     }
     actual = {
         "mode": entry.mode,
-        "owner": entry.owner,
-        "surface_class": entry.surface_class,
+        "projection_producer": entry.projection_producer,
+        "projection_kind": entry.projection_kind,
     }
     for field, expected_value in expected.items():
         if actual[field] != expected_value:
@@ -1627,8 +1627,8 @@ def validate_vscode_manifest(
             continue
         if (
             candidate.mode != "symlink"
-            or candidate.owner != "agent-canon"
-            or candidate.surface_class != "runtime_surface"
+            or candidate.projection_producer != "agent-canon"
+            or candidate.projection_kind != "runtime_surface"
         ):
             findings.append(
                 Finding(

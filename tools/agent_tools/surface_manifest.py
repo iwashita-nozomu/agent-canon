@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Parses and validates AgentCanon shared runtime surface ownership.
+# responsibility Parses and validates AgentCanon shared runtime projection metadata.
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable surface manifest
 # downstream implementation ../sync_agent_canon.sh consumes sync specs from this manifest
 # downstream implementation ./check_convention_compliance.py validates manifest wiring
 # @dependency-end
-"""Parse AgentCanon runtime surface ownership manifests."""
+"""Parse AgentCanon runtime surface projection manifests."""
 
 from __future__ import annotations
 
@@ -39,7 +39,7 @@ ALLOWED_MODES = frozenset(
         "removed_legacy",
     }
 )
-ALLOWED_OWNERS = frozenset(
+ALLOWED_PROJECTION_PRODUCERS = frozenset(
     {
         "agent-canon",
         "template",
@@ -51,7 +51,7 @@ ALLOWED_OWNERS = frozenset(
         "legacy",
     }
 )
-ALLOWED_CLASSES = frozenset(
+ALLOWED_PROJECTION_KINDS = frozenset(
     {
         "runtime_surface",
         "shared_policy",
@@ -71,15 +71,9 @@ ALLOWED_CLASSES = frozenset(
 )
 DOC_ALWAYS_REQUIRED_MARKERS = (
     "documents/runtime/shared-runtime-surfaces.toml",
-    ".codex/hooks.json",
-    ".codex/hooks",
-    ".devcontainer/",
-    "documents/README.md",
-    "documents/contracts/template-bootstrap.md",
-    "documents/contracts/github-first-module-and-devcontainer-policy.md",
-    "memory/README.md",
-    "memory/records/",
-    "tests/agent_tools/",
+    "AGENTS.md",
+    ".codex/config.toml",
+    "tools/agent-canon",
     "Root `tools/` is a parent-owned regular container",
     "tools/agent-canon -> ../vendor/agent-canon/tools",
     "vendor/agent-canon/tools/",
@@ -97,8 +91,8 @@ class SurfaceEntry:
 
     path: str
     mode: str
-    owner: str
-    surface_class: str
+    projection_producer: str
+    projection_kind: str
     source: str
     local_override_allowed: bool
     optional: bool
@@ -212,34 +206,38 @@ def validate_entry(entry: SurfaceEntry) -> SurfaceEntry:
     """Validate one manifest entry."""
     if entry.mode not in ALLOWED_MODES:
         raise ValueError(f"{entry.path}: invalid mode {entry.mode}")
-    if entry.owner not in ALLOWED_OWNERS:
-        raise ValueError(f"{entry.path}: invalid owner {entry.owner}")
-    if entry.surface_class not in ALLOWED_CLASSES:
-        raise ValueError(f"{entry.path}: invalid class {entry.surface_class}")
+    if entry.projection_producer not in ALLOWED_PROJECTION_PRODUCERS:
+        raise ValueError(
+            f"{entry.path}: invalid projection_producer {entry.projection_producer}"
+        )
+    if entry.projection_kind not in ALLOWED_PROJECTION_KINDS:
+        raise ValueError(
+            f"{entry.path}: invalid projection_kind {entry.projection_kind}"
+        )
     if entry.mode in {"symlink", "copy"} and not entry.source_or_default():
         raise ValueError(f"{entry.path}: {entry.mode} requires a source")
     return entry
 
 
-def default_local_override(owner: str) -> bool:
-    """Return the default local override policy for one owner."""
-    return owner in {"template", "template-or-derived-repo", "project"}
+def default_local_override(projection_producer: str) -> bool:
+    """Return the default override policy for one projection producer."""
+    return projection_producer in {"template", "template-or-derived-repo", "project"}
 
 
 def entry_from_mapping(mapping: Mapping[str, object]) -> SurfaceEntry:
     """Create one manifest entry from one TOML table."""
-    owner = string_value(mapping, "owner")
+    projection_producer = string_value(mapping, "projection_producer")
     return validate_entry(
         SurfaceEntry(
             path=string_value(mapping, "path"),
             mode=string_value(mapping, "mode"),
-            owner=owner,
-            surface_class=string_value(mapping, "class"),
+            projection_producer=projection_producer,
+            projection_kind=string_value(mapping, "projection_kind"),
             source=string_value(mapping, "source"),
             local_override_allowed=bool_value(
                 mapping,
                 "local_override_allowed",
-                default_local_override(owner),
+                default_local_override(projection_producer),
             ),
             optional=bool_value(mapping, "optional", False),
             sync_control=bool_value(mapping, "sync_control", False),
@@ -249,9 +247,9 @@ def entry_from_mapping(mapping: Mapping[str, object]) -> SurfaceEntry:
 
 def entries_from_group(mapping: Mapping[str, object]) -> tuple[SurfaceEntry, ...]:
     """Expand one grouped manifest table."""
-    owner = string_value(mapping, "owner")
+    projection_producer = string_value(mapping, "projection_producer")
     mode = string_value(mapping, "mode")
-    surface_class = string_value(mapping, "class")
+    projection_kind = string_value(mapping, "projection_kind")
     source_prefix = string_value(mapping, "source_prefix")
     entries: list[SurfaceEntry] = []
     for path in path_list(mapping):
@@ -261,13 +259,13 @@ def entries_from_group(mapping: Mapping[str, object]) -> tuple[SurfaceEntry, ...
                 SurfaceEntry(
                     path=path,
                     mode=mode,
-                    owner=owner,
-                    surface_class=surface_class,
+                    projection_producer=projection_producer,
+                    projection_kind=projection_kind,
                     source=source,
                     local_override_allowed=bool_value(
                         mapping,
                         "local_override_allowed",
-                        default_local_override(owner),
+                        default_local_override(projection_producer),
                     ),
                     optional=bool_value(mapping, "optional", False),
                     sync_control=bool_value(mapping, "sync_control", False),
@@ -502,8 +500,8 @@ def normalized_snapshot(manifest: SurfaceManifest) -> Mapping[str, object]:
                     if entry.mode in {"symlink", "copy"}
                     else entry.source
                 ),
-                "owner": entry.owner,
-                "class": entry.surface_class,
+                "projection_producer": entry.projection_producer,
+                "projection_kind": entry.projection_kind,
                 "local_override_allowed": entry.local_override_allowed,
                 "optional": entry.optional,
                 "sync_control": entry.sync_control,

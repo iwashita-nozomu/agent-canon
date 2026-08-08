@@ -128,27 +128,21 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "issues/open/ issue_sync.py github_mirror\n"
     ),
     "documents/runtime/SHARED_RUNTIME_SURFACES.md": (
-        "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml owner class\n"
-        ".codex/hooks.json .codex/hooks .devcontainer/ .vscode/ documents/README.md "
-        "documents/contracts/template-bootstrap.md "
-        "documents/contracts/github-first-module-and-devcontainer-policy.md "
-        "memory/README.md memory/records/ "
-        "tests/agent_tools/ Root `tools/` is a parent-owned regular container "
+        "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml AGENTS.md "
+        ".codex/config.toml tools/agent-canon Root `tools/` is a parent-owned regular container "
         "tools/agent-canon -> ../vendor/agent-canon/tools "
         "vendor/agent-canon/tools/ "
         "Project-local automation must stay in project-owned paths\n"
     ),
     "documents/runtime/shared-runtime-surfaces.toml": (
-        'mode = "standalone_only"\n'
-        'owner = "agent-canon-standalone"\n'
-        'path = "goal.md"\n'
-        '"documents/README.md"\n'
-        '"documents/contracts/template-bootstrap.md"\n'
-        '".devcontainer"\n'
-        '".vscode"\n'
-        '"documents/contracts/github-first-module-and-devcontainer-policy.md"\n'
-        '".codex/hooks.json"\n'
-        '"tests/agent_tools/test_check_convention_compliance.py"\n'
+        'version = 1\n'
+        'prefix = "vendor/agent-canon"\n'
+        'path = "AGENTS.md"\n'
+        'path = ".codex/config.toml"\n'
+        'path = "tools/agent-canon"\n'
+        'path = ".agent-canon"\n'
+        'mode = "removed_legacy"\n'
+        'paths = [\n'
     ),
     "documents/agent-canon/agent-canon-parent-repo-latest-checklist.md": "checklist\n",
     "documents/runtime/runtime-profiles-and-check-matrix.md": (
@@ -854,7 +848,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 "surface_manifest:documents/runtime/SHARED_RUNTIME_SURFACES.md",
                 result.stdout,
             )
-            self.assertIn("missing-marker:.codex/hooks.json", result.stdout)
+            self.assertIn("missing-marker:AGENTS.md", result.stdout)
 
     def test_parent_root_sync_adapter_delegates_to_vendored_source(self) -> None:
         """A parent root adapter may delegate all sync internals to AgentCanon."""

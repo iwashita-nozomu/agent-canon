@@ -685,8 +685,11 @@ link_path() {
 copy_path() {
   local path="$1"
   local source="$2"
+  [ -n "$path" ] || die "copy path must not be empty"
+  [ -n "$source" ] || die "copy source path must not be empty"
   local abs_path="$ROOT_DIR/$path"
   local abs_source="$ROOT_DIR/$source"
+  [ "$(realpath -m "$abs_path")" != "$ROOT_DIR" ] || die "copy target must not be repository root"
   [ -e "$abs_source" ] || die "copy source '$source' does not exist"
   rm -rf "$abs_path"
   mkdir -p "$(dirname "$abs_path")"
@@ -776,8 +779,10 @@ project_copy_source() {
 regular_path() {
   local path="$1"
   local source="${2:-}"
+  [ -n "$path" ] || die "regular path must not be empty"
   local abs_path="$ROOT_DIR/$path"
   local abs_source=""
+  [ "$(realpath -m "$abs_path")" != "$ROOT_DIR" ] || die "regular target must not be repository root"
   if [ -e "$abs_path" ] && [ ! -L "$abs_path" ] \
     && { [ "$path" != ".vscode" ] || [ -d "$abs_path" ]; }; then
     if [ "$path" = ".devcontainer" ] && is_submodule_prefix; then
@@ -960,18 +965,21 @@ cmd_link_root() {
   # whole-directory symlinks first, so child operations cannot delete files in
   # the AgentCanon source checkout through the old directory link.
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local source="${spec#*:}"
     regular_path "$path" "$source"
   done < <(build_regular_specs)
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local target="${spec#*:}"
     link_path "$path" "$target"
   done < <(build_link_specs)
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local source="${spec#*:}"
     copy_path "$path" "$source"
@@ -983,7 +991,11 @@ cmd_link_root() {
 
   while IFS= read -r path; do
     [ -n "$path" ] || continue
-    rm -rf "$ROOT_DIR/$path"
+    # Retired shared views may only be removed when they are still symlinks.
+    # A regular path belongs to the parent and is preserved.
+    if [ -L "$ROOT_DIR/$path" ]; then
+      rm -f "$ROOT_DIR/$path"
+    fi
   done < <(build_root_absent_paths)
 
   ensure_repo_local_goal
@@ -1009,6 +1021,7 @@ cmd_check() {
   local projection_rc=0
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local target="${spec#*:}"
     local abs_path="$ROOT_DIR/$path"
@@ -1026,6 +1039,7 @@ cmd_check() {
   done < <(build_link_specs)
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local abs_path="$ROOT_DIR/$path"
     if [ -f "$abs_path" ]; then
@@ -1040,6 +1054,7 @@ cmd_check() {
   done < <(build_copy_specs)
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local abs_path="$ROOT_DIR/$path"
     if [ -e "$abs_path" ] && [ ! -L "$abs_path" ] \
@@ -1062,7 +1077,7 @@ cmd_check() {
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     local abs_path="$ROOT_DIR/$path"
-    if [ -e "$abs_path" ] || [ -L "$abs_path" ]; then
+    if [ -L "$abs_path" ]; then
       echo "absent[$path]=present" >&2
       failed=1
     fi
@@ -2007,6 +2022,7 @@ cmd_status() {
     echo "prefix_status=missing"
   fi
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local target="${spec#*:}"
     local abs_path="$ROOT_DIR/$path"
@@ -2020,6 +2036,7 @@ cmd_status() {
   done < <(build_link_specs)
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local abs_path="$ROOT_DIR/$path"
     if [ -f "$abs_path" ]; then
@@ -2032,6 +2049,7 @@ cmd_status() {
   done < <(build_copy_specs)
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local abs_path="$ROOT_DIR/$path"
     if [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then

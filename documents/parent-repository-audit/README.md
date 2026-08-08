@@ -37,16 +37,16 @@ ID を自己完結して持ちます。unit の変更責務が変わったとき
 
 ## Parent Scope And Selection
 
-監査対象は親 root の `git ls-files -z` が返す tracked path 集合です。submodule 内部の
-tree は親の tracked tree に展開せず、親側の gitlink として扱います。`--scope` が
-指定されなければ全 tracked path を使い、指定時は親 root 配下の tracked file または
-directory に限定します。path escape、存在しない scope、親 Git 不在は typed failure
-として返し、暗黙に別 root へ切り替えません。
+監査対象は親 root 配下の選択された tracked path です。submodule 内部の tree は親の
+tracked tree に展開せず、親側の gitlink として扱います。`--scope` が指定されなければ
+tracked path を evidence として読み、指定時は親 root 配下の tracked file または directory
+に限定します。path escape、存在しない scope、親 Git 不在は typed failure として返し、
+暗黙に別 root へ切り替えません。
 
-`repository-structure` unit は `all-tracked` を所有し、全 tracked path に少なくとも
-一つの owner view を与えます。他の unit は責務別 pattern を重ねてよく、重複は
-primary owner と cross-reference を evidence に残します。uncovered path は audit
-failure であり、pattern を勝手に広げずに該当 owner unit を更新します。
+一般 path の owner/class は親の `responsibility-scope.toml` が唯一の source です。
+`repository-structure` unit は structure contract の existence/kind と structure-owned
+paths だけを確認し、`all-tracked` fallback や一般 path ownership の二重判定を持ちません。
+他の unit の責務別 pattern はそれぞれの owner surface を参照します。
 
 ## Execution And Closure
 
@@ -60,10 +60,11 @@ python3 tools/agent_tools/parent_repository_audit.py check --root <parent-root> 
 public skill は最初にこの README と list packet を読み、返された unit file を昇順で
 一つずつ read します。各 unit は `pass`、または finding を owner skill/worker へ
 routing して修正、対象 readback、close receipt まで完了してから次へ進みます。
-finding が一つ出ても全監査を abort しません。repair が blocked の unit は
+finding が一つ出ても全監査を abort しません。repair が blocked または deferred の unit は
 `repair_blocked` と blocker evidence を記録して未完了のまま次へ進み、最終 status は
-blocked とします。source-root missing、invalid unit、path escape、uncovered tracked
-path も packet に固定された failure code として扱います。
+blocked/failed とします。failed/deferred check が残る状態を `closed` や `pass` として
+報告しません。source-root missing、invalid unit、path escape、uncovered selected path
+も packet に固定された failure code として扱います。
 
 静的 structure/readback で invariant が確定できる unit は runtime build や全 suite を
 実行しません。runtime validation は unit が静的に判定できない場合だけ、その unit が

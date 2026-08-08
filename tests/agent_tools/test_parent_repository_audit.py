@@ -52,9 +52,9 @@ class ParentRepositoryAuditTests(unittest.TestCase):
         return root
 
     def test_canonical_units_have_unique_migration_ids(self) -> None:
-        """All twelve units expose the required self-contained contract and unique IDs."""
+        """The nine surviving units expose the contract and unique migration IDs."""
         units = _load_units(PROJECT_ROOT)
-        self.assertEqual(len(units), 12)
+        self.assertEqual(len(units), 9)
         migration_ids = [legacy_id for unit in units for legacy_id in unit.legacy_ids]
         self.assertEqual(len(migration_ids), len(set(migration_ids)))
         expected_ids = {
@@ -85,8 +85,8 @@ class ParentRepositoryAuditTests(unittest.TestCase):
         }
         self.assertEqual(ledger, unit_ids)
 
-    def test_list_and_check_cover_the_parent_tracked_tree(self) -> None:
-        """The all-tracked structure unit makes full-tree coverage explicit."""
+    def test_list_and_check_read_parent_tree_without_ownership_fallback(self) -> None:
+        """Full checks read tracked evidence without creating a second owner map."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             parent = self.make_parent(
                 Path(tmp_dir), "README.md", "docker/Dockerfile", "python/main.py"
@@ -95,14 +95,15 @@ class ParentRepositoryAuditTests(unittest.TestCase):
             self.assertEqual(listed.returncode, 0, listed.stdout + listed.stderr)
             listed_payload = json.loads(listed.stdout)
             self.assertEqual(listed_payload["tracked_path_count"], 3)
-            self.assertEqual(len(listed_payload["unit_paths"]), 12)
+            self.assertEqual(len(listed_payload["unit_paths"]), 9)
 
             checked = self.run_tool(parent, "check")
             self.assertEqual(checked.returncode, 0, checked.stdout + checked.stderr)
             payload = json.loads(checked.stdout)
             self.assertEqual(payload["status"], "pass")
             self.assertEqual(payload["uncovered_path_count"], 0)
-            self.assertGreater(payload["overlap_path_count"], 0)
+            self.assertEqual(payload["overlap_path_count"], 0)
+            self.assertEqual(payload["overlap_paths"], {})
 
     def test_scope_escape_returns_typed_failure(self) -> None:
         """A scope outside the parent root is rejected without fallback selection."""
@@ -112,6 +113,34 @@ class ParentRepositoryAuditTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             payload = json.loads(result.stdout)
             self.assertEqual(payload["failure_code"], "parent_repository_audit_path_escape")
+
+    def test_failed_or_deferred_unit_receipt_cannot_close_audit(self) -> None:
+        """Failed and deferred unit receipts remain failed in the CLI packet."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            parent = self.make_parent(Path(tmp_dir), "README.md")
+            for status in ("failed", "deferred"):
+                result = self.run_tool(parent, "check", "--unit-status", status)
+                self.assertNotEqual(result.returncode, 0)
+                payload = json.loads(result.stdout)
+                self.assertEqual(payload["status"], "failed")
+                self.assertEqual(payload["failure_code"], "parent_repository_audit_unit_status_failed")
+
+    def test_all_complete_unit_receipts_pass(self) -> None:
+        """All positive unit receipts produce a passing audit packet."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            parent = self.make_parent(Path(tmp_dir), "README.md")
+            result = self.run_tool(
+                parent,
+                "check",
+                "--unit-status",
+                "pass",
+                "--unit-status",
+                "closed",
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            payload = json.loads(result.stdout)
+            self.assertEqual(payload["status"], "pass")
+            self.assertEqual(payload["unit_statuses"], ["pass", "closed"])
 
     def test_scoped_listing_selects_matching_units_deterministically(self) -> None:
         """A scoped path selects matching units while preserving canonical order."""

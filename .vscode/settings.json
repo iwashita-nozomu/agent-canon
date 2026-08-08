@@ -1,13 +1,4 @@
 {
-  "_dependency_manifest": [
-    "@dependency-start",
-    "contract reference",
-    "responsibility Configures shared VS Code workspace defaults for AgentCanon and template roots.",
-    "upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface policy",
-    "upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md VS Code and devcontainer boundary policy",
-    "upstream design ../responsibility-scope.toml runtime-entrypoints ownership scope",
-    "@dependency-end"
-  ],
   "files.associations": {
     "*.cu": "cuda-cpp",
     "*.cuh": "cuda-cpp",

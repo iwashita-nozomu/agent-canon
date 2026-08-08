@@ -1,15 +1,4 @@
 {
-  "_dependency_manifest": [
-    "@dependency-start",
-    "contract reference",
-    "responsibility Exposes shared VS Code task entrypoints for AgentCanon validation commands.",
-    "upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface policy",
-    "upstream implementation ../tools/lib/repo_paths.sh repository and AgentCanon tool-root resolver",
-    "upstream implementation ../tools/bin/agent-canon AgentCanon CLI wrapper",
-    "upstream implementation ../tools/agent_tools/check_convention_compliance.py convention compliance verifier",
-    "upstream implementation ../tools/agent_tools/check_dependency_headers.py dependency header verifier",
-    "@dependency-end"
-  ],
   "version": "2.0.0",
   "tasks": [
     {
