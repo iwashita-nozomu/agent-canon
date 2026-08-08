@@ -302,7 +302,11 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
             script,
         )
         self.assertIn(
-            'COMMIT_REQUEST_EVIDENCE_DIGEST="$(sha256sum agents/workflows/agent-canon-pr-workflow.md',
+            "AGENT_CANON_COMMIT_REQUEST_WORKFLOW_PATH=vendor/agent-canon/agents/workflows/agent-canon-pr-workflow.md",
+            script,
+        )
+        self.assertIn(
+            "AGENT_CANON_COMMIT_REQUEST_WORKFLOW_PATH=agents/workflows/agent-canon-pr-workflow.md",
             script,
         )
         self.assertLess(
