@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 9a146f7073e9d58802fb9fea370658d1653b41bb5deec9408b07db44cdf808eb
+# source canonical digest: d686af8563334e5559e65c6819e7f342a0f13bb8accb849b12b785ff6fe8d55a
 
 name = "benchmark_reviewer"
 description = "Read-only reviewer for fairness, confounders, and benchmark anti-patterns."

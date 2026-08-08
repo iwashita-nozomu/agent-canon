@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 67ec57507fc9d419e25f8daf2cf2ed2c420b2bff1e6d2b2e8ebd22480bcefdeb
+# source canonical digest: f7d386a8ac4f36f5e2e1b75662d2cbd7c4cfd462394e55d7930a615ce255a329
 
 name = "worker"
 description = "Implementation agent for bounded code, docs, or test changes."

@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 1245aa61500823d856e19369264f3186fc55b8d8e58dc14775818db276fcbc36
+# source canonical digest: 3834527592934e4b60efc546e3e8eac2de19d153015d86f61abc8073f94caab4
 
 name = "cpp_reviewer"
 description = "Read-only reviewer for C and C++ diffs, build/test evidence, ABI-boundary changes, and native-code regressions."

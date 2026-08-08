@@ -103,8 +103,8 @@ required_regex = ["check_static_any.py", "pyright", "ruff", "oop-readability-che
 forbidden_regex = ["keyword routing", "keyword trigger", "coordination[_ ]cost", "connected-components", "line/function count|function count", "exhaustive partition|partition threshold|cohesion threshold", "compatibility-preservation drift|compatibility (path|route)"]
 
 [[evals]]
-id = "owner-bounded-public-surface-invariance-human"
-target = "agents/skills/owner-bounded-routing.md"
+id = "bounded-owner-public-surface-invariance-human"
+target = "agents/skills/agent-orchestration.md"
 kind = "skill"
 description = "The canonical owner-bounded route requires public-surface invariance and escalates every public delta with full consumer closure."
 
@@ -121,8 +121,8 @@ required_regex = [
 ]
 
 [[evals]]
-id = "owner-bounded-public-surface-invariance-runtime"
-target = ".agents/skills/owner-bounded-routing/SKILL.md"
+id = "bounded-owner-public-surface-invariance-runtime"
+target = ".agents/skills/agent-orchestration/SKILL.md"
 kind = "skill"
 description = "The materialized runtime skill exposes the same public-surface invariance and broader-route contract."
 

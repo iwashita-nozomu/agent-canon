@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: ecc40306ef40d15ee99e86bd780c996d54d97edd75acdc24469632157f1c14af
+# source canonical digest: 86581acfd72ae8a74bdf040e66034148d079dda215a0eae37ba57164be6a5a70
 
 name = "artifact_reviewer"
 description = "Read-only reviewer for code, scripts, raw results, environment capture, and artifact-readiness."

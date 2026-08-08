@@ -1910,10 +1910,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "ecc40306ef40d15ee99e86bd780c996d54d97edd75acdc24469632157f1c14af"
+      "projection_digest": "86581acfd72ae8a74bdf040e66034148d079dda215a0eae37ba57164be6a5a70"
     },
     "benchmark_reviewer": {
       "name": "benchmark_reviewer",
@@ -1944,10 +1944,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "9a146f7073e9d58802fb9fea370658d1653b41bb5deec9408b07db44cdf808eb"
+      "projection_digest": "d686af8563334e5559e65c6819e7f342a0f13bb8accb849b12b785ff6fe8d55a"
     },
     "citation_evidence_reviewer": {
       "name": "citation_evidence_reviewer",
@@ -1978,10 +1978,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "68f23dc8017f0da2c76f62e1fbbe6cd0a1aa123c578fb6ed1b6d1eea569d76b8"
+      "projection_digest": "003e21b87184802b1ff63ae3f46c5a6295e3e3a0ae84ef375f6d0a6d50e37ef3"
     },
     "cpp_reviewer": {
       "name": "cpp_reviewer",
@@ -2012,10 +2012,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "1245aa61500823d856e19369264f3186fc55b8d8e58dc14775818db276fcbc36"
+      "projection_digest": "3834527592934e4b60efc546e3e8eac2de19d153015d86f61abc8073f94caab4"
     },
     "detailed_design_reviewer": {
       "name": "detailed_design_reviewer",
@@ -2046,10 +2046,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "1e50e4a6cec4b8fa59afd8d84118e816cea24a3bb500e6a78238e9e01097449e"
+      "projection_digest": "42f8ee47eda7a2049008ca98759a0ea40424116eade758579dbf69f5adaf82ce"
     },
     "detailed_designer": {
       "name": "detailed_designer",
@@ -2057,7 +2057,7 @@
       "nickname_candidates": [
         "detailed_designer"
       ],
-      "sandbox_mode": "workspace-write",
+      "sandbox_mode": "read-only",
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
@@ -2080,10 +2080,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "04b88bc705194b571d8b10ae90998c81b0bdbcab4659f8296744e488f95b1d2d"
+      "projection_digest": "3d7e48f58a4c647656dac1a6781cab05d2b9ca5a5ae540739d59e49c97007188"
     },
     "diff_triage_reviewer": {
       "name": "diff_triage_reviewer",
@@ -2114,10 +2114,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "a750bbf5f7f2576b4e900120599e88ed22c580385ee16e5ee0959bcd035bd332"
+      "projection_digest": "543fb2137053883a9b3789a5b5ce2eb112a9b2109e1e21039d29219656819e53"
     },
     "docs_workflow_steward": {
       "name": "docs_workflow_steward",
@@ -2125,7 +2125,7 @@
       "nickname_candidates": [
         "docs_workflow_steward"
       ],
-      "sandbox_mode": "workspace-write",
+      "sandbox_mode": "read-only",
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
@@ -2148,10 +2148,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "ba53a4d54a94ea83fd73306fa3e06a1510f02c0bf5754f1cf6b7f34dd6a3dd63"
+      "projection_digest": "5a0323be001cad9e8acc493cdf9026475d58d3e1be005c6e493566dd8eaaf151"
     },
     "document_flow_reviewer": {
       "name": "document_flow_reviewer",
@@ -2182,10 +2182,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "800da34d508fe3599d06aef4791e2deb5df7a7e3a1e30aa9e99f82eff23ce574"
+      "projection_digest": "231c36f33aac9d61e64c32edabf324520e8832dcc0ddb36d03c56b1458daceba"
     },
     "execution_planner": {
       "name": "execution_planner",
@@ -2193,7 +2193,7 @@
       "nickname_candidates": [
         "execution_planner"
       ],
-      "sandbox_mode": "workspace-write",
+      "sandbox_mode": "read-only",
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
@@ -2216,10 +2216,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "f40955788532d5672936855d5bce0287765aba5f11d5b288cb1b13af988e34dc"
+      "projection_digest": "55f4fbe0c9119b52342922d01fa83798696936236a2e34f333932ee2dc52c771"
     },
     "experiment_runner": {
       "name": "experiment_runner",
@@ -2227,7 +2227,7 @@
       "nickname_candidates": [
         "experiment_runner"
       ],
-      "sandbox_mode": "workspace-write",
+      "sandbox_mode": "read-only",
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
@@ -2250,10 +2250,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e16b0021fde54dccd820ef6a155ff994938d8f87433864208c14d3c98b1b3386"
+      "projection_digest": "16cb978da4ad9c2a786b41b325eae99b170933108ba15c248cc6acc394240f06"
     },
     "explorer": {
       "name": "explorer",
@@ -2284,10 +2284,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "491e2305089346a2b5d9feadaf7458b35a6d85660613374b0472876994297ee4"
+      "projection_digest": "0ad4a6fbec489c28a33fb83799bfd50e02511d8010dc93124822c098599233db"
     },
     "fair_data_reviewer": {
       "name": "fair_data_reviewer",
@@ -2318,10 +2318,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "8d887cf425cdd3ceef59f7aefe1ab5763ed6b00f39a7601700b6bb26ca95070e"
+      "projection_digest": "8a1a72f2db2e6b82b1d5ef55a4a0bd1ec392341b4835b9a6d369a7aa39bd8f76"
     },
     "literature_researcher": {
       "name": "literature_researcher",
@@ -2352,10 +2352,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "460ea2610226ca9243f006cd7294f20aac7436b319744497b6b6d89b9a6e51c7"
+      "projection_digest": "7cff6ad79b30828241c26ab5bbaff9aab7c7a2def1a3817d0f1e13e6b575b1f5"
     },
     "logic_gap_reviewer": {
       "name": "logic_gap_reviewer",
@@ -2386,10 +2386,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "3a210e08c3417638f783a01434c56189bd5b29afda8f78413b189041e7b948e0"
+      "projection_digest": "cdff30f7f541025f45629f93c4402a0db5119993bbd2510eab0ef750b3257b84"
     },
     "long_form_writer": {
       "name": "long_form_writer",
@@ -2397,7 +2397,7 @@
       "nickname_candidates": [
         "long_form_writer"
       ],
-      "sandbox_mode": "workspace-write",
+      "sandbox_mode": "read-only",
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
@@ -2420,10 +2420,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "732a021da775136cec0f7aa322cd4a7307937de8cb71dd923ead6a5ae975cd6e"
+      "projection_digest": "f8c0d306e98286c6a639b0227518b1de544de91b40cd16a211cb1c6da9302fb9"
     },
     "manager_reviewer": {
       "name": "manager_reviewer",
@@ -2454,10 +2454,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "02deb282af5558b31f6556fd10739ee6e811ea9c1d540784c3d3dd2b48e55cc5"
+      "projection_digest": "efaf6059b12fc6ea1d4e4d0aaf1a963150568d3f27993418a9eedf36f42f1452"
     },
     "ml_science_reviewer": {
       "name": "ml_science_reviewer",
@@ -2488,10 +2488,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "7d47e4a8a9dbddb4c68ae684375009dc4396c11af462224e7de991f23c60487a"
+      "projection_digest": "8676c475903f950e66c5966b59562b83761070a1fcb6928565ed17cd4101c5d2"
     },
     "notation_definition_reviewer": {
       "name": "notation_definition_reviewer",
@@ -2522,10 +2522,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "829092681e2bf0913d47ab74003e16c950ede8a539557f8f76b95347f6a2b801"
+      "projection_digest": "782b9259f35489b2e335463031258d6e47a9300f8f349c79d73f0c4d34221dd8"
     },
     "oop_readability_reviewer": {
       "name": "oop_readability_reviewer",
@@ -2556,10 +2556,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "7d95842f1dffc3441f2de0147534c7e358e16f02db000b13ec70862e722c41d0"
+      "projection_digest": "ccf10c750058f6f1ae2a3b5ac23b1a10502bad1cd9f5aae4154477860c5db2a5"
     },
     "plan_reviewer": {
       "name": "plan_reviewer",
@@ -2590,10 +2590,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "4718ce49cfb3fdd3ad73a2fefb5042ff07f6a2116ecf9b3e2ed5b1a7b9d344ef"
+      "projection_digest": "8a02de81412e0048f0af30c7d1677d916868b3b82e14681ebbfb0b7ec6bd32b0"
     },
     "project_reviewer": {
       "name": "project_reviewer",
@@ -2624,10 +2624,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "39d39d0f82067761372c5b3aab58b8723418691491fc4b0fd94641109aa8d016"
+      "projection_digest": "a23ab45717e395548b3e426ca925f585d1d43708935d333ea05acc060004c3ae"
     },
     "prompt_config_reviewer": {
       "name": "prompt_config_reviewer",
@@ -2658,10 +2658,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e26e35c63898843f16041d103c4844eae5a0e77d092ceba763d59b4ec9213228"
+      "projection_digest": "07853e06d549ad0a021208668bdeb6342c1e4eec59fda994c71373e77c0f3786"
     },
     "python_reviewer": {
       "name": "python_reviewer",
@@ -2692,10 +2692,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "095599b7a2cc0157f43a54b08446fbcf21c138fa1656054a4f209ad756022e33"
+      "projection_digest": "24ad0b6c58be25bd244aca83288b0ad98d013d5a50e0d7f57505ed4cc740e646"
     },
     "report_reviewer": {
       "name": "report_reviewer",
@@ -2726,10 +2726,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "0237d90b3a51c6fffcc5edaab0153864ba29a223e3ea099d3fdaed56abecef64"
+      "projection_digest": "99264cc9e3333524cf695ea370a89225a4952427a9fc08e55f328d9c9c060abe"
     },
     "reproducibility_reviewer": {
       "name": "reproducibility_reviewer",
@@ -2760,10 +2760,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "c352d794b5666b560ce7ca1393856322bce9a460a4b15f844634966ecfc1eea3"
+      "projection_digest": "e505e11a2740cb1bf7fe637d838c356d3306fac3c442a1b973446b17f3439a82"
     },
     "requirements_organizer": {
       "name": "requirements_organizer",
@@ -2771,7 +2771,7 @@
       "nickname_candidates": [
         "requirements_organizer"
       ],
-      "sandbox_mode": "workspace-write",
+      "sandbox_mode": "read-only",
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
@@ -2794,10 +2794,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "47b289b06b0174a392ebd5a114a6ca379ad342a7486d16ad72949b44a132c1fd"
+      "projection_digest": "e65090393567b50c5a4d214a3b1ee9c00504fb2e664ca8fdb3ad3b2bc266e28c"
     },
     "reviewer": {
       "name": "reviewer",
@@ -2828,10 +2828,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "04fcb18036e91b6d5fa05df507799411d8c3d915cdc1686f4a4982ed81e505b9"
+      "projection_digest": "be182cb6606ad0919f194fbc1eb3d7c516c525ad6bd116d36884f2be6678d634"
     },
     "scientific_computing_reviewer": {
       "name": "scientific_computing_reviewer",
@@ -2862,10 +2862,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "eac6268e089e91bd95194f611311ce86ed52965003024c06a5a4d7c9faee3059"
+      "projection_digest": "0ddd9a811fabd32aee09919fd3222f332635fa203471c03e6c61092bb072c273"
     },
     "ship_reviewer": {
       "name": "ship_reviewer",
@@ -2896,10 +2896,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "ship_review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "single_owner_gate",
       "continuation_policy": "terminal_after_gate",
-      "projection_digest": "e43497eb12555e119a32e79cbb9a721f789da8081a4d4ffda441aa15c7973ce1"
+      "projection_digest": "02afc64ea65a70464500a94d66540421c3f8bd162b34159818be698f3fcab5fd"
     },
     "skill_evaluator": {
       "name": "skill_evaluator",
@@ -2929,10 +2929,10 @@
         "common_run_context",
         "prior_scenario_context"
       ],
-      "return_schema_id": "skill_evaluation_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "terminal_evaluation",
       "continuation_policy": "fresh_only_no_continuation",
-      "projection_digest": "54b6a83198993745ff8b2e649b2557978495b4eb800db4d7458d1ab723060036"
+      "projection_digest": "fee704fc8391b129c128f07a8c8c39f757b02947cabe32d5f24a4317e9965281"
     },
     "spark_worker": {
       "name": "spark_worker",
@@ -2965,10 +2965,10 @@
         "unrelated_paths",
         "alternate_architecture"
       ],
-      "return_schema_id": "spark_implementation_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation_only",
       "continuation_policy": "same_spark_after_one_repaired_structural_gap",
-      "projection_digest": "59a128eed6867f3d30a2216ddd5839f7754fa0a82838480f8e29e1ba5750e89f"
+      "projection_digest": "2c1caf7f71eb452c46f951630094588f8407957e7232852d02e051e8f49315e3"
     },
     "terra": {
       "name": "terra",
@@ -3001,10 +3001,10 @@
         "unrelated_paths",
         "write_scope"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "d9316e9aa1a118056f400c9f8981ed0d9d1142a1f3f166c8d282d7b5773bd6cf"
+      "projection_digest": "1c16d8ac47e435bda16b03b176229ddfadf198ad786e7ad553f75676d08e810c"
     },
     "test_designer": {
       "name": "test_designer",
@@ -3035,10 +3035,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "b1805de39dcbc003fdd7bfb13eb7931872184c8d9a2bf067ee4edda4c909dae3"
+      "projection_digest": "b8f308a403e83481bb8128367fa08403ce7b3ffca249f9ea1ca45757070233b0"
     },
     "worker": {
       "name": "worker",
@@ -3070,10 +3070,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "implementation_feedback_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "67ec57507fc9d419e25f8daf2cf2ed2c420b2bff1e6d2b2e8ebd22480bcefdeb"
+      "projection_digest": "f7d386a8ac4f36f5e2e1b75662d2cbd7c4cfd462394e55d7930a615ce255a329"
     }
   },
   "roles": [
@@ -3095,10 +3095,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "ecc40306ef40d15ee99e86bd780c996d54d97edd75acdc24469632157f1c14af"
+      "projection_digest": "86581acfd72ae8a74bdf040e66034148d079dda215a0eae37ba57164be6a5a70"
     },
     {
       "id": "benchmark_reviewer",
@@ -3118,10 +3118,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "9a146f7073e9d58802fb9fea370658d1653b41bb5deec9408b07db44cdf808eb"
+      "projection_digest": "d686af8563334e5559e65c6819e7f342a0f13bb8accb849b12b785ff6fe8d55a"
     },
     {
       "id": "citation_evidence_reviewer",
@@ -3141,10 +3141,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "68f23dc8017f0da2c76f62e1fbbe6cd0a1aa123c578fb6ed1b6d1eea569d76b8"
+      "projection_digest": "003e21b87184802b1ff63ae3f46c5a6295e3e3a0ae84ef375f6d0a6d50e37ef3"
     },
     {
       "id": "cpp_reviewer",
@@ -3164,10 +3164,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "1245aa61500823d856e19369264f3186fc55b8d8e58dc14775818db276fcbc36"
+      "projection_digest": "3834527592934e4b60efc546e3e8eac2de19d153015d86f61abc8073f94caab4"
     },
     {
       "id": "detailed_design_reviewer",
@@ -3187,10 +3187,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "1e50e4a6cec4b8fa59afd8d84118e816cea24a3bb500e6a78238e9e01097449e"
+      "projection_digest": "42f8ee47eda7a2049008ca98759a0ea40424116eade758579dbf69f5adaf82ce"
     },
     {
       "id": "detailed_designer",
@@ -3210,10 +3210,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "04b88bc705194b571d8b10ae90998c81b0bdbcab4659f8296744e488f95b1d2d"
+      "projection_digest": "3d7e48f58a4c647656dac1a6781cab05d2b9ca5a5ae540739d59e49c97007188"
     },
     {
       "id": "diff_triage_reviewer",
@@ -3233,10 +3233,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "a750bbf5f7f2576b4e900120599e88ed22c580385ee16e5ee0959bcd035bd332"
+      "projection_digest": "543fb2137053883a9b3789a5b5ce2eb112a9b2109e1e21039d29219656819e53"
     },
     {
       "id": "docs_workflow_steward",
@@ -3256,10 +3256,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "ba53a4d54a94ea83fd73306fa3e06a1510f02c0bf5754f1cf6b7f34dd6a3dd63"
+      "projection_digest": "5a0323be001cad9e8acc493cdf9026475d58d3e1be005c6e493566dd8eaaf151"
     },
     {
       "id": "document_flow_reviewer",
@@ -3279,10 +3279,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "800da34d508fe3599d06aef4791e2deb5df7a7e3a1e30aa9e99f82eff23ce574"
+      "projection_digest": "231c36f33aac9d61e64c32edabf324520e8832dcc0ddb36d03c56b1458daceba"
     },
     {
       "id": "execution_planner",
@@ -3302,10 +3302,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "f40955788532d5672936855d5bce0287765aba5f11d5b288cb1b13af988e34dc"
+      "projection_digest": "55f4fbe0c9119b52342922d01fa83798696936236a2e34f333932ee2dc52c771"
     },
     {
       "id": "experiment_runner",
@@ -3325,10 +3325,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e16b0021fde54dccd820ef6a155ff994938d8f87433864208c14d3c98b1b3386"
+      "projection_digest": "16cb978da4ad9c2a786b41b325eae99b170933108ba15c248cc6acc394240f06"
     },
     {
       "id": "explorer",
@@ -3348,10 +3348,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "491e2305089346a2b5d9feadaf7458b35a6d85660613374b0472876994297ee4"
+      "projection_digest": "0ad4a6fbec489c28a33fb83799bfd50e02511d8010dc93124822c098599233db"
     },
     {
       "id": "fair_data_reviewer",
@@ -3371,10 +3371,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "8d887cf425cdd3ceef59f7aefe1ab5763ed6b00f39a7601700b6bb26ca95070e"
+      "projection_digest": "8a1a72f2db2e6b82b1d5ef55a4a0bd1ec392341b4835b9a6d369a7aa39bd8f76"
     },
     {
       "id": "literature_researcher",
@@ -3394,10 +3394,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "460ea2610226ca9243f006cd7294f20aac7436b319744497b6b6d89b9a6e51c7"
+      "projection_digest": "7cff6ad79b30828241c26ab5bbaff9aab7c7a2def1a3817d0f1e13e6b575b1f5"
     },
     {
       "id": "logic_gap_reviewer",
@@ -3417,10 +3417,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "3a210e08c3417638f783a01434c56189bd5b29afda8f78413b189041e7b948e0"
+      "projection_digest": "cdff30f7f541025f45629f93c4402a0db5119993bbd2510eab0ef750b3257b84"
     },
     {
       "id": "long_form_writer",
@@ -3440,10 +3440,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "732a021da775136cec0f7aa322cd4a7307937de8cb71dd923ead6a5ae975cd6e"
+      "projection_digest": "f8c0d306e98286c6a639b0227518b1de544de91b40cd16a211cb1c6da9302fb9"
     },
     {
       "id": "manager_reviewer",
@@ -3463,10 +3463,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "02deb282af5558b31f6556fd10739ee6e811ea9c1d540784c3d3dd2b48e55cc5"
+      "projection_digest": "efaf6059b12fc6ea1d4e4d0aaf1a963150568d3f27993418a9eedf36f42f1452"
     },
     {
       "id": "ml_science_reviewer",
@@ -3486,10 +3486,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "7d47e4a8a9dbddb4c68ae684375009dc4396c11af462224e7de991f23c60487a"
+      "projection_digest": "8676c475903f950e66c5966b59562b83761070a1fcb6928565ed17cd4101c5d2"
     },
     {
       "id": "notation_definition_reviewer",
@@ -3509,10 +3509,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "829092681e2bf0913d47ab74003e16c950ede8a539557f8f76b95347f6a2b801"
+      "projection_digest": "782b9259f35489b2e335463031258d6e47a9300f8f349c79d73f0c4d34221dd8"
     },
     {
       "id": "oop_readability_reviewer",
@@ -3532,10 +3532,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "7d95842f1dffc3441f2de0147534c7e358e16f02db000b13ec70862e722c41d0"
+      "projection_digest": "ccf10c750058f6f1ae2a3b5ac23b1a10502bad1cd9f5aae4154477860c5db2a5"
     },
     {
       "id": "plan_reviewer",
@@ -3555,10 +3555,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "4718ce49cfb3fdd3ad73a2fefb5042ff07f6a2116ecf9b3e2ed5b1a7b9d344ef"
+      "projection_digest": "8a02de81412e0048f0af30c7d1677d916868b3b82e14681ebbfb0b7ec6bd32b0"
     },
     {
       "id": "project_reviewer",
@@ -3578,10 +3578,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "39d39d0f82067761372c5b3aab58b8723418691491fc4b0fd94641109aa8d016"
+      "projection_digest": "a23ab45717e395548b3e426ca925f585d1d43708935d333ea05acc060004c3ae"
     },
     {
       "id": "prompt_config_reviewer",
@@ -3601,10 +3601,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e26e35c63898843f16041d103c4844eae5a0e77d092ceba763d59b4ec9213228"
+      "projection_digest": "07853e06d549ad0a021208668bdeb6342c1e4eec59fda994c71373e77c0f3786"
     },
     {
       "id": "python_reviewer",
@@ -3624,10 +3624,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "095599b7a2cc0157f43a54b08446fbcf21c138fa1656054a4f209ad756022e33"
+      "projection_digest": "24ad0b6c58be25bd244aca83288b0ad98d013d5a50e0d7f57505ed4cc740e646"
     },
     {
       "id": "report_reviewer",
@@ -3647,10 +3647,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "0237d90b3a51c6fffcc5edaab0153864ba29a223e3ea099d3fdaed56abecef64"
+      "projection_digest": "99264cc9e3333524cf695ea370a89225a4952427a9fc08e55f328d9c9c060abe"
     },
     {
       "id": "reproducibility_reviewer",
@@ -3670,10 +3670,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "c352d794b5666b560ce7ca1393856322bce9a460a4b15f844634966ecfc1eea3"
+      "projection_digest": "e505e11a2740cb1bf7fe637d838c356d3306fac3c442a1b973446b17f3439a82"
     },
     {
       "id": "requirements_organizer",
@@ -3693,10 +3693,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "47b289b06b0174a392ebd5a114a6ca379ad342a7486d16ad72949b44a132c1fd"
+      "projection_digest": "e65090393567b50c5a4d214a3b1ee9c00504fb2e664ca8fdb3ad3b2bc266e28c"
     },
     {
       "id": "reviewer",
@@ -3716,10 +3716,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "04fcb18036e91b6d5fa05df507799411d8c3d915cdc1686f4a4982ed81e505b9"
+      "projection_digest": "be182cb6606ad0919f194fbc1eb3d7c516c525ad6bd116d36884f2be6678d634"
     },
     {
       "id": "scientific_computing_reviewer",
@@ -3739,10 +3739,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "eac6268e089e91bd95194f611311ce86ed52965003024c06a5a4d7c9faee3059"
+      "projection_digest": "0ddd9a811fabd32aee09919fd3222f332635fa203471c03e6c61092bb072c273"
     },
     {
       "id": "ship_reviewer",
@@ -3762,10 +3762,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "ship_review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "single_owner_gate",
       "continuation_policy": "terminal_after_gate",
-      "projection_digest": "e43497eb12555e119a32e79cbb9a721f789da8081a4d4ffda441aa15c7973ce1"
+      "projection_digest": "02afc64ea65a70464500a94d66540421c3f8bd162b34159818be698f3fcab5fd"
     },
     {
       "id": "skill_evaluator",
@@ -3784,10 +3784,10 @@
         "common_run_context",
         "prior_scenario_context"
       ],
-      "return_schema_id": "skill_evaluation_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "terminal_evaluation",
       "continuation_policy": "fresh_only_no_continuation",
-      "projection_digest": "54b6a83198993745ff8b2e649b2557978495b4eb800db4d7458d1ab723060036"
+      "projection_digest": "fee704fc8391b129c128f07a8c8c39f757b02947cabe32d5f24a4317e9965281"
     },
     {
       "id": "spark_worker",
@@ -3809,10 +3809,10 @@
         "unrelated_paths",
         "alternate_architecture"
       ],
-      "return_schema_id": "spark_implementation_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation_only",
       "continuation_policy": "same_spark_after_one_repaired_structural_gap",
-      "projection_digest": "59a128eed6867f3d30a2216ddd5839f7754fa0a82838480f8e29e1ba5750e89f"
+      "projection_digest": "2c1caf7f71eb452c46f951630094588f8407957e7232852d02e051e8f49315e3"
     },
     {
       "id": "terra",
@@ -3834,10 +3834,10 @@
         "unrelated_paths",
         "write_scope"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "d9316e9aa1a118056f400c9f8981ed0d9d1142a1f3f166c8d282d7b5773bd6cf"
+      "projection_digest": "1c16d8ac47e435bda16b03b176229ddfadf198ad786e7ad553f75676d08e810c"
     },
     {
       "id": "test_designer",
@@ -3857,10 +3857,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "review_result_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "b1805de39dcbc003fdd7bfb13eb7931872184c8d9a2bf067ee4edda4c909dae3"
+      "projection_digest": "b8f308a403e83481bb8128367fa08403ce7b3ffca249f9ea1ca45757070233b0"
     },
     {
       "id": "worker",
@@ -3881,10 +3881,10 @@
       "forbidden_context": [
         "unrelated_paths"
       ],
-      "return_schema_id": "implementation_feedback_v1",
+      "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "67ec57507fc9d419e25f8daf2cf2ed2c420b2bff1e6d2b2e8ebd22480bcefdeb"
+      "projection_digest": "f7d386a8ac4f36f5e2e1b75662d2cbd7c4cfd462394e55d7930a615ce255a329"
     }
   ],
   "generated_profile_projection": {
@@ -3892,6 +3892,6 @@
     "materializer": "tools/agent_tools/model_profile_registry.py",
     "registry_ref": "agents/model_profiles.toml",
     "role_count": 35,
-    "projection_digest": "879d3abc1ac0fc391b9133625d662979f2ebaeef4265ac91da8cd582205b3bea"
+    "projection_digest": "bd2288be0c127f12f3abfeba8180fe2843cacf0bbb239f9b80046e96684cf45f"
   }
 }

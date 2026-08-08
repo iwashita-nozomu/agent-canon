@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: d9316e9aa1a118056f400c9f8981ed0d9d1142a1f3f166c8d282d7b5773bd6cf
+# source canonical digest: 1c16d8ac47e435bda16b03b176229ddfadf198ad786e7ad553f75676d08e810c
 
 name = "terra"
 description = "Conditional read-only cross-cutting specialist for owner closure, context reconstruction, and adversarial contradiction validation."

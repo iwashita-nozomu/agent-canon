@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 800da34d508fe3599d06aef4791e2deb5df7a7e3a1e30aa9e99f82eff23ce574
+# source canonical digest: 231c36f33aac9d61e64c32edabf324520e8832dcc0ddb36d03c56b1458daceba
 
 name = "document_flow_reviewer"
 description = "Read-only reviewer for top-down document coherence, section order, term introduction order, and first-reader comprehension."

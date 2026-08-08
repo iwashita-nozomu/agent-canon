@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 491e2305089346a2b5d9feadaf7458b35a6d85660613374b0472876994297ee4
+# source canonical digest: 0ad4a6fbec489c28a33fb83799bfd50e02511d8010dc93124822c098599233db
 
 name = "explorer"
 description = "Read-only agent for tracing code paths, docs, and workflow state."

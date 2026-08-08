@@ -42,13 +42,12 @@ execution_time_policy:
   owner_ref: "agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract"
   applies_to: repo-changing execution
   projection: templates/agents/schedule.md#Execution-Time-Aware Plan
+  graph_activation: only_when_selected_ordering_or_collision_edges_exist
+  graph_scope: selected_dependency_and_collision_edges_only
   executable_fields:
     - dependency_dag
-    - makespan_objective
     - responsibility_completeness
     - correctness
-    - critical_path
-    - ready_set
     - context_reuse
     - affected_evidence_invalidation
 
@@ -92,8 +91,10 @@ role_topology_defaults: &standard_role_topology
     status: allowed_with_distinct_packets
     identity_key: role_id+instance_id+agent_type
     read_only: allowed_when_input_packets_or_review_focus_are_distinct
-    write_capable: allowed_only_with_disjoint_write_scopes_and_parent_integration_order
+    write_capable: allowed_only_for_worker_or_spark_worker
+    current_checkout_parallel_requirements: disjoint_paths+no_shared_git_index_or_head+no_generated_or_formatter_effects
     collision_policy: serialize_current_checkout_waves
+    isolated_worktree_policy: explicit_alternative_implementation_experiment_only
     runtime_threads_are_cardinality_source: false
   stage_waves:
     - id: intake

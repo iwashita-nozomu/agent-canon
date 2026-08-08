@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 7d95842f1dffc3441f2de0147534c7e358e16f02db000b13ec70862e722c41d0
+# source canonical digest: ccf10c750058f6f1ae2a3b5ac23b1a10502bad1cd9f5aae4154477860c5db2a5
 
 name = "oop_readability_reviewer"
 description = "Read-only reviewer that documents mechanical OOP readability reports without changing their verdicts."

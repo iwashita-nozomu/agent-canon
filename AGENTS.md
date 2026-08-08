@@ -46,7 +46,8 @@ owner surfaces it names.
 質問・明示 write clause・進行中 update・integration cleanup の compact flow は
 [`documents/design/request-intent-and-update-relation.md`](documents/design/request-intent-and-update-relation.md)
 から各 canonical owner へ投影する。
-Related Document Closure は DIC-010 の path+section+clause/ref receipt を owner packet が消費する。
+Related Document Closure は active DIC route でだけ DIC-010 の path+section+clause/ref receipt を
+owner packet が消費する。bounded owner/path/targeted-validation route には適用しない。
 
 この projection は `operation -> resulting state -> completion evidence` の順で
 materialize します。質問は read scope と evidence を読み、evidence-backed answer
@@ -59,11 +60,14 @@ readback および context reuse または必要並列 handoff を完了 evidenc
 completed integration は tree/remote readback を受け、既存 cleanup executor dispatch state
 に到達し、executor receipt、CleanupProof、closeout packet readback を完了 evidence にします。
 
-Repository-changing implementation の全 stage は、
+public API / behavior / schema、algorithm、ownership / path、runtime contract の変更、または
+明示的に選択した design workflow の implementation stage は、
 [`agents/internal-routines/design-implementation-correspondence.md`](agents/internal-routines/design-implementation-correspondence.md)
 を先に通ります。これは各 skill に共通規則を複製するための新しい policy
 source ではなく、owning design の read、clause fingerprint、handoff、
 forward/reverse review coverage、design drift block の内部 route です。
+owner、path、targeted validation が固定された bounded edit は通常の owner route として
+短い owner/path/validation note で完了し、この routine の fingerprint/closure を要求しません。
 - After context compaction, invoke the final-objective declaration required by
   `agents/COMMUNICATION_PROTOCOL.md` section `Post-Compaction Objective
   Re-Declaration Contract` before any work resumes.
@@ -178,8 +182,11 @@ ToolCall records are owned by `tools/agent_tools/update_lifecycle_contract.py`;
 the Decision Sufficiency policy remains owned by
 `agents/skills/agent-orchestration.md#Decision Sufficiency Packet`.
 
-For repo-changing work, create or reuse the run bundle and follow the
-machine-readable packet emitted by:
+For repo-changing work, create or reuse a run bundle only when coordination,
+resumption, or the selected workflow requires durable lifecycle evidence. A
+bounded owner/path/validation request may use a direct structured handoff and
+targeted validation without `task_start.py` or a bundle. When a packet is
+selected, follow the machine-readable output emitted by:
 
 ```bash
 python3 tools/agent_tools/task_start.py \

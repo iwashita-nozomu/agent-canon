@@ -121,7 +121,7 @@ in the Codex host runtime.
 - template clone から新 repo を始めるときは `start-repository` を使います。
 - 長い tool / skill 候補名を短い command に落とすときは `task-routing` を使います。
 - specialist を使う場合の Codex-specific routing は `agents/canonical/CODEX_SUBAGENTS.md` を見ます。
-- repo-changing task では `$agent-orchestration` から始めます。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じている修正では `$owner-bounded-routing` を使い、execution stage で `$codex-task-workflow`、handoff / wave が ready になった stage で `$subagent-bootstrap` を追加します。
+- repo-changing task では `$agent-orchestration` から始めます。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じている修正は通常の owner route で進め、execution stage で `$codex-task-workflow`、handoff / wave が ready になった stage で `$subagent-bootstrap` を追加します。
 - 文献調査が主タスクなら `literature-survey` を先に見ます。
 - 自然言語の数学的 claim を形式証明へ落とすときは `formal-proof-workflow` を使い、既存 proof / 文献探索は `literature-survey` へ接続します。
 - 実装前にアルゴリズムを設計する場合は `lean-algorithm-design` を使い、Lean 上の数学モデルと target theorem を先に検証してから production API へ渡します。
@@ -138,7 +138,7 @@ in the Codex host runtime.
 - `test-design` は owning mechanism の確立または修復後に、既存 owner と targeted validation
   では閉じない test-owned runtime risk がある場合だけ起動します。contract-only wrapper は
   static contract validation と canonical command evidence を使います。
-- owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じている修正では `owner-bounded-routing` を使い、existing tool を読了 gate なしに先に実行し、owner boundary、existing-tool route、targeted validation を evidence に残します。typo / link / format-only、Routine docs、Focused code の label もこの invariance gate を迂回しません。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更は `scoped_change` または broader route に進め、`dependency/consumer/migration/docs closure` を形成します。file 数や近接 owner だけでは route を固定しません。
+- owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じている修正は通常の owner route で進め、existing tool を読了 gate なしに先に実行し、owner boundary、existing-tool route、targeted validation を evidence に残します。typo / link / format-only、Routine docs、Focused code の label もこの invariance gate を迂回しません。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更は `scoped_change` または broader route に進め、`dependency/consumer/migration/docs closure` を形成します。file 数や近接 owner だけでは route を固定しません。
 - 文書整理で正本、generated evidence、closed issue record、重複見出しを分けるときは `document-canon-cleanup` を使います。
 - dependency manifest、reverse edge、cycle、full-repo manifest inventory、または修正対象の change-impact / repair-planning packet を作るときは `dependency-analysis` を使います。
 - 大規模 refactor では `refactor-loop` を追加し、semantic delta を別管理にします。target 選定と subagent handoff の前に `dependency-analysis` の change-impact packet を正本入力にします。

@@ -14,7 +14,6 @@
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR essence workflow
 # upstream design ../../agents/workflows/pr-queue-cleanup-workflow.md PR queue cleanup body update workflow
 # upstream design ../../agents/skills/md-style-check.md Markdown small-edit skill route
-# upstream design ../../agents/skills/owner-bounded-routing.md owner-bounded routing skill
 # upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
 # upstream design ../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
 # upstream design ../../templates/agents/workflow_monitoring.md tool warning closeout ledger
@@ -424,9 +423,6 @@ DOCUMENT_SPLIT_DECISION_MARKERS = {
         "document_split_decision_ready",
     ),
 }
-OWNER_BOUNDED_TOOL_ROUTE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
-    "owner_bounded_tool_route"
-]
 STATIC_READ_VALIDATION_POLICY_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "static_read_validation_policy"
 ]
@@ -1709,11 +1705,6 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(
         collect_marker_contract_findings(
             root, "design_integrity_gate", DESIGN_INTEGRITY_GATE_MARKERS
-        )
-    )
-    findings.extend(
-        collect_marker_contract_findings(
-            root, "owner_bounded_tool_route", OWNER_BOUNDED_TOOL_ROUTE_MARKERS
         )
     )
     findings.extend(

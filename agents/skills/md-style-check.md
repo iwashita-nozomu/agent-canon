@@ -37,7 +37,7 @@ marker is not readback evidence.
 Markdown の体裁、見出し、リンク、可読性を崩さずに保ちます。
 formatter を実行した場合は、体裁修正だけで完了にせず、同じ入口で周辺チェックまで閉じます。
 この skill 単独で扱うのは typo / link / format-only の文書変更です。
-repo-changing task 全体が owner-bounded 修正として閉じる場合は `$owner-bounded-routing`
+repo-changing task 全体が bounded owner 修正として閉じる場合は通常の owner route
 と組み合わせ、owner boundary、existing-tool route、targeted validation を残します。
 section order、reader path、claim support、source map、canonical route、
 document responsibility が変わる substantive な文書変更では、
@@ -145,7 +145,7 @@ The runtime discovery adapter delegates these required operating clauses to this
    `documents/conventions/common/05_docs.md`.
 1. Treat plain `md-style-check` or `$md-style-check` in a user request as an explicit skill invocation, not only a candidate signal.
 1. Select this skill when a repo-changing task edits Markdown files or routes docs lint, link, heading, Mermaid, markdown math, docs-check, formatter, or `agent-canon docs` failures.
-1. Treat this skill as the Markdown checker route for typo/link/format-only edits. Pair it with `$owner-bounded-routing` when the whole task is an owner-bounded repository edit. When a Markdown change alters section order, reader path, claim support, source map, canonical route, or document responsibility, add `$prose-reasoning-graph` and `$structure-planning` before prose edits; for the format-only route, record `structure_contract=skipped` with the reason.
+1. Treat this skill as the Markdown checker route for typo/link/format-only edits. Use it with the normal owner route when the whole task is a bounded repository edit. When a Markdown change alters section order, reader path, claim support, source map, canonical route, or document responsibility, add `$prose-reasoning-graph` and `$structure-planning` before prose edits; for the format-only route, record `structure_contract=skipped` with the reason.
 1. For typo/link/format-only edits, do not require runtime `SKILL.md` reading
    before running the docs tool or patching. Keep owner, existing-tool route,
    and targeted-validation evidence.
