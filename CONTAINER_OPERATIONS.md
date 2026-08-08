@@ -101,25 +101,40 @@ developer convenience.
 
 The mounted workspace devcontainer contract is separate. The fixed
 `.devcontainer/bootstrap-dependencies.sh` establishes only the base capabilities
-needed to read a manifest. `postCreateCommand` invokes this shell-owned bootstrap
-with `--install` before it invokes the Python source-root wrapper, so the
-bootstrap establishes `python3`/`tomllib` or `tomli` and
-`python3-packaging` for structured PEP 508 parsing, pinned Node/npm 22.14.0
-with architecture-specific SHA256 verification, `ninja-build`, `build-essential`,
+needed to read a manifest. The standalone AgentCanon image runs that existing
+bootstrap with `--install` during image build; parent images own an equivalent
+fixed bootstrap in their image build. Post-create runs the bootstrap once in
+`--check` mode, so it never performs a runtime network install for these fixed
+capabilities. The bootstrap establishes `python3`/`tomllib` or `tomli`,
+`python3-pip`, `python3-packaging`, pinned Node/npm 22.14.0 with
+architecture-specific SHA256 verification, `ninja-build`, `build-essential`,
 and the fixed APT-repository prerequisite `gnupg` with a working `gpg`
 executable. It also checks `cc` and `gcc` before any repository-key/source
 operation and fails closed when the bootstrap capability is absent.
-`.devcontainer/dependencies.toml` then describes mounted developer/agent tools.
-The shared post-create validates and merges the parent manifest before the
-AgentCanon manifest, validates the complete graph, and executes it only after
-that validation succeeds.
+`.devcontainer/dependencies.toml` then describes the small default set of
+mounted developer/agent tools. Browser, TeX/PDF, proof, full Rust, and security
+scanner capabilities are selected by their owning workflow or CI image rather
+than installed by every default startup.
+
+In a derived repository, the parent overlay and final hook are optional:
+`.devcontainer/dependencies.toml` is read only when present, and its absence
+means no parent dependency overlay; `.devcontainer/post-create-parent.sh` is
+called only when present, and its absence means no parent final hook. The
+legacy parent-environment pair is likewise optional and is audited only when
+present. No empty sentinel, disabled marker, or no-op wrapper is required.
+The shared post-create validates the available sources, merges a present parent
+manifest before the canonical AgentCanon manifest, validates the complete graph,
+and executes it only after that validation succeeds.
 
 ## Manifest Source Roles And Cardinality
 
 Schema v2 uses structured manifest-source roles rather than filename guesses.
 In a parent-plus-vendor layout, `<workspace>/.devcontainer/dependencies.toml`
-is the `parent-overlay` source and may explicitly declare `records = []` when
-the parent Template has no parent-owned derived tools. The
+is the optional `parent-overlay` source when present. Its absence means no
+parent-owned derived tools. New derived repositories must not create an empty
+manifest or sentinel for that case; they leave the optional overlay absent.
+For migration compatibility, the parser still accepts an existing present
+overlay that explicitly declares `records = []`. The
 `vendor/agent-canon/.devcontainer/dependencies.toml` source is `canonical` and
 must remain non-empty. In standalone AgentCanon, the workspace manifest is
 also `canonical` and must remain non-empty. After source loading, the merged
@@ -166,7 +181,9 @@ Keep the project `Dockerfile` focused on the project runtime.
 - Do not bake host-specific mount paths such as `/mnt/git` into the image.
 - Do not install repository Python dependencies during image build when those
   dependencies depend on the mounted workspace.
-- Do not make Dockerfile changes to repair AgentCanon post-create behavior.
+- Do not add fixed AgentCanon bootstrap capability to a project product
+  Dockerfile; standalone AgentCanon `.devcontainer/Dockerfile` owns its image
+  build invocation of the existing bootstrap.
 
 If a project genuinely needs Node.js, npm, GitHub CLI, Rust, or another
 agent-looking tool as a product/runtime dependency, document that as a
@@ -197,24 +214,11 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   files, executables, toolchains, browser cache targets, or built Cargo
   binaries invalidate the receipt and enter method-specific repair installation
   before a new receipt is written.
-- Public-repository security scanners used by agents, including `gitleaks`,
-  `trufflehog`, and `detect-secrets`, belong in the typed manifest.
-  They are audit tooling, not project runtime dependencies, and must not be
-  installed in the project Dockerfile unless a project explicitly needs them at
-  runtime.
-- Browser automation tooling used by agents to validate generated HTML and
-  JavaScript report artifacts is represented by separate pinned Playwright and
-  dependent `browser-install` records. The browser record owns the typed shared
-  cache `/usr/local/share/ms-playwright` and exports it through
-  `PLAYWRIGHT_BROWSERS_PATH` for non-root devcontainer commands. It is
-  report-validation infrastructure, not a project runtime dependency. Receipt
-  verification resolves and executes a declared browser target inside that
-  cache; the Playwright CLI version alone is not sufficient.
-- Rust, cargo, rustfmt, clippy, rust-analyzer, and the AgentCanon Rust CLI
-  belong in typed `rust-toolchain` and `cargo-source-build` records when they
-  are only needed for shared AgentCanon tooling. The Cargo record verifies the
-  exact source-local `target/release/agent-canon` binary rather than ambient
-  `cargo`.
+- Public-repository security scanners, browser automation, TeX/PDF, proof
+  toolchains, and full Rust tooling are opt-in workflow or CI capabilities.
+  Their records and caches must not be added to the default manifest merely to
+  make those workflows available in every project. A selected workflow owns
+  its external/on-demand installation and typed verification route.
 - Shared C/C++ formatting tooling, including `clang-format`, belongs in one
   typed `apt-package` record in `.devcontainer/dependencies.toml` when it is
   only needed for shared AgentCanon tooling. The manifest owns installation,
@@ -259,26 +263,13 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   `/usr/bin/dpkg-query --listfiles` ownership output; Rust binds the pinned
   toolchain's `rust-analyzer` path. Ambient `PATH` or `shutil.which` never
   participates.
-- Lean theorem-proving tooling used by formal-proof skills, including
-  `elan`, Lean, and Lake, belongs in `.devcontainer/post-create.sh` when it is
-  only needed for AgentCanon proof tooling and is declared by exact
-  `lean-toolchain` and `release-asset` records. Install `elan` from a pinned
-  release-asset record with recorded architecture checksums, not by piping a
-  moving installer script. It is agent-side proof infrastructure, not a
-  project runtime dependency.
-- Structured analysis cache rebuilds belong in `.devcontainer/post-create.sh`
-  after the AgentCanon Rust CLI is installed. The rebuild uses
-  `agent-canon structured-analysis build --root <workspace> --profile devcontainer`, writes only to
-  `${AGENT_CANON_STRUCTURED_ANALYSIS_HOME:-$HOME/.cache/agent-canon/structured-analysis}`,
-  materializes `prose_graph.sqlite` plus a separate `diagnostics.sqlite` warning
-  DB, and must be warning-only so container creation continues when the cache
-  can be regenerated later.
-- TeX document and image tooling used by the Academic Writing skill, including
-  `latexmk`, pdfLaTeX, XeLaTeX, TikZ packages, `dvisvgm`, `pdfcrop`,
-  Ghostscript, and PDF inspection helpers, belongs in typed apt records in
-  `.devcontainer/dependencies.toml`.
-  This is an agent-side writing toolchain, not a default project runtime
-  dependency.
+- Lean/proof and TeX/PDF tooling are selected workflow capabilities. When a
+  proof or writing workflow needs them, its owning CI image or on-demand pack
+  declares the same typed records and checksums; these records are not part of
+  the default manifest.
+- Structured analysis cache rebuilds remain warning-only when an external or
+  selected AgentCanon CLI is available. Default startup does not build Rust or
+  require a Cargo record, so an unavailable CLI simply skips the cache rebuild.
 - Model server, installer, model-cache, and compatibility consumers are not
   part of the container runtime. Former compatibility validation is a read-only
   `skill_evaluator` route using `gpt-5.4-mini`; the container does not download,

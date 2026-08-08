@@ -28,7 +28,11 @@ downstream design parent-dependency-manifest-followup.md declares the parent man
 
 - `.devcontainer/devcontainer.json` は
   `vendor/agent-canon/.devcontainer/devcontainer.json` への symlink。
-- 親固有の処理がある場合は `.devcontainer/post-create-parent.sh` に置く。
+- 親固有の処理がある場合だけ `.devcontainer/post-create-parent.sh` に置く。
+  ファイルが無い場合は親固有の final hook なしとして扱う。
+- 親固有の developer/agent tool がある場合だけ
+  `.devcontainer/dependencies.toml` に置く。ファイルが無い場合は parent
+  overlay なしとして vendor の canonical manifest だけを読む。
 - `.devcontainer/parent-environment.sh` と `.devcontainer/parent-environment.toml`
   は既定 devcontainer の入力ではない。存在する場合の監査対象にはできるが、
   bind mount、shell startup、tool availability の前提にしない。
@@ -53,7 +57,8 @@ variables = ["PROJECT_TOKEN", "PROJECT_REGION"]
 validator は export name と TOML の `variables` を順序付きで完全一致させます。
 許可されない shell 行、重複名、未知の TOML key、name の不正、順序差は failure
 です。構造検査でファイルが存在しても、値の定義、Compose の意味、image の zsh
-startup、host premise の十分条件を証明したことにはなりません。
+startup、host premise の十分条件を証明したことにはなりません。組が存在しない
+場合は親環境 contract なしとして検査を成功させます。
 
 ## 直接参照
 
@@ -210,7 +215,7 @@ host の全 supplementary GID を bootstrap receipt から再読し、Compose �
 | rationale | 既定開発は container-local の product/runtime setup とし、GPU admission は異なる host 権限・lifecycle 契約を持つ実験 capability として分離する |
 | security/runtime impact | 既定経路の host privilege escalation、固定 GID/セッション結合、host runtime 永続化を除去する。container-local logs/state と明示 opt-in 実験 capability は保持する |
 | owner / surfaces | AgentCanon は `.devcontainer/devcontainer.json`、`.devcontainer/gpu-admission/devcontainer.json`、`.devcontainer/gpu-admission.sh`、`generate-runtime-compose.sh`、`post-create.sh`、`post-attach.sh`、bootstrap/finalize scripts、layout/readback を所有する。親は image、`docker/`、parent hook を所有する。Issue #521 の opt-in owner は GPU-admission selector/orchestrator とし、既定境界の authority は本設計と実装の clause に置く |
-| dependency/install order | `postCreateCommand` が shell-owned `bootstrap-dependencies.sh --install` を Python source-root wrapper より先に実行し、manifest parser capability と APT repository prerequisite の `gnupg`/`gpg` を先に確立する。続けて親 manifest、vendor manifest、plan validation、topological derived execution、親 Python installer、AgentCanon build/cache/projection の順序を維持する。AgentCanon の package/manifest dependency は追加せず、親 image が digest-pinned Ubuntu 22.04、mapped `project` user/group、container-local sudo を準備する |
+| dependency/install order | standalone AgentCanon image build が shell-owned `bootstrap-dependencies.sh --install` を一度だけ実行し、post-create は `--check` を一度だけ実行する。続けて（存在する場合の）親 manifest、vendor manifest、plan validation、topological derived execution、親 Python installer、AgentCanon cache/projection の順序を維持する。AgentCanon の package/manifest dependency は追加せず、親 image が digest-pinned Ubuntu 22.04、mapped `project` user/group、container-local sudo を準備する |
 | validation | default/opt-in generated Compose scenario を `container_config.py` で別 profile として検証し、dependency manifest の validate/dry-run、Docker dependency validator、対象 devcontainer/lifecycle tests、host password prompt なしの親 root default `devcontainer up` を実行する。GPU profile は `nvidia-smi -L`、selector、profile-specific Compose/project、complete host GID、bootstrap provision、finalize readback を確認する。固定 bootstrap は `command -v gpg`/`gpg --version`、`command -v cc`、`command -v gcc` と `gnupg` capability を確認してから apt repository operation を行い、親 image は base digest、`PROJECT_UID/GID/USER=project`、`USER project`、`containerUser`/`remoteUser`、`sudo -n true`、apt dependency bootstrap、bind workspace owner の host UID/GID 一致を確認する。公開 override が無いこと、managed-topic と direct-repo の layout/mount/readback を検証する。Python/wgrib2 の container smoke は親側 ownership とする |
 | rollback | GPU profile の up/finalize 失敗は default profile へ降格せず、検証済み profile Compose/project identity を指定してその container/project だけを停止する。cleanup failure は別の typed evidence とし、entrypoint は元の rc を保持する。default profile へ host bootstrap を戻さない。rollback evidence は profile selector、host capability contract、別 Compose/project identity、cleanup command/result、元の rc、receipt readback を含む |
 
@@ -274,25 +279,26 @@ root or sudo is required`、host password prompt、UID/GID mismatch、または 
 ## post-create の順序
 
 `postCreateCommand` は AgentCanon の共有 `post-create.sh` を先に呼び、成功した
-後に親固有の `post-create-parent.sh` を直接呼ぶ。共有処理が失敗した場合は親固有
-処理へ進まない。親固有処理の失敗も devcontainer 作成の失敗として扱う。
+後に存在する場合だけ親固有の `post-create-parent.sh` を直接呼ぶ。共有処理が失敗
+した場合は親固有処理へ進まない。親固有処理の失敗も devcontainer 作成の失敗として
+扱う。
 
 shared post-create の内部順序は
-container-local fixed bootstrap、親 manifest、vendor manifest、全体 validation、
+container-local fixed bootstrap check、（存在する場合の）親 manifest、vendor manifest、全体 validation、
 topological derived execution、親の
 docker/install_python_dependencies.sh、AgentCanon build/cache/projection の順です。
 host shared-runtime bootstrap と GPU admission finalize は既定順序の外側にあり、
 既定の public lifecycle からは選択しません。GPU-admission profile では
 `gpu-admission.sh` が `devcontainer up` 完了後に finalize を実行します。この shared command の完了後に、devcontainer.json
 の直接参照が親の
-post-create-parent.sh を最後に実行します。詳細な親側 follow-up は
+存在する場合だけ post-create-parent.sh を最後に実行します。詳細な親側 follow-up は
 parent-dependency-manifest-followup.md に従います。
 
-AgentCanon は mounted tool のために独立した pinned PyYAML record を持ちます。
-親が `docker/requirements.txt` または親 manifest で PyYAML を宣言している場合も、
-その親 ownership は保持します。fixed bootstrap の packaging / tomli 契約はこの
-source change で変更せず、親の Python 3.11 移行時の tomli 整理は親側 follow-up
-です。依存 manifest の plan validation が pass するまで install は開始しません。
+AgentCanon の default manifest は検証済み LSP と小さな構造確認ツールに限定します。
+PyYAML、browser、TeX/PDF、proof、full Rust、security scanner は default startup
+の入力ではなく、選択した workflow または CI image が所有します。fixed bootstrap
+の packaging / tomli 契約はこの source change で変更せず、依存 manifest の plan
+validation が pass するまで install は開始しません。
 
 ## requirements lock の parser ownership
 

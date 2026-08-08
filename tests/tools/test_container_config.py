@@ -33,7 +33,6 @@ GPU_ADMISSION_SELECTOR = (
 )
 GPU_ADMISSION_ORCHESTRATOR = PROJECT_ROOT / ".devcontainer" / "gpu-admission.sh"
 POST_CREATE_COMMAND = (
-    "bash .devcontainer/bootstrap-dependencies.sh --install && "
     "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
     ".devcontainer/post-create-entrypoint.sh "
     "/workspace/${localWorkspaceFolderBasename}"
@@ -284,8 +283,8 @@ def test_gpu_admission_selector_isolated_from_default_selector() -> None:
     assert load_container_config_module().validate_gpu_admission_selector(PROJECT_ROOT) == []
 
 
-def test_post_create_bootstraps_before_python_source_root_wrapper() -> None:
-    """Both selectors provision shell prerequisites before Python starts."""
+def test_post_create_uses_image_bootstrap_before_shared_lifecycle() -> None:
+    """Both selectors rely on the image-owned fixed bootstrap and check at runtime."""
     for config_path in (
         PROJECT_ROOT / ".devcontainer" / "devcontainer.json",
         GPU_ADMISSION_SELECTOR,
@@ -294,9 +293,7 @@ def test_post_create_bootstraps_before_python_source_root_wrapper() -> None:
         command = config["postCreateCommand"]
 
         assert command == POST_CREATE_COMMAND
-        assert command.index("bootstrap-dependencies.sh --install") < command.index(
-            "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py"
-        )
+        assert "bootstrap-dependencies.sh --install" not in command
 
 
 def test_gpu_admission_selector_is_mandatory(tmp_path: Path) -> None:

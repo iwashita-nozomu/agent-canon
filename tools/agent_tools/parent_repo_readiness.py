@@ -110,6 +110,9 @@ PARENT_CONTRACT_PATHS = (
 ENVIRONMENT_PATHS = (
     ExpectedPath(".devcontainer", "devcontainer_environment", "dir"),
     ExpectedPath(".devcontainer/devcontainer.json", "devcontainer_environment", "file"),
+)
+
+OPTIONAL_ENVIRONMENT_PATHS = (
     ExpectedPath(
         ".devcontainer/post-create-parent.sh",
         "devcontainer_environment",
@@ -543,6 +546,28 @@ class ParentRepoReadinessChecker:
             )
         expected_paths = (*PARENT_CONTRACT_PATHS, *ENVIRONMENT_PATHS)
         findings.extend(ExpectedPathChecker(self.root, expected_paths).run())
+        for optional in OPTIONAL_ENVIRONMENT_PATHS:
+            path = self.root / optional.path
+            if not path.exists():
+                continue
+            if not ExpectedPathChecker.path_matches_kind(path, optional.kind):
+                findings.append(
+                    Finding(
+                        optional.severity,
+                        optional.category,
+                        optional.path,
+                        f"missing-{optional.kind}",
+                    )
+                )
+            elif optional.executable and not os.access(path, os.X_OK):
+                findings.append(
+                    Finding(
+                        optional.severity,
+                        optional.category,
+                        optional.path,
+                        "not-executable",
+                    )
+                )
         findings.extend(ContentMarkerChecker(self.root, CONTENT_MARKERS).run())
         container_findings, container_checked = ContainerConfigChecker(
             self.root,

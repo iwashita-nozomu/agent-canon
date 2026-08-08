@@ -10,6 +10,8 @@ FROM ubuntu:22.04@sha256:0e0a0fc6d18feda9db1590da249ac93e8d5abfea8f4c3c0c849ce51
 ARG PROJECT_UID=1000
 ARG PROJECT_GID=1000
 
+COPY .devcontainer/bootstrap-dependencies.sh /usr/local/lib/agent-canon/bootstrap-dependencies.sh
+
 RUN set -eux; \
     test "${PROJECT_UID}" -gt 0; \
     test "${PROJECT_GID}" -gt 0; \
@@ -19,6 +21,9 @@ RUN set -eux; \
       git \
       sudo; \
     rm -rf /var/lib/apt/lists/*; \
+    chmod 0755 /usr/local/lib/agent-canon/bootstrap-dependencies.sh; \
+    /usr/local/lib/agent-canon/bootstrap-dependencies.sh --install; \
+    rm -f /usr/local/lib/agent-canon/bootstrap-dependencies.sh; \
     groupadd --gid "${PROJECT_GID}" project; \
     useradd --uid "${PROJECT_UID}" --gid project --create-home --shell /bin/bash project; \
     printf '%s\n' 'project ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/project; \

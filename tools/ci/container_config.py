@@ -471,7 +471,7 @@ def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
         "containerUser": "project",
         "remoteUser": "project",
         "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-        "postCreateCommand": "bash .devcontainer/bootstrap-dependencies.sh --install && python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
+        "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
         "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
     }
     for key, expected in expected_json.items():
@@ -584,7 +584,7 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
         "containerUser": "project",
         "remoteUser": "project",
         "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-        "postCreateCommand": "bash .devcontainer/bootstrap-dependencies.sh --install && python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
+        "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
         "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
     }
     for key, expected_value in expected.items():
