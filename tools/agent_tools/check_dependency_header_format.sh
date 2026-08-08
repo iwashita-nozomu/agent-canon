@@ -234,11 +234,18 @@ strip_manifest_line() {
 normalize_path() {
   local source_file="$1"
   local rel_path="$2"
-  local source_context
   local source_dir
-  source_context="$(source_context_file "$source_file")"
-  source_dir="$(dirname "$source_context")"
-  realpath -m --relative-to="$ROOT_DIR" "$source_dir/$rel_path"
+  local direct_target
+  local mapped_target
+  source_dir="$(dirname "$source_file")"
+  direct_target="$(realpath -m --relative-to="$ROOT_DIR" "$source_dir/$rel_path")"
+  if [[ -e "$direct_target" ]]; then
+    printf '%s\n' "$direct_target"
+    return
+  fi
+  source_dir="$(dirname "$(source_context_file "$source_file")")"
+  mapped_target="$(realpath -m --relative-to="$ROOT_DIR" "$source_dir/$rel_path")"
+  printf '%s\n' "$mapped_target"
 }
 
 source_context_file() {

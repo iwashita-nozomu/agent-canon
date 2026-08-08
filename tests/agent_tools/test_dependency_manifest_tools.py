@@ -1338,6 +1338,74 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
 
+    def test_format_prefers_direct_template_target_for_vendor_path(self) -> None:
+        """Template header paths that point through the vendored source resolve directly."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
+            vendor_agent = root / "vendor" / "agent-canon" / ".github"
+            vendor_agent.mkdir(parents=True)
+            (vendor_agent / "AGENTS.md").write_text("# AGENTS\n", encoding="utf-8")
+            workflow.parent.mkdir(parents=True)
+            (root / "vendor" / "agent-canon" / ".github" / "workflows").mkdir(
+                parents=True
+            )
+            (root / "vendor" / "agent-canon" / ".github" / "workflows" / "agent-improvement-guide.yml").write_text(
+                "name: Agent Improvement Guide\n", encoding="utf-8"
+            )
+            workflow.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# contract test",
+                        "# responsibility Exercises vendored path resolution preference.",
+                        "# upstream design ../../vendor/agent-canon/.github/AGENTS.md vendor header path",
+                        "# @dependency-end",
+                        "name: Agent Improvement Guide",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
+    def test_format_falls_back_to_template_source_context_when_direct_missing(self) -> None:
+        """Fallback context is still used when direct dependency target does not exist."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
+            workflow.parent.mkdir(parents=True)
+            (root / "vendor" / "agent-canon" / ".github" / "workflows").mkdir(
+                parents=True
+            )
+            (root / "vendor" / "agent-canon" / ".github" / "AGENTS.md").write_text(
+                "# Vendor AGENTS\n", encoding="utf-8"
+            )
+            (
+                root / "vendor" / "agent-canon" / ".github" / "workflows" / "agent-improvement-guide.yml"
+            ).write_text("name: Agent Improvement Guide\n", encoding="utf-8")
+            workflow.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# contract test",
+                        "# responsibility Exercises fallback source-context resolution.",
+                        "# upstream design ../../.github/AGENTS.md context fallback",
+                        "# @dependency-end",
+                        "name: Agent Improvement Guide",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
     def test_format_accepts_markdown_h1_before_manifest(self) -> None:
         """Markdown H1 titles may precede the dependency manifest near the top."""
         with tempfile.TemporaryDirectory() as tmp_dir:
