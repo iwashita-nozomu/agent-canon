@@ -12,6 +12,11 @@ version: 2
 review_activation_policy:
   mode: candidate_only
   owner_gate_cardinality: one_gate_per_replaceable_responsibility
+  review_dispatch_owner: change_reviewer
+  domain_validators:
+    - python_reviewer
+    - cpp_reviewer
+  domain_validator_mode: bounded_claims_only
   specialist_activation: distinct_unresolved_claim_or_risk_only
   task_default_specialists: candidate_only
   default_review_packs: candidate_only
@@ -31,6 +36,7 @@ review_activation_policy:
     full_suite_or_remote_ci: see_owner_ref
   artifacts:
     empty_reviewer_or_template_files: do_not_materialize
+    selected_outputs_only: true
 
 execution_time_policy:
   owner_ref: "agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract"
@@ -181,6 +187,8 @@ role_topology_defaults: &standard_role_topology
         - change_reviewer
         - python_reviewer
         - cpp_reviewer
+      owner_gate: change_reviewer
+      domain_validators_are_bounded: true
     - id: final_review
       stage_class: final
       role_ids:

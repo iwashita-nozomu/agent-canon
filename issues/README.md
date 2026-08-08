@@ -34,7 +34,8 @@ Use it when a user, reviewer, runtime check, CI failure, or agent retrospective 
 
 ## File Naming
 
-Use one file per finding:
+Use one file per finding. Findings with the same owner, root cause, and fix
+are one issue candidate even when several paths or agents reported them:
 
 ```text
 issues/open/AC-YYYYMMDD-short-slug.md
@@ -48,19 +49,27 @@ issues/open/AC-YYYYMMDD-short-slug.md
 
 ## Required Fields
 
-Every issue file must contain these machine-readable lines near the top:
+Every issue file must contain these identity lines near the top:
 
 ```text
 issue_id: AC-YYYYMMDD-short-slug
 status: open|in_progress|resolved|deferred|wontfix
 source: user|reviewer|runtime|ci|retrospective
 severity: S0|S1|S2|S3
+problem: <one sentence>
 evidence: <repo-relative path or external PR/issue URL>
-affected_surfaces: <comma-separated repo-relative paths>
-edit_scope: <dependency-expanded paths or report artifact path>
-required_action: <one sentence>
-close_condition: <one sentence>
+done: <one sentence>
 ```
+
+The extended issue form may add `affected_surfaces`, `edit_scope`,
+`required_action`, and `close_condition`. Existing issues may retain those
+fields; they are optional when the compact form is complete. The compact issue
+form may use `problem`, `evidence`, and `done` instead of
+the extended `affected_surfaces`, `edit_scope`, `required_action`, and
+`close_condition` fields. The extended fields remain optional when the compact
+form is complete. `evidence` is always required. New finding intake defaults
+to changed-surface, user-request, or owner-bounded scope; `repo-wide` must be
+selected explicitly.
 
 Issue text must summarize the behavior and cite evidence.
 Do not paste raw chat logs or long run-bundle transcripts.

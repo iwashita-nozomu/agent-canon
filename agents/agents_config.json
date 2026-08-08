@@ -238,7 +238,7 @@
         "allowed_artifacts": [
           "change_review"
         ],
-        "notes": "The implementation reviewer checks each coding chunk, verifies request-clause and Design Side-Effect Map coverage for that chunk, records fix-now findings, and may only update review artifacts. Python-specific validation follows agents/skills/python-review.md#Validation route; OOP/SOLID evidence and check_solid_evidence.py path-coverage are added only when that canonical route requires them."
+        "notes": "The implementation reviewer is the single owning review dispatch. It checks each coding chunk, verifies request-clause and Design Side-Effect Map coverage, records finding-level status, and may only update review artifacts. Python/C++ reviewers are bounded domain validators for distinct claims selected by the owning dispatch; they do not create duplicate full-review workflows."
       }
     },
     {
@@ -821,7 +821,7 @@
         "allowed_artifacts": [
           "python_review"
         ],
-        "notes": "The Python reviewer records type, test, and lint findings only in the python review artifact."
+        "notes": "The Python reviewer is a bounded domain validator selected by change_reviewer for a distinct Python claim. It records type, test, and lint findings only in the python review artifact and does not make the owning review decision."
       }
     },
     {
@@ -844,7 +844,7 @@
         "allowed_artifacts": [
           "cpp_review"
         ],
-        "notes": "The C++ reviewer records native build, ABI, ownership, and test findings only in the C++ review artifact."
+        "notes": "The C++ reviewer is a bounded domain validator selected by change_reviewer for a distinct native claim. It records native build, ABI, ownership, and test findings only in the C++ review artifact and does not make the owning review decision."
       }
     },
     {

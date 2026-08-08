@@ -18,6 +18,8 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "issue_sync.py"
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+import issue_sync  # noqa: E402
 
 
 class IssueSyncTest(unittest.TestCase):
@@ -207,6 +209,56 @@ class IssueSyncTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("## Issue Mirror Check", text)
             self.assertIn("missing_github_links: `1`", text)
+
+    def test_group_findings_reuses_one_owner_root_cause_fix(self) -> None:
+        """Duplicate observations become one issue candidate without fan-out."""
+        grouped = issue_sync.group_findings(
+            [
+                {
+                    "owner": "issue_sync",
+                    "root_cause": "duplicate warning",
+                    "fix": "normalize once",
+                    "evidence": "a.log",
+                    "path": "tools/a.py",
+                },
+                {
+                    "owner": "issue_sync",
+                    "root_cause": "duplicate warning",
+                    "fix": "normalize once",
+                    "evidence": "b.log",
+                    "path": "tools/b.py",
+                },
+            ]
+        )
+        self.assertEqual(len(grouped), 1)
+        self.assertEqual(grouped[0]["evidence"], ["a.log", "b.log"])
+        self.assertEqual(grouped[0]["scope"], "changed")
+
+    def test_compact_problem_evidence_done_issue_form_is_valid(self) -> None:
+        """The minimum issue form does not require extended scope fields."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            path = root / "issues" / "open" / "AC-20260517-compact.md"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "\n".join(
+                    [
+                        "# Compact",
+                        "",
+                        "issue_id: AC-20260517-compact",
+                        "status: open",
+                        "source: user",
+                        "severity: S2",
+                        "problem: warning is duplicated",
+                        "evidence: reports/run.log",
+                        "done: one owner groups the finding",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            result = self.run_checker(root)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def write_issue(
         self,

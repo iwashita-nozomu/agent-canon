@@ -83,7 +83,7 @@ evidence.
 ## Required Shape
 
 1. Choose the destination class before writing.
-1. Preserve the raw machine-readable result before writing a prose summary.
+1. Preserve the raw machine-readable source result before writing a prose summary when the caller selects a raw artifact. Raw, summary, manifest, report, and archive outputs are optional; do not materialize empty placeholders for unselected outputs.
 1. If the user asks for a reader-facing report from tool, JSON / JSONL, hook,
    eval, checker, experiment, review, or audit evidence, also use
    `report-writing`. This skill owns raw / summary artifact writeout, not the
@@ -160,7 +160,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 
 1. Read `agents/skills/result-artifact-writeout.md`.
 1. Classify the destination before writing: `run-local`, `accumulated-eval`, `hook-result`, `experiment-result`, `reader-report`, or `generated-triage`.
-1. Preserve the raw machine-readable source result first, then derive the Markdown/table summary from that same result.
+1. When raw output is selected, preserve the machine-readable source result first, then derive the Markdown/table summary from that same result. Raw, summary, manifest, report, and archive outputs are otherwise optional and unselected outputs remain absent.
 1. For prose graph outputs, treat the SQLite DB as the source result and keep projection, diagnostics, explanation, integration plan, handoff, and rewrite packets tied to that DB path.
 1. If the user asks for a reader-facing report from tool, JSON/JSONL, hook, eval, checker, experiment, review, or audit evidence, also use `$report-writing`; this skill owns raw/summary artifact writeout, not the report source packet, interpretation, limitations, next action, or quality checklist.
 1. Record `source_result`, `artifact_id`, raw artifact path, summary artifact path, manifest details, and overwrite policy; manifest details include command/argv, cwd, branch, commit, runtime namespace, timestamps, exit code, status, inputs, counts, and schema version when available.

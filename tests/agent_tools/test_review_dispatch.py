@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -74,6 +75,152 @@ class ReviewDispatchTest(unittest.TestCase):
         state = self.project(decision("APPROVE"))
 
         self.assertTrue(state["publication_unlocked"])
+
+    def test_publication_projection_accepts_only_canonical_approve(self) -> None:
+        """Publication remains locked if an uncanonical alias reaches the ledger."""
+        self.assertFalse(self.project(decision("ACCEPT"))["publication_unlocked"])
+        self.assertFalse(
+            self.project(decision("CHANGES-REQUIRED"))["publication_unlocked"]
+        )
+
+    def test_nonblocking_findings_are_accepted(self) -> None:
+        """Non-blocking findings do not force a changes-required outcome."""
+        self.assertEqual(
+            review_dispatch.derive_review_outcome(
+                [
+                    {"status": "non-blocking"},
+                    {"status": "question"},
+                    {"status": "accepted-risk"},
+                ]
+            ),
+            "accept",
+        )
+
+    def test_only_unresolved_blocking_finding_requires_changes(self) -> None:
+        """The owning decision is derived from finding status, not style severity."""
+        self.assertEqual(
+            review_dispatch.derive_review_outcome(
+                [{"severity": "style", "status": "non-blocking"}, {"status": "blocking"}]
+            ),
+            "changes-required",
+        )
+
+    def test_finding_table_rows_are_normalized(self) -> None:
+        """Existing Markdown finding tables feed the shared status contract."""
+        rows = review_dispatch.parse_finding_rows(
+            "| Chunk | Finding | Severity | Status | Evidence |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| docs | wording | style | non-blocking | docs.md |\n"
+        )
+        self.assertEqual(rows[0]["status"], "non-blocking")
+
+    def test_status_column_is_header_aware_for_python_review_shape(self) -> None:
+        """Status is read by header name when Evidence follows it."""
+        rows = review_dispatch.parse_finding_rows(
+            "| File | Finding | Severity | Status | Evidence |\n"
+            "| ---- | ------- | -------- | ------ | -------- |\n"
+            "| tool.py | broken path | high | blocking | test.py:10 |\n"
+        )
+        self.assertEqual(rows[0]["status"], "blocking")
+        self.assertEqual(
+            review_dispatch.derive_review_outcome(rows),
+            "changes-required",
+        )
+
+    def test_decision_aliases_are_canonicalized_at_dispatch(self) -> None:
+        """Template aliases preserve the canonical publication decision vocabulary."""
+        self.assertEqual(
+            review_dispatch.canonicalize_review_decision("ACCEPT"),
+            "APPROVE",
+        )
+        self.assertEqual(
+            review_dispatch.canonicalize_review_decision("CHANGES-REQUIRED"),
+            "REVISE",
+        )
+
+    def test_record_decision_canonicalizes_aliases_and_blocking_derived_state(self) -> None:
+        """Recorded events retain APPROVE/REVISE for publication consumers."""
+        candidate_payload = {
+            "candidate_id": "candidate-1",
+            "candidate_revision": 1,
+            "candidate_body_sha256": "candidate-hash",
+            "candidate_commit": "a" * 40,
+            "candidate_tree": "b" * 40,
+        }
+        frame = {
+            "review_role_id": "change_reviewer",
+            "candidate_id": "candidate-1",
+            "review_frame_id": "frame-1",
+            "review_request_id": "request-1",
+            "review_context_id": "context-1",
+            "review_lineage_id": "lineage-1",
+            "reviewer_assignment_id": "assignment-1",
+            "review_frame_body_sha256": "frame-hash",
+            "event_order_index": 1,
+        }
+        resume_event = {
+            "review_frame_id": "frame-1",
+            "observed_result": {"nested_runtime_agent_id": "reviewer-1"},
+        }
+
+        def record(text: str) -> dict[str, object]:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                report_dir = Path(temp_dir)
+                (report_dir / "change_review.md").write_text(text, encoding="utf-8")
+                captured: list[dict[str, object]] = []
+
+                def payloads(_report_dir: Path, kind: str | None = None) -> list[dict[str, object]]:
+                    if kind == "frame":
+                        return [frame]
+                    if kind == "resume_event":
+                        return [resume_event]
+                    return [frame, resume_event]
+
+                with (
+                    patch.object(review_dispatch, "_active_report_dir", return_value=report_dir),
+                    patch.object(review_dispatch, "_current_candidate", return_value=candidate_payload),
+                    patch.object(review_dispatch, "_automatic_payloads", side_effect=payloads),
+                    patch.object(
+                        review_dispatch,
+                        "_review_route",
+                        return_value={"review_artifact": "change_review.md"},
+                    ),
+                    patch.object(
+                        review_dispatch,
+                        "materialize_artifact_identity",
+                        return_value={
+                            "identity_record_id": "identity-1",
+                            "identity_record_body_sha256": "identity-hash",
+                            "artifact_path": "change_review.md",
+                            "sha256": "artifact-hash",
+                            "git_blob": "blob-hash",
+                        },
+                    ),
+                    patch.object(
+                        review_dispatch,
+                        "_append_automatic_event",
+                        side_effect=lambda _path, payload, outcome: captured.append(payload),
+                    ),
+                ):
+                    review_dispatch.record_current_review_decision(report_dir)
+                self.assertEqual(len(captured), 1)
+                return captured[0]
+
+        accepted = record(
+            "| Chunk | Finding | Severity | Status | Evidence |\n"
+            "| --- | --- | --- | --- | --- |\n"
+            "| docs | wording | style | non-blocking | docs.md |\n"
+            "\nDecision: ACCEPT\n"
+        )
+        self.assertEqual(accepted["decision"], "APPROVE")
+
+        required = record(
+            "| File | Finding | Severity | Status | Evidence |\n"
+            "| ---- | ------- | -------- | ------ | -------- |\n"
+            "| tool.py | broken path | high | blocking | test.py:10 |\n"
+            "\nDecision: CHANGES-REQUIRED\n"
+        )
+        self.assertEqual(required["decision"], "REVISE")
 
 
 if __name__ == "__main__":

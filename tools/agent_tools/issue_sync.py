@@ -17,7 +17,7 @@ import argparse
 import json
 import re
 import subprocess
-from collections.abc import Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -32,6 +32,9 @@ REQUIRED_FIELDS = (
     "required_action",
     "close_condition",
 )
+MINIMUM_ISSUE_FIELDS = ("issue_id", "status", "source", "severity", "evidence")
+MINIMUM_ISSUE_CONTENT_FIELDS = ("problem", "done")
+FINDING_SCOPES = frozenset({"changed", "user", "owner-bounded", "repo-wide"})
 OPEN_STATUSES = {"open", "in_progress", "deferred"}
 CLOSED_STATUSES = {"resolved", "wontfix", "deferred"}
 ISSUE_ID_RE = re.compile(r"^AC-\d{8}-[a-z0-9]+(?:-[a-z0-9]+)*$")
@@ -51,6 +54,81 @@ class Finding:
         return f"ISSUE_SYNC_FINDING={self.check}:{self.path}:{self.detail}"
 
 
+def normalize_finding(record: Mapping[str, object], *, default_scope: str = "changed") -> dict[str, object]:
+    """Normalize one tool or issue finding at the shared pipeline boundary.
+
+    Findings default to the changed/user/owner-bounded view.  Repo-wide scope
+    is accepted only when explicitly supplied by the caller; no path-based
+    inference silently broadens a run.
+    """
+    scope_value = record.get("scope", default_scope)
+    if not isinstance(scope_value, str):
+        raise ValueError("finding scope must be a string")
+    scope = scope_value.strip().lower().replace("_", "-")
+    if scope not in FINDING_SCOPES:
+        raise ValueError(f"unsupported finding scope: {scope}")
+    owner = str(record.get("owner", "")).strip()
+    root_cause = str(record.get("root_cause", record.get("cause", ""))).strip()
+    fix = str(record.get("fix", record.get("required_action", ""))).strip()
+    if not owner or not root_cause or not fix:
+        raise ValueError("finding owner, root_cause, and fix are required")
+    status = str(record.get("status", "warning")).strip().lower().replace("_", "-")
+    return {
+        "owner": owner,
+        "root_cause": root_cause,
+        "fix": fix,
+        "scope": scope,
+        "status": status,
+        "evidence": str(record.get("evidence", "")).strip(),
+        "actionable": bool(record.get("actionable", status in {"blocking", "error", "warning"})),
+        "path": str(record.get("path", "")).strip(),
+    }
+
+
+def group_findings(
+    records: Iterable[Mapping[str, object]],
+    *,
+    scope: str = "changed",
+) -> tuple[dict[str, object], ...]:
+    """Group findings by owner, root cause, and fix into one issue candidate.
+
+    Multiple agents or paths describing the same repair remain one candidate;
+    this owner deliberately does not partition a group into agents.
+    """
+    normalized = [normalize_finding(record, default_scope=scope) for record in records]
+    grouped: dict[tuple[str, str, str], dict[str, object]] = {}
+    for finding in normalized:
+        key = (
+            str(finding["owner"]),
+            str(finding["root_cause"]),
+            str(finding["fix"]),
+        )
+        current = grouped.setdefault(
+            key,
+            {
+                "owner": key[0],
+                "root_cause": key[1],
+                "fix": key[2],
+                "scope": finding["scope"],
+                "status": finding["status"],
+                "actionable": finding["actionable"],
+                "evidence": [],
+                "paths": [],
+            },
+        )
+        evidence = current["evidence"]
+        paths = current["paths"]
+        if isinstance(evidence, list) and finding["evidence"] and finding["evidence"] not in evidence:
+            evidence.append(finding["evidence"])
+        path = finding.get("path")
+        if isinstance(paths, list) and isinstance(path, str) and path and path not in paths:
+            paths.append(path)
+        if finding["status"] == "blocking":
+            current["status"] = "blocking"
+        current["actionable"] = bool(current["actionable"] or finding["actionable"])
+    return tuple(grouped[key] for key in sorted(grouped))
+
+
 @dataclass(frozen=True)
 class IssueRecord:
     """One parsed local issue file."""
@@ -58,6 +136,7 @@ class IssueRecord:
     path: Path
     directory_state: str
     fields: dict[str, str]
+    body: str = ""
 
     @property
     def issue_id(self) -> str:
@@ -244,6 +323,26 @@ def parse_fields(text: str) -> dict[str, str]:
     return fields
 
 
+def compact_issue_sections(text: str) -> dict[str, str]:
+    """Read the compact Problem/Evidence/Done headings from an issue body."""
+    sections: dict[str, str] = {}
+    heading: str | None = None
+    content: list[str] = []
+    for line in text.splitlines():
+        match = re.match(r"^##+\s+(.+?)\s*$", line)
+        if match:
+            if heading is not None:
+                sections[heading] = "\n".join(content).strip()
+            heading = match.group(1).strip().lower().replace("-", " ")
+            content = []
+            continue
+        if heading is not None:
+            content.append(line)
+    if heading is not None:
+        sections[heading] = "\n".join(content).strip()
+    return sections
+
+
 def issue_files(root: Path) -> tuple[Path, ...]:
     """Return local issue files under open and closed directories."""
     paths: list[Path] = []
@@ -264,19 +363,49 @@ def read_issues(root: Path) -> tuple[IssueRecord, ...]:
                 path=path,
                 directory_state=directory_state,
                 fields=parse_fields(path.read_text(encoding="utf-8")),
+                body=path.read_text(encoding="utf-8"),
             )
         )
     return tuple(records)
 
 
 def validate_required_fields(root: Path, issue: IssueRecord) -> list[Finding]:
-    """Validate required local issue fields."""
+    """Validate legacy metadata or the compact problem/evidence/done form."""
     rel_path = relative(root, issue.path)
     findings = [
         Finding("field", rel_path, f"missing:{field}")
-        for field in REQUIRED_FIELDS
+        for field in MINIMUM_ISSUE_FIELDS
         if not issue.fields.get(field)
     ]
+    has_extended = all(issue.fields.get(field) for field in (
+        "affected_surfaces", "edit_scope", "required_action", "close_condition"
+    ))
+    compact_sections = compact_issue_sections(issue.body)
+    has_compact = all(
+        issue.fields.get(field) or compact_sections.get(field)
+        for field in MINIMUM_ISSUE_CONTENT_FIELDS
+    )
+    if not has_extended and not has_compact:
+        extended_fields = (
+            "affected_surfaces",
+            "edit_scope",
+            "required_action",
+            "close_condition",
+        )
+        if any(issue.fields.get(field) for field in extended_fields):
+            findings.extend(
+                Finding("field", rel_path, f"missing:{field}")
+                for field in extended_fields
+                if not issue.fields.get(field)
+            )
+        else:
+            findings.append(
+                Finding(
+                    "field",
+                    rel_path,
+                    "missing:problem-evidence-done-or-extended-fields",
+                )
+            )
     if issue.directory_state == "closed" and not issue.fields.get("resolved_by"):
         findings.append(Finding("field", rel_path, "missing:resolved_by"))
     return findings

@@ -29,7 +29,7 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 ## Accumulated Context Resolution Review（蓄積 context の解決レビュー）
 
-<!-- open question が最初に memory、notes/themes、notes/guardrails、notes/knowledge、notes/failures、documents、prior log、local code、test、必要な external constraint と照合されたか確認します。この sweep なしに user へ質問した、または unknown を残した場合は revise とします。 -->
+<!-- scope または判定を変える具体的な evidence がある場合だけ memory、notes/themes、notes/guardrails、notes/knowledge、notes/failures、documents、prior log、local code、test、必要な external constraint と照合します。decision に影響しない sweep は実行せず、未実行だけで revise にしません。 -->
 
 ## Unknown Handling Review（unknown 処理レビュー）
 
@@ -38,6 +38,16 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 ## Routing Review（routing レビュー）
 
 <!-- workflow=<family>、skills=<...>、review=<...> が宣言され、適切な specialist role と明示的な stage subagent が有効か確認します。fanout ledger が Intake Responsibility Wave を total cap ではなく intake slice と証明しない場合、または dynamic expansion wave に budget/scope evidence がなければ revise とします。 -->
+
+## Finding Status And Outcome（finding status と判定）
+
+| Finding Status | Outcome impact |
+| --- | --- |
+| `blocking` | `changes-required` while unresolved |
+| `non-blocking`, `question`, `not-applicable`, `accepted-risk` | visible evidence only; does not force changes |
+
+<!-- management review is one owner gate; specialist checks remain bounded
+validators and do not create duplicate full-review artifacts. -->
 
 ## Context And Library Sweep Review（context と library sweep レビュー）
 

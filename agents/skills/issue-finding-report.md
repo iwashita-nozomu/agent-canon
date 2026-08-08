@@ -31,9 +31,9 @@ downstream design ../../.agents/skills/issue-finding-report/SKILL.md exposes thi
 ## Purpose
 
 Convert accumulated prompt, run-bundle, hook, skill, tool, workflow, and eval
-evidence into durable AgentCanon operational issues. The skill groups repeated
-signals by abstract cause, assigns multi-agent review partitions, and writes
-issue candidates that cite structured evidence.
+evidence into durable AgentCanon operational issues. The shared finding
+normalization/grouping owner groups repeated signals by owner, root cause, and
+fix; one resulting group becomes one issue candidate with structured evidence.
 
 This skill is the issue-production follow-up to `agent-log-analysis`. It
 receives structured dashboard artifacts and produces issue records or a finding
@@ -46,8 +46,8 @@ with their owner skills.
   skill issues.
 - A structured dashboard exposes repeated skill, workflow, tool, hook, wave, eval,
   or token evidence that should survive the current run.
-- Multi-agent review is needed to separate abstract causes before writing
-  `issues/open/AC-*.md` files.
+- An explicit repo-wide sweep is requested. Otherwise use changed-surface,
+  user-request, or owner-bounded scope.
 - The task asks why agent behavior keeps recurring and wants issue-backed
   repair work.
 
@@ -95,6 +95,14 @@ Assign each cluster to one primary cause and optional secondary causes:
 Create one issue per abstract recurring cause cluster, with structured evidence
 counts and route target.
 
+## Grouping And Dispatch Boundary
+
+Use `tools/agent_tools/issue_sync.py` as the shared normalization/grouping
+owner for tool and issue findings. A group is keyed by `(owner, root_cause,
+fix)` and remains one issue candidate; do not automatically partition a group
+into multiple agents. Warnings add a closeout obligation only when they are
+actionable or blocking.
+
 ## Multi-Agent Partition
 
 Use a parent-created `Issue Finding Packet` before spawning. Each packet fixes:
@@ -116,10 +124,11 @@ Recommended review partition:
 - `project_reviewer`: `archive_hygiene`, `wave_execution`, `structure_boundary`
 - `artifact_reviewer`: raw/structured artifact sufficiency and evidence paths
 
-When several independent clusters exist, spawn same-role instances by
-`instance_partition`. Each instance receives only its packet, structured artifact
-paths, allowed issue paths, candidate affected surfaces, validation route, and
-return schema. The parent deduplicates returned candidates before writing files.
+When several independent clusters exist, parent-owned routing may dispatch
+distinct groups. A single group is never split solely to increase fan-out.
+Each optional instance receives only its packet, structured artifact paths,
+allowed issue paths, candidate affected surfaces, validation route, and return
+schema; the parent consumes the shared grouping result before writing files.
 
 ## Issue Candidate Contract
 
@@ -141,10 +150,9 @@ Before writing a new issue:
 
 1. Write `issues/open/AC-YYYYMMDD-short-slug.md` after the duplicate search
    shows that the cause cluster needs a new durable record.
-1. Populate the required fields from `issues/README.md`:
-   `issue_id`, `status`, `source`, `severity`, `evidence`,
-   `affected_surfaces`, `edit_scope`, `required_action`, and
-   `close_condition`.
+1. Populate the minimum issue form from `issues/README.md`: `problem`,
+   `evidence`, and `done`, plus identity fields. Add extended fields only when
+   they carry actionable scope or ownership detail.
 1. Use `github_issue: pending` for a GitHub mirror created in the same branch
    or explicit follow-up.
 
