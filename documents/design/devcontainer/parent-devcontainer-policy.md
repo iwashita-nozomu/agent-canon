@@ -281,8 +281,11 @@ root or sudo is required`、host password prompt、UID/GID mismatch、または 
 
 ## post-create の順序
 
-`postCreateCommand` は source-root resolver 経由で standalone AgentCanon source の
-`.devcontainer/post-create.sh` を先に呼び、成功した後に存在する場合だけ親固有の
+Template / derived parent の `postCreateCommand` は source-root resolver 経由で fixed
+bootstrap の `--install-language-runtime` を明示実行し、続けて standalone AgentCanon
+source の `.devcontainer/post-create.sh` を呼ぶ。Standalone AgentCanon image は build 時に
+同じ language runtime を materialize 済みのため、この先行 install は parent layout
+だけが持つ。shared lifecycle が成功した後に存在する場合だけ親固有の
 `post-create-parent.sh` を直接呼ぶ。standalone-source 処理が失敗した場合は親固有処理へ
 進まない。親固有処理の失敗も devcontainer 作成の失敗として扱う。
 

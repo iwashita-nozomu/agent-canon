@@ -454,7 +454,26 @@ def load_devcontainer_json(
     return mapping, []
 
 
-def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
+def expected_post_create_command(*, parent_layout: bool) -> str:
+    """Return the lifecycle command for standalone or parent-projected layouts."""
+    resolver = (
+        "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec"
+    )
+    entrypoint = (
+        f"{resolver} .devcontainer/post-create-entrypoint.sh "
+        "/workspace/${localWorkspaceFolderBasename}"
+    )
+    if not parent_layout:
+        return entrypoint
+    return (
+        f"{resolver} .devcontainer/bootstrap-dependencies.sh "
+        f"--install-language-runtime && {entrypoint}"
+    )
+
+
+def validate_devcontainer_json(
+    config: Mapping[str, object], *, parent_layout: bool = False
+) -> list[Finding]:
     """Validate required devcontainer JSON fields."""
     findings: list[Finding] = []
     expected_json = {
@@ -465,7 +484,7 @@ def validate_devcontainer_json(config: Mapping[str, object]) -> list[Finding]:
         "containerUser": "project",
         "remoteUser": "project",
         "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-        "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
+        "postCreateCommand": expected_post_create_command(parent_layout=parent_layout),
         "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
     }
     for key, expected in expected_json.items():
@@ -578,7 +597,9 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
         "containerUser": "project",
         "remoteUser": "project",
         "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-        "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
+        "postCreateCommand": expected_post_create_command(
+            parent_layout=(root / "vendor" / "agent-canon").is_dir()
+        ),
         "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
     }
     for key, expected_value in expected.items():
@@ -1480,7 +1501,11 @@ def validate_devcontainer(root: Path) -> list[Finding]:
     if config is None:
         return findings
 
-    findings.extend(validate_devcontainer_json(config))
+    findings.extend(
+        validate_devcontainer_json(
+            config, parent_layout=(root / "vendor" / "agent-canon").is_dir()
+        )
+    )
     findings.extend(validate_generate_runtime_compose_script(root))
     findings.extend(validate_post_create(root))
     findings.extend(validate_default_lifecycle_scripts(root))

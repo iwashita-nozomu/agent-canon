@@ -107,6 +107,7 @@ Playwright を convenience-only の理由で Dockerfile に追加しません。
 親の `postCreateCommand` は次の順を直接保持します。
 
 ```text
+fixed bootstrap --install-language-runtime  # parent selector only
 shared post-create
   fixed bootstrap validation
   parent manifest -> vendor manifest merge
@@ -116,6 +117,12 @@ shared post-create
   AgentCanon build, cache, and runtime projection
 parent .devcontainer/post-create-parent.sh  # final, when present
 ```
+
+Standalone AgentCanon image は build 時に同じ fixed bootstrap を materialize 済みのため、
+standalone selector は shared post-create から始める。Template / derived parent selector は
+product image が所有しない Node/npm と Ninja を明示的な
+`--install-language-runtime` で先に materialize し、その後の shared `--check` を
+fail-closed validation として使う。
 
 親 record の manifest order と parent-first merge order は、依存制約がない
 record の安定順として保持します。親 post-create を shared script に吸収したり、
