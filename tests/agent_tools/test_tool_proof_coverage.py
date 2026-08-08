@@ -46,8 +46,8 @@ class ToolProofCoverageTest(unittest.TestCase):
             self.assertIn("# Tool Proof Coverage", result.stdout)
             self.assertIn("Lean theorem binding tool-catalog behavior spec", result.stdout)
 
-    def test_require_lean_verified_fails_without_proofs(self) -> None:
-        """Strict mode is available when the workflow needs full Lean verification."""
+    def test_require_lean_verified_requires_explicit_selection(self) -> None:
+        """Strict mode never recreates a universal proof backlog."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_minimal_repo(root, include_proofs=False)
@@ -55,8 +55,30 @@ class ToolProofCoverageTest(unittest.TestCase):
             result = self.run_checker(root, "--require-lean-verified")
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("behavior-not-lean-verified", result.stdout)
+            self.assertIn("explicit-tool-selection-required", result.stdout)
+            self.assertNotIn("behavior-not-lean-verified", result.stdout)
+
+    def test_require_lean_verified_checks_selected_tool_only(self) -> None:
+        """A selected tool receives strict behavior/performance proof checks."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_minimal_repo(root, include_proofs=True)
+
+            result = self.run_checker(
+                root,
+                "--tool-id",
+                "tool-catalog",
+                "--require-lean-verified",
+            )
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertNotIn("explicit-tool-selection-required", result.stdout)
             self.assertIn("performance-not-lean-verified", result.stdout)
+            payload = json.loads(
+                self.run_checker(root, "--tool-id", "tool-catalog", "--format", "json").stdout
+            )
+            self.assertEqual(payload["selected_tool_ids"], ["tool-catalog"])
+            self.assertEqual([row["tool_id"] for row in payload["rows"]], ["tool-catalog"])
 
     def test_declared_lean_verified_rejects_sorry(self) -> None:
         """Lean-verified claims must not point at proof files with escape hatches."""

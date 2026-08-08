@@ -8,12 +8,12 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: f40955788532d5672936855d5bce0287765aba5f11d5b288cb1b13af988e34dc
+# source canonical digest: 55f4fbe0c9119b52342922d01fa83798696936236a2e34f333932ee2dc52c771
 
 name = "execution_planner"
 description = "Execution-planning agent for stage order, subagent assignment, validation sequence, and rollback-aware task plans."
 nickname_candidates = ["execution_planner"]
-sandbox_mode = "workspace-write"
+sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"

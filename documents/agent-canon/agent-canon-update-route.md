@@ -112,7 +112,7 @@ eligibility remains the separate clean-`main` contract after source publication.
 | runtime state | `.agent-canon/update-lifecycle/state/` | resumable transaction pointer and typed GitHub/source-publication packets; never source canon |
 | generated evidence | `reports/agents/<run-id>/` and `.agent-canon/update-lifecycle/evidence/` | immutable receipts, timings, review and readback evidence |
 | projection queue | `.agent-canon/update-lifecycle/projection-queue/` | accepted QueueReceipt and pending/accepted DependencyFrontier |
-| parent projection | parent `vendor/agent-canon` gitlink and AgentCanon-owned root views | downstream view after frontier acceptance only |
+| parent projection | parent `vendor/agent-canon` gitlink and the active root views `AGENTS.md`, `.codex/config.toml`, `tools/agent-canon` | downstream view after frontier acceptance only; regular parent paths are preserved |
 
 Unknown shared state is outside the task-owned namespace and remains unchanged.
 There is no legacy subtree, snapshot, wrapper, or alternate owner route.
@@ -211,7 +211,7 @@ identity and ordering only; they do not rerun the owned check.
 ## Centralized Template Parent Follow-Up
 
 When a source update changes centralized template owners under source-root
-`templates/`, the parent projection packet is incomplete until it records all
+`templates/`, the parent follow-up packet is incomplete until it records all
 of the following:
 
 - parent-integration `git rm templates` after confirming that the tracked
@@ -221,8 +221,8 @@ of the following:
 - deletion of parent `experiments/_template/`;
 - deletion of only the `_template` entry in the parent project registry;
 - deletion of parent docs/tests that only exercise that removed scaffold; and
-- regeneration and validation of GitHub Issue/PR projections from
-  `vendor/agent-canon/templates/documents/github/`.
+- preservation of parent-owned regular `.github` content without regenerating
+  AgentCanon GitHub targets into the parent root.
 
 The parent registry remains project-owned. AgentCanon source validation uses a
 temporary parent-shaped registry fixture and never mutates a source or parent

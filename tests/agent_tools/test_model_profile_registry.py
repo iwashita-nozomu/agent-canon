@@ -24,6 +24,8 @@ from tools.agent_tools.model_profile_registry import (
     main,
     materialize_prompt_capsule,
     materialize_tool_call_token,
+    validate_claim_evidence_result,
+    validate_common_return_schema,
 )
 
 
@@ -112,6 +114,17 @@ def test_registry_is_closed_and_has_typed_projection(workspace: Path) -> None:
     assert registry.instruction_clauses_for_role("sol_parent")[-1].text == (
         "Use the role-specific contract."
     )
+
+
+def test_common_claim_evidence_contract_is_validated(workspace: Path) -> None:
+    registry = load_model_profile_registry(workspace)
+    assert not validate_common_return_schema(registry).valid
+    assert validate_claim_evidence_result(
+        {"status": "pass", "claim": "bounded", "evidence": ["test:1"]}
+    ).valid
+    assert not validate_claim_evidence_result(
+        {"status": "pass", "claim": "", "evidence": []}
+    ).valid
 
 
 def test_registry_rejects_unknown_profile_field(workspace: Path) -> None:

@@ -2,7 +2,7 @@
 name: issue-finding-report
 description: "Use when converting accumulated prompt history, run bundles, hook logs, skill/tool/workflow routing evidence, eval summaries, or agent reports into durable AgentCanon skill issues; groups repeated evidence by abstract cause, shards multi-agent review by evidence partition, and writes issue candidates from structured dashboard artifacts."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"2139c99412be360baec36d94bb046b0fc37c5a8a1966b770e17ff33ba0922947"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"d70312871f86c6907ad00096933a358c83e4f2c0ad653be3682aba4d2b22013e"} -->
 
 <!--
 @dependency-start

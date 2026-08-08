@@ -113,8 +113,9 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                 encoding="utf-8",
             )
             (parent_devcontainer / "post-create-parent.sh").chmod(0o755)
-            (parent_devcontainer / "devcontainer.json").symlink_to(
-                "../vendor/agent-canon/.devcontainer/devcontainer.json"
+            shutil.copy2(
+                source / ".devcontainer" / "devcontainer.json",
+                parent_devcontainer / "devcontainer.json",
             )
             (parent / "tools").mkdir(parents=True)
             (parent / "tools" / "agent-canon").symlink_to(
@@ -293,11 +294,11 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                     )
                     public_view = command_root / "tools" / "agent-canon"
                     self.assertTrue(public_view.is_symlink())
-                    self.assertEqual(
-                        (command_root / ".devcontainer" / "devcontainer.json")
-                        .resolve(),
-                        (source / ".devcontainer" / "devcontainer.json").resolve(),
-                    )
+                    config_path = command_root / ".devcontainer" / "devcontainer.json"
+                    self.assertTrue(config_path.is_file())
+                    self.assertFalse(config_path.is_symlink())
+                    if derived:
+                        self.assertNotEqual(config_path, source / ".devcontainer" / "devcontainer.json")
                     config = json.loads(
                         (command_root / ".devcontainer" / "devcontainer.json")
                         .read_text(encoding="utf-8")

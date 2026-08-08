@@ -1,16 +1,4 @@
 {
-  "_dependency_manifest": [
-    "@dependency-start",
-    "contract environment",
-    "responsibility Defines the shared VS Code devcontainer runtime entrypoint.",
-    "upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md devcontainer ownership policy",
-    "upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract",
-    "upstream implementation ../tools/agent_tools/dependency_module_change.py source clone and workspace lifecycle",
-    "downstream implementation ../.devcontainer/post-create.sh runs workspace-mounted setup and agent CLI setup",
-    "downstream implementation ../.devcontainer/post-attach.sh reports attach-time runtime status",
-    "downstream implementation ../.devcontainer/generate-runtime-compose.sh renders devcontainer compose from repo-local docker pack",
-    "@dependency-end"
-  ],
   "name": "${localWorkspaceFolderBasename}-devcontainer",
   "initializeCommand": "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
   "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
@@ -18,7 +6,7 @@
   "containerUser": "project",
   "remoteUser": "project",
   "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-  "postCreateCommand": "bash .devcontainer/bootstrap-dependencies.sh --install && python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
+  "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
   "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
   "shutdownAction": "stopCompose",
   "overrideCommand": false,

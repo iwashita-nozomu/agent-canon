@@ -26,6 +26,11 @@ downstream implementation ../../tools/agent_tools/agent_team.py materializes rou
 - Boundary: this skill selects routes; the selected skills still own execution
   rules and validation.
 
+`agent-orchestration` owns request mode, decision sufficiency, bounded-owner
+execution, coordination activation, and write safety. This skill only resolves
+the compact route name and command packet; it does not add a second execution
+workflow or owner-bounded public layer.
+
 ## Purpose
 
 短い tool / skill 名で、task に必要な profile、check、runtime、closeout、

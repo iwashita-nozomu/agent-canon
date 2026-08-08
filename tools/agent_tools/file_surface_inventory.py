@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Builds machine-readable file surface inventories for repo review.
+# responsibility Builds machine-readable file-surface inventories and projection metadata for repo review.
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface model
 # downstream implementation ./review_backlog_scan.sh includes inventory reports
 # downstream implementation ../../tests/agent_tools/test_file_surface_inventory.py tests inventory
@@ -71,8 +71,8 @@ class FileEntry:
     scope: str
     path: str
     kind: str
-    owner: str
-    surface_class: str
+    projection_producer: str
+    projection_kind: str
     suffix: str
     checkable: bool
     git_mode: str
@@ -95,13 +95,13 @@ class ScopeInventory:
 
 @dataclass(frozen=True)
 class SurfaceLookup:
-    """Root surface ownership lookup derived from the shared manifest."""
+    """Root projection metadata lookup derived from the shared manifest."""
 
     by_path: Mapping[str, tuple[str, str, str, str]]
     prefix: str
 
     def get(self, relative: Path) -> tuple[str, str, str, str]:
-        """Return ``(kind, owner, class, source)`` for a root path."""
+        """Return ``(kind, projection_producer, projection_kind, source)``."""
         return self.by_path.get(relative.as_posix(), ("", "", "", ""))
 
 
@@ -125,7 +125,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def load_surface_lookup(root: Path) -> SurfaceLookup:
-    """Load shared surface metadata when the manifest is available."""
+    """Load shared projection metadata when the manifest is available."""
     try:
         manifest = load_manifest(root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml")
     except (OSError, ValueError):
@@ -134,21 +134,21 @@ def load_surface_lookup(root: Path) -> SurfaceLookup:
 
 
 def surface_entries(manifest: SurfaceManifest) -> dict[str, tuple[str, str, str, str]]:
-    """Return path-indexed surface metadata."""
+    """Return path-indexed projection metadata."""
     entries: dict[str, tuple[str, str, str, str]] = {}
     for entry in manifest.entries:
         kind = {
-            "copy": entry.surface_class,
+            "copy": entry.projection_kind,
             "repo_state": "repo_state",
             "regular": "product_file",
             "standalone_only": "standalone_only",
             "removed_legacy": "removed_legacy",
             "symlink": "symlink_view",
-        }.get(entry.mode, entry.surface_class)
+        }.get(entry.mode, entry.projection_kind)
         entries[entry.path] = (
             kind,
-            entry.owner,
-            entry.surface_class,
+            entry.projection_producer,
+            entry.projection_kind,
             entry.source_or_default(),
         )
     return entries
@@ -255,7 +255,7 @@ def make_entry(
     full_path = root / relative
     suffix = relative.suffix
     kind = entry_kind(scope_name, relative, full_path, git_mode, surface_lookup)
-    _, owner, surface_class, source = (
+    _, projection_producer, projection_kind, source = (
         surface_lookup.get(relative) if scope_name == "root" else ("", "", "", "")
     )
     symlink_target = os.readlink(full_path) if full_path.is_symlink() else ""
@@ -267,8 +267,8 @@ def make_entry(
         scope=scope_name,
         path=relative.as_posix(),
         kind=kind,
-        owner=owner,
-        surface_class=surface_class,
+        projection_producer=projection_producer,
+        projection_kind=projection_kind,
         suffix=suffix,
         checkable=suffix in CHECKABLE_SUFFIXES and kind != "submodule_pin",
         git_mode=git_mode,
@@ -356,8 +356,8 @@ def markdown_entry_rows(scopes: Sequence[ScopeInventory], limit: int) -> list[st
                         entry.scope,
                         entry.path,
                         entry.kind,
-                        entry.owner,
-                        entry.surface_class,
+                        entry.projection_producer,
+                        entry.projection_kind,
                         "yes" if entry.checkable else "no",
                         entry.real_source_path,
                         entry.canonical_source_path,
@@ -405,8 +405,8 @@ def render_markdown(mode: str, root: Path, scopes: Sequence[ScopeInventory], lim
             "",
             "## File Rows",
             "",
-            "| Scope | Path | Kind | Owner | Surface Class | Checkable | Real Source Path | Canonical Source Path |",
-            "| ----- | ---- | ---- | ----- | ------------- | --------- | ---------------- | --------------------- |",
+            "| Scope | Path | Kind | Projection Producer | Projection Kind | Checkable | Real Source Path | Canonical Source Path |",
+            "| ----- | ---- | ---- | ------------------- | --------------- | --------- | ---------------- | --------------------- |",
             *markdown_entry_rows(scopes, limit),
         ]
     )

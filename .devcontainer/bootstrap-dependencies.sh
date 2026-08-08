@@ -218,7 +218,6 @@ install_standalone_base() {
     curl \
     gnupg \
     xz-utils \
-    ninja-build \
     build-essential
   if ! python3 - <<'PY'
 try:

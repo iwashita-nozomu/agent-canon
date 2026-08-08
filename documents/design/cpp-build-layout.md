@@ -465,13 +465,14 @@ resolved.
 | root `cmake/` | current parent helper surface | migration input | move helpers used by the C++ project to `cpp/cmake/`; retain shared non-C++ helpers under their own owner |
 | root `CMakeLists.txt` | current parent C++ entrypoint | migration input | translate project settings/targets into `cpp/CMakeLists.txt`, then leave the parent root language-neutral |
 | root `experiments/` | derived project experiment system | Python managed runs/reports | keep the registry and managed runner route; native targets use `cpp/experiments/` |
-| `vendor/agent-canon`, `agents`, `.agents`, `.codex`, shared root views | AgentCanon | runtime projection/symlink/copy surface | preserve AgentCanon ownership; C++ migration does not edit or replace these surfaces |
+| `vendor/agent-canon`, `AGENTS.md`, `.codex/config.toml`, `tools/agent-canon` | AgentCanon | source checkout plus the three active parent views | preserve AgentCanon ownership; C++ migration does not edit or replace these surfaces; parent `agents/`, `.agents/`, `.codex/`, and other runtime directories remain parent-owned |
 | `build/`, `.state/` | generator/runner | generated state | create by commands, not as source inputs or source projections |
 
 The C++ source tree is a real source boundary under `cpp/`; source files and
 headers are not made canonical through symlinks to legacy root directories.
-AgentCanon runtime projections retain their existing symlink/copy ownership and
-remain outside the C++ project graph.
+The three active AgentCanon views retain their existing symlink ownership and
+remain outside the C++ project graph. Other parent runtime directories and
+regular content are not AgentCanon projections.
 
 ## Parent migration map
 

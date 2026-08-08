@@ -662,11 +662,11 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("task-routing", decision["matched_skills"])
         self.assertIn("task-routing", decision["active_skills"])
-        self.assertIn("owner-bounded-routing", decision["related_skill_candidates"])
-        self.assertNotIn("owner-bounded-routing", decision["active_skills"])
+        self.assertNotIn("bounded-owner-route", decision["related_skill_candidates"])
+        self.assertNotIn("bounded-owner-route", decision["active_skills"])
         self.assertIn("task-routing", decision["related_skills"])
-        self.assertIn(
-            "owner-bounded-routing", decision["related_skills"]["task-routing"]
+        self.assertNotIn(
+            "bounded-owner-route", decision["related_skills"].get("task-routing", ())
         )
 
     def test_prompt_preserves_test_design_related_skills_for_validation_failure(
@@ -754,7 +754,7 @@ class RouteToolTest(unittest.TestCase):
                     dependency_expected,
                 )
                 if ".gitignore" in prompt:
-                    self.assertNotIn("owner-bounded-routing", decision["matched_skills"])
+                    self.assertNotIn("bounded-owner-route", decision["matched_skills"])
 
     def test_prompt_routes_patch_only_no_validation_as_implementation(self) -> None:
         """No-validation clauses after patch-only work should not mean no patch."""
@@ -1855,8 +1855,8 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
-        self.assertIn("owner-bounded-routing", decision["matched_skills"])
-        self.assertIn("owner-bounded-routing", decision["active_skills"])
+        self.assertNotIn("bounded-owner-route", decision["matched_skills"])
+        self.assertNotIn("bounded-owner-route", decision["active_skills"])
         self.assertIn("python-review", decision["matched_skills"])
         self.assertIn("python-review", decision["deferred_skills"])
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")

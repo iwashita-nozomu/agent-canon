@@ -177,7 +177,7 @@ class RepoStructureContractTest(unittest.TestCase):
             self.assertNotIn("unexpected_top_level:evidence", result.stdout)
 
     def test_template_profile_allows_evidence_root_view(self) -> None:
-        """Template roots should classify the shared evidence symlink view."""
+        """Template roots should classify parent-owned evidence content."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_template_fixture(root)
@@ -187,6 +187,19 @@ class RepoStructureContractTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertNotIn("unexpected_top_level:evidence", result.stdout)
+
+    def test_template_parent_may_omit_agent_and_editor_directories(self) -> None:
+        """Parent-owned agents and editor directories are optional structure."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_template_fixture(root)
+            (root / "agents").rmdir()
+            (root / ".vscode").rmdir()
+
+            result = self.run_checker(root, "--profile", "template_or_derived_repo")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("missing-file", result.stdout)
 
     def write_standalone_fixture(self, root: Path) -> None:
         """Create the minimal standalone structure required by the contract."""

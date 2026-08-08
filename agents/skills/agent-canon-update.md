@@ -197,8 +197,8 @@ Add creation authority/reason only when the route creates a branch or
 worktree; force-create or ref-overwrite routes require both pairs.
 
 Treat this as the mandatory `agentcanon_structure_followup` gate when this
-owner route reports the parent sync trigger is active for source, submodule pin,
-root runtime views, root-copy surfaces, or sync-control surfaces. Record
+owner route reports the parent sync trigger is active for active root projection.
+Record
 `agentcanon_structure_followup=required` before the commands and
 `agentcanon_structure_followup=pass` only after the sync check passes.
    Template / derived parent roots must run this gate from the parent root after

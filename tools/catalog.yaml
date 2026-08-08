@@ -1888,8 +1888,6 @@ entries:
       - agents/COMMUNICATION_PROTOCOL.md
       - agents/skills/codex-task-workflow.md
       - .agents/skills/codex-task-workflow/SKILL.md
-      - agents/skills/owner-bounded-routing.md
-      - .agents/skills/owner-bounded-routing/SKILL.md
     tests:
       - tests/agent_tools/test_tool_rejection_preflight.py
 

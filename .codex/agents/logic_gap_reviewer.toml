@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 3a210e08c3417638f783a01434c56189bd5b29afda8f78413b189041e7b948e0
+# source canonical digest: cdff30f7f541025f45629f93c4402a0db5119993bbd2510eab0ef750b3257b84
 
 name = "logic_gap_reviewer"
 description = "Read-only reviewer for academic-argument continuity, claim-to-evidence links, hidden assumptions, and unsupported inferential jumps."

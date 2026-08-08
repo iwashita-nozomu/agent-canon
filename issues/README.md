@@ -34,7 +34,8 @@ Use it when a user, reviewer, runtime check, CI failure, or agent retrospective 
 
 ## File Naming
 
-Use one file per finding:
+Use one file per finding. Findings with the same owner, root cause, and fix
+are one issue candidate even when several paths or agents reported them:
 
 ```text
 issues/open/AC-YYYYMMDD-short-slug.md
@@ -48,18 +49,32 @@ issues/open/AC-YYYYMMDD-short-slug.md
 
 ## Required Fields
 
-Every issue file must contain these machine-readable lines near the top:
+Every issue file must contain these identity lines near the top:
 
 ```text
 issue_id: AC-YYYYMMDD-short-slug
 status: open|in_progress|resolved|deferred|wontfix
 source: user|reviewer|runtime|ci|retrospective
 severity: S0|S1|S2|S3
+problem: <one sentence>
 evidence: <repo-relative path or external PR/issue URL>
-affected_surfaces: <comma-separated repo-relative paths>
-edit_scope: <dependency-expanded paths or report artifact path>
-required_action: <one sentence>
-close_condition: <one sentence>
+done: <one sentence>
+```
+
+The extended issue form may add `affected_surfaces`, `edit_scope`,
+`required_action`, and `close_condition`. Existing issues may retain those
+fields; they are optional when `required_action` and `close_condition`
+are not needed. `evidence` is always required. New finding intake defaults to
+changed-surface, user-request, or owner-bounded scope; `repo-wide` must be
+selected explicitly.
+
+Extended operational examples (optional, but recommended when available):
+
+```text
+affected_surfaces: <repo paths covered by the finding>
+edit_scope: changed|user|owner-bounded|repo-wide
+required_action: <required action or follow-up>
+close_condition: <condition for closure>
 ```
 
 Issue text must summarize the behavior and cite evidence.
@@ -70,7 +85,11 @@ When an issue is mirrored to GitHub, add this optional field:
 github_issue: https://github.com/<owner>/<repo>/issues/<number>
 ```
 
-Use `github_issue: pending` only while a branch is preparing the GitHub mirror.
+Use `github_issue: pending` or `github_issue: not-created` only while a branch
+is preparing the GitHub mirror. These markers and an empty field are
+unresolved: ordinary validation may plan or apply them, but
+`--require-github-link` and `--github-check` require a real
+`https://github.com/<owner>/<repo>/issues/<n>` URL.
 Closed issue files must additionally include:
 
 ```text
@@ -136,14 +155,18 @@ python3 tools/agent_tools/issue_sync.py \
 
 `.github/workflows/issue-mirror.yml` runs the read-only check on PRs and branch
 pushes and writes the mirror status, drift, and planned sync commands to the
-GitHub Step Summary. Missing `github_issue:` links generate deterministic
-`ISSUE_SYNC_PLAN=` lines; they do not fail PRs unless the local issue schema,
-status, duplicate IDs, or linked GitHub mirror state is inconsistent.
+GitHub Step Summary. Missing, pending, and not-created `github_issue:` values
+generate deterministic `ISSUE_SYNC_PLAN=` lines; ordinary validation accepts
+these temporary states, but `--github-check` reports them as unresolved and
+`--require-github-link` fails until a real URL exists.
 
-Apply mode may create GitHub Issues and insert `github_issue:` fields, but it
-must be an explicit operator action. GitHub Actions sync mode updates already
-linked GitHub Issues on `main` pushes or manual dispatch; it does not commit
-new `github_issue:` fields back to the repository.
+Apply mode may create GitHub Issues and replace empty, pending, or not-created
+markers with one real `github_issue:` field, then synchronizes the updated local
+body to the newly created remote issue. It must be an explicit operator action;
+creation or post-create synchronization failures are nonzero actionable errors.
+GitHub Actions sync mode updates already linked GitHub Issues on `main` pushes or
+manual dispatch; it does not commit new `github_issue:` fields back to the
+repository.
 
 ```bash
 python3 tools/agent_tools/issue_sync.py \

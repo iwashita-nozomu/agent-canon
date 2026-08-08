@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: b1805de39dcbc003fdd7bfb13eb7931872184c8d9a2bf067ee4edda4c909dae3
+# source canonical digest: b8f308a403e83481bb8128367fa08403ce7b3ffca249f9ea1ca45757070233b0
 
 name = "test_designer"
 description = "Read-only agent for post-implementation static analysis when an explicit unresolved oracle, specification, regression, or failure-mode risk remains beyond existing validation."

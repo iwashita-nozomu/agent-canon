@@ -685,8 +685,11 @@ link_path() {
 copy_path() {
   local path="$1"
   local source="$2"
+  [ -n "$path" ] || die "copy path must not be empty"
+  [ -n "$source" ] || die "copy source path must not be empty"
   local abs_path="$ROOT_DIR/$path"
   local abs_source="$ROOT_DIR/$source"
+  [ "$(realpath -m "$abs_path")" != "$ROOT_DIR" ] || die "copy target must not be repository root"
   [ -e "$abs_source" ] || die "copy source '$source' does not exist"
   rm -rf "$abs_path"
   mkdir -p "$(dirname "$abs_path")"
@@ -776,13 +779,12 @@ project_copy_source() {
 regular_path() {
   local path="$1"
   local source="${2:-}"
+  [ -n "$path" ] || die "regular path must not be empty"
   local abs_path="$ROOT_DIR/$path"
   local abs_source=""
+  [ "$(realpath -m "$abs_path")" != "$ROOT_DIR" ] || die "regular target must not be repository root"
   if [ -e "$abs_path" ] && [ ! -L "$abs_path" ] \
     && { [ "$path" != ".vscode" ] || [ -d "$abs_path" ]; }; then
-    if [ "$path" = ".devcontainer" ] && is_submodule_prefix; then
-      prune_parent_devcontainer_artifacts
-    fi
     return
   fi
   if [ -z "$source" ]; then
@@ -790,8 +792,6 @@ regular_path() {
       # Remove legacy whole-directory views before child links materialize.
       # Do not create an empty parent; the child surface creates it safely.
       rm -f "$abs_path"
-    elif [ "$path" = ".devcontainer" ] && [ -e "$abs_path" ]; then
-      prune_parent_devcontainer_artifacts
     fi
     return
   fi
@@ -801,22 +801,6 @@ regular_path() {
   rm -rf "$abs_path"
   mkdir -p "$(dirname "$abs_path")"
   cp -a "$abs_source" "$abs_path"
-
-  if [ "$path" = ".devcontainer" ] && is_submodule_prefix && [ -d "$abs_path" ]; then
-    prune_parent_devcontainer_artifacts
-  fi
-}
-
-prune_parent_devcontainer_artifacts() {
-  local abs_path="$ROOT_DIR/.devcontainer"
-  [ -d "$abs_path" ] || return 0
-  rm -f \
-    "$abs_path/bootstrap-shared-runtime.sh" \
-    "$abs_path/finalize-shared-runtime.sh" \
-    "$abs_path/generate-runtime-compose.sh" \
-    "$abs_path/docker-compose.generated.yml" \
-    "$abs_path/post-attach.sh" \
-    "$abs_path/post-create.sh"
 }
 
 path_is_tracked() {
@@ -825,9 +809,27 @@ path_is_tracked() {
 }
 
 is_agentcanon_root_view_target() {
-  local target="$1"
-  case "$target" in
-    "$PREFIX"|"$PREFIX"/*|"./$PREFIX"/*|"../$PREFIX"/*|"../../$PREFIX"/*|"../../../$PREFIX"/*|"../../../../$PREFIX"/*|"$ROOT_DIR/$PREFIX"|"$ROOT_DIR/$PREFIX"/*)
+  local link_path="$1"
+  local target="${2:-}"
+  local resolved_target=""
+  local resolved_prefix=""
+
+  # A standalone source checkout has PREFIX='.'; its root is the whole
+  # repository, so no parent retired-path symlink may be classified here.
+  if [ "$PREFIX" = "." ] && ! is_submodule_prefix; then
+    return 1
+  fi
+  [ -n "$target" ] || return 1
+  if [[ "$target" = /* ]]; then
+    resolved_target="$target"
+  else
+    resolved_target="$(dirname "$link_path")/$target"
+  fi
+  resolved_target="$(realpath -m -- "$resolved_target" 2>/dev/null || true)"
+  resolved_prefix="$(realpath -m -- "$ROOT_DIR/$PREFIX" 2>/dev/null || true)"
+  [ -n "$resolved_target" ] && [ -n "$resolved_prefix" ] || return 1
+  case "$resolved_target" in
+    "$resolved_prefix"|"$resolved_prefix"/*)
       return 0
       ;;
   esac
@@ -854,7 +856,7 @@ check_agentcanon_root_view_symlink_targets() {
     abs_path="$ROOT_DIR/$path"
     [ -L "$abs_path" ] || continue
     target="$(readlink "$abs_path")"
-    is_agentcanon_root_view_target "$target" || continue
+    is_agentcanon_root_view_target "$abs_path" "$target" || continue
     if [ ! -e "$abs_path" ]; then
       echo "root-symlink[$path]=broken" >&2
       had_broken=1
@@ -960,30 +962,38 @@ cmd_link_root() {
   # whole-directory symlinks first, so child operations cannot delete files in
   # the AgentCanon source checkout through the old directory link.
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local source="${spec#*:}"
     regular_path "$path" "$source"
   done < <(build_regular_specs)
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local target="${spec#*:}"
     link_path "$path" "$target"
   done < <(build_link_specs)
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local source="${spec#*:}"
     copy_path "$path" "$source"
   done < <(build_copy_specs)
 
-  if is_submodule_prefix; then
-    prune_parent_devcontainer_artifacts
-  fi
-
   while IFS= read -r path; do
     [ -n "$path" ] || continue
-    rm -rf "$ROOT_DIR/$path"
+    # Retired shared views may only be removed when they are still symlinks.
+    # A regular path belongs to the parent and is preserved.
+    local abs_path="$ROOT_DIR/$path"
+    local target=""
+    if [ -L "$abs_path" ]; then
+      target="$(readlink "$abs_path")"
+    fi
+    if [ -L "$abs_path" ] && is_agentcanon_root_view_target "$abs_path" "$target"; then
+      rm -f "$ROOT_DIR/$path"
+    fi
   done < <(build_root_absent_paths)
 
   ensure_repo_local_goal
@@ -1009,6 +1019,7 @@ cmd_check() {
   local projection_rc=0
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local target="${spec#*:}"
     local abs_path="$ROOT_DIR/$path"
@@ -1026,6 +1037,7 @@ cmd_check() {
   done < <(build_link_specs)
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local abs_path="$ROOT_DIR/$path"
     if [ -f "$abs_path" ]; then
@@ -1040,6 +1052,7 @@ cmd_check() {
   done < <(build_copy_specs)
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local abs_path="$ROOT_DIR/$path"
     if [ -e "$abs_path" ] && [ ! -L "$abs_path" ] \
@@ -1062,7 +1075,11 @@ cmd_check() {
   while IFS= read -r path; do
     [ -n "$path" ] || continue
     local abs_path="$ROOT_DIR/$path"
-    if [ -e "$abs_path" ] || [ -L "$abs_path" ]; then
+    local target=""
+    if [ -L "$abs_path" ]; then
+      target="$(readlink "$abs_path")"
+    fi
+    if [ -L "$abs_path" ] && is_agentcanon_root_view_target "$abs_path" "$target"; then
       echo "absent[$path]=present" >&2
       failed=1
     fi
@@ -2007,6 +2024,7 @@ cmd_status() {
     echo "prefix_status=missing"
   fi
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local target="${spec#*:}"
     local abs_path="$ROOT_DIR/$path"
@@ -2020,6 +2038,7 @@ cmd_status() {
   done < <(build_link_specs)
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local abs_path="$ROOT_DIR/$path"
     if [ -f "$abs_path" ]; then
@@ -2032,6 +2051,7 @@ cmd_status() {
   done < <(build_copy_specs)
 
   while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
     local path="${spec%%:*}"
     local abs_path="$ROOT_DIR/$path"
     if [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then

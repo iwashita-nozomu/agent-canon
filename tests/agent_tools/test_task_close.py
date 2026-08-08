@@ -24,15 +24,23 @@ from tools.agent_tools.task_close import (
 )
 
 
-def test_agent_canon_parent_sync_gate_requires_exact_symlink_path() -> None:
-    """Root symlink entry itself must trigger parent sync gate."""
+def test_agent_canon_parent_sync_gate_non_trigger_and_exact_symlink_path() -> None:
+    """Active projection source roots are non-triggers; exact symlink links are triggers."""
     workspace = Path(__file__).resolve().parents[2]
     assert not agent_canon_parent_sync_gate_required(
         ("agents/foo.md",),
         workspace=workspace,
     )
     assert agent_canon_parent_sync_gate_required(
-        ("agents", ".vscode/settings.json"),
+        ("AGENTS.md",),
+        workspace=workspace,
+    )
+    assert agent_canon_parent_sync_gate_required(
+        (".codex/config.toml",),
+        workspace=workspace,
+    )
+    assert agent_canon_parent_sync_gate_required(
+        ("tools/agent-canon",),
         workspace=workspace,
     )
 
@@ -46,18 +54,18 @@ def test_agent_canon_parent_sync_gate_ignores_symlink_source_changes() -> None:
     )
 
 
-def test_agent_canon_parent_sync_gate_requires_sync_control_and_materialization_roots() -> None:
-    """Sync-control and materialized copy paths must open the parent sync gate."""
+def test_agent_canon_parent_sync_gate_ignores_sync_control_former_triggers() -> None:
+    """Materialized copy paths that are no longer sync-control should be non-triggers."""
     workspace = Path(__file__).resolve().parents[2]
-    assert agent_canon_parent_sync_gate_required(
+    assert not agent_canon_parent_sync_gate_required(
         ("tools/sync_agent_canon.sh",),
         workspace=workspace,
     )
-    assert agent_canon_parent_sync_gate_required(
+    assert not agent_canon_parent_sync_gate_required(
         ("tools/agent_tools/surface_manifest.py",),
         workspace=workspace,
     )
-    assert agent_canon_parent_sync_gate_required(
+    assert not agent_canon_parent_sync_gate_required(
         ("documents/runtime/shared-runtime-surfaces.toml",),
         workspace=workspace,
     )

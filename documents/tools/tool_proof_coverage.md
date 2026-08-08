@@ -13,7 +13,8 @@ downstream implementation ../../tests/agent_tools/test_tool_proof_coverage.py te
 # Tool Proof Coverage
 
 `tools/agent_tools/tool_proof_coverage.py` reports formal proof-obligation
-coverage for every entry in `tools/catalog.yaml`.
+coverage for catalog entries selected by the caller. Without a selection it is
+an observational report; it does not create a universal Lean backlog.
 
 The checker does not prove that tools are correct. It prevents the stronger
 mistake: claiming Lean verification when the catalog only has tests, docs, or
@@ -28,15 +29,19 @@ For each cataloged tool, the checker emits:
 - performance model shape;
 - the next witness needed before the claim can become Lean verified.
 
-By default the checker passes when every catalog row can be classified. Use
-strict mode when a workflow requires all tools to have checked Lean proofs:
+By default the checker passes when catalog rows can be classified. A workflow
+that genuinely needs a proof selects the exact tool IDs and enables strict
+mode:
 
 ```bash
-python3 tools/agent_tools/tool_proof_coverage.py --require-lean-verified
+python3 tools/agent_tools/tool_proof_coverage.py \
+  --tool-id check-dependency-headers \
+  --require-lean-verified
 ```
 
-Strict mode currently fails until every tool has checked behavior and
-performance proofs. That failure is expected evidence, not a CI regression.
+Strict mode without `--tool-id` fails with a typed selection error. Missing or
+unavailable proof evidence remains a failure for the selected tool; it is not
+reported as pass or deferred success.
 
 ## Verified Proof Metadata
 
@@ -62,6 +67,7 @@ as `sorry`, `admit`, or unchecked `axiom`.
 python3 tools/agent_tools/tool_proof_coverage.py
 python3 tools/agent_tools/tool_proof_coverage.py --format markdown
 python3 tools/agent_tools/tool_proof_coverage.py --format json
+python3 tools/agent_tools/tool_proof_coverage.py --tool-id <catalog-id> --require-lean-verified
 ```
 
 The compact text output includes counts such as:

@@ -333,22 +333,17 @@ category = "agent_canon_submodule"
 [[profile.required]]
 path = "tools"
 kind = "any"
-category = "shared_runtime_view"
-
-[[profile.required]]
-path = "agents"
-kind = "any"
-category = "shared_runtime_view"
+category = "tooling"
 
 [[profile.required]]
 path = ".codex"
 kind = "dir"
-category = "shared_runtime_view"
+category = "runtime_config"
 
 [[profile.required]]
 path = ".devcontainer"
 kind = "any"
-category = "shared_runtime_view"
+category = "parent_environment"
 
 [[profile.optional]]
 path = ".devcontainer/parent-environment.sh"
@@ -359,11 +354,6 @@ category = "parent_environment"
 path = ".devcontainer/parent-environment.toml"
 kind = "file"
 category = "parent_environment"
-
-[[profile.required]]
-path = ".vscode"
-kind = "any"
-category = "shared_runtime_view"
 
 [[profile.required]]
 path = "documents/README.md"

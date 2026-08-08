@@ -156,7 +156,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             self.assertIn("scope_overlap:tools/evidence.py:scopes:tools,evidence", result.stdout)
 
     def test_starter_manifest_partitions_parent_tools_from_agent_canon_view(self) -> None:
-        """Assign only the AgentCanon tool view away from parent-owned tools."""
+        """Keep only active AgentCanon views in the starter runtime scope."""
         data = tomllib.loads(STARTER_MANIFEST.read_text(encoding="utf-8"))
         scopes = {
             str(raw["id"]): scope_from_mapping(raw)
@@ -164,17 +164,24 @@ class ResponsibilityScopeTest(unittest.TestCase):
         }
         agent_canon = scopes["agent-canon-runtime-view"]
         parent = scopes["parent-repo-active-contract"]
+        durable = scopes["project-durable-state"]
 
         ownership = {
             path: tuple(
                 scope.scope_id
-                for scope in (agent_canon, parent)
+                for scope in (agent_canon, parent, durable)
                 if scope_covers(scope, path)
             )
             for path in (
                 "tools/agent-canon/sync_agent_canon.sh",
                 "tools/project_check.py",
                 "tools/team/local.sh",
+                ".codex/config.toml",
+                "agents/skills/local.md",
+                ".agents/skills/local.md",
+                ".devcontainer/devcontainer.json",
+                ".vscode/settings.json",
+                "evidence/run.json",
             )
         }
 
@@ -190,6 +197,15 @@ class ResponsibilityScopeTest(unittest.TestCase):
             ownership["tools/team/local.sh"],
             ("parent-repo-active-contract",),
         )
+        self.assertEqual(ownership[".codex/config.toml"], ("agent-canon-runtime-view",))
+        for path in (
+            "agents/skills/local.md",
+            ".agents/skills/local.md",
+            ".devcontainer/devcontainer.json",
+            ".vscode/settings.json",
+        ):
+            self.assertEqual(ownership[path], ("parent-repo-active-contract",))
+        self.assertEqual(ownership["evidence/run.json"], ("project-durable-state",))
 
     def write_fixture(self, root: Path) -> None:
         """Write a bounded responsibility-scope fixture repository."""

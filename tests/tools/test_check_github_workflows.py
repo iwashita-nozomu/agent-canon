@@ -264,7 +264,7 @@ raise SystemExit(2)
         """The source and generated checklist expose only the parent PR gate."""
         canonical = "- [ ] `make agent-canon-pr-check`"
         derived_boundary = (
-            "Derived parent shared gate owns AgentCanon pin/projection/header/"
+            "Derived parent shared gate owns AgentCanon pin/active-root-view/header/"
             "graph/workflow/skill-command surfaces only; development prompt and "
             "accumulated evals run only in the standalone AgentCanon static owner."
         )
@@ -881,7 +881,7 @@ raise SystemExit(2)
             root = Path(tmp_dir)
             self.write_valid_workflow(root)
             self.copy_required_surfaces(root)
-            issue = next((root / "issues" / "open").glob("*.md"))
+            issue = root / "issues" / "closed" / "AC-20260517-eval-accumulation-gaps.md"
             issue.write_text(
                 issue.read_text(encoding="utf-8").replace("edit_scope:", "scope:"),
                 encoding="utf-8",
@@ -896,6 +896,141 @@ raise SystemExit(2)
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_text:edit_scope:", result.stdout)
+
+    def test_issue_mirror_workflow_with_checkout_failure_summary_passes(self) -> None:
+        """Standalone issue mirror can only fail checkout by writing failure summary."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_required_surfaces(root)
+            self.ensure_issue_readme_contains_issue_required_fields(root)
+            workflow_dir = root / ".github" / "workflows"
+            workflow_dir.mkdir(parents=True, exist_ok=True)
+            (workflow_dir / "issue-mirror.yml").write_text(
+                (REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml").read_text(
+                    encoding="utf-8"
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
+
+    def test_issue_mirror_fails_with_continue_on_error_checkout(self) -> None:
+        """Issue-mirror checkout must not swallow failures with continue-on-error."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_required_surfaces(root)
+            self.ensure_issue_readme_contains_issue_required_fields(root)
+            workflow = root / ".github" / "workflows" / "issue-mirror.yml"
+            workflow.parent.mkdir(parents=True, exist_ok=True)
+            workflow.write_text(
+                (REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml").read_text(
+                    encoding="utf-8"
+                ).replace(
+                    "      - name: Checkout repository\n"
+                    "        id: checkout\n"
+                    "        uses: actions/checkout@v4\n",
+                    "      - name: Checkout repository\n"
+                    "        id: checkout\n"
+                    "        uses: actions/checkout@v4\n        continue-on-error: true\n",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "issue_mirror_checkout_continue_on_error_not_allowed",
+                result.stdout,
+            )
+
+    def test_issue_mirror_fails_with_checkout_pass_fallback(self) -> None:
+        """Issue-mirror checkout failure handling must not emit pass status."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_required_surfaces(root)
+            self.ensure_issue_readme_contains_issue_required_fields(root)
+            workflow = root / ".github" / "workflows" / "issue-mirror.yml"
+            workflow.parent.mkdir(parents=True, exist_ok=True)
+            workflow.write_text(
+                (
+                    REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml"
+                ).read_text(encoding="utf-8").replace(
+                    "echo \"- status: \\\\`fail\\\\`\"",
+                    "echo \"- status: \\\\`pass\\\\`\"",
+                ).replace(
+                    "echo \"ISSUE_SYNC=fail\"",
+                    "echo \"ISSUE_SYNC=pass\"",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "issue_mirror_checkout_failure_fallback_must_fail",
+                result.stdout,
+            )
+
+    def test_issue_mirror_fails_without_failure_gate_on_checkout_summary(self) -> None:
+        """Failure fallback must be gated by failure() and outcome predicate."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_required_surfaces(root)
+            self.ensure_issue_readme_contains_issue_required_fields(root)
+            workflow = root / ".github" / "workflows" / "issue-mirror.yml"
+            workflow.parent.mkdir(parents=True, exist_ok=True)
+            workflow.write_text(
+                (REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml").read_text(
+                    encoding="utf-8"
+                ).replace(
+                    "if: failure() && steps.checkout.outcome != 'success'",
+                    "if: steps.checkout.outcome != 'success'",
+                ),
+                encoding="utf-8",
+            )
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn(
+                "issue_mirror_checkout_failure_summary_must_be_gated_by_failure",
+                result.stdout,
+            )
+
+    def ensure_issue_readme_contains_issue_required_fields(self, root: Path) -> None:
+        """Add missing durable fields to a temporary issue README fixture."""
+        issues_readme = root / "issues" / "README.md"
+        issues_readme_text = issues_readme.read_text(encoding="utf-8")
+        if "affected_surfaces:" not in issues_readme_text:
+            issues_readme_text += "\naffected_surfaces:\n  - issue-mirror-check.yml\n"
+        if "edit_scope:" not in issues_readme_text:
+            issues_readme_text += "edit_scope:\n  - write issue mirror workflow\n"
+        issues_readme.write_text(issues_readme_text, encoding="utf-8")
 
     def write_template_root_pr_template(self, root: Path) -> None:
         """Write a minimal valid template-root PR template."""
@@ -1243,7 +1378,7 @@ raise SystemExit(2)
             "templates/documents/github/pull-request/agent_canon.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             "issues/README.md",
-            "issues/open/AC-20260517-eval-accumulation-gaps.md",
+            "issues/closed/AC-20260517-eval-accumulation-gaps.md",
             "issues/closed/AC-20260513-durable-finding-auto-promotion.md",
             "README.md",
         ]:
@@ -1280,7 +1415,7 @@ raise SystemExit(2)
             ".github/workflows/agent-coordination.yml",
             ".github/workflows/agent-runtime-dashboard.yml",
             "issues/README.md",
-            "issues/open/AC-20260517-eval-accumulation-gaps.md",
+            "issues/closed/AC-20260517-eval-accumulation-gaps.md",
             "issues/closed/AC-20260513-durable-finding-auto-promotion.md",
         ]:
             source = REPO_ROOT / relative

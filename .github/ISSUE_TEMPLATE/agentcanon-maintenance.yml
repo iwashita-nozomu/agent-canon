@@ -8,10 +8,10 @@
 # downstream implementation ../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
 # @dependency-end
 
-# Canonical source: templates/documents/github/issue/agentcanon-maintenance.yml. Generated projection targets .github/ISSUE_TEMPLATE/agentcanon-maintenance.yml; edit this source only.
+# Canonical source and checked-in standalone target: update templates/documents/github/issue/agentcanon-maintenance.yml and .github/ISSUE_TEMPLATE/agentcanon-maintenance.yml together.
 
 name: AgentCanon 保守 Issue
-description: AgentCanon runtime、tool、workflow、文書、projection の defect を記録します。
+description: AgentCanon runtime、tool、workflow、文書、checked-in target の defect を記録します。
 title: "[agent-canon] "
 labels: ["agent-canon", "maintenance"]
 body:
@@ -128,7 +128,7 @@ body:
       value: |
         - [ ] targeted local check:
         - [ ] Markdown/math/Mermaid docs check:
-        - [ ] projection/readback check:
+        - [ ] checked-in source/target consistency:
     validations:
       required: true
   - type: textarea
@@ -157,11 +157,11 @@ body:
     id: reader_context
     attributes:
       label: Reader map / 含む内容
-      description: 読者、判断、含める証拠、canonical/generated/local の境界を記録します。
+      description: 読者、判断、含める証拠、canonical/checked-in-standalone/parent-owned-local の境界を記録します。
       value: |
         intended reader and decision:
         what this issue contains:
-        canonical source / generated projection:
+        canonical source and checked-in standalone target:
         owner and responsibility boundary:
     validations:
       required: true
@@ -173,7 +173,7 @@ body:
       value: |
         design clause:
         implementation path:
-        generated/readback path:
+        semantic validation command:
         validation evidence:
     validations:
       required: true
@@ -244,7 +244,7 @@ body:
     id: lifecycle_cleanup
     attributes:
       label: Lifecycle / cleanup
-      description: result、生成 projection、temporary clone の retention、cleanup command、再構築 readback を記録します。
+      description: result、checked-in standalone target、temporary clone の retention、cleanup command、再構築 validation を記録します。
       value: |
         retention owner:
         cleanup command:

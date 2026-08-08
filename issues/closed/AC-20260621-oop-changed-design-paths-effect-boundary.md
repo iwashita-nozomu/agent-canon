@@ -15,6 +15,7 @@ status: resolved
 source: runtime
 severity: S2
 evidence: reports/agents/oop-readability-20260621-refactor-issues/oop_readability_check_design_doc_claims.md
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/581
 affected_surfaces: tools/agent_tools/check_design_doc_claims.py, tools/oop/python/readability.py, tests/agent_tools/test_check_design_doc_claims.py
 edit_scope: tools/agent_tools/check_design_doc_claims.py changed_design_paths, reports/agents/oop-readability-20260621-refactor-issues/oop_readability_check_design_doc_claims.md
 required_action: Refactor `changed_design_paths` so process execution and returned path normalization are separated into named effect and pure transform steps.

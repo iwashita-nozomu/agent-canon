@@ -33,8 +33,8 @@ from manifest_rendering import (  # noqa: E402
     render_template,
     suggested_public_skills,
 )
-from packets import resolve_active_design_packet_config  # noqa: E402
-from team_config import load_team_config  # noqa: E402
+from packets import iter_artifacts, resolve_active_design_packet_config  # noqa: E402
+from team_config import load_team_config, resolve_role  # noqa: E402
 
 
 class AgentTeamTemplateTest(unittest.TestCase):
@@ -154,6 +154,22 @@ class AgentTeamTemplateTest(unittest.TestCase):
             skills.index("$literature-survey"),
             skills.index("$research-workflow"),
         )
+
+    def test_optional_review_templates_are_materialized_only_when_selected(self) -> None:
+        """Core bundle artifacts stay available without empty review templates."""
+        config = load_team_config()
+        packet = resolve_active_design_packet_config(config)
+        core_only = iter_artifacts(config, ())
+        self.assertIn("team_manifest.yaml", core_only)
+        self.assertNotIn(packet.design_artifact, core_only)
+        self.assertNotIn(packet.design_review_artifact, core_only)
+        selected = iter_artifacts(
+            config,
+            (resolve_role(config, "change_reviewer"),),
+            packet,
+        )
+        self.assertIn("change_review.md", selected)
+        self.assertNotIn("python_review.md", selected)
 
     def test_fixed_implementation_dispatch_uses_typed_route_and_registry_prompt(
         self,

@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 4718ce49cfb3fdd3ad73a2fefb5042ff07f6a2116ecf9b3e2ed5b1a7b9d344ef
+# source canonical digest: 8a02de81412e0048f0af30c7d1677d916868b3b82e14681ebbfb0b7ec6bd32b0
 
 name = "plan_reviewer"
 description = "Read-only reviewer for execution plans, stage order, reviewer separation, validation sequencing, and rollback readiness."

@@ -34,6 +34,11 @@ project は対象にしますが、template root に top-level CMake を要求�
 
 ## Findings（指摘）
 
+Each finding records one of `blocking`, `non-blocking`, `question`,
+`not-applicable`, or `accepted-risk`. Only unresolved `blocking` findings make
+the owning review outcome `changes-required`; style observations remain
+non-blocking.
+
 ### Fix Now（今直す）
 
 -
