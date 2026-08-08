@@ -239,12 +239,18 @@ normalize_path() {
   local mapped_target
   source_dir="$(dirname "$source_file")"
   direct_target="$(realpath -m --relative-to="$ROOT_DIR" "$source_dir/$rel_path")"
+  if [[ "$direct_target" == ".." || "$direct_target" == ../* ]]; then
+    return 1
+  fi
   if [[ -e "$direct_target" ]]; then
     printf '%s\n' "$direct_target"
     return
   fi
   source_dir="$(dirname "$(source_context_file "$source_file")")"
   mapped_target="$(realpath -m --relative-to="$ROOT_DIR" "$source_dir/$rel_path")"
+  if [[ "$mapped_target" == ".." || "$mapped_target" == ../* ]]; then
+    return 1
+  fi
   printf '%s\n' "$mapped_target"
 }
 
@@ -393,7 +399,10 @@ check_file() {
       echo "$file:$line_no: dependency path must be relative: $rel_path"
       return 1
     fi
-    target="$(normalize_path "$file" "$rel_path")"
+    if ! target="$(normalize_path "$file" "$rel_path")"; then
+      echo "$file:$line_no: dependency target escapes repository root: $rel_path"
+      return 1
+    fi
     if [[ ! -e "$target" ]]; then
       # Issue files are durable mirrors. Their dependency paths describe the
       # historical repository state and must not be rewritten as part of a

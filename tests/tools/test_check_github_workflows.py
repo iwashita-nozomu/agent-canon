@@ -13,11 +13,11 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import tempfile
-import re
 import textwrap
 import unittest
 from collections.abc import Callable
@@ -37,9 +37,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
 
     def scheduled_graph_command(self) -> tuple[str, str]:
         """Read the producer-owned scheduled graph command from its workflow."""
-        payload = yaml.safe_load(
-            RUNTIME_DASHBOARD_WORKFLOW.read_text(encoding="utf-8")
-        )
+        payload = yaml.safe_load(RUNTIME_DASHBOARD_WORKFLOW.read_text(encoding="utf-8"))
         steps = payload["jobs"]["dashboard"]["steps"]
         step = next(
             item
@@ -245,7 +243,10 @@ raise SystemExit(2)
     def test_scheduled_graph_build_failure_and_incomplete_stop_readback(self) -> None:
         """Build failure and incomplete publication fail before status readback."""
         for build_mode in ("failure", "incomplete"):
-            with self.subTest(build_mode=build_mode), tempfile.TemporaryDirectory() as tmp_dir:
+            with (
+                self.subTest(build_mode=build_mode),
+                tempfile.TemporaryDirectory() as tmp_dir,
+            ):
                 root = Path(tmp_dir)
                 calls, _db = self.scheduled_graph_fixture(root)
 
@@ -688,7 +689,9 @@ raise SystemExit(2)
                 capture_output=True,
                 text=True,
             )
-            self.assertEqual(bootstrap.returncode, 0, bootstrap.stdout + bootstrap.stderr)
+            self.assertEqual(
+                bootstrap.returncode, 0, bootstrap.stdout + bootstrap.stderr
+            )
             report_dir = next(
                 Path(line.split("=", 1)[1])
                 for line in bootstrap.stdout.splitlines()
@@ -721,7 +724,9 @@ raise SystemExit(2)
             root = Path(tmp_dir)
             self.write_valid_workflow(root)
             self.copy_required_surfaces(root)
-            shutil.copy2(workflow, root / ".github/workflows/agent-improvement-guide.yml")
+            shutil.copy2(
+                workflow, root / ".github/workflows/agent-improvement-guide.yml"
+            )
             result = subprocess.run(
                 [sys.executable, str(SCRIPT), "--root", str(root)],
                 check=False,
@@ -739,7 +744,9 @@ raise SystemExit(2)
             root = Path(tmp_dir)
             self.write_valid_workflow(root)
             self.copy_required_surfaces(root)
-            root_workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
+            root_workflow = (
+                root / ".github" / "workflows" / "agent-improvement-guide.yml"
+            )
             shutil.copy2(workflow, root_workflow)
 
             for allowed in (
@@ -1044,9 +1051,9 @@ raise SystemExit(2)
             workflow = root / ".github" / "workflows" / "issue-mirror.yml"
             workflow.parent.mkdir(parents=True, exist_ok=True)
             workflow.write_text(
-                (REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml").read_text(
-                    encoding="utf-8"
-                ).replace(
+                (REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml")
+                .read_text(encoding="utf-8")
+                .replace(
                     "      - name: Checkout repository\n"
                     "        id: checkout\n"
                     "        uses: actions/checkout@v4\n",
@@ -1079,14 +1086,15 @@ raise SystemExit(2)
             workflow = root / ".github" / "workflows" / "issue-mirror.yml"
             workflow.parent.mkdir(parents=True, exist_ok=True)
             workflow.write_text(
-                (
-                    REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml"
-                ).read_text(encoding="utf-8").replace(
-                    "echo \"- status: \\\\`fail\\\\`\"",
-                    "echo \"- status: \\\\`pass\\\\`\"",
-                ).replace(
-                    "echo \"ISSUE_SYNC=fail\"",
-                    "echo \"ISSUE_SYNC=pass\"",
+                (REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml")
+                .read_text(encoding="utf-8")
+                .replace(
+                    'echo "- status: \\\\`fail\\\\`"',
+                    'echo "- status: \\\\`pass\\\\`"',
+                )
+                .replace(
+                    'echo "ISSUE_SYNC=fail"',
+                    'echo "ISSUE_SYNC=pass"',
                 ),
                 encoding="utf-8",
             )
@@ -1113,9 +1121,9 @@ raise SystemExit(2)
             workflow = root / ".github" / "workflows" / "issue-mirror.yml"
             workflow.parent.mkdir(parents=True, exist_ok=True)
             workflow.write_text(
-                (REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml").read_text(
-                    encoding="utf-8"
-                ).replace(
+                (REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml")
+                .read_text(encoding="utf-8")
+                .replace(
                     "if: failure() && steps.checkout.outcome != 'success'",
                     "if: steps.checkout.outcome != 'success'",
                 ),
@@ -1379,7 +1387,10 @@ raise SystemExit(2)
                 / "pull-request"
                 / "agent_canon.md"
             )
-            self.assertIn("changed-surface validation:", derived_template.read_text(encoding="utf-8"))
+            self.assertIn(
+                "changed-surface validation:",
+                derived_template.read_text(encoding="utf-8"),
+            )
             (root / ".gitmodules").write_text(
                 '[submodule "vendor/agent-canon"]\n'
                 "\tpath = vendor/agent-canon\n"
