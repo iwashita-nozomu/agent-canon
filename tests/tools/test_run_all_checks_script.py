@@ -60,6 +60,67 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertLess(text.index(producer_marker), text.index(checker_marker))
         self.assertNotIn("export AGENT_CANON_HOOK_ARCHIVE_DIR", text)
 
+    def test_eval_accumulation_runs_only_in_standalone_source(self) -> None:
+        """run_all_checks runs accumulated eval checks only in standalone AgentCanon source."""
+        text = SCRIPT.read_text(encoding="utf-8")
+
+        standalone_condition = 'if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then'
+        mode_definition = (
+            'if [[ -d "${WORKSPACE_ROOT}/vendor/agent-canon" && -f "${WORKSPACE_ROOT}/.gitmodules" ]]; then'
+        )
+        parent_template_mode = (
+            'AGENT_CANON_REPOSITORY_MODE="template_or_derived"'
+        )
+        standalone_marker = (
+            'accumulated_eval_args=(--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}")'
+        )
+        standalone_eval_run = (
+            'run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then'
+        )
+        skip_eval_mark = "ACCUMULATED_AGENT_EVAL=skip reason=agentcanon_source_owned_gate"
+        skip_check_mark = "EVAL_ACCUMULATION=skip reason=agentcanon_source_owned_gate"
+
+        self.assertIn(standalone_condition, text)
+        self.assertIn(mode_definition, text)
+        self.assertIn(parent_template_mode, text)
+        self.assertIn(standalone_marker, text)
+        self.assertIn(standalone_eval_run, text)
+        self.assertIn(skip_eval_mark, text)
+        self.assertIn(skip_check_mark, text)
+
+        standalone_condition_index = text.index(standalone_condition)
+        skip_eval_index = text.index(skip_eval_mark)
+        skip_check_index = text.index(skip_check_mark)
+        producer_index = text.index(standalone_eval_run)
+        checker_index = text.index('eval_accumulation_check.py" 2>&1; then')
+
+        self.assertLess(standalone_condition_index, producer_index)
+        self.assertLess(standalone_condition_index, checker_index)
+        self.assertLess(standalone_condition_index, skip_eval_index)
+        self.assertLess(standalone_condition_index, skip_check_index)
+        self.assertLess(producer_index, checker_index)
+        self.assertLess(producer_index, skip_eval_index)
+        self.assertLess(skip_eval_index, skip_check_index)
+
+    def test_mode_collision_with_root_cargo_and_vendor_submodule_skips_accumulated_eval(self) -> None:
+        """Root Cargo.toml plus vendored submodule markers classify as template_or_derived."""
+        text = SCRIPT.read_text(encoding="utf-8")
+
+        standalone_mode_marker = 'AGENT_CANON_REPOSITORY_MODE="standalone_source"'
+        template_mode_marker = 'AGENT_CANON_REPOSITORY_MODE="template_or_derived"'
+        skip_eval_mark = "ACCUMULATED_AGENT_EVAL=skip reason=agentcanon_source_owned_gate"
+        skip_check_mark = "EVAL_ACCUMULATION=skip reason=agentcanon_source_owned_gate"
+
+        self.assertGreater(text.count(standalone_mode_marker), 0)
+        self.assertEqual(text.count(template_mode_marker), 1)
+        self.assertEqual(text.count(skip_eval_mark), 1)
+        self.assertEqual(text.count(skip_check_mark), 1)
+        self.assertIn(
+            'if [[ -d "${WORKSPACE_ROOT}/vendor/agent-canon" && -f "${WORKSPACE_ROOT}/.gitmodules" ]]; then',
+            text,
+        )
+        self.assertIn("AGENT_CANON_SOURCE_ROOT=\"${WORKSPACE_ROOT}/vendor/agent-canon\"", text)
+
     def test_pr_gate_only_keeps_shared_surface_ownership(self) -> None:
         """The PR gate emits ownership evidence without running run_all_checks."""
         ci_text = SCRIPT.read_text(encoding="utf-8")

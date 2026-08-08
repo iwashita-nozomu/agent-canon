@@ -71,10 +71,12 @@ CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$WORKSPACE_ROOT")"
 CANON_CI_ROOT="${CANON_TOOLS_ROOT}/ci"
 cd "$WORKSPACE_ROOT"
 
-AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
-if [ ! -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ] \
-  && [ -f "${WORKSPACE_ROOT}/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]; then
+if [[ -d "${WORKSPACE_ROOT}/vendor/agent-canon" && -f "${WORKSPACE_ROOT}/.gitmodules" ]]; then
+  AGENT_CANON_REPOSITORY_MODE="template_or_derived"
   AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
+else
+  AGENT_CANON_REPOSITORY_MODE="standalone_source"
+  AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
 fi
 AGENT_CANON_CARGO_MANIFEST="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml"
 AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${HOME}/.tools/agent-canon/cargo-target}"
@@ -451,19 +453,24 @@ else
   echo "❌ local issue sync checks 失敗"
   EXIT_CODE=1
 fi
-accumulated_eval_args=(--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}")
-if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
-  "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then
-  echo "✅ accumulated agent eval producers 成功"
+if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
+  accumulated_eval_args=(--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}")
+  if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
+    "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then
+    echo "✅ accumulated agent eval producers 成功"
+  else
+    echo "❌ accumulated agent eval producers 失敗"
+    EXIT_CODE=1
+  fi
+  if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/eval_accumulation_check.py" 2>&1; then
+    echo "✅ eval accumulation checks 成功"
+  else
+    echo "❌ eval accumulation checks 失敗"
+    EXIT_CODE=1
+  fi
 else
-  echo "❌ accumulated agent eval producers 失敗"
-  EXIT_CODE=1
-fi
-if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/eval_accumulation_check.py" 2>&1; then
-  echo "✅ eval accumulation checks 成功"
-else
-  echo "❌ eval accumulation checks 失敗"
-  EXIT_CODE=1
+  echo "ACCUMULATED_AGENT_EVAL=skip reason=agentcanon_source_owned_gate"
+  echo "EVAL_ACCUMULATION=skip reason=agentcanon_source_owned_gate"
 fi
 if cargo fmt --manifest-path "$AGENT_CANON_CARGO_MANIFEST" -- --check 2>&1; then
   echo "✅ Rust format checks 成功"
