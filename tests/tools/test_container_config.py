@@ -310,6 +310,7 @@ def test_missing_generated_compose_is_a_required_scenario_finding(
 def test_generator_scenarios_require_both_compose_outputs(tmp_path: Path) -> None:
     """A generator that exits successfully without output fails both scenarios."""
     repo = write_topic_fixture(tmp_path)
+    (repo / "docker/packs").mkdir(parents=True)
     generator = repo / ".devcontainer/generate-runtime-compose.sh"
     generator.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
     generator.chmod(0o755)
@@ -436,21 +437,15 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     assert "gpus: all" not in compose
     assert "group_add:" not in compose
     assert "/var/lib/agent-canon/runtime" not in compose
+    assert "\n      target:" not in compose
 
 
 def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
     tmp_path: Path,
 ) -> None:
     """The explicit profile projects the host identity and GPU runtime fields together."""
-    repo = tmp_path / "workspace" / "topic" / "agent-canon"
-    write_devcontainer(repo)
-    write_file(
-        repo,
-        ".devcontainer/generate-runtime-compose.sh",
-        GENERATOR.read_text(encoding="utf-8"),
-    )
-    write_file(repo, ".devcontainer/Dockerfile", DOCKERFILE.read_text(encoding="utf-8"))
-    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    repo = write_parent_generator_fixture(tmp_path)
+    write_gpu_admission_pack(repo)
     output_path = repo / ".agent-canon/gpu-admission-compose.generated.yml"
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
@@ -458,8 +453,6 @@ def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
         env={
             **os.environ,
             "HOME": str(tmp_path / "missing-home"),
-            "PROJECT_UID": "1000",
-            "PROJECT_GID": "1000",
             "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
             "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
             "AGENT_CANON_RUNTIME_GID": "4242",
@@ -476,23 +469,89 @@ def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
 
     assert result.returncode == 0, result.stdout + result.stderr
     compose = output_path.read_text(encoding="utf-8")
-    assert "name: agent-canon-" in compose
+    assert "name: parent-" in compose
     assert "-gpu-admission" in compose.splitlines()[0]
     assert "    gpus: all" in compose
+    assert "      target: gpu-runtime" in compose
+    assert 'AGENT_CANON_DEPENDENCY_PROFILE: "gpu"' in compose
     assert '        target: "/var/lib/agent-canon/runtime"' in compose
     assert "    group_add:\n      - \"1000\"\n      - \"4242\"\n      - \"5000\"" in compose
     assert 'DEVCONTAINER_GPU_MODE: "enabled"' in compose
     assert 'DEVCONTAINER_GPU_REQUEST: "all"' in compose
     assert 'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"' in compose
+    module = load_container_config_module()
+    pack, pack_findings = module.load_pack(
+        repo, repo / "docker/packs/gpu-admission.toml"
+    )
+    assert pack_findings == []
+    assert pack is not None
     assert (
-        load_container_config_module().validate_generated_compose(
+        module.validate_generated_compose(
             repo,
-            None,
+            pack,
             profile="gpu-admission",
             compose_path=output_path,
-        )
-        == []
     )
+    == []
+    )
+
+
+@pytest.mark.parametrize("target", [None, "cpu-runtime", "gpu/runtime"])
+def test_gpu_admission_requires_gpu_runtime_pack_target(
+    tmp_path: Path,
+    target: str | None,
+) -> None:
+    """The GPU profile fails closed unless its selected pack names gpu-runtime."""
+    repo = write_parent_generator_fixture(tmp_path)
+    write_gpu_admission_pack(repo, target=target)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(tmp_path / "missing-home"),
+            "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+            "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
+            "AGENT_CANON_RUNTIME_GID": "4242",
+            "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": "1000 4242 5000",
+            "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert (
+        "pack target must be gpu-runtime" in result.stderr
+        or "safe Docker build stage name" in result.stderr
+    )
+
+
+def test_default_rejects_gpu_runtime_pack_target(tmp_path: Path) -> None:
+    """The default profile cannot silently select the GPU build stage."""
+    repo = write_parent_generator_fixture(tmp_path)
+    default_pack = repo / "docker/packs/default.toml"
+    default_pack.write_text(
+        default_pack.read_text(encoding="utf-8").replace(
+            'platform = "linux/amd64"',
+            'platform = "linux/amd64"\ntarget = "gpu-runtime"',
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "HOME": str(tmp_path / "missing-home")},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "default profile rejects GPU build target" in result.stderr
 
 
 def test_default_scenario_rejects_shared_runtime_without_profile_selector(
@@ -766,6 +825,42 @@ def write_parent_generator_fixture(
     return repo
 
 
+def write_gpu_admission_pack(
+    repo: Path,
+    *,
+    target: str | None = "gpu-runtime",
+    dockerfile: str = "docker/Dockerfile",
+) -> None:
+    """Write the opt-in pack selected by the GPU generator profile."""
+    target_line = f'target = "{target}"' if target is not None else ""
+    write_file(
+        repo,
+        "docker/packs/gpu-admission.toml",
+        "\n".join(
+            [
+                "[pack]",
+                'name = "gpu-admission"',
+                f'dockerfile = "{dockerfile}"',
+                'context = "."',
+                'image_tag = "gpu-admission:fixture"',
+                'platform = "linux/amd64"',
+                target_line,
+                "",
+                "[smoke]",
+                'shell = "/bin/bash"',
+                "commands = []",
+                "",
+                "[runtime]",
+                'shell = "/bin/bash"',
+                'workdir = "/workspace"',
+                'workspace_mount = "/workspace"',
+                'dependency_profile = "gpu"',
+                "",
+            ]
+        ),
+    )
+
+
 def test_load_pack_reads_optional_platform_when_present_or_omitted(
     tmp_path: Path,
 ) -> None:
@@ -827,8 +922,6 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
         env={
             **os.environ,
             "HOME": str(home),
-            "PROJECT_UID": "1234",
-            "PROJECT_GID": "2345",
             "AGENT_CANON_OPTIONAL_MOUNTS": "host-zshrc",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
@@ -849,10 +942,10 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     assert 'SHELL: "/bin/zsh"' in compose
     assert 'AGENT_CANON_DEPENDENCY_PROFILE: "full"' in compose
     assert 'AGENT_CANON_CODEX_SESSION_ROOT: "/home/project/.codex/sessions"' in compose
-    assert 'user: "1234:2345"' in compose
+    assert f'user: "{os.getuid()}:{os.getgid()}"' in compose
     assert 'PROJECT_USER:' not in compose
-    assert 'PROJECT_UID: "1234"' in compose
-    assert 'PROJECT_GID: "2345"' in compose
+    assert f'PROJECT_UID: "{os.getuid()}"' in compose
+    assert f'PROJECT_GID: "{os.getgid()}"' in compose
     assert 'command: /bin/zsh -lc "sleep infinity"' in compose
     module = load_container_config_module()
     pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
@@ -878,8 +971,6 @@ def test_parent_generator_disables_unconfigured_parent_environment(
         env={
             **os.environ,
             "HOME": str(home),
-            "PROJECT_UID": "1000",
-            "PROJECT_GID": "1000",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
         check=False,
@@ -919,8 +1010,6 @@ def test_parent_environment_symlinks_to_existing_sources_pass(tmp_path: Path) ->
         env={
             **os.environ,
             "HOME": str(home),
-            "PROJECT_UID": "1000",
-            "PROJECT_GID": "1000",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
         check=False,
@@ -1012,34 +1101,23 @@ def test_generator_rejects_public_project_user_override(tmp_path: Path) -> None:
     assert "DEVCONTAINER_IDENTITY_ERROR=PROJECT_USER_OVERRIDE_FORBIDDEN" in result.stderr
 
 
-def test_generator_rejects_zero_project_uid_or_gid(tmp_path: Path) -> None:
-    """Project UID and GID must both be positive decimal integers."""
-    for field, value in (("PROJECT_UID", "0"), ("PROJECT_GID", "0")):
+def test_generator_rejects_project_uid_or_gid_override(tmp_path: Path) -> None:
+    """The generator derives host IDs and rejects caller-provided overrides."""
+    for field in ("PROJECT_UID", "PROJECT_GID"):
         case_root = tmp_path / field
         repo = write_parent_generator_fixture(case_root)
         (repo / ".agent-canon").mkdir()
-        home = case_root / "home"
-        write_host_zshrc(home)
-        environment = {
-            **os.environ,
-            "HOME": str(home),
-            "PROJECT_UID": "1234",
-            "PROJECT_GID": "2345",
-            field: value,
-        }
-        environment.pop("PROJECT_USER", None)
-        environment.pop("AGENT_CANON_RUNTIME_GID", None)
         result = subprocess.run(
             ["bash", ".devcontainer/generate-runtime-compose.sh"],
             cwd=repo,
-            env=environment,
+            env={**os.environ, field: "1234"},
             check=False,
             capture_output=True,
             text=True,
         )
 
         assert result.returncode == 1
-        assert "DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_MUST_BE_POSITIVE_DECIMAL" in result.stderr
+        assert "DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_OVERRIDE_FORBIDDEN" in result.stderr
 
 
 def test_parent_validator_rejects_zero_uid_or_gid(tmp_path: Path) -> None:
@@ -1054,8 +1132,6 @@ def test_parent_validator_rejects_zero_uid_or_gid(tmp_path: Path) -> None:
         env={
             **os.environ,
             "HOME": str(home),
-            "PROJECT_UID": "1234",
-            "PROJECT_GID": "2345",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
         check=False,
@@ -1072,14 +1148,20 @@ def test_parent_validator_rejects_zero_uid_or_gid(tmp_path: Path) -> None:
 
     malformed_cases = (
         (
-            valid.replace('user: "1234:2345"', 'user: "0:2345"').replace(
-                'PROJECT_UID: "1234"', 'PROJECT_UID: "0"'
+            valid.replace(
+                f'user: "{os.getuid()}:{os.getgid()}"',
+                f'user: "0:{os.getgid()}"',
+            ).replace(
+                f'PROJECT_UID: "{os.getuid()}"', 'PROJECT_UID: "0"'
             ),
             {"default-user-must-have-positive-uid-gid", "build-arg-PROJECT_UID-must-be-positive-integer"},
         ),
         (
-            valid.replace('user: "1234:2345"', 'user: "1234:0"').replace(
-                'PROJECT_GID: "2345"', 'PROJECT_GID: "0"'
+            valid.replace(
+                f'user: "{os.getuid()}:{os.getgid()}"',
+                f'user: "{os.getuid()}:0"',
+            ).replace(
+                f'PROJECT_GID: "{os.getgid()}"', 'PROJECT_GID: "0"'
             ),
             {"default-user-must-have-positive-uid-gid", "build-arg-PROJECT_GID-must-be-positive-integer"},
         ),
@@ -1128,7 +1210,7 @@ def test_generator_rejects_pack_override_of_runtime_route(tmp_path: Path) -> Non
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,
-        env={**os.environ, "PROJECT_UID": "1234", "PROJECT_GID": "2345"},
+        env={**os.environ},
         check=False,
         capture_output=True,
         text=True,
@@ -1138,6 +1220,32 @@ def test_generator_rejects_pack_override_of_runtime_route(tmp_path: Path) -> Non
         "runtime.env cannot override reserved key: AGENT_CANON_RUNTIME_ROUTE"
         in result.stderr
     )
+
+
+@pytest.mark.parametrize("identity_key", ["PROJECT_UID", "PROJECT_GID", "PROJECT_USER"])
+def test_generator_rejects_pack_override_of_host_identity(
+    tmp_path: Path,
+    identity_key: str,
+) -> None:
+    """Pack environment cannot introduce a second source of host identity."""
+    repo = write_parent_generator_fixture(tmp_path)
+    pack = repo / "docker/packs/default.toml"
+    pack.write_text(
+        pack.read_text(encoding="utf-8")
+        + f'\nenv = ["{identity_key}=pack-value"]\n',
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert f"runtime.env cannot override reserved key: {identity_key}" in result.stderr
 
 
 def test_container_config_requires_executable_resolver_entrypoint(tmp_path: Path) -> None:
@@ -1249,7 +1357,7 @@ def test_generator_rejects_raw_runtime_mounts_before_compose_output(
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,
-        env={**os.environ, "PROJECT_UID": "1234", "PROJECT_GID": "2345"},
+        env={**os.environ},
         check=False,
         capture_output=True,
         text=True,
@@ -1289,8 +1397,6 @@ def test_generated_compose_platform_is_read_back_exactly(tmp_path: Path) -> None
         cwd=repo,
         env={
             **os.environ,
-            "PROJECT_UID": "1234",
-            "PROJECT_GID": "2345",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
         check=False,

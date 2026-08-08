@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Validates Dockerfile, runtime pack, devcontainer, and retired VS Code projection paths.
+# responsibility Validates Dockerfile, runtime pack, host-identity devcontainer, and retired VS Code projection paths.
 # upstream design ../../documents/conventions/coding-conventions-project.md environment configuration policy
 # upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell boundary
@@ -66,6 +66,7 @@ PARENT_ENVIRONMENT_MANIFEST = ".devcontainer/parent-environment.toml"
 ENVIRONMENT_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 RUNTIME_SHELL_RE = re.compile(r"/[A-Za-z0-9._/-]+\Z")
 DEPENDENCY_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+BUILD_TARGET_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 DEFAULT_DEPENDENCY_PROFILE = "full"
 OPTIONAL_MOUNT_PROFILES = frozenset(
     {
@@ -238,9 +239,11 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
     image_tag = required_pack_fields["image_tag"]
     target_value = pack.get("target")
     target = target_value if isinstance(target_value, str) else None
-    if target_value is not None and target is None:
+    if target_value is not None and (
+        target is None or BUILD_TARGET_RE.fullmatch(target) is None
+    ):
         findings.append(
-            Finding("invalid_manifest", source, "pack.target-must-be-string")
+            Finding("invalid_manifest", source, "pack.target-must-be-safe-build-stage")
         )
     platform_value = pack.get("platform")
     platform = platform_value if isinstance(platform_value, str) else None
@@ -762,6 +765,32 @@ def validate_generated_compose(
             )
         )
     build = as_mapping(service.get("build"))
+    build_target = build.get("target") if build is not None else None
+    if profile == "gpu-admission" and build_target != "gpu-runtime":
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "gpu-admission-build-target-required:gpu-runtime",
+            )
+        )
+    elif profile == "default" and build_target == "gpu-runtime":
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "default-gpu-build-target-forbidden:gpu-runtime",
+            )
+        )
+    if pack is not None and build_target != pack.target:
+        expected_target = pack.target if pack.target is not None else "absent"
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                f"compose-build-target-expected:{expected_target}",
+            )
+        )
     if build is not None and build.get("context") != "..":
         findings.append(
             Finding("inconsistency", relative, f"build-context:{build.get('context')}")
@@ -1372,28 +1401,36 @@ def validate_generated_compose_scenarios(
         base_environment.update(
             {
                 "HOME": str(temporary_root / "home-without-host-state"),
-                "PROJECT_UID": "1000",
-                "PROJECT_GID": "1000",
                 "AGENT_CANON_DEVCONTAINER_REPO_ROOT": str(root.resolve()),
             }
         )
-        scenarios = (
-            ("default", {}),
-            (
-                "gpu-admission",
-                {
-                    "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
-                    "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
-                    "AGENT_CANON_RUNTIME_GID": "4242",
-                    "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": "1000 4242 5000",
-                    "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
-                    "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
-                    "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
-                },
-            ),
-        )
+        scenarios: list[tuple[str, dict[str, str]]] = [("default", {})]
+        packs_dir = root / "docker" / "packs"
+        if packs_dir.is_dir():
+            scenarios.append(
+                (
+                    "gpu-admission",
+                    {
+                        "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+                        "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
+                        "AGENT_CANON_RUNTIME_GID": "4242",
+                        "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": "1000 4242 5000",
+                        "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
+                        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
+                        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+                    },
+                )
+            )
         for profile, additions in scenarios:
             compose_path = temporary_root / f"{profile}.yml"
+            scenario_pack = pack
+            if profile == "gpu-admission":
+                gpu_pack_path = packs_dir / "gpu-admission.toml"
+                if gpu_pack_path.is_file():
+                    scenario_pack, gpu_pack_findings = load_pack(
+                        root, gpu_pack_path
+                    )
+                    findings.extend(gpu_pack_findings)
             environment = {
                 **base_environment,
                 **additions,
@@ -1421,7 +1458,7 @@ def validate_generated_compose_scenarios(
             findings.extend(
                 validate_generated_compose(
                     root,
-                    pack,
+                    scenario_pack,
                     profile=profile,
                     compose_path=compose_path,
                 )
@@ -1497,10 +1534,15 @@ def validate_devcontainer_pack_alignment(
         )
     profile_compose = root / ".agent-canon" / "gpu-admission-compose.generated.yml"
     if profile_compose.exists():
+        profile_pack = pack
+        gpu_pack_path = root / "docker" / "packs" / "gpu-admission.toml"
+        if gpu_pack_path.is_file():
+            profile_pack, gpu_pack_findings = load_pack(root, gpu_pack_path)
+            findings.extend(gpu_pack_findings)
         findings.extend(
             validate_generated_compose(
                 root,
-                pack,
+                profile_pack,
                 profile="gpu-admission",
                 compose_path=profile_compose,
             )

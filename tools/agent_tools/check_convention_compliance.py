@@ -630,19 +630,17 @@ REVIEW_ISSUE_ROUTING_MARKERS = {
 PR_ESSENCE_DOCUMENTATION_MARKERS = {
     ".github/PULL_REQUEST_TEMPLATE.md": (
         "## PR Essence",
-        "Problem / user request",
-        "Design intent",
-        "Canonical owner",
-        "Behavior or contract delta",
-        "Evidence route",
+        "Problem / user request:",
+        "Canonical owner / responsibility unit:",
+        "Behavior or contract delta:",
+        "Evidence route:",
     ),
     ".github/PULL_REQUEST_TEMPLATE/agent_canon.md": (
         "## PR Essence",
-        "Problem / user request",
-        "Design intent",
-        "Canonical owner",
-        "Behavior or contract delta",
-        "Evidence route",
+        "Problem / user request:",
+        "Canonical owner / responsibility unit:",
+        "Behavior or contract delta:",
+        "Evidence route:",
     ),
     "agents/skills/pr-processing.md": (
         "PR Essence",
