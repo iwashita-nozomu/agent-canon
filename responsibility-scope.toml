@@ -203,7 +203,7 @@ protecting_tools = [
   "tools/agent_tools/generate_agent_improvement_guide.py",
 ]
 issues = [
-  "issues/open/AC-20260517-eval-accumulation-gaps.md",
+  "issues/closed/AC-20260517-eval-accumulation-gaps.md",
 ]
 
 [[scope]]

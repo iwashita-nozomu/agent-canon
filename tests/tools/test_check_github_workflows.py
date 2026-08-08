@@ -881,7 +881,7 @@ raise SystemExit(2)
             root = Path(tmp_dir)
             self.write_valid_workflow(root)
             self.copy_required_surfaces(root)
-            issue = next((root / "issues" / "open").glob("*.md"))
+            issue = root / "issues" / "closed" / "AC-20260517-eval-accumulation-gaps.md"
             issue.write_text(
                 issue.read_text(encoding="utf-8").replace("edit_scope:", "scope:"),
                 encoding="utf-8",
@@ -1378,7 +1378,7 @@ raise SystemExit(2)
             "templates/documents/github/pull-request/agent_canon.md",
             "agents/workflows/agent-canon-pr-workflow.md",
             "issues/README.md",
-            "issues/open/AC-20260517-eval-accumulation-gaps.md",
+            "issues/closed/AC-20260517-eval-accumulation-gaps.md",
             "issues/closed/AC-20260513-durable-finding-auto-promotion.md",
             "README.md",
         ]:
@@ -1415,7 +1415,7 @@ raise SystemExit(2)
             ".github/workflows/agent-coordination.yml",
             ".github/workflows/agent-runtime-dashboard.yml",
             "issues/README.md",
-            "issues/open/AC-20260517-eval-accumulation-gaps.md",
+            "issues/closed/AC-20260517-eval-accumulation-gaps.md",
             "issues/closed/AC-20260513-durable-finding-auto-promotion.md",
         ]:
             source = REPO_ROOT / relative
