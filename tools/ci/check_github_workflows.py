@@ -118,8 +118,11 @@ ROOT_COORDINATION_WORKFLOW_REQUIREMENTS = (
     "result=bundle_ready",
 )
 ROOT_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
-    "Standalone AgentCanon improvement guidance workflow",
     "generate_agent_improvement_guide.py",
+)
+ROOT_IMPROVEMENT_GUIDE_WORKFLOW_ALLOWED_TAGS = (
+    "Standalone AgentCanon improvement guidance workflow",
+    "Template AgentCanon improvement guidance workflow",
 )
 STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
     "Standalone-only workflow",
@@ -928,6 +931,18 @@ def require_text(path: Path, required: Sequence[str]) -> list[Finding]:
     ]
 
 
+def require_text_any_of(path: Path, options: Sequence[str]) -> list[Finding]:
+    """Check that a file contains one of the allowed snippets."""
+    if not path.exists():
+        return [Finding("error", path, "missing_file")]
+    text = read_text(path)
+    normalized_text = re.sub(r"/{2,}", "/", text)
+    if any(option in text or option in normalized_text for option in options):
+        return []
+    joined = " | ".join(options)
+    return [Finding("error", path, f"missing_text_any_of:{joined}")]
+
+
 def projected_template_requirements(
     root: Path, required: Sequence[str]
 ) -> tuple[str, ...]:
@@ -961,6 +976,12 @@ def check_root_copy_headers(root: Path) -> list[Finding]:
         )
     for path, required in workflow_header_requirement_specs(root):
         if path.exists():
+            if path == root / ".github" / "workflows" / "agent-improvement-guide.yml":
+                findings.extend(
+                    require_text_any_of(
+                        path, ROOT_IMPROVEMENT_GUIDE_WORKFLOW_ALLOWED_TAGS
+                    )
+                )
             findings.extend(require_text(path, required))
     return findings
 

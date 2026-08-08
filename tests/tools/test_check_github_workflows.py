@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -729,6 +730,51 @@ raise SystemExit(2)
             )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_root_improvement_guide_allows_standalone_or_template_claim(self) -> None:
+        """Root improvement workflow accepts standalone or template contract phrasing."""
+        workflow = REPO_ROOT / ".github" / "workflows" / "agent-improvement-guide.yml"
+        source = workflow.read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            root_workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
+            shutil.copy2(workflow, root_workflow)
+
+            for allowed in (
+                "Standalone AgentCanon improvement guidance workflow",
+                "Template AgentCanon improvement guidance workflow",
+            ):
+                rewritten = re.sub(
+                    r"Standalone AgentCanon improvement guidance workflow|Template AgentCanon improvement guidance workflow",
+                    allowed,
+                    source,
+                )
+                root_workflow.write_text(rewritten, encoding="utf-8")
+                result = subprocess.run(
+                    [sys.executable, str(SCRIPT), "--root", str(root)],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+            root_workflow.write_text(
+                root_workflow.read_text(encoding="utf-8").replace(
+                    "AgentCanon improvement guidance workflow",
+                    "General improvement guidance workflow",
+                ),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("missing_text_any_of:", result.stdout)
 
     def test_legacy_auto_submodule_checkout_fails(self) -> None:
         """Checkout steps must use the explicit AgentCanon helper."""
