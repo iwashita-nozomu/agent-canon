@@ -36,6 +36,11 @@ POST_CREATE_COMMAND = (
     ".devcontainer/post-create-entrypoint.sh "
     "/workspace/${localWorkspaceFolderBasename}"
 )
+PARENT_POST_CREATE_COMMAND = (
+    "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
+    ".devcontainer/bootstrap-dependencies.sh --install-language-runtime && "
+    f"{POST_CREATE_COMMAND}"
+)
 
 
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
@@ -273,6 +278,48 @@ def test_post_create_uses_image_bootstrap_before_shared_lifecycle() -> None:
 
         assert command == POST_CREATE_COMMAND
         assert "bootstrap-dependencies.sh --install" not in command
+
+
+def test_parent_layout_requires_language_runtime_before_shared_lifecycle(
+    tmp_path: Path,
+) -> None:
+    """Parent default and GPU selectors require the explicit bootstrap prefix."""
+    module = load_container_config_module()
+    default = json.loads(
+        (PROJECT_ROOT / ".devcontainer/devcontainer.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    default["postCreateCommand"] = PARENT_POST_CREATE_COMMAND
+    assert module.validate_devcontainer_json(default, parent_layout=True) == []
+    default["postCreateCommand"] = POST_CREATE_COMMAND
+    default_findings = module.validate_devcontainer_json(default, parent_layout=True)
+    assert [finding.detail for finding in default_findings] == [
+        f"postCreateCommand-expected:{PARENT_POST_CREATE_COMMAND}"
+    ]
+
+    parent = tmp_path / "parent"
+    (parent / "vendor/agent-canon").mkdir(parents=True)
+    profile = json.loads(GPU_ADMISSION_SELECTOR.read_text(encoding="utf-8"))
+    profile["postCreateCommand"] = PARENT_POST_CREATE_COMMAND
+    write_file(
+        parent,
+        ".devcontainer/gpu-admission/devcontainer.json",
+        json.dumps(profile),
+    )
+    gpu_findings = module.validate_gpu_admission_selector(parent)
+    assert not any("postCreateCommand-expected" in item.detail for item in gpu_findings)
+
+    profile["postCreateCommand"] = POST_CREATE_COMMAND
+    write_file(
+        parent,
+        ".devcontainer/gpu-admission/devcontainer.json",
+        json.dumps(profile),
+    )
+    gpu_findings = module.validate_gpu_admission_selector(parent)
+    assert [
+        item.detail for item in gpu_findings if "postCreateCommand-expected" in item.detail
+    ] == [f"postCreateCommand-expected:{PARENT_POST_CREATE_COMMAND}"]
 
 
 def test_gpu_admission_selector_is_mandatory(tmp_path: Path) -> None:
