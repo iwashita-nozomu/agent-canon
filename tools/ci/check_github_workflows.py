@@ -688,7 +688,14 @@ def coordination_relay_findings(
             findings.append(Finding("error", path, f"fixed_manager_relay_job:{relay_job}"))
     for job_name, job in jobs.items():
         needs = job.get("needs")
-        need_names = {needs} if isinstance(needs, str) else set(needs or [])
+        if isinstance(needs, str):
+            need_names: set[str] = {needs}
+        elif isinstance(needs, list):
+            need_names = {
+                item for item in cast(list[object], needs) if isinstance(item, str)
+            }
+        else:
+            need_names = set()
         for relay_job in ("manager_reviewer", "manager_response"):
             if relay_job in need_names:
                 findings.append(
@@ -703,7 +710,7 @@ def coordination_relay_findings(
         steps = coordinate.get("steps")
         upload_count = 0
         if isinstance(steps, list):
-            for item in steps:
+            for item in cast(list[object], steps):
                 step = as_string_dict(item)
                 if isinstance(step, dict) and str(step.get("uses", "")).startswith(
                     "actions/upload-artifact@"

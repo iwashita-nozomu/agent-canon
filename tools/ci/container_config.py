@@ -1404,7 +1404,7 @@ def validate_generated_compose_scenarios(
                 "AGENT_CANON_DEVCONTAINER_REPO_ROOT": str(root.resolve()),
             }
         )
-        scenarios = [("default", {})]
+        scenarios: list[tuple[str, dict[str, str]]] = [("default", {})]
         packs_dir = root / "docker" / "packs"
         if packs_dir.is_dir():
             scenarios.append(
