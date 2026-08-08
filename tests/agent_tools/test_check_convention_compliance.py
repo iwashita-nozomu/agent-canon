@@ -868,36 +868,42 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             self.assertEqual(findings, [])
 
-    def test_parent_root_sync_adapter_missing_or_wrong_target_fails(self) -> None:
-        """Missing and mistargeted parent adapters fail without internal markers."""
-        for adapter_text in (
-            None,
-            "#!/usr/bin/env bash\n"
-            'exec env PYTHONPATH="vendor/agent-canon/tools:tools" '
-            "python3 -m agent_tools.agent_canon_source_root exec "
-            'tools/update_agent_canon.sh "$@"\n',
-        ):
-            with (
-                self.subTest(adapter_text=adapter_text),
-                tempfile.TemporaryDirectory() as tmp_dir,
-            ):
-                root = Path(tmp_dir)
-                source = root / "vendor" / "agent-canon"
-                self.copy_minimal_repo(source)
-                if adapter_text is not None:
-                    adapter = root / "tools" / "sync_agent_canon.sh"
-                    adapter.parent.mkdir(parents=True)
-                    adapter.write_text(adapter_text, encoding="utf-8")
+    def test_parent_without_root_sync_adapter_uses_vendored_projection(self) -> None:
+        """Parent mode without root adapter still passes when vendored projection is present."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "vendor" / "agent-canon"
+            self.copy_minimal_repo(source)
 
-                findings = check_surface_manifest_wiring(root)
+            findings = check_surface_manifest_wiring(root)
 
-                self.assertTrue(findings)
-                self.assertTrue(
-                    any(
-                        "missing-root-source-adapter-marker" in finding.detail
-                        for finding in findings
-                    )
+            self.assertEqual(findings, [])
+
+    def test_parent_root_sync_adapter_wrong_target_fails(self) -> None:
+        """Mistargeted parent adapters fail without internal markers."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "vendor" / "agent-canon"
+            self.copy_minimal_repo(source)
+            adapter = root / "tools" / "sync_agent_canon.sh"
+            adapter.parent.mkdir(parents=True)
+            adapter.write_text(
+                "#!/usr/bin/env bash\n"
+                'exec env PYTHONPATH="vendor/agent-canon/tools:tools" '
+                "python3 -m agent_tools.agent_canon_source_root exec "
+                'tools/update_agent_canon.sh "$@"\n',
+                encoding="utf-8",
+            )
+
+            findings = check_surface_manifest_wiring(root)
+
+            self.assertTrue(findings)
+            self.assertTrue(
+                any(
+                    "missing-root-source-adapter-marker" in finding.detail
+                    for finding in findings
                 )
+            )
 
     def test_hook_guardrail_policy_marker_fails(self) -> None:
         """Every stable dispatcher contract marker remains mechanically required."""

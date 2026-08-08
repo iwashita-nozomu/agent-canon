@@ -193,7 +193,7 @@ def write_topic_fixture(
     )
     write_file(
         repo,
-        "tools/agent_tools/dependency_module_change.py",
+        "tools/agent-canon/agent_tools/dependency_module_change.py",
         "#!/usr/bin/env python3\n",
     )
     return repo
@@ -233,6 +233,17 @@ def test_topic_compose_semantics_pass(tmp_path: Path) -> None:
     result = run_validator(repo)
 
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_validator_rejects_missing_dependency_module_change_in_parent_mode(tmp_path: Path) -> None:
+    """Parent mode requires the canonical dependency module path when module checks are enabled."""
+    repo = write_topic_fixture(tmp_path)
+    (repo / "tools" / "agent-canon" / "agent_tools" / "dependency_module_change.py").unlink()
+
+    result = run_validator(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "required-for-devcontainer-dependency-check" in result.stdout
 
 
 def test_gpu_admission_selector_isolated_from_default_selector() -> None:

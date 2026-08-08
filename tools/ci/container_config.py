@@ -1501,6 +1501,8 @@ def validate_devcontainer(root: Path) -> list[Finding]:
 
 def shared_agent_tools_dir(root: Path) -> Path:
     """Locate shared agent tools in standalone or parent-projected layouts."""
+    if (root / "vendor" / "agent-canon").is_dir():
+        return root / "tools" / "agent-canon" / "agent_tools"
     direct = root / "tools" / "agent_tools"
     if direct.is_dir():
         return direct

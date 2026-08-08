@@ -1489,7 +1489,7 @@ def check_surface_manifest_wiring(root: Path) -> list[Finding]:
                     f"missing-marker:{marker}",
                 )
             )
-    if vendored_sync.is_file():
+    if vendored_sync.is_file() and root_sync.is_file():
         adapter_text = (
             root_sync.read_text(encoding="utf-8") if root_sync.is_file() else ""
         )
