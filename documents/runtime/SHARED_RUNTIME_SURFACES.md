@@ -25,6 +25,9 @@ view `.codex/config.toml`, and the shared CLI/tool namespace
 `tools/agent-canon`. The update lifecycle may create optional transaction state
 under `.agent-canon/`. Tests, notes, memory, evidence, editor, devcontainer,
 and GitHub paths are not mirrored shared surfaces.
+Standalone AgentCanon may retain and validate its own regular `.vscode` source
+files; that standalone source ownership is separate from any parent `.vscode`
+directory, which remains parent-owned regular content.
 
 ## Reader Map
 

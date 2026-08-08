@@ -2702,22 +2702,49 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertFalse((repo / ".github" / "PULL_REQUEST_TEMPLATE.md").exists())
 
     def test_link_root_migrates_legacy_vscode_directory_before_child_links(self) -> None:
-        """Link-root must materialize the real container before child symlinks."""
+        """Link-root preserves regular parent editor content after projection retirement."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
             repo = self.make_superproject(root, bare_repo)
             vscode_dir = repo / ".vscode"
             vscode_dir.mkdir()
-            (vscode_dir / "settings.json").write_text(
-                '{"legacyRepoLocalSetting": true}\n',
-                encoding="utf-8",
-            )
-            subprocess.run(["git", "add", ".vscode/settings.json"], cwd=repo, check=True)
+            vscode_files = {
+                name: f"parent-owned-{name}\n"
+                for name in (
+                    "c_cpp_properties.json",
+                    "extensions.json",
+                    "settings.json",
+                    "tasks.json",
+                )
+            }
+            for name, content in vscode_files.items():
+                (vscode_dir / name).write_text(content, encoding="utf-8")
+            subprocess.run(["git", "add", ".vscode"], cwd=repo, check=True)
             subprocess.run(
-                ["git", "commit", "-m", "add legacy vscode settings"],
+                ["git", "commit", "-m", "add parent vscode settings"],
                 cwd=repo,
                 check=True,
+            )
+
+            # Keep this historical fixture, but remove its retired VS Code
+            # projection entries before exercising the current contract.
+            manifest = repo / "vendor" / "agent-canon" / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+            manifest_text = manifest.read_text(encoding="utf-8")
+            manifest_text = manifest_text.replace(
+                '\n[[surface]]\npath = ".vscode"\nmode = "regular"\n'
+                'projection_producer = "template-or-derived-repo"\n'
+                'projection_kind = "active_contract"\nsource = ".vscode"\n',
+                "\n",
+            )
+            for name in vscode_files:
+                manifest_text = manifest_text.replace(f'  ".vscode/{name}",\n', "")
+            manifest.write_text(manifest_text, encoding="utf-8")
+            source_doc = manifest.with_name("SHARED_RUNTIME_SURFACES.md")
+            source_doc.write_text(
+                source_doc.read_text(encoding="utf-8")
+                + "\nAGENTS.md\n.codex/config.toml\n",
+                encoding="utf-8",
             )
 
             result = subprocess.run(
@@ -2737,22 +2764,12 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertFalse(vscode_dir.is_symlink())
-            for vscode_name in (
-                "c_cpp_properties.json",
-                "extensions.json",
-                "settings.json",
-                "tasks.json",
-            ):
-                self.assertTrue((vscode_dir / vscode_name).is_symlink())
-                self.assertIn("vendor/agent-canon/.vscode", os.readlink(vscode_dir / vscode_name))
-            self.assertEqual(
-                (repo / "vendor" / "agent-canon" / ".vscode" / "settings.json").read_text(
-                    encoding="utf-8"
-                ),
-                '{"agentCanonTest": true}\n',
-            )
+            for vscode_name, content in vscode_files.items():
+                path = vscode_dir / vscode_name
+                self.assertTrue(path.is_file() and not path.is_symlink())
+                self.assertEqual(path.read_text(encoding="utf-8"), content)
             self.assertEqual(check.returncode, 0, check.stderr)
-            subprocess.run(["git", "add", "-A", ".vscode"], cwd=repo, check=True)
+            subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
             subprocess.run(
                 ["git", "commit", "-m", "sync vscode shared surface"],
                 cwd=repo,

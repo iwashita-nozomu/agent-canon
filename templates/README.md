@@ -1,7 +1,7 @@
 <!--
 @dependency-start
 contract reference
-responsibility Indexes the centralized AgentCanon template owner and its parent-root projections.
+responsibility Indexes the centralized AgentCanon template owner and the parent-owned boundary.
 upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared template surface ownership
 upstream design ../documents/rule/README.md document filename, placement, and language rules
 upstream design ../documents/conventions/DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse projection traces
@@ -12,7 +12,7 @@ downstream implementation ./experiments/_template/run.py runnable experiment sca
 downstream implementation ../tools/agent_tools/code_template_rendering.py renders materializable code templates
 downstream implementation ../tools/agent_tools/agent_team.py renders agent templates
 downstream implementation ../tools/experiments/create_experiment_topic.py copies experiment templates
-downstream implementation ../tools/sync_agent_canon.sh retires the parent-root template view and projects GitHub copies
+downstream implementation ../tools/ci/check_github_workflows.py validates checked-in GitHub template targets
 @dependency-end
 -->
 
@@ -24,7 +24,7 @@ wrapper、互換コピーも作りません。
 
 ## Reader Map
 
-この README は、template source の全体像、各 source view の責務、生成 projection、
+この README は、template source の全体像、各 source view の責務、checked-in target、
 親repoとの境界、更新・再現・cleanup の入口を提供します。最初にこの表で source owner
 を決め、次に対象 template の `what this document contains`、owner、設計 trace、
 validation/readback、lifecycle を読みます。
@@ -33,9 +33,9 @@ validation/readback、lifecycle を読みます。
 - intended reader: template利用者、実装者、reviewer、親repo integrator、保守者。
 - what this directory contains: agent artifact、reader-facing document、materializable code、experiment scaffold、GitHub source。
 - canonical source: `templates/`。
-- generated / local surfaces: `.github/` projection、run/result、reports、親repoの view。
-- update owner: 各 source template とその直接 consumer。index/manifest は参照が変わる場合だけ更新する。
-- required readback: source→consumer→projection identity、formatter/docs、dependency header、scope/projection checks。
+- checked-in / local surfaces: standalone AgentCanon `.github/` targets、run/result、reports。derived parent の `.github` と runtime directories は parent-owned regular content。
+- update owner: 各 source template と対応する checked-in target。
+- required validation: source/target identity、formatter/docs、dependency header、semantic checker。
 - lifecycle: run-local data と generated copies は retention policy / producer owner が cleanup する。
 
 ## Source-view index
@@ -43,7 +43,7 @@ validation/readback、lifecycle を読みます。
 | Source view | Responsibility | Materialization rule |
 | --- | --- | --- |
 | `templates/agents/` | task-start、run bundle、review、closeout の artifact template | Agent team がこの path を直接 render する |
-| `templates/documents/` | README、design、experiment、host、remote execution、GitHub template source | GitHub surface は manifest 経由で `.github/` へ copy projection する |
+| `templates/documents/` | README、design、experiment、host、remote execution、GitHub template source | standalone AgentCanon の checked-in GitHub targets を source と同時に更新する |
 | `templates/code/` | parse-valid module/class/function と Docstring の materializable source | `render_code_template()` または明示 copy で destination owner へ materialize する |
 | `templates/experiments/_template/` | runnable experiment scaffold の frozen source | `create_experiment_topic.py` が新規 `experiments/<topic>/` へ copy する |
 | `templates/agents/_partials/` | reader map、review contract、finding/decision の再利用部品 | top-level agent artifact の render 時だけ展開する |
@@ -52,8 +52,10 @@ validation/readback、lifecycle を読みます。
 `vendor/agent-canon/templates/` から直接解決します。root `templates` symlink
 view は materialize しません。親側の `experiments/_template` は source owner
 ではないため削除し、親の `experiments/registry.toml` から `_template`
-entry と対応する docs / tests を削除します。GitHub Issue / PR projection は
-source-root `templates/documents/github/` から `.github/` へ再生成します。
+entry と対応する docs / tests を削除します。GitHub Issue / PR の checked-in standalone
+targets は `templates/documents/github/` source と同時に更新します。derived parent の
+`.github`、`.devcontainer`、`.vscode`、`agents`、`.agents` は parent-owned regular content
+であり、この source から親rootへ反映しません。
 
 ## Experiment copy boundary
 
@@ -77,7 +79,8 @@ source-root `templates/documents/github/` から `.github/` へ再生成しま�
 - parent の `experiments/_template/` を削除する。
 - parent registry の `_template` entry を削除する。
 - 削除した scaffold だけを使う parent docs と tests を削除する。
-- `.github/ISSUE_TEMPLATE/` と `.github/PULL_REQUEST_TEMPLATE/` projection を再生成して確認する。
+- derived parent の `.github` regular content を保持し、AgentCanon source の GitHub
+  targets を親rootへ再生成しないことを確認する。
 - pin/root-view 更新後、parent root で
   `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check`
   を pass させる。

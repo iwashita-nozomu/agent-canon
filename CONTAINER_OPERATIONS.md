@@ -7,13 +7,13 @@ responsibility Documents AgentCanon-owned container, devcontainer, editor worksp
 upstream design README.md AgentCanon top-level entrypoint and rule index.
 upstream design documents/runtime/SHARED_RUNTIME_SURFACES.md shared root view and owner-class manifest.
 upstream design documents/experiments/gpu-admission-r5-source-packet.md exact GPU admission runtime identity boundary.
-downstream design documents/contracts/github-first-module-and-devcontainer-policy.md GitHub-first module and shared devcontainer boundary policy.
+downstream design documents/contracts/github-first-module-and-devcontainer-policy.md GitHub-first module and standalone-source/parent devcontainer boundary policy.
 downstream design documents/design/rust-agent-tool-migration.md Rust toolchain and AgentCanon CLI migration boundary.
 downstream design documents/conventions/coding-conventions-project.md project environment and dependency ownership conventions.
 downstream environment agent-canon-environment.toml machine-readable AgentCanon environment contract.
-downstream implementation .devcontainer/devcontainer.json shared AgentCanon devcontainer entrypoint.
-downstream implementation .devcontainer/post-create.sh shared AgentCanon post-create bootstrap.
-downstream implementation .vscode/settings.json shared AgentCanon VS Code workspace defaults.
+downstream implementation .devcontainer/devcontainer.json standalone AgentCanon devcontainer entrypoint.
+downstream implementation .devcontainer/post-create.sh standalone AgentCanon post-create bootstrap.
+downstream implementation .vscode/settings.json standalone AgentCanon source editor defaults.
 downstream implementation tools/ci/container_config.py container and devcontainer configuration validator.
 downstream implementation tools/ci/check_github_workflows.py GitHub workflow checkout and Docker-build validator.
 @dependency-end
@@ -26,15 +26,16 @@ template-derived repository.
 
 ## Reader Map
 
-- This rulebook owns the AgentCanon Docker, devcontainer, VS Code, and shared editor workspace boundary.
+- This rulebook owns the AgentCanon Docker, standalone devcontainer/VS Code source, and active root-view boundary.
 - `Scope`, `Canonical Source Contract`, and `Ownership Boundary` explain what this file controls; the Dockerfile, devcontainer, Python dependency, GitHub workflow, validation, hook, and recent-rule sections cover the operational details.
 - Read it before changing container, devcontainer, editor workspace, Docker workflow, or related validator surfaces.
 
 ## Scope
 
 This document is AgentCanon-owned. It describes the shared rule boundary. The
-actual project container contract remains repository-local unless the path is an
-AgentCanon shared root view.
+actual project container contract remains repository-local unless the path is one
+of the active AgentCanon root views (`AGENTS.md`, `.codex/config.toml`, or
+`tools/agent-canon`).
 
 Read this file when a task touches any of these surfaces:
 
@@ -82,11 +83,11 @@ The ownership boundary covers these primary surfaces.
 
 | Surface                | Owner                          | Rule                                                                                                                                                           |
 | ---------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `.devcontainer/`       | AgentCanon                     | Shared runtime view. Keep the fixed base bootstrap, declarative developer/agent manifest, mount, and post-create lifecycle here.                              |
-| `.vscode/`             | AgentCanon                     | Shared editor workspace view. Keep common AgentCanon recommendations, safe defaults, and validation tasks here.                                                |
+| `.devcontainer/`       | Template or derived repository | Parent-owned regular environment directory. Standalone AgentCanon owns only its own source checkout; parent regular files are preserved.                   |
+| `.vscode/`             | Template or derived repository | Parent-owned regular editor directory. Standalone AgentCanon may validate its four source files; no parent mirror is required.                              |
 | `Dockerfile`           | Template or derived repository | Project image contract. Do not add generic Codex, GitHub CLI, Rust toolchain, or agent convenience tooling here.                                               |
 | `docker/`              | Template or derived repository | Project-local container runbook, dependency packs, runtime package contract, and repository-specific image policy.                                             |
-| GitHub Docker workflow | Mixed                          | Workflow file may be GitHub path-constrained copy, but its Docker behavior must follow this rulebook and checkout AgentCanon before shared devcontainer smoke. |
+| GitHub Docker workflow | Template or derived repository | Parent-owned workflow. Its Docker behavior follows this rulebook; any AgentCanon source use is selected by the workflow rather than materialized as a root copy. |
 
 The separation is intentional. AgentCanon owns the shared automation boundary;
 the repository owns its runtime image and product dependencies.
@@ -122,7 +123,7 @@ means no parent dependency overlay; `.devcontainer/post-create-parent.sh` is
 called only when present, and its absence means no parent final hook. The
 legacy parent-environment pair is likewise optional and is audited only when
 present. No empty sentinel, disabled marker, or no-op wrapper is required.
-The shared post-create validates the available sources, merges a present parent
+The standalone-source post-create invoked via the source-root resolver validates the available sources, merges a present parent
 manifest before the canonical AgentCanon manifest, validates the complete graph,
 and executes it only after that validation succeeds.
 
@@ -192,7 +193,7 @@ project CI path.
 
 ## Devcontainer Rules
 
-Use the shared `.devcontainer/` surface for agent runtime setup.
+Use the parent-owned `.devcontainer/` surface for project and agent runtime setup.
 
 - Codex CLI, GitHub CLI, `gh`, Node.js used only by Codex or agent tooling,
   JSON and structure inspection helpers such as `jq` and `tree`, and other
@@ -324,12 +325,10 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   に保持するが、linked config の default lifecycle からは非選択とする。既定境界の
   authority は本 rulebook と linked implementation に置く。experiment scheduler
   や managed experiment の wholesale deletion を意味しない。
-- GPU admission を使う場合は `.devcontainer/gpu-admission/devcontainer.json` を
-  selector とする `.devcontainer/gpu-admission.sh` を明示実行する。derived repository
-  には `.devcontainer/gpu-admission ->
-  ../vendor/agent-canon/.devcontainer/gpu-admission` child symlink を投影し、
-  `python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec
-  .devcontainer/gpu-admission.sh`、standalone AgentCanon では同じ resolver を
+- GPU admission を使う場合は親-owned regular `.devcontainer/gpu-admission/devcontainer.json`
+  を selector とする `.devcontainer/gpu-admission.sh` を明示実行する。derived repository
+  へ AgentCanon の child symlink は投影せず、親が必要な entrypoint を source-root
+  resolver 経由で選択する。standalone AgentCanon では同じ resolver を
   `tools/agent_tools/agent_canon_source_root.py` から実行する。profile は
   `nvidia-smi -L`、`devcontainer` CLI、active repository、host runtime group/session
   を fail-closed に確認した後でだけ bootstrap を呼ぶ。GPU 不在、host `sudo`/group
@@ -362,7 +361,7 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   `tools/experiments/execution_resource_plan.py` とし、scripts に第二の parser/writer
   や identity repair を追加しない。
 - Mount behavior belongs in `.devcontainer/devcontainer.json`.
-- Shared devcontainer names must be repository-specific. Do not use a fixed
+- Devcontainer names must be repository-specific. Do not use a fixed
   `name` or Compose project name that makes every template-derived repository
   create the same visible devcontainer/container names.
 - The generated Docker Compose file must set a top-level project `name` derived
@@ -392,7 +391,7 @@ Use the shared `.devcontainer/` surface for agent runtime setup.
   `AGENT_CANON_SECRET_MOUNT` target is rejected. Use
   `AGENT_CANON_SECRET_DIR_MODE=rw` only when the container must update local
   Git remotes; otherwise keep the default read-only mode.
-- Shared post-create logic must tolerate a repository that has no local bare
+- Resolver-invoked standalone-source post-create logic must tolerate a repository that has no local bare
   mirror and no host-specific optional mount.
 - Devcontainer-generated Compose must forward repo-local runtime environment
   entries from `docker/packs/default.toml` so editor kernels, shells, and smoke
@@ -442,11 +441,11 @@ before editing.
 
 | Step | Required check                                                                                                                             |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1    | Classify each touched path as AgentCanon-owned, template-owned, project-owned, or GitHub path-constrained copy.                            |
-| 2    | Check the AgentCanon submodule pin and repair shared views with the request-evidence-authorized source-root resolver `exec tools/sync_agent_canon.sh link-root` route when needed. |
-| 3    | Move agent convenience installs out of `Dockerfile` and into shared `.devcontainer/post-create.sh` when they are not product dependencies. |
+| 1    | Classify each touched path as AgentCanon-owned, template-owned, parent-owned regular content, or one of the three active root views.       |
+| 2    | Check the AgentCanon submodule pin and repair only the three active root views with the request-evidence-authorized source-root resolver `exec tools/sync_agent_canon.sh link-root` route when needed. |
+| 3    | Move agent convenience installs out of `Dockerfile` and into the parent-owned `.devcontainer/post-create.sh` when they are not product dependencies. |
 | 4    | Keep workspace-dependent Python package installation in `docker/install_python_dependencies.sh`.                                           |
-| 5    | Ensure Docker workflows checkout `vendor/agent-canon/` before shared devcontainer smoke.                                                   |
+| 5    | Ensure Docker workflows checkout `vendor/agent-canon/` before parent devcontainer smoke.                                                   |
 | 6    | Update `docker/README.md`, top-level README links, and workflow comments that still assume older ownership rules.                          |
 | 7    | Run the validators listed below and record any skipped command with reason and owner.                                                      |
 
@@ -510,11 +509,11 @@ the tooling that enforces them. Merge times are GitHub `mergedAt` values in UTC.
 
 | PR            | Merge            | Rule change for downstream repositories                                                                                                           |
 | ------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #17 `9241cbd` | 2026-05-13 14:47 | Docker devcontainer CI must checkout AgentCanon before shared devcontainer smoke. The workflow checker rejects the old submodule-free assumption. |
+| #17 `9241cbd` | 2026-05-13 14:47 | Docker devcontainer CI must checkout AgentCanon before parent devcontainer smoke. The workflow checker rejects the old submodule-free assumption. |
 | #16 `0de03e4` | 2026-05-13 14:28 | Hook, skill, eval, memory, issue, and improvement-guide evidence must accumulate through explicit files and workflow gates.                       |
-| #14 `dfd0b6d` | 2026-05-13 13:29 | Nested Codex post-create setup belongs in the shared devcontainer path and runs after the workspace is available.                                 |
+| #14 `dfd0b6d` | 2026-05-13 13:29 | Nested Codex post-create setup belongs in the resolver-invoked standalone-source path and runs after the workspace is available.                                 |
 | #13 `d679446` | 2026-05-13 13:36 | Helper inventory supports changed-file baseline mode; new helpers require reuse evidence and changed-scope inspection.                            |
-| #12 `c5a7c77` | 2026-05-13 13:12 | GitHub-first custom modules and shared devcontainer ownership are the default; local Git mirrors are compatibility-only.                          |
+| #12 `c5a7c77` | 2026-05-13 13:12 | GitHub-first custom modules and standalone-source/parent devcontainer ownership are the default; local Git mirrors are compatibility-only.                          |
 | #11 `62d8342` | 2026-05-13 12:57 | Helper definitions must be inventoried and justified instead of added as untracked convenience code.                                              |
 | #10 `d8caa5b` | 2026-05-13 12:15 | Review backlog and repo-wide scans must degrade when `rg` is missing instead of assuming one local search tool.                                   |
 | #9 `2da3793`  | 2026-05-13 12:01 | PR queue cleanup requires validation gates and authority evidence before mutation.                                                                |

@@ -76,10 +76,10 @@ binary verification が一致しない場合は receipt を再利用せず fail/
 
 ## pin と root projection
 
-親側で AgentCanon submodule pin を更新し、`.devcontainer/devcontainer.json`
-と shared root view がその pin を直接参照することを確認します。親の
-`.devcontainer/` は実ディレクトリのまま保持し、shared file の全体コピーや
-wrapper を追加しません。生成された
+親側で AgentCanon submodule pin を更新し、active root views がその pin と
+一致することを確認します。親の `.devcontainer/` は実ディレクトリのまま保持し、
+`devcontainer.json` を含む regular files の shared copy、symlink、wrapper は
+追加しません。生成された
 `.agent-canon/docker-compose.generated.yml` と dependency receipts は追跡対象にしません。
 
 AgentCanon source update 後の親側 follow-up は request-evidence を付けた

@@ -9,13 +9,13 @@ downstream implementation ../../tools/ci/check_github_workflows.py validates PR 
 downstream implementation ../../tools/agent_tools/tool_drift.py validates PR/tool trace contracts
 downstream implementation ../../tools/agent_tools/issue_sync.py validates local/GitHub issue sync state
 downstream implementation ../../tools/agent_tools/check_convention_compliance.py validates PR Essence checklist wiring
-upstream design ../../templates/documents/README.md canonical template owner and projection boundary
+upstream design ../../templates/documents/README.md canonical template owner and checked-in target boundary
 upstream design ../../documents/operations/issue-label-taxonomy.md issue/eval routing taxonomy
 upstream design ../AGENTS.md GitHub subtree instructions
 @dependency-end
 -->
 
-<!-- canonical source は templates/documents/github/pull-request/agent_canon.md です。generated projection は .github/PULL_REQUEST_TEMPLATE/agent_canon.md を対象とするため、この source だけを編集します。 -->
+<!-- canonical source と checked-in standalone target は templates/documents/github/pull-request/agent_canon.md と .github/PULL_REQUEST_TEMPLATE/agent_canon.md です。両方を同じ変更で更新します。 -->
 
 ## Reader Map
 
@@ -37,15 +37,15 @@ upstream design ../AGENTS.md GitHub subtree instructions
 ## Reader Map And Contents
 
 この PR template は、変更の本質、canonical owner、設計から実装への trace、依存/副作用、
-validation、projection、cleanup を一つの reviewer path にまとめます。読者は `PR Essence`
+validation、checked-in standalone target、cleanup を一つの reviewer path にまとめます。読者は `PR Essence`
 と `Scope` で判断対象を固定し、`Validation Trust Boundary` と `Artifact And Clone Cleanup`
 で完了証拠を read back します。
 
 - intended reader and decision:
 - what this PR contains:
-- canonical source / generated projection / run-local artifact:
+- canonical source / checked-in standalone target / run-local artifact:
 - owner and responsibility / OOP boundary:
-- required formatter, parse, projection, and post-format readback:
+- required formatter, parse, semantic validation, and post-format source/target check:
 - lifecycle retention and cleanup owner:
 
 ## Design, Algorithm, And Oracle Trace
@@ -88,7 +88,7 @@ validation、projection、cleanup を一つの reviewer path にまとめます�
 - pushed branch:
 - PR head:
 - local = push = PR head evidence:
-- submodule / generated projection identity:
+- submodule / checked-in standalone target identity:
 
 ## Summary
 
@@ -112,7 +112,7 @@ validation、projection、cleanup を一つの reviewer path にまとめます�
 - [ ] Tool additions or tool behavior changes are represented by an AgentCanon source PR, not only by this template pin/root-view PR.
 - [ ] Memory additions, agent-learning updates, skill eval results, or feedback-loop changes are represented by an AgentCanon source PR, not only by this template pin/root-view PR.
 - [ ] This PR is a pin/root-view update after the AgentCanon source PR, or the deferred upstream-sync reason is documented below.
-- [ ] This PR records `agentcanon_structure_followup=required` for AgentCanon source, pin, root-view, root-copy, or parent sync changes.
+- [ ] This PR records `agentcanon_structure_followup=required` for AgentCanon source, pin, active-root-view, or parent sync changes.
 
 Route notes:
 
@@ -187,15 +187,15 @@ Impact notes:
 
 ## Validation
 
-- [ ] Validation failure response, if any, cites `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.json` as the canonical taxonomy owner; `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md` is the generated reader projection. PR evidence records the required evidence and same-intent repair / escalation result.
+- [ ] Validation failure response, if any, cites `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.json` as the canonical taxonomy owner; `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md` is the runtime-profile reader document. PR evidence records the required evidence and same-intent repair / escalation result.
 - [ ] `bash tools/agent-canon/sync_agent_canon.sh link-root`
 - [ ] `bash tools/agent-canon/sync_agent_canon.sh check`
 - [ ] `make agent-canon-pr-check`
 - [ ] Standalone AgentCanon source: existing `static-gates` owns shared AgentCanon surfaces; no repository-wide project-quality job is added.
 - [ ] Derived parent: `AGENT_CANON_PR_PROJECT_QUALITY=delegated` with owner `parent_ci`; the parent workflow exposes the canonical `make ci` command under that owner, independent of job name.
-- [ ] Derived parent shared gate owns AgentCanon pin/projection/header/graph/workflow/skill-command surfaces only; development prompt and accumulated evals run only in the standalone AgentCanon static owner.
+- [ ] Derived parent shared gate owns AgentCanon pin/active-root-view/header/graph/workflow/skill-command surfaces only; development prompt and accumulated evals run only in the standalone AgentCanon static owner.
 - [ ] Parent gate dependency graph receipt is `prepared` when parent graph
-  migration, a touched canonical dependency surface/manifest, or the selected
+  migration, a touched canonical dependency surface/contract, or the selected
   canonical validation profile requires strict completeness; otherwise it is
   `skipped` with selector reason/evidence.
 - [ ] `python3 tools/agent-canon/agent_tools/check_agent_runtime_alignment.py`
@@ -206,7 +206,7 @@ Impact notes:
 - [ ] `python3 tools/agent-canon/agent_tools/issue_sync.py --repo iwashita-nozomu/agent-canon --github-check`
 - [ ] Standalone AgentCanon only: prompt/accumulated eval evidence is supplied by the standalone static-gates owner when evaluator review is in scope.
 - [ ] AgentCanon pin/update path: `bash tools/agent-canon/update_agent_canon.sh rebuild-tools` or a documented `AGENT_CANON_TOOL_REBUILD_*` skip reason.
-- [ ] GitHub workflow / PR template changes: `python3 tools/agent-canon/ci/check_github_workflows.py`
+- [ ] GitHub workflow / PR template changes: `python3 tools/ci/check_github_workflows.py`
 - [ ] GitHub workflow changes: every `actions/checkout` job uses `submodules: false`, then runs `.github/scripts/checkout_agent_canon_submodule.sh` in template / derived roots or `tools/ci/checkout_agent_canon_submodule.sh` in standalone AgentCanon source when AgentCanon is needed.
 - [ ] Private AgentCanon submodule access is covered by repository secret `AGENT_CANON_REPO_TOKEN`, `AGENT_CANON_REPO_SSH_KEY` from a read-only deploy key, or the PR explains why the workflow does not need it.
 - [ ] GitHub workflow changes: `persist-credentials: false` is set unless the job has documented write intent.
@@ -230,18 +230,18 @@ paste the key pass lines here
 - validation failure semantics and escalation:
 - Markdown/math/Mermaid command: `tools/bin/agent-canon docs check <changed-markdown-paths>`
 - formatter/fixer command, if any:
-- post-format source readback and projection identity:
+- post-format source/target consistency:
 - TOML/YAML/JSON parse evidence:
 
 ## Shared Surface Changes
 
 - new surfaces:
 - removed surfaces:
-- root copy surfaces touched:
+- parent-owned regular surfaces touched:
 - link spec changes:
 - `.gitmodules` changed / reviewed:
-- generated copy/form producer:
-- generated paths read back:
+- checked-in standalone target update owner:
+- checked-in standalone targets updated:
 
 ## Integration
 
@@ -267,10 +267,10 @@ Upstream sync note:
 
 - temporary clone/worktree paths:
 - run-local reports and raw logs:
-- generated artifacts retained:
+- run artifacts retained:
 - cleanup command and owner:
 - cleanup result / explicit preservation reason:
-- generic topic-clone lifecycle/materialization manifest:
+- generic topic-clone lifecycle/materialization record:
 - source remote / branch / base SHA readback:
 - local-only commit or untracked artifact decision:
 - reconstructibility evidence before removal:

@@ -88,7 +88,7 @@ unit の invariant が静的に確定できない場合を除き選択しませ�
 | `documents/parent-repository-audit/audit-unit/*.md` | AgentCanon | 新設正本 | 一変更責務単位ごとの self-contained audit contract |
 | `documents/design/parent-repository-audit.md` | AgentCanon | 新設正本 | target state、unit map、移行と実装の設計 |
 | `agents/skills/parent-repository-audit.md` | AgentCanon | 新設正本 | public skill の実行 workflow と closure protocol |
-| `.agents/skills/parent-repository-audit/SKILL.md` | AgentCanon | generated runtime view | catalog から materialize する discovery adapter |
+| `.agents/skills/parent-repository-audit/SKILL.md` | AgentCanon source only | generated runtime view | standalone source catalogから materializeする discovery adapter。parent rootではoptional regular content |
 | `tools/agent_tools/parent_repository_audit.py` | AgentCanon | 新設実装 | source root resolver 経由の unit enumeration/contract check |
 | `agents/skills/catalog.yaml` | AgentCanon | owner registry | capability/dependency-aware public skill route |
 | `agents/skills/skill-dependencies.yaml` | AgentCanon | owner registry | prerequisite/successor/parallel relation |
@@ -186,7 +186,7 @@ unit を同じ変更で更新しません。
 | Unit file | owner responsibility | 主対象 |
 | --- | --- | --- |
 | `audit-unit/repository-structure.md` | structure required path kind | `documents/structure/**` と責務 scope の存在/kind |
-| `audit-unit/ownership-root-views.md` | AgentCanon pin と source/view ownership | `vendor/agent-canon`、root views、`.codex`、`.agents` |
+| `audit-unit/ownership-root-views.md` | AgentCanon pin と active source/view ownership | `vendor/agent-canon`、`AGENTS.md`、`.codex/config.toml`、`tools/agent-canon` |
 | `audit-unit/environment-containers.md` | Docker/devcontainer と環境境界 | `docker/`、`.devcontainer/`、environment manifests |
 | `audit-unit/dependency-integrity.md` | dependency header/graph と import boundary | headers、manifests、dependency tools |
 | `audit-unit/code-type-boundaries.md` | code API/type/runtime boundary | implementation、public APIs、static type tools |

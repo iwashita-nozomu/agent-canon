@@ -2,9 +2,8 @@
 
 # @dependency-start
 # contract test
-# responsibility Verifies topic-root Compose mounts, selected repo paths, and VS Code surfaces.
+# responsibility Verifies topic-root Compose mounts, selected repo paths, and retired VS Code projections.
 # upstream design ../../documents/rule/dependency-module-changes.md topic-root mount policy
-# upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared VS Code surface ownership
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell contract
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission selector and scenario validation
 # upstream implementation ../../tools/ci/container_config.py semantic devcontainer checker
@@ -200,39 +199,8 @@ def write_topic_fixture(
     return repo
 
 
-def write_surface_manifest(root: Path, prefix: str = "") -> None:
-    """Write the real-container/four-individual-symlink manifest."""
-    manifest = "\n".join(
-        [
-            "version = 1",
-            f'prefix = "{prefix or "vendor/agent-canon"}"',
-            "",
-            "[[surface]]",
-            'path = ".vscode"',
-            'mode = "regular"',
-            'projection_producer = "template-or-derived-repo"',
-            'projection_kind = "active_contract"',
-            'source = ".vscode"',
-            "",
-            "[[group]]",
-            'mode = "symlink"',
-            'projection_producer = "agent-canon"',
-            'projection_kind = "runtime_surface"',
-            'source_prefix = ""',
-            'paths = [".vscode/c_cpp_properties.json", ".vscode/extensions.json", ".vscode/settings.json", ".vscode/tasks.json"]',
-            "",
-        ]
-    )
-    path = root / (
-        "documents/runtime/shared-runtime-surfaces.toml"
-        if not prefix
-        else f"{prefix}/documents/runtime/shared-runtime-surfaces.toml"
-    )
-    write_file(root, str(path.relative_to(root)), manifest)
-
-
 def write_vscode_source(root: Path, relative: str = ".vscode") -> None:
-    """Write regular source files for the four shared VS Code surfaces."""
+    """Write regular files for the four standalone VS Code surfaces."""
     for name in (
         "c_cpp_properties.json",
         "extensions.json",
@@ -1348,29 +1316,25 @@ def test_generated_compose_platform_is_read_back_exactly(tmp_path: Path) -> None
 
 
 def test_source_vscode_surface_and_shared_files_pass(tmp_path: Path) -> None:
-    """Standalone source owns a real .vscode directory and four shared files."""
-    write_surface_manifest(tmp_path)
+    """Standalone source validates four files without a shared-surface manifest."""
+    write_file(tmp_path, "ROOT_AGENTS.md", "# standalone\n")
+    write_file(tmp_path, "agent-canon-environment.toml", "version = 1\n")
     write_vscode_source(tmp_path)
 
     result = run_validator(tmp_path)
 
     assert result.returncode == 0, result.stdout + result.stderr
+    assert "documents/runtime/shared-runtime-surfaces.toml" not in result.stdout
 
 
-def test_template_vscode_surface_uses_individual_symlinks(tmp_path: Path) -> None:
-    """A template root keeps the container real and links exactly four files."""
-    write_surface_manifest(tmp_path, "vendor/agent-canon")
-    write_vscode_source(tmp_path, "vendor/agent-canon/.vscode")
+def test_derived_vscode_surface_allows_regular_project_content_and_extra_files(
+    tmp_path: Path,
+) -> None:
+    """Derived parent content is regular, unconstrained, and need not mirror AgentCanon."""
+    write_file(tmp_path, "vendor/agent-canon/README.md", "project dependency\n")
     (tmp_path / ".vscode").mkdir()
-    for name in (
-        "c_cpp_properties.json",
-        "extensions.json",
-        "settings.json",
-        "tasks.json",
-    ):
-        (tmp_path / ".vscode" / name).symlink_to(
-            f"../vendor/agent-canon/.vscode/{name}"
-        )
+    write_file(tmp_path, ".vscode/settings.json", "{}\n")
+    write_file(tmp_path, ".vscode/project-specific.json", "{}\n")
 
     result = run_validator(tmp_path)
 
@@ -1379,7 +1343,6 @@ def test_template_vscode_surface_uses_individual_symlinks(tmp_path: Path) -> Non
 
 def test_legacy_vscode_directory_symlink_is_rejected(tmp_path: Path) -> None:
     """The checker rejects the removed whole-directory topology."""
-    write_surface_manifest(tmp_path, "vendor/agent-canon")
     write_vscode_source(tmp_path, "vendor/agent-canon/.vscode")
     (tmp_path / ".vscode").symlink_to(
         "vendor/agent-canon/.vscode", target_is_directory=True
@@ -1391,17 +1354,60 @@ def test_legacy_vscode_directory_symlink_is_rejected(tmp_path: Path) -> None:
     assert "expected-real-directory" in result.stdout
 
 
-def test_missing_individual_symlink_is_rejected(tmp_path: Path) -> None:
-    """The checker rejects a regular file replacing a shared-file symlink."""
-    write_surface_manifest(tmp_path, "vendor/agent-canon")
+def test_legacy_vscode_individual_symlink_is_rejected(tmp_path: Path) -> None:
+    """The checker rejects an individual link into the retired AgentCanon surface."""
     write_vscode_source(tmp_path, "vendor/agent-canon/.vscode")
     (tmp_path / ".vscode").mkdir()
-    write_file(tmp_path, ".vscode/c_cpp_properties.json", "{}\n")
+    (tmp_path / ".vscode" / "settings.json").symlink_to(
+        "../vendor/agent-canon/.vscode/settings.json"
+    )
 
     result = run_validator(tmp_path)
 
     assert result.returncode == 1, result.stdout + result.stderr
-    assert "expected-individual-symlink" in result.stdout
+    assert "legacy-agent-canon-symlink" in result.stdout
+
+
+def test_missing_parent_vscode_surface_is_not_forced(tmp_path: Path) -> None:
+    """A derived parent without editor content remains valid and unconfigured."""
+    write_file(tmp_path, "vendor/agent-canon/README.md", "project dependency\n")
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "CONTAINER_CONFIG_FINDINGS=0" in result.stdout
+
+
+def test_standalone_vscode_missing_file_is_rejected(tmp_path: Path) -> None:
+    """Standalone source still requires each of its four regular files."""
+    write_file(tmp_path, "ROOT_AGENTS.md", "# standalone\n")
+    write_file(tmp_path, "agent-canon-environment.toml", "version = 1\n")
+    write_vscode_source(tmp_path)
+    (tmp_path / ".vscode" / "tasks.json").unlink()
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert ".vscode/tasks.json:missing" in result.stdout
+
+
+def test_standalone_vscode_directory_missing_reports_all_source_files(
+    tmp_path: Path,
+) -> None:
+    """Standalone markers keep source-file checks active when .vscode is absent."""
+    write_file(tmp_path, "ROOT_AGENTS.md", "# standalone\n")
+    write_file(tmp_path, "agent-canon-environment.toml", "version = 1\n")
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    for name in (
+        "c_cpp_properties.json",
+        "extensions.json",
+        "settings.json",
+        "tasks.json",
+    ):
+        assert f".vscode/{name}:missing" in result.stdout
 
 
 def test_validate_requirements_accepts_pep508_direct_reference(tmp_path: Path) -> None:

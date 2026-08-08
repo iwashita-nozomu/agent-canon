@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Validates Dockerfile, runtime pack, devcontainer, and shared VS Code surface configuration.
+# responsibility Validates Dockerfile, runtime pack, devcontainer, and retired VS Code projection paths.
 # upstream design ../../documents/conventions/coding-conventions-project.md environment configuration policy
-# upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable shared runtime surface ownership
 # upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell boundary
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
@@ -13,7 +12,6 @@
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
 # upstream design ../../documents/tools/lean_proof_env.md Lean proof environment toolchain boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
-# upstream implementation ../agent_tools/surface_manifest.py parses shared runtime surface manifests
 # upstream implementation ../agent_tools/requirements_lock.py canonical requirements lock parser and result/error model
 # upstream implementation ../docker_dependency_validator.sh validates Docker dependency contents
 # upstream implementation ./container_runtime.py loads runtime pack contracts
@@ -23,7 +21,7 @@
 # downstream implementation ../../.devcontainer/gpu-admission/devcontainer.json selects the opt-in Compose scenario
 # downstream implementation ../../.devcontainer/gpu-admission.sh owns the opt-in lifecycle scenario
 # @dependency-end
-"""Validate Dockerfile, runtime pack, devcontainer, and shared VS Code surfaces."""
+"""Validate Dockerfile, runtime pack, devcontainer, and retired VS Code projections."""
 
 from __future__ import annotations
 
@@ -55,13 +53,6 @@ if str(AGENT_TOOLS_DIR) not in sys.path:
 from requirements_lock import (  # noqa: E402,I001  # pyright: ignore[reportMissingTypeStubs]
     parse_requirements,
 )
-from surface_manifest import (  # noqa: E402,I001
-    SurfaceEntry,
-    SurfaceManifest,
-    load_manifest,
-    target_for_entry,
-)
-
 REQUIRED_REQUIREMENTS = (
     "jupyterlab",
     "notebook",
@@ -1517,62 +1508,18 @@ def validate_devcontainer_pack_alignment(
     return findings
 
 
+def is_standalone_source(root: Path) -> bool:
+    """Return whether root carries the standalone AgentCanon source markers."""
+    return all(
+        (root / marker).is_file() and not (root / marker).is_symlink()
+        for marker in ("ROOT_AGENTS.md", "agent-canon-environment.toml")
+    )
+
+
 def has_vscode_contract(root: Path) -> bool:
-    """Return whether this root declares an AgentCanon VS Code surface."""
+    """Return whether this root has a VS Code contract to inspect."""
     vscode_dir = root / ".vscode"
-    vendor_manifest = (
-        root / "vendor" / "agent-canon" / "documents" / "shared-runtime-surfaces.toml"
-    )
-    return (
-        (root / "documents" / "shared-runtime-surfaces.toml").is_file()
-        or vendor_manifest.is_file()
-        or vscode_dir.exists()
-        or vscode_dir.is_symlink()
-    )
-
-
-def load_shared_surface_manifest(
-    root: Path,
-) -> tuple[SurfaceManifest | None, list[Finding]]:
-    """Load the shared runtime surface manifest through its canonical parser."""
-    try:
-        return load_manifest(
-            root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml"
-        ), []
-    except (OSError, ValueError, tomllib.TOMLDecodeError) as exc:
-        return None, [
-            Finding(
-                "invalid_manifest",
-                "documents/runtime/shared-runtime-surfaces.toml",
-                f"load-failed:{exc}",
-            )
-        ]
-
-
-def load_vscode_surface(
-    root: Path,
-) -> tuple[SurfaceEntry | None, SurfaceManifest | None, list[Finding]]:
-    """Load the .vscode entry from the shared runtime surface manifest."""
-    manifest, findings = load_shared_surface_manifest(root)
-    if manifest is None:
-        return None, None, findings
-    entry = next(
-        (candidate for candidate in manifest.entries if candidate.path == ".vscode"),
-        None,
-    )
-    if entry is None:
-        return (
-            None,
-            manifest,
-            [
-                Finding(
-                    "dependency_contract_violation",
-                    "documents/runtime/shared-runtime-surfaces.toml",
-                    "missing-surface:.vscode",
-                )
-            ],
-        )
-    return entry, manifest, []
+    return is_standalone_source(root) or vscode_dir.exists() or vscode_dir.is_symlink()
 
 
 VSCODE_SHARED_FILES = (
@@ -1583,134 +1530,54 @@ VSCODE_SHARED_FILES = (
 )
 
 
-def validate_vscode_manifest(
-    entry: SurfaceEntry, manifest: SurfaceManifest
-) -> list[Finding]:
-    """Validate the real .vscode container and exact shared-file coverage."""
-    findings: list[Finding] = []
-    expected = {
-        "mode": "regular",
-        "projection_producer": "template-or-derived-repo",
-        "projection_kind": "active_contract",
-    }
-    actual = {
-        "mode": entry.mode,
-        "projection_producer": entry.projection_producer,
-        "projection_kind": entry.projection_kind,
-    }
-    for field, expected_value in expected.items():
-        if actual[field] != expected_value:
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    "documents/runtime/shared-runtime-surfaces.toml",
-                    f".vscode-{field}-expected:{expected_value}",
-                )
-            )
-    shared = {
-        candidate.path: candidate
-        for candidate in manifest.entries
-        if candidate.path.startswith(".vscode/")
-    }
-    expected_paths = {f".vscode/{name}" for name in VSCODE_SHARED_FILES}
-    if set(shared) != expected_paths:
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                "documents/runtime/shared-runtime-surfaces.toml",
-                "vscode-source-coverage",
-            )
+def is_agent_canon_vscode_symlink(path: Path, root: Path) -> bool:
+    """Return whether a parent editor file still links into AgentCanon."""
+    if not path.is_symlink():
+        return False
+    source_dir = root / "vendor" / "agent-canon" / ".vscode"
+    try:
+        target = path.readlink()
+        target_path = target if target.is_absolute() else path.parent / target
+        return target_path.resolve(strict=False).is_relative_to(
+            source_dir.resolve(strict=False)
         )
-    for path in expected_paths:
-        candidate = shared.get(path)
-        if candidate is None:
-            continue
-        if (
-            candidate.mode != "symlink"
-            or candidate.projection_producer != "agent-canon"
-            or candidate.projection_kind != "runtime_surface"
-        ):
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    "documents/runtime/shared-runtime-surfaces.toml",
-                    f"vscode-file-surface:{path}",
-                )
-            )
-    return findings
+    except (OSError, RuntimeError):
+        return False
 
 
 def validate_vscode(root: Path) -> list[Finding]:
-    """Validate shared VS Code surface ownership."""
-    entry, manifest, findings = load_vscode_surface(root)
-    if entry is None or manifest is None:
-        return findings
-    findings.extend(validate_vscode_manifest(entry, manifest))
+    """Validate standalone files and reject retired parent projections."""
+    findings: list[Finding] = []
     root_vscode = root / ".vscode"
+    source_checkout = is_standalone_source(root)
     if root_vscode.is_symlink():
         findings.append(Finding("inconsistency", ".vscode", "expected-real-directory"))
         return findings
-    source_checkout = not (
-        root
-        / "vendor"
-        / "agent-canon"
-        / "documents"
-        / "runtime"
-        / "shared-runtime-surfaces.toml"
-    ).is_file()
-    source_relative = ".vscode" if source_checkout else f"{manifest.prefix}/.vscode"
-    source_dir = root / source_relative
-    if source_dir.is_symlink() or not source_dir.is_dir():
+    if source_checkout:
+        for name in VSCODE_SHARED_FILES:
+            source_file = root_vscode / name
+            path = f".vscode/{name}"
+            if not source_file.is_file():
+                findings.append(Finding("missing_file", path, "missing"))
+            elif source_file.is_symlink():
+                findings.append(
+                    Finding(
+                        "inconsistency", path, "source-file-must-be-regular"
+                    )
+                )
+        return findings
+    if not root_vscode.is_dir():
         findings.append(Finding("inconsistency", ".vscode", "expected-real-directory"))
         return findings
-    shared = {
-        candidate.path: candidate
-        for candidate in manifest.entries
-        if candidate.path.startswith(".vscode/")
-    }
-    for name in VSCODE_SHARED_FILES:
-        path = f".vscode/{name}"
-        source_file = source_dir / name
-        if not source_file.is_file():
+    for child in root_vscode.iterdir():
+        if is_agent_canon_vscode_symlink(child, root):
             findings.append(
-                Finding("missing_file", f"{source_relative}/{name}", "missing")
+                Finding(
+                    "inconsistency",
+                    str(child.relative_to(root)),
+                    "legacy-agent-canon-symlink",
+                )
             )
-        root_file = root / path
-        if source_checkout:
-            if source_file.is_symlink():
-                findings.append(
-                    Finding("inconsistency", path, "source-file-must-be-regular")
-                )
-        elif path in shared:
-            if not root_file.is_symlink():
-                findings.append(
-                    Finding("inconsistency", path, "expected-individual-symlink")
-                )
-                continue
-            expected_target = target_for_entry(root, manifest.prefix, shared[path])
-            target = root_file.readlink()
-            target_path = target if target.is_absolute() else root_file.parent / target
-            try:
-                matches = target_path.resolve(strict=True) == source_file.resolve(
-                    strict=True
-                )
-            except FileNotFoundError:
-                matches = False
-            if target.as_posix() != expected_target and not matches:
-                findings.append(
-                    Finding(
-                        "inconsistency", path, "unexpected-individual-symlink-target"
-                    )
-                )
-    if not source_checkout:
-        allowed = set(VSCODE_SHARED_FILES)
-        for child in (root / ".vscode").iterdir():
-            if child.name not in allowed:
-                findings.append(
-                    Finding(
-                        "inconsistency", str(child.relative_to(root)), "unexpected-file"
-                    )
-                )
     return findings
 
 

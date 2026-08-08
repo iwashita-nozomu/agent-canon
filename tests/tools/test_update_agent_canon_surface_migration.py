@@ -253,14 +253,15 @@ class SurfaceMigrationTest(unittest.TestCase):
         custom_hook.write_text("#!/usr/bin/env bash\necho parent hook\n", encoding="utf-8")
         custom_hook.chmod(0o755)
         unknown_file.write_text("keep this parent-owned file\n", encoding="utf-8")
-        for name in (
+        parent_devcontainer_files = (
             "bootstrap-shared-runtime.sh",
             "finalize-shared-runtime.sh",
             "generate-runtime-compose.sh",
             "docker-compose.generated.yml",
             "post-attach.sh",
             "post-create.sh",
-        ):
+        )
+        for name in parent_devcontainer_files:
             self.write_file(devcontainer / name, "legacy wrapper\n")
 
         result = self.run_sync(root, "link-root")
@@ -283,19 +284,13 @@ class SurfaceMigrationTest(unittest.TestCase):
         self.assertTrue((root / "tools" / "agent_tools" / "update_agent_canon.sh").is_file())
         self.assertTrue((root / "tools" / "agent-canon").is_symlink())
         self.assertTrue(devcontainer.is_dir() and not devcontainer.is_symlink())
-        self.assertFalse((devcontainer / "devcontainer.json").exists())
         self.assertEqual(custom_hook.read_text(encoding="utf-8"), "#!/usr/bin/env bash\necho parent hook\n")
         self.assertTrue(os.access(custom_hook, os.X_OK))
         self.assertEqual(unknown_file.read_text(encoding="utf-8"), "keep this parent-owned file\n")
-        for name in (
-            "bootstrap-shared-runtime.sh",
-            "finalize-shared-runtime.sh",
-            "generate-runtime-compose.sh",
-            "docker-compose.generated.yml",
-            "post-attach.sh",
-            "post-create.sh",
-        ):
-            self.assertFalse((devcontainer / name).exists(), name)
+        for name in parent_devcontainer_files:
+            path = devcontainer / name
+            self.assertTrue(path.is_file() and not path.is_symlink(), name)
+            self.assertEqual(path.read_text(encoding="utf-8"), "legacy wrapper\n")
 
         check = self.run_sync(root, "check")
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
@@ -457,6 +452,82 @@ class SurfaceMigrationTest(unittest.TestCase):
 
         check = self.run_sync(root, "check")
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+
+    def test_retired_direct_unrelated_symlinks_are_preserved(self) -> None:
+        """Retired names preserve unrelated absolute and relative symlinks."""
+        root = self.clone_parent_fixture()
+        self.assertEqual(
+            self.run_sync(root, "link-root").returncode,
+            0,
+        )
+        absolute_target = root.parent / "unrelated-absolute-target"
+        relative_target = root.parent / "unrelated-relative-target"
+        absolute_target.write_text("absolute parent target\n", encoding="utf-8")
+        relative_target.write_text("relative parent target\n", encoding="utf-8")
+        absolute_link = root / ".agents"
+        relative_link = root / "agents"
+        absolute_link.symlink_to(absolute_target)
+        relative_link.symlink_to("../unrelated-relative-target")
+
+        result = self.run_sync(root, "link-root")
+        check = self.run_sync(root, "check")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+        self.assertTrue(absolute_link.is_symlink())
+        self.assertEqual(os.readlink(absolute_link), str(absolute_target))
+        self.assertTrue(relative_link.is_symlink())
+        self.assertEqual(os.readlink(relative_link), "../unrelated-relative-target")
+
+    def test_retired_direct_agentcanon_symlink_is_removed(self) -> None:
+        """Live AgentCanon targets at retired names are removed by link-root."""
+        root = self.clone_parent_fixture()
+        self.assertEqual(
+            self.run_sync(root, "link-root").returncode,
+            0,
+        )
+        retired = root / ".agents"
+        retired.symlink_to("vendor/agent-canon/README.md")
+
+        result = self.run_sync(root, "link-root")
+        check = self.run_sync(root, "check")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(os.path.lexists(retired))
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+
+    def test_absolute_agentcanon_symlink_is_removed(self) -> None:
+        """An absolute AgentCanon target is removed at a retired name."""
+        root = self.clone_parent_fixture()
+        self.assertEqual(
+            self.run_sync(root, "link-root").returncode,
+            0,
+        )
+        retired = root / ".codex" / "hooks"
+        retired.symlink_to((root / "vendor" / "agent-canon" / "README.md").resolve())
+
+        result = self.run_sync(root, "link-root")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(os.path.lexists(retired))
+
+    def test_broken_agentcanon_traversal_symlink_is_flagged_then_removed(self) -> None:
+        """Canonical traversal targets fail check and are removed by link-root."""
+        root = self.clone_parent_fixture()
+        self.assertEqual(
+            self.run_sync(root, "link-root").returncode,
+            0,
+        )
+        retired = root / "agents"
+        retired.symlink_to("vendor/agent-canon/../agent-canon/missing-file")
+
+        preflight = self.run_sync(root, "check")
+        result = self.run_sync(root, "link-root")
+
+        self.assertNotEqual(preflight.returncode, 0)
+        self.assertIn("absent[agents]=present", preflight.stderr)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(os.path.lexists(retired))
 
 
 if __name__ == "__main__":
