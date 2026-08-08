@@ -12,15 +12,17 @@ downstream implementation ../../tools/agent_tools/generate_agent_improvement_gui
 -->
 
 issue_id: AC-20260517-eval-accumulation-gaps
-status: in_progress
+status: resolved
+resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/587
+resolved_at: 2026-08-08
 source: user
 severity: S1
 evidence: User feedback on 2026-05-17: eval collection is still not reliably accumulating into AgentCanon.
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/242
 affected_surfaces: evidence/agent-evals/README.md, documents/runtime-log-archive.md, .codex/hooks/hook_event_log.py, .codex/hooks/skill_usage_logger.py, tools/agent_tools/evaluate_skill_workflow_prompts.py, tools/agent_tools/generate_agent_improvement_guide.py, tools/agent_tools/generate_agent_runtime_dashboard.py
 edit_scope: tools/agent_tools/eval_accumulation_check.py, tests/agent_tools/test_eval_accumulation_check.py, tools/catalog.yaml, tools/README.md, documents/tools/README.md, tools/ci/run_all_checks.sh, .github/workflows/agent-canon-static-gates.yml
-required_action: Add a structural gate for AgentCanon-owned hook and skill eval result accumulation, with canonical agent-canon.behavior-event.v1 workflow attribution and prompt-capture validation. Preserve legacy rows as warning-compatible evidence, and apply token comparison checks only when a token-reduction objective is selected.
-close_condition: The gate passes on current accumulated evidence and fails on missing result directories, duplicate hook run ids, malformed JSONL, ignored result paths, or structurally invalid new behavior-event fields. Legacy behavior-shaped rows remain readable as warnings. Token comparison is required only when the run selects a token-reduction objective; no global count, ratio, or improvement threshold is imposed.
+required_action: Implemented by https://github.com/iwashita-nozomu/agent-canon/pull/587 with AgentCanon-owned hook and skill accumulation gate changes.
+close_condition: Completed: the accumulated evidence gate is implemented structurally with legacy warning compatibility and no global token-threshold requirement.
 
 ## Reader Map
 

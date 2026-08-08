@@ -16,14 +16,16 @@ downstream implementation ../../.codex/agents/worker.toml defines the broader im
 -->
 
 issue_id: AC-20260519-codex-worker-routing-miss
-status: open
+status: resolved
+resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/587
+resolved_at: 2026-08-08
 source: user
 severity: S2
 evidence: reports/dependency-review/agent-selection-routing-20260519/search_hits.txt
 affected_surfaces: agents/canonical/CODEX_SUBAGENTS.md, agents/TASK_WORKFLOWS.md, agents/skills/agent-orchestration.md, .codex/agents/spark_worker.toml, .codex/agents/worker.toml
 edit_scope: reports/dependency-review/agent-selection-routing-20260519/dependency_edit_scope.txt
-required_action: Add a routing evidence step that makes Codex cite why implementation delegation selected spark_worker or worker before spawning the implementation agent.
-close_condition: A workflow, skill, or eval gate fails or flags implementation delegation when a narrow design-traced slice skips the configured spark_worker role without an explicit alternate route reason.
+required_action: Implemented by https://github.com/iwashita-nozomu/agent-canon/pull/587 by adding the required implementation-role evidence step.
+close_condition: Completed: delegation evidence now requires explicit role selection and explicit alternate-route rationale when worker is used.
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/579
 
 ## Reader Map
