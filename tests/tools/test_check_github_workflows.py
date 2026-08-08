@@ -601,6 +601,14 @@ raise SystemExit(2)
         self.assertNotIn("manager_response", source)
         self.assertNotIn("\n    needs:", source)
         self.assertEqual(source.count("name: Upload coordination bundle"), 1)
+        self.assertIn("team_manifest.yaml", source)
+        self.assertIn("run.lineage.role_ids", source)
+        self.assertIn("GITHUB_STEP_SUMMARY", source)
+        self.assertIn("SCHEDULED_SPECIALISTS=", source)
+        self.assertIn("executed_role=coordination", source)
+        self.assertIn("finding=none at intake", source)
+        self.assertIn("result=bundle_ready", source)
+        self.assertEqual(source.count("--role manager"), 1)
 
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -616,6 +624,33 @@ raise SystemExit(2)
             )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_coordination_summary_route_is_required(self) -> None:
+        """The checker rejects coordination without packet readback summary evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_valid_workflow(root)
+            self.copy_required_surfaces(root)
+            target = root / ".github" / "workflows" / "agent-coordination.yml"
+            source = REPO_ROOT.joinpath(
+                ".github/workflows/agent-coordination.yml"
+            ).read_text(encoding="utf-8")
+            target.write_text(
+                source.replace("GITHUB_STEP_SUMMARY", "STEP_SUMMARY_REMOVED"),
+                encoding="utf-8",
+            )
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "coordination_summary_missing:GITHUB_STEP_SUMMARY",
+            result.stdout,
+        )
 
     def test_improvement_guide_is_bounded_and_manual(self) -> None:
         """Improvement guidance does not run for every push or unscoped PR."""

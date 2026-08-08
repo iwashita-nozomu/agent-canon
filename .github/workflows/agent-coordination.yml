@@ -112,23 +112,93 @@ jobs:
           echo "report_dir=reports/agents/${run_id}" >> "$GITHUB_OUTPUT"
       - name: Record coordination intake
         run: |
+          # Readback source is run.lineage.role_ids in the generated team_manifest.yaml.
+          # Summary vocabulary: finding=none at intake and result=bundle_ready are
+          # emitted only after packet readback and write-scope validation pass.
+          report_dir="${{ steps.coordinate.outputs.report_dir }}"
+          manifest_path="${report_dir}/team_manifest.yaml"
           report_snapshot="${RUNNER_TEMP}/coordination-report-before.json"
           workspace_snapshot="${RUNNER_TEMP}/coordination-workspace-before.json"
           python3 tools/agent_tools/validate_role_write_scope.py \
-            --report-dir "${{ steps.coordinate.outputs.report_dir }}" \
+            --report-dir "${report_dir}" \
             --workspace-root "${GITHUB_WORKSPACE}" \
             --report-snapshot-out "${report_snapshot}" \
             --workspace-snapshot-out "${workspace_snapshot}"
           {
             echo ""
             echo "- github_actions_coordination: intake recorded for selected role set"
-          } >> "${{ steps.coordinate.outputs.report_dir }}/intent_brief.md"
-          python3 tools/agent_tools/validate_role_write_scope.py \
+          } >> "${report_dir}/intent_brief.md"
+          summary_result="bundle_ready"
+          summary_finding="none at intake"
+          if ! role_readback="$(python3 - "${manifest_path}" <<'PY'
+          from __future__ import annotations
+
+          import sys
+          from pathlib import Path
+
+          import yaml
+
+          manifest = yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          run = manifest.get("run") if isinstance(manifest, dict) else None
+          lineage = run.get("lineage") if isinstance(run, dict) else None
+          role_ids = lineage.get("role_ids") if isinstance(lineage, dict) else None
+          role_entries = manifest.get("roles") if isinstance(manifest, dict) else None
+          if (
+              not isinstance(role_ids, list)
+              or not all(isinstance(role_id, str) for role_id in role_ids)
+              or not isinstance(role_entries, list)
+          ):
+              raise SystemExit("team_manifest role readback is incomplete")
+          always_on = {
+              entry.get("id")
+              for entry in role_entries
+              if isinstance(entry, dict) and entry.get("activation") == "always"
+          }
+          if not all(isinstance(role_id, str) for role_id in always_on):
+              raise SystemExit("team_manifest always-on role readback is incomplete")
+          specialists = [role_id for role_id in role_ids if role_id not in always_on]
+          print(f"ACTIVE_ROLES={','.join(role_ids)}")
+          print(f"SCHEDULED_SPECIALISTS={','.join(specialists) or '-'}")
+          PY
+          )"; then
+            summary_result="fail"
+            summary_finding="team_manifest_role_readback_failed"
+            {
+              echo "### Agent coordination"
+              echo "- executed_role=coordination"
+              echo "- scheduled_specialists=readback_failed"
+              echo "- finding=${summary_finding}"
+              echo "- result=${summary_result}"
+            } >> "${GITHUB_STEP_SUMMARY}"
+            exit 1
+          fi
+          printf '%s\n' "${role_readback}"
+          scheduled_specialists="$(printf '%s\n' "${role_readback}" | sed -n 's/^SCHEDULED_SPECIALISTS=//p')"
+          if [ -z "${scheduled_specialists}" ]; then
+            summary_result="fail"
+            summary_finding="team_manifest_specialist_readback_missing"
+          fi
+          write_scope_status="pass"
+          if ! python3 tools/agent_tools/validate_role_write_scope.py \
             --role manager \
-            --report-dir "${{ steps.coordinate.outputs.report_dir }}" \
+            --report-dir "${report_dir}" \
             --workspace-root "${GITHUB_WORKSPACE}" \
             --report-snapshot-in "${report_snapshot}" \
-            --workspace-snapshot-in "${workspace_snapshot}"
+            --workspace-snapshot-in "${workspace_snapshot}"; then
+            write_scope_status="fail"
+            summary_result="fail"
+            summary_finding="write_scope_validation_failed"
+          fi
+          {
+            echo "### Agent coordination"
+            echo "- executed_role=coordination"
+            echo "- scheduled_specialists=${scheduled_specialists:-readback_failed}"
+            echo "- finding=${summary_finding}"
+            echo "- result=${summary_result}"
+          } >> "${GITHUB_STEP_SUMMARY}"
+          if [ "${write_scope_status}" != "pass" ] || [ "${summary_result}" != "bundle_ready" ]; then
+            exit 1
+          fi
       - name: Upload coordination bundle
         uses: actions/upload-artifact@v4
         with:

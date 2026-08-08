@@ -109,6 +109,13 @@ SUBMODULE_CHECKOUT_WRAPPER_REQUIREMENTS = (
 ROOT_COORDINATION_WORKFLOW_REQUIREMENTS = (
     "Standalone AgentCanon coordination workflow",
     "selected roles",
+    "team_manifest.yaml",
+    "run.lineage.role_ids",
+    "GITHUB_STEP_SUMMARY",
+    "SCHEDULED_SPECIALISTS=",
+    "executed_role=coordination",
+    "finding=none at intake",
+    "result=bundle_ready",
 )
 ROOT_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
     "Standalone AgentCanon improvement guidance workflow",
@@ -134,6 +141,13 @@ VENDOR_COORDINATION_WORKFLOW_REQUIREMENTS = (
     "agents/workflows/agent-canon-pr-workflow.md",
     "Standalone AgentCanon coordination workflow",
     "selected roles",
+    "team_manifest.yaml",
+    "run.lineage.role_ids",
+    "GITHUB_STEP_SUMMARY",
+    "SCHEDULED_SPECIALISTS=",
+    "executed_role=coordination",
+    "finding=none at intake",
+    "result=bundle_ready",
 )
 VENDOR_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
     "pull_request:",
@@ -659,6 +673,11 @@ def check_workflow(root: Path, path: Path) -> list[Finding]:
             else []
         ),
         *(
+            coordination_summary_findings(path, workflow_text)
+            if path.name == "agent-coordination.yml"
+            else []
+        ),
+        *(
             coordination_relay_findings(path, workflow)
             if path.name == "agent-coordination.yml"
             else []
@@ -734,6 +753,32 @@ def improvement_guide_trigger_findings(
         findings.append(Finding("error", path, "improvement_guide_pull_request_paths_required"))
     if not re.search(r"(?m)^  workflow_dispatch:\s*$", workflow_text):
         findings.append(Finding("error", path, "improvement_guide_manual_dispatch_required"))
+    return findings
+
+
+def coordination_summary_findings(path: Path, workflow_text: str) -> list[Finding]:
+    """Require truthful packet readback and one write-scope validation boundary."""
+    findings: list[Finding] = []
+    for required in (
+        "team_manifest.yaml",
+        "run.lineage.role_ids",
+        "GITHUB_STEP_SUMMARY",
+        "SCHEDULED_SPECIALISTS=",
+        "executed_role=coordination",
+        "finding=none at intake",
+        "result=bundle_ready",
+    ):
+        if required not in workflow_text:
+            findings.append(Finding("error", path, f"coordination_summary_missing:{required}"))
+    role_validation_count = workflow_text.count("--role manager")
+    if role_validation_count != 1:
+        findings.append(
+            Finding(
+                "error",
+                path,
+                f"coordination_write_scope_validation_count:{role_validation_count}",
+            )
+        )
     return findings
 
 

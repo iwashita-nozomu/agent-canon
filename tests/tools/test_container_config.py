@@ -1222,6 +1222,32 @@ def test_generator_rejects_pack_override_of_runtime_route(tmp_path: Path) -> Non
     )
 
 
+@pytest.mark.parametrize("identity_key", ["PROJECT_UID", "PROJECT_GID", "PROJECT_USER"])
+def test_generator_rejects_pack_override_of_host_identity(
+    tmp_path: Path,
+    identity_key: str,
+) -> None:
+    """Pack environment cannot introduce a second source of host identity."""
+    repo = write_parent_generator_fixture(tmp_path)
+    pack = repo / "docker/packs/default.toml"
+    pack.write_text(
+        pack.read_text(encoding="utf-8")
+        + f'\nenv = ["{identity_key}=pack-value"]\n',
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert f"runtime.env cannot override reserved key: {identity_key}" in result.stderr
+
+
 def test_container_config_requires_executable_resolver_entrypoint(tmp_path: Path) -> None:
     """The public post-create resolver must remain executable in a fresh checkout."""
     repo = write_topic_fixture(tmp_path)

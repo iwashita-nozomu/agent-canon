@@ -74,10 +74,11 @@ duplicate owner を作らず、source と checked-in standalone targets を同�
 
 - source の依存header、Issue taxonomy、eval reference、PR workflow referenceを更新する。
 - template / derived repo の AgentCanon PR checklist は parent gate command
-  `make agent-canon-pr-check` を一つだけ公開する。dependency graph などの internal
-  subcommand は `check_agent_canon_pr.sh` の実行責務であり、checklist authority として
-  重複掲載しない。
-- GitHub YAML parse、Markdown/docs format/check、および
+  `make agent-canon-pr-check` を一つだけ公開する。この gate が changed-surface
+  checker route として、対象 surface に対応する検証結果を束ねる。dependency graph
+  などの internal subcommand は `check_agent_canon_pr.sh` の実行責務であり、checklist
+  authority として重複掲載しない。
+- GitHub YAML parse、Markdown/docs format/check、および gate が呼び出す
   `python3 tools/ci/check_github_workflows.py --root .` を実行する。
 
 ## Required evidence vocabulary（必要な evidence 用語）
