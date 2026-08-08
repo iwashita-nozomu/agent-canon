@@ -314,6 +314,8 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
             script,
         )
         self.assertNotIn('sync_agent_canon.sh" check || true', script)
+        self.assertIn('make -C "${CLONE_DIR}" agent-canon-check', script)
+        self.assertNotIn('make -C "${CLONE_DIR}" agent-checks', script)
         self.assertLess(
             script.index('attach_submodule_main_to_staged_pin "vendor/agent-canon"'),
             script.index('bash "${CLONE_TOOLS_ROOT}/sync_agent_canon.sh" check'),
