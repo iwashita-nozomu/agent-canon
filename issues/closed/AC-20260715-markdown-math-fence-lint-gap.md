@@ -15,14 +15,16 @@ upstream implementation ../../documents/structured-analysis/graph-dsl.md and ../
 -->
 
 issue_id: AC-20260715-markdown-math-fence-lint-gap
-status: in_progress
+status: resolved
+resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/379
+resolved_at: 2026-08-08
 source: user
 severity: S2
 evidence: tests/tools/test_check_markdown_math.py, evidence/agent-evals/skill_workflow_prompt_eval.toml, documents/structured-analysis/graph-dsl.md, references/gpt-5.6-benchmark-report-ja.md
 affected_surfaces: agents/skills/md-style-check.md, .agents/skills/md-style-check/SKILL.md, documents/conventions/common/05_docs.md, rust/agent-canon/src/docs.rs, tests/tools/test_check_markdown_math.py, evidence/agent-evals/skill_workflow_prompt_eval.toml, documents/structured-analysis/graph-dsl.md, references/gpt-5.6-benchmark-report-ja.md
 edit_scope: agents/skills/md-style-check.md, .agents/skills/md-style-check/SKILL.md, documents/conventions/common/05_docs.md, rust/agent-canon/src/docs.rs, tests/tools/test_check_markdown_math.py, evidence/agent-evals/skill_workflow_prompt_eval.toml, documents/structured-analysis/graph-dsl.md, references/gpt-5.6-benchmark-report-ja.md, issues/open/AC-20260715-markdown-math-fence-lint-gap.md
-required_action: Prohibit mathematical notation in generic text-like code fences and declared math-like fences. Recognize text/plaintext/txt/plain and math/latex/tex fence info aliases case-insensitively, report declared math-like blocks once at the opening fence, and report deterministic delimiter, numeric/function equality, and operand-checked relation syntax without fuzzy or scored classification. Exclude only literal URL, backtick, arrow, angle-placeholder, currency, and shell-variable spans or tokens rather than bypassing their whole line.
-close_condition: Canonical runtime skill and convention documents state the rule; the Rust docs checker rejects representative text/plaintext/txt/plain/math/latex/tex, numeric/function equality, compact/spaced/Unicode relation, and mixed math-plus-literal-span violations; pure literal/protocol output, currency/shell-variable syntax, HTML/placeholder text, and typed source fences pass; the focused regression suite and full docs scan pass; the existing graph-dsl and benchmark math are display-math compliant; and the deterministic skill eval passes all canonical/runtime checks.
+required_action: Update the markdown math checker and md-style contract so text-like and math-like fenced blocks are consistently validated, with deterministic math detection and no fuzzy classification.
+close_condition: PR #379 (commit 770f0e68) added the fixed checker behavior, and `python3 -m unittest -q tests.tools.test_check_markdown_math` passes with all 22 focused cases; the issue has therefore been closed as implemented.
 
 ## Finding
 

@@ -11,15 +11,17 @@ upstream design ../../tools/catalog.yaml lists cataloged AgentCanon tools.
 -->
 
 issue_id: AC-20260612-tool-proof-coverage-backlog
-status: not_planned
+status: wontfix
+resolved_by: GitHub issue #544; G5 proof-policy simplification branch
+resolved_at: 2026-08-08
 source: user
 severity: S1
 evidence: Universal Lean proof coverage was superseded by the selected-proof contract; unverified rows remain honest observational evidence.
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/244
 affected_surfaces: tools/catalog.yaml, tools/agent_tools/tool_proof_coverage.py, documents/tools/tool_proof_coverage.md, tests/agent_tools/test_tool_proof_coverage.py
 edit_scope: none; retain selected proof metadata only when a real contract requires it
-required_action: none; select a concrete catalog tool before requiring Lean evidence.
-close_condition: universal backlog retired; selected checks remain fail-closed.
+required_action: none; superseded by issue #544, retain selected proof checks only.
+close_condition: universal backlog retired and superseded by issue #544; selected checks remain operational.
 
 ## Finding
 
