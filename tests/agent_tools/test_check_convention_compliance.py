@@ -237,7 +237,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
     ),
     "agents/workflows/pr-queue-cleanup-workflow.md": (
-        "PR Essence problem / user request design intent canonical owner "
+        "PR Essence problem / user request canonical owner "
         "behavior or contract delta evidence route\n"
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
@@ -299,7 +299,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "SOLID principle signal OOP readability report class Protocol\n"
     ),
     "agents/skills/pr-processing.md": (
-        "PR Essence problem / user request design intent canonical owner "
+        "PR Essence problem / user request canonical owner "
         "behavior or contract delta evidence route\n"
     ),
     "agents/skills/subagent-bootstrap.md": (
@@ -493,7 +493,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/workflows/agent-canon-pr-workflow.md": (
         "check_github_workflows.py\n"
-        "PR Essence problem / user request design intent canonical owner "
+        "PR Essence problem / user request canonical owner "
         "behavior or contract delta evidence route\n"
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
@@ -501,19 +501,17 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     ".github/PULL_REQUEST_TEMPLATE.md": (
         "## PR Essence\n"
-        "Problem / user request\n"
-        "Design intent\n"
-        "Canonical owner\n"
-        "Behavior or contract delta\n"
-        "Evidence route\n"
+        "Problem / user request:\n"
+        "Canonical owner / responsibility unit:\n"
+        "Behavior or contract delta:\n"
+        "Evidence route:\n"
     ),
     ".github/PULL_REQUEST_TEMPLATE/agent_canon.md": (
         "## PR Essence\n"
-        "Problem / user request\n"
-        "Design intent\n"
-        "Canonical owner\n"
-        "Behavior or contract delta\n"
-        "Evidence route\n"
+        "Problem / user request:\n"
+        "Canonical owner / responsibility unit:\n"
+        "Behavior or contract delta:\n"
+        "Evidence route:\n"
     ),
     "tools/ci/run_all_checks.sh": (
         "check_static_any.py "
@@ -1719,7 +1717,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             template = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
             template.write_text(
                 template.read_text(encoding="utf-8").replace(
-                    "Behavior or contract delta\n",
+                    "Behavior or contract delta:\n",
                     "",
                 ),
                 encoding="utf-8",
@@ -1730,7 +1728,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("pr_essence_documentation", result.stdout)
             self.assertIn(
-                "missing-marker:Behavior or contract delta",
+                "missing-marker:Behavior or contract delta:",
                 result.stdout,
             )
 
