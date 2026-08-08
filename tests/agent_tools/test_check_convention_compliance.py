@@ -237,7 +237,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
     ),
     "agents/workflows/pr-queue-cleanup-workflow.md": (
-        "PR Essence problem / user request canonical owner "
+        "PR Essence problem / user request design intent canonical owner "
         "behavior or contract delta evidence route\n"
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"
@@ -299,7 +299,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "SOLID principle signal OOP readability report class Protocol\n"
     ),
     "agents/skills/pr-processing.md": (
-        "PR Essence problem / user request canonical owner "
+        "PR Essence problem / user request design intent canonical owner "
         "behavior or contract delta evidence route\n"
     ),
     "agents/skills/subagent-bootstrap.md": (
@@ -493,7 +493,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "agents/workflows/agent-canon-pr-workflow.md": (
         "check_github_workflows.py\n"
-        "PR Essence problem / user request canonical owner "
+        "PR Essence problem / user request design intent canonical owner "
         "behavior or contract delta evidence route\n"
         "Before closeout, run "
         "`python3 tools/agent_tools/check_convention_compliance.py`.\n"

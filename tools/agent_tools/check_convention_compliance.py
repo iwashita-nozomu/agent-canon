@@ -645,6 +645,7 @@ PR_ESSENCE_DOCUMENTATION_MARKERS = {
     "agents/skills/pr-processing.md": (
         "PR Essence",
         "problem / user request",
+        "design intent",
         "canonical owner",
         "behavior or contract delta",
         "evidence route",
@@ -652,6 +653,7 @@ PR_ESSENCE_DOCUMENTATION_MARKERS = {
     "agents/workflows/agent-canon-pr-workflow.md": (
         "PR Essence",
         "problem / user request",
+        "design intent",
         "canonical owner",
         "behavior or contract delta",
         "evidence route",
