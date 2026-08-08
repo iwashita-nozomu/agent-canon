@@ -77,10 +77,9 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - intended named `vendor/agent-canon/` source branch を source owner とし、branch / ahead / diverged / dirty state は evidence として保持します。全 local uncommitted / ignored materialized paths と `HEAD` から planned result tree への exact update write set の unpreservable collision、または unresolved merge conflict だけを block します。
 - requested topic が current branch と異なる場合だけ `documents/rule/dependency-module-changes.md` の topic workspace branch clone route を使います。parent pin/root projection は引き続き clean `main` と staged gitlink の一致を要求します。
 - update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon branch / PR に出します。merge 後も read-only plan を先に行い、必要な approval/authority fields と同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route の後で root view と parent pin を同期します。
-- AgentCanon source change、parent submodule pin change、`.gitmodules`
-  change、AgentCanon-owned root runtime view / root-copy surface change、parent
-  root sync PR は `agentcanon_structure_followup=required` です。template /
-  derived parent root で `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` link-root と
+- active root projection change、parent root sync PR は `agentcanon_structure_followup=required`
+  です。template / derived parent root で
+  `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` link-root と
   `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` check が pass した後だけ
   `agentcanon_structure_followup=pass` として closeout に使えます。
 - 承認済み protected `ensure-latest` は `.gitmodules` の URL と immutable remote branch SHA を見て、parent gitlink と submodule worktree HEAD が remote main と一致するかを判定し、必要な pin と root shared surface を同期します。

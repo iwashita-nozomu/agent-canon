@@ -423,11 +423,8 @@ AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent
   PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 ```
 
-Run these commands when this owner's follow-up contract says parent sync
-evidence is required, after the AgentCanon source / submodule pin / shared
-root / root-copy / sync-control surfaces are changed. Keep the trigger surface
-definition in this owner route only and reference
-`agents/skills/agent-canon-update.md` for the canonical trigger matrix.
+Run these commands when `agents/skills/agent-canon-update.md` (active root
+projection owner) indicates parent sync evidence is required.
 Record `agentcanon_structure_followup=required` and `agentcanon_structure_followup=pass`
 only after `link-root` and `check` pass from the template / derived parent root.
 
@@ -442,8 +439,7 @@ For repo-changing implementation, patch, or doc-edit work, closeout cites the
 write-capable handoff route, integration result, review gate, validation
 evidence, and subagent lifecycle evidence.
 
-For AgentCanon source, submodule pin, root runtime view, root-copy surface,
-parent root sync, and sync-control updates, closeout also cites
+For active root projection updates and parent root sync, closeout also cites
 `agentcanon_structure_followup=required` and
 `agentcanon_structure_followup=pass`, including the parent-root
 request-evidence-authorized `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` link-root and

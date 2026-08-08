@@ -264,7 +264,7 @@ raise SystemExit(2)
         """The source and generated checklist expose only the parent PR gate."""
         canonical = "- [ ] `make agent-canon-pr-check`"
         derived_boundary = (
-            "Derived parent shared gate owns AgentCanon pin/projection/header/"
+            "Derived parent shared gate owns AgentCanon pin/active-root-view/header/"
             "graph/workflow/skill-command surfaces only; development prompt and "
             "accumulated evals run only in the standalone AgentCanon static owner."
         )
