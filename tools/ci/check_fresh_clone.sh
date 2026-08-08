@@ -229,7 +229,6 @@ else
   echo "FRESH_CLONE_AGENT_CANON_MODE=standalone"
   echo "FRESH_CLONE_PARENT_PROJECTION=not-applicable"
   echo "FRESH_CLONE_REPOSITORY_CI_OWNER=repository_ci_job"
-  echo "FRESH_CLONE_ACCEPTANCE=pass"
   FRESH_CLONE_RUNTIME_SURFACES=(
     AGENTS.md
     agents
@@ -268,7 +267,7 @@ AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:${COMMIT_REQUEST_EVIDENCE_DIGEST}"
 export AGENT_CANON_COMMIT_REQUEST_EVIDENCE
 echo "fresh-clone commit request evidence: ${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}"
 
-bash "${CLONE_TOOLS_ROOT}/sync_agent_canon.sh" check || true
+bash "${CLONE_TOOLS_ROOT}/sync_agent_canon.sh" check
 AGENT_CANON_TEST_REMOTE="${TMP_DIR}/agent-canon-upstream.git"
 AGENT_CANON_TEST_WORK="${TMP_DIR}/agent-canon-work"
 git init --bare "${AGENT_CANON_TEST_REMOTE}" >/dev/null
