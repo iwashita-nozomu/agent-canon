@@ -319,7 +319,14 @@ def main() -> int:
         tty = defaults.tty
 
         mounts: list[str] = []
-        envs: list[str] = [f"HOME={container_home}"]
+        # Nested Codex deliberately uses a profile-specific HOME rather than the
+        # dedicated image identity HOME.  Clear the dedicated identity contract
+        # so shared post-create performs the rest of setup without rejecting the
+        # nested session as a runtime-user mismatch.
+        envs: list[str] = [
+            f"HOME={container_home}",
+            "AGENT_CANON_CONTAINER_USER=",
+        ]
 
         host_gitconfig = Path.home() / ".gitconfig"
         if defaults.mount_host_gitconfig and host_gitconfig.is_file():
@@ -358,6 +365,7 @@ def main() -> int:
             command=build_shell_invocation(pack.runtime.shell, shell_script),
             env=tuple(envs),
             mounts=tuple(mounts),
+            user="root" if use_host_user else None,
             tty=tty,
         )
 

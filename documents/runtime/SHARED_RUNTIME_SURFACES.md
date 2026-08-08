@@ -219,13 +219,18 @@ Its minimum shared shape is the symlink
 `.devcontainer/devcontainer.json -> ../vendor/agent-canon/.devcontainer/devcontainer.json`
 and the child symlink
 `.devcontainer/gpu-admission -> ../vendor/agent-canon/.devcontainer/gpu-admission`,
-plus any parent-specific source such as `post-create-parent.sh`. The linked configs
-call initialize, post-create, and post-attach through the single public source-root
-entry `tools/agent-canon/agent_tools/agent_canon_source_root.py`; the resolver then
-selects the standalone source or the vendored AgentCanon root. Direct parent-root
-`tools/agent_tools` references, fixed `vendor/agent-canon` script paths, parent
-wrappers, and copied shared scripts are not part of the surface. Generated Compose
-is written to the ignored parent state path `.agent-canon/docker-compose.generated.yml`.
+the bootstrap child symlink
+`.devcontainer/bootstrap-dependencies.sh -> ../vendor/agent-canon/.devcontainer/bootstrap-dependencies.sh`,
+plus any parent-specific source such as `post-create-parent.sh`. The fixed bootstrap
+is the direct pre-wrapper stage for the linked `postCreateCommand` and must run as
+`bash .devcontainer/bootstrap-dependencies.sh --install` before the Python source-root
+wrapper. Subsequent shared lifecycle commands use the single public source-root entry
+`tools/agent-canon/agent_tools/agent_canon_source_root.py`; the resolver then selects
+the standalone source or the vendored AgentCanon root. Direct parent-root
+`tools/agent_tools` references, fixed `vendor/agent-canon` script paths for later
+stages, parent wrappers, and copied shared scripts are not part of the surface.
+Generated Compose is written to the ignored parent state path
+`.agent-canon/docker-compose.generated.yml`.
 
 The devcontainer consumes repo-local `docker/Dockerfile`,
 `docker/packs/default.toml`, and `docker/install_python_dependencies.sh`; it does
@@ -253,9 +258,10 @@ the experiment scheduler, and managed experiment functionality is intentional; t
 boundary is not a wholesale deletion.
 
 `parent-hook` must not replace AgentCanon shared stages. The linked config runs
-`vendor/agent-canon/.devcontainer/post-create.sh` first, then
-`.devcontainer/post-create-parent.sh` in `set -e` mode. If AgentCanon standard
-`post-create` fails, the parent hook is not executed.
+`bash .devcontainer/bootstrap-dependencies.sh --install` first, then the Python
+source-root wrapper for `.devcontainer/post-create-entrypoint.sh`. That entrypoint
+runs the shared `post-create.sh`, then `.devcontainer/post-create-parent.sh` in
+`set -e` mode. If the shared lifecycle fails, the parent hook is not executed.
 
 `.vscode/` is also a shared AgentCanon runtime ergonomics surface. The parent
 owns the real directory container; AgentCanon owns the individual

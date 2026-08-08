@@ -44,12 +44,28 @@ def test_print_only_runs_shared_post_create_before_codex() -> None:
         "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
         in result.stdout
     )
+    assert "--user root" in result.stdout
+    assert "-e AGENT_CANON_CONTAINER_USER=" in result.stdout
     assert "setpriv --reuid" in result.stdout
-    assert "--user" not in result.stdout
     assert "/root/.codex" not in result.stdout
     assert "codex-state" not in result.stdout
     assert 'export AGENT_CANON_CODEX_SESSION_ROOT="${AGENT_CANON_CODEX_SESSION_ROOT:-$HOME/.codex/sessions}"' in result.stdout
     assert "exec codex" in result.stdout
+
+
+def test_host_docker_keeps_socket_mount_with_root_setup() -> None:
+    """Host Docker keeps its socket mount while nested setup starts as root."""
+    result = run_cli("--print-only", "--profile", "host-docker")
+
+    assert result.returncode == 0, result.stderr
+    assert "--user root" in result.stdout
+    assert "-v /var/run/docker.sock:/var/run/docker.sock" in result.stdout
+    assert "-e AGENT_CANON_CONTAINER_USER=" in result.stdout
+    assert (
+        "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
+        in result.stdout
+    )
+    assert "setpriv --reuid" in result.stdout
 
 
 def test_standalone_dockerfile_uses_canonical_project_identity() -> None:
@@ -154,6 +170,8 @@ def test_runtime_identity(tmp_path: Path) -> None:
         "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
         in result.stdout
     )
+    assert "-e AGENT_CANON_CONTAINER_USER=" in result.stdout
+    assert "--user root" not in result.stdout
     devcontainer = (PROJECT_ROOT / ".devcontainer" / "devcontainer.json").read_text(
         encoding="utf-8"
     )

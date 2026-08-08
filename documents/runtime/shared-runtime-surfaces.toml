@@ -77,6 +77,13 @@ class = "active_contract"
 local_override_allowed = true
 
 [[surface]]
+path = ".devcontainer/bootstrap-dependencies.sh"
+mode = "symlink"
+source = ".devcontainer/bootstrap-dependencies.sh"
+owner = "agent-canon"
+class = "runtime_surface"
+
+[[surface]]
 path = ".devcontainer/post-create-parent.sh"
 mode = "regular"
 source = ".devcontainer/post-create-parent.sh"

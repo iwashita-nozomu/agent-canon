@@ -132,6 +132,11 @@ class ParentRepoReadinessTest(unittest.TestCase):
             for entry in manifest.entries
             if entry.path == ".devcontainer/devcontainer.json"
         )
+        bootstrap_dependencies = next(
+            entry
+            for entry in manifest.entries
+            if entry.path == ".devcontainer/bootstrap-dependencies.sh"
+        )
         gpu_admission = next(
             entry
             for entry in manifest.entries
@@ -145,6 +150,14 @@ class ParentRepoReadinessTest(unittest.TestCase):
             (PROJECT_ROOT / devcontainer_json.source_or_default()).is_file()
         )
         self.assertEqual(devcontainer_json.mode, "symlink")
+        self.assertEqual(bootstrap_dependencies.mode, "symlink")
+        self.assertEqual(
+            bootstrap_dependencies.source,
+            ".devcontainer/bootstrap-dependencies.sh",
+        )
+        self.assertTrue(
+            (PROJECT_ROOT / bootstrap_dependencies.source_or_default()).is_file()
+        )
         self.assertEqual(gpu_admission.mode, "symlink")
         self.assertEqual(gpu_admission.source, ".devcontainer/gpu-admission")
 
@@ -155,6 +168,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             self.write_parent_fixture(root)
             devcontainer = root / ".devcontainer"
             devcontainer_json = devcontainer / "devcontainer.json"
+            bootstrap_dependencies = devcontainer / "bootstrap-dependencies.sh"
             gpu_admission = devcontainer / "gpu-admission"
 
             self.assertTrue(devcontainer.is_dir())
@@ -164,6 +178,13 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 os.readlink(devcontainer_json),
                 "../vendor/agent-canon/.devcontainer/devcontainer.json",
             )
+            self.assertTrue(bootstrap_dependencies.is_symlink())
+            self.assertEqual(
+                os.readlink(bootstrap_dependencies),
+                "../vendor/agent-canon/.devcontainer/bootstrap-dependencies.sh",
+            )
+            self.assertTrue(bootstrap_dependencies.is_file())
+            self.assertTrue(os.access(bootstrap_dependencies, os.X_OK))
             self.assertTrue(gpu_admission.is_symlink())
             self.assertEqual(
                 os.readlink(gpu_admission),
