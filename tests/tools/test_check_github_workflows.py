@@ -17,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import textwrap
 import unittest
 from collections.abc import Callable
 from pathlib import Path
@@ -602,7 +603,7 @@ raise SystemExit(2)
         self.assertNotIn("\n    needs:", source)
         self.assertEqual(source.count("name: Upload coordination bundle"), 1)
         self.assertIn("team_manifest.yaml", source)
-        self.assertIn("run.lineage.role_ids", source)
+        self.assertIn("run.capacity_request.lineage.role_ids", source)
         self.assertIn("GITHUB_STEP_SUMMARY", source)
         self.assertIn("SCHEDULED_SPECIALISTS=", source)
         self.assertIn("executed_role=coordination", source)
@@ -650,6 +651,61 @@ raise SystemExit(2)
         self.assertIn(
             "coordination_summary_missing:GITHUB_STEP_SUMMARY",
             result.stdout,
+        )
+
+    def test_coordination_readback_executes_against_generated_manifest(self) -> None:
+        """The workflow's packet readback resolves specialists from a real bundle."""
+        workflow = REPO_ROOT / ".github/workflows/agent-coordination.yml"
+        source = workflow.read_text(encoding="utf-8")
+        start = 'if ! role_readback="$(python3 - "${manifest_path}" <<\'PY\'\n'
+        end = "\n          PY\n"
+        self.assertIn(start, source)
+        embedded = source.split(start, 1)[1].split(end, 1)[0]
+        readback_script = textwrap.dedent(embedded)
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            report_root = Path(tmp_dir)
+            bootstrap = subprocess.run(
+                [
+                    sys.executable,
+                    "tools/agent_tools/bootstrap_agent_run.py",
+                    "--skip-agent-canon-preflight",
+                    "--task",
+                    "coordination readback test",
+                    "--owner",
+                    "workflow-test",
+                    "--workspace-root",
+                    str(REPO_ROOT),
+                    "--report-root",
+                    str(report_root),
+                    "--enable",
+                    "researcher",
+                    "--enable",
+                    "scheduler",
+                ],
+                cwd=REPO_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(bootstrap.returncode, 0, bootstrap.stdout + bootstrap.stderr)
+            report_dir = next(
+                Path(line.split("=", 1)[1])
+                for line in bootstrap.stdout.splitlines()
+                if line.startswith("REPORT_DIR=")
+            )
+            readback = subprocess.run(
+                [sys.executable, "-", str(report_dir / "team_manifest.yaml")],
+                input=readback_script,
+                cwd=REPO_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+        self.assertEqual(readback.returncode, 0, readback.stdout + readback.stderr)
+        self.assertIn(
+            "SCHEDULED_SPECIALISTS=test_designer,researcher,scheduler",
+            readback.stdout,
         )
 
     def test_improvement_guide_is_bounded_and_manual(self) -> None:

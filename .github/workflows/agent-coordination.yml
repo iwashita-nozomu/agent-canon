@@ -112,7 +112,7 @@ jobs:
           echo "report_dir=reports/agents/${run_id}" >> "$GITHUB_OUTPUT"
       - name: Record coordination intake
         run: |
-          # Readback source is run.lineage.role_ids in the generated team_manifest.yaml.
+          # Readback source is run.capacity_request.lineage.role_ids in the generated team_manifest.yaml.
           # Summary vocabulary: finding=none at intake and result=bundle_ready are
           # emitted only after packet readback and write-scope validation pass.
           report_dir="${{ steps.coordinate.outputs.report_dir }}"
@@ -140,7 +140,14 @@ jobs:
 
           manifest = yaml.safe_load(Path(sys.argv[1]).read_text(encoding="utf-8"))
           run = manifest.get("run") if isinstance(manifest, dict) else None
-          lineage = run.get("lineage") if isinstance(run, dict) else None
+          capacity_request = (
+              run.get("capacity_request") if isinstance(run, dict) else None
+          )
+          lineage = (
+              capacity_request.get("lineage")
+              if isinstance(capacity_request, dict)
+              else None
+          )
           role_ids = lineage.get("role_ids") if isinstance(lineage, dict) else None
           role_entries = manifest.get("roles") if isinstance(manifest, dict) else None
           if (

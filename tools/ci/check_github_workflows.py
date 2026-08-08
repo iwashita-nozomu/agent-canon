@@ -110,7 +110,7 @@ ROOT_COORDINATION_WORKFLOW_REQUIREMENTS = (
     "Standalone AgentCanon coordination workflow",
     "selected roles",
     "team_manifest.yaml",
-    "run.lineage.role_ids",
+    "run.capacity_request.lineage.role_ids",
     "GITHUB_STEP_SUMMARY",
     "SCHEDULED_SPECIALISTS=",
     "executed_role=coordination",
@@ -142,7 +142,7 @@ VENDOR_COORDINATION_WORKFLOW_REQUIREMENTS = (
     "Standalone AgentCanon coordination workflow",
     "selected roles",
     "team_manifest.yaml",
-    "run.lineage.role_ids",
+    "run.capacity_request.lineage.role_ids",
     "GITHUB_STEP_SUMMARY",
     "SCHEDULED_SPECIALISTS=",
     "executed_role=coordination",
@@ -761,7 +761,7 @@ def coordination_summary_findings(path: Path, workflow_text: str) -> list[Findin
     findings: list[Finding] = []
     for required in (
         "team_manifest.yaml",
-        "run.lineage.role_ids",
+        "run.capacity_request.lineage.role_ids",
         "GITHUB_STEP_SUMMARY",
         "SCHEDULED_SPECIALISTS=",
         "executed_role=coordination",
