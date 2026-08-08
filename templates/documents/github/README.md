@@ -25,9 +25,9 @@ content であり、ここから投影しません。
 ## Reader Map
 
 この README は、Issue/PR source、standalone の checked-in target、owner、cleanup の境界を
-最初に説明します。Issue/PR の本文は reader map、PR Essence または observed facts、
-owner/OOP boundary、design trace、dependency/effect、oracle/failure、conflict intent、
-alternatives/independent review、validation の順で記録します。
+最初に説明します。PR の本文は concise な PR Essence、canonical route、changed-surface
+validation、mutation authority、risk/follow-up の順で記録します。Alternatives / independent
+review は実際の選択肢またはリスクがある場合だけ記録します。
 
 - purpose: GitHub Issue/PR source を一つの canonical path で提供する。
 - intended reader and decision: issue author、PR author/reviewer、maintainer、親repo integrator。
@@ -82,8 +82,8 @@ duplicate owner を作らず、source と checked-in standalone targets を同�
 
 ## Required evidence vocabulary（必要な evidence 用語）
 
-source の変更では、必要な範囲で owner/responsibility と OOP/type boundary、design-to-
-implementation trace、dependency/side-effect map、algorithm contract before tests、
-necessary-and-sufficient oracle、failure-cause classification、conflict intent、複数案と
-independent review、formatter/readback、lifecycle cleanup を同じ terms で入力します。
-不要な欄は `not_applicable` と理由を記録します。
+source の変更では、`source_commit`、`template_pin`、`pr_head` を一つの identity relation
+として記録し、canonical route、changed-surface validation、mutation authority、risk /
+follow-up を入力します。不要な alternatives / independent review は
+`not_applicable` と理由を記録します。固定の全チェック一覧、事前の Plan / route pause、
+issue・memory・failure の全件 sweep、毎回の mirror、Copilot 設定レビューは必須にしません。

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract environment
-# responsibility Renders shared devcontainer compose from repo-local Docker pack.
+# responsibility Renders shared devcontainer compose from repo-local Docker pack and the host process identity.
 # upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md devcontainer boundary
 # upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract
 # upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell boundary
@@ -40,15 +40,31 @@ if [[ "${PROJECT_USER+x}" = "x" ]]; then
   printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_USER_OVERRIDE_FORBIDDEN:canonical=project:received=%s\n' "$PROJECT_USER" >&2
   exit 1
 fi
+if [[ "${PROJECT_UID+x}" = "x" || "${PROJECT_GID+x}" = "x" ]]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_OVERRIDE_FORBIDDEN:canonical=host-process-identity\n' >&2
+  exit 1
+fi
 project_user="project"
-project_uid="${PROJECT_UID:-$(id -u)}"
-project_gid="${PROJECT_GID:-$(id -g)}"
+project_uid="$(id -u)"
+project_gid="$(id -g)"
 if [[ ! "$project_uid" =~ ^[1-9][0-9]*$ || ! "$project_gid" =~ ^[1-9][0-9]*$ ]]; then
   printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_MUST_BE_POSITIVE_DECIMAL:uid=%s:gid=%s\n' "$project_uid" "$project_gid" >&2
   exit 1
 fi
 project_home="/home/${project_user}"
-pack="${repo_root}/docker/packs/default.toml"
+gpu_profile="${AGENT_CANON_GPU_ADMISSION_PROFILE:-default}"
+case "$gpu_profile" in
+  default|gpu-admission) ;;
+  *)
+    printf 'devcontainer GPU admission profile is unsupported: %s\n' "$gpu_profile" >&2
+    exit 1
+    ;;
+esac
+pack_name="default"
+if [ "$gpu_profile" = "gpu-admission" ]; then
+  pack_name="gpu-admission"
+fi
+pack="${repo_root}/docker/packs/${pack_name}.toml"
 compose_output_raw="${AGENT_CANON_DOCKER_COMPOSE_OUTPUT:-.devcontainer/docker-compose.generated.yml}"
 if [ "${compose_output_raw#/}" = "$compose_output_raw" ]; then
   compose_output="${repo_root}/${compose_output_raw}"
@@ -126,6 +142,14 @@ reserved_environment = {
     "AGENT_CANON_CONTAINER_USER",
 }
 print(f"dockerfile={pack['dockerfile']}")
+target = pack.get("target")
+if target is not None and (
+    not isinstance(target, str)
+    or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", target) is None
+):
+    raise SystemExit("pack.target must be a safe Docker build stage name")
+if target is not None:
+    print(f"target={target}")
 print(f"runtime_shell={runtime_shell}")
 print(f"dependency_profile={dependency_profile}")
 print(f"platform={runtime_platform}")
@@ -145,6 +169,7 @@ PY
 
   compose_mode="repo-docker-pack"
   dockerfile=""
+  build_target=""
   runtime_shell="/bin/bash"
   dependency_profile="full"
   runtime_platform="linux/amd64"
@@ -155,6 +180,7 @@ PY
   for pack_value in "${pack_values[@]}"; do
     case "$pack_value" in
       dockerfile=*) dockerfile="${pack_value#dockerfile=}" ;;
+      target=*) build_target="${pack_value#target=}" ;;
       runtime_shell=*) runtime_shell="${pack_value#runtime_shell=}" ;;
       dependency_profile=*) dependency_profile="${pack_value#dependency_profile=}" ;;
       platform=*) runtime_platform="${pack_value#platform=}" ;;
@@ -167,6 +193,7 @@ PY
 else
   compose_mode="agent-canon-source-only"
   dockerfile=""
+  build_target=""
   runtime_shell="/bin/bash"
   dependency_profile="full"
   runtime_platform="linux/amd64"
@@ -176,19 +203,25 @@ else
   pack_environment_lines=()
 fi
 
+if [ "$gpu_profile" = "gpu-admission" ]; then
+  if [ ! -f "$pack" ]; then
+    printf 'devcontainer GPU admission profile requires pack: %s\n' "$pack" >&2
+    exit 1
+  fi
+  if [ "$build_target" != "gpu-runtime" ]; then
+    printf 'devcontainer GPU admission pack target must be gpu-runtime: %s\n' "${build_target:-missing}" >&2
+    exit 1
+  fi
+elif [ "$build_target" = "gpu-runtime" ]; then
+  printf 'devcontainer default profile rejects GPU build target: %s\n' "$build_target" >&2
+  exit 1
+fi
+
 parent_layout=false
 if [ -d "${repo_root}/vendor/agent-canon" ]; then
   parent_layout=true
 fi
 
-gpu_profile="${AGENT_CANON_GPU_ADMISSION_PROFILE:-default}"
-case "$gpu_profile" in
-  default|gpu-admission) ;;
-  *)
-    printf 'devcontainer GPU admission profile is unsupported: %s\n' "$gpu_profile" >&2
-    exit 1
-    ;;
-esac
 if [ "$gpu_profile" = "gpu-admission" ]; then
   compose_project_name="${compose_project_name}-gpu-admission"
   [[ "$compose_project_name" =~ ^[a-z0-9][a-z0-9_-]*-gpu-admission$ ]] || {
@@ -473,6 +506,9 @@ mkdir -p "$(dirname "$compose_output")"
     printf '    build:\n'
     printf '      context: ..\n'
     printf '      dockerfile: %s\n' "$dockerfile"
+    if [ -n "$build_target" ]; then
+      printf '      target: %s\n' "$build_target"
+    fi
     printf '      args:\n'
     printf '        PROJECT_UID: "%s"\n' "$project_uid"
     printf '        PROJECT_GID: "%s"\n' "$project_gid"

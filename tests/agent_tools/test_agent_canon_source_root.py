@@ -166,6 +166,19 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         self.assertEqual(parsed.command, "tools/sync_agent_canon.sh")
         self.assertEqual(parsed.args, ["check"])
 
+    def test_public_entrypoints_are_executable_for_source_root_dispatch(self) -> None:
+        """Source-root dispatch targets keep their shebang entrypoint mode."""
+        for relative in (
+            "tools/update_agent_canon.sh",
+            "tools/ci/check_agent_canon_latest.sh",
+            "tools/ci/check_agent_canon_pr.sh",
+            "tools/agent_tools/surface_manifest.py",
+            "tools/agent_tools/dependency_module_change.py",
+        ):
+            with self.subTest(path=relative):
+                mode = (PROJECT_ROOT / relative).stat().st_mode
+                self.assertTrue(mode & stat.S_IXUSR, relative)
+
     def test_exec_command_runs_tracked_entrypoint_script(self) -> None:
         """Run the public sync check in an isolated standalone source clone."""
         with tempfile.TemporaryDirectory() as workspace:
