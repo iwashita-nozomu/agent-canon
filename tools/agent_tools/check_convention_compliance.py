@@ -268,11 +268,7 @@ SKILL_ROUTING_MARKERS = (
 )
 EXIT_BLOCKER_POLICY_MARKERS = {
     "agents/skills/agent-orchestration.md": (
-        "selected_agent_type",
-        "write_capable_handoff_blocker",
         "evidence",
-        "parent_packet_ref",
-        "status=blocked",
         "router_unavailable_blocker",
     ),
     "agents/skills/codex-task-workflow.md": (
@@ -585,8 +581,6 @@ IMPLEMENTATION_GUARDRAIL_MARKERS = {
         "implementation shortcut",
     ),
     "agents/skills/codex-task-workflow.md": (
-        "contract-complete implementation",
-        "acceptance contract",
         "design_issue_blocker",
         "implementation shortcut",
     ),

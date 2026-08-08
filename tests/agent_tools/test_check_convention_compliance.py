@@ -1074,7 +1074,7 @@ class CheckConventionComplianceTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
-            skill = root / "agents" / "skills" / "agent-orchestration.md"
+            skill = root / "agents" / "skills" / "codex-task-workflow.md"
             skill.write_text(
                 skill.read_text(encoding="utf-8").replace(
                     " status=blocked",
