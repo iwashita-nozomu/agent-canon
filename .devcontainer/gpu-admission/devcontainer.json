@@ -6,6 +6,14 @@
   "containerUser": "project",
   "remoteUser": "project",
   "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
+  "features": {
+    "ghcr.io/devcontainers/features/node@sha256:586c9a6f7dd40bd3ba2cd41e7f2f88dcc31fbe5d1442afcbf07ffbc66b686857": {
+      "version": "22.14.0",
+      "npmVersion": "10.9.2",
+      "nodeGypDependencies": false,
+      "pnpmVersion": "none"
+    }
+  },
   "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
   "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
   "shutdownAction": "stopCompose",

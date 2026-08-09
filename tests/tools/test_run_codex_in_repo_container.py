@@ -56,13 +56,12 @@ def test_print_only_runs_shared_post_create_before_codex() -> None:
     assert "exec codex" in result.stdout
 
 
-def test_host_docker_keeps_socket_mount_with_root_setup() -> None:
-    """Host Docker keeps its socket mount while nested setup starts as root."""
-    result = run_cli("--print-only", "--profile", "host-docker")
+def test_default_does_not_mount_host_docker_socket() -> None:
+    """Default nested Codex keeps the host Docker socket outside its contract."""
+    result = run_cli("--print-only")
 
     assert result.returncode == 0, result.stderr
-    assert "--user root" in result.stdout
-    assert "-v /var/run/docker.sock:/var/run/docker.sock" in result.stdout
+    assert "-v /var/run/docker.sock:/var/run/docker.sock" not in result.stdout
     assert "-e AGENT_CANON_CONTAINER_USER=" in result.stdout
     assert (
         "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
@@ -299,7 +298,7 @@ def test_runtime_identity(tmp_path: Path) -> None:
                 'shell = "/bin/bash"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
-                'dependency_profile = "gpu"',
+                'dependency_extras = ["dev", "cuda12"]',
                 "env = []",
                 "mounts = []",
                 "",
@@ -348,9 +347,6 @@ def test_runtime_identity(tmp_path: Path) -> None:
     post_attach = (PROJECT_ROOT / ".devcontainer" / "post-attach.sh").read_text(
         encoding="utf-8"
     )
-    bootstrap = (
-        PROJECT_ROOT / ".devcontainer" / "bootstrap-dependencies.sh"
-    ).read_text(encoding="utf-8")
     gpu_admission = (
         PROJECT_ROOT / ".devcontainer" / "gpu-admission.sh"
     ).read_text(encoding="utf-8")
@@ -376,12 +372,11 @@ def test_runtime_identity(tmp_path: Path) -> None:
     )
     assert "-e OPENAI_API_KEY=test-api-key" in result.stdout
     assert "-e OPENAI_BASE_URL=https://api.example.test/v1" in result.stdout
-    assert "-e AGENT_CANON_DEPENDENCY_PROFILE=gpu" in result.stdout
+    assert "-e AGENT_CANON_PYTHON_EXTRAS=dev,cuda12" in result.stdout
     assert "/root/.codex" not in result.stdout
     assert "umask 0007" in post_create
     assert '"$devcontainer_dir/finalize-shared-runtime.sh"' not in post_create
-    assert 'dependency_profile="${AGENT_CANON_DEPENDENCY_PROFILE:-full}"' in post_create
-    assert '--profile "$dependency_profile"' in post_create
+    assert "project-install --workspace" in post_create
     assert 'echo "codex-state: ${codex_state_status}"' in post_attach
     assert 'workspace_layout="${AGENT_CANON_WORKSPACE_LAYOUT:-managed-topic}"' in post_attach
     assert 'workspace_source="${DEPENDENCY_MODULE_CONTAINER_SOURCE:-}"' in post_attach
@@ -409,16 +404,18 @@ def test_runtime_identity(tmp_path: Path) -> None:
     assert "write_runtime_receipt_atomic" in gpu_admission
     assert "write_runtime_receipt_atomic" in finalize
     assert (PROJECT_ROOT / ".devcontainer" / "finalize-shared-runtime.sh").is_file()
-    assert (PROJECT_ROOT / ".devcontainer" / "bootstrap-dependencies.sh").is_file()
+    assert not (PROJECT_ROOT / ".devcontainer" / "bootstrap-dependencies.sh").exists()
     assert not (PROJECT_ROOT / ".devcontainer" / "bootstrap-shared-runtime.sh").exists()
     assert "bootstrap-shared-runtime.sh" not in devcontainer
     assert "finalize-shared-runtime.sh" not in devcontainer
     assert "nvidia-smi" not in compose
-    assert "DEVCONTAINER_GPU_REQUEST" not in compose
+    assert "AGENT_CANON_PYTHON_EXTRAS" in compose
+    assert "AGENT_CANON_DEPENDENCY_PROFILE" not in compose
+    assert "DEVCONTAINER_GPU_REQUEST" in compose
     assert "group_add:" not in compose
-    assert "gpus: all" not in compose
-    assert "/var/lib/agent-canon/runtime" not in compose
-    assert "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT" not in compose
+    assert "gpus: all" in compose
+    assert "/var/lib/agent-canon/runtime" in compose
+    assert "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT" in compose
     assert (
         "/var/lib/agent-canon/runtime/shared-runtime-provision.json"
         in environment_manifest
@@ -429,10 +426,10 @@ def test_runtime_identity(tmp_path: Path) -> None:
     )
     assert "expected_provision_path" in managed_runner
     assert "/receipts/shared-runtime-provision" not in "\n".join(
-        (bootstrap, finalize, compose, environment_manifest, managed_runner)
+        (finalize, compose, environment_manifest, managed_runner)
     )
     assert "/receipts/shared-runtime-readback" not in "\n".join(
-        (bootstrap, finalize, compose, environment_manifest, managed_runner)
+        (finalize, compose, environment_manifest, managed_runner)
     )
     assert "exec codex" in result.stdout
     assert "--platform linux/amd64" in result.stdout

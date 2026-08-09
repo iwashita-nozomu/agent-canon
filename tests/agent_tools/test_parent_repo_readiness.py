@@ -350,9 +350,6 @@ class ParentRepoReadinessTest(unittest.TestCase):
             ".dockerignore": ".git\n",
             "docker/README.md": "docker\n",
             "docker/Dockerfile": "FROM ubuntu:24.04\n",
-            "docker/requirements.txt": "pytest\n",
-            "docker/install_python_dependencies.sh": "#!/usr/bin/env bash\n",
-            "docker/register_safe_directories.sh": "#!/usr/bin/env bash\n",
             "docker/packs/default.toml": '[pack]\nname = "default"\n',
             "docker/packs/default-host-docker.toml": '[pack]\nname = "default-host-docker"\n',
             ".github/workflows/ci.yml": "name: CI\n",
@@ -361,7 +358,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 [
                     "{",
                     '  "initializeCommand": "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",',
-                    '  "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/bootstrap-dependencies.sh --install-language-runtime && python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",',
+                    '  "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",',
                     '  "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",',
                     '  "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",',
                     '  "service": "workspace",',
@@ -378,8 +375,6 @@ class ParentRepoReadinessTest(unittest.TestCase):
         for path, text in files.items():
             self.write_file(root, path, text)
         for relative in [
-            "docker/install_python_dependencies.sh",
-            "docker/register_safe_directories.sh",
             ".devcontainer/post-create-parent.sh",
         ]:
             (root / relative).chmod(0o755)

@@ -100,7 +100,7 @@ PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_sou
 親の `docker/README.md` に、Docker product image/build/runtime と mounted
 devcontainer developer/agent tools の差を明記します。Product image は
 project runtime と project Python dependency の owner、AgentCanon manifest は
-mounted shared tools の owner、親 `docker/install_python_dependencies.sh` は
+mounted shared tools の owner、親 `pyproject.toml` の optional extras は
 workspace Python packages の owner です。Codex、Node/npm、Rust、Lean、
 Playwright を convenience-only の理由で Dockerfile に追加しません。
 
@@ -109,22 +109,17 @@ Playwright を convenience-only の理由で Dockerfile に追加しません。
 親の `postCreateCommand` は次の順を直接保持します。
 
 ```text
-fixed bootstrap --install-language-runtime  # parent selector only
 shared post-create
-  fixed bootstrap validation
   parent manifest -> vendor manifest merge
   full plan validation
   topological derived execution and per-record receipts
-  parent docker/install_python_dependencies.sh
+  parent pyproject.toml extras -> editable install -> pip check (when selected)
   AgentCanon build, cache, and runtime projection
 parent .devcontainer/post-create-parent.sh  # final, when present
 ```
 
-Standalone AgentCanon image は build 時に同じ fixed bootstrap を materialize 済みのため、
-standalone selector は shared post-create から始める。Template / derived parent selector は
-product image が所有しない Node/npm と Ninja を明示的な
-`--install-language-runtime` で先に materialize し、その後の shared `--check` を
-fail-closed validation として使う。
+Standalone AgentCanon image は固定 OS/Python capability を image build で準備し、Node/npm は
+digest-pinned Feature が所有するため、全 selector は shared post-create から始める。
 
 親 record の manifest order と parent-first merge order は、依存制約がない
 record の安定順として保持します。親 post-create を shared script に吸収したり、

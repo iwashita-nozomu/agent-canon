@@ -117,8 +117,8 @@ The standalone source consumes repo-local Docker runtime contracts instead of
 owning parent files. A template or derived parent keeps its own regular
 `.devcontainer/` contract and may invoke source entrypoints through the resolver.
 The standalone source reads `docker/packs/default.toml`, builds the repo-local
-`docker/Dockerfile`, forwards the pack runtime environment into the generated
-Compose service, and runs repo-local `docker/install_python_dependencies.sh`
+`docker/Dockerfile`, forwards the typed pack runtime environment into the generated
+Compose service, and installs only explicitly selected `pyproject.toml` extras
 after the workspace is mounted.
 
 When AgentCanon itself is opened as a standalone source checkout and no

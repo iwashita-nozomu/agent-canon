@@ -60,18 +60,19 @@ def run_container_cli(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def write_pack(tmp_path: Path, *, dependency_profile: str, gpus: str | None) -> Path:
-    """Write one runtime pack fixture with an explicit dependency profile."""
-    pack = tmp_path / f"{dependency_profile}.toml"
+def write_pack(tmp_path: Path, *, dependency_extras: tuple[str, ...], gpus: str | None) -> Path:
+    """Write one runtime pack fixture with typed project extras."""
+    pack_name = "gpu" if gpus else "default"
+    pack = tmp_path / f"{pack_name}.toml"
     gpu_line = f'gpus = "{gpus}"' if gpus is not None else ""
     pack.write_text(
         "\n".join(
             [
                 "[pack]",
-                f'name = "{dependency_profile}"',
+                f'name = "{pack_name}"',
                 'dockerfile = "docker/Dockerfile"',
                 'context = "."',
-                f'image_tag = "fixture:{dependency_profile}"',
+                f'image_tag = "fixture:{pack_name}"',
                 "",
                 "[smoke]",
                 'shell = "/bin/bash"',
@@ -81,7 +82,7 @@ def write_pack(tmp_path: Path, *, dependency_profile: str, gpus: str | None) -> 
                 'shell = "/bin/bash"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
-                f'dependency_profile = "{dependency_profile}"',
+                "dependency_extras = " + repr(list(dependency_extras)).replace("'", '"'),
                 gpu_line,
                 "",
             ]
@@ -97,9 +98,9 @@ def test_print_only_python_file_uses_python_runner_and_env_check() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "env-check:" in result.stdout
-    assert "docker/install_python_dependencies.sh" in result.stdout
-    assert "--profile full" in result.stdout
-    assert "-e AGENT_CANON_DEPENDENCY_PROFILE=full" in result.stdout
+    assert "project-install --workspace" in result.stdout
+    assert "--extras \"${AGENT_CANON_PYTHON_EXTRAS}\"" in result.stdout
+    assert "-e AGENT_CANON_PYTHON_EXTRAS=dev,cuda12" in result.stdout
     assert f"python3 /workspace/{GENERIC_PYTHON_FIXTURE}" in result.stdout
 
 
@@ -127,8 +128,7 @@ def test_print_only_command_without_workspace_file_runs_directly() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "run:" in result.stdout
-    assert "docker/install_python_dependencies.sh" in result.stdout
-    assert "--profile full" in result.stdout
+    assert "project-install --workspace" in result.stdout
     assert "python3 --version" in result.stdout
 
 
@@ -146,13 +146,12 @@ def test_run_in_repo_container_print_only_publishes_ports() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "-p 8888:8888" in result.stdout
-    assert "docker/install_python_dependencies.sh" in result.stdout
-    assert "--profile full" in result.stdout
+    assert "project-install --workspace" in result.stdout
 
 
 def test_gpu_profile_reaches_every_runtime_entrypoint(tmp_path: Path) -> None:
     """GPU profile and runtime allocation survive every shared CLI route."""
-    pack = write_pack(tmp_path, dependency_profile="gpu", gpus="all")
+    pack = write_pack(tmp_path, dependency_extras=("dev", "cuda12"), gpus="all")
     commands = (
         (
             RUN_CONTAINER_SCRIPT,
@@ -193,5 +192,5 @@ def test_gpu_profile_reaches_every_runtime_entrypoint(tmp_path: Path) -> None:
         )
         assert result.returncode == 0, result.stderr
         assert "--gpus all" in result.stdout
-        assert "--profile gpu" in result.stdout
-        assert "-e AGENT_CANON_DEPENDENCY_PROFILE=gpu" in result.stdout
+        assert "project-install --workspace" in result.stdout
+        assert "-e AGENT_CANON_PYTHON_EXTRAS=dev,cuda12" in result.stdout

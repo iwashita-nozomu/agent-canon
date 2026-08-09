@@ -89,13 +89,13 @@ python3 tools/ci/run_container_pack.py --pack docker/packs/default.toml --print-
 必要なら:
 
 ```bash
-make docker-build-check-host-docker
-python3 tools/ci/run_codex_in_repo_container.py --profile host-docker --print-only
+python3 tools/ci/run_codex_in_repo_container.py --print-only
 ```
 
 確認:
 
-- repo-local `docker/Dockerfile`、`docker/requirements.txt`、AgentCanon-owned `.devcontainer/` の責務境界が同期している
+- repo-local `docker/Dockerfile`、`pyproject.toml`、AgentCanon-owned `.devcontainer/` の責務境界が同期している
+- fixed OS/Python capability、digest-pinned Node Feature、typed dependency manifest、project extras の owner が混在していない
 - `docker/README.md`、`README.md`、`QUICK_START.md` が更新されている
 - `templates/agents/environment_change_proposal.md` に proposal が残っている
 
