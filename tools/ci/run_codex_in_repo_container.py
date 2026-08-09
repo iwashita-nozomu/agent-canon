@@ -292,8 +292,9 @@ def build_nested_codex_script(
             [
                 'if [ "$(id -u)" -eq 0 ]; then',
                 f'  chown -R {run_uid}:{run_gid} "$HOME" || true',
-                f'  find -P {shlex.quote(workspace)} -xdev -uid 0 -newer "$workspace_marker" '
+                f'  find -P {shlex.quote(workspace)} -xdev -mindepth 1 -uid 0 -newer "$workspace_marker" '
                 f'-exec chown -h {run_uid}:{run_gid} {{}} +',
+                '  rm -f "$workspace_marker"',
                 "  if command -v setpriv >/dev/null 2>&1; then",
                 f"    exec setpriv --reuid {run_uid} --regid {run_gid} --clear-groups {quoted_command}",
                 "  fi",

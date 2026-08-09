@@ -82,12 +82,13 @@ def test_host_uid_setup_chowns_workspace_artifacts_before_setpriv() -> None:
     )
     workspace_marker = output.index('workspace_marker="$(mktemp)"')
     workspace_ownership = output.index(
-        f"find -P /workspace -xdev -uid 0 -newer \"$workspace_marker\" "
+        f"find -P /workspace -xdev -mindepth 1 -uid 0 -newer \"$workspace_marker\" "
         f"-exec chown -h {os.getuid()}:{os.getgid()} {{}} +",
         post_create,
     )
+    marker_cleanup = output.index('rm -f "$workspace_marker"', workspace_ownership)
     setpriv = output.index("setpriv --reuid", workspace_ownership)
-    assert workspace_marker < post_create < workspace_ownership < setpriv
+    assert workspace_marker < post_create < workspace_ownership < marker_cleanup < setpriv
 
 
 def _write_executable(path: Path, contents: str) -> None:
@@ -183,6 +184,12 @@ def test_host_uid_setup_executes_workspace_ownership_handoff(tmp_path: Path) -> 
         "exit 0\n",
     )
     _write_executable(
+        bin_dir / "rm",
+        "#!/usr/bin/env bash\n"
+        'printf "rm %s\\n" "$*" >>"${EVENT_LOG:?}"\n'
+        'exec /usr/bin/rm "$@"\n',
+    )
+    _write_executable(
         bin_dir / "setpriv",
         "#!/usr/bin/env bash\n"
         'printf "setpriv-called\\n" >>"${EVENT_LOG:?}"\n'
@@ -240,7 +247,10 @@ def test_host_uid_setup_executes_workspace_ownership_handoff(tmp_path: Path) -> 
     assert str(workspace / "new-outside-link") in chown_targets
     assert str(workspace / "pre-existing-root-owned.txt") not in chown_targets
     assert str(outside_target) not in chown_targets
-    assert events.index(chown_events[-1]) < events.index("setpriv-called")
+    marker_cleanup_events = [line for line in events if line.startswith("rm ")]
+    assert marker_cleanup_events
+    assert events.index(chown_events[-1]) < events.index(marker_cleanup_events[-1])
+    assert events.index(marker_cleanup_events[-1]) < events.index("setpriv-called")
 
     log.write_text("", encoding="utf-8")
     failed = subprocess.run(
