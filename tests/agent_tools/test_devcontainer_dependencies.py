@@ -345,6 +345,70 @@ class FakeRunner:
         return subprocess.CompletedProcess(command, 0, "1.0.0\n", "")
 
 
+class ActiveSourceCargoRunner(FakeRunner):
+    """Build a source-local test binary without consulting repository metadata."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.cargo_builds = 0
+
+    def run(
+        self,
+        argv: Sequence[str],
+        *,
+        cwd: Path | None = None,
+        privileged: bool = False,
+        capture_output: bool = False,
+        env: Mapping[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        command = tuple(argv)
+        if command[:2] == ("cargo", "build"):
+            manifest = Path(command[command.index("--manifest-path") + 1])
+            binary = manifest.parent / "target" / "release" / "agent-canon"
+            binary.parent.mkdir(parents=True, exist_ok=True)
+            binary.write_text(
+                "#!/usr/bin/env sh\nprintf '%s\\n' 'agent-canon 0.1.0'\n",
+                encoding="utf-8",
+            )
+            binary.chmod(0o755)
+            self.cargo_builds += 1
+        result = super().run(
+            argv,
+            cwd=cwd,
+            privileged=privileged,
+            capture_output=capture_output,
+            env=env,
+        )
+        if Path(command[0]).name == "agent-canon":
+            return subprocess.CompletedProcess(command, 0, "agent-canon 0.1.0\n", "")
+        return result
+
+
+class MismatchedCommitRunner(FakeRunner):
+    """Return a different source HEAD to exercise fixed-commit rejection."""
+
+    def run(
+        self,
+        argv: Sequence[str],
+        *,
+        cwd: Path | None = None,
+        privileged: bool = False,
+        capture_output: bool = False,
+        env: Mapping[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        result = super().run(
+            argv,
+            cwd=cwd,
+            privileged=privileged,
+            capture_output=capture_output,
+            env=env,
+        )
+        command = tuple(argv)
+        if command[:2] == ("git", "-C"):
+            return subprocess.CompletedProcess(command, 0, f"{'b' * 40}\n", "")
+        return result
+
+
 class LeanToolchainRetryRunner(FakeRunner):
     """Model an install that leaves a live Lean toolchain before failing."""
 
@@ -504,6 +568,30 @@ class DependencyModelTests(unittest.TestCase):
             vendor_root.symlink_to(outside, target_is_directory=True)
             with self.assertRaisesRegex(DependencyError, "escapes workspace"):
                 installer._cargo_source(cargo, root)
+
+    def test_fixed_commit_rejects_mismatched_source_head(self) -> None:
+        """Explicit commit records retain Git validation and reject source drift."""
+        expected_commit = "a" * 40
+        cargo = parse_record(
+            record(
+                "agent-cli",
+                method="cargo-source-build",
+                source="rust/agent-canon",
+                repo="https://example.test/agent-canon.git",
+                commit=expected_commit,
+                locked=True,
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = MismatchedCommitRunner()
+        installer = Installer(runner)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "rust" / "agent-canon").mkdir(parents=True)
+            with self.assertRaisesRegex(DependencyError, "cargo source commit mismatch"):
+                installer.verify(cargo, workspace=root)
+        self.assertTrue(any(command[:2] == ("git", "-C") for command in runner.calls))
 
     def test_schema_rejects_missing_and_unknown_fields(self) -> None:
         value = record("invalid")
@@ -2066,8 +2154,28 @@ class DependencyModelTests(unittest.TestCase):
                 )
             self.assertFalse((root / "failed-receipts" / "tool.json").exists())
 
-    def test_active_source_identity_uses_standalone_head_and_parent_gitlink(self) -> None:
-        """Active-source verification accepts the selected provider and rejects drift."""
+    def _active_source_record(self) -> Any:
+        return parse_record(
+            record(
+                "agent-canon-cli",
+                method="cargo-source-build",
+                source="rust/agent-canon",
+                repo="https://example.test/agent-canon.git",
+                source_identity="active-source",
+                locked=True,
+                verification={
+                    "kind": "cargo-binary",
+                    "path": "target/release/agent-canon",
+                    "args": ["--version"],
+                    "output_contains": "agent-canon 0.1.0",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+
+    def test_active_source_build_ignores_parent_gitlink_and_source_metadata(self) -> None:
+        """Active-source verification uses the binary and does not inspect Git."""
         active = parse_record(
             record(
                 "agent-canon-cli",
@@ -2130,9 +2238,7 @@ class DependencyModelTests(unittest.TestCase):
             init_repository(root)
             write_cli_source(root)
             standalone_commit = commit_repository(root, "standalone source")
-            self.assertEqual(
-                installer.verify(active, workspace=root), standalone_commit
-            )
+            self.assertIsNone(installer.verify(active, workspace=root))
             standalone_resolver_cases = (("standalone-prefix-dot", "."),)
             for case_name, source_prefix in standalone_resolver_cases:
                 with self.subTest(case=case_name):
@@ -2163,11 +2269,11 @@ class DependencyModelTests(unittest.TestCase):
                     self.assertEqual(resolved.stdout.strip(), standalone_commit)
 
         derived_cases = (
-            ("detached-gitlink-match", "match", None),
-            ("detached-gitlink-mismatch", "mismatch", "provider identity mismatch"),
-            ("missing-git-metadata", "missing", "source-root Git metadata"),
+            ("detached-gitlink-match", "match"),
+            ("detached-gitlink-drift", "mismatch"),
+            ("missing-git-metadata", "missing"),
         )
-        for case_name, case_kind, failure_text in derived_cases:
+        for case_name, case_kind in derived_cases:
             with self.subTest(case=case_name), tempfile.TemporaryDirectory() as temporary:
                 root = Path(temporary)
                 parent = root / "parent"
@@ -2225,24 +2331,40 @@ class DependencyModelTests(unittest.TestCase):
                 if case_kind == "missing":
                     shutil.rmtree(source / ".git")
 
-                if failure_text is None:
-                    self.assertEqual(
-                        installer.verify(active, workspace=parent), source_commit
-                    )
-                    with self.assertRaisesRegex(
-                        DependencyError, "binary source identity mismatch"
-                    ):
-                        installer.verify(
-                            active,
-                            workspace=parent,
-                            expected_source_identity="0" * 40,
-                        )
-                else:
-                    with self.assertRaisesRegex(DependencyError, failure_text):
-                        installer.verify(active, workspace=parent)
+                self.assertIsNone(installer.verify(active, workspace=parent))
 
-    def test_active_source_receipt_rejects_build_time_source_change(self) -> None:
-        """A source mutation during Cargo build removes the receipt and fails closed."""
+    def test_active_source_build_always_invokes_cargo_and_has_no_receipt(self) -> None:
+        """Cargo owns incremental detection; active-source installs are not cached."""
+        active = self._active_source_record()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "rust" / "agent-canon"
+            source.mkdir(parents=True)
+            (source / "Cargo.toml").write_text(
+                "[package]\nname = 'agent-canon'\nversion = '0.1.0'\nedition = '2021'\n",
+                encoding="utf-8",
+            )
+            runner = ActiveSourceCargoRunner()
+            plan = build_plan((loaded_manifest(Path("fixture.toml"), (active,)),))
+            receipts = root / "receipts"
+            installer = Installer(runner)
+            installer.install(plan, workspace=root, receipts=receipts)
+            installer.install(plan, workspace=root, receipts=receipts)
+            self.assertEqual(runner.cargo_builds, 2)
+            cargo_commands = [
+                command for command in runner.calls if command[:2] == ("cargo", "build")
+            ]
+            self.assertTrue(
+                all(
+                    "--release" in command and "--locked" in command
+                    for command in cargo_commands
+                )
+            )
+            self.assertFalse((receipts / "agent-canon-cli.json").exists())
+            self.assertFalse(any(command[:2] == ("git", "-C") for command in runner.calls))
+
+    def test_active_source_build_accepts_source_mutation_without_identity_checks(self) -> None:
+        """Cargo owns source change handling and the active install stays receipt-free."""
         active = parse_record(
             record(
                 "agent-canon-cli",
@@ -2316,8 +2438,9 @@ class DependencyModelTests(unittest.TestCase):
             )
             self.assertNotEqual(receipt_check.returncode, 0)
             self.assertIn("receipt source identity mismatch", receipt_check.stderr)
-            fake_bin = root / "fake-bin"
-            fake_bin.mkdir()
+            fake_cargo_home = root / "fake-cargo-home"
+            fake_bin = fake_cargo_home / "bin"
+            fake_bin.mkdir(parents=True)
             cargo = fake_bin / "cargo"
             cargo.write_text(
                 "#!/usr/bin/env bash\n"
@@ -2338,12 +2461,9 @@ class DependencyModelTests(unittest.TestCase):
             plan = build_plan((loaded_manifest(Path("fixture.toml"), (active,)),))
             receipts = root / "receipts"
             environment = dict(os.environ)
-            environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
+            environment["CARGO_HOME"] = str(fake_cargo_home)
             with mock.patch.dict(os.environ, environment, clear=True):
-                with self.assertRaisesRegex(
-                    DependencyError, "source identity changed during build"
-                ):
-                    Installer().install(plan, workspace=root, receipts=receipts)
+                Installer().install(plan, workspace=root, receipts=receipts)
             self.assertFalse((receipts / "agent-canon-cli.json").exists())
 
     def test_rebuild_provenance_uses_parent_gitlink_and_rejects_source_drift(self) -> None:

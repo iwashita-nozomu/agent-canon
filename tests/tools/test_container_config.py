@@ -16,6 +16,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -65,6 +66,36 @@ def write_host_zshrc(home: Path, content: str = "# fixture zshrc\n") -> None:
     """Write the explicit host zshrc premise used by generator tests."""
     home.mkdir(parents=True, exist_ok=True)
     (home / ".zshrc").write_text(content, encoding="utf-8")
+
+
+def write_host_zshrc_symlink(home: Path, content: str = "# fixture zshrc\n") -> Path:
+    """Write a host zshrc symlink and return its regular canonical target."""
+    home.mkdir(parents=True, exist_ok=True)
+    target = home / "real-zshrc"
+    target.write_text(content, encoding="utf-8")
+    (home / ".zshrc").symlink_to(target)
+    return target.resolve()
+
+
+def write_host_zsh_directory_symlink(home: Path) -> Path:
+    """Write a host zsh directory symlink and return its canonical target."""
+    home.mkdir(parents=True, exist_ok=True)
+    target = home / "real zsh"
+    target.mkdir()
+    (target / "zsh-autosuggestions.zsh").write_text("# fixture\n", encoding="utf-8")
+    (target / "zsh-syntax-highlighting.zsh").write_text("# fixture\n", encoding="utf-8")
+    (home / ".zsh").symlink_to(target)
+    return target.resolve()
+
+
+def write_linked_data_root_symlink(repo: Path, tmp_path: Path) -> tuple[str, Path]:
+    """Create one repository symlink and a temporary canonical directory."""
+    target = tmp_path / "linked-data-target"
+    target.mkdir(parents=True, exist_ok=True)
+    link = repo / "link" / "msm_data_root"
+    link.parent.mkdir(parents=True, exist_ok=True)
+    link.symlink_to(target)
+    return link.relative_to(repo).as_posix(), target
 
 
 def write_devcontainer(root: Path) -> None:
@@ -383,6 +414,42 @@ def test_generator_scenarios_require_both_compose_outputs(tmp_path: Path) -> Non
     }
 
 
+def generate_gpu_admission_compose(tmp_path: Path) -> tuple[Path, Path]:
+    """Generate one valid GPU-admission Compose fixture for mutation tests."""
+    repo = tmp_path / "workspace" / "topic" / "agent-canon"
+    write_devcontainer(repo)
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
+    write_file(repo, ".devcontainer/Dockerfile", DOCKERFILE.read_text(encoding="utf-8"))
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    write_gpu_admission_pack(repo)
+    output_path = repo / ".agent-canon/gpu-admission-compose.generated.yml"
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(tmp_path / "missing-home"),
+            "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+            "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
+            "AGENT_CANON_RUNTIME_GID": "4242",
+            "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": "1000 4242 5000",
+            "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/gpu-admission-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    return repo, output_path
+
+
 def test_noncanonical_remote_user_contract_is_rejected(tmp_path: Path) -> None:
     """The devcontainer runtime identity is fixed to the canonical project user."""
     repo = write_topic_fixture(tmp_path)
@@ -610,6 +677,259 @@ def test_default_rejects_gpu_runtime_pack_target(tmp_path: Path) -> None:
 
     assert result.returncode == 1, result.stdout + result.stderr
     assert "default profile rejects GPU build target" in result.stderr
+@pytest.mark.parametrize(
+    ("mutation", "expected_detail"),
+    (
+        (
+            "source",
+            "gpu-admission-runtime-mount-source-must-be-canonical",
+        ),
+        (
+            "read_only",
+            "gpu-admission-runtime-mount-must-be-read-write",
+        ),
+    ),
+)
+def test_gpu_admission_validator_rejects_runtime_bind_mutations(
+    tmp_path: Path, mutation: str, expected_detail: str
+) -> None:
+    """GPU admission runtime binds keep the canonical source and RW contract."""
+    repo, output_path = generate_gpu_admission_compose(tmp_path)
+    compose = output_path.read_text(encoding="utf-8")
+    if mutation == "source":
+        malformed = compose.replace(
+            '        source: "/var/lib/agent-canon/runtime"\n',
+            '        source: "/tmp/evil-runtime"\n',
+            1,
+        )
+    else:
+        malformed = compose.replace(
+            '        target: "/var/lib/agent-canon/runtime"\n',
+            '        target: "/var/lib/agent-canon/runtime"\n        read_only: true\n',
+            1,
+        )
+    output_path.write_text(malformed, encoding="utf-8")
+
+    module = load_container_config_module()
+    findings = module.validate_generated_compose(
+        repo,
+        None,
+        profile="gpu-admission",
+        compose_path=output_path,
+    )
+
+    assert expected_detail in {finding.detail for finding in findings}
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_detail"),
+    (
+        (
+            "runtime-gid-zero",
+            "gpu-admission-runtime-gid-must-be-positive-integer",
+        ),
+        (
+            "host-gid-invalid",
+            "gpu-admission-host-supplementary-gids-must-be-positive-integers",
+        ),
+        (
+            "host-gid-duplicate",
+            "gpu-admission-host-supplementary-gids-must-be-unique",
+        ),
+    ),
+)
+def test_gpu_admission_validator_rejects_malformed_gid_environment(
+    tmp_path: Path, mutation: str, expected_detail: str
+) -> None:
+    """GPU admission validates GID values independently of matching group_add."""
+    repo, output_path = generate_gpu_admission_compose(tmp_path)
+    compose = output_path.read_text(encoding="utf-8")
+    if mutation == "runtime-gid-zero":
+        malformed = compose.replace(
+            'AGENT_CANON_RUNTIME_GID: "4242"',
+            'AGENT_CANON_RUNTIME_GID: "0"',
+            1,
+        )
+    elif mutation == "host-gid-invalid":
+        malformed = compose.replace(
+            'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS: "1000 4242 5000"',
+            'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS: "1000 0 5000"',
+            1,
+        ).replace('      - "5000"\n', '      - "0"\n', 1)
+    else:
+        malformed = compose.replace(
+            'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS: "1000 4242 5000"',
+            'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS: "1000 4242 4242"',
+            1,
+        ).replace('      - "5000"\n', '      - "4242"\n', 1)
+    output_path.write_text(malformed, encoding="utf-8")
+
+    module = load_container_config_module()
+    findings = module.validate_generated_compose(
+        repo,
+        None,
+        profile="gpu-admission",
+        compose_path=output_path,
+    )
+
+    assert expected_detail in {finding.detail for finding in findings}
+
+
+@pytest.mark.parametrize("optional_mounts", ("", "host-git"))
+def test_gpu_admission_validator_requires_shared_runtime_profile(
+    tmp_path: Path, optional_mounts: str
+) -> None:
+    """GPU admission cannot validate without its explicit shared-runtime token."""
+    repo, output_path = generate_gpu_admission_compose(tmp_path)
+    compose = output_path.read_text(encoding="utf-8").replace(
+        'AGENT_CANON_OPTIONAL_MOUNTS: "shared-runtime"',
+        f'AGENT_CANON_OPTIONAL_MOUNTS: "{optional_mounts}"',
+        1,
+    )
+    output_path.write_text(compose, encoding="utf-8")
+
+    module = load_container_config_module()
+    findings = module.validate_generated_compose(
+        repo,
+        None,
+        profile="gpu-admission",
+        compose_path=output_path,
+    )
+
+    assert "gpu-admission-shared-runtime-profile-required" in {
+        finding.detail for finding in findings
+    }
+
+
+def _docker_host_compose_fixture(tmp_path: Path) -> tuple[Path, Path]:
+    """Return a GPU Compose fixture with the canonical docker-host bind selected."""
+    repo, output_path = generate_gpu_admission_compose(tmp_path)
+    compose = output_path.read_text(encoding="utf-8").replace(
+        'AGENT_CANON_OPTIONAL_MOUNTS: "shared-runtime"',
+        'AGENT_CANON_OPTIONAL_MOUNTS: "shared-runtime,docker-host"',
+        1,
+    )
+    compose = compose.replace(
+        '      - type: bind\n        source: "/var/lib/agent-canon/runtime"',
+        '      - /var/run/docker.sock:/var/run/docker.sock\n'
+        '      - type: bind\n        source: "/var/lib/agent-canon/runtime"',
+        1,
+    )
+    output_path.write_text(compose, encoding="utf-8")
+    return repo, output_path
+
+
+def test_docker_host_validator_accepts_canonical_rw_bind(tmp_path: Path) -> None:
+    """Selected docker-host accepts exactly one canonical read-write bind."""
+    repo, output_path = _docker_host_compose_fixture(tmp_path)
+    module = load_container_config_module()
+    findings = module.validate_generated_compose(
+        repo,
+        None,
+        profile="gpu-admission",
+        compose_path=output_path,
+    )
+    assert not any(finding.detail.startswith("docker-host-mount-") for finding in findings)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_detail"),
+    (
+        ("source", "docker-host-mount-source-must-be-canonical"),
+        ("read_only", "docker-host-mount-must-be-read-write"),
+        ("read_only_ro_z", "docker-host-mount-must-be-read-write"),
+        ("read_only_z_ro", "docker-host-mount-must-be-read-write"),
+        ("read_only_string", "docker-host-mount-must-be-read-write"),
+        ("read_only_numeric", "docker-host-mount-must-be-read-write"),
+        ("type", "docker-host-mount-type-must-be-bind"),
+        ("duplicate", "docker-host-mount-count:2"),
+    ),
+)
+def test_docker_host_validator_rejects_socket_bind_tampering(
+    tmp_path: Path, mutation: str, expected_detail: str
+) -> None:
+    """Selected docker-host rejects source, type, read-only, and duplicate tampering."""
+    repo, output_path = _docker_host_compose_fixture(tmp_path)
+    compose = output_path.read_text(encoding="utf-8")
+    if mutation == "source":
+        compose = compose.replace(
+            "      - /var/run/docker.sock:/var/run/docker.sock\n",
+            "      - /tmp/evil.sock:/var/run/docker.sock\n",
+            1,
+        )
+    elif mutation in {"read_only", "read_only_ro_z", "read_only_z_ro"}:
+        mode = {
+            "read_only": "ro",
+            "read_only_ro_z": "ro,Z",
+            "read_only_z_ro": "Z,ro",
+        }[mutation]
+        compose = compose.replace(
+            "      - /var/run/docker.sock:/var/run/docker.sock\n",
+            f"      - /var/run/docker.sock:/var/run/docker.sock:{mode}\n",
+            1,
+        )
+    elif mutation in {"read_only_string", "read_only_numeric"}:
+        read_only_value = '"true"' if mutation == "read_only_string" else "1"
+        compose = compose.replace(
+            "      - /var/run/docker.sock:/var/run/docker.sock\n",
+            '      - type: bind\n        source: "/var/run/docker.sock"\n'
+            '        target: "/var/run/docker.sock"\n'
+            f"        read_only: {read_only_value}\n",
+            1,
+        )
+    elif mutation == "type":
+        compose = compose.replace(
+            "      - /var/run/docker.sock:/var/run/docker.sock\n",
+            '      - type: volume\n        source: "/var/run/docker.sock"\n'
+            '        target: "/var/run/docker.sock"\n',
+            1,
+        )
+    else:
+        compose = compose.replace(
+            "      - /var/run/docker.sock:/var/run/docker.sock\n",
+            "      - /var/run/docker.sock:/var/run/docker.sock\n"
+            "      - /var/run/docker.sock:/var/run/docker.sock\n",
+            1,
+        )
+    output_path.write_text(compose, encoding="utf-8")
+    module = load_container_config_module()
+    findings = module.validate_generated_compose(
+        repo,
+        None,
+        profile="gpu-admission",
+        compose_path=output_path,
+    )
+    assert expected_detail in {finding.detail for finding in findings}
+
+
+def test_generator_docker_host_fails_closed_without_socket(tmp_path: Path) -> None:
+    """Selected docker-host fails before output when the host socket is unavailable."""
+    repo = write_parent_generator_fixture(tmp_path)
+    generator = repo / ".devcontainer/generate-runtime-compose.sh"
+    missing_socket = tmp_path / "missing-docker.sock"
+    generator.write_text(
+        generator.read_text(encoding="utf-8").replace(
+            "if [ ! -S /var/run/docker.sock ]; then",
+            f"if [ ! -S {missing_socket} ]; then",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    generator.chmod(0o755)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "AGENT_CANON_OPTIONAL_MOUNTS": "docker-host",
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "requires an existing Unix socket" in result.stderr
 
 
 def test_default_scenario_rejects_shared_runtime_without_profile_selector(
@@ -727,6 +1047,43 @@ def test_generator_classifies_checkout_layouts(
     assert load_container_config_module().validate_generated_compose(repo, None) == []
 
 
+def test_generator_standalone_projects_host_zshrc_only_when_profile_selected(
+    tmp_path: Path,
+) -> None:
+    """Standalone layout shares the opt-in host zshrc profile contract."""
+    repo = tmp_path / "workspace" / "data_download"
+    write_file(
+        repo,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
+    write_file(repo, ".devcontainer/Dockerfile", DOCKERFILE.read_text(encoding="utf-8"))
+    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    home = tmp_path / "home with spaces"
+    target = write_host_zshrc_symlink(home)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "AGENT_CANON_OPTIONAL_MOUNTS": "host-zshrc",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert f'source: "{target}"' in compose
+    assert 'target: "/home/project/.zshrc"' in compose
+    assert load_container_config_module().validate_generated_compose(repo, None) == []
+
+
 def test_generator_accepts_explicit_output_path(tmp_path: Path) -> None:
     """Generator writes compose output to an explicit caller-provided destination."""
     repo = tmp_path / "workspace" / "topic" / "agent-canon"
@@ -831,6 +1188,8 @@ def write_parent_generator_fixture(
     runtime_shell: str = "/bin/zsh",
     dependency_profile: str = "full",
     runtime_mounts: tuple[str, ...] = (),
+    optional_mount_profiles: tuple[str, ...] = (),
+    linked_data_roots: tuple[tuple[str, str], ...] = (),
     environment_script: str = "",
     environment_variables: tuple[str, ...] = (),
 ) -> Path:
@@ -846,6 +1205,25 @@ def write_parent_generator_fixture(
     variables = ", ".join(json.dumps(item) for item in environment_variables)
     runtime_mounts_line = (
         f"mounts = {json.dumps(list(runtime_mounts))}" if runtime_mounts else ""
+    )
+    optional_mount_profiles_line = (
+        f"optional_mount_profiles = {json.dumps(list(optional_mount_profiles))}"
+        if optional_mount_profiles
+        else ""
+    )
+    linked_data_roots_line = (
+        "linked_data_roots = ["
+        + ", ".join(
+            "{link = "
+            + json.dumps(link)
+            + ", target = "
+            + json.dumps(target)
+            + "}"
+            for link, target in linked_data_roots
+        )
+        + "]"
+        if linked_data_roots
+        else ""
     )
     write_file(
         repo,
@@ -874,6 +1252,8 @@ def write_parent_generator_fixture(
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
                 f'dependency_profile = "{dependency_profile}"',
+                optional_mount_profiles_line,
+                linked_data_roots_line,
                 runtime_mounts_line,
                 "",
             ]
@@ -964,6 +1344,123 @@ def test_load_pack_reads_optional_platform_when_present_or_omitted(
     assert explicit.dependency_profile == "gpu"
 
 
+def test_load_pack_rejects_invalid_optional_profiles(tmp_path: Path) -> None:
+    """Pack optional profiles are typed, known, non-empty, and unique."""
+    cases = (("unknown",), ("",), ("host-git", "host-git"))
+    module = load_container_config_module()
+    for index, profiles in enumerate(cases):
+        repo = write_parent_generator_fixture(
+            tmp_path / str(index), optional_mount_profiles=profiles
+        )
+        pack, findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+        assert pack is None
+        assert findings
+
+    repo = write_parent_generator_fixture(tmp_path / "wrong-type")
+    pack_path = repo / "docker/packs/default.toml"
+    pack_path.write_text(
+        pack_path.read_text(encoding="utf-8")
+        + 'optional_mount_profiles = "host-git"\n',
+        encoding="utf-8",
+    )
+    pack, findings = module.load_pack(repo, pack_path)
+    assert pack is None
+    assert any("optional_mount_profiles" in finding.detail for finding in findings)
+
+
+def test_load_pack_requires_linked_data_profile_and_list_pair(tmp_path: Path) -> None:
+    """Linked data roots require the matching profile in either direction."""
+    module = load_container_config_module()
+    repo = write_parent_generator_fixture(
+        tmp_path / "profile-only", optional_mount_profiles=("linked-data-roots",)
+    )
+    pack, findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack is None
+    assert any("profile-and-list" in finding.detail for finding in findings)
+
+    repo = write_parent_generator_fixture(
+        tmp_path / "empty-list", optional_mount_profiles=("linked-data-roots",)
+    )
+    empty_pack_path = repo / "docker/packs/default.toml"
+    empty_pack_path.write_text(
+        empty_pack_path.read_text(encoding="utf-8")
+        + "linked_data_roots = []\n",
+        encoding="utf-8",
+    )
+    pack, findings = module.load_pack(repo, empty_pack_path)
+    assert pack is None
+    assert any("must-be-non-empty" in finding.detail for finding in findings)
+
+    repo = write_parent_generator_fixture(tmp_path / "list-only")
+    link, target = write_linked_data_root_symlink(repo, tmp_path / "list-only")
+    pack_path = repo / "docker/packs/default.toml"
+    pack_path.write_text(
+        pack_path.read_text(encoding="utf-8")
+        + f'linked_data_roots = [{{link = {json.dumps(link)}, target = "/mnt/l/list-only"}}]\n',
+        encoding="utf-8",
+    )
+    try:
+        pack, findings = module.load_pack(repo, pack_path)
+        assert pack is None
+        assert any("profile-and-list" in finding.detail for finding in findings)
+    finally:
+        shutil.rmtree(target)
+
+
+def test_load_pack_rejects_invalid_linked_data_root_entries(tmp_path: Path) -> None:
+    """Linked root links and targets reject path escapes, broad roots, and duplicates."""
+    module = load_container_config_module()
+    cases = (
+        "absolute-link",
+        "dotdot-link",
+        "regular-file",
+        "broad-target",
+        "punctuated-target",
+        "duplicate",
+    )
+    for case in cases:
+        repo = write_parent_generator_fixture(
+            tmp_path / case, optional_mount_profiles=("linked-data-roots",)
+        )
+        link, target = write_linked_data_root_symlink(repo, tmp_path / case)
+        pack_path = repo / "docker/packs/default.toml"
+        if case == "absolute-link":
+            configured_link = str(repo / link)
+            configured_target = "/mnt/l/absolute"
+            entries = [(configured_link, configured_target)]
+        elif case == "dotdot-link":
+            entries = [("../escape", "/mnt/l/escape")]
+        elif case == "regular-file":
+            (repo / link).unlink()
+            (repo / link).write_text("not a symlink\n", encoding="utf-8")
+            entries = [(link, "/mnt/l/regular")]
+        elif case == "broad-target":
+            entries = [(link, "/mnt/l")]
+        elif case == "punctuated-target":
+            entries = [(link, "/mnt/l/data,part")]
+        else:
+            entries = [(link, "/mnt/l/duplicate"), (link, "/mnt/l/duplicate")]
+        entries_toml = ", ".join(
+            "{link = "
+            + json.dumps(entry_link)
+            + ", target = "
+            + json.dumps(entry_target)
+            + "}"
+            for entry_link, entry_target in entries
+        )
+        pack_path.write_text(
+            pack_path.read_text(encoding="utf-8")
+            + f"linked_data_roots = [{entries_toml}]\n",
+            encoding="utf-8",
+        )
+        try:
+            pack, findings = module.load_pack(repo, pack_path)
+            assert pack is None
+            assert findings
+        finally:
+            shutil.rmtree(target)
+
+
 def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> None:
     """Fresh parent generation creates output state and projects its zsh contract."""
     repo = write_parent_generator_fixture(
@@ -1010,6 +1507,243 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     assert pack_findings == []
     assert pack is not None
     assert module.validate_generated_compose(repo, pack) == []
+
+
+def test_parent_generator_resolves_symlink_host_zshrc(tmp_path: Path) -> None:
+    """A host zshrc symlink binds its canonical regular target read-only."""
+    repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".agent-canon").mkdir()
+    home = tmp_path / "home with spaces"
+    target = write_host_zshrc_symlink(home)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "AGENT_CANON_OPTIONAL_MOUNTS": "host-zshrc",
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".agent-canon/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert f'source: "{target}"' in compose
+    assert 'target: "/home/project/.zshrc"' in compose
+    assert 'target: "/home/project/.zsh"' not in compose
+    module = load_container_config_module()
+    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack_findings == []
+    assert pack is not None
+    assert module.validate_generated_compose(repo, pack) == []
+
+
+def test_parent_generator_rejects_linked_data_roots_target_failures(
+    tmp_path: Path,
+) -> None:
+    """Generator fails closed for missing, file, and canonical-target mismatches."""
+    cases = ("missing", "file", "mismatch")
+    for case in cases:
+        case_root = tmp_path / case
+        repo = write_parent_generator_fixture(
+            case_root,
+            optional_mount_profiles=("linked-data-roots",),
+        )
+        (repo / ".agent-canon").mkdir()
+        link, target = write_linked_data_root_symlink(repo, case_root)
+        if case == "missing":
+            target.rmdir()
+            configured_target = "/mnt/l/missing"
+        elif case == "file":
+            target.rmdir()
+            target.write_text("not a directory\n", encoding="utf-8")
+            configured_target = "/mnt/l/file"
+        else:
+            configured_target = "/mnt/l/mismatch"
+        pack_path = repo / "docker/packs/default.toml"
+        pack_path.write_text(
+            pack_path.read_text(encoding="utf-8")
+            + "linked_data_roots = [{link = "
+            + json.dumps(link)
+            + ", target = "
+            + json.dumps(configured_target)
+            + "}]\n",
+            encoding="utf-8",
+        )
+
+        result = subprocess.run(
+            ["bash", ".devcontainer/generate-runtime-compose.sh"],
+            cwd=repo,
+            env={
+                **os.environ,
+                "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+            },
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 1, result.stdout + result.stderr
+        if case == "missing":
+            assert "must resolve to an existing directory" in result.stderr
+        elif case == "file":
+            assert "must resolve to an existing directory" in result.stderr
+        else:
+            assert "does not match resolved source" in result.stderr
+
+
+def test_generator_rejects_invalid_optional_mount_environment(tmp_path: Path) -> None:
+    """Environment profile input rejects empty, whitespace, unknown, and duplicates."""
+    for index, raw_profiles in enumerate(
+        ("", " ", "host-zshrc,", "host-zshrc, host-git", "unknown", "host-git,host-git")
+    ):
+        repo = write_parent_generator_fixture(tmp_path / str(index))
+        result = subprocess.run(
+            ["bash", ".devcontainer/generate-runtime-compose.sh"],
+            cwd=repo,
+            env={
+                **os.environ,
+                "AGENT_CANON_OPTIONAL_MOUNTS": raw_profiles,
+            },
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 1, result.stdout + result.stderr
+
+
+def test_generator_rejects_empty_selected_linked_data_roots(tmp_path: Path) -> None:
+    """Generator fails closed when linked-data-roots is selected with an empty list."""
+    repo = write_parent_generator_fixture(
+        tmp_path, optional_mount_profiles=("linked-data-roots",)
+    )
+    pack_path = repo / "docker/packs/default.toml"
+    pack_path.write_text(
+        pack_path.read_text(encoding="utf-8") + "linked_data_roots = []\n",
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "AGENT_CANON_OPTIONAL_MOUNTS": "linked-data-roots"},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "non-empty linked_data_roots" in result.stderr
+
+
+def test_validator_requires_pack_for_selected_linked_data_profile(tmp_path: Path) -> None:
+    """A generated linked profile cannot validate without its source pack."""
+    repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".agent-canon").mkdir()
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose_path = repo / ".agent-canon/docker-compose.generated.yml"
+    compose = compose_path.read_text(encoding="utf-8")
+    compose_path.write_text(
+        compose.replace(
+            'AGENT_CANON_OPTIONAL_MOUNTS: ""',
+            'AGENT_CANON_OPTIONAL_MOUNTS: "linked-data-roots"',
+        ),
+        encoding="utf-8",
+    )
+    module = load_container_config_module()
+    findings = module.validate_generated_compose(repo, None)
+    assert any("linked-data-roots-pack-required" in finding.detail for finding in findings)
+
+
+def test_parent_generator_resolves_symlink_host_zsh_directory(tmp_path: Path) -> None:
+    """A host zsh directory symlink binds its canonical directory read-only."""
+    repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".agent-canon").mkdir()
+    home = tmp_path / "home with spaces"
+    target = write_host_zsh_directory_symlink(home)
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "AGENT_CANON_OPTIONAL_MOUNTS": "host-zshrc",
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".agent-canon/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert f'source: "{target}"' in compose
+    assert 'target: "/home/project/.zsh"' in compose
+    assert 'target: "/home/project/.zshrc"' not in compose
+    module = load_container_config_module()
+    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack_findings == []
+    assert pack is not None
+    assert module.validate_generated_compose(repo, pack) == []
+
+
+def test_parent_generator_skips_invalid_optional_host_zsh_paths(
+    tmp_path: Path,
+) -> None:
+    """Missing, broken, and wrong-type optional zsh paths are omitted."""
+    cases = ("missing", "broken-symlink", "directory", "regular-file")
+    for case in cases:
+        case_root = tmp_path / case
+        repo = write_parent_generator_fixture(case_root)
+        (repo / ".agent-canon").mkdir()
+        home = case_root / "home"
+        home.mkdir(parents=True)
+        if case == "broken-symlink":
+            (home / ".zshrc").symlink_to(home / "missing-zshrc")
+            (home / ".zsh").symlink_to(home / "missing-zsh")
+        elif case == "directory":
+            (home / ".zshrc").mkdir()
+        elif case == "regular-file":
+            (home / ".zsh").write_text("# not a directory\n", encoding="utf-8")
+
+        result = subprocess.run(
+            ["bash", ".devcontainer/generate-runtime-compose.sh"],
+            cwd=repo,
+            env={
+                **os.environ,
+                "HOME": str(home),
+                "AGENT_CANON_OPTIONAL_MOUNTS": "host-zshrc",
+                "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+            },
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        assert result.returncode == 0, result.stdout + result.stderr
+        compose = (repo / ".agent-canon/docker-compose.generated.yml").read_text(
+            encoding="utf-8"
+        )
+        assert 'target: "/home/project/.zshrc"' not in compose
+        assert 'target: "/home/project/.zsh"' not in compose
 
 
 def test_parent_generator_disables_unconfigured_parent_environment(
@@ -1398,7 +2132,15 @@ def test_default_generator_omits_all_optional_host_files_and_sockets(
         encoding="utf-8"
     )
     volume_section = compose.split("    environment:", 1)[0]
-    for marker in (".zshrc", "/mnt/git", ".config/gh", "/.ssh", "/ssh-agent", "/mnt/agent-canon-secrets"):
+    for marker in (
+        ".zshrc",
+        "/home/project/.zsh",
+        "/mnt/git",
+        ".config/gh",
+        "/.ssh",
+        "/ssh-agent",
+        "/mnt/agent-canon-secrets",
+    ):
         assert marker not in volume_section
     assert 'AGENT_CANON_RUNTIME_ROUTE: "CONTAINER_LOCAL"' in compose
     assert 'AGENT_CANON_SECRET_MOUNT: "/mnt/agent-canon-secrets"' in compose
@@ -1422,6 +2164,45 @@ def test_generator_rejects_raw_runtime_mounts_before_compose_output(
     )
     assert result.returncode == 1
     assert "rejects raw runtime.mounts" in result.stderr
+
+
+def test_validator_rejects_raw_runtime_mounts(tmp_path: Path) -> None:
+    """The static pack validator rejects raw runtime.mounts as a contract finding."""
+    repo = write_parent_generator_fixture(
+        tmp_path,
+        runtime_mounts=("/var/run/docker.sock:/var/run/docker.sock",),
+    )
+    module = load_container_config_module()
+    pack, findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack is None
+    assert any("runtime.mounts-unsupported-use-optional-profile" in finding.detail for finding in findings)
+
+
+def test_generator_rejects_delimiter_linked_target(tmp_path: Path) -> None:
+    """Generator linked targets reject delimiters unsafe for short Docker binds."""
+    repo = write_parent_generator_fixture(
+        tmp_path,
+        optional_mount_profiles=("linked-data-roots",),
+    )
+    link, _target = write_linked_data_root_symlink(repo, tmp_path)
+    pack_path = repo / "docker/packs/default.toml"
+    pack_path.write_text(
+        pack_path.read_text(encoding="utf-8")
+        + "linked_data_roots = [{link = "
+        + json.dumps(link)
+        + ', target = "/mnt/l/data,part"}]\n',
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env=os.environ.copy(),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "narrow /mnt/<letter> path" in result.stderr
 
 
 def test_generator_rejects_custom_secret_target(tmp_path: Path) -> None:

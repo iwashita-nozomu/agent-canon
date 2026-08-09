@@ -2211,6 +2211,10 @@ class Installer:
         for record_id in plan.order:
             record = by_id[record_id]
             receipt = _receipt_path(receipts, record.id)
+            active_source = (
+                record.method is Method.CARGO_SOURCE_BUILD
+                and record.source_identity == ACTIVE_SOURCE_IDENTITY
+            )
             blockers = tuple(
                 provider
                 for provider in plan.providers_for(record.id)
@@ -2229,7 +2233,13 @@ class Installer:
                     )
                     continue
                 raise error
-            receipt_matches = self._receipt_matches(receipt, plan, record)
+            # Active-source builds are intentionally non-cacheable at this
+            # layer.  Cargo owns incremental change detection for the mounted
+            # source tree, so a dependency receipt must never suppress the
+            # build or carry a source identity derived from Git.
+            receipt_matches = not active_source and self._receipt_matches(
+                receipt, plan, record
+            )
             repair = receipt.exists()
             if receipt_matches:
                 try:
@@ -2259,12 +2269,17 @@ class Installer:
                 source_identity = self.verify(
                     record, workspace=workspace, strict_executables=True
                 )
-                executable_bindings = self._executable_bindings(
-                    record, workspace=workspace
-                )
-                self._write_receipt(
-                    receipt, plan, record, source_identity, executable_bindings
-                )
+                if active_source:
+                    # There is no reusable receipt for an active mounted
+                    # source.  Keep the next startup on the Cargo build path.
+                    receipt.unlink(missing_ok=True)
+                else:
+                    executable_bindings = self._executable_bindings(
+                        record, workspace=workspace
+                    )
+                    self._write_receipt(
+                        receipt, plan, record, source_identity, executable_bindings
+                    )
             except Exception as exc:
                 receipt.unlink(missing_ok=True)
                 unavailable.add(record.id)
@@ -2281,6 +2296,11 @@ class Installer:
     def _receipt_matches(
         path: Path, plan: DependencyPlan, record: DependencyRecord
     ) -> bool:
+        if (
+            record.method is Method.CARGO_SOURCE_BUILD
+            and record.source_identity == ACTIVE_SOURCE_IDENTITY
+        ):
+            return False
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
         except (FileNotFoundError, OSError, json.JSONDecodeError):
@@ -2649,9 +2669,11 @@ class Installer:
             )
         elif method is Method.CARGO_SOURCE_BUILD:
             source = self._cargo_source(record, workspace)
-            source_identity_before = self._cargo_source_identity(
-                record, workspace, source=source
-            )
+            source_identity_before = None
+            if record.commit is not None:
+                source_identity_before = self._cargo_source_identity(
+                    record, workspace, source=source
+                )
             self._run(
                 [
                     "cargo",
@@ -2664,14 +2686,15 @@ class Installer:
                 workspace=workspace,
                 env=self._with_tool_paths({"CARGO_TARGET_DIR": str(source / "target")}),
             )
-            source_identity_after = self._cargo_source_identity(
-                record, workspace, source=source
-            )
-            if source_identity_before != source_identity_after:
-                raise DependencyError(
-                    f"{record.id}: source identity changed during build "
-                    f"{source_identity_before}!={source_identity_after}"
+            if source_identity_before is not None:
+                source_identity_after = self._cargo_source_identity(
+                    record, workspace, source=source
                 )
+                if source_identity_before != source_identity_after:
+                    raise DependencyError(
+                        f"{record.id}: source identity changed during build "
+                        f"{source_identity_before}!={source_identity_after}"
+                    )
         elif method is Method.BROWSER_INSTALL:
             assert record.browser is not None
             assert record.browser_cache_path is not None
@@ -2710,7 +2733,7 @@ class Installer:
     ) -> str | None:
         """Dispatch the record's typed owner-specific live verifier."""
         source_identity = None
-        if record.method is Method.CARGO_SOURCE_BUILD:
+        if record.method is Method.CARGO_SOURCE_BUILD and record.commit is not None:
             source_identity = self._cargo_source_identity(record, workspace)
             if (
                 expected_source_identity is not None
@@ -3081,33 +3104,6 @@ class Installer:
             raise DependencyError(f"{record.id}: cargo source is missing: {source}")
         return source
 
-    def _git_commit(
-        self,
-        repository: Path,
-        revision: str,
-        *,
-        workspace: Path,
-        record_id: str,
-        label: str,
-    ) -> str:
-        """Read one full Git commit identity and fail closed on missing output."""
-        try:
-            result = self.runner.run(
-                ["git", "-C", str(repository), "rev-parse", "--verify", revision],
-                cwd=workspace,
-                capture_output=True,
-            )
-        except (OSError, subprocess.CalledProcessError) as exc:
-            raise DependencyError(
-                f"{record_id}: cannot read {label} identity from {repository}: {exc}"
-            ) from exc
-        value = result.stdout.strip()
-        if COMMIT_RE.fullmatch(value) is None:
-            raise DependencyError(
-                f"{record_id}: {label} identity is not a full commit: {value!r}"
-            )
-        return value.lower()
-
     def _cargo_source_identity(
         self,
         record: DependencyRecord,
@@ -3115,54 +3111,12 @@ class Installer:
         *,
         source: Path | None = None,
     ) -> str:
-        """Resolve the Cargo provider identity selected by the record.
-
-        The active-source selector derives its identity from the checked-out
-        source. In a derived repository, the committed parent gitlink is the
-        provider identity and must equal that source-root identity. No clean
-        tree or unselected source copy is part of this contract.
-        """
+        """Validate and return the Git identity for an explicit commit record."""
         resolved_source = source or self._cargo_source(record, workspace)
-        if record.source_identity == ACTIVE_SOURCE_IDENTITY:
-            workspace_root = workspace.resolve()
-            vendor_root = (workspace_root / "vendor" / "agent-canon").resolve()
-            source_root = (
-                vendor_root
-                if vendor_root.is_dir() and vendor_root in resolved_source.parents
-                else workspace_root
+        if record.commit is None:
+            raise DependencyError(
+                f"{record.id}: active-source records have no Git source identity"
             )
-            source_metadata = source_root / ".git"
-            if not source_metadata.is_file() and not source_metadata.is_dir():
-                raise DependencyError(
-                    f"{record.id}: source-root Git metadata is unavailable: "
-                    f"{source_root}"
-                )
-            source_commit = self._git_commit(
-                source_root,
-                "HEAD",
-                workspace=workspace,
-                record_id=record.id,
-                label="source-root",
-            )
-            if vendor_root.is_dir() and (
-                resolved_source == vendor_root or vendor_root in resolved_source.parents
-            ):
-                provider_commit = self._git_commit(
-                    workspace_root,
-                    "HEAD:vendor/agent-canon",
-                    workspace=workspace,
-                    record_id=record.id,
-                    label="parent gitlink",
-                )
-                if provider_commit != source_commit:
-                    raise DependencyError(
-                        f"{record.id}: provider identity mismatch "
-                        f"{provider_commit}!={source_commit}"
-                    )
-                return provider_commit
-            return source_commit
-
-        assert record.commit is not None
         try:
             result = self.runner.run(
                 [
@@ -3201,7 +3155,8 @@ class Installer:
         spec = record.verification
         assert spec.path is not None and spec.output_contains is not None
         source = self._cargo_source(record, workspace)
-        self._cargo_source_identity(record, workspace, source=source)
+        if record.commit is not None:
+            self._cargo_source_identity(record, workspace, source=source)
         binary = (source / spec.path).resolve()
         if os.path.commonpath((str(source), str(binary))) != str(source):
             raise DependencyError(f"{record.id}: cargo binary escapes source")

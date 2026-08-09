@@ -784,6 +784,15 @@ skill_dependencies:
     successors: []
     order_constraints: []
     parallel_independent: []
+  devcontainer-exec:
+    responsibility_group: runtime
+    required_prerequisites: []
+    routing_candidates:
+    - environment-maintenance
+    - gpu-execution
+    successors: []
+    order_constraints: []
+    parallel_independent: []
   environment-maintenance:
     responsibility_group: delivery
     required_prerequisites:

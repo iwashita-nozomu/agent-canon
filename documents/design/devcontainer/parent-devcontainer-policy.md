@@ -74,18 +74,39 @@ startup、host premise の十分条件を証明したことにはなりません
 
 default generator は parent environment、host credentials、SSH、Docker socket、
 host runtime state を mount しない。host zshrc は `host-zshrc` optional profile が
-明示され、regular file が存在するときだけ追加する。profile が選択されても欠落時は
-同じ default runtime を生成する。
+明示され、regular file または regular fileへ解決する symlink があるときだけ
+`realpath -e` の canonical absolute source から追加する。profile が選択されても
+欠落・broken symlink・型違いでは同じ default runtime を生成する。
 
-- `host-zshrc`: absolute host `~/.zshrc` -> `/home/project/.zshrc` read-only
+- `host-zshrc`: resolved host `~/.zshrc` -> `/home/project/.zshrc` read-only
+  （resolved regular directory `~/.zsh` がある場合は `/home/project/.zsh` も read-only）
 - `host-git`: existing `/mnt/git` -> `/mnt/git`
 - `host-credentials`: existing `~/.config/gh`/`~/.ssh` -> project home read-only
 - `ssh-agent`: valid socket only -> `/ssh-agent`
 - `host-secrets`: existing `AGENT_CANON_SECRET_DIR` -> fixed `/mnt/agent-canon-secrets`
 - `docker-host`: existing Docker socket -> `/var/run/docker.sock`
+- `shared-runtime`: GPU-admission profile only -> canonical shared runtime namespace
+- `linked-data-roots`: pack-defined repository symlinks -> their declared `/mnt/<letter>/<subpath>`
+  targets as structured read-write binds
 
-validator は profile と target の一致、bind type、read-only、fixed secret target を
-静的に確認する。fresh clone / CI runnerのhost fileは必要条件ではない。
+`runtime.optional_mount_profiles` は既知 profile の string array とし、pack内の順序を
+保持します。`AGENT_CANON_OPTIONAL_MOUNTS` は空要素・whitespace・unknown・duplicateを
+拒否する comma list です。生成時の canonical profile union は pack 順を先に置き、環境
+だけに現れる profile を環境順で後置し、pack と環境の重複は pack 側を first-wins とします。
+plain pack と空の環境では host mount は生成しません。
+
+`linked-data-roots` は profile と `runtime.linked_data_roots` inline table array の
+存在を相互必須とします。各 entry は `{link, target}` の二フィールドだけで、`link` は
+normalized repo-relative symlink、`target` は `/mnt/[a-z]/<nonempty-subpath>` です。
+短い Docker bind 表記を安全に構成するため target に `:`、`,` は含めません。
+absolute、empty、`.`、`..`、repo外、非symlink、reserved/broad root、重複 source/target
+は拒否します。generator は `realpath -e` した既存 directory が declared target と
+exact に一致することを確認し、`source == target`、`read_only: false` の structured
+bind だけを出力します。validator は host probe を行わず、typed pack と生成 Compose
+の target/source/type/read-write を照合します。
+
+validator は profile と target の一致、bind type、resolved absolute source、read-only、
+fixed secret target を静的に確認する。fresh clone / CI runnerのhost fileは必要条件ではない。
 `ZDOTDIR`、`.zshenv`、`/etc/project-template/zsh`、parent environment source は
 default shell startup に存在しない。user customization は image-ownedまたは
 `/home/project/.zshrc`だけであり、noninteractive command、sudo、post-create は
@@ -101,8 +122,10 @@ runtime-log ownerが利用するcontainer-local `/home/project/.codex/sessions` 
 指し、host `~/.codex` のmountやfallbackを意味しません。
 `HOME` は dedicated non-root userの `/home/project` であり、zsh startupはoptional
 host zshrcの有無にかかわらずimage-owned startup fileから開始します。
-standalone AgentCanon source layout では host `~/.zshrc`、parent environment mount、
-`HOME`、`ZDOTDIR`、tmpfs を要求せず、pack-derived command だけを生成します。
+standalone AgentCanon source layout でも `host-zshrc` profile は parent layout と同じ
+host `~/.zshrc`/`~/.zsh` optional projectionを使えます。profile未選択時は host
+`~/.zshrc`、parent environment mount、`HOME`、`ZDOTDIR`、tmpfs を要求せず、
+pack-derived command だけを生成します。
 
 Compose の生成先は親レポの `.agent-canon/docker-compose.generated.yml` とする。
 `.agent-canon/` は親レポの実行状態用であり、生成 Compose を追跡対象にしない。
@@ -144,7 +167,7 @@ sudo contractで直接 buildする。standalone generator は `image: ubuntu:22.
 fallbackを生成せず、このDockerfileとbuild argsをComposeに出力する。親repositoryの
 `docker/packs/default.toml` がある場合は親owned Dockerfileのbuildを継続する。
 
-### DEV-DEFAULT-001〜DEV-DEFAULT-008: operation -> resulting state -> completion evidence
+### DEV-DEFAULT-001〜DEV-DEFAULT-011 / DEV-GPU-001〜DEV-GPU-005: operation -> resulting state -> completion evidence
 
 既定の `devcontainer up` は、利用者の host セッションを変更しない
 unprivileged profile とする。`devcontainer.json` の `initializeCommand` は
@@ -164,6 +187,9 @@ absent を正本とする。
 | DEV-DEFAULT-006 | profile boundary、dependency packet、rollback と検証コマンドを owner docs に固定する | 実装者が host bootstrap を復活させずに default/opt-in の責務を判定できる | 本節の DIC trace、dependency-design packet、`container_config.py`/dependency validator/launch smoke の結果を readback する |
 | DEV-DEFAULT-007 | repository path を `managed-topic` または `direct-repo` layout として判定し、layout に対応する mount/status guard を選択する | managed-topic は従来の workspace root bind と topic marker/status guard を保持し、direct-repo は topic marker/status を要求しない | generated env `AGENT_CANON_WORKSPACE_LAYOUT` が layout 名を示し、post-attach が同じ layout を readback する |
 | DEV-DEFAULT-008 | direct-repo では repository root だけを `/workspace/<basename>` に bind し、`devcontainer up --workspace-folder .` を受理する | sibling repository、親 `~/workspace` 全体、topic marker/status を direct default の前提にしない | generated Compose の bind source が exact repo root 一つで、target/env/readback が direct-repo、topic status guard が未実行で起動が完了する |
+| DEV-DEFAULT-009 | pack/env の既知 optional profile を pack 順、環境-only 順で canonical union し、raw `runtime.mounts` を拒否する。`docker-host` は明示選択時だけ existing Unix socket を read-write bind する | plain pack と空の環境は host mount なしで空の selected profile を持ち、直接 runner と generator が同じ順序・拒否規則を共有する。docker socket 欠落時の直接 runner は fail-closed とする | `container_config.py`、`container_runtime.py`、generator、runtime 回帰テストで profile order、raw mount rejection、socket bind/missing、validator の pack readback を確認する |
+| DEV-DEFAULT-010 | `linked-data-roots` 選択時に non-empty inline table array、normalized repo-relative symlink、`realpath -e` の既存 directory、declared target exact match を要求する | generator と直接 runner は source==target の structured read-write bind だけを生成し、missing/file/mismatch、重複、CLI destination collision を fail-closed にする | generator missing/file/mismatch tests、parent-shaped load/run/print-only tests、read-write validator finding で確認する |
+| DEV-DEFAULT-011 | standalone default の未選択 profile と devcontainer-only host zsh projection の境界を保ち、host zshrc/.zsh と linked data を明示選択時だけ評価する | standalone plain default は host-independent で空の optional profileを持ち、host zshrc/.zsh は generator scope、linked data は pack-defined direct-runner scope に限定する | standalone generator/config tests と parent/runtime profile readback が profile未選択時の空 mount および selected scope を示す |
 
 この変更の不足は、従来の linked config が host provisioning と container runtime
 identity を一つの default lifecycle に結合していた点である。host group の存在や
@@ -235,6 +261,9 @@ host の全 supplementary GID を bootstrap receipt から再読し、Compose �
 | DEV-DEFAULT-007 | layout detector and post-attach readback: select managed-topic or direct-repo without changing topic guard semantics | layout env/readback matches source path; a direct repo must not be rejected for missing topic marker, and a managed topic must not bypass its marker/status guard |
 | DEV-DEFAULT-008 | direct-repo mount projection: bind exact repository root to `/workspace/<basename>` and exclude parent workspace/siblings | Compose source/target inspection plus `devcontainer up --workspace-folder .`; any sibling or `~/workspace` bind is a drift blocker |
 | DEV-GPU-001 | Parent-owned `.devcontainer/gpu-admission/devcontainer.json` and `.devcontainer/gpu-admission.sh`: select a distinct config/output/project and bind up/exec to that config | derived parents keep the selector as regular project content and neither the default selector/output/container nor another profile container can be reused | regular selector, selector JSON, exact up/exec commands, output path, project suffix, lifecycle order |
+| DEV-DEFAULT-009 | `.devcontainer/generate-runtime-compose.sh`, `tools/ci/container_runtime.py`, and `tools/ci/container_config.py`: parse canonical optional profiles, reject raw runtime mounts, and resolve explicit `docker-host` socket bind | generator/runtime/config tests show pack-first union, empty plain default, raw-mount rejection, and socket missing/collision failure; a profile order, socket, or bypass mismatch is a drift blocker |
+| DEV-DEFAULT-010 | linked root parser/resolver and direct runner: validate typed list, repo-root symlink ownership, `realpath -e` directory/target equality, and collision-free RW binds | missing/file/mismatch, parent-shape, print-only, and CLI collision tests plus generated Compose readback; any host probe bypass, target mismatch, duplicate, or read-only linked bind is a drift blocker |
+| DEV-DEFAULT-011 | standalone/parent generator profile boundary: keep host zsh projection in generator and linked data in explicit pack/runtime routes | standalone plain output and selected profile tests; default host mount or implicit experiment/runtime profile is a drift blocker |
 | DEV-GPU-002 | `.devcontainer/gpu-admission.sh` and `bootstrap-shared-runtime.sh`: validate host GPU/CLI/capability and publish the provision receipt before Compose | host identity and exact shared-runtime namespace are established or the profile stops | preflight, bootstrap, provision receipt, runtime GID/full group readback |
 | DEV-GPU-003 | `.devcontainer/generate-runtime-compose.sh`: profile branch projects bind, complete `group_add`, `gpus: all`, and receipt environment | profile Compose carries the admitted shared runtime and GPU request; default generation remains disabled and receipt-free | default/opt-in scenario validator and generated Compose readback |
 | DEV-GPU-004 | `.devcontainer/gpu-admission.sh`, source-root resolver, then `.devcontainer/finalize-shared-runtime.sh`: run profile-bound up/exec/finalize and exact profile cleanup on failure | finalize resolves through AgentCanon source, verifies the complete identity/bind/mount contract, and publishes readback; failure cleans only the verified profile project and preserves the original rc | finalize receipt/exit, exact cleanup command/result, original rc; default lifecycle remains without finalize |

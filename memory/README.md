@@ -31,6 +31,7 @@ failure evidence、recurrence decision を検索入力として、必要な reco
 - テストで最小 protocol fixture と実 repository surface を使い分ける判断。
 - runtime archive の publish 後に remote readback まで確認する手順。
 - 欠落 path を作る前に owner と責務を解決する triage。
+- repository symlink の外部解決先を container mount inventory に含める判断。
 
 ## Record Contract
 

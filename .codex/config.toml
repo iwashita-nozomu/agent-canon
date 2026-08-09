@@ -109,6 +109,10 @@ path = "../.agents/skills/dependency-design/SKILL.md"
 enabled = true
 
 [[skills.config]]
+path = "../.agents/skills/devcontainer-exec/SKILL.md"
+enabled = true
+
+[[skills.config]]
 path = "../.agents/skills/environment-maintenance/SKILL.md"
 enabled = true
 

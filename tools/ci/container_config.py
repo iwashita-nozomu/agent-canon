@@ -76,9 +76,11 @@ OPTIONAL_MOUNT_PROFILES = frozenset(
         "host-credentials",
         "ssh-agent",
         "docker-host",
+        "linked-data-roots",
         "shared-runtime",
     }
 )
+LINKED_DATA_TARGET_RE = re.compile(r"/mnt/[a-z]/[^/].*\Z")
 
 
 @dataclass(frozen=True)
@@ -109,6 +111,17 @@ class PackConfig:
     workspace_mount: str
     platform: str | None
     dependency_profile: str
+    optional_mount_profiles: tuple[str, ...]
+    linked_data_roots: tuple[LinkedDataRoot, ...]
+    linked_data_roots_declared: bool
+
+
+@dataclass(frozen=True)
+class LinkedDataRoot:
+    """One repository symlink projected to its declared host data directory."""
+
+    link: str
+    target: str
 
 
 @dataclass(frozen=True)
@@ -204,6 +217,33 @@ def validate_repo_path(
         findings.append(Finding("missing_file", source, f"{field}-missing:{value}"))
 
 
+def is_normalized_repo_relative_link(value: str) -> bool:
+    """Return whether a configured link is a normalized repository-relative path."""
+    path = Path(value)
+    return (
+        bool(value)
+        and not any(ord(char) < 32 for char in value)
+        and not path.is_absolute()
+        and value != "."
+        and value == path.as_posix()
+        and all(part not in {"", ".", ".."} for part in path.parts)
+    )
+
+
+def is_valid_linked_data_target(value: str) -> bool:
+    """Return whether a linked-data target is a narrow, non-root mount path."""
+    path = Path(value)
+    return bool(
+        LINKED_DATA_TARGET_RE.fullmatch(value)
+        and not any(ord(char) < 32 for char in value)
+        and ":" not in value
+        and "," not in value
+        and value == path.as_posix()
+        and all(part not in {"", ".", ".."} for part in path.parts)
+        and value not in {"/mnt", "/mnt/l"}
+    )
+
+
 def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]:
     """Load and validate one runtime pack TOML file."""
     source = path.relative_to(root).as_posix()
@@ -252,14 +292,171 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             Finding("invalid_manifest", source, "pack.platform-must-be-string")
         )
 
+    optional_mount_profiles_value = runtime.get("optional_mount_profiles", ())
+    optional_mount_profiles: tuple[str, ...] = ()
+    if "optional_mount_profiles" in runtime:
+        profile_sequence = as_sequence(optional_mount_profiles_value)
+        if profile_sequence is None or not all(
+            isinstance(item, str) for item in profile_sequence
+        ):
+            findings.append(
+                Finding(
+                    "invalid_manifest",
+                    source,
+                    "runtime.optional_mount_profiles-must-be-string-list",
+                )
+            )
+        else:
+            profiles = tuple(cast(Sequence[str], profile_sequence))
+            seen_profiles: set[str] = set()
+            for profile in profiles:
+                if not profile or profile != profile.strip():
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            "runtime.optional_mount_profiles-empty-or-whitespace",
+                        )
+                    )
+                elif profile not in OPTIONAL_MOUNT_PROFILES:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.optional_mount_profiles-unknown:{profile}",
+                        )
+                    )
+                if profile in seen_profiles:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.optional_mount_profiles-duplicate:{profile}",
+                        )
+                    )
+                seen_profiles.add(profile)
+            optional_mount_profiles = profiles
+
+    linked_data_roots_value = runtime.get("linked_data_roots")
+    linked_data_roots: tuple[LinkedDataRoot, ...] = ()
+    linked_data_roots_present = "linked_data_roots" in runtime
+    if linked_data_roots_present:
+        root_sequence = as_sequence(linked_data_roots_value)
+        if root_sequence is None:
+            findings.append(
+                Finding(
+                    "invalid_manifest",
+                    source,
+                    "runtime.linked_data_roots-must-be-inline-table-array",
+                )
+            )
+        else:
+            parsed_roots: list[LinkedDataRoot] = []
+            seen_links: set[str] = set()
+            seen_targets: set[str] = set()
+            for index, raw_root in enumerate(root_sequence):
+                root_table = as_mapping(raw_root)
+                if root_table is None or set(root_table) != {"link", "target"}:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-entry-{index}-must-have-link-target",
+                        )
+                    )
+                    continue
+                link = root_table.get("link")
+                linked_target = root_table.get("target")
+                if not isinstance(link, str) or not isinstance(linked_target, str):
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-entry-{index}-strings-required",
+                        )
+                    )
+                    continue
+                if not is_normalized_repo_relative_link(link):
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-link-invalid:{link}",
+                        )
+                    )
+                elif not (root / link).is_symlink():
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-link-must-be-symlink:{link}",
+                        )
+                    )
+                if not is_valid_linked_data_target(linked_target):
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-target-invalid:{linked_target}",
+                        )
+                    )
+                if link in seen_links:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-link-duplicate:{link}",
+                        )
+                    )
+                if linked_target in seen_targets:
+                    findings.append(
+                        Finding(
+                            "invalid_manifest",
+                            source,
+                            f"runtime.linked_data_roots-target-duplicate:{linked_target}",
+                        )
+                    )
+                seen_links.add(link)
+                seen_targets.add(linked_target)
+                parsed_roots.append(LinkedDataRoot(link=link, target=linked_target))
+            linked_data_roots = tuple(parsed_roots)
+    if ("linked-data-roots" in optional_mount_profiles) != linked_data_roots_present:
+        findings.append(
+            Finding(
+                "invalid_manifest",
+                source,
+                "runtime.linked-data-roots-profile-and-list-must-match",
+            )
+        )
+    if "linked-data-roots" in optional_mount_profiles and not linked_data_roots:
+        findings.append(
+            Finding(
+                "invalid_manifest",
+                source,
+                "runtime.linked_data_roots-must-be-non-empty-when-selected",
+            )
+        )
+
     for table, key, section in (
         (smoke, "commands", "smoke"),
         (runtime, "env", "runtime"),
-        (runtime, "mounts", "runtime"),
     ):
         _, finding = require_string_list(table, key, source, section)
         if finding is not None:
             findings.append(finding)
+    runtime_mounts, mounts_finding = require_string_list(
+        runtime, "mounts", source, "runtime"
+    )
+    if mounts_finding is not None:
+        findings.append(mounts_finding)
+    elif runtime_mounts:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                source,
+                "runtime.mounts-unsupported-use-optional-profile",
+            )
+        )
     workdir = runtime.get("workdir", "/workspace")
     workspace_mount = runtime.get("workspace_mount", "/workspace")
     shell = runtime.get("shell", "/bin/bash")
@@ -305,6 +502,7 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             )
         )
         dependency_profile = DEFAULT_DEPENDENCY_PROFILE
+    pack_shell = shell if isinstance(shell, str) else "/bin/bash"
 
     validate_repo_path(root, source, "dockerfile", dockerfile, findings)
     validate_repo_path(root, source, "context", context, findings)
@@ -318,11 +516,14 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             context=context,
             image_tag=image_tag,
             target=target,
-            shell=shell,
+            shell=pack_shell,
             workdir=workdir,
             workspace_mount=workspace_mount,
             platform=platform,
             dependency_profile=dependency_profile,
+            optional_mount_profiles=optional_mount_profiles,
+            linked_data_roots=linked_data_roots,
+            linked_data_roots_declared=linked_data_roots_present,
         ),
         [],
     )
@@ -647,16 +848,17 @@ def parse_parent_environment_manifest(path: Path) -> tuple[tuple[str, ...], list
     try:
         with path.open("rb") as handle:
             data = tomllib.load(handle)
-    except (OSError, tomllib.TOMLDecodeError) as exc:
-        return (), [f"toml-decode:{exc}"]
+    except (OSError, tomllib.TOMLDecodeError):
+        return (), ["toml-decode:invalid-or-unreadable-file"]
     if set(data) != {"variables"}:
         return (), ["toml-keys-must-be-variables-only"]
     variables = data.get("variables")
-    if not isinstance(variables, list) or not all(
-        isinstance(item, str) for item in variables
-    ):
+    if not isinstance(variables, list):
         return (), ["variables-must-be-string-list"]
-    names = cast(list[str], variables)
+    variable_values = cast(list[object], variables)
+    if not all(isinstance(item, str) for item in variable_values):
+        return (), ["variables-must-be-string-list"]
+    names = cast(list[str], variable_values)
     findings: list[str] = []
     seen: set[str] = set()
     for name in names:
@@ -883,7 +1085,8 @@ def validate_generated_compose(
         if volume is not None:
             return volume.get("read_only") is True
         if isinstance(raw_volume, str):
-            return raw_volume.rsplit(":", 1)[-1] == "ro"
+            options = raw_volume.rsplit(":", 1)[-1].split(",")
+            return "ro" in options
         return False
 
     def volume_type(raw_volume: object) -> str | None:
@@ -905,12 +1108,26 @@ def validate_generated_compose(
         if environment is not None
         else ""
     )
-    optional_mounts = (
-        optional_mounts_value if isinstance(optional_mounts_value, str) else ""
-    )
-    optional_tokens_list = [
-        token.strip() for token in optional_mounts.split(",") if token.strip()
-    ]
+    optional_mounts = optional_mounts_value if isinstance(optional_mounts_value, str) else ""
+    optional_tokens_list: list[str] = []
+    if not isinstance(optional_mounts_value, str):
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "optional-mount-profile-source-must-be-string",
+            )
+        )
+    elif optional_mounts:
+        optional_tokens_list = optional_mounts.split(",")
+        if any(not token or token != token.strip() or re.search(r"\s", token) for token in optional_tokens_list):
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "optional-mount-profile-empty-or-whitespace",
+                )
+            )
     optional_tokens = set(optional_tokens_list)
     supported_optional_mounts = OPTIONAL_MOUNT_PROFILES
     if profile != "gpu-admission":
@@ -923,12 +1140,50 @@ def validate_generated_compose(
                 f"optional-mount-profile-unsupported:{token}",
             )
         )
+    if profile == "gpu-admission" and "shared-runtime" not in optional_tokens:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "gpu-admission-shared-runtime-profile-required",
+            )
+        )
     if len(optional_tokens_list) != len(optional_tokens):
         findings.append(
             Finding(
                 "dependency_contract_violation",
                 relative,
                 "optional-mount-profile-duplicate",
+            )
+        )
+    if pack is not None:
+        expected_profiles = list(pack.optional_mount_profiles)
+        expected_profiles.extend(
+            token for token in optional_tokens_list if token not in expected_profiles
+        )
+        if optional_tokens_list != expected_profiles:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "optional-mount-profile-canonical-union",
+                )
+            )
+    linked_profile_selected = "linked-data-roots" in optional_tokens
+    if pack is not None and linked_profile_selected != pack.linked_data_roots_declared:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "linked-data-roots-profile-and-list-must-match",
+            )
+        )
+    elif pack is None and linked_profile_selected:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                "linked-data-roots-pack-required",
             )
         )
     workspace_layout = (
@@ -947,9 +1202,7 @@ def validate_generated_compose(
                 "workspace-layout-environment-required",
             )
         )
-    elif expected_workspace_layout is not None and (
-        workspace_layout != expected_workspace_layout
-    ):
+    elif workspace_layout != expected_workspace_layout:
         findings.append(
             Finding(
                 "inconsistency",
@@ -1132,6 +1385,45 @@ def validate_generated_compose(
                     "gpu-admission-runtime-mount-type-must-be-bind",
                 )
             )
+        else:
+            runtime_source, runtime_target = volume_fields(runtime_mounts[0])
+            if runtime_source != "/var/lib/agent-canon/runtime":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "gpu-admission-runtime-mount-source-must-be-canonical",
+                    )
+                )
+            if runtime_target != "/var/lib/agent-canon/runtime":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "gpu-admission-runtime-mount-target-must-be-canonical",
+                    )
+                )
+            runtime_volume = as_mapping(runtime_mounts[0])
+            if runtime_volume is not None:
+                if (
+                    "read_only" in runtime_volume
+                    and runtime_volume.get("read_only") is not False
+                ):
+                    findings.append(
+                        Finding(
+                            "dependency_contract_violation",
+                            relative,
+                            "gpu-admission-runtime-mount-must-be-read-write",
+                        )
+                    )
+            elif volume_is_read_only(runtime_mounts[0]):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "gpu-admission-runtime-mount-must-be-read-write",
+                    )
+                )
     if parent_layout or "host-zshrc" in optional_tokens:
         zshrc_matches = [
             raw_volume
@@ -1160,15 +1452,12 @@ def validate_generated_compose(
                     )
                 )
             source, _ = volume_fields(host_zshrc)
-            if not isinstance(source, str) or (
-                source != "${HOME}/.zshrc"
-                and (not source.startswith("/") or not source.endswith("/.zshrc"))
-            ):
+            if not isinstance(source, str) or not Path(source).is_absolute():
                 findings.append(
                     Finding(
                         "dependency_contract_violation",
                         relative,
-                        "host-zshrc-source-must-be-absolute-zshrc",
+                        "host-zshrc-source-must-be-resolved-absolute-file",
                     )
                 )
             if not volume_is_read_only(host_zshrc):
@@ -1177,6 +1466,45 @@ def validate_generated_compose(
                         "dependency_contract_violation",
                         relative,
                         "host-zshrc-mount-read-only",
+                    )
+                )
+        zsh_matches = [
+            raw_volume
+            for raw_volume in volumes
+            if volume_fields(raw_volume)[1] == "/home/project/.zsh"
+        ]
+        for host_zsh in zsh_matches:
+            source, target = volume_fields(host_zsh)
+            if target != "/home/project/.zsh":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zsh-target-must-be-/home/project/.zsh",
+                    )
+                )
+            if volume_type(host_zsh) != "bind":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zsh-mount-type-must-be-bind",
+                    )
+                )
+            if not isinstance(source, str) or not Path(source).is_absolute():
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zsh-source-must-be-resolved-absolute-directory",
+                    )
+                )
+            if not volume_is_read_only(host_zsh):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "host-zsh-mount-read-only",
                     )
                 )
         if not isinstance(service_user, str) or re.fullmatch(r"[1-9][0-9]*:[1-9][0-9]*", service_user) is None:
@@ -1240,9 +1568,140 @@ def validate_generated_compose(
                         "root-home-mount-forbidden",
                     )
                 )
+    linked_targets: set[str] = set()
+    if pack is not None:
+        linked_targets = {linked_root.target for linked_root in pack.linked_data_roots}
+    if linked_profile_selected and pack is not None:
+        linked_mounts = [
+            raw_volume
+            for raw_volume in volumes
+            if volume_fields(raw_volume)[1] in linked_targets
+        ]
+        seen_linked_sources: set[str] = set()
+        seen_linked_targets: set[str] = set()
+        for linked_root in pack.linked_data_roots:
+            matches = [
+                raw_volume
+                for raw_volume in linked_mounts
+                if volume_fields(raw_volume)[1] == linked_root.target
+            ]
+            if len(matches) != 1:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-mount-count:{linked_root.target}",
+                    )
+                )
+                continue
+            linked_mount = matches[0]
+            source, target = volume_fields(linked_mount)
+            if source != linked_root.target or target != linked_root.target:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-source-target-mismatch:{linked_root.target}",
+                    )
+                )
+            if volume_type(linked_mount) != "bind":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-mount-type-must-be-bind:{linked_root.target}",
+                    )
+                )
+            volume = as_mapping(linked_mount)
+            if volume is None or volume.get("read_only") is not False:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-mount-must-be-read-write:{linked_root.target}",
+                    )
+                )
+            if isinstance(source, str) and source in seen_linked_sources:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-source-duplicate:{source}",
+                    )
+                )
+            if isinstance(target, str) and target in seen_linked_targets:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        f"linked-data-root-target-duplicate:{target}",
+                    )
+                )
+            if isinstance(source, str):
+                seen_linked_sources.add(source)
+            if isinstance(target, str):
+                seen_linked_targets.add(target)
+    docker_host_mounts = [
+        raw_volume
+        for raw_volume in volumes
+        if volume_fields(raw_volume)[1] == "/var/run/docker.sock"
+    ]
+    if "docker-host" in optional_tokens:
+        if len(docker_host_mounts) != 1:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    f"docker-host-mount-count:{len(docker_host_mounts)}",
+                )
+            )
+        else:
+            docker_host_mount = docker_host_mounts[0]
+            docker_source, docker_target = volume_fields(docker_host_mount)
+            if docker_source != "/var/run/docker.sock":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "docker-host-mount-source-must-be-canonical",
+                    )
+                )
+            if docker_target != "/var/run/docker.sock":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "docker-host-mount-target-must-be-canonical",
+                    )
+                )
+            docker_volume = as_mapping(docker_host_mount)
+            if docker_volume is not None and volume_type(docker_host_mount) != "bind":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "docker-host-mount-type-must-be-bind",
+                    )
+                )
+            malformed_read_only = (
+                docker_volume is not None
+                and "read_only" in docker_volume
+                and docker_volume.get("read_only") is not False
+            )
+            if malformed_read_only or (
+                docker_volume is None and volume_is_read_only(docker_host_mount)
+            ):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "docker-host-mount-must-be-read-write",
+                    )
+                )
     allowed_targets = {"/workspace", repo_target}
     if "host-zshrc" in optional_tokens:
         allowed_targets.add("/home/project/.zshrc")
+        allowed_targets.add("/home/project/.zsh")
     if profile == "gpu-admission":
         allowed_targets.add("/var/lib/agent-canon/runtime")
     if "host-git" in optional_tokens:
@@ -1255,6 +1714,8 @@ def validate_generated_compose(
         allowed_targets.add("/ssh-agent")
     if "docker-host" in optional_tokens:
         allowed_targets.add("/var/run/docker.sock")
+    if linked_profile_selected:
+        allowed_targets.update(linked_targets)
     for raw_volume in volumes:
         source, target = volume_fields(raw_volume)
         if target not in allowed_targets:
@@ -1372,6 +1833,69 @@ def validate_generated_compose(
                             f"gpu-admission-environment:{name}",
                         )
                     )
+            runtime_gid_value = environment.get("AGENT_CANON_RUNTIME_GID")
+            runtime_gid_valid = isinstance(runtime_gid_value, str) and re.fullmatch(
+                r"[1-9][0-9]*", runtime_gid_value
+            ) is not None
+            if not runtime_gid_valid:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "gpu-admission-runtime-gid-must-be-positive-integer",
+                    )
+                )
+
+            host_groups_value = environment.get("AGENT_CANON_HOST_SUPPLEMENTARY_GIDS")
+            host_group_values: tuple[str, ...] = ()
+            host_groups_valid = False
+            if isinstance(host_groups_value, str):
+                host_group_values = tuple(host_groups_value.split())
+                if not host_group_values:
+                    findings.append(
+                        Finding(
+                            "dependency_contract_violation",
+                            relative,
+                            "gpu-admission-host-supplementary-gids-required",
+                        )
+                    )
+                elif any(
+                    re.fullmatch(r"[1-9][0-9]*", value) is None
+                    for value in host_group_values
+                ):
+                    findings.append(
+                        Finding(
+                            "dependency_contract_violation",
+                            relative,
+                            "gpu-admission-host-supplementary-gids-must-be-positive-integers",
+                        )
+                    )
+                elif len(set(host_group_values)) != len(host_group_values):
+                    findings.append(
+                        Finding(
+                            "dependency_contract_violation",
+                            relative,
+                            "gpu-admission-host-supplementary-gids-must-be-unique",
+                        )
+                    )
+                else:
+                    host_groups_valid = True
+            else:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "gpu-admission-host-supplementary-gids-required",
+                    )
+                )
+            if runtime_gid_valid and host_groups_valid and runtime_gid_value not in host_group_values:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "gpu-admission-runtime-gid-must-be-in-host-supplementary-gids",
+                    )
+                )
         for name, expected in required_environment.items():
             if name not in environment:
                 findings.append(

@@ -1232,18 +1232,18 @@ class RouteToolTest(unittest.TestCase):
         self.assertIsNone(decision.visualization_tool_call)
 
     def test_code_visualization_small_model_route_is_exact_and_early(self) -> None:
-        """The runtime skill exposes the exact renderer route before generic guidance."""
+        """The canonical owner exposes the exact renderer route."""
         runtime_text = (
             PROJECT_ROOT / ".agents" / "skills" / "code-visualization" / "SKILL.md"
         ).read_text(encoding="utf-8")
-        direct_start = runtime_text.index("## Small-Model Direct Route")
-        canonical_read = runtime_text.index(
-            "1. Read `agents/skills/code-visualization.md`."
-        )
-        generic_tree = runtime_text.index("1. Infer the context question")
-        direct_text = runtime_text[direct_start:canonical_read]
-        self.assertLess(direct_start, canonical_read)
-        self.assertLess(canonical_read, generic_tree)
+        self.assertIn("Canonical workflow and policy", runtime_text)
+        canonical_text = (
+            PROJECT_ROOT / "agents" / "skills" / "code-visualization.md"
+        ).read_text(encoding="utf-8")
+        direct_start = canonical_text.index("## Source Evidence Routes")
+        renderer_choice = canonical_text.index("## Renderer Choice")
+        direct_text = canonical_text[direct_start:renderer_choice]
+        self.assertLess(direct_start, renderer_choice)
         for command in (
             "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
             "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
@@ -1252,7 +1252,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("<path>", direct_text)
         self.assertNotIn("<provided-path>", direct_text)
         self.assertIn(
-            "--scope changed` only when the request explicitly asks for changed scope",
+            "Use this exact changed-scope command only when changed scope is explicit",
             direct_text,
         )
         self.assertIn("`--json` is invalid", direct_text)
@@ -1738,6 +1738,54 @@ class RouteToolTest(unittest.TestCase):
             decision["active_skills"].index("dependency-design"),
             decision["active_skills"].index("environment-maintenance"),
         )
+
+    def test_devcontainer_exec_routes_existing_container_only(self) -> None:
+        """Existing-container exec prompts must avoid maintenance routes."""
+        result = self.run_route(
+            "--prompt",
+            "devcontainer exec --workspace-folder . zsh これで行けるっしょ？",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("devcontainer-exec", decision["matched_skills"])
+        self.assertIn("devcontainer-exec", decision["active_skills"])
+        self.assertNotIn("environment-maintenance", decision["matched_skills"])
+        self.assertNotIn("environment-maintenance", decision["active_skills"])
+        self.assertNotIn("dependency-design", decision["matched_skills"])
+        self.assertNotIn("dependency-design", decision["active_skills"])
+
+    def test_devcontainer_maintenance_terms_still_route_maintenance(self) -> None:
+        """Devcontainer configuration/build prompts retain maintenance routing."""
+        result = self.run_route(
+            "--prompt",
+            "devcontainer configuration build update",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("environment-maintenance", decision["matched_skills"])
+        self.assertIn("environment-maintenance", decision["active_skills"])
+        self.assertNotIn("devcontainer-exec", decision["matched_skills"])
+
+    def test_japanese_existing_container_test_prompt_routes_exec(self) -> None:
+        """Japanese existing-container test prompts activate devcontainer-exec."""
+        result = self.run_route(
+            "--prompt",
+            "コンテナ内に一時的に入ってテストすれば？",
+            "--format",
+            "json",
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        decision = json.loads(result.stdout)
+        self.assertIn("devcontainer-exec", decision["matched_skills"])
+        self.assertIn("devcontainer-exec", decision["active_skills"])
+        self.assertNotIn("environment-maintenance", decision["matched_skills"])
 
     def test_prompt_does_not_route_ordinary_url_or_report_text_to_runtime_log_repair(
         self,

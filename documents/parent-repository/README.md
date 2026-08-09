@@ -147,11 +147,23 @@ post-attach / Compose generator の有無と内容は親の environment contract
   mounted dependency の導入にだけ使い、host sudo、host password prompt、host group
   mutation は要求しない。
 - 親の default pack が zsh を選ぶ場合、generator は pack の `runtime.shell` を
-  process boundary とし、regular fileであるhost `${HOME}/.zshrc` expressionだけを
-  dedicated non-root homeへread-only mountする。欠落時はmountを省略し、parent
-  environment pairが有効な場合だけそのshell sourceをread-only mountする。validator
-  は各source expression、bind type、non-root target、read-onlyを静的に確認する。
-  zsh startupとfresh CIはhost zshrcの有無に依存せず、代替pathは探索しない。
+  process boundary とし、`host-zshrc` profile が明示された場合だけ、resolved regular
+  fileであるhost `${HOME}/.zshrc` と resolved regular directoryである `${HOME}/.zsh`
+  を canonical sourceからdedicated non-root homeへread-only mountする。欠落・broken
+  symlink・型違いはmountを省略し、validatorはresolved absolute source、bind type、
+  non-root target、read-onlyを静的に確認する。zsh startupとfresh CIはhost
+  zshrc/zsh directoryの有無に依存せず、代替pathは探索しない。
+- packの `optional_mount_profiles` と環境 `AGENT_CANON_OPTIONAL_MOUNTS` は、pack順を
+  優先したcanonical unionで選択される。`linked-data-roots` は pack-defined inline
+  table の repository symlinkを `realpath -e` で確認し、declared `/mnt/<letter>/...`
+  targetと一致する既存directoryだけを `read_only: false` の structured bindとして
+  投影する。absolute/escape/non-symlink、broad root、重複 source/target、raw
+  `runtime.mounts` は拒否し、plain pack/envではhost mountを生成しない。
+
+直接 pack runner は `linked-data-roots` または `docker-host` を明示選択した pack に限って
+それぞれの bind を適用し、host zshrc/.zsh など generator 専用の profile を暗黙に再現
+しません。`docker-host` の socket が欠落する場合や CLI mount が linked/docker target を
+上書きする場合は fail-closed です。
 
 この分離により、active root view の更新と親プロジェクトの hook / build 設定を
 別々に review でき、親固有の変更が AgentCanon source の pin を汚染しません。

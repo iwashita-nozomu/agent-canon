@@ -15,6 +15,7 @@ import re
 import shlex
 import shutil
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import cast
@@ -44,6 +45,7 @@ HOST_SSH_DIR = Path.home() / ".ssh"
 BUILDER_INFO_TIMEOUT_SECONDS = 15
 HOST_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
 CONTAINER_RUNTIME_ROOT = "/var/lib/agent-canon/runtime"
+DOCKER_HOST_SOCKET = Path("/var/run/docker.sock")
 RUNTIME_GROUP_NAME = "agent-canon-runtime"
 PROCESS_UMASK = 0o0007
 DIRECTORY_MODE = 0o2770
@@ -55,6 +57,18 @@ RUNTIME_ROUTE = "MANAGED_CONTAINER"
 DEPENDENCY_PROFILE_ENV = "AGENT_CANON_DEPENDENCY_PROFILE"
 DEFAULT_DEPENDENCY_PROFILE = "full"
 DEPENDENCY_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+OPTIONAL_MOUNT_PROFILES = frozenset(
+    {
+        "host-zshrc",
+        "host-git",
+        "host-secrets",
+        "host-credentials",
+        "ssh-agent",
+        "docker-host",
+        "linked-data-roots",
+    }
+)
+LINKED_DATA_TARGET_RE = re.compile(r"/mnt/[a-z]/[^/].*\Z")
 
 
 @dataclass(frozen=True)
@@ -76,6 +90,17 @@ class RuntimeSpec:
     mounts: tuple[str, ...] = ()
     gpus: str | None = None
     dependency_profile: str = DEFAULT_DEPENDENCY_PROFILE
+    optional_mount_profiles: tuple[str, ...] = ()
+    linked_data_roots: tuple[LinkedDataRoot, ...] = ()
+    linked_data_roots_declared: bool = False
+
+
+@dataclass(frozen=True)
+class LinkedDataRoot:
+    """Describe one repository symlink and its exact declared data target."""
+
+    link: str
+    target: str
 
 
 @dataclass(frozen=True)
@@ -253,6 +278,230 @@ def require_string_list(
     return tuple(cast("list[str]", value_items))
 
 
+def _is_normalized_link(value: str) -> bool:
+    """Return whether a pack link is normalized and repository-relative."""
+    path = Path(value)
+    return (
+        bool(value)
+        and not any(ord(char) < 32 for char in value)
+        and not path.is_absolute()
+        and value != "."
+        and value == path.as_posix()
+        and all(part not in {"", ".", ".."} for part in path.parts)
+    )
+
+
+def _is_linked_target(value: str) -> bool:
+    """Return whether a linked data target is a narrow /mnt mount path."""
+    path = Path(value)
+    return bool(
+        LINKED_DATA_TARGET_RE.fullmatch(value)
+        and not any(ord(char) < 32 for char in value)
+        and ":" not in value
+        and "," not in value
+        and value == path.as_posix()
+        and all(part not in {"", ".", ".."} for part in path.parts)
+        and value not in {"/mnt", "/mnt/l"}
+    )
+
+
+def _parse_optional_mount_profiles(
+    runtime_section: dict[str, object], source: Path
+) -> tuple[str, ...]:
+    """Parse and validate the pack-declared optional profile order."""
+    value = runtime_section.get("optional_mount_profiles", [])
+    if not isinstance(value, list):
+        raise ValueError(f"{source}: [runtime].optional_mount_profiles must be a string array")
+    profile_values = cast(list[object], value)
+    if not all(isinstance(item, str) for item in profile_values):
+        raise ValueError(f"{source}: [runtime].optional_mount_profiles must be a string array")
+    profiles = tuple(cast(list[str], profile_values))
+    seen: set[str] = set()
+    for profile in profiles:
+        if not profile or profile != profile.strip():
+            raise ValueError(
+                f"{source}: [runtime].optional_mount_profiles cannot contain empty or whitespace entries"
+            )
+        if profile not in OPTIONAL_MOUNT_PROFILES:
+            raise ValueError(
+                f"{source}: [runtime].optional_mount_profiles contains unknown profile: {profile}"
+            )
+        if profile in seen:
+            raise ValueError(
+                f"{source}: [runtime].optional_mount_profiles contains duplicate profile: {profile}"
+            )
+        seen.add(profile)
+    return profiles
+
+
+def _parse_linked_data_roots(
+    runtime_section: dict[str, object], source: Path
+) -> tuple[tuple[LinkedDataRoot, ...], bool]:
+    """Parse typed linked roots without probing their runtime targets."""
+    declared = "linked_data_roots" in runtime_section
+    value = runtime_section.get("linked_data_roots", [])
+    if not declared:
+        return (), False
+    if not isinstance(value, list):
+        raise ValueError(
+            f"{source}: [runtime].linked_data_roots must be an inline table array"
+        )
+    if not value:
+        raise ValueError(
+            f"{source}: [runtime].linked_data_roots must be non-empty when selected"
+        )
+    # A pack is stored at ``<repo>/docker/packs/<name>.toml``.  Resolve links
+    # against the repository root rather than the intermediate ``docker``
+    # directory; parent/derived checkouts use the same layout.
+    pack_root = source.parent.parent.parent
+    roots: list[LinkedDataRoot] = []
+    seen_links: set[str] = set()
+    seen_targets: set[str] = set()
+    items = cast(list[object], value)
+    for index, item in enumerate(items):
+        if not isinstance(item, dict):
+            raise ValueError(
+                f"{source}: linked_data_roots entry {index} must contain only link and target"
+            )
+        item_map = cast(dict[str, object], item)
+        if set(item_map) != {"link", "target"}:
+            raise ValueError(
+                f"{source}: linked_data_roots entry {index} must contain only link and target"
+            )
+        link = item_map.get("link")
+        target = item_map.get("target")
+        if not isinstance(link, str) or not isinstance(target, str):
+            raise ValueError(
+                f"{source}: linked_data_roots entry {index} requires string link and target"
+            )
+        if not _is_normalized_link(link):
+            raise ValueError(f"{source}: linked_data_roots link is invalid: {link}")
+        if not (pack_root / link).is_symlink():
+            raise ValueError(f"{source}: linked_data_roots link must be a symlink: {link}")
+        if not _is_linked_target(target):
+            raise ValueError(f"{source}: linked_data_roots target is invalid: {target}")
+        if link in seen_links or target in seen_targets:
+            raise ValueError(f"{source}: linked_data_roots links and targets must be unique")
+        seen_links.add(link)
+        seen_targets.add(target)
+        roots.append(LinkedDataRoot(link=link, target=target))
+    return tuple(roots), True
+
+
+def _canonical_optional_mount_profiles(pack: ContainerPack) -> tuple[str, ...]:
+    """Return pack-first optional profiles plus strict environment-only additions."""
+    env_name = "AGENT_CANON_OPTIONAL_MOUNTS"
+    env_profiles: tuple[str, ...] = ()
+    if env_name in os.environ:
+        raw = os.environ[env_name]
+        if not raw:
+            raise ValueError("AGENT_CANON_OPTIONAL_MOUNTS cannot be empty")
+        values = raw.split(",")
+        if any(not value or value != value.strip() or any(char.isspace() for char in value) for value in values):
+            raise ValueError("AGENT_CANON_OPTIONAL_MOUNTS cannot contain empty or whitespace entries")
+        seen: set[str] = set()
+        for profile in values:
+            if profile not in OPTIONAL_MOUNT_PROFILES:
+                raise ValueError(f"AGENT_CANON_OPTIONAL_MOUNTS contains unknown profile: {profile}")
+            if profile in seen:
+                raise ValueError(f"AGENT_CANON_OPTIONAL_MOUNTS contains duplicate profile: {profile}")
+            seen.add(profile)
+        env_profiles = tuple(values)
+    profiles = list(pack.runtime.optional_mount_profiles)
+    profiles.extend(profile for profile in env_profiles if profile not in profiles)
+    return tuple(profiles)
+
+
+def resolve_linked_data_mounts(
+    pack: ContainerPack,
+    workspace_root: Path,
+    *,
+    resolve_path: Callable[[Path], Path] | None = None,
+) -> tuple[str, ...]:
+    """Resolve selected linked roots to exact read-write Docker bind strings."""
+    profiles = _canonical_optional_mount_profiles(pack)
+    selected = "linked-data-roots" in profiles
+    if selected != pack.runtime.linked_data_roots_declared:
+        raise ValueError("linked-data-roots profile and linked_data_roots list must match")
+    if not selected:
+        return ()
+    if not pack.runtime.linked_data_roots:
+        raise ValueError("linked-data-roots profile requires a non-empty linked_data_roots list")
+    resolver: Callable[[Path], Path] = resolve_path or (
+        lambda path: path.resolve(strict=True)
+    )
+    mounts: list[str] = []
+    seen_sources: set[str] = set()
+    seen_targets: set[str] = set()
+    for linked_root in pack.runtime.linked_data_roots:
+        source_path = workspace_root / linked_root.link
+        try:
+            resolved = resolver(source_path)
+        except FileNotFoundError as exc:
+            raise ValueError(
+                f"linked_data_roots source does not resolve: {linked_root.link}"
+            ) from exc
+        if not resolved.is_dir():
+            raise ValueError(
+                f"linked_data_roots source must resolve to an existing directory: {linked_root.link}"
+            )
+        resolved_text = str(resolved)
+        if resolved_text != linked_root.target:
+            raise ValueError(
+                f"linked_data_roots target does not match resolved source: {linked_root.link}"
+            )
+        if resolved_text in seen_sources or linked_root.target in seen_targets:
+            raise ValueError("linked_data_roots sources and targets must be unique")
+        seen_sources.add(resolved_text)
+        seen_targets.add(linked_root.target)
+        mounts.append(f"{resolved_text}:{linked_root.target}")
+    return tuple(mounts)
+
+
+def resolve_docker_host_mounts(
+    *, socket_path: Path = DOCKER_HOST_SOCKET
+) -> tuple[str, ...]:
+    """Resolve the explicit docker-host profile to one read-write socket bind."""
+    if not socket_path.exists() or not socket_path.is_socket():
+        raise ValueError(
+            f"docker-host profile requires an existing Unix socket: {socket_path}"
+        )
+    return (f"{socket_path}:/var/run/docker.sock",)
+
+
+def _mount_destination(mount: str) -> str | None:
+    """Extract a Docker bind destination from short or ``--mount`` syntax."""
+    long_keys = {"type", "source", "src", "target", "dst", "destination"}
+    fields = mount.split(",")
+    first_key = fields[0].partition("=")[0]
+    long_form = first_key in long_keys or any(
+        field.partition("=")[0] in long_keys for field in fields[1:]
+    )
+    if long_form:
+        for field in fields:
+            key, separator, value = field.partition("=")
+            if separator and key in {"target", "dst", "destination"}:
+                return value
+        raise ValueError(
+            "unsupported long Docker mount syntax; target, dst, or destination is required"
+        )
+    parts = mount.split(":")
+    if len(parts) >= 2:
+        return parts[1]
+    return None
+
+
+def _normalized_mount_destination(mount: str) -> Path | None:
+    """Return an absolute, lexical destination for overlap checks."""
+    destination = _mount_destination(mount)
+    if destination is None:
+        return None
+    path = Path(destination)
+    if not path.is_absolute():
+        return None
+    return path.resolve(strict=False)
+
+
 def load_pack(path_like: str | Path) -> ContainerPack:
     """Load a runtime pack from TOML."""
     path = workspace_path(path_like)
@@ -309,6 +558,19 @@ def load_pack(path_like: str | Path) -> ContainerPack:
         raise ValueError(
             f"{path}: [runtime].dependency_profile must be a non-empty profile name"
         )
+    optional_mount_profiles = _parse_optional_mount_profiles(runtime_section, path)
+    linked_data_roots, linked_data_roots_declared = _parse_linked_data_roots(
+        runtime_section, path
+    )
+    if ("linked-data-roots" in optional_mount_profiles) != linked_data_roots_declared:
+        raise ValueError(
+            f"{path}: linked-data-roots profile and linked_data_roots list must both be present or absent"
+        )
+    raw_runtime_mounts = require_string_list(runtime_section, "mounts", path, "runtime")
+    if raw_runtime_mounts:
+        raise ValueError(
+            f"{path}: [runtime].mounts is not supported; use an explicit optional mount profile"
+        )
 
     return ContainerPack(
         name=name,
@@ -326,9 +588,12 @@ def load_pack(path_like: str | Path) -> ContainerPack:
             workdir=workdir,
             workspace_mount=workspace_mount,
             env=require_string_list(runtime_section, "env", path, "runtime"),
-            mounts=require_string_list(runtime_section, "mounts", path, "runtime"),
+            mounts=(),
             gpus=gpus,
             dependency_profile=dependency_profile,
+            optional_mount_profiles=optional_mount_profiles,
+            linked_data_roots=linked_data_roots,
+            linked_data_roots_declared=linked_data_roots_declared,
         ),
     )
 
@@ -408,13 +673,44 @@ def build_run_command(
     resolved_workdir = workdir or pack.runtime.workdir
     resolved_shell = shell or pack.runtime.shell
     resolved_gpus = gpus if gpus is not None else pack.runtime.gpus
+    if pack.runtime.mounts:
+        raise ValueError(
+            "raw runtime.mounts are not supported; use an explicit optional mount profile"
+        )
     dependency_profile_env = (
         f"{DEPENDENCY_PROFILE_ENV}={pack.runtime.dependency_profile}"
     )
     combined_env = tuple(
         dict.fromkeys((*pack.runtime.env, *env, dependency_profile_env))
     )
-    combined_mounts = pack.runtime.mounts + mounts
+    optional_profiles = _canonical_optional_mount_profiles(pack)
+    linked_data_mounts = resolve_linked_data_mounts(pack, resolved_workspace)
+    profile_mounts = (
+        resolve_docker_host_mounts()
+        if "docker-host" in optional_profiles
+        else ()
+    )
+    linked_targets = tuple(
+        Path(linked_root.target).resolve(strict=False)
+        for linked_root in pack.runtime.linked_data_roots
+    )
+    for mount in mounts:
+        destination = _normalized_mount_destination(mount)
+        if destination is not None and any(
+            destination == linked_target
+            or destination.is_relative_to(linked_target)
+            or linked_target.is_relative_to(destination)
+            for linked_target in linked_targets
+        ):
+            raise ValueError(
+                "CLI mount destination collides with a linked-data-roots target"
+            )
+        if (
+            "docker-host" in optional_profiles
+            and destination == Path("/var/run/docker.sock").resolve(strict=False)
+        ):
+            raise ValueError("CLI mount destination collides with docker-host socket target")
+    combined_mounts = linked_data_mounts + profile_mounts + mounts
 
     run_command = [builder, "run", "--rm"]
     if tty:
