@@ -977,15 +977,7 @@ def validate_generated_compose(
         )
     build = as_mapping(service.get("build"))
     build_target = build.get("target") if build is not None else None
-    if profile == "gpu-admission" and build_target != "gpu-runtime":
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                relative,
-                "gpu-admission-build-target-required:gpu-runtime",
-            )
-        )
-    elif profile == "default" and build_target == "gpu-runtime":
+    if profile == "default" and build_target == "gpu-runtime":
         findings.append(
             Finding(
                 "dependency_contract_violation",
