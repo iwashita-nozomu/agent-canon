@@ -105,11 +105,107 @@ BASE_CAPABILITIES = frozenset(
     }
 )
 NPM_GLOBAL_PREFIX = "/usr/local"
+NPM_FEATURE_BIN = "/usr/local/share/nvm/current/bin"
+NPM_ENV_EXECUTABLE = "/usr/bin/env"
+NPM_SYSTEM_BIN_DIRS = (
+    "/usr/local/sbin",
+    "/usr/local/bin",
+    "/usr/sbin",
+    "/usr/bin",
+    "/sbin",
+    "/bin",
+)
+NPM_TRUSTED_BIN_DIRS = (NPM_FEATURE_BIN, *NPM_SYSTEM_BIN_DIRS)
+NPM_TRUSTED_BIN_ROOTS = {
+    NPM_FEATURE_BIN: "/usr/local/share/nvm",
+    "/usr/local/sbin": "/usr/local",
+    "/usr/local/bin": "/usr/local",
+    "/usr/sbin": "/usr",
+    "/usr/bin": "/usr",
+    "/sbin": "/usr",
+    "/bin": "/usr",
+}
 STRUCTURAL_BINDING_OUTPUT_PREFIX = "agent-canon.executable-binding.structural.v1"
 
 
 class DependencyError(ValueError):
     """Base error for schema, merge, plan, and execution failures."""
+
+
+@dataclass(frozen=True)
+class NpmToolchain:
+    """Validated Node/npm paths and the minimal PATH used for npm commands."""
+
+    node: Path
+    npm: Path
+    path: str
+
+
+def resolve_npm_toolchain(workspace: Path) -> NpmToolchain:
+    """Resolve Feature/system Node tools without accepting ambient PATH entries."""
+    env_executable = Path(NPM_ENV_EXECUTABLE)
+    if not env_executable.is_file() or not os.access(env_executable, os.X_OK):
+        raise DependencyError(
+            f"npm-global requires executable launcher: {NPM_ENV_EXECUTABLE}"
+        )
+    trusted_path = os.pathsep.join(NPM_TRUSTED_BIN_DIRS)
+    trusted_dirs = {Path(directory) for directory in NPM_TRUSTED_BIN_DIRS}
+    workspace_root = workspace.resolve()
+    resolved: dict[str, Path] = {}
+    for executable in ("node", "npm"):
+        candidate_text = shutil.which(executable, path=trusted_path)
+        if candidate_text is None:
+            raise DependencyError(
+                f"npm-global requires a trusted {executable} executable"
+            )
+        candidate = Path(candidate_text)
+        if not candidate.is_absolute():
+            raise DependencyError(
+                f"npm-global {executable} executable is not absolute: {candidate}"
+            )
+        try:
+            resolved_candidate = candidate.resolve(strict=False)
+        except OSError as exc:
+            raise DependencyError(
+                f"npm-global {executable} executable cannot be resolved: {candidate}"
+            ) from exc
+        try:
+            resolved_candidate.relative_to(workspace_root)
+        except ValueError:
+            pass
+        else:
+            raise DependencyError(
+                f"npm-global {executable} executable is inside workspace: {candidate}"
+            )
+        if Path(os.path.normpath(str(candidate.parent))) not in trusted_dirs:
+            raise DependencyError(
+                f"npm-global {executable} executable is outside trusted Node/system directories: "
+                f"{candidate}"
+            )
+        allowed_root_text = NPM_TRUSTED_BIN_ROOTS.get(str(candidate.parent))
+        if allowed_root_text is None:  # pragma: no cover - mappings are source-owned.
+            raise DependencyError(
+                f"npm-global {executable} executable has no trusted root: {candidate}"
+            )
+        allowed_root = Path(allowed_root_text).resolve()
+        try:
+            resolved_candidate.relative_to(allowed_root)
+        except ValueError as exc:
+            raise DependencyError(
+                f"npm-global {executable} resolved path escapes trusted Node/system root: "
+                f"{resolved_candidate}"
+            ) from exc
+        if not resolved_candidate.is_absolute():
+            raise DependencyError(
+                f"npm-global {executable} executable resolved path is not absolute: "
+                f"{resolved_candidate}"
+            )
+        resolved[executable] = candidate
+    return NpmToolchain(
+        node=resolved["node"],
+        npm=resolved["npm"],
+        path=trusted_path,
+    )
 
 
 def parse_python_extras(raw: str | Sequence[str]) -> tuple[str, ...]:
@@ -2501,8 +2597,8 @@ class Installer:
                 privileged=True,
             )
         elif method is Method.NPM_GLOBAL:
-            command = [
-                "npm",
+            toolchain = resolve_npm_toolchain(workspace)
+            npm_args = [
                 "install",
                 "--global",
                 "--prefix",
@@ -2510,7 +2606,13 @@ class Installer:
                 f"{record.package}@{record.version}",
             ]
             if repair:
-                command.insert(2, "--force")
+                npm_args.insert(1, "--force")
+            command = [
+                NPM_ENV_EXECUTABLE,
+                f"PATH={toolchain.path}",
+                str(toolchain.npm),
+                *npm_args,
+            ]
             self._run(
                 command,
                 workspace=workspace,
@@ -2900,14 +3002,11 @@ class Installer:
         workspace: Path,
         strict_executable: bool = False,
     ) -> None:
-        npm_env = {
-            "PATH": os.pathsep.join(
-                [f"{NPM_GLOBAL_PREFIX}/bin", os.environ.get("PATH", "")]
-            )
-        }
-        result = self._capture(
+        toolchain = resolve_npm_toolchain(workspace)
+        npm_env = {"PATH": toolchain.path}
+        result = self.runner.run(
             [
-                "npm",
+                str(toolchain.npm),
                 "ls",
                 "--global",
                 "--prefix",
@@ -2916,7 +3015,8 @@ class Installer:
                 "--depth=0",
                 record.package,
             ],
-            workspace=workspace,
+            cwd=workspace,
+            capture_output=True,
             env=npm_env,
         )
         try:
@@ -2939,9 +3039,10 @@ class Installer:
                 record, executable, workspace=workspace
             )
             command[0] = str(resolved)
-        executable = self._capture(
+        executable = self.runner.run(
             command,
-            workspace=workspace,
+            cwd=workspace,
+            capture_output=True,
             env=npm_env,
         )
         self._require_output(executable, spec.output_contains, record.id)

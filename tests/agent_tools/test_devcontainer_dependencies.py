@@ -285,7 +285,11 @@ class FakeRunner:
             package = command[-1]
             owned = self.ownership_lists.get(package, (f"/usr/bin/{package}",))
             return subprocess.CompletedProcess(command, 0, "\n".join(owned) + "\n", "")
-        if command[:3] == ("npm", "ls", "--global") and "--json" in command:
+        if (
+            Path(command[0]).name == "npm"
+            and command[1:3] == ("ls", "--global")
+            and "--json" in command
+        ):
             package = command[-1]
             return subprocess.CompletedProcess(
                 command,
@@ -481,29 +485,51 @@ class DependencyModelTests(unittest.TestCase):
             path=Path("fixture.toml"),
             index=0,
         )
-        runner = FakeRunner()
+        runner = FakeRunner(emulate_non_root_sudo=True)
         installer = Installer(runner)
+        feature_bin = dependency_module.NPM_FEATURE_BIN
+        trusted_path = os.pathsep.join(dependency_module.NPM_TRUSTED_BIN_DIRS)
+
+        def feature_which(name: str, *, path: str | None = None) -> str:
+            self.assertEqual(path, trusted_path)
+            return f"{feature_bin}/{name}"
+
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            installer.install_record(parsed, workspace=root)
-            installer.verify(parsed, workspace=root)
+            with mock.patch.object(
+                dependency_module.shutil, "which", side_effect=feature_which
+            ):
+                installer.install_record(parsed, workspace=root)
+                installer.verify(parsed, workspace=root)
 
         install_call = next(
-            call for call in runner.calls if call[:2] == ("npm", "install")
+            call
+            for call in runner.calls
+            if "install" in call and any(Path(item).name == "npm" for item in call)
         )
         self.assertEqual(
             install_call,
-            ("npm", "install", "--global", "--prefix", "/usr/local", "codex@1.0.0"),
+            (
+                "sudo",
+                dependency_module.NPM_ENV_EXECUTABLE,
+                f"PATH={trusted_path}",
+                f"{feature_bin}/npm",
+                "install",
+                "--global",
+                "--prefix",
+                "/usr/local",
+                "codex@1.0.0",
+            ),
         )
         ls_index = next(
             index
             for index, call in enumerate(runner.calls)
-            if call[:2] == ("npm", "ls")
+            if call[:2] == (f"{feature_bin}/npm", "ls")
         )
         self.assertEqual(
             runner.calls[ls_index],
             (
-                "npm",
+                f"{feature_bin}/npm",
                 "ls",
                 "--global",
                 "--prefix",
@@ -515,7 +541,7 @@ class DependencyModelTests(unittest.TestCase):
         )
         self.assertIsNotNone(runner.environments[ls_index])
         assert runner.environments[ls_index] is not None
-        self.assertIn("/usr/local/bin", runner.environments[ls_index]["PATH"].split(os.pathsep))
+        self.assertEqual(runner.environments[ls_index]["PATH"], trusted_path)
         executable_index = next(
             index
             for index, call in enumerate(runner.calls)
@@ -523,6 +549,184 @@ class DependencyModelTests(unittest.TestCase):
         )
         self.assertEqual(runner.calls[executable_index], ("codex", "--version"))
         self.assertIsNotNone(runner.environments[executable_index])
+
+    def test_npm_global_rejects_workspace_untrusted_or_missing_node(self) -> None:
+        """npm installation fails closed before sudo for unsafe Node resolution."""
+        parsed = parse_record(
+            record("codex", method="npm-global"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        feature_bin = dependency_module.NPM_FEATURE_BIN
+        trusted_path = os.pathsep.join(dependency_module.NPM_TRUSTED_BIN_DIRS)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cases = (
+                (
+                    "workspace",
+                    {
+                        "node": str(root / "node"),
+                        "npm": f"{feature_bin}/npm",
+                    },
+                    "inside workspace",
+                ),
+                (
+                    "untrusted",
+                    {
+                        "node": "/tmp/agent-canon-untrusted/node",
+                        "npm": f"{feature_bin}/npm",
+                    },
+                    "outside trusted Node/system directories",
+                ),
+                (
+                    "missing-node",
+                    {"node": None, "npm": f"{feature_bin}/npm"},
+                    "requires a trusted node executable",
+                ),
+            )
+            for name, paths, message in cases:
+                with self.subTest(name=name):
+
+                    def fake_which(
+                        executable: str, *, path: str | None = None
+                    ) -> str | None:
+                        self.assertEqual(path, trusted_path)
+                        return paths[executable]
+
+                    with mock.patch.object(
+                        dependency_module.shutil, "which", side_effect=fake_which
+                    ):
+                        with self.assertRaisesRegex(DependencyError, message):
+                            Installer(FakeRunner()).install_record(
+                                parsed, workspace=root
+                            )
+
+    def test_npm_global_rejects_escaped_node_and_npm_symlinks(self) -> None:
+        """Feature-bin symlinks cannot resolve into workspace or temporary roots."""
+        parsed = parse_record(
+            record("codex", method="npm-global"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        system_dirs = dependency_module.NPM_SYSTEM_BIN_DIRS
+        system_roots = {
+            directory: dependency_module.NPM_TRUSTED_BIN_ROOTS[directory]
+            for directory in system_dirs
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cases = (
+                ("node", "inside workspace"),
+                ("npm", "escapes trusted Node/system root"),
+            )
+            for escaped, message in cases:
+                with self.subTest(escaped=escaped):
+                    case_root = root / escaped
+                    feature_bin = case_root / "current" / "bin"
+                    feature_bin.mkdir(parents=True)
+                    workspace = case_root / "workspace"
+                    workspace.mkdir()
+                    target = (
+                        workspace / f"{escaped}-target"
+                        if escaped == "node"
+                        else Path("/tmp/agent-canon-npm-escaped-target")
+                    )
+                    if escaped == "node":
+                        target.write_text("workspace target\n", encoding="utf-8")
+                    escaped_path = feature_bin / escaped
+                    escaped_path.symlink_to(target)
+                    other = feature_bin / ("npm" if escaped == "node" else "node")
+                    other.write_text("feature target\n", encoding="utf-8")
+
+                    trusted_dirs = (str(feature_bin), *system_dirs)
+                    trusted_roots = {
+                        str(feature_bin): str(case_root),
+                        **system_roots,
+                    }
+
+                    def fake_which(
+                        executable: str, *, path: str | None = None
+                    ) -> str:
+                        self.assertEqual(path, os.pathsep.join(trusted_dirs))
+                        return str(feature_bin / executable)
+
+                    with (
+                        mock.patch.object(
+                            dependency_module, "NPM_FEATURE_BIN", str(feature_bin)
+                        ),
+                        mock.patch.object(
+                            dependency_module,
+                            "NPM_TRUSTED_BIN_DIRS",
+                            trusted_dirs,
+                        ),
+                        mock.patch.object(
+                            dependency_module,
+                            "NPM_TRUSTED_BIN_ROOTS",
+                            trusted_roots,
+                        ),
+                        mock.patch.object(
+                            dependency_module.shutil, "which", side_effect=fake_which
+                        ),
+                    ):
+                        with self.assertRaisesRegex(DependencyError, message):
+                            Installer(FakeRunner()).install_record(
+                                parsed, workspace=workspace
+                            )
+
+    def test_npm_global_allows_feature_version_symlink(self) -> None:
+        """The Feature's current symlink may resolve within its version root."""
+        parsed = parse_record(
+            record("codex", method="npm-global"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            feature_root = root / "nvm"
+            version_bin = feature_root / "v22.14.0" / "bin"
+            version_bin.mkdir(parents=True)
+            current = feature_root / "current"
+            current.symlink_to(version_bin.parent)
+            feature_bin = current / "bin"
+            (version_bin / "node").write_text("node\n", encoding="utf-8")
+            (version_bin / "npm").write_text("npm\n", encoding="utf-8")
+            workspace = root / "workspace"
+            workspace.mkdir()
+            system_dirs = dependency_module.NPM_SYSTEM_BIN_DIRS
+            trusted_dirs = (str(feature_bin), *system_dirs)
+            trusted_roots = {
+                str(feature_bin): str(feature_root),
+                **{
+                    directory: dependency_module.NPM_TRUSTED_BIN_ROOTS[directory]
+                    for directory in system_dirs
+                },
+            }
+
+            def feature_which(
+                executable: str, *, path: str | None = None
+            ) -> str:
+                self.assertEqual(path, os.pathsep.join(trusted_dirs))
+                return str(feature_bin / executable)
+
+            with (
+                mock.patch.object(
+                    dependency_module, "NPM_FEATURE_BIN", str(feature_bin)
+                ),
+                mock.patch.object(
+                    dependency_module,
+                    "NPM_TRUSTED_BIN_DIRS",
+                    trusted_dirs,
+                ),
+                mock.patch.object(
+                    dependency_module,
+                    "NPM_TRUSTED_BIN_ROOTS",
+                    trusted_roots,
+                ),
+                mock.patch.object(
+                    dependency_module.shutil, "which", side_effect=feature_which
+                ),
+            ):
+                Installer(FakeRunner()).install_record(parsed, workspace=workspace)
 
     def test_pipx_installs_and_verifies_one_isolated_cli(self) -> None:
         """Python CLI records use pipx without a shared pip install surface."""
