@@ -837,6 +837,10 @@ def test_docker_host_validator_accepts_canonical_rw_bind(tmp_path: Path) -> None
     (
         ("source", "docker-host-mount-source-must-be-canonical"),
         ("read_only", "docker-host-mount-must-be-read-write"),
+        ("read_only_ro_z", "docker-host-mount-must-be-read-write"),
+        ("read_only_z_ro", "docker-host-mount-must-be-read-write"),
+        ("read_only_string", "docker-host-mount-must-be-read-write"),
+        ("read_only_numeric", "docker-host-mount-must-be-read-write"),
         ("type", "docker-host-mount-type-must-be-bind"),
         ("duplicate", "docker-host-mount-count:2"),
     ),
@@ -853,10 +857,24 @@ def test_docker_host_validator_rejects_socket_bind_tampering(
             "      - /tmp/evil.sock:/var/run/docker.sock\n",
             1,
         )
-    elif mutation == "read_only":
+    elif mutation in {"read_only", "read_only_ro_z", "read_only_z_ro"}:
+        mode = {
+            "read_only": "ro",
+            "read_only_ro_z": "ro,Z",
+            "read_only_z_ro": "Z,ro",
+        }[mutation]
         compose = compose.replace(
             "      - /var/run/docker.sock:/var/run/docker.sock\n",
-            "      - /var/run/docker.sock:/var/run/docker.sock:ro\n",
+            f"      - /var/run/docker.sock:/var/run/docker.sock:{mode}\n",
+            1,
+        )
+    elif mutation in {"read_only_string", "read_only_numeric"}:
+        read_only_value = '"true"' if mutation == "read_only_string" else "1"
+        compose = compose.replace(
+            "      - /var/run/docker.sock:/var/run/docker.sock\n",
+            '      - type: bind\n        source: "/var/run/docker.sock"\n'
+            '        target: "/var/run/docker.sock"\n'
+            f"        read_only: {read_only_value}\n",
             1,
         )
     elif mutation == "type":

@@ -1085,7 +1085,8 @@ def validate_generated_compose(
         if volume is not None:
             return volume.get("read_only") is True
         if isinstance(raw_volume, str):
-            return raw_volume.rsplit(":", 1)[-1] == "ro"
+            options = raw_volume.rsplit(":", 1)[-1].split(",")
+            return "ro" in options
         return False
 
     def volume_type(raw_volume: object) -> str | None:
@@ -1682,7 +1683,14 @@ def validate_generated_compose(
                         "docker-host-mount-type-must-be-bind",
                     )
                 )
-            if volume_is_read_only(docker_host_mount):
+            malformed_read_only = (
+                docker_volume is not None
+                and "read_only" in docker_volume
+                and docker_volume.get("read_only") is not False
+            )
+            if malformed_read_only or (
+                docker_volume is None and volume_is_read_only(docker_host_mount)
+            ):
                 findings.append(
                     Finding(
                         "dependency_contract_violation",

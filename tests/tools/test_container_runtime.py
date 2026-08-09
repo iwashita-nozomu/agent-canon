@@ -230,6 +230,9 @@ def test_docker_host_profile_requires_socket_and_projects_rw_bind(tmp_path: Path
         socket_path.unlink()
     with pytest.raises(ValueError, match="existing Unix socket"):
         runtime.resolve_docker_host_mounts(socket_path=socket_path)
+    socket_path.write_text("not a socket\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="existing Unix socket"):
+        runtime.resolve_docker_host_mounts(socket_path=socket_path)
 
 
 def test_docker_host_profile_reaches_direct_run_command(tmp_path: Path) -> None:
