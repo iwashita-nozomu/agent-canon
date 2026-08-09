@@ -526,6 +526,11 @@ context evidence. Freshness binds parent HEAD, dirty fingerprint, source
 snapshot, producer hashes, profile pair `default`/`parent`, schema, and tool
 versions; stale state is reported and never silently rebuilt.
 
+`issues/closed/` records are historical evidence, not active dependency
+owners. They remain source identities so active canon may cite a closed issue,
+but their dependency headers do not emit declarations or unresolved-target
+diagnostics. `issues/open/` records retain the ordinary active manifest route.
+
 ### Executable finite-set contract
 
 For one captured source/producer state `S` and public profile `p=default`, graph

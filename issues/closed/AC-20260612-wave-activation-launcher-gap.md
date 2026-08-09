@@ -9,6 +9,7 @@ upstream design ../../agents/canonical/CODEX_SUBAGENTS.md defines Codex subagent
 upstream design ../../agents/TASK_WORKFLOWS.md defines dynamic expansion wave expectations.
 upstream design ../../agents/skills/subagent-bootstrap.md defines run-bundle bootstrap and subagent packet expectations.
 downstream implementation ../../tools/agent_tools/bootstrap_agent_run.py emits recommended initial and expansion waves.
+downstream implementation ../../tools/agent_tools/task_start.py emits task-start workflow recommendations.
 downstream implementation ../../tools/agent_tools/agent_team.py defines team manifests and role routing.
 downstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py should expose runtime wave/subagent evidence.
 @dependency-end
