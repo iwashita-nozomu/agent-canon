@@ -511,7 +511,7 @@ class DependencyModelTests(unittest.TestCase):
             install_call,
             (
                 "sudo",
-                "env",
+                dependency_module.NPM_ENV_EXECUTABLE,
                 f"PATH={trusted_path}",
                 f"{feature_bin}/npm",
                 "install",
@@ -600,6 +600,133 @@ class DependencyModelTests(unittest.TestCase):
                             Installer(FakeRunner()).install_record(
                                 parsed, workspace=root
                             )
+
+    def test_npm_global_rejects_escaped_node_and_npm_symlinks(self) -> None:
+        """Feature-bin symlinks cannot resolve into workspace or temporary roots."""
+        parsed = parse_record(
+            record("codex", method="npm-global"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        system_dirs = dependency_module.NPM_SYSTEM_BIN_DIRS
+        system_roots = {
+            directory: dependency_module.NPM_TRUSTED_BIN_ROOTS[directory]
+            for directory in system_dirs
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cases = (
+                ("node", "inside workspace"),
+                ("npm", "escapes trusted Node/system root"),
+            )
+            for escaped, message in cases:
+                with self.subTest(escaped=escaped):
+                    case_root = root / escaped
+                    feature_bin = case_root / "current" / "bin"
+                    feature_bin.mkdir(parents=True)
+                    workspace = case_root / "workspace"
+                    workspace.mkdir()
+                    target = (
+                        workspace / f"{escaped}-target"
+                        if escaped == "node"
+                        else Path("/tmp/agent-canon-npm-escaped-target")
+                    )
+                    if escaped == "node":
+                        target.write_text("workspace target\n", encoding="utf-8")
+                    escaped_path = feature_bin / escaped
+                    escaped_path.symlink_to(target)
+                    other = feature_bin / ("npm" if escaped == "node" else "node")
+                    other.write_text("feature target\n", encoding="utf-8")
+
+                    trusted_dirs = (str(feature_bin), *system_dirs)
+                    trusted_roots = {
+                        str(feature_bin): str(case_root),
+                        **system_roots,
+                    }
+
+                    def fake_which(
+                        executable: str, *, path: str | None = None
+                    ) -> str:
+                        self.assertEqual(path, os.pathsep.join(trusted_dirs))
+                        return str(feature_bin / executable)
+
+                    with (
+                        mock.patch.object(
+                            dependency_module, "NPM_FEATURE_BIN", str(feature_bin)
+                        ),
+                        mock.patch.object(
+                            dependency_module,
+                            "NPM_TRUSTED_BIN_DIRS",
+                            trusted_dirs,
+                        ),
+                        mock.patch.object(
+                            dependency_module,
+                            "NPM_TRUSTED_BIN_ROOTS",
+                            trusted_roots,
+                        ),
+                        mock.patch.object(
+                            dependency_module.shutil, "which", side_effect=fake_which
+                        ),
+                    ):
+                        with self.assertRaisesRegex(DependencyError, message):
+                            Installer(FakeRunner()).install_record(
+                                parsed, workspace=workspace
+                            )
+
+    def test_npm_global_allows_feature_version_symlink(self) -> None:
+        """The Feature's current symlink may resolve within its version root."""
+        parsed = parse_record(
+            record("codex", method="npm-global"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            feature_root = root / "nvm"
+            version_bin = feature_root / "v22.14.0" / "bin"
+            version_bin.mkdir(parents=True)
+            current = feature_root / "current"
+            current.symlink_to(version_bin.parent)
+            feature_bin = current / "bin"
+            (version_bin / "node").write_text("node\n", encoding="utf-8")
+            (version_bin / "npm").write_text("npm\n", encoding="utf-8")
+            workspace = root / "workspace"
+            workspace.mkdir()
+            system_dirs = dependency_module.NPM_SYSTEM_BIN_DIRS
+            trusted_dirs = (str(feature_bin), *system_dirs)
+            trusted_roots = {
+                str(feature_bin): str(feature_root),
+                **{
+                    directory: dependency_module.NPM_TRUSTED_BIN_ROOTS[directory]
+                    for directory in system_dirs
+                },
+            }
+
+            def feature_which(
+                executable: str, *, path: str | None = None
+            ) -> str:
+                self.assertEqual(path, os.pathsep.join(trusted_dirs))
+                return str(feature_bin / executable)
+
+            with (
+                mock.patch.object(
+                    dependency_module, "NPM_FEATURE_BIN", str(feature_bin)
+                ),
+                mock.patch.object(
+                    dependency_module,
+                    "NPM_TRUSTED_BIN_DIRS",
+                    trusted_dirs,
+                ),
+                mock.patch.object(
+                    dependency_module,
+                    "NPM_TRUSTED_BIN_ROOTS",
+                    trusted_roots,
+                ),
+                mock.patch.object(
+                    dependency_module.shutil, "which", side_effect=feature_which
+                ),
+            ):
+                Installer(FakeRunner()).install_record(parsed, workspace=workspace)
 
     def test_pipx_installs_and_verifies_one_isolated_cli(self) -> None:
         """Python CLI records use pipx without a shared pip install surface."""

@@ -106,6 +106,7 @@ BASE_CAPABILITIES = frozenset(
 )
 NPM_GLOBAL_PREFIX = "/usr/local"
 NPM_FEATURE_BIN = "/usr/local/share/nvm/current/bin"
+NPM_ENV_EXECUTABLE = "/usr/bin/env"
 NPM_SYSTEM_BIN_DIRS = (
     "/usr/local/sbin",
     "/usr/local/bin",
@@ -115,6 +116,15 @@ NPM_SYSTEM_BIN_DIRS = (
     "/bin",
 )
 NPM_TRUSTED_BIN_DIRS = (NPM_FEATURE_BIN, *NPM_SYSTEM_BIN_DIRS)
+NPM_TRUSTED_BIN_ROOTS = {
+    NPM_FEATURE_BIN: "/usr/local/share/nvm",
+    "/usr/local/sbin": "/usr/local",
+    "/usr/local/bin": "/usr/local",
+    "/usr/sbin": "/usr",
+    "/usr/bin": "/usr",
+    "/sbin": "/usr",
+    "/bin": "/usr",
+}
 STRUCTURAL_BINDING_OUTPUT_PREFIX = "agent-canon.executable-binding.structural.v1"
 
 
@@ -133,6 +143,11 @@ class NpmToolchain:
 
 def resolve_npm_toolchain(workspace: Path) -> NpmToolchain:
     """Resolve Feature/system Node tools without accepting ambient PATH entries."""
+    env_executable = Path(NPM_ENV_EXECUTABLE)
+    if not env_executable.is_file() or not os.access(env_executable, os.X_OK):
+        raise DependencyError(
+            f"npm-global requires executable launcher: {NPM_ENV_EXECUTABLE}"
+        )
     trusted_path = os.pathsep.join(NPM_TRUSTED_BIN_DIRS)
     trusted_dirs = {Path(directory) for directory in NPM_TRUSTED_BIN_DIRS}
     workspace_root = workspace.resolve()
@@ -167,6 +182,19 @@ def resolve_npm_toolchain(workspace: Path) -> NpmToolchain:
                 f"npm-global {executable} executable is outside trusted Node/system directories: "
                 f"{candidate}"
             )
+        allowed_root_text = NPM_TRUSTED_BIN_ROOTS.get(str(candidate.parent))
+        if allowed_root_text is None:  # pragma: no cover - mappings are source-owned.
+            raise DependencyError(
+                f"npm-global {executable} executable has no trusted root: {candidate}"
+            )
+        allowed_root = Path(allowed_root_text).resolve()
+        try:
+            resolved_candidate.relative_to(allowed_root)
+        except ValueError as exc:
+            raise DependencyError(
+                f"npm-global {executable} resolved path escapes trusted Node/system root: "
+                f"{resolved_candidate}"
+            ) from exc
         if not resolved_candidate.is_absolute():
             raise DependencyError(
                 f"npm-global {executable} executable resolved path is not absolute: "
@@ -2580,7 +2608,7 @@ class Installer:
             if repair:
                 npm_args.insert(1, "--force")
             command = [
-                "env",
+                NPM_ENV_EXECUTABLE,
                 f"PATH={toolchain.path}",
                 str(toolchain.npm),
                 *npm_args,
