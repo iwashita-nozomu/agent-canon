@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -68,6 +69,123 @@ def test_default_does_not_mount_host_docker_socket() -> None:
         in result.stdout
     )
     assert "setpriv --reuid" in result.stdout
+
+
+def test_nested_runner_xdg_state_allows_container_local_receipts(
+    tmp_path: Path,
+) -> None:
+    """Nested generated env lets post-create write receipts outside workspace HOME."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    pack = tmp_path / "pack.toml"
+    pack.write_text(
+        "\n".join(
+            [
+                "[pack]",
+                'name = "nested-receipt"',
+                'dockerfile = "docker/Dockerfile"',
+                'context = "."',
+                'image_tag = "nested-receipt:test"',
+                'platform = "linux/amd64"',
+                "",
+                "[smoke]",
+                'shell = "/bin/bash"',
+                "commands = []",
+                "",
+                "[runtime]",
+                'shell = "/bin/bash"',
+                'workdir = "/workspace"',
+                'workspace_mount = "/workspace"',
+                "dependency_extras = []",
+                "env = []",
+                "mounts = []",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    profile_name = "receipt-regression"
+    profiles = tmp_path / "profiles.toml"
+    profiles.write_text(
+        "\n".join(
+            [
+                "[defaults]",
+                'container_home_root = "/workspace/.state/nested-codex"',
+                "use_host_user = false",
+                "tty = false",
+                "mount_host_gitconfig = false",
+                "mount_host_git_credentials = false",
+                "mount_host_ssh_dir = false",
+                "forward_ssh_auth_sock = false",
+                "forward_env = []",
+                "",
+                "[[profile]]",
+                f'name = "{profile_name}"',
+                f'pack = "{pack}"',
+                'description = "receipt state regression"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_cli(
+        "--print-only",
+        "--profiles",
+        str(profiles),
+        "--profile",
+        profile_name,
+        "--workspace-root",
+        str(workspace),
+    )
+    assert result.returncode == 0, result.stderr
+    xdg_state = Path(f"/tmp/agent-canon-xdg-state/{profile_name}")
+    assert f"-e XDG_STATE_HOME={xdg_state}" in result.stdout
+
+    post_create = workspace / "vendor/agent-canon/.devcontainer/post-create.sh"
+    post_create.parent.mkdir(parents=True)
+    post_create.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        'workspace="$1"\n'
+        'state_home="${XDG_STATE_HOME:-$HOME/.local/state}"\n'
+        'workspace_real="$(realpath -m -- "$workspace")"\n'
+        'state_home="$(realpath -m -- "$state_home")"\n'
+        'case "$state_home/" in "$workspace_real/"*) exit 41;; esac\n'
+        'receipts="$state_home/agent-canon/dependency-receipts"\n'
+        'mkdir -p "$receipts"\n'
+        'printf receipt >"$receipts/regression.json"\n'
+        'workspace_state="$workspace/.agent-canon"\n'
+        'test ! -e "$workspace_state/dependency-receipts"\n',
+        encoding="utf-8",
+    )
+    post_create.chmod(0o755)
+    script = build_nested_codex_script(
+        ["sh", "-c", "test -f \"$XDG_STATE_HOME/agent-canon/dependency-receipts/regression.json\""],
+        mount_host_ssh_dir=False,
+        workspace=str(workspace),
+        run_uid=None,
+        run_gid=None,
+    )
+    shutil.rmtree(xdg_state, ignore_errors=True)
+    try:
+        executed = subprocess.run(
+            ["bash", "-c", script],
+            cwd=workspace,
+            check=False,
+            capture_output=True,
+            text=True,
+            env={
+                **os.environ,
+                "HOME": str(workspace / ".state/nested-codex" / profile_name),
+                "XDG_STATE_HOME": str(xdg_state),
+            },
+        )
+        assert executed.returncode == 0, executed.stdout + executed.stderr
+        assert (xdg_state / "agent-canon/dependency-receipts/regression.json").is_file()
+        assert not (workspace / ".agent-canon/dependency-receipts").exists()
+    finally:
+        shutil.rmtree(xdg_state, ignore_errors=True)
 
 
 def test_host_uid_setup_chowns_workspace_artifacts_before_setpriv() -> None:

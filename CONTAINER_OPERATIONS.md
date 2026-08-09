@@ -293,8 +293,11 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
   recorded and later certified by `EnvironmentCertificate`, not by a second
   environment policy surface.
 - Nested Codex uses container-local state under the selected workspace runtime
-  home. The runner may forward `OPENAI_API_KEY` and `OPENAI_BASE_URL` explicitly;
-  it never mounts or seeds host Codex state.
+  home for Codex session semantics, but the runner sets the profile-scoped
+  `XDG_STATE_HOME=/tmp/agent-canon-xdg-state/<profile>` outside the workspace
+  so shared post-create dependency receipts remain container-local. The runner
+  may forward `OPENAI_API_KEY` and `OPENAI_BASE_URL` explicitly; it never
+  mounts or seeds host Codex state.
 - 既定 devcontainer は GPU admission の host runtime identity を要求しない。
   固定 OS/Python capability は image、Node/npm は digest-pinned Feature が所有し、
   `finalize-shared-runtime.sh`、shared lock、provision/readback receipt は GPU

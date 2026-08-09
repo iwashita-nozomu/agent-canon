@@ -54,6 +54,14 @@ class CodexProfile:
     description: str
 
 
+NESTED_XDG_STATE_ROOT = "/tmp/agent-canon-xdg-state"
+
+
+def nested_xdg_state_home(profile: CodexProfile) -> str:
+    """Return the profile-scoped container-local XDG state root."""
+    return f"{NESTED_XDG_STATE_ROOT}/{profile.name}"
+
+
 def parse_bool(data: dict[str, object], key: str, default: bool) -> bool:
     """Extract a boolean option with a default."""
     value = data.get(key, default)
@@ -338,6 +346,7 @@ def main() -> int:
         # nested session as a runtime-user mismatch.
         envs: list[str] = [
             f"HOME={container_home}",
+            f"XDG_STATE_HOME={nested_xdg_state_home(profile)}",
             "AGENT_CANON_CONTAINER_USER=",
         ]
 
