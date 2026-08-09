@@ -2747,6 +2747,15 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("STRUCTURED_ANALYSIS_BOOTSTRAP=warn", post_create)
         self.assertIn("project-install --workspace", post_create)
         self.assertNotIn("docker/install_python_dependencies.sh", post_create)
+        self.assertIn(
+            'state_home="${XDG_STATE_HOME:-$home/.local/state}"',
+            post_create,
+        )
+        self.assertIn(
+            'dependency_receipts="$state_home/agent-canon/dependency-receipts"',
+            post_create,
+        )
+        self.assertNotIn(".agent-canon/dependency-receipts", post_create)
         validate_index = post_create.index("validate --workspace")
         install_index = post_create.index("install --workspace")
         cache_index = post_create.rindex("\nbuild_agent_canon_cache\n")

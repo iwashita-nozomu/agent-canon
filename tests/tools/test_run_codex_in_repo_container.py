@@ -120,8 +120,7 @@ def test_host_uid_setup_executes_workspace_ownership_handoff(tmp_path: Path) -> 
         'workspace="$1"\n'
         'mkdir -p "$workspace/reports/agents/devcontainer/runtime"\n'
         'printf arbitrary >"$workspace/reports/agents/devcontainer/runtime/output.txt"\n'
-        'mkdir -p "$workspace/.agent-canon/dependency-receipts"\n'
-        'printf receipt >"$workspace/.agent-canon/dependency-receipts/receipt.txt"\n'
+        'mkdir -p "$workspace/.agent-canon"\n'
         'mkdir -p "$workspace/editable-install-output/package"\n'
         'printf editable >"$workspace/editable-install-output/package/module.py"\n'
         'ln -s "${OUTSIDE_TARGET:?}" "$workspace/new-outside-link"\n'
@@ -132,8 +131,6 @@ def test_host_uid_setup_executes_workspace_ownership_handoff(tmp_path: Path) -> 
         '"$workspace/reports/agents" '
         '"$workspace/reports/agents/devcontainer" '
         '"$workspace/.agent-canon" '
-        '"$workspace/.agent-canon/dependency-receipts" '
-        '"$workspace/.agent-canon/dependency-receipts/receipt.txt" '
         '"$workspace/editable-install-output" '
         '"$workspace/editable-install-output/package" '
         '"$workspace/editable-install-output/package/module.py" '
@@ -241,7 +238,6 @@ def test_host_uid_setup_executes_workspace_ownership_handoff(tmp_path: Path) -> 
     assert str(workspace / "reports/agents/devcontainer") in chown_targets
     assert str(workspace / "reports/agents/devcontainer/runtime") in chown_targets
     assert str(workspace / ".agent-canon") in chown_targets
-    assert str(workspace / ".agent-canon/dependency-receipts") in chown_targets
     assert str(workspace / "editable-install-output/package/module.py") in chown_targets
     assert str(workspace / "new-outside-link") in chown_targets
     assert str(workspace / "pre-existing-root-owned.txt") not in chown_targets
@@ -377,6 +373,9 @@ def test_runtime_identity(tmp_path: Path) -> None:
     assert "umask 0007" in post_create
     assert '"$devcontainer_dir/finalize-shared-runtime.sh"' not in post_create
     assert "project-install --workspace" in post_create
+    assert 'state_home="${XDG_STATE_HOME:-$home/.local/state}"' in post_create
+    assert 'dependency_receipts="$state_home/agent-canon/dependency-receipts"' in post_create
+    assert ".agent-canon/dependency-receipts" not in post_create
     assert 'echo "codex-state: ${codex_state_status}"' in post_attach
     assert 'workspace_layout="${AGENT_CANON_WORKSPACE_LAYOUT:-managed-topic}"' in post_attach
     assert 'workspace_source="${DEPENDENCY_MODULE_CONTAINER_SOURCE:-}"' in post_attach

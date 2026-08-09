@@ -382,6 +382,13 @@ state.
 
 - Select `runtime.dependency_extras` in the pack when project packages are needed;
   `post-create.sh` installs them from the parent `pyproject.toml` when present.
+- Shared post-create passes dependency receipts to the container-local
+  `${XDG_STATE_HOME:-$HOME/.local/state}/agent-canon/dependency-receipts` path;
+  it validates that the state root is absolute and outside the workspace before
+  the installer creates it. Receipts never use the workspace's `.agent-canon`
+  bind state, so rootless mapped users can write them without changing host
+  ownership. The generic dependency CLI fallback remains available for direct
+  callers that do not select the shared post-create path.
 - Host runtime does not create a repository-local virtual environment.
 - Container runtime may create `.venv` only through the canonical policy tool:
 
