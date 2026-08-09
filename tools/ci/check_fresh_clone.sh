@@ -288,6 +288,8 @@ if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 
   git config -f .gitmodules submodule.vendor/agent-canon.url "${AGENT_CANON_TEST_REMOTE}"
   git submodule sync vendor/agent-canon >/dev/null
   git -C vendor/agent-canon remote set-url origin "${AGENT_CANON_TEST_REMOTE}"
+  git -C vendor/agent-canon fetch --force origin \
+    "refs/heads/main:refs/remotes/origin/main" >/dev/null
 else
   git remote add agent-canon "${AGENT_CANON_TEST_REMOTE}"
 fi

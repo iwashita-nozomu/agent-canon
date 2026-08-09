@@ -367,6 +367,21 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
             script.index('git -C "$submodule_path" switch main'),
         )
 
+    def test_fresh_clone_rebinds_tracking_ref_with_the_fixture_remote(self) -> None:
+        """The disposable remote replacement must replace its stale tracking identity."""
+        script = (AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_fresh_clone.sh").read_text(
+            encoding="utf-8"
+        )
+        remote_rebind = (
+            'git -C vendor/agent-canon fetch --force origin \\\n'
+            '    "refs/heads/main:refs/remotes/origin/main"'
+        )
+        self.assertIn(remote_rebind, script)
+        self.assertLess(
+            script.index(remote_rebind),
+            script.index("materialize_current_lifecycle_projection"),
+        )
+
     def test_merge_invocations_disable_configured_autostash(self) -> None:
         """Every AgentCanon update merge must refuse config-driven autostash."""
         for relative_path in ("tools/sync_agent_canon.sh", "tools/update_agent_canon.sh"):
