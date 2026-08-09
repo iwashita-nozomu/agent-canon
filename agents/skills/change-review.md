@@ -66,6 +66,12 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 
 - findings が summary より先に並んでいる
 - `fix now` と `follow-up` が分かれている
+- finding-level status is one of `blocking`, `non-blocking`, `question`,
+  `not-applicable`, or `accepted-risk`; status is recorded independently from
+  severity and evidence
+- the overall review outcome is `accept` unless an unresolved `blocking`
+  finding remains; non-blocking findings never force a revise/changes-required
+  outcome
 - `revise`、`required_change`、rejected diff、requested-change review が user
   request を戻す権限として扱われていない。各 finding は保持する request clause
   または design intent を示し、修正、再設計、または escalation に接続している
@@ -77,6 +83,28 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 - one owning review gate covers the claims in one replaceable responsibility.
   Add a specialist only for a distinct unresolved claim or risk that the owning
   gate cannot judge.
+
+## Finding Status And Severity Contract
+
+Each finding row records `severity`, `status`, and evidence separately. Use the
+following severity rubric:
+
+| Severity | Use | Minimum evidence |
+| --- | --- | --- |
+| `critical` | reproducible correctness, security, data-loss, or publication failure | a concrete reproduction or an equivalent static argument |
+| `high` | material correctness, security, or contract regression | a concrete reproduction or an equivalent static argument |
+| `medium` | bounded risk that does not currently block acceptance | reachable-path evidence or a targeted check |
+| `low` | minor robustness or maintainability concern | a precise changed-path observation |
+| `style` | wording, formatting, or preference only | a changed-path reference; suppressible |
+
+`critical` and `high` claims without a reproduction or equivalent static
+argument are rejected as evidence-insufficient. Style findings are
+`non-blocking` by default and may be suppressed with a rationale. Questions and
+not-applicable observations remain visible but do not change the outcome.
+
+The owning review dispatch records one decision for the responsibility unit;
+Python/C++/domain reviewers are bounded validators of distinct claims and do
+not create parallel full-review workflows.
 
 ## Mandatory Checklist
 
@@ -114,6 +142,9 @@ diff を findings-first で読み、回帰、欠落テスト、古い文書を�
 - durable finding を作る場合は `issues/README.md` の required fields と
   `issue_sync.py` の mirror route を使う
 - `no findings` の場合でも residual risk を残している
+- management context sweeps run only when a scope or decision question has
+  evidence that the sweep can resolve; an unconditional management revise gate
+  is not a finding status
 - validation is static/targeted first. Full suites or remote CI run once for the
   final candidate only when the touched contract requires them.
 

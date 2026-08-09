@@ -12,25 +12,24 @@ downstream implementation ../../../agents/skills/structure-refactor.md repairs s
 
 ## Reader Map
 
-全 tracked tree の被覆と directory responsibility の入口を読む unit です。最初に
-`git ls-files -z` と structure contract の結果を比較し、個別 owner unit の重複を
-cross-reference として扱います。
+repository structure contract と responsibility scope の path/kind evidence を読む unit
+です。`git ls-files -z` の全 tree をこの unit の fallback pattern として再分類せず、
+一般 path owner は `responsibility-scope.toml` に委譲します。
 
 ## Owner Responsibility
 
-`structure-refactor` が親 repository の root、directory、README、submodule境界、
-responsibility scope を所有します。`repository-structure` は全 tracked path の
-一次的な被覆判定を所有します。
+`structure-refactor` が親 repository の root、directory、README、submodule 境界を
+所有します。`responsibility-scope.toml` が一般 path owner/class の唯一の source であり、
+`repo_structure_contract.py` は required path の existence/kind だけを判定します。
 
 ## Invariant
 
-親 root の全 tracked path が少なくとも一つの audit-unit pattern に決定論的に一致し、
-path escape と不明な directory ownership がない。submodule 内部は親 tree に混ぜず、
-generated report を source structure と誤認しない。
+structure contract の required path が存在し、kind が一致し、path escape がない。
+submodule 内部は親 tree に混ぜず、generated report を source structure と誤認しない。
+一般 path の owner/class と audit-unit の scope は別の二重正本にならない。
 
 ## Evidence Sources
 
-- `git ls-files -z` の親 root readback
 - `documents/structure/repo-structure-contract.toml`
 - `tools/agent_tools/repo_structure_contract.py`
 - `tools/agent_tools/responsibility_scope.py`
@@ -39,21 +38,19 @@ generated report を source structure と誤認しない。
 ## Repair Route
 
 owner skill は `structure-refactor`、主 tool は `repo_structure_contract.py` と
-`responsibility_scope.py`。uncovered path はこの unit の pattern を無根拠に広げず、
-実際の責務 owner を決めて該当 unit と directory README を修正し、親 root の readback
-を再実行します。
+`responsibility_scope.py`。missing/kind mismatch は structure contract を修正し、一般
+path owner の判断は responsibility scope に追加して readback します。audit-unit の
+pattern を `all-tracked` に広げる fallback は使いません。
 
 ## Validation
 
-static structure contract、scope map、audit tool の uncovered/overlap packet で判定します。
-runtime build は構造 invariant を静的に確定できない場合だけ、owner tool が指定した
-最小 command を実行します。
+static structure contract と scope map で判定します。runtime build は構造 invariant を
+静的に確定できない場合だけ、owner tool が指定した最小 command を実行します。
 
 ## Close Condition
 
-全 tracked path が被覆され、structure contract と responsibility scope が pass し、
-overlap には primary owner と cross-reference があり、修正後の対象 path readback が
-同じ結果を返す。
+structure contract と responsibility scope が pass し、修正後の対象 path readback が
+同じ結果を返す。audit unit の overlap や全 tracked fallback を完了条件にしない。
 
 ## Related Change Surfaces
 
@@ -62,7 +59,12 @@ README、unit pattern のいずれかを変更した同じ PR でこの unit の
 
 ## Scope Patterns
 
-- `pattern:all-tracked`
+- `pattern:documents/structure/**`
+- `pattern:responsibility-scope.toml`
+- `pattern:README.md`
+- `pattern:AGENTS.md`
+- `pattern:ROOT_AGENTS.md`
+- `pattern:.gitmodules`
 
 ## Legacy Migration IDs
 

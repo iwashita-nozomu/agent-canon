@@ -13,7 +13,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 import shutil
 import subprocess
@@ -28,6 +27,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 from surface_manifest import (  # noqa: E402
     load_manifest,
+    render_copy_specs,
     render_regular_specs,
     render_root_absent_paths,
     target_for_entry,
@@ -118,143 +118,41 @@ class ParentRepoReadinessTest(unittest.TestCase):
             )
 
     def test_shared_surface_receipt(self) -> None:
-        """The shared devcontainer surface keeps opt-in receipt owners in source."""
+        """The manifest exposes only the minimal root projection surfaces."""
         manifest = load_manifest(
             PROJECT_ROOT,
             ".",
             "documents/runtime/shared-runtime-surfaces.toml",
         )
-        devcontainer = next(
-            entry for entry in manifest.entries if entry.path == ".devcontainer"
-        )
-        devcontainer_json = next(
-            entry
+        active = {
+            entry.path: entry
             for entry in manifest.entries
-            if entry.path == ".devcontainer/devcontainer.json"
-        )
-        bootstrap_dependencies = next(
-            entry
-            for entry in manifest.entries
-            if entry.path == ".devcontainer/bootstrap-dependencies.sh"
-        )
-        gpu_admission = next(
-            entry
-            for entry in manifest.entries
-            if entry.path == ".devcontainer/gpu-admission"
-        )
-
-        self.assertEqual(devcontainer.mode, "regular")
-        self.assertEqual(devcontainer.surface_class, "active_contract")
-        self.assertTrue((PROJECT_ROOT / devcontainer.path).is_dir())
-        self.assertTrue(
-            (PROJECT_ROOT / devcontainer_json.source_or_default()).is_file()
-        )
-        self.assertEqual(devcontainer_json.mode, "symlink")
-        self.assertEqual(bootstrap_dependencies.mode, "symlink")
+            if entry.mode in {"symlink", "repo_state"} and not entry.optional
+        }
         self.assertEqual(
-            bootstrap_dependencies.source,
-            ".devcontainer/bootstrap-dependencies.sh",
+            set(active), {"AGENTS.md", ".codex/config.toml", "tools/agent-canon"}
         )
-        self.assertTrue(
-            (PROJECT_ROOT / bootstrap_dependencies.source_or_default()).is_file()
-        )
-        self.assertEqual(gpu_admission.mode, "symlink")
-        self.assertEqual(gpu_admission.source, ".devcontainer/gpu-admission")
+        for entry in active.values():
+            self.assertEqual(entry.projection_producer, "agent-canon")
+            self.assertEqual(entry.projection_kind, "runtime_surface")
 
-    def test_materialized_devcontainer_uses_child_symlink(self) -> None:
-        """Manifest materialization creates directory and individual symlinks."""
+    def test_materialized_minimal_projection(self) -> None:
+        """Manifest materialization creates only the three active symlink views."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_parent_fixture(root)
-            devcontainer = root / ".devcontainer"
-            devcontainer_json = devcontainer / "devcontainer.json"
-            bootstrap_dependencies = devcontainer / "bootstrap-dependencies.sh"
-            gpu_admission = devcontainer / "gpu-admission"
-
-            self.assertTrue(devcontainer.is_dir())
-            self.assertFalse(devcontainer.is_symlink())
-            self.assertTrue(devcontainer_json.is_symlink())
-            self.assertEqual(
-                os.readlink(devcontainer_json),
-                "../vendor/agent-canon/.devcontainer/devcontainer.json",
-            )
-            self.assertTrue(bootstrap_dependencies.is_symlink())
-            self.assertEqual(
-                os.readlink(bootstrap_dependencies),
-                "../vendor/agent-canon/.devcontainer/bootstrap-dependencies.sh",
-            )
-            self.assertTrue(bootstrap_dependencies.is_file())
-            self.assertTrue(os.access(bootstrap_dependencies, os.X_OK))
-            self.assertTrue(gpu_admission.is_symlink())
-            self.assertEqual(
-                os.readlink(gpu_admission),
-                "../vendor/agent-canon/.devcontainer/gpu-admission",
-            )
-            profile = json.loads(
-                (gpu_admission / "devcontainer.json").read_text(encoding="utf-8")
-            )
-            self.assertEqual(
-                profile["dockerComposeFile"],
-                "../../.agent-canon/gpu-admission-compose.generated.yml",
-            )
-            config = json.loads(devcontainer_json.read_text(encoding="utf-8"))
-            assert config["initializeCommand"] == (
-                "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml "
-                "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
-                ".devcontainer/generate-runtime-compose.sh"
-            )
-            assert config["postCreateCommand"] == (
-                "bash .devcontainer/bootstrap-dependencies.sh --install && "
-                "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
-                ".devcontainer/post-create-entrypoint.sh "
-                "/workspace/${localWorkspaceFolderBasename}"
-            )
-            assert config["postAttachCommand"] == (
-                "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
-                ".devcontainer/post-attach.sh"
-            )
-            for name in (
-                "bootstrap-shared-runtime.sh",
-                "finalize-shared-runtime.sh",
-                "generate-runtime-compose.sh",
-                "post-attach.sh",
-                "post-create.sh",
-                "post-create-entrypoint.sh",
-            ):
-                self.assertFalse((devcontainer / name).exists())
-            self.assertTrue(
-                (
-                    root
-                    / "vendor/agent-canon/.devcontainer/bootstrap-shared-runtime.sh"
-                ).is_file()
-            )
-            self.assertTrue(
-                (
-                    root / "vendor/agent-canon/.devcontainer/finalize-shared-runtime.sh"
-                ).is_file()
-            )
-            self.assertNotIn("bootstrap-shared-runtime.sh", config["initializeCommand"])
-            self.assertNotIn("finalize-shared-runtime.sh", config["postCreateCommand"])
-
-    def test_legacy_devcontainer_directory_symlink_is_rejected(self) -> None:
-        """Whole-directory .devcontainer symlink is rejected by readiness checks."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_parent_fixture(root)
-            devcontainer = root / ".devcontainer"
-            shutil.rmtree(devcontainer)
-            devcontainer.symlink_to(
-                "vendor/agent-canon/.devcontainer", target_is_directory=True
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "PARENT_REPO_READINESS_FINDING=error:active_contract:"
-                ".devcontainer:must-be-parent-owned-directory",
-                result.stdout,
-            )
+            for path, target in {
+                "AGENTS.md": "vendor/agent-canon/ROOT_AGENTS.md",
+                ".codex/config.toml": "vendor/agent-canon/.codex/config.toml",
+                "tools/agent-canon": "vendor/agent-canon/tools",
+            }.items():
+                projection = root / path
+                self.assertTrue(projection.is_symlink(), path)
+                self.assertEqual(
+                    os.readlink(projection),
+                    os.path.relpath(root / target, projection.parent),
+                    path,
+                )
 
     def test_regular_specs_skip_optional_project_skill_lane(self) -> None:
         """Optional project content should not be materialized by link-root."""
@@ -324,37 +222,34 @@ class ParentRepoReadinessTest(unittest.TestCase):
         self.assertIn("vendor/agent-canon/", readme)
 
     def test_missing_active_contract_fails(self) -> None:
-        """Template-owned active contract files are required at the parent root."""
+        """Active AgentCanon projection views are required at the parent root."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_parent_fixture(root)
-            (root / "documents" / "contracts" / "server-host-contract.md").unlink()
+            (root / "AGENTS.md").unlink()
 
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "PARENT_REPO_READINESS_FINDING=error:active_contract:"
-                "documents/contracts/server-host-contract.md:missing-regular-file",
+                "PARENT_REPO_READINESS_FINDING=error:shared_surface:"
+                "AGENTS.md:missing-symlink",
                 result.stdout,
             )
 
     def test_missing_github_copy_fails(self) -> None:
-        """Required GitHub path constraint files must exist in the parent."""
+        """The runtime config projection is required at the parent root."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_parent_fixture(root)
-            (
-                root / ".github" / "scripts" / "checkout_agent_canon_submodule.sh"
-            ).unlink()
+            (root / ".codex" / "config.toml").unlink()
 
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn(
-                "PARENT_REPO_READINESS_FINDING=error:github_copy:"
-                ".github/scripts/checkout_agent_canon_submodule.sh:"
-                "missing-copy",
+                "PARENT_REPO_READINESS_FINDING=error:shared_surface:"
+                ".codex/config.toml:missing-symlink",
                 result.stdout,
             )
 
@@ -368,26 +263,8 @@ class ParentRepoReadinessTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
-    def test_standalone_only_root_document_stale_copy_fails(self) -> None:
-        """Stale parent copies of standalone-only root docs should fail readiness."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_parent_fixture(root)
-            self.write_file(
-                root, "documents/runtime/SHARED_RUNTIME_SURFACES.md", "stale root copy\n"
-            )
-
-            result = self.run_checker(root)
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "PARENT_REPO_READINESS_FINDING=error:standalone_only_leak:"
-                "documents/runtime/SHARED_RUNTIME_SURFACES.md:must-not-exist-in-parent-root",
-                result.stdout,
-            )
-
     def test_standalone_only_entries_not_in_regular_specs_root_absent_paths(self) -> None:
-        """Standalone-only manifest entries must appear in root-absent, not regular specs."""
+        """Retired root views appear in root-absent, not regular specs."""
         manifest = load_manifest(
             PROJECT_ROOT,
             ".",
@@ -400,10 +277,28 @@ class ParentRepoReadinessTest(unittest.TestCase):
         self.assertNotIn(
             "documents/runtime/shared-runtime-surfaces.toml", regular_specs
         )
-        self.assertIn("documents/runtime/SHARED_RUNTIME_SURFACES.md", root_absent_specs)
-        self.assertIn(
-            "documents/runtime/shared-runtime-surfaces.toml", root_absent_specs
+        self.assertIn(".agents", root_absent_specs)
+        self.assertIn(".vscode", root_absent_specs)
+
+    def test_agentcanon_workflow_sources_stay_standalone_only(self) -> None:
+        """AgentCanon workflows remain source-owned but are never root copies."""
+        manifest = load_manifest(
+            PROJECT_ROOT,
+            ".",
+            "documents/runtime/shared-runtime-surfaces.toml",
         )
+        root_absent_paths = set(render_root_absent_paths(manifest.entries).splitlines())
+        copy_specs = render_copy_specs(manifest.entries, manifest.prefix)
+
+        for workflow in (
+            ".github/workflows/agent-improvement-guide.yml",
+            ".github/workflows/agent-coordination.yml",
+        ):
+            self.assertIn(workflow, root_absent_paths)
+            self.assertNotIn(f"{workflow}:", copy_specs)
+            source = PROJECT_ROOT / workflow
+            self.assertTrue(source.is_file(), workflow)
+            self.assertIn("workflow_dispatch:", source.read_text(encoding="utf-8"))
 
     def write_parent_fixture(self, root: Path) -> None:
         """Create a synthetic template-derived parent repo."""
@@ -430,7 +325,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             elif entry.mode == "regular":
                 if entry.optional:
                     continue
-                if entry.surface_class == "project_content":
+                if entry.projection_kind == "project_content":
                     target.mkdir(parents=True, exist_ok=True)
                     continue
                 source = root / manifest.prefix / entry.source_or_default()
@@ -448,6 +343,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             "Makefile": "ci:\n\t@true\n",
             ".gitmodules": '[submodule "vendor/agent-canon"]\n\tpath = vendor/agent-canon\n\turl = https://github.com/iwashita-nozomu/agent-canon.git\n',
             "goal.md": "goal\n",
+            "documents/README.md": "documents\n",
             "responsibility-scope.toml": 'catalog_kind = "agent_canon_responsibility_scope"\n',
             ".agent-canon/update-state.toml": 'tasks_applied_through = "fixture"\n',
             "scripts/README.md": "scripts\n",
@@ -465,7 +361,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
                 [
                     "{",
                     '  "initializeCommand": "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",',
-                    '  "postCreateCommand": "bash .devcontainer/bootstrap-dependencies.sh --install && python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",',
+                    '  "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/bootstrap-dependencies.sh --install-language-runtime && python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",',
                     '  "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",',
                     '  "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",',
                     '  "service": "workspace",',

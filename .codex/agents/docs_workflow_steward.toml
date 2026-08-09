@@ -8,12 +8,12 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: ba53a4d54a94ea83fd73306fa3e06a1510f02c0bf5754f1cf6b7f34dd6a3dd63
+# source canonical digest: 5a0323be001cad9e8acc493cdf9026475d58d3e1be005c6e493566dd8eaaf151
 
 name = "docs_workflow_steward"
 description = "Docs and workflow steward for canonical instructions, notes, and agent workflows."
 nickname_candidates = ["docs_workflow_steward"]
-sandbox_mode = "workspace-write"
+sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"

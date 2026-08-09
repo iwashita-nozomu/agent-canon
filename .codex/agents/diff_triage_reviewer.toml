@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: a750bbf5f7f2576b4e900120599e88ed22c580385ee16e5ee0959bcd035bd332
+# source canonical digest: 543fb2137053883a9b3789a5b5ce2eb112a9b2109e1e21039d29219656819e53
 
 name = "diff_triage_reviewer"
 description = "Read-only reviewer for bounded diffs before escalation to broad review."

@@ -35,11 +35,11 @@ failure routes, and the legacy compatibility appendix for non-submodule repos.
 | Path | Expected State | Owner | Check |
 | --- | --- | --- | --- |
 | `vendor/agent-canon/` | AgentCanon Git submodule checkout and parent gitlink | AgentCanon | `git submodule status vendor/agent-canon` and `git rev-parse HEAD:vendor/agent-canon` |
-| `AGENTS.md`, `agents/`, `.agents/`, `.codex/` | root runtime view of AgentCanon | AgentCanon | source-root resolver `check` |
+| `AGENTS.md`, `.codex/config.toml`, `tools/agent-canon` | active root runtime views of AgentCanon | AgentCanon | source-root resolver `check` |
+| `agents/`, `.agents/`, `.codex/agents/`, `.vscode/`, `.devcontainer/` | optional parent-owned regular content | template or derived repo | parent structure/environment checks when present |
 | `tools/` | parent-owned regular container; shared tooling is only `tools/agent-canon/` | parent / AgentCanon | source-root resolver `check` |
 | `vendor/agent-canon/templates/` | centralized AgentCanon template source with no parent-root symlink view | AgentCanon | manifest `link-specs` and consumer path readback |
-| `.github/AGENTS.md` | GitHub agent root view | AgentCanon | source-root resolver `check` |
-| `.github/workflows/agent-coordination.yml`, `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`, `.github/scripts/checkout_agent_canon_submodule.sh` | regular root copies forced by GitHub path constraints | AgentCanon source, root copy | source-root resolver `check` |
+| `.github/` | parent-owned GitHub workflows, templates, and automation | template or derived repo | GitHub workflow checks |
 | `documents/runtime/SHARED_RUNTIME_SURFACES.md`, `documents/runtime/shared-runtime-surfaces.toml` | shared surface policy and machine manifest | AgentCanon | source-root resolver `check-convention` |
 | `.agent-canon/update-state.toml` | parent-local AgentCanon update TODO boundary | parent repo | `python3 tools/agent_tools/agent_canon_update_todos.py status` |
 | `documents/README.md`, template bootstrap / host / server contract docs | parent repo active contracts | template or derived repo | regular file, not root symlink |
@@ -70,7 +70,7 @@ git -C vendor/agent-canon status --short --branch --untracked-files=all 2>/dev/n
 1. If `vendor/agent-canon/` is a submodule, unrelated parent dirty state does not block an AgentCanon update. `make agent-canon-ensure-latest` classifies the update surface directly using the [`AgentCanon parent state decision table`](../rule/dependency-module-changes.md#agentcanon-parent-state-decision-table):
 
 - clean `vendor/agent-canon/` on named `main` with worktree `HEAD` equal to the
-  staged index gitlink is the parent pin/root projection pass state.
+  staged index gitlink is the parent pin and active-root-view repair pass state.
 - clean `vendor/agent-canon/` on a named topic branch is the source-edit owner;
   `main` is only the topic-creation starting point.
 - dirty `vendor/agent-canon/` follows the table's requested-topic identity
@@ -118,7 +118,7 @@ binary just because the source commit has not changed yet.
    repaired only after the source/pin owner is selected.
 
 Parent `latest` first handles the intended named topic source owner through the
-source PR merge route; its parent pin/root projection phase does not invoke
+source PR merge route; its parent pin/active-root-view phase does not invoke
 `merge-main-into-current`. A parent checkout on `main` stops at topic creation,
 and standalone source mode retains its own source-branch merge route.
 
@@ -132,8 +132,8 @@ PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_sou
 
 Record this as `agentcanon_structure_followup=required` for every AgentCanon
 source integration, parent `vendor/agent-canon` pin update, `.gitmodules`
-change, AgentCanon-owned root runtime view change, shared root-copy surface
-change, or parent root sync PR. Record `agentcanon_structure_followup=pass` only
+change, AgentCanon-owned active root runtime view change, or parent root sync PR.
+Parent-owned regular surfaces do not require AgentCanon projection readback. Record `agentcanon_structure_followup=pass` only
 after both commands pass from the parent root. If the AgentCanon source change
 was prepared in standalone AgentCanon or in the submodule worktree, this parent
 root follow-up is still mandatory after the source PR is integrated or while
@@ -147,8 +147,8 @@ identity. A parent-owned regular `templates/` directory remains unchanged.
 The same packet preserves `vendor/agent-canon/templates/`, deletes parent
 `experiments/_template/`, removes only the `_template` entry from the
 project-owned `experiments/registry.toml`, removes docs/tests that only
-exercise that scaffold, and regenerates the GitHub Issue/PR copies from
-`vendor/agent-canon/templates/documents/github/`. Do not delete other
+exercise that scaffold, and preserves parent-owned regular GitHub content without
+regenerating it from `vendor/agent-canon/templates/documents/github/`. Do not delete other
 experiment topics or mutate the AgentCanon source registry (the source tree has
 no project registry).
 
@@ -385,7 +385,7 @@ When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the ou
 - `missing checklist`: restore or update `vendor/agent-canon/`, then rerun
   `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root`.
 - missing `agentcanon_structure_followup=pass`: keep the AgentCanon source, pin,
-  root-view, shared root-copy, or parent root sync PR open. Run the root-view
+  active-root-view or parent root sync PR open. Run the active-root-view
   commands from the parent root, then run the parent readiness / structure
   checks selected by the active profile:
 

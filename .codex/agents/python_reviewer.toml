@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 095599b7a2cc0157f43a54b08446fbcf21c138fa1656054a4f209ad756022e33
+# source canonical digest: 24ad0b6c58be25bd244aca83288b0ad98d013d5a50e0d7f57505ed4cc740e646
 
 name = "python_reviewer"
 description = "Read-only reviewer for Python diffs, type boundaries, and parent-selected validation evidence."

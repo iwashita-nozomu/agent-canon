@@ -46,6 +46,7 @@ required_coverage = [
   "tests",
   "tools",
   "vendor/agent-canon",
+  "AGENTS.md",
   "README.md",
   "QUICK_START.md",
   "responsibility-scope.toml",
@@ -91,15 +92,9 @@ class = "shared_runtime"
 description = "AgentCanon submodule pin and root runtime views into that pin."
 paths = [
   "vendor/agent-canon/**",
-  "agents/**",
-  ".agents/**",
-  ".codex/**",
-  ".devcontainer/**",
-  ".vscode/**",
-  "evidence",
-  "evidence/**",
   "tools/agent-canon",
   "tools/agent-canon/**",
+  ".codex/config.toml",
   "AGENTS.md",
 ]
 # Optional:
@@ -121,6 +116,11 @@ paths = [
   "README.md",
   "QUICK_START.md",
   "responsibility-scope.toml",
+  ".agents/**",
+  "agents/**",
+  ".codex/**",
+  ".devcontainer/**",
+  ".vscode/**",
   "documents/**",
   "docker/**",
   "scripts/**",
@@ -131,6 +131,7 @@ paths = [
 exclude_paths = [
   "tools/agent-canon",
   "tools/agent-canon/**",
+  ".codex/config.toml",
 ]
 protecting_tools = [
   "tools/agent-canon/agent_tools/responsibility_scope.py",
@@ -158,6 +159,8 @@ description = "Project-specific checked-in experiments, notes, and durable state
 paths = [
   "experiments/**",
   "notes/**",
+  "evidence",
+  "evidence/**",
 ]
 protecting_tools = [
   "tools/agent-canon/agent_tools/responsibility_scope.py",

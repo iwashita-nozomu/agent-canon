@@ -319,6 +319,39 @@ def validate_project_config() -> None:
     """Check that the shared project config exposes the review route."""
     config = load_project_config_toml()
     registry = model_profile_registry.load_model_profile_registry(ROOT)
+    common_return = model_profile_registry.validate_common_return_schema(registry)
+    ensure(common_return.valid, "all canonical profiles must use the common claim/evidence return schema")
+    writer_policy = registry.writer_isolation_policy
+    ensure(
+        writer_policy.get("current_checkout_mode")
+        == "parallel_only_for_disjoint_paths_without_shared_state",
+        "writer isolation policy must protect shared current-checkout state",
+    )
+    ensure(
+        tuple(writer_policy.get("parallel_requirements", ()))
+        == (
+            "disjoint_paths",
+            "no_shared_git_index_or_head",
+            "no_generated_or_formatter_effects",
+        ),
+        "writer isolation policy requirements must be explicit",
+    )
+    ensure(
+        writer_policy.get("collision_action") == "serialize_current_checkout_waves",
+        "writer collisions must serialize in the current checkout",
+    )
+    ensure(
+        writer_policy.get("isolated_worktree_mode")
+        == "explicit_alternative_implementation_experiment_only",
+        "isolated worktrees are reserved for explicit alternative implementation experiments",
+    )
+    repository_writers = {"worker", "spark_worker"}
+    for role_id, sandbox in registry.role_sandbox_bindings.items():
+        expected_sandbox = "workspace-write" if role_id in repository_writers else "read-only"
+        ensure(
+            sandbox == expected_sandbox,
+            f"{role_id} sandbox/write policy contradiction: expected {expected_sandbox}",
+        )
     parent_profile = registry.by_profile("sol_parent_high")
     review_profile = registry.by_profile("luna_reasoning_high")
     ensure(config.get("model") == parent_profile.model, "parent model must project sol_parent_high")

@@ -23,9 +23,11 @@ downstream implementation ../../../agents/skills/agent-canon-update.md owns pin 
 
 ## Invariant
 
-`vendor/agent-canon`、root `agents/`、`.agents/`、`tools/agent-canon/`、`AGENTS.md` の
-各 view は canonical source と整合し、pin は意図した remote/main を指す。MCP、個人
-Codex state、template 固有説明を別責務として保持する。
+`vendor/agent-canon`、root `AGENTS.md`、`.codex/config.toml`、
+`tools/agent-canon/` の active views は canonical source と整合し、pin は意図した
+remote/main を指す。`agents/`、`.agents/`、`.devcontainer/`、`.vscode/`、GitHub
+paths は親-owned regular content として保持する。MCP、個人 Codex state、template
+固有説明を別責務として保持する。
 
 ## Evidence Sources
 
@@ -60,9 +62,7 @@ shared surface、source-root resolver、pin、root AGENTS の変更時だけ本 
 ## Scope Patterns
 
 - `pattern:vendor/agent-canon/**`
-- `pattern:agents/**`
-- `pattern:.agents/**`
-- `pattern:.codex/**`
+- `pattern:.codex/config.toml`
 - `pattern:tools/agent-canon/**`
 - `pattern:AGENTS.md`
 - `pattern:ROOT_AGENTS.md`
@@ -70,4 +70,4 @@ shared surface、source-root resolver、pin、root AGENTS の変更時だけ本 
 
 ## Legacy Migration IDs
 
-PRA-C007 PRA-C008 PRA-C009 PRA-C010 PRA-C011 PRA-C012 PRA-C013 PRA-C014 PRA-C015 PRA-C016 PRA-C017 PRA-C018 PRA-C019 PRA-C020 PRA-C021 PRA-C022 PRA-C023 PRA-C024 PRA-C087 PRA-C089 PRA-C090 PRA-C091 PRA-X005 PRA-X006 PRA-X007 PRA-X008 PRA-X009 PRA-X010 PRA-X011 PRA-X012 PRA-X013 PRA-X014 PRA-X015 PRA-X016 PRA-X017 PRA-X048
+PRA-C001 PRA-C002 PRA-C003 PRA-C004 PRA-C005 PRA-C006 PRA-C007 PRA-C008 PRA-C009 PRA-C010 PRA-C011 PRA-C012 PRA-C013 PRA-C014 PRA-C015 PRA-C016 PRA-C017 PRA-C018 PRA-C019 PRA-C020 PRA-C021 PRA-C022 PRA-C023 PRA-C024 PRA-C087 PRA-C088 PRA-C089 PRA-C090 PRA-C091 PRA-C097 PRA-C098 PRA-C099 PRA-C100 PRA-C102 PRA-C103 PRA-C104 PRA-C105 PRA-X001 PRA-X002 PRA-X003 PRA-X004 PRA-X005 PRA-X006 PRA-X007 PRA-X008 PRA-X009 PRA-X010 PRA-X011 PRA-X012 PRA-X013 PRA-X014 PRA-X015 PRA-X016 PRA-X017 PRA-X047 PRA-X048 PRA-X050 PRA-X051 PRA-X052 PRA-X053

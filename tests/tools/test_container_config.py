@@ -2,9 +2,8 @@
 
 # @dependency-start
 # contract test
-# responsibility Verifies topic-root Compose mounts, selected repo paths, and VS Code surfaces.
+# responsibility Verifies topic-root Compose mounts, selected repo paths, and retired VS Code projections.
 # upstream design ../../documents/rule/dependency-module-changes.md topic-root mount policy
-# upstream design ../../documents/runtime/shared-runtime-surfaces.toml shared VS Code surface ownership
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell contract
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission selector and scenario validation
 # upstream implementation ../../tools/ci/container_config.py semantic devcontainer checker
@@ -33,10 +32,14 @@ GPU_ADMISSION_SELECTOR = (
 )
 GPU_ADMISSION_ORCHESTRATOR = PROJECT_ROOT / ".devcontainer" / "gpu-admission.sh"
 POST_CREATE_COMMAND = (
-    "bash .devcontainer/bootstrap-dependencies.sh --install && "
     "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
     ".devcontainer/post-create-entrypoint.sh "
     "/workspace/${localWorkspaceFolderBasename}"
+)
+PARENT_POST_CREATE_COMMAND = (
+    "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
+    ".devcontainer/bootstrap-dependencies.sh --install-language-runtime && "
+    f"{POST_CREATE_COMMAND}"
 )
 
 
@@ -195,45 +198,14 @@ def write_topic_fixture(
     )
     write_file(
         repo,
-        "tools/agent_tools/dependency_module_change.py",
+        "tools/agent-canon/agent_tools/dependency_module_change.py",
         "#!/usr/bin/env python3\n",
     )
     return repo
 
 
-def write_surface_manifest(root: Path, prefix: str = "") -> None:
-    """Write the real-container/four-individual-symlink manifest."""
-    manifest = "\n".join(
-        [
-            "version = 1",
-            f'prefix = "{prefix or "vendor/agent-canon"}"',
-            "",
-            "[[surface]]",
-            'path = ".vscode"',
-            'mode = "regular"',
-            'owner = "template-or-derived-repo"',
-            'class = "active_contract"',
-            'source = ".vscode"',
-            "",
-            "[[group]]",
-            'mode = "symlink"',
-            'owner = "agent-canon"',
-            'class = "runtime_surface"',
-            'source_prefix = ""',
-            'paths = [".vscode/c_cpp_properties.json", ".vscode/extensions.json", ".vscode/settings.json", ".vscode/tasks.json"]',
-            "",
-        ]
-    )
-    path = root / (
-        "documents/runtime/shared-runtime-surfaces.toml"
-        if not prefix
-        else f"{prefix}/documents/runtime/shared-runtime-surfaces.toml"
-    )
-    write_file(root, str(path.relative_to(root)), manifest)
-
-
 def write_vscode_source(root: Path, relative: str = ".vscode") -> None:
-    """Write regular source files for the four shared VS Code surfaces."""
+    """Write regular files for the four standalone VS Code surfaces."""
     for name in (
         "c_cpp_properties.json",
         "extensions.json",
@@ -268,6 +240,17 @@ def test_topic_compose_semantics_pass(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
+def test_validator_rejects_missing_dependency_module_change_in_parent_mode(tmp_path: Path) -> None:
+    """Parent mode requires the canonical dependency module path when module checks are enabled."""
+    repo = write_topic_fixture(tmp_path)
+    (repo / "tools" / "agent-canon" / "agent_tools" / "dependency_module_change.py").unlink()
+
+    result = run_validator(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "required-for-devcontainer-dependency-check" in result.stdout
+
+
 def test_gpu_admission_selector_isolated_from_default_selector() -> None:
     """The opt-in selector owns a distinct config and generated Compose identity."""
     default = json.loads(
@@ -284,8 +267,8 @@ def test_gpu_admission_selector_isolated_from_default_selector() -> None:
     assert load_container_config_module().validate_gpu_admission_selector(PROJECT_ROOT) == []
 
 
-def test_post_create_bootstraps_before_python_source_root_wrapper() -> None:
-    """Both selectors provision shell prerequisites before Python starts."""
+def test_post_create_uses_image_bootstrap_before_shared_lifecycle() -> None:
+    """Both selectors rely on the image-owned fixed bootstrap and check at runtime."""
     for config_path in (
         PROJECT_ROOT / ".devcontainer" / "devcontainer.json",
         GPU_ADMISSION_SELECTOR,
@@ -294,9 +277,49 @@ def test_post_create_bootstraps_before_python_source_root_wrapper() -> None:
         command = config["postCreateCommand"]
 
         assert command == POST_CREATE_COMMAND
-        assert command.index("bootstrap-dependencies.sh --install") < command.index(
-            "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py"
+        assert "bootstrap-dependencies.sh --install" not in command
+
+
+def test_parent_layout_requires_language_runtime_before_shared_lifecycle(
+    tmp_path: Path,
+) -> None:
+    """Parent default and GPU selectors require the explicit bootstrap prefix."""
+    module = load_container_config_module()
+    default = json.loads(
+        (PROJECT_ROOT / ".devcontainer/devcontainer.json").read_text(
+            encoding="utf-8"
         )
+    )
+    default["postCreateCommand"] = PARENT_POST_CREATE_COMMAND
+    assert module.validate_devcontainer_json(default, parent_layout=True) == []
+    default["postCreateCommand"] = POST_CREATE_COMMAND
+    default_findings = module.validate_devcontainer_json(default, parent_layout=True)
+    assert [finding.detail for finding in default_findings] == [
+        f"postCreateCommand-expected:{PARENT_POST_CREATE_COMMAND}"
+    ]
+
+    parent = tmp_path / "parent"
+    (parent / "vendor/agent-canon").mkdir(parents=True)
+    profile = json.loads(GPU_ADMISSION_SELECTOR.read_text(encoding="utf-8"))
+    profile["postCreateCommand"] = PARENT_POST_CREATE_COMMAND
+    write_file(
+        parent,
+        ".devcontainer/gpu-admission/devcontainer.json",
+        json.dumps(profile),
+    )
+    gpu_findings = module.validate_gpu_admission_selector(parent)
+    assert not any("postCreateCommand-expected" in item.detail for item in gpu_findings)
+
+    profile["postCreateCommand"] = POST_CREATE_COMMAND
+    write_file(
+        parent,
+        ".devcontainer/gpu-admission/devcontainer.json",
+        json.dumps(profile),
+    )
+    gpu_findings = module.validate_gpu_admission_selector(parent)
+    assert [
+        item.detail for item in gpu_findings if "postCreateCommand-expected" in item.detail
+    ] == [f"postCreateCommand-expected:{PARENT_POST_CREATE_COMMAND}"]
 
 
 def test_gpu_admission_selector_is_mandatory(tmp_path: Path) -> None:
@@ -345,6 +368,7 @@ def test_missing_generated_compose_is_a_required_scenario_finding(
 def test_generator_scenarios_require_both_compose_outputs(tmp_path: Path) -> None:
     """A generator that exits successfully without output fails both scenarios."""
     repo = write_topic_fixture(tmp_path)
+    (repo / "docker/packs").mkdir(parents=True)
     generator = repo / ".devcontainer/generate-runtime-compose.sh"
     generator.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
     generator.chmod(0o755)
@@ -471,21 +495,15 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     assert "gpus: all" not in compose
     assert "group_add:" not in compose
     assert "/var/lib/agent-canon/runtime" not in compose
+    assert "\n      target:" not in compose
 
 
 def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
     tmp_path: Path,
 ) -> None:
     """The explicit profile projects the host identity and GPU runtime fields together."""
-    repo = tmp_path / "workspace" / "topic" / "agent-canon"
-    write_devcontainer(repo)
-    write_file(
-        repo,
-        ".devcontainer/generate-runtime-compose.sh",
-        GENERATOR.read_text(encoding="utf-8"),
-    )
-    write_file(repo, ".devcontainer/Dockerfile", DOCKERFILE.read_text(encoding="utf-8"))
-    (repo / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    repo = write_parent_generator_fixture(tmp_path)
+    write_gpu_admission_pack(repo)
     output_path = repo / ".agent-canon/gpu-admission-compose.generated.yml"
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
@@ -493,8 +511,6 @@ def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
         env={
             **os.environ,
             "HOME": str(tmp_path / "missing-home"),
-            "PROJECT_UID": "1000",
-            "PROJECT_GID": "1000",
             "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
             "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
             "AGENT_CANON_RUNTIME_GID": "4242",
@@ -511,23 +527,89 @@ def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
 
     assert result.returncode == 0, result.stdout + result.stderr
     compose = output_path.read_text(encoding="utf-8")
-    assert "name: agent-canon-" in compose
+    assert "name: parent-" in compose
     assert "-gpu-admission" in compose.splitlines()[0]
     assert "    gpus: all" in compose
+    assert "      target: gpu-runtime" in compose
+    assert 'AGENT_CANON_DEPENDENCY_PROFILE: "gpu"' in compose
     assert '        target: "/var/lib/agent-canon/runtime"' in compose
     assert "    group_add:\n      - \"1000\"\n      - \"4242\"\n      - \"5000\"" in compose
     assert 'DEVCONTAINER_GPU_MODE: "enabled"' in compose
     assert 'DEVCONTAINER_GPU_REQUEST: "all"' in compose
     assert 'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"' in compose
+    module = load_container_config_module()
+    pack, pack_findings = module.load_pack(
+        repo, repo / "docker/packs/gpu-admission.toml"
+    )
+    assert pack_findings == []
+    assert pack is not None
     assert (
-        load_container_config_module().validate_generated_compose(
+        module.validate_generated_compose(
             repo,
-            None,
+            pack,
             profile="gpu-admission",
             compose_path=output_path,
-        )
-        == []
     )
+    == []
+    )
+
+
+@pytest.mark.parametrize("target", [None, "cpu-runtime", "gpu/runtime"])
+def test_gpu_admission_requires_gpu_runtime_pack_target(
+    tmp_path: Path,
+    target: str | None,
+) -> None:
+    """The GPU profile fails closed unless its selected pack names gpu-runtime."""
+    repo = write_parent_generator_fixture(tmp_path)
+    write_gpu_admission_pack(repo, target=target)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(tmp_path / "missing-home"),
+            "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+            "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
+            "AGENT_CANON_RUNTIME_GID": "4242",
+            "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": "1000 4242 5000",
+            "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert (
+        "pack target must be gpu-runtime" in result.stderr
+        or "safe Docker build stage name" in result.stderr
+    )
+
+
+def test_default_rejects_gpu_runtime_pack_target(tmp_path: Path) -> None:
+    """The default profile cannot silently select the GPU build stage."""
+    repo = write_parent_generator_fixture(tmp_path)
+    default_pack = repo / "docker/packs/default.toml"
+    default_pack.write_text(
+        default_pack.read_text(encoding="utf-8").replace(
+            'platform = "linux/amd64"',
+            'platform = "linux/amd64"\ntarget = "gpu-runtime"',
+        ),
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "HOME": str(tmp_path / "missing-home")},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "default profile rejects GPU build target" in result.stderr
 
 
 def test_default_scenario_rejects_shared_runtime_without_profile_selector(
@@ -801,6 +883,42 @@ def write_parent_generator_fixture(
     return repo
 
 
+def write_gpu_admission_pack(
+    repo: Path,
+    *,
+    target: str | None = "gpu-runtime",
+    dockerfile: str = "docker/Dockerfile",
+) -> None:
+    """Write the opt-in pack selected by the GPU generator profile."""
+    target_line = f'target = "{target}"' if target is not None else ""
+    write_file(
+        repo,
+        "docker/packs/gpu-admission.toml",
+        "\n".join(
+            [
+                "[pack]",
+                'name = "gpu-admission"',
+                f'dockerfile = "{dockerfile}"',
+                'context = "."',
+                'image_tag = "gpu-admission:fixture"',
+                'platform = "linux/amd64"',
+                target_line,
+                "",
+                "[smoke]",
+                'shell = "/bin/bash"',
+                "commands = []",
+                "",
+                "[runtime]",
+                'shell = "/bin/bash"',
+                'workdir = "/workspace"',
+                'workspace_mount = "/workspace"',
+                'dependency_profile = "gpu"',
+                "",
+            ]
+        ),
+    )
+
+
 def test_load_pack_reads_optional_platform_when_present_or_omitted(
     tmp_path: Path,
 ) -> None:
@@ -862,8 +980,6 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
         env={
             **os.environ,
             "HOME": str(home),
-            "PROJECT_UID": "1234",
-            "PROJECT_GID": "2345",
             "AGENT_CANON_OPTIONAL_MOUNTS": "host-zshrc",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
@@ -884,10 +1000,10 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     assert 'SHELL: "/bin/zsh"' in compose
     assert 'AGENT_CANON_DEPENDENCY_PROFILE: "full"' in compose
     assert 'AGENT_CANON_CODEX_SESSION_ROOT: "/home/project/.codex/sessions"' in compose
-    assert 'user: "1234:2345"' in compose
+    assert f'user: "{os.getuid()}:{os.getgid()}"' in compose
     assert 'PROJECT_USER:' not in compose
-    assert 'PROJECT_UID: "1234"' in compose
-    assert 'PROJECT_GID: "2345"' in compose
+    assert f'PROJECT_UID: "{os.getuid()}"' in compose
+    assert f'PROJECT_GID: "{os.getgid()}"' in compose
     assert 'command: /bin/zsh -lc "sleep infinity"' in compose
     module = load_container_config_module()
     pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
@@ -913,8 +1029,6 @@ def test_parent_generator_disables_unconfigured_parent_environment(
         env={
             **os.environ,
             "HOME": str(home),
-            "PROJECT_UID": "1000",
-            "PROJECT_GID": "1000",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
         check=False,
@@ -954,8 +1068,6 @@ def test_parent_environment_symlinks_to_existing_sources_pass(tmp_path: Path) ->
         env={
             **os.environ,
             "HOME": str(home),
-            "PROJECT_UID": "1000",
-            "PROJECT_GID": "1000",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
         check=False,
@@ -1047,34 +1159,23 @@ def test_generator_rejects_public_project_user_override(tmp_path: Path) -> None:
     assert "DEVCONTAINER_IDENTITY_ERROR=PROJECT_USER_OVERRIDE_FORBIDDEN" in result.stderr
 
 
-def test_generator_rejects_zero_project_uid_or_gid(tmp_path: Path) -> None:
-    """Project UID and GID must both be positive decimal integers."""
-    for field, value in (("PROJECT_UID", "0"), ("PROJECT_GID", "0")):
+def test_generator_rejects_project_uid_or_gid_override(tmp_path: Path) -> None:
+    """The generator derives host IDs and rejects caller-provided overrides."""
+    for field in ("PROJECT_UID", "PROJECT_GID"):
         case_root = tmp_path / field
         repo = write_parent_generator_fixture(case_root)
         (repo / ".agent-canon").mkdir()
-        home = case_root / "home"
-        write_host_zshrc(home)
-        environment = {
-            **os.environ,
-            "HOME": str(home),
-            "PROJECT_UID": "1234",
-            "PROJECT_GID": "2345",
-            field: value,
-        }
-        environment.pop("PROJECT_USER", None)
-        environment.pop("AGENT_CANON_RUNTIME_GID", None)
         result = subprocess.run(
             ["bash", ".devcontainer/generate-runtime-compose.sh"],
             cwd=repo,
-            env=environment,
+            env={**os.environ, field: "1234"},
             check=False,
             capture_output=True,
             text=True,
         )
 
         assert result.returncode == 1
-        assert "DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_MUST_BE_POSITIVE_DECIMAL" in result.stderr
+        assert "DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_OVERRIDE_FORBIDDEN" in result.stderr
 
 
 def test_parent_validator_rejects_zero_uid_or_gid(tmp_path: Path) -> None:
@@ -1089,8 +1190,6 @@ def test_parent_validator_rejects_zero_uid_or_gid(tmp_path: Path) -> None:
         env={
             **os.environ,
             "HOME": str(home),
-            "PROJECT_UID": "1234",
-            "PROJECT_GID": "2345",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
         check=False,
@@ -1107,14 +1206,20 @@ def test_parent_validator_rejects_zero_uid_or_gid(tmp_path: Path) -> None:
 
     malformed_cases = (
         (
-            valid.replace('user: "1234:2345"', 'user: "0:2345"').replace(
-                'PROJECT_UID: "1234"', 'PROJECT_UID: "0"'
+            valid.replace(
+                f'user: "{os.getuid()}:{os.getgid()}"',
+                f'user: "0:{os.getgid()}"',
+            ).replace(
+                f'PROJECT_UID: "{os.getuid()}"', 'PROJECT_UID: "0"'
             ),
             {"default-user-must-have-positive-uid-gid", "build-arg-PROJECT_UID-must-be-positive-integer"},
         ),
         (
-            valid.replace('user: "1234:2345"', 'user: "1234:0"').replace(
-                'PROJECT_GID: "2345"', 'PROJECT_GID: "0"'
+            valid.replace(
+                f'user: "{os.getuid()}:{os.getgid()}"',
+                f'user: "{os.getuid()}:0"',
+            ).replace(
+                f'PROJECT_GID: "{os.getgid()}"', 'PROJECT_GID: "0"'
             ),
             {"default-user-must-have-positive-uid-gid", "build-arg-PROJECT_GID-must-be-positive-integer"},
         ),
@@ -1163,7 +1268,7 @@ def test_generator_rejects_pack_override_of_runtime_route(tmp_path: Path) -> Non
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,
-        env={**os.environ, "PROJECT_UID": "1234", "PROJECT_GID": "2345"},
+        env={**os.environ},
         check=False,
         capture_output=True,
         text=True,
@@ -1173,6 +1278,32 @@ def test_generator_rejects_pack_override_of_runtime_route(tmp_path: Path) -> Non
         "runtime.env cannot override reserved key: AGENT_CANON_RUNTIME_ROUTE"
         in result.stderr
     )
+
+
+@pytest.mark.parametrize("identity_key", ["PROJECT_UID", "PROJECT_GID", "PROJECT_USER"])
+def test_generator_rejects_pack_override_of_host_identity(
+    tmp_path: Path,
+    identity_key: str,
+) -> None:
+    """Pack environment cannot introduce a second source of host identity."""
+    repo = write_parent_generator_fixture(tmp_path)
+    pack = repo / "docker/packs/default.toml"
+    pack.write_text(
+        pack.read_text(encoding="utf-8")
+        + f'\nenv = ["{identity_key}=pack-value"]\n',
+        encoding="utf-8",
+    )
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert f"runtime.env cannot override reserved key: {identity_key}" in result.stderr
 
 
 def test_container_config_requires_executable_resolver_entrypoint(tmp_path: Path) -> None:
@@ -1284,7 +1415,7 @@ def test_generator_rejects_raw_runtime_mounts_before_compose_output(
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,
-        env={**os.environ, "PROJECT_UID": "1234", "PROJECT_GID": "2345"},
+        env={**os.environ},
         check=False,
         capture_output=True,
         text=True,
@@ -1324,8 +1455,6 @@ def test_generated_compose_platform_is_read_back_exactly(tmp_path: Path) -> None
         cwd=repo,
         env={
             **os.environ,
-            "PROJECT_UID": "1234",
-            "PROJECT_GID": "2345",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
         },
         check=False,
@@ -1351,29 +1480,25 @@ def test_generated_compose_platform_is_read_back_exactly(tmp_path: Path) -> None
 
 
 def test_source_vscode_surface_and_shared_files_pass(tmp_path: Path) -> None:
-    """Standalone source owns a real .vscode directory and four shared files."""
-    write_surface_manifest(tmp_path)
+    """Standalone source validates four files without a shared-surface manifest."""
+    write_file(tmp_path, "ROOT_AGENTS.md", "# standalone\n")
+    write_file(tmp_path, "agent-canon-environment.toml", "version = 1\n")
     write_vscode_source(tmp_path)
 
     result = run_validator(tmp_path)
 
     assert result.returncode == 0, result.stdout + result.stderr
+    assert "documents/runtime/shared-runtime-surfaces.toml" not in result.stdout
 
 
-def test_template_vscode_surface_uses_individual_symlinks(tmp_path: Path) -> None:
-    """A template root keeps the container real and links exactly four files."""
-    write_surface_manifest(tmp_path, "vendor/agent-canon")
-    write_vscode_source(tmp_path, "vendor/agent-canon/.vscode")
+def test_derived_vscode_surface_allows_regular_project_content_and_extra_files(
+    tmp_path: Path,
+) -> None:
+    """Derived parent content is regular, unconstrained, and need not mirror AgentCanon."""
+    write_file(tmp_path, "vendor/agent-canon/README.md", "project dependency\n")
     (tmp_path / ".vscode").mkdir()
-    for name in (
-        "c_cpp_properties.json",
-        "extensions.json",
-        "settings.json",
-        "tasks.json",
-    ):
-        (tmp_path / ".vscode" / name).symlink_to(
-            f"../vendor/agent-canon/.vscode/{name}"
-        )
+    write_file(tmp_path, ".vscode/settings.json", "{}\n")
+    write_file(tmp_path, ".vscode/project-specific.json", "{}\n")
 
     result = run_validator(tmp_path)
 
@@ -1382,7 +1507,6 @@ def test_template_vscode_surface_uses_individual_symlinks(tmp_path: Path) -> Non
 
 def test_legacy_vscode_directory_symlink_is_rejected(tmp_path: Path) -> None:
     """The checker rejects the removed whole-directory topology."""
-    write_surface_manifest(tmp_path, "vendor/agent-canon")
     write_vscode_source(tmp_path, "vendor/agent-canon/.vscode")
     (tmp_path / ".vscode").symlink_to(
         "vendor/agent-canon/.vscode", target_is_directory=True
@@ -1394,17 +1518,60 @@ def test_legacy_vscode_directory_symlink_is_rejected(tmp_path: Path) -> None:
     assert "expected-real-directory" in result.stdout
 
 
-def test_missing_individual_symlink_is_rejected(tmp_path: Path) -> None:
-    """The checker rejects a regular file replacing a shared-file symlink."""
-    write_surface_manifest(tmp_path, "vendor/agent-canon")
+def test_legacy_vscode_individual_symlink_is_rejected(tmp_path: Path) -> None:
+    """The checker rejects an individual link into the retired AgentCanon surface."""
     write_vscode_source(tmp_path, "vendor/agent-canon/.vscode")
     (tmp_path / ".vscode").mkdir()
-    write_file(tmp_path, ".vscode/c_cpp_properties.json", "{}\n")
+    (tmp_path / ".vscode" / "settings.json").symlink_to(
+        "../vendor/agent-canon/.vscode/settings.json"
+    )
 
     result = run_validator(tmp_path)
 
     assert result.returncode == 1, result.stdout + result.stderr
-    assert "expected-individual-symlink" in result.stdout
+    assert "legacy-agent-canon-symlink" in result.stdout
+
+
+def test_missing_parent_vscode_surface_is_not_forced(tmp_path: Path) -> None:
+    """A derived parent without editor content remains valid and unconfigured."""
+    write_file(tmp_path, "vendor/agent-canon/README.md", "project dependency\n")
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "CONTAINER_CONFIG_FINDINGS=0" in result.stdout
+
+
+def test_standalone_vscode_missing_file_is_rejected(tmp_path: Path) -> None:
+    """Standalone source still requires each of its four regular files."""
+    write_file(tmp_path, "ROOT_AGENTS.md", "# standalone\n")
+    write_file(tmp_path, "agent-canon-environment.toml", "version = 1\n")
+    write_vscode_source(tmp_path)
+    (tmp_path / ".vscode" / "tasks.json").unlink()
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert ".vscode/tasks.json:missing" in result.stdout
+
+
+def test_standalone_vscode_directory_missing_reports_all_source_files(
+    tmp_path: Path,
+) -> None:
+    """Standalone markers keep source-file checks active when .vscode is absent."""
+    write_file(tmp_path, "ROOT_AGENTS.md", "# standalone\n")
+    write_file(tmp_path, "agent-canon-environment.toml", "version = 1\n")
+
+    result = run_validator(tmp_path)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    for name in (
+        "c_cpp_properties.json",
+        "extensions.json",
+        "settings.json",
+        "tasks.json",
+    ):
+        assert f".vscode/{name}:missing" in result.stdout
 
 
 def test_validate_requirements_accepts_pep508_direct_reference(tmp_path: Path) -> None:

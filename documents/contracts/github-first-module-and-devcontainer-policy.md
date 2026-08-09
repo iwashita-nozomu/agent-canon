@@ -6,7 +6,7 @@ downstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface o
 downstream design ../rule/dependency-module-changes.md general dependency source-clone rule
 downstream design ../conventions/coding-conventions-project.md project environment rules
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-downstream environment ../../.devcontainer/devcontainer.json shared devcontainer entrypoint
+downstream environment ../../.devcontainer/devcontainer.json parent-owned devcontainer entrypoint; standalone source is invoked through the source-root resolver
 downstream implementation ../../tools/ci/container_config.py validates Dockerfile and devcontainer boundaries
 @dependency-end
 -->
@@ -88,10 +88,11 @@ Docker docs and validation. Agent convenience is not enough.
 
 ## Devcontainer Boundary
 
-`.devcontainer/` is AgentCanon-owned runtime ergonomics. Template and derived
-repos expose it as a root symlink view into `vendor/agent-canon/.devcontainer`.
+`.devcontainer/` is parent-owned regular environment content in template and
+derived repositories. Standalone AgentCanon keeps its own `.devcontainer/`
+source contract; that source is not projected into parent roots.
 
-The shared devcontainer owns:
+The standalone AgentCanon devcontainer source owns:
 
 - declarative `.devcontainer/dependencies.toml` records for Codex, npm/Node
   when needed for Codex, and GitHub CLI / `gh`;
@@ -112,8 +113,10 @@ The shared devcontainer owns:
 - agent bootstrap ergonomics that should stay consistent across template
   clones.
 
-The shared devcontainer consumes repo-local Docker runtime contracts instead of
-owning them. It reads `docker/packs/default.toml`, builds the repo-local
+The standalone source consumes repo-local Docker runtime contracts instead of
+owning parent files. A template or derived parent keeps its own regular
+`.devcontainer/` contract and may invoke source entrypoints through the resolver.
+The standalone source reads `docker/packs/default.toml`, builds the repo-local
 `docker/Dockerfile`, forwards the pack runtime environment into the generated
 Compose service, and runs repo-local `docker/install_python_dependencies.sh`
 after the workspace is mounted.
@@ -190,13 +193,11 @@ startup design failure です。
 `prepare` が返す `SOURCE_CLONE` は filesystem / lifecycle と devcontainer
 mount の path contract であり、VS Code workspace の構成入力ではありません。
 
-この禁止は `.vscode/` の共有 extension/settings/tasks surface を変更しません。
-`.vscode/` は親所有の regular directory container とし、template と derived repo
-には `vendor/agent-canon/.vscode` の共有ファイルを個別 symlink として公開します。
-共有面は推奨 extension、repository 間で安全な editor defaults、共有 validation
-task を所有しますが、dependency clone 群の構成責務は所有しません。個人の
-editor state、machine-local settings、host-specific path、project/product 固有の
-command は共有面に置きません。
+この禁止は `.vscode/` の shared projection を作りません。`.vscode/` は存在する
+場合に親が所有する regular directory であり、追加ファイル、editor state、
+machine-local settings、host-specific path、project/product 固有 command は親の
+contract に残します。Standalone AgentCanon は自身の regular 4-file `.vscode`
+source を検証できますが、親へ mirror しません。
 
 ## Validation
 

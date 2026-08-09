@@ -8,7 +8,7 @@
 # downstream implementation ../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
 # @dependency-end
 
-# Canonical source: templates/documents/github/issue/config.yml. Generated projection targets .github/ISSUE_TEMPLATE/config.yml; edit this source only.
+# Canonical source and checked-in standalone target: update templates/documents/github/issue/config.yml and .github/ISSUE_TEMPLATE/config.yml together.
 
 blank_issues_enabled: true
 contact_links:

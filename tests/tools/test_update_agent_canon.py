@@ -302,9 +302,20 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
             script,
         )
         self.assertIn(
-            'COMMIT_REQUEST_EVIDENCE_DIGEST="$(sha256sum agents/workflows/agent-canon-pr-workflow.md',
+            "AGENT_CANON_COMMIT_REQUEST_WORKFLOW_PATH=vendor/agent-canon/agents/workflows/agent-canon-pr-workflow.md",
             script,
         )
+        self.assertIn(
+            "AGENT_CANON_COMMIT_REQUEST_WORKFLOW_PATH=agents/workflows/agent-canon-pr-workflow.md",
+            script,
+        )
+        self.assertIn(
+            'COMMIT_REQUEST_EVIDENCE_DIGEST="$(sha256sum "${AGENT_CANON_COMMIT_REQUEST_WORKFLOW_PATH}"',
+            script,
+        )
+        self.assertNotIn('sync_agent_canon.sh" check || true', script)
+        self.assertIn('make -C "${CLONE_DIR}" agent-canon-check', script)
+        self.assertNotIn('make -C "${CLONE_DIR}" agent-checks', script)
         self.assertLess(
             script.index('attach_submodule_main_to_staged_pin "vendor/agent-canon"'),
             script.index('bash "${CLONE_TOOLS_ROOT}/sync_agent_canon.sh" check'),
@@ -1699,20 +1710,20 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     'path = "AGENTS.md"',
                     'mode = "symlink"',
                     'source = "ROOT_AGENTS.md"',
-                    'owner = "agent-canon"',
-                    'class = "runtime_surface"',
+                    'projection_producer = "agent-canon"',
+                    'projection_kind = "runtime_surface"',
                     '',
                     '[[surface]]',
                     'path = ".vscode"',
                     'mode = "regular"',
-                    'owner = "template-or-derived-repo"',
-                    'class = "active_contract"',
+                    'projection_producer = "template-or-derived-repo"',
+                    'projection_kind = "active_contract"',
                     'source = ".vscode"',
                     '',
                     '[[group]]',
                     'mode = "symlink"',
-                    'owner = "agent-canon"',
-                    'class = "runtime_surface"',
+                    'projection_producer = "agent-canon"',
+                    'projection_kind = "runtime_surface"',
                     'source_prefix = ""',
                     'paths = [',
                     '  ".vscode/c_cpp_properties.json",',
@@ -1724,18 +1735,27 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     '',
                     '[[group]]',
                     'mode = "copy"',
-                    'owner = "github-path-constraint"',
-                    'class = "github_copy"',
+                    'projection_producer = "github-path-constraint"',
+                    'projection_kind = "github_copy"',
                     'local_override_allowed = false',
                     'paths = [',
-                    '  ".github/workflows/agent-coordination.yml",',
                     *(f'  "{path}",' for path in github_template_paths),
                     ']',
                     '',
                     '[[group]]',
+                    'mode = "removed_legacy"',
+                    'projection_producer = "legacy"',
+                    'projection_kind = "removed_legacy"',
+                    'local_override_allowed = false',
+                    'paths = [',
+                    '  ".github/workflows/agent-improvement-guide.yml",',
+                    '  ".github/workflows/agent-coordination.yml",',
+                    ']',
+                    '',
+                    '[[group]]',
                     'mode = "regular"',
-                    'owner = "template-or-derived-repo"',
-                    'class = "active_contract"',
+                    'projection_producer = "template-or-derived-repo"',
+                    'projection_kind = "active_contract"',
                     'local_override_allowed = true',
                     'source_prefix = ""',
                     'paths = [',
@@ -1746,13 +1766,13 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     'path = "tools/agent-canon"',
                     'mode = "symlink"',
                     'source = "tools"',
-                    'owner = "agent-canon"',
-                    'class = "runtime_surface"',
+                    'projection_producer = "agent-canon"',
+                    'projection_kind = "runtime_surface"',
                     '',
                     '[[group]]',
                     'mode = "standalone_only"',
-                    'owner = "agent-canon-standalone"',
-                    'class = "standalone_only"',
+                    'projection_producer = "agent-canon-standalone"',
+                    'projection_kind = "standalone_only"',
                     'local_override_allowed = false',
                     'paths = [',
                     '  "documents/runtime/SHARED_RUNTIME_SURFACES.md",',
@@ -1761,8 +1781,8 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     '[[surface]]',
                     'path = "goal.md"',
                     'mode = "repo_state"',
-                    'owner = "project"',
-                    'class = "durable_state"',
+                    'projection_producer = "project"',
+                    'projection_kind = "durable_state"',
                     'local_override_allowed = true',
                     '',
                 ]
@@ -1815,6 +1835,10 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         )
         (work_dir / ".github" / "workflows" / "agent-coordination.yml").write_text(
             "name: agent coordination\n",
+            encoding="utf-8",
+        )
+        (work_dir / ".github" / "workflows" / "agent-improvement-guide.yml").write_text(
+            "name: agent improvement guide\non:\n  workflow_dispatch:\n",
             encoding="utf-8",
         )
         for template_path in github_template_paths:
@@ -2613,14 +2637,32 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("agent_canon_snapshot_alias=deprecated_use_link_root", result.stdout)
 
-    def test_link_root_keeps_goal_local_and_syncs_copy_surfaces(self) -> None:
-        """Link-root should restore root views and project GitHub copy surfaces."""
+    def test_link_root_keeps_goal_local_and_excludes_agentcanon_workflows(self) -> None:
+        """Link-root keeps local state and leaves AgentCanon workflows source-only."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
             repo = self.make_superproject(root, bare_repo)
             goal_path = repo / "goal.md"
             os.symlink("vendor/agent-canon/goal.md", goal_path)
+            workflow_root = repo / ".github" / "workflows"
+            workflow_root.mkdir(parents=True, exist_ok=True)
+            workflow_paths = {
+                workflow: workflow_root / workflow
+                for workflow in (
+                    "agent-improvement-guide.yml",
+                    "agent-coordination.yml",
+                )
+            }
+            os.symlink(
+                "missing-agentcanon-workflow",
+                workflow_paths["agent-improvement-guide.yml"],
+            )
+            regular_sentinel = "name: parent-owned workflow\n"
+            workflow_paths["agent-coordination.yml"].write_text(
+                regular_sentinel,
+                encoding="utf-8",
+            )
 
             result = subprocess.run(
                 ["bash", "tools/sync_agent_canon.sh", "link-root"],
@@ -2633,19 +2675,26 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertFalse(goal_path.is_symlink())
             self.assertIn("repo-local goal", goal_path.read_text(encoding="utf-8"))
+            self.assertFalse(
+                os.path.lexists(workflow_paths["agent-improvement-guide.yml"])
+            )
+            regular_workflow = workflow_paths["agent-coordination.yml"]
+            self.assertTrue(os.path.lexists(regular_workflow))
+            self.assertTrue(regular_workflow.is_file())
             self.assertEqual(
-                (repo / ".github" / "workflows" / "agent-coordination.yml").read_text(
-                    encoding="utf-8"
-                ),
-                (
+                regular_workflow.read_text(encoding="utf-8"),
+                regular_sentinel,
+            )
+            for workflow, path in workflow_paths.items():
+                source = (
                     repo
                     / "vendor"
                     / "agent-canon"
                     / ".github"
                     / "workflows"
-                    / "agent-coordination.yml"
-                ).read_text(encoding="utf-8"),
-            )
+                    / workflow
+                )
+                self.assertTrue(source.is_file(), workflow)
             issue_templates = sorted(
                 path
                 for path in (repo / ".github" / "ISSUE_TEMPLATE").iterdir()
@@ -2664,22 +2713,49 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertFalse((repo / ".github" / "PULL_REQUEST_TEMPLATE.md").exists())
 
     def test_link_root_migrates_legacy_vscode_directory_before_child_links(self) -> None:
-        """Link-root must materialize the real container before child symlinks."""
+        """Link-root preserves regular parent editor content after projection retirement."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             bare_repo, _work_dir = self.make_agent_canon_remote(root)
             repo = self.make_superproject(root, bare_repo)
             vscode_dir = repo / ".vscode"
             vscode_dir.mkdir()
-            (vscode_dir / "settings.json").write_text(
-                '{"legacyRepoLocalSetting": true}\n',
-                encoding="utf-8",
-            )
-            subprocess.run(["git", "add", ".vscode/settings.json"], cwd=repo, check=True)
+            vscode_files = {
+                name: f"parent-owned-{name}\n"
+                for name in (
+                    "c_cpp_properties.json",
+                    "extensions.json",
+                    "settings.json",
+                    "tasks.json",
+                )
+            }
+            for name, content in vscode_files.items():
+                (vscode_dir / name).write_text(content, encoding="utf-8")
+            subprocess.run(["git", "add", ".vscode"], cwd=repo, check=True)
             subprocess.run(
-                ["git", "commit", "-m", "add legacy vscode settings"],
+                ["git", "commit", "-m", "add parent vscode settings"],
                 cwd=repo,
                 check=True,
+            )
+
+            # Keep this historical fixture, but remove its retired VS Code
+            # projection entries before exercising the current contract.
+            manifest = repo / "vendor" / "agent-canon" / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+            manifest_text = manifest.read_text(encoding="utf-8")
+            manifest_text = manifest_text.replace(
+                '\n[[surface]]\npath = ".vscode"\nmode = "regular"\n'
+                'projection_producer = "template-or-derived-repo"\n'
+                'projection_kind = "active_contract"\nsource = ".vscode"\n',
+                "\n",
+            )
+            for name in vscode_files:
+                manifest_text = manifest_text.replace(f'  ".vscode/{name}",\n', "")
+            manifest.write_text(manifest_text, encoding="utf-8")
+            source_doc = manifest.with_name("SHARED_RUNTIME_SURFACES.md")
+            source_doc.write_text(
+                source_doc.read_text(encoding="utf-8")
+                + "\nAGENTS.md\n.codex/config.toml\n",
+                encoding="utf-8",
             )
 
             result = subprocess.run(
@@ -2699,22 +2775,12 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertFalse(vscode_dir.is_symlink())
-            for vscode_name in (
-                "c_cpp_properties.json",
-                "extensions.json",
-                "settings.json",
-                "tasks.json",
-            ):
-                self.assertTrue((vscode_dir / vscode_name).is_symlink())
-                self.assertIn("vendor/agent-canon/.vscode", os.readlink(vscode_dir / vscode_name))
-            self.assertEqual(
-                (repo / "vendor" / "agent-canon" / ".vscode" / "settings.json").read_text(
-                    encoding="utf-8"
-                ),
-                '{"agentCanonTest": true}\n',
-            )
+            for vscode_name, content in vscode_files.items():
+                path = vscode_dir / vscode_name
+                self.assertTrue(path.is_file() and not path.is_symlink())
+                self.assertEqual(path.read_text(encoding="utf-8"), content)
             self.assertEqual(check.returncode, 0, check.stderr)
-            subprocess.run(["git", "add", "-A", ".vscode"], cwd=repo, check=True)
+            subprocess.run(["git", "add", "-A"], cwd=repo, check=True)
             subprocess.run(
                 ["git", "commit", "-m", "sync vscode shared surface"],
                 cwd=repo,

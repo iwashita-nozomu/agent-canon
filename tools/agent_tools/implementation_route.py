@@ -489,6 +489,51 @@ class SparkImplementationResult:
     durable_result_summary: str
 
 
+def route_result_as_claim_evidence(result: ImplementationRouteResult) -> dict[str, object]:
+    """Adapt the route result to the shared claim/evidence return contract.
+
+    The route keeps its immutable packet schema IDs for transport compatibility; this
+    adapter is the single common return boundary consumed by profile/runtime checks.
+    """
+    status = {
+        "completed": "pass",
+        "queued": "revise",
+        "blocked": "blocked",
+    }.get(result.status, "escalate")
+    evidence: list[str] = [f"decision:{result.decision_ref}"]
+    if result.packet_ref:
+        evidence.append(f"packet:{result.packet_ref}")
+    if result.packet_sha256:
+        evidence.append(f"packet_sha256:{result.packet_sha256}")
+    evidence.extend(f"acceptance:{check.command}" for check in result.acceptance_checks)
+    evidence.extend(f"validation:{command}" for command in result.static_validation_commands)
+    if result.failure:
+        evidence.extend(f"failure:{item}" for item in result.failure.evidence_refs)
+    return {
+        "status": status,
+        "claim": (
+            f"implementation route {result.status}"
+            f" for {result.selected_agent_type}/{result.selected_profile_id}"
+        ),
+        "evidence": evidence,
+    }
+
+
+def validate_route_result_common(result: ImplementationRouteResult) -> model_profile_registry.ValidationResult:
+    """Validate the actual route output after common-contract adaptation."""
+    return model_profile_registry.validate_claim_evidence_result(
+        route_result_as_claim_evidence(result)
+    )
+
+
+def _ensure_common_return_contract(result: ImplementationRouteResult) -> ImplementationRouteResult:
+    validation = validate_route_result_common(result)
+    if not validation.valid:
+        details = ";".join(issue.code for issue in validation.issues)
+        raise RuntimeError(f"route_result_common_contract_invalid:{details}")
+    return result
+
+
 def _parse_source_anchor(value: object, index: int) -> SourceAnchor:
     anchor = _closed_mapping(value, _ANCHOR_FIELDS, f"immutable_source_anchors[{index}]")
     sha = None if anchor["sha256"] is None else _sha256(anchor["sha256"], "source_anchor.sha256")
@@ -870,7 +915,7 @@ def resolve_implementation_candidate(
 
 def _blocked_result(code: str, evidence: str, *, packet: FixedImplementationPacket | None = None) -> ImplementationRouteResult:
     digest = hashlib.sha256(evidence.encode("utf-8")).hexdigest()[:16]
-    return ImplementationRouteResult(
+    return _ensure_common_return_contract(ImplementationRouteResult(
         result_version=1,
         decision_ref=f"{code}:{digest}",
         selected_agent_type="none",
@@ -886,7 +931,7 @@ def _blocked_result(code: str, evidence: str, *, packet: FixedImplementationPack
         source_anchors=packet.immutable_source_anchors if packet else (),
         acceptance_checks=packet.acceptance_checks if packet else (),
         static_validation_commands=packet.static_validation_commands if packet else (),
-    )
+    ))
 
 
 def route_implementation(request: Mapping[str, Any] | ImplementationRouteRequest) -> ImplementationRouteResult:
@@ -907,7 +952,7 @@ def route_implementation(request: Mapping[str, Any] | ImplementationRouteRequest
         return _blocked_result("stale_or_malformed_packet_evidence", str(exc), packet=packet)
     if decision.eligibility == "ineligible":
         return _blocked_result(decision.reason_codes[0], decision.evidence_ref, packet=packet)
-    return ImplementationRouteResult(
+    return _ensure_common_return_contract(ImplementationRouteResult(
         result_version=1,
         decision_ref=decision.decision_id,
         selected_agent_type=decision.selected_agent_type,
@@ -923,7 +968,7 @@ def route_implementation(request: Mapping[str, Any] | ImplementationRouteRequest
         source_anchors=packet.immutable_source_anchors,
         acceptance_checks=packet.acceptance_checks,
         static_validation_commands=packet.static_validation_commands,
-    )
+    ))
 
 
 def build_spark_result(

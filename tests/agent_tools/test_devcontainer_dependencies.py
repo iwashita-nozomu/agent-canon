@@ -1716,19 +1716,61 @@ class DependencyModelTests(unittest.TestCase):
             )
         )
 
-    def test_canonical_manifest_owns_pinned_pyyaml_independently(self) -> None:
-        """AgentCanon's mounted validators receive their own exact PyYAML record."""
-        plan = load_plan(ROOT, ROOT)
-        pyyaml = next(item for item in plan.records if item.id == "pyyaml")
+    def test_boundary_accepts_absent_parent_overlay_and_hook(self) -> None:
+        """A derived repository may omit all parent-owned devcontainer overlays."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            model, _ = write_boundary_fixture(
+                root,
+                "jupyterlab\nnotebook\nipykernel\npydeps\nsnakeviz\npyyaml\n",
+            )
+            (root / ".devcontainer/dependencies.toml").unlink()
+            (root / ".devcontainer/post-create-parent.sh").unlink()
 
-        self.assertEqual(pyyaml.package, "pyyaml")
-        self.assertEqual(pyyaml.method.value, "pip-user")
-        self.assertEqual(pyyaml.version, "6.0.3")
-        self.assertEqual(pyyaml.deps, ("python3-pip",))
-        self.assertEqual(pyyaml.verification.executable, "python3")
-        self.assertTrue(
-            any("yaml.__version__" in arg for arg in pyyaml.verification.args)
+            report = model.validate()
+
+        self.assertFalse(
+            any(
+                finding.path.endswith(
+                    (".devcontainer/dependencies.toml", ".devcontainer/post-create-parent.sh")
+                )
+                and finding.detail == "missing-file"
+                for finding in report.findings
+            )
         )
+
+    def test_canonical_manifest_is_a_small_default_tool_set(self) -> None:
+        """Default startup retains only LSP and small structure/agent tools."""
+        plan = load_plan(ROOT, ROOT)
+        ids = {item.id for item in plan.records}
+        self.assertEqual(
+            ids,
+            {
+                "github-cli",
+                "codex-cli",
+                "pyright-language-server",
+                "bash-language-server",
+                "jq",
+                "tree",
+                "clang-format",
+                "clangd-language-server",
+            },
+        )
+        for removed in (
+            "playwright",
+            "playwright-chromium",
+            "pdflatex",
+            "gitleaks",
+            "trufflehog",
+            "detect-secrets",
+            "elan",
+            "rustup-init",
+            "rust-toolchain",
+            "lean-toolchain",
+            "agent-canon-cli",
+            "pyyaml",
+        ):
+            self.assertNotIn(removed, ids)
 
     def test_canonical_apt_records_are_jammy_amd64_owned(self) -> None:
         """The shared apt tool records target the canonical Ubuntu 22.04 base."""
@@ -2688,6 +2730,9 @@ class DependencyModelTests(unittest.TestCase):
         bootstrap = (ROOT / ".devcontainer" / "bootstrap-dependencies.sh").read_text(
             encoding="utf-8"
         )
+        dockerfile = (ROOT / ".devcontainer" / "Dockerfile").read_text(
+            encoding="utf-8"
+        )
         post_create = (ROOT / ".devcontainer" / "post-create.sh").read_text(
             encoding="utf-8"
         )
@@ -2701,6 +2746,7 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("NODE_X86_64_SHA256", bootstrap)
         self.assertIn("NODE_AARCH64_SHA256", bootstrap)
         self.assertIn("ninja-build", bootstrap)
+        self.assertEqual(bootstrap.count("ninja-build"), 2)
         self.assertIn("build-essential", bootstrap)
         self.assertIn('command -v cc', bootstrap)
         self.assertIn('command -v gcc', bootstrap)
@@ -2712,25 +2758,34 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("NODE_BOOTSTRAP_RECEIPT", bootstrap)
         self.assertIn('NODE_NPM_VERSION="10.9.2"', bootstrap)
         self.assertIn(
+            "COPY .devcontainer/bootstrap-dependencies.sh /usr/local/lib/agent-canon/bootstrap-dependencies.sh",
+            dockerfile,
+        )
+        self.assertIn(
+            "/usr/local/lib/agent-canon/bootstrap-dependencies.sh --install",
+            dockerfile,
+        )
+        self.assertIn(
             '"$NODE_INSTALL_PATH/lib/node_modules/npm/bin/npm-cli.js"', bootstrap
         )
         self.assertNotIn('"$NODE_INSTALL_PATH/bin/npm"', bootstrap)
         self.assertIn("tomllib", bootstrap)
         self.assertIn("tomli", bootstrap)
-        self.assertIn('"$devcontainer_dir/bootstrap-dependencies.sh" --install-language-runtime', post_create)
+        self.assertIn('"$devcontainer_dir/bootstrap-dependencies.sh" --check', post_create)
+        self.assertNotIn('--install-language-runtime', post_create)
         self.assertNotIn("NODE_VERSION:-", bootstrap)
         self.assertNotIn("npm install -g", post_create)
         self.assertNotIn("install_github_cli", post_create)
         self.assertNotIn("install_rust_toolchain", post_create)
         self.assertNotIn("grep", validator)
-        self.assertIn("PLAYWRIGHT_BROWSERS_PATH", post_create)
-        self.assertIn('export CARGO_HOME="$cargo_home"', post_create)
-        self.assertIn('export RUSTUP_HOME="$rustup_home"', post_create)
-        self.assertIn("agent_canon_source_identity", post_create)
+        self.assertNotIn("PLAYWRIGHT_BROWSERS_PATH", post_create)
+        self.assertNotIn("export CARGO_HOME", post_create)
+        self.assertNotIn("export RUSTUP_HOME", post_create)
+        self.assertNotIn("agent_canon_source_identity", post_create)
         self.assertIn('"HEAD:$source_prefix"', identity_helper)
-        self.assertIn("agent_canon_receipt_matches_identity", post_create)
-        self.assertIn("agent_canon_source_commit", post_create)
-        self.assertIn('export ELAN_HOME="$elan_home"', post_create)
+        self.assertNotIn("agent_canon_receipt_matches_identity", post_create)
+        self.assertNotIn("agent_canon_source_commit", post_create)
+        self.assertNotIn("export ELAN_HOME", post_create)
         self.assertIn("STRUCTURED_ANALYSIS_BOOTSTRAP=warn", post_create)
         cache_function = post_create.split("build_agent_canon_cache() {", 1)[1].split(
             "\n}\n", 1
@@ -2748,7 +2803,6 @@ class DependencyModelTests(unittest.TestCase):
         bootstrap_index = post_create.rindex(
             '"$devcontainer_dir/bootstrap-dependencies.sh" --check'
         )
-        pip_user_path_index = post_create.index('pip_user_script_dir="$(')
         validate_index = post_create.index("validate --workspace")
         install_index = post_create.index("install --workspace")
         python_installer_index = post_create.rindex(
@@ -2756,8 +2810,7 @@ class DependencyModelTests(unittest.TestCase):
         )
         cache_index = post_create.rindex("\nbuild_agent_canon_cache\n")
         projection_index = post_create.rindex("\npublish_container_local_runtime\n")
-        self.assertLess(bootstrap_index, pip_user_path_index)
-        self.assertLess(pip_user_path_index, validate_index)
+        self.assertLess(bootstrap_index, validate_index)
         self.assertLess(
             validate_index,
             install_index,
@@ -2768,10 +2821,7 @@ class DependencyModelTests(unittest.TestCase):
         )
         self.assertLess(python_installer_index, cache_index)
         self.assertLess(cache_index, projection_index)
-        self.assertLess(
-            python_installer_index,
-            post_create.rindex("\npublish_agent_canon_cli\n"),
-        )
+        self.assertNotIn("publish_agent_canon_cli", post_create)
 
 
 if __name__ == "__main__":

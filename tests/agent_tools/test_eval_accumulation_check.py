@@ -111,6 +111,321 @@ class EvalAccumulationCheckTest(unittest.TestCase):
             self.assertIn("EVAL_ACCUMULATION_HOOK_NAMESPACE_DEBT=1", result.stdout)
             self.assertIn("EVAL_ACCUMULATION=pass", result.stdout)
 
+    def test_canonical_behavior_event_owner_and_prompt_fields_pass(self) -> None:
+        """New behavior events are checked as typed attribution evidence."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            entry = self.hook_entry("behavior-owner")
+            entry.update(
+                {
+                    "schema": "agent-canon.behavior-event.v1",
+                    "record_kind": "behavior_event",
+                    "event_id": "a" * 64,
+                    "hook_invocation_id": "behavior-owner",
+                    "hook_event_name": "UserPromptSubmit",
+                    "event_kind": "behavior_snapshot",
+                    "source": "behavior_event_assembly",
+                    "workflow_attribution_kind": "owner",
+                    "selected_workflows": ["scoped-change"],
+                    "workflow_owner": "scoped-change",
+                    "workflow_owner_workflows": ["scoped-change"],
+                    "workflow_context_workflows": [],
+                    "workflow_context_kind": "",
+                    "workflow_context_source": "",
+                    "prompt_capture_status": "present",
+                    "prompt_excerpt_redacted": "bounded prompt",
+                    "prompt_fingerprint": "b" * 16,
+                    "prompt_char_count": 14,
+                    "prompt_excerpt_truncated": False,
+                }
+            )
+            self.hook_path(root).write_text(json.dumps(entry) + "\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn("behavior_event", result.stdout)
+
+    def test_canonical_behavior_event_incoherent_workflow_fails(self) -> None:
+        """Owner attribution cannot be asserted with context-only fields."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            entry = self.hook_entry("behavior-invalid")
+            entry.update(
+                {
+                    "schema": "agent-canon.behavior-event.v1",
+                    "record_kind": "behavior_event",
+                    "event_id": "c" * 64,
+                    "hook_invocation_id": "behavior-invalid",
+                    "hook_event_name": "UserPromptSubmit",
+                    "event_kind": "behavior_snapshot",
+                    "source": "behavior_event_assembly",
+                    "workflow_attribution_kind": "owner",
+                    "selected_workflows": [],
+                    "workflow_owner": "",
+                    "workflow_owner_workflows": [],
+                    "workflow_context_workflows": ["scoped-change"],
+                    "workflow_context_kind": "context_workflow",
+                    "workflow_context_source": "recent_log",
+                    "prompt_capture_status": "missing",
+                    "prompt_excerpt_redacted": "",
+                    "prompt_fingerprint": "",
+                    "prompt_char_count": 0,
+                    "prompt_excerpt_truncated": False,
+                }
+            )
+            self.hook_path(root).write_text(json.dumps(entry) + "\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("workflow-owner-fields-incoherent", result.stdout)
+
+    def test_canonical_owner_requires_matching_owner_and_selected_fields(self) -> None:
+        """Owner and selected workflow identities must agree exactly."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            entry = self.hook_entry("behavior-owner-mismatch")
+            entry.update(
+                {
+                    "schema": "agent-canon.behavior-event.v1",
+                    "record_kind": "behavior_event",
+                    "event_id": "1" * 64,
+                    "hook_invocation_id": "behavior-owner-mismatch",
+                    "hook_event_name": "UserPromptSubmit",
+                    "event_kind": "behavior_snapshot",
+                    "source": "behavior_event_assembly",
+                    "workflow_attribution_kind": "owner",
+                    "selected_workflow": "other-workflow",
+                    "selected_workflows": ["scoped-change"],
+                    "workflow_owner": "other-workflow",
+                    "workflow_owner_workflows": ["scoped-change"],
+                    "workflow_context_workflows": [],
+                    "workflow_context_kind": "",
+                    "workflow_context_source": "",
+                    "prompt_capture_status": "missing",
+                    "prompt_excerpt_redacted": "",
+                    "prompt_fingerprint": "",
+                    "prompt_char_count": 0,
+                    "prompt_excerpt_truncated": False,
+                }
+            )
+            self.hook_path(root).write_text(json.dumps(entry) + "\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("workflow-owner-fields-incoherent", result.stdout)
+
+    def test_canonical_owner_rejects_mixed_context_fields(self) -> None:
+        """Owner attribution cannot carry context fields at the same time."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            entry = self.hook_entry("behavior-owner-context-mix")
+            entry.update(
+                {
+                    "schema": "agent-canon.behavior-event.v1",
+                    "record_kind": "behavior_event",
+                    "event_id": "2" * 64,
+                    "hook_invocation_id": "behavior-owner-context-mix",
+                    "hook_event_name": "PostToolUse",
+                    "event_kind": "behavior_snapshot",
+                    "source": "behavior_event_assembly",
+                    "workflow_attribution_kind": "owner",
+                    "selected_workflow": "scoped-change",
+                    "selected_workflows": ["scoped-change"],
+                    "workflow_owner": "scoped-change",
+                    "workflow_owner_workflows": ["scoped-change"],
+                    "workflow_context_workflows": ["inherited-change"],
+                    "workflow_context_kind": "context_workflow",
+                    "workflow_context_source": "recent_log",
+                    "workflow_context_timestamp": "2026-05-17T00:00:00Z",
+                    "workflow_context_source_event": "UserPromptSubmit",
+                    "prompt_capture_status": "missing",
+                    "prompt_excerpt_redacted": "",
+                    "prompt_fingerprint": "",
+                    "prompt_char_count": 0,
+                    "prompt_excerpt_truncated": False,
+                }
+            )
+            self.hook_path(root).write_text(json.dumps(entry) + "\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("workflow-owner-fields-incoherent", result.stdout)
+
+    def test_canonical_context_rejects_owner_carriers(self) -> None:
+        """Context attribution cannot hide a selected or owner workflow."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            entry = self.hook_entry("behavior-context-owner-contradiction")
+            entry.update(
+                {
+                    "schema": "agent-canon.behavior-event.v1",
+                    "record_kind": "behavior_event",
+                    "event_id": "d" * 64,
+                    "hook_invocation_id": "behavior-context-owner-contradiction",
+                    "hook_event_name": "PostToolUse",
+                    "event_kind": "behavior_snapshot",
+                    "source": "behavior_event_assembly",
+                    "workflow_attribution_kind": "context",
+                    "selected_workflow": "scoped-change",
+                    "selected_workflows": ["scoped-change"],
+                    "workflow": ["scoped-change"],
+                    "workflow_family": "scoped-change",
+                    "workflow_selection_kind": "context_workflow",
+                    "workflow_owner": "scoped-change",
+                    "workflow_owner_workflows": ["scoped-change"],
+                    "workflow_context_kind": "context_workflow",
+                    "workflow_context_source": "recent_log",
+                    "workflow_context_workflows": ["scoped-change"],
+                    "workflow_context_timestamp": "2026-05-17T00:00:00Z",
+                    "workflow_context_source_event": "UserPromptSubmit",
+                    "selected_workflow_count": 1,
+                    "prompt_capture_status": "missing",
+                    "prompt_excerpt_redacted": "",
+                    "prompt_fingerprint": "",
+                    "prompt_char_count": 0,
+                    "prompt_excerpt_truncated": False,
+                }
+            )
+            self.hook_path(root).write_text(json.dumps(entry) + "\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("workflow-context-fields-incoherent", result.stdout)
+
+    def test_canonical_missing_rejects_all_workflow_carriers(self) -> None:
+        """Missing attribution requires every owner/context carrier to be empty."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            entry = self.hook_entry("behavior-missing-hidden-workflow")
+            entry.update(
+                {
+                    "schema": "agent-canon.behavior-event.v1",
+                    "record_kind": "behavior_event",
+                    "event_id": "e" * 64,
+                    "hook_invocation_id": "behavior-missing-hidden-workflow",
+                    "hook_event_name": "UserPromptSubmit",
+                    "event_kind": "behavior_snapshot",
+                    "source": "behavior_event_assembly",
+                    "workflow_attribution_kind": "missing",
+                    "selected_workflow": "scoped-change",
+                    "selected_workflows": ["scoped-change"],
+                    "workflow": ["scoped-change"],
+                    "workflow_family": "scoped-change",
+                    "workflow_selection_kind": "declared_workflow",
+                    "workflow_owner": "scoped-change",
+                    "workflow_owner_workflows": ["scoped-change"],
+                    "workflow_context_kind": "context_workflow",
+                    "workflow_context_source": "recent_log",
+                    "workflow_context_workflows": ["scoped-change"],
+                    "workflow_context_timestamp": "2026-05-17T00:00:00Z",
+                    "workflow_context_source_event": "UserPromptSubmit",
+                    "selected_workflow_count": 1,
+                    "prompt_capture_status": "missing",
+                    "prompt_excerpt_redacted": "",
+                    "prompt_fingerprint": "",
+                    "prompt_char_count": 0,
+                    "prompt_excerpt_truncated": False,
+                }
+            )
+            self.hook_path(root).write_text(json.dumps(entry) + "\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+        self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+        self.assertIn("workflow-missing-fields-incoherent", result.stdout)
+
+    def test_canonical_present_prompt_rejects_credential_material(self) -> None:
+        """Present prompt excerpts must not contain known credential classes."""
+        secret_excerpts = (
+            "credential AKIAIOSFODNN7EXAMPLE leaked",
+            "credential ghp_abcdefghijklmnopqrstuvwxyz0123456789 leaked",
+            "credential sk-abcdefghijklmnopqrstuvwxyz0123456789 leaked",
+            "-----BEGIN PRIVATE KEY----- leaked",
+        )
+        for index, excerpt in enumerate(secret_excerpts):
+            with self.subTest(secret=excerpt):
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    root = Path(temp_dir)
+                    self.write_fixture(root)
+                    entry = self.hook_entry(f"behavior-secret-prompt-{index}")
+                    entry.update(
+                        {
+                            "schema": "agent-canon.behavior-event.v1",
+                            "record_kind": "behavior_event",
+                            "event_id": f"{index + 6:x}" * 64,
+                            "hook_invocation_id": f"behavior-secret-prompt-{index}",
+                            "hook_event_name": "UserPromptSubmit",
+                            "event_kind": "behavior_snapshot",
+                            "source": "behavior_event_assembly",
+                            "workflow_attribution_kind": "owner",
+                            "selected_workflows": ["scoped-change"],
+                            "workflow_owner": "scoped-change",
+                            "workflow_owner_workflows": ["scoped-change"],
+                            "workflow_context_workflows": [],
+                            "workflow_context_kind": "",
+                            "workflow_context_source": "",
+                            "prompt_capture_status": "present",
+                            "prompt_excerpt_redacted": excerpt,
+                            "prompt_fingerprint": "b" * 16,
+                            "prompt_char_count": len(excerpt),
+                            "prompt_excerpt_truncated": False,
+                        }
+                    )
+                    self.hook_path(root).write_text(json.dumps(entry) + "\n", encoding="utf-8")
+
+                    result = self.run_checker(root)
+
+                self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+                self.assertIn("prompt-excerpt-secret-material", result.stdout)
+
+    def test_legacy_behavior_fields_are_warning_compatible(self) -> None:
+        """Legacy behavior-shaped hook rows remain readable without blocking."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            entry = self.hook_entry("legacy-behavior")
+            entry.update(
+                {
+                    "prompt_capture_status": "missing",
+                    "prompt_excerpt_redacted": "",
+                    "prompt_fingerprint": "",
+                    "prompt_char_count": 0,
+                }
+            )
+            self.hook_path(root).write_text(json.dumps(entry) + "\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("legacy-behavior-schema", result.stdout)
+        self.assertIn("EVAL_ACCUMULATION_WARNINGS=1", result.stdout)
+
+    def test_legacy_candidate_workflow_is_warning_compatible(self) -> None:
+        """Legacy candidate workflow rows are visible without becoming attribution."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            entry = self.hook_entry("legacy-candidate-workflow")
+            entry.update({"candidate_workflows": ["scoped-change"]})
+            self.hook_path(root).write_text(json.dumps(entry) + "\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("legacy-behavior-schema", result.stdout)
+        self.assertIn("EVAL_ACCUMULATION_WARNINGS=1", result.stdout)
+
     def test_external_hook_archive_entries_are_counted(self) -> None:
         """Mounted hook archive entries should satisfy hook accumulation evidence."""
         with tempfile.TemporaryDirectory() as temp_dir:

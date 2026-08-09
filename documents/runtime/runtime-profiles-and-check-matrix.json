@@ -27,10 +27,9 @@
       "strict_dependency_graph_required": false,
       "activates": [
         "`AGENTS.md`",
-        "`agents/`",
-        "`.agents/`",
-        "`.codex/`",
-        "shared `tools/`"
+        "`.codex/config.toml`",
+        "`tools/agent-canon`",
+        "project-owned `agents/`, `.agents/`, `.codex/`, and `tools/` remain separate"
       ],
       "required_when": "An agent performs or reviews repo work"
     },

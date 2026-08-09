@@ -749,6 +749,18 @@ $$
 
 閾値は業務ごとに変える。金融・医療・本番writeでは品質と安全の許容差をほぼゼロにし、低リスクの分類・抽出では費用と速度を重視する。
 
+### 12.7 AgentCanon 実装への採用判定（2026年7月11日基準）
+
+この表は調査結果の採用 readback であり、runtime の既定 behavior や新しい router を定義しない。
+
+| Issue | 判定 | 理由 |
+| --- | --- | --- |
+| #569 | adopted | Luna は探索・定型検証、Terra は cross-owner 反証、Sol は親の裁定という役割 binding を registry に固定する。 |
+| #570 | adopted | current checkout は disjoint path かつ Git index/HEAD・generated・formatter 共有なしの場合だけ並列化し、それ以外は serialize する。isolated worktree は明示された独立 alternative implementation experiment に限定する。 |
+| #571 | adopted | role ごとの opaque return schema を増やさず、全 profile が共通 `claim_evidence_v1` と validator を使う。 |
+| #572 | adopted | repository write capability は `worker` / `spark_worker` に限定し、reviewer と artifact-only role は read-only とする。 |
+| #567 | partial | dated research は採用理由と制約を記録するが、未評価の behavioral default や追加 routing layer は導入しない。 |
+
 ---
 ## 13. 公開ベンチマーク全表
 

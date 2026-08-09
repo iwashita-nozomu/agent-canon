@@ -177,7 +177,7 @@ equality/readback は四段で行う。(1) source→materialized IR は catalog 
 | 3 | task-routing | 23 | agent-update-branch | 43 | experiment-lifecycle |
 | 4 | start-repository | 24 | report-writing | 44 | save-experiment-results |
 | 5 | codex-task-workflow | 25 | prose-reasoning-graph | 45 | experiment-review |
-| 6 | owner-bounded-routing | 26 | structure-planning | 46 | gpu-execution |
+| 6 | agent-orchestration (bounded owner route) | 26 | structure-planning | 46 | gpu-execution |
 | 7 | subagent-bootstrap | 27 | code-visualization | 47 | computational-optimization |
 | 8 | change-review | 28 | html-output | 48 | adaptive-improvement-loop |
 | 9 | python-review | 29 | html-experiment-report | 49 | literature-survey |

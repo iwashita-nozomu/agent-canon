@@ -77,10 +77,9 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - intended named `vendor/agent-canon/` source branch を source owner とし、branch / ahead / diverged / dirty state は evidence として保持します。全 local uncommitted / ignored materialized paths と `HEAD` から planned result tree への exact update write set の unpreservable collision、または unresolved merge conflict だけを block します。
 - requested topic が current branch と異なる場合だけ `documents/rule/dependency-module-changes.md` の topic workspace branch clone route を使います。parent pin/root projection は引き続き clean `main` と staged gitlink の一致を要求します。
 - update surface が unsafe な場合だけ、`agents/workflows/agent-canon-pr-workflow.md` または `agents/workflows/derived-agent-canon-diff-workflow.md` に入り、AgentCanon branch / PR に出します。merge 後も read-only plan を先に行い、必要な approval/authority fields と同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected latest route の後で root view と parent pin を同期します。
-- AgentCanon source change、parent submodule pin change、`.gitmodules`
-  change、AgentCanon-owned root runtime view / root-copy surface change、parent
-  root sync PR は `agentcanon_structure_followup=required` です。template /
-  derived parent root で `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` link-root と
+- active root projection change、parent root sync PR は `agentcanon_structure_followup=required`
+  です。template / derived parent root で
+  `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` link-root と
   `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` check が pass した後だけ
   `agentcanon_structure_followup=pass` として closeout に使えます。
 - 承認済み protected `ensure-latest` は `.gitmodules` の URL と immutable remote branch SHA を見て、parent gitlink と submodule worktree HEAD が remote main と一致するかを判定し、必要な pin と root shared surface を同期します。
@@ -130,9 +129,11 @@ the applicable validation and checker obligations.
 - A runtime profile selects validation and checker obligations only. It does
   not limit context size, work scope, team mode, or task size.
 - For repo-changing implementation / patch / doc-edit work, the selected
-  write-capable `worker` / `spark_worker` handoff remains the default.
-  Parent-direct execution requires a recorded exception rationale before
-  editing.
+  write-capable `worker` / `spark_worker` handoff is used when a separate writer
+  is needed. Explicit bounded owner/path/targeted-validation requests use the
+  normal parent-direct route with a short owner/path/design-boundary note.
+  Exception markers are reserved for genuinely out-of-scope or unbounded
+  parent-direct routes.
 - Record the selected profile and the evidence that made it applicable;
   inactive profiles remain unrecorded unless an active workflow explicitly
   asks for their status.
@@ -168,7 +169,7 @@ decision が選択された後、必要な record だけを `agent-canon memory 
 に検索します。stable preference は対象 owner への明示変更として扱います。
 
 raw text search の hit だけで編集対象を決めません。
-検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を直接 materialize する handoff を作ります。空の unresolved-decision set は即時に one-pass materialization へ遷移し、owner gate は完了後だけです。parent repository edits は `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` かつ `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を記録した場合だけ許可します。
+検索 hit を修正 surface にする場合は、hit path を保存し、dependency header graph と責務 owner で edit scope を展開します。owner boundary、差し替え可能な単位、validation route、`external public API/behavior/schema unchanged` が evidence で閉じたら、implementation-executable TargetStateContract に固定された complete responsibility unit を通常の owner route で materialize します。空の unresolved-decision set は即時に one-pass materialization へ遷移し、owner gate は完了後だけです。明示された bounded owner/path/targeted-validation request は parent-direct の短い owner/path/design-boundary note で進め、例外 marker は genuinely out-of-scope または unbounded route に限ります。
 bounded route では、existing tool の実行と patching を tool-owned evidence から開始します。runtime `SKILL.md` 読了は、対象 property を正本として持つ existing tool の実行後に必要な場合だけ使う follow-up context です。結果の解釈や修正に必要な owner surface だけを開きます。bounded route は route と validation profile の signal であり、実装 behavior は契約完全実装ポリシーから導きます。
 
 ```bash
@@ -242,9 +243,9 @@ owning responsibility model から始めます。Full staged route では `Abstr
 Frame`、`Implementation Source Packet`、`Design Side-Effect Map`、
 `Design-To-Implementation Trace` をそろえます。Parent-Direct Context Note は
 routing / handoff artifact として扱い、edit authorization は別 gate で固定します。親が repo
-を直接編集するには、同じ責務 model に加えて
-`PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` と
-`PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` が必要です。
+を直接編集する明示された bounded owner/path/targeted-validation request は通常の
+parent-direct route とし、短い owner/path/design-boundary note を添えます。例外 marker は
+genuinely out-of-scope または unbounded route に限ります。
 Gate 6 の detailed design review は、owner/design boundary、API shape、仕様解釈、
 または別の unresolved claim が owning review gate では判定できない場合だけ選択します。
 設計文書の存在だけでは別 review stage や artifact を生成しません。reviewer output は
@@ -310,8 +311,8 @@ retry loops, apply `agents/workflows/token-efficient-codex-workflow.md`.
 - Context may be large. Remove duplicated or decision-irrelevant copies, not
   context required by request clauses, owner boundaries, or traceability.
 - Keep `worker` as the implementation default. Select `spark_worker` only from
-  the typed parent packet; keep parent-direct writes on the recorded exception
-  route.
+  the typed parent packet. Explicit bounded owner/path/validation requests may
+  close through the normal parent-direct route.
 - Attribute change with the existing session comparison, role evaluator, and
   runtime dashboard tools. Missing post-change runtime evidence remains
   `missing`; it is not inferred from fewer configured roles.
@@ -537,7 +538,7 @@ checked and cited.
 - context sweep と library sweep を先に行う
 - 変更対象と acceptance criteria を短く固定する
 - `user_request_contract.md` に must-do、must-not-do、completion-evidence の clause ID を書く
-- repo-changing task では早い段階で `schedule.md` を TODO 正本として埋め、stage plan / clause coverage / planned work units を concrete にする
+- coordination、resumption、または selected workflow が要求する場合だけ `schedule.md` を TODO 正本として materialize し、stage plan / clause coverage / planned work units を concrete にする。bounded one-writer task は owner/path/validation note で閉じる
 - 各 clause に source bucket を付け、`current_request`、`durable_user_preference`、`repo_or_code_precedent`、`domain_or_external_constraint`、`unknown_or_open_question` を混ぜずに扱う
 - 不明点は notes、guardrails、documents、prior logs、local code / tests で解決できるかを `Requirements Resolution Sweep` に記録してから deferred / escalation を決める
 - active な must-do、must-not-do、completion-evidence clause に `unknown_or_open_question` を残さない
@@ -585,7 +586,7 @@ full staged route でも、`scheduler`、`schedule_reviewer`、`designer`、`des
 active gate の場合の `document_flow_reviewer` は候補です。owner-critical decision または
 distinct unresolved claim/risk が選択した stage だけを materialize し、W2 の completion
 gate は approved typed contract evidence と active owner route で確定します。
-owner-bounded route は `external public API/behavior/schema unchanged` の場合だけ維持します。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更がある場合は `scoped_change` または broader route へ進み、`dependency/consumer/migration/docs closure` を scope 形成します。reader-facing docs、新用語、cross-surface risk がある場合も従来どおり broader route へ進みますが、その理由だけで同 closure を無条件要求しません。
+bounded owner route は `external public API/behavior/schema unchanged` の場合だけ維持します。public surface の追加、縮小、削除、rename、restriction、deprecation、意味変更がある場合は `scoped_change` または broader route へ進み、`dependency/consumer/migration/docs closure` を scope 形成します。reader-facing docs、新用語、cross-surface risk がある場合も従来どおり broader route へ進みますが、その理由だけで同 closure を無条件要求しません。
 Codex subagent では、候補 role を workflow family に応じて宣言しますが、owner-critical
 decision、distinct unresolved claim/risk、または selected validation route が要求した
 role だけを materialize します。W2 の completion predicate は approved typed contract
@@ -717,8 +718,8 @@ cost を無視して review coverage を優先する run では、research-drive
   `Design Artifact Under Review` が現在の `design_brief.md` を指し decision が
   `approve` であることを確認する。設計を修正した後は selected Gate 6 で現行設計を
   adjudicate し直す
-- selected design review がある run では、write-capable handoff と parent-direct
-  exception の前に `pre_handoff_gate_status` へ `design_review.md decision=approve`
+- selected design review がある run では、write-capable handoff または parent-direct
+  route の前に `pre_handoff_gate_status` へ `design_review.md decision=approve`
   と `waterfall-gate-check --gate design` pass evidence を記録する。candidate artifact
   は記録や handoff を自動的に要求しない
 - 詳細設計前に `task_start.py` / `bootstrap_agent_run.py` の `DESIGN_DOCUMENT_PACKET` を読み、その path 群を `design_brief.md` の `Upstream Requirement Packet` に転記する
@@ -726,11 +727,11 @@ cost を無視して review coverage を優先する run では、research-drive
 - worker の実装入力は、各 implementation slice の前に明示された design artifact path、design section、request clause ID です。test plan item は、active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ実装入力に含めます
 - worker は docs、workflow、prompt/config、validation output、dependency manifest、user-facing surface へ波及する変更を `Design Side-Effect Map` の item として扱い、implementation summary に owner stage と review gate を残す
 - `Abstract Design Frame`、`Installed Libraries And Existing Implementation Survey`、`Implementation Source Packet`、選択された場合の承認済み `design_review.md`、design gate check、および design と現行 repo docs / code / dependency surface の整合が揃った時点で実装へ進む。design review が未選択なら semantic decision sufficiency と owner validation evidence を使い、欠けた場合だけ Gate 5-6 へ戻る
-- 実装中に design issue が見つかった場合は、`design_issue_blocker=<issue>`、evidence、候補 option を artifact に残し、Gate 5-6 へ戻す。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾は設計側で解決します。run bundle が無い parent-direct task では編集を止めて user に設計判断を返す
+- 実装中に design issue が見つかった場合は、`design_issue_blocker=<issue>`、evidence、候補 option を artifact または structured handoff に残し、Gate 5-6 へ戻す。API shape、責務境界、path layout、命名、アルゴリズム、証明対象、test oracle、依存方向、runtime contract、config surface の欠落や矛盾は設計側で解決します。run bundle が無い bounded parent-direct task は owner/path/validation note を使って継続する
 - `design_issue_blocker` は local fallback、wrapper、helper、分岐、別経路、test 緩和、docs 上書きではなく、Gate 5-6 の設計更新で閉じる。承認済み design と局所 precedent から一意に導ける typo、format、import、狭い機械的追従だけが同じ implementation pass で修正できる
 - legacy-route drift と duplicate implementation は implementation GuardRail finding として扱い、旧 route、旧 wrapper、旧 helper、config mirror は caller migration で canonical owner へ統合する
 - implementation は current tree head の canonical path だけを更新対象にし、`*_old`、`*_copy`、dated clone、parallel module、duplicate directory のような別 truth surface を作らない
-- `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認し、repo-changing implementation / patch / doc-edit work は write-capable handoff first で進める。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ）、dependency-expanded handoff scope に加え、`--select-agent-type implementer=spark_worker:<evidence>` が stdout / manifest に記録された場合だけ使います。選択済み candidate が blocked の場合は local/tool context に `selected_agent_type`、`write_capable_handoff_blocker`、`evidence`、`parent_packet_ref`、`status=blocked` を記録し、candidate を変える場合は parent packet と wave の改訂を必須にします。parent-direct は explicit approval、spawn authorization blocker、または tool-gate blocker を記録した exception route です
+- `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認し、repo-changing implementation / patch / doc-edit work は、別 writer が必要な場合だけ write-capable handoff で進める。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ）、dependency-expanded handoff scope に加え、`--select-agent-type implementer=spark_worker:<evidence>` が stdout / manifest に記録された場合だけ使います。選択済み candidate が blocked の場合は local/tool context に blocker を記録します。明示された bounded owner/path/validation request の parent-direct は通常 route です
 - 新規または rename する file、function、class、theorem、artifact、CLI flag、
   config key は、implementation handoff 前に naming plan で固定する。naming plan は
   対象概念、責務語彙、既存 naming family、採用名、avoid-name list を含み、
@@ -827,7 +828,7 @@ environment, produce resources, or duplicate tests/gates.
 - Source freeze 後は canonical formatter/check path と選択した非 Python static
   evidence を一度記録する。別 CI、別 formatter、別 checker、checker-retest
   は W2 completion gate にならない。
-- Hook、tool、skill、workflow、agent protocol、GitHub workflow、dependency manifest に触る前には `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、`TOOL_REJECTION_PREDICTED_GATE` を write-capable subagent handoff に渡す。parent 直編集に渡す場合は先に `PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` と `PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>` を記録する。予測 gate が出た場合は、gate-specific command と repair plan を実装前に固定する
+- Hook、tool、skill、workflow、agent protocol、GitHub workflow、dependency manifest に触る前には `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>` を走らせ、`TOOL_REJECTION_PREDICTED_GATE` を write-capable subagent handoff または parent-direct note に渡す。予測 gate が出た場合は、gate-specific command と repair plan を実装前に固定する
 - tool / checker / hook / reviewer / subagent feedback から実装へ進む場合は `$tool-finding-report` で finding packet を作り、raw artifact、structured artifact、impact、prompt feedback decision を handoff に渡す。`handoff_prompt_gap` または `shared_skill_or_workflow_gap` は次の write-capable subagent 起動前に prompt を修正し、`workflow_monitor.py --runtime-feedback ... action=prompt_repair` で記録する
 - agent runtime / skill 変更では active profile に応じて `make agent-checks` または relevant subchecks を使う
 - 文書変更では canonical formatter/check path が Markdown、math、Mermaid の

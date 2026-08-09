@@ -34,12 +34,16 @@ SCHEMA_IDS = {
     "role_instruction_template": "role_instruction_template_v1",
     "tool_call_token": "tool_call_token_v1",
     "generated_role_view": "generated_role_view_v1",
+    "common_return": "claim_evidence_v1",
 }
+
+COMMON_RETURN_SCHEMA_ID = SCHEMA_IDS["common_return"]
 
 _ROOT_FIELDS = {
     "schema_id",
     "registry_id",
     "registry_version",
+    "writer_isolation_policy",
     "role_profile_bindings",
     "role_sandbox_bindings",
     "role_instruction_templates",
@@ -150,6 +154,59 @@ class ValidationResult:
     @classmethod
     def fail(cls, issues: Iterable[ValidationIssue]) -> "ValidationResult":
         return cls(SCHEMA_IDS["execution_contract"], False, tuple(issues))
+
+
+def validate_claim_evidence_result(value: object) -> ValidationResult:
+    """Validate the one common claim/evidence return contract for all roles."""
+    issues: list[ValidationIssue] = []
+    if not isinstance(value, Mapping):
+        return ValidationResult.fail(
+            [ValidationIssue("return_contract.type", "claim/evidence result must be a mapping")]
+        )
+    status = value.get("status")
+    if status not in {"pass", "revise", "escalate", "blocked"}:
+        issues.append(
+            ValidationIssue(
+                "return_contract.status",
+                "status must be pass, revise, escalate, or blocked",
+                "status",
+            )
+        )
+    claim = value.get("claim")
+    if not isinstance(claim, str) or not claim.strip():
+        issues.append(ValidationIssue("return_contract.claim", "claim must be non-empty text", "claim"))
+    evidence = value.get("evidence")
+    if (
+        not isinstance(evidence, list)
+        or not evidence
+        or not all(isinstance(item, str) and item.strip() for item in evidence)
+    ):
+        issues.append(
+            ValidationIssue(
+                "return_contract.evidence",
+                "evidence must be a non-empty list of text references",
+                "evidence",
+            )
+        )
+    return ValidationResult.fail(issues) if issues else ValidationResult(
+        COMMON_RETURN_SCHEMA_ID, True, ()
+    )
+
+
+def validate_common_return_schema(registry: "ModelProfileRegistry") -> ValidationResult:
+    """Ensure every canonical profile advertises the common return contract."""
+    profile_ids = {profile.return_schema_id for profile in registry.model_profiles}
+    if profile_ids != {COMMON_RETURN_SCHEMA_ID}:
+        return ValidationResult.fail(
+            [
+                ValidationIssue(
+                    "return_contract.schema_ids",
+                    f"all profiles must use {COMMON_RETURN_SCHEMA_ID}",
+                    "model_profiles.return_schema_id",
+                )
+            ]
+        )
+    return ValidationResult(COMMON_RETURN_SCHEMA_ID, True, ())
 
 
 @dataclass(frozen=True)
@@ -319,6 +376,7 @@ class ModelProfileRegistry:
     role_sandbox_bindings: Mapping[str, str]
     role_instruction_templates: Mapping[str, tuple[RoleInstructionClause, ...]]
     standalone_role_metadata: Mapping[str, tuple[str, str, str]]
+    writer_isolation_policy: Mapping[str, object]
 
     def by_profile(self, profile_id: str) -> ModelProfile:
         matches = [profile for profile in self.model_profiles if profile.id == profile_id]
@@ -395,6 +453,7 @@ def load_model_profile_registry(root: os.PathLike[str] | str = ".") -> ModelProf
     data = _closed_mapping(
         _read_toml_file(root_path / "agents" / "model_profiles.toml"),
         fields=_ROOT_FIELDS,
+        required=_ROOT_FIELDS - {"writer_isolation_policy"},
         label="registry",
     )
     if _text(data["schema_id"], "schema_id") != SCHEMA_IDS["registry"]:
@@ -402,6 +461,52 @@ def load_model_profile_registry(root: os.PathLike[str] | str = ".") -> ModelProf
     version = data["registry_version"]
     if not isinstance(version, int) or version <= 0:
         raise ModelProfileRegistryError("registry_version:must_be_positive_int")
+    raw_writer_policy = _closed_mapping(
+        data.get(
+            "writer_isolation_policy",
+            {
+                "current_checkout_mode": "legacy_unspecified",
+                "parallel_requirements": ["disjoint_paths"],
+                "collision_action": "serialize_current_checkout_waves",
+                "isolated_worktree_mode": "explicit_only",
+            },
+        ),
+        fields={
+            "current_checkout_mode",
+            "parallel_requirements",
+            "collision_action",
+            "isolated_worktree_mode",
+        },
+        required={
+            "current_checkout_mode",
+            "parallel_requirements",
+            "collision_action",
+            "isolated_worktree_mode",
+        },
+        label="writer_isolation_policy",
+    )
+    current_checkout_mode = _text(
+        raw_writer_policy["current_checkout_mode"],
+        "writer_isolation_policy.current_checkout_mode",
+    )
+    collision_action = _text(
+        raw_writer_policy["collision_action"],
+        "writer_isolation_policy.collision_action",
+    )
+    isolated_worktree_mode = _text(
+        raw_writer_policy["isolated_worktree_mode"],
+        "writer_isolation_policy.isolated_worktree_mode",
+    )
+    parallel_requirements = _string_tuple(
+        raw_writer_policy["parallel_requirements"],
+        "writer_isolation_policy.parallel_requirements",
+    )
+    writer_policy = {
+        "current_checkout_mode": current_checkout_mode,
+        "parallel_requirements": parallel_requirements,
+        "collision_action": collision_action,
+        "isolated_worktree_mode": isolated_worktree_mode,
+    }
     raw_bindings = data["role_profile_bindings"]
     if not isinstance(raw_bindings, Mapping) or not raw_bindings:
         raise ModelProfileRegistryError("role_profile_bindings:must_be_nonempty_mapping")
@@ -575,6 +680,7 @@ def load_model_profile_registry(root: os.PathLike[str] | str = ".") -> ModelProf
         role_sandbox_bindings=sandboxes,
         role_instruction_templates=role_templates,
         standalone_role_metadata=standalone,
+        writer_isolation_policy=writer_policy,
     )
     for role_id in role_templates:
         registry.instruction_clauses_for_role(role_id)

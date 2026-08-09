@@ -217,10 +217,6 @@ path = "../.agents/skills/result-visualize/SKILL.md"
 enabled = true
 
 [[skills.config]]
-path = "../.agents/skills/owner-bounded-routing/SKILL.md"
-enabled = true
-
-[[skills.config]]
 path = "../.agents/skills/start-repository/SKILL.md"
 enabled = true
 

@@ -1555,6 +1555,24 @@ class EnvironmentBoundaryModel:
             findings.append(BoundaryFinding(category, relative, "not-executable"))
         return path
 
+    def _optional(
+        self,
+        checked: list[str],
+        relative: str,
+        *,
+        executable: bool = False,
+    ) -> Path | None:
+        """Record an optional parent-owned path when it is present."""
+        path = self.workspace / relative
+        checked.append(relative)
+        if not path.is_file():
+            return None
+        if executable and not os.access(path, os.X_OK):
+            # Optional does not mean unvalidated: a present hook must remain
+            # executable before the resolver can dispatch it.
+            return path
+        return path
+
     @staticmethod
     def _tokens(path: Path) -> tuple[tuple[str, tuple[str, ...]], ...]:
         """Parse Dockerfile instructions without matching install strings."""
@@ -1783,14 +1801,13 @@ class EnvironmentBoundaryModel:
         config = self._require(
             findings, checked, ".devcontainer/devcontainer.json", "parent"
         )
-        self._require(
-            findings,
-            checked,
-            ".devcontainer/post-create-parent.sh",
-            "parent",
-            executable=True,
+        parent_hook = self._optional(
+            checked, ".devcontainer/post-create-parent.sh", executable=True
         )
-        self._require(findings, checked, ".devcontainer/dependencies.toml", "parent")
+        if parent_hook is not None and not os.access(parent_hook, os.X_OK):
+            findings.append(
+                BoundaryFinding("parent", str(parent_hook), "not-executable")
+            )
         if config is None:
             return
         try:

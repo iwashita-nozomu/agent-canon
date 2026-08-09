@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: e43497eb12555e119a32e79cbb9a721f789da8081a4d4ffda441aa15c7973ce1
+# source canonical digest: 02afc64ea65a70464500a94d66540421c3f8bd162b34159818be698f3fcab5fd
 
 name = "ship_reviewer"
 description = "High-assurance read-only reviewer for final clause coverage and release readiness."

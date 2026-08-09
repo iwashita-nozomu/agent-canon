@@ -9,7 +9,7 @@
 # downstream implementation ../../../../tools/ci/check_github_workflows.py validates GitHub surface conventions.
 # @dependency-end
 
-# Canonical source: templates/documents/github/issue/eval-capture.yml. Generated projection targets .github/ISSUE_TEMPLATE/eval-capture.yml; edit this source only.
+# Canonical source and checked-in standalone target: update templates/documents/github/issue/eval-capture.yml and .github/ISSUE_TEMPLATE/eval-capture.yml together.
 
 name: Agent behavior eval capture
 description: 観測した agent/workflow failure を再利用可能な eval case に変換します。

@@ -13,10 +13,16 @@
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import re
 import subprocess
 from collections.abc import Sequence
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 compatibility
+    import tomli as tomllib  # type: ignore[no-redef]
 
 try:
     from .graph_client import GraphClient, GraphClientError
@@ -52,6 +58,7 @@ BINARY_SNIFF_BYTES = 4096
 CONTRACT_REGISTRY = Path("documents/design/dependency-contract-kinds.toml")
 CONTRACT_LINE_RE = re.compile(r"^contract\s+(?P<kind>[a-z0-9][a-z0-9-]*)$")
 TOML_STRING_RE = re.compile(r'"(?P<value>[a-z0-9][a-z0-9-]*)"')
+RESPONSIBILITY_SCOPE_MANIFEST = Path("responsibility-scope.toml")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -64,12 +71,18 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "paths",
         nargs="*",
-        help="Specific files to check. When omitted, use --changed.",
+        help=(
+            "Specific files to check. Ignored when --changed is present; when omitted, "
+            "check changed and untracked files in declared surfaces."
+        ),
     )
     parser.add_argument(
         "--changed",
         action="store_true",
-        help="Check files changed relative to HEAD plus untracked files.",
+        help=(
+            "Check files changed relative to HEAD plus untracked files in declared "
+            "responsibility-scope surfaces; takes precedence over positional paths."
+        ),
     )
     parser.add_argument(
         "--root",
@@ -82,6 +95,15 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Accepted for policy-explicit callers. YAML frontmatter and Markdown H1 "
             "titles are allowed before the manifest by default."
+        ),
+    )
+    parser.add_argument(
+        "--surface",
+        action="append",
+        default=[],
+        help=(
+            "Select an additional path or glob as a dependency-header surface. "
+            "Repeat for multiple surfaces."
         ),
     )
     return parser
@@ -104,6 +126,44 @@ def changed_paths(root: Path) -> list[Path]:
     changed = git_lines(root, ["diff", "--name-only", "--diff-filter=ACMRT", "HEAD", "--"])
     untracked = git_lines(root, ["ls-files", "--others", "--exclude-standard"])
     return [root / path for path in [*changed, *untracked]]
+
+
+def declared_surface_patterns(root: Path) -> tuple[str, ...]:
+    """Read the canonical opt-in header surfaces from responsibility scope."""
+    manifest = root / RESPONSIBILITY_SCOPE_MANIFEST
+    if not manifest.is_file():
+        raise ValueError(
+            f"dependency header scope manifest is missing: {manifest}; "
+            "restore responsibility-scope.toml before using --changed or no-path mode"
+        )
+    try:
+        raw = tomllib.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise ValueError(
+            f"dependency header scope manifest is invalid: {manifest}: {error}"
+        ) from error
+    values = raw.get("dependency_header_surfaces")
+    if not isinstance(values, list) or not values:
+        raise ValueError(
+            f"dependency header scope manifest has no declared surfaces: {manifest}; "
+            "add a non-empty dependency_header_surfaces list"
+        )
+    if any(not isinstance(value, str) or not value for value in values):
+        raise ValueError(
+            f"dependency header scope manifest contains an invalid surface: {manifest}; "
+            "each dependency_header_surfaces entry must be a non-empty string"
+        )
+    return tuple(value for value in values if isinstance(value, str))
+
+
+def matches_declared_surface(relative: str, patterns: Sequence[str]) -> bool:
+    """Return whether a path is in an opt-in dependency-header surface."""
+    return any(
+        relative == pattern
+        or fnmatch.fnmatchcase(relative, pattern)
+        or (pattern.endswith("/**") and relative.startswith(pattern[:-3].rstrip("/") + "/"))
+        for pattern in patterns
+    )
 
 
 def repo_relative(root: Path, path: Path) -> str:
@@ -157,11 +217,6 @@ def has_dependency_manifest(path: Path) -> bool:
     return any("@dependency-start" in line for line in lines) and any(
         "@dependency-end" in line for line in lines
     )
-
-
-def has_dependency_header(path: Path) -> bool:
-    """Return whether a file declares the dependency manifest format."""
-    return has_dependency_manifest(path)
 
 
 def strip_manifest_line(line: str) -> str:
@@ -292,6 +347,11 @@ def graph_manifest_facts(root: Path) -> tuple[dict[str, dict[str, object]], list
 
 def normalized_surface_bindings(root: Path) -> tuple[tuple[tuple[str, str], ...], list[str]]:
     """Return manifest-owned projection bindings without a second TOML parser."""
+    manifest_path = root / "vendor/agent-canon" / "documents/runtime/shared-runtime-surfaces.toml"
+    if not manifest_path.is_file():
+        # Standalone fixtures and ordinary parent files have no projection map;
+        # graph validation can still consume their canonical path directly.
+        return (), []
     try:
         snapshot = normalized_snapshot(
             load_manifest(root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml")
@@ -355,15 +415,33 @@ def graph_contract_kind_findings(
     return []
 
 
+def request_paths(root: Path, args: argparse.Namespace) -> list[Path]:
+    """Resolve CLI path selection while preserving changed-mode precedence."""
+    changed_mode = bool(args.changed)
+    if changed_mode or not args.paths:
+        declared = declared_surface_patterns(root)
+        patterns = tuple(dict.fromkeys((*declared, *args.surface)))
+        return [
+            path
+            for path in changed_paths(root)
+            if matches_declared_surface(repo_relative(root, path), patterns)
+        ]
+    return [Path(path) for path in args.paths]
+
+
 def main() -> int:
     """Run dependency header validation."""
     args = build_parser().parse_args()
     root = Path(args.root).resolve()
-    paths = (
-        changed_paths(root)
-        if args.changed or not args.paths
-        else [Path(path) for path in args.paths]
-    )
+    # ``--changed`` intentionally takes precedence over positional paths for
+    # compatibility with the original CLI.  No-path mode intentionally follows
+    # the changed/untracked route to avoid an implicit full-repository over-check.
+    try:
+        paths = request_paths(root, args)
+    except ValueError as error:
+        print("DEPENDENCY_HEADERS=fail")
+        print(f"- {error}")
+        return 1
     findings: list[str] = []
     allowed_kinds = allowed_contract_kinds(root)
     if not allowed_kinds:

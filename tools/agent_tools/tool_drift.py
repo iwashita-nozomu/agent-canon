@@ -195,7 +195,6 @@ CONTRACTS = (
         links=(
             LinkCheck("agents/COMMUNICATION_PROTOCOL.md"),
             LinkCheck("agents/skills/codex-task-workflow.md"),
-            LinkCheck("agents/skills/owner-bounded-routing.md"),
             LinkCheck("tools/agent_tools/responsibility_scope.py"),
             LinkCheck("tools/README.md"),
             LinkCheck("documents/tools/README.md"),
@@ -211,11 +210,6 @@ CONTRACTS = (
                 "agents/skills/codex-task-workflow.md",
                 "responsibility_scope",
                 "missing-runtime-workflow-responsibility-preflight",
-            ),
-            TextCheck(
-                "agents/skills/owner-bounded-routing.md",
-                "responsibility_scope",
-                "missing-runtime-small-change-responsibility-preflight",
             ),
         ),
     ),

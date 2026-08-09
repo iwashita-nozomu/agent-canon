@@ -38,11 +38,9 @@ downstream implementation ../../tools/update_agent_canon.sh derived repo update 
 - submodule URL:
   - `.gitmodules` では `https://github.com/iwashita-nozomu/agent-canon.git` を標準にします。
 - root 側の shared runtime surface:
-  - `documents/runtime/shared-runtime-surfaces.toml` に載っている symlink view、synced copy、regular active contract、repo-local state
-- root 側の shared devcontainer:
-  - `.devcontainer/` は親-owned の実体ディレクトリ。`devcontainer.json` だけを
-    AgentCanon source (`vendor/agent-canon/.devcontainer/devcontainer.json`) へ symlink し、
-    共有 script は `vendor/agent-canon/.devcontainer/` を直接参照します。親 wrapper は作りません。
+  - `documents/runtime/shared-runtime-surfaces.toml` に載っている active view、optional transaction state、retired path policy
+- root 側の parent environment:
+  - `.devcontainer/`、`.vscode/`、`agents/`、`.agents/` は親-owned regular content。Standalone AgentCanon source は自身の source checkout 内で管理し、親へ投影しません。
 - root 側の template entrypoint:
   - `README.md`
   - `QUICK_START.md`
@@ -58,7 +56,7 @@ downstream implementation ../../tools/update_agent_canon.sh derived repo update 
   - skill canon
   - subagent 定義
   - shared notes template
-  - shared devcontainer post-create / attach runtime ergonomics
+  - standalone source の devcontainer post-create / attach runtime ergonomics
   - shared CI / review / runtime helper
   - submodule update / PR / shared surface ownership 文書
 - root 側:
@@ -71,7 +69,7 @@ downstream implementation ../../tools/update_agent_canon.sh derived repo update 
 ## 編集ルール
 
 - shared canon を直すときは `vendor/agent-canon/` 側を編集します。
-- root 側の symlink view や synced copy を直接編集しません。
+- root 側の active symlink view を直接編集せず、parent-owned regular content を synced copy として扱いません。
 - shared surface を増減したら、同じ pass で `documents/runtime/shared-runtime-surfaces.toml` と ownership 文書を更新します。
 - root 側の入口文書を変える場合でも、shared canon の説明は `agent-canon` 側の正本に寄せます。
 
@@ -96,7 +94,7 @@ After an approved update, repair and check root views.
 - `merge-main-into-current`:
   - 通常 sequence ではなく、intended named AgentCanon source branch に local commit がある場合の AgentCanon PR route で使う。ahead / diverged / dirty state は evidence として保持し、仮想 merge conflict または materialization collision だけを block する
 - `link-root`:
-  - root の symlink view と synced copy を vendor 正本から再構成する
+  - root の active symlink view を vendor 正本から再構成し、parent-owned regular content は保持する
 - `check`:
   - root surface と vendor 正本の drift を検出する
 - `sync_agent_canon.sh pull` / `push`:
@@ -130,7 +128,7 @@ remote 名や一台の host path に合わせて変えません。
 
 - source-root resolver の `exec tools/sync_agent_canon.sh check` が pass
 - `make agent-canon-pr-check` が pass
-- root 側の shared surface が構成どおりに再同期されている
+- root 側の active surface が構成どおりに再同期されている
 - AgentCanon GitHub `main` SHA、template submodule pin SHA、`git submodule status vendor/agent-canon` が PR / closeout evidence に残っている
 
 ## 参照先
@@ -159,14 +157,12 @@ remote 名や一台の host path に合わせて変えません。
 
 root 側は owner class ごとに薄い wrapper、symlink view、copy surface、regular active contract を分けます。
 
-- AgentCanon-owned symlink views:
-  - `AGENTS.md`, `agents/`, `.agents/`, `.codex/`, `tools/`
-  - AgentCanon-owned shared policy docs listed in `documents/runtime/shared-runtime-surfaces.toml`
-  - AgentCanon-owned `tests/agent_tools/` and `tests/tools/` mirror tests
-- GitHub path constraint copy surfaces:
-  - `.github/workflows/agent-coordination.yml`
-  - `.github/PULL_REQUEST_TEMPLATE/agent_canon.md`
-  - `.github/scripts/checkout_agent_canon_submodule.sh`
+- AgentCanon-owned active views:
+  - `AGENTS.md`, `.codex/config.toml`, `tools/agent-canon`
+  - optional transaction state under `.agent-canon/`
+- Parent-owned regular content:
+  - `agents/`, `.agents/`, `.codex/agents/`, `.devcontainer/`, `.vscode/`, `.github/`
+  - parent workflows, templates, and editor/devcontainer configuration are not copied from AgentCanon
 - Template-owned active contracts, regular at root:
   - `README.md`, `QUICK_START.md`, `documents/README.md`
   - `documents/contracts/template-bootstrap.md`
@@ -286,7 +282,7 @@ commit message には `AgentCanon subtree-to-submodule migration` と、local wo
 
 標準 pin は `vendor/agent-canon` の submodule URL
 `https://github.com/iwashita-nozomu/agent-canon.git`、branch `main` です。
-親 repo の root symlink view は維持し、request-evidence-authorized
+親 repo の active root symlink view は維持し、request-evidence-authorized
 source-root resolver の `exec tools/sync_agent_canon.sh link-root` と
 `exec tools/sync_agent_canon.sh check` で検証します。
 
@@ -325,7 +321,7 @@ from a derived repo must follow the intended named vendor branch source-owner ro
 - `vendor/agent-canon/` の submodule pin を置く
 - submodule-first の sync / review script を追加する
 - root `AGENTS.md` を shared runtime surface に寄せる
-- root の shared docs / scripts / discovery surface を symlink view に寄せる
+- root の `AGENTS.md`、`.codex/config.toml`、`tools/agent-canon` だけを symlink view に寄せる
 - root `.codex/config.toml` も shared default に寄せる
 
 ### Phase 1. upstream `agent-canon` repo を作る

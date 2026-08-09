@@ -790,15 +790,18 @@ def iter_artifacts(
     roles: tuple[Role, ...],
     active_design_packet: ActiveDesignPacketConfig | None = None,
 ) -> tuple[str, ...]:
-    """Return unique artifact filenames in deterministic order."""
+    """Return core plus explicitly selected artifact filenames.
+
+    Core run metadata is always materialized so a bundle remains usable.  Role
+    outputs (including design and review documents) are opt-in: an inactive
+    reviewer does not leave an empty template or an implicit optional-template
+    state machine in the bundle.
+    """
     packet = active_design_packet or resolve_active_design_packet_config(config)
     return tuple(
         dict.fromkeys(
             (
                 *(config.artifacts[key] for key in STANDARD_RUN_ARTIFACT_KEYS),
-                packet.design_artifact,
-                packet.design_review_artifact,
-                packet.document_flow_review_artifact,
                 *(
                     output
                     for role in roles

@@ -8,12 +8,12 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: e16b0021fde54dccd820ef6a155ff994938d8f87433864208c14d3c98b1b3386
+# source canonical digest: 16cb978da4ad9c2a786b41b325eae99b170933108ba15c248cc6acc394240f06
 
 name = "experiment_runner"
 description = "Execution-only agent for running bounded experiments and summarizing logs."
 nickname_candidates = ["experiment_runner"]
-sandbox_mode = "workspace-write"
+sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
