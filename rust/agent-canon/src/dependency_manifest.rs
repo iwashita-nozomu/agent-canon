@@ -899,7 +899,11 @@ pub(crate) fn source_path_is_explicitly_excluded(relative_path: &str) -> bool {
 }
 
 pub(crate) fn source_path_is_historical_dependency_record(relative_path: &str) -> bool {
-    relative_path.starts_with("issues/closed/")
+    relative_path
+        .split('/')
+        .collect::<Vec<_>>()
+        .windows(2)
+        .any(|components| components == ["issues", "closed"])
 }
 
 fn path_is_surface_or_descendant(relative: &str, surface: &str) -> bool {
@@ -2065,8 +2069,17 @@ mod tests {
         assert!(source_path_is_historical_dependency_record(
             "issues/closed/AC-20260612-wave-activation-launcher-gap.md"
         ));
+        assert!(source_path_is_historical_dependency_record(
+            "vendor/agent-canon/issues/closed/AC-20260612-wave-activation-launcher-gap.md"
+        ));
         assert!(!source_path_is_historical_dependency_record(
             "issues/open/AC-20260612-active-finding.md"
+        ));
+        assert!(!source_path_is_historical_dependency_record(
+            "vendor/agent-canon/issues/open/AC-20260612-active-finding.md"
+        ));
+        assert!(!source_path_is_historical_dependency_record(
+            "vendor/agent-canon/issues/archive/closed.md"
         ));
     }
 
