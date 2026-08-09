@@ -19,6 +19,9 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_codex_in_repo_container.py"
+sys.path.insert(0, str(SCRIPT.parent))
+
+from run_codex_in_repo_container import build_nested_codex_script  # noqa: E402
 
 
 def run_cli(
@@ -44,12 +47,221 @@ def test_print_only_runs_shared_post_create_before_codex() -> None:
         "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
         in result.stdout
     )
+    assert "--user root" in result.stdout
+    assert "-e AGENT_CANON_CONTAINER_USER=" in result.stdout
     assert "setpriv --reuid" in result.stdout
-    assert "--user" not in result.stdout
     assert "/root/.codex" not in result.stdout
     assert "codex-state" not in result.stdout
     assert 'export AGENT_CANON_CODEX_SESSION_ROOT="${AGENT_CANON_CODEX_SESSION_ROOT:-$HOME/.codex/sessions}"' in result.stdout
     assert "exec codex" in result.stdout
+
+
+def test_host_docker_keeps_socket_mount_with_root_setup() -> None:
+    """Host Docker keeps its socket mount while nested setup starts as root."""
+    result = run_cli("--print-only", "--profile", "host-docker")
+
+    assert result.returncode == 0, result.stderr
+    assert "--user root" in result.stdout
+    assert "-v /var/run/docker.sock:/var/run/docker.sock" in result.stdout
+    assert "-e AGENT_CANON_CONTAINER_USER=" in result.stdout
+    assert (
+        "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
+        in result.stdout
+    )
+    assert "setpriv --reuid" in result.stdout
+
+
+def test_host_uid_setup_chowns_workspace_artifacts_before_setpriv() -> None:
+    """Host-UID setup hands mounted post-create artifacts back to the host user."""
+    result = run_cli("--print-only")
+
+    assert result.returncode == 0, result.stderr
+    output = result.stdout
+    post_create = output.index(
+        "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
+    )
+    workspace_marker = output.index('workspace_marker="$(mktemp)"')
+    workspace_ownership = output.index(
+        f"find -P /workspace -xdev -mindepth 1 -uid 0 -newer \"$workspace_marker\" "
+        f"-exec chown -h {os.getuid()}:{os.getgid()} {{}} +",
+        post_create,
+    )
+    marker_cleanup = output.index('rm -f "$workspace_marker"', workspace_ownership)
+    setpriv = output.index("setpriv --reuid", workspace_ownership)
+    assert workspace_marker < post_create < workspace_ownership < marker_cleanup < setpriv
+
+
+def _write_executable(path: Path, contents: str) -> None:
+    """Write one executable fixture script."""
+    path.write_text(contents, encoding="utf-8")
+    path.chmod(0o755)
+
+
+def test_host_uid_setup_executes_workspace_ownership_handoff(tmp_path: Path) -> None:
+    """The handoff covers new parents and fails closed before setpriv on chown errors."""
+    workspace = tmp_path / "workspace"
+    home = tmp_path / "home"
+    bin_dir = tmp_path / "bin"
+    log = tmp_path / "events.log"
+    root_owned_manifest = tmp_path / "root-owned.txt"
+    outside_target = tmp_path / "outside.txt"
+    post_create = workspace / "vendor/agent-canon/.devcontainer/post-create.sh"
+    generated_script = tmp_path / "nested-codex.sh"
+    workspace.mkdir()
+    home.mkdir()
+    bin_dir.mkdir()
+    (workspace / "pre-existing-root-owned.txt").write_text(
+        "keep", encoding="utf-8"
+    )
+    outside_target.write_text("outside", encoding="utf-8")
+    post_create.parent.mkdir(parents=True)
+    post_create.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        'workspace="$1"\n'
+        'mkdir -p "$workspace/reports/agents/devcontainer/runtime"\n'
+        'printf arbitrary >"$workspace/reports/agents/devcontainer/runtime/output.txt"\n'
+        'mkdir -p "$workspace/.agent-canon/dependency-receipts"\n'
+        'printf receipt >"$workspace/.agent-canon/dependency-receipts/receipt.txt"\n'
+        'mkdir -p "$workspace/editable-install-output/package"\n'
+        'printf editable >"$workspace/editable-install-output/package/module.py"\n'
+        'ln -s "${OUTSIDE_TARGET:?}" "$workspace/new-outside-link"\n'
+        'printf "%s\\n" '
+        '"$workspace/reports/agents/devcontainer/runtime" '
+        '"$workspace/reports/agents/devcontainer/runtime/output.txt" '
+        '"$workspace/reports" '
+        '"$workspace/reports/agents" '
+        '"$workspace/reports/agents/devcontainer" '
+        '"$workspace/.agent-canon" '
+        '"$workspace/.agent-canon/dependency-receipts" '
+        '"$workspace/.agent-canon/dependency-receipts/receipt.txt" '
+        '"$workspace/editable-install-output" '
+        '"$workspace/editable-install-output/package" '
+        '"$workspace/editable-install-output/package/module.py" '
+        '"$workspace/new-outside-link" '
+        '"$workspace/pre-existing-root-owned.txt" >"${ROOT_OWNED_MANIFEST:?}"\n',
+        encoding="utf-8",
+    )
+    post_create.chmod(0o755)
+    _write_executable(
+        bin_dir / "id",
+        "#!/usr/bin/env bash\n"
+        'case "${1:-}" in\n'
+        "  -u|-g) printf '0\\n' ;;\n"
+        "  *) exec /usr/bin/id \"$@\" ;;\n"
+        "esac\n",
+    )
+    _write_executable(
+        bin_dir / "find",
+        "#!/usr/bin/env python3\n"
+        "import os\n"
+        "import subprocess\n"
+        "import sys\n"
+        "from pathlib import Path\n"
+        "args = sys.argv[1:]\n"
+        "marker = Path(args[args.index('-newer') + 1])\n"
+        "manifest = Path(os.environ['ROOT_OWNED_MANIFEST'])\n"
+        "selected = {Path(line.strip()) for line in manifest.read_text().splitlines()}\n"
+        "root = Path(args[1] if args[0] == '-P' else args[0])\n"
+        "paths = []\n"
+        "for directory, directories, files in os.walk(root, followlinks=False):\n"
+        "    candidates = [Path(directory), *(Path(directory) / name for name in (*directories, *files))]\n"
+        "    for candidate in candidates:\n"
+        "        if candidate in selected and os.lstat(candidate).st_mtime_ns > marker.stat().st_mtime_ns:\n"
+        "            paths.append(str(candidate))\n"
+        "if not paths:\n"
+        "    raise SystemExit(0)\n"
+        "exec_index = args.index('-exec')\n"
+        "chown_command = args[exec_index + 1]\n"
+        "chown_args = [arg for arg in args[exec_index + 2:-2] if arg != '{}']\n"
+        "raise SystemExit(subprocess.run([chown_command, *chown_args, *paths], check=False).returncode)\n",
+    )
+    _write_executable(
+        bin_dir / "chown",
+        "#!/usr/bin/env bash\n"
+        'printf "chown %s\\n" "$*" >>"${EVENT_LOG:?}"\n'
+        'if [[ "${FAIL_CHOWN:-0}" == 1 && "${1:-}" == "-h" ]]; then exit 42; fi\n'
+        "exit 0\n",
+    )
+    _write_executable(
+        bin_dir / "rm",
+        "#!/usr/bin/env bash\n"
+        'printf "rm %s\\n" "$*" >>"${EVENT_LOG:?}"\n'
+        'exec /usr/bin/rm "$@"\n',
+    )
+    _write_executable(
+        bin_dir / "setpriv",
+        "#!/usr/bin/env bash\n"
+        'printf "setpriv-called\\n" >>"${EVENT_LOG:?}"\n'
+        "while (($#)); do\n"
+        '  case "$1" in\n'
+        "    --reuid|--regid) shift 2 ;;\n"
+        "    --clear-groups) shift ;;\n"
+        "    *) break ;;\n"
+        "  esac\n"
+        "done\n"
+        'exec "$@"\n',
+    )
+    _write_executable(
+        bin_dir / "codex",
+        "#!/usr/bin/env bash\n"
+        'printf "codex-called\\n" >>"${EVENT_LOG:?}"\n',
+    )
+    generated_script.write_text(
+        build_nested_codex_script(
+            ["codex"],
+            mount_host_ssh_dir=False,
+            workspace=str(workspace),
+            run_uid=os.getuid(),
+            run_gid=os.getgid(),
+        ),
+        encoding="utf-8",
+    )
+
+    common_env = {
+        **os.environ,
+        "EVENT_LOG": str(log),
+        "HOME": str(home),
+        "PATH": f"{bin_dir}:{os.environ['PATH']}",
+        "OUTSIDE_TARGET": str(outside_target),
+        "ROOT_OWNED_MANIFEST": str(root_owned_manifest),
+    }
+    first = subprocess.run(
+        ["bash", str(generated_script)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=common_env,
+    )
+    assert first.returncode == 0, first.stderr
+    events = log.read_text(encoding="utf-8").splitlines()
+    chown_events = [line for line in events if line.startswith("chown -h")]
+    chown_targets = {target for line in chown_events for target in line.split()[2:]}
+    assert str(workspace / "reports") in chown_targets
+    assert str(workspace / "reports/agents") in chown_targets
+    assert str(workspace / "reports/agents/devcontainer") in chown_targets
+    assert str(workspace / "reports/agents/devcontainer/runtime") in chown_targets
+    assert str(workspace / ".agent-canon") in chown_targets
+    assert str(workspace / ".agent-canon/dependency-receipts") in chown_targets
+    assert str(workspace / "editable-install-output/package/module.py") in chown_targets
+    assert str(workspace / "new-outside-link") in chown_targets
+    assert str(workspace / "pre-existing-root-owned.txt") not in chown_targets
+    assert str(outside_target) not in chown_targets
+    marker_cleanup_events = [line for line in events if line.startswith("rm ")]
+    assert marker_cleanup_events
+    assert events.index(chown_events[-1]) < events.index(marker_cleanup_events[-1])
+    assert events.index(marker_cleanup_events[-1]) < events.index("setpriv-called")
+
+    log.write_text("", encoding="utf-8")
+    failed = subprocess.run(
+        ["bash", str(generated_script)],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={**common_env, "FAIL_CHOWN": "1"},
+    )
+    assert failed.returncode != 0
+    assert "setpriv-called" not in log.read_text(encoding="utf-8")
 
 
 def test_standalone_dockerfile_uses_canonical_project_identity() -> None:
@@ -154,6 +366,8 @@ def test_runtime_identity(tmp_path: Path) -> None:
         "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
         in result.stdout
     )
+    assert "-e AGENT_CANON_CONTAINER_USER=" in result.stdout
+    assert "--user root" not in result.stdout
     devcontainer = (PROJECT_ROOT / ".devcontainer" / "devcontainer.json").read_text(
         encoding="utf-8"
     )
