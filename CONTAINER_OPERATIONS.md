@@ -12,7 +12,7 @@ downstream design documents/design/rust-agent-tool-migration.md Rust toolchain a
 downstream design documents/conventions/coding-conventions-project.md project environment and dependency ownership conventions.
 downstream environment agent-canon-environment.toml machine-readable AgentCanon environment contract.
 downstream implementation .devcontainer/devcontainer.json standalone AgentCanon devcontainer entrypoint.
-downstream implementation .devcontainer/post-create.sh standalone AgentCanon shared post-create lifecycle.
+downstream implementation .devcontainer/post-create.sh standalone AgentCanon image verification and runtime readback.
 downstream implementation .vscode/settings.json standalone AgentCanon source editor defaults.
 downstream implementation tools/ci/container_config.py container and devcontainer configuration validator.
 downstream implementation tools/ci/check_github_workflows.py GitHub workflow checkout and Docker-build validator.
@@ -101,15 +101,13 @@ Node/npm, Rust, Lean, Playwright, or other shared agent tooling solely for
 developer convenience.
 
 The mounted workspace devcontainer contract is separate. The standalone image
-installs fixed OS/Python capabilities directly in its Dockerfile. Node/npm
-22.14.0/10.9.2 is owned by the exact digest-pinned Node devcontainer Feature.
-The image provides `pipx` for isolated manifest-defined Python CLIs; project
-dependencies use selected `pyproject.toml` extras through the standard editable
-`project-install` path.
-`.devcontainer/dependencies.toml` then describes the small default set of
-mounted developer/agent tools. Browser, TeX/PDF, proof, full Rust, and security
-scanner capabilities are selected by their owning workflow or CI image rather
-than installed by every default startup.
+installs fixed OS/Python capabilities directly in its Dockerfile and imports
+Node/npm 22.14.0/10.9.2 from the digest-pinned official OCI provider. The
+Dockerfile runs the typed manifest engine during image build, placing the full
+image-safe tool plan and receipts in the immutable canonical image root.
+Browser, TeX/PDF, proof, full Rust, and security scanner capabilities are
+selected by their owning workflow or CI image rather than installed by every
+default startup.
 
 In a derived repository, the parent overlay and final hook are optional:
 `.devcontainer/dependencies.toml` is read only when present, and its absence
@@ -117,9 +115,10 @@ means no parent dependency overlay; `.devcontainer/post-create-parent.sh` is
 called only when present, and its absence means no parent final hook. The
 legacy parent-environment pair is likewise optional and is audited only when
 present. No empty sentinel, disabled marker, or no-op wrapper is required.
-The standalone-source post-create invoked via the source-root resolver validates the available sources, merges a present parent
-manifest before the canonical AgentCanon manifest, validates the complete graph,
-and executes it only after that validation succeeds.
+The standalone-source post-create invoked via the source-root resolver performs
+read-only `image-verify` against the build-time plan and receipts, then reads
+back the container runtime. It does not install packages, access the network,
+repair workspace ownership, or write dependency receipts.
 
 ### Image dependency snapshot
 
@@ -130,8 +129,8 @@ fresh clones produce the same image identity. This build-only command publishes
 the immutable plan and receipts under
 `/usr/local/share/agent-canon/image-dependencies/{plan.json,receipts}`; it does
 not include methods outside the image-safe APT package/repository, npm-global,
-and release-asset whitelist, and does not replace the mounted `install` or
-`project-install` lifecycle.
+and release-asset whitelist, and does not replace the legacy mounted `install`
+CLI, which remains available only for explicit internal callers.
 Production publication requires euid 0, uses the canonical path without a CLI
 root override, and freezes the recursively published tree as root-owned `0555`
 directories and `0444` files.
@@ -156,12 +155,11 @@ also `canonical` and must remain non-empty. After source loading, the merged
 plan must contain at least one record. Provider, missing-dependency, cycle, and
 typed-verification invariants are unchanged.
 
-The parent-owned `pyproject.toml` is the owner of workspace Python packages.
-Runtime packs declare ordered `runtime.dependency_extras` (default `[]`), and
-the generated environment serializes them only at the boundary as
-`AGENT_CANON_PYTHON_EXTRAS=extra,...`. When selected, shared post-create validates
-the extras against `project.optional-dependencies`, performs one standard
-editable install with current Python/pip, and runs `pip check`.
+The parent-owned `pyproject.toml` remains the owner of workspace Python packages.
+Runtime packs no longer declare `dependency_extras`, and generated environments
+do not serialize `AGENT_CANON_PYTHON_EXTRAS`. The legacy extras API remains
+available to explicit internal callers, but active post-create and runner paths
+do not invoke it.
 ## Dockerfile Rules
 
 Keep the project `Dockerfile` focused on the project runtime.
@@ -170,8 +168,10 @@ Keep the project `Dockerfile` focused on the project runtime.
   dependencies require.
 - Keep `python3`, `pip`, compilers, and build tools only when the project needs
   them.
-- Do not install Codex CLI, GitHub CLI, `gh`, Node.js, or npm solely for agent
-  convenience.
+- Do not install Codex CLI, GitHub CLI, `gh`, Node.js, or npm in a project
+  product image solely for agent convenience. The standalone AgentCanon
+  devcontainer image owns these capabilities through its digest-pinned provider
+  and manifest.
 - Do not install rustup or run cargo solely for AgentCanon CLI or shared
   analysis-tool migration work.
 - Do not install `elan`, Lean, Lake, or proof-search tooling solely for
@@ -181,8 +181,9 @@ Keep the project `Dockerfile` focused on the project runtime.
 - Do not install repository Python dependencies during image build when those
   dependencies depend on the mounted workspace.
 - Do not add fixed AgentCanon capability to a project product Dockerfile;
-  standalone AgentCanon `.devcontainer/Dockerfile` owns fixed OS/Python
-  capability, while the digest-pinned official Node Feature owns Node/npm.
+  standalone AgentCanon `.devcontainer/Dockerfile` owns fixed OS/Python and
+  manifest-selected tooling, while its digest-pinned official OCI provider owns
+  Node/npm.
 
 If a project genuinely needs Node.js, npm, GitHub CLI, Rust, or another
 agent-looking tool as a product/runtime dependency, document that as a
@@ -196,10 +197,10 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
 - Codex CLI, GitHub CLI, `gh`, Node.js used only by Codex or agent tooling,
   JSON and structure inspection helpers such as `jq` and `tree`, and other
   shared developer/agent tools belong in `.devcontainer/dependencies.toml`.
-  Fixed OS/Python capabilities are image-owned, Node/npm is supplied by the
-  digest-pinned official Node Feature, and the typed dependency engine is
-  invoked by `.devcontainer/post-create.sh`; package versions are not
-  overridden by environment variables.
+  Fixed OS/Python and manifest-selected capabilities are image-owned, Node/npm
+  is copied from the digest-pinned official OCI provider, and `.devcontainer/
+  post-create.sh` invokes only read-only `image-verify`; package versions are
+  not overridden by environment variables.
 - `tree` is the canonical agent-side structure inspection display for template
   and derived parent repo readiness. Use
   `tree -a -L <depth> -I '.git|__pycache__|.venv|node_modules|target|reports' <parent-root>`
@@ -209,9 +210,9 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
 - Codex CLI setup is a pinned `npm-global` record for `@openai/codex` 0.145.0
   with an exact npm package identity and executable verification contract. Its
   installer resolves absolute `node`/`npm` paths only from the digest-pinned
-  Feature directory and fixed system bin directories, rejects workspace or
-  untrusted paths, and invokes the absolute npm path through `sudo env` with
-  that minimal trusted PATH; ambient or workspace PATH entries are never
+  image provider and fixed system bin directories, rejects workspace or
+  untrusted paths, and invokes the absolute npm path through a minimal trusted
+  environment; ambient or workspace PATH entries are never
   forwarded.
 - Every dependency record has one method-compatible typed verification
   contract. A matching receipt is reusable only while that contract proves the
@@ -321,15 +322,15 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
   recorded and later certified by `EnvironmentCertificate`, not by a second
   environment policy surface.
 - Nested Codex uses container-local state under the selected workspace runtime
-  home for Codex session semantics, but the runner sets the profile-scoped
-  `XDG_STATE_HOME=/tmp/agent-canon-xdg-state/<profile>` outside the workspace
-  so shared post-create dependency receipts remain container-local. The runner
+  home for Codex session semantics, and the runner sets the profile-scoped
+  `XDG_STATE_HOME=/tmp/agent-canon-xdg-state/<profile>` outside the workspace.
+  The runner
   rejects pack/profile/CLI forwarding of the owned `HOME`, `XDG_STATE_HOME`, and
   `AGENT_CANON_CONTAINER_USER` keys, then emits those authoritative values last.
   It may forward `OPENAI_API_KEY` and `OPENAI_BASE_URL` explicitly; it never
   mounts or seeds host Codex state.
 - 既定 devcontainer は GPU admission の host runtime identity を要求しない。
-  固定 OS/Python capability は image、Node/npm は digest-pinned Feature が所有し、
+  固定 OS/Python、manifest-selected tools、Node/npm は digest-pinned image が所有し、
   `finalize-shared-runtime.sh`、shared lock、provision/readback receipt は GPU
   admission の明示 lifecycle に保持する。既定の linked config からは GPU runtime
   を選択せず、experiment scheduler や managed experiment の wholesale deletion を
@@ -413,15 +414,11 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
 Repository Python dependencies are mounted-workspace state, not Docker image
 state.
 
-- Select `runtime.dependency_extras` in the pack when project packages are needed;
-  `post-create.sh` installs them from the parent `pyproject.toml` when present.
-- Shared post-create passes dependency receipts to the container-local
-  `${XDG_STATE_HOME:-$HOME/.local/state}/agent-canon/dependency-receipts` path;
-  it validates that the state root is absolute and outside the workspace before
-  the installer creates it. Receipts never use the workspace's `.agent-canon`
-  bind state, so rootless mapped users can write them without changing host
-  ownership. The generic dependency CLI fallback remains available for direct
-  callers that do not select the shared post-create path.
+- Runtime packs do not select project extras. Image build or a parent-owned
+  product image prepares workspace Python packages before startup.
+- Shared post-create does not create dependency receipts or repair a workspace
+  bind. If a workspace projection/cache is rootless and unwritable, the
+  container-local canonical runtime remains the only fallback.
 - Host runtime does not create a repository-local virtual environment.
 - Container runtime may create `.venv` only through the canonical policy tool:
 
@@ -460,8 +457,8 @@ before editing.
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1    | Classify each touched path as AgentCanon-owned, template-owned, parent-owned regular content, or one of the three active root views.       |
 | 2    | Check the AgentCanon submodule pin and repair only the three active root views with the request-evidence-authorized source-root resolver `exec tools/sync_agent_canon.sh link-root` route when needed. |
-| 3    | Move agent convenience installs out of `Dockerfile` and into the parent-owned `.devcontainer/post-create.sh` when they are not product dependencies. |
-| 4    | Keep workspace-dependent Python package installation in `pyproject.toml` optional extras and the shared post-create lifecycle.       |
+| 3    | Keep product Dockerfiles focused on product dependencies; standalone AgentCanon `.devcontainer/Dockerfile` owns digest-pinned Node and manifest-selected image tools. |
+| 4    | Keep workspace-dependent Python package ownership in the parent image or explicit image-build route; do not install it from active post-create/runners.       |
 | 5    | Ensure Docker workflows checkout `vendor/agent-canon/` before parent devcontainer smoke.                                                   |
 | 6    | Update `docker/README.md`, top-level README links, and workflow comments that still assume older ownership rules.                          |
 | 7    | Run the validators listed below and record any skipped command with reason and owner.                                                      |

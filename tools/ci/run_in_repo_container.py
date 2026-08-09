@@ -17,7 +17,6 @@ from container_runtime import (
     apply_pack_overrides,
     build_build_command,
     build_run_command,
-    build_workspace_setup_command,
     load_or_default_pack,
     print_label_and_command,
     resolve_builder,
@@ -111,15 +110,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Open the configured shell instead of running a command.",
     )
     parser.add_argument(
-        "--skip-workspace-setup",
-        action="store_true",
-        help=(
-            "Skip the workspace-mounted setup step. By default, the runner "
-            "runs standard editable project installation for pack dependency "
-            "extras when a project pyproject.toml is present."
-        ),
-    )
-    parser.add_argument(
         "command",
         nargs=argparse.REMAINDER,
         help=(
@@ -163,16 +153,8 @@ def main() -> int:
         builder = resolve_builder(args.builder, print_only=args.print_only)
         workspace_root = workspace_path(args.workspace_root)
         command = normalize_command(args.command, shell_session=args.shell_session)
-        container_workspace = args.container_workspace or pack.runtime.workspace_mount
         shell = args.shell or pack.runtime.shell
         run_payload = command if command else [shell]
-        run_payload = build_workspace_setup_command(
-            run_payload,
-            shell=shell,
-            container_workspace=container_workspace,
-            dependency_extras=pack.runtime.dependency_extras,
-            skip_setup=args.skip_workspace_setup,
-        )
 
         build_command = build_build_command(
             builder, pack, pull=args.pull, no_cache=args.no_cache

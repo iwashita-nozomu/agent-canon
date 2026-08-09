@@ -955,7 +955,7 @@ class DependencyModelTests(unittest.TestCase):
                     1,
                 )
 
-    def test_npm_global_uses_stable_prefix_for_install_and_verification(self) -> None:
+    def test_npm_global_uses_oci_image_bin_for_install_and_verification(self) -> None:
         parsed = parse_record(
             record("codex", method="npm-global"),
             path=Path("fixture.toml"),
@@ -963,20 +963,43 @@ class DependencyModelTests(unittest.TestCase):
         )
         runner = FakeRunner(emulate_non_root_sudo=True)
         installer = Installer(runner)
-        feature_bin = dependency_module.NPM_FEATURE_BIN
-        trusted_path = os.pathsep.join(dependency_module.NPM_TRUSTED_BIN_DIRS)
-
-        def feature_which(name: str, *, path: str | None = None) -> str:
-            self.assertEqual(path, trusted_path)
-            return f"{feature_bin}/{name}"
-
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            oci_root = root / "usr" / "local"
+            oci_bin = oci_root / "bin"
+            system_bin = root / "usr" / "bin"
+            oci_bin.mkdir(parents=True)
+            system_bin.mkdir(parents=True)
+            trusted_dirs = (str(oci_bin), str(system_bin))
+            trusted_roots = {
+                str(oci_bin): str(oci_root),
+                str(system_bin): str(root / "usr"),
+            }
+            trusted_path = os.pathsep.join(trusted_dirs)
+            workspace = root / "workspace"
+            workspace.mkdir()
+
+            def oci_which(name: str, *, path: str | None = None) -> str:
+                self.assertEqual(path, trusted_path)
+                return str(oci_bin / name)
+
             with mock.patch.object(
-                dependency_module.shutil, "which", side_effect=feature_which
+                dependency_module,
+                "NPM_SYSTEM_BIN_DIRS",
+                trusted_dirs,
+            ), mock.patch.object(
+                dependency_module,
+                "NPM_TRUSTED_BIN_DIRS",
+                trusted_dirs,
+            ), mock.patch.object(
+                dependency_module,
+                "NPM_TRUSTED_BIN_ROOTS",
+                trusted_roots,
+            ), mock.patch.object(
+                dependency_module.shutil, "which", side_effect=oci_which
             ):
-                installer.install_record(parsed, workspace=root)
-                installer.verify(parsed, workspace=root)
+                installer.install_record(parsed, workspace=workspace)
+                installer.verify(parsed, workspace=workspace)
 
         install_call = next(
             call
@@ -989,7 +1012,7 @@ class DependencyModelTests(unittest.TestCase):
                 "sudo",
                 dependency_module.NPM_ENV_EXECUTABLE,
                 f"PATH={trusted_path}",
-                f"{feature_bin}/npm",
+                f"{oci_bin}/npm",
                 "install",
                 "--global",
                 "--prefix",
@@ -1000,12 +1023,12 @@ class DependencyModelTests(unittest.TestCase):
         ls_index = next(
             index
             for index, call in enumerate(runner.calls)
-            if call[:2] == (f"{feature_bin}/npm", "ls")
+            if call[:2] == (f"{oci_bin}/npm", "ls")
         )
         self.assertEqual(
             runner.calls[ls_index],
             (
-                f"{feature_bin}/npm",
+                f"{oci_bin}/npm",
                 "ls",
                 "--global",
                 "--prefix",
@@ -1033,16 +1056,25 @@ class DependencyModelTests(unittest.TestCase):
             path=Path("fixture.toml"),
             index=0,
         )
-        feature_bin = dependency_module.NPM_FEATURE_BIN
-        trusted_path = os.pathsep.join(dependency_module.NPM_TRUSTED_BIN_DIRS)
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            oci_root = root / "usr" / "local"
+            oci_bin = oci_root / "bin"
+            system_bin = root / "usr" / "bin"
+            oci_bin.mkdir(parents=True)
+            system_bin.mkdir(parents=True)
+            trusted_dirs = (str(oci_bin), str(system_bin))
+            trusted_roots = {
+                str(oci_bin): str(oci_root),
+                str(system_bin): str(root / "usr"),
+            }
+            trusted_path = os.pathsep.join(trusted_dirs)
             cases = (
                 (
                     "workspace",
                     {
                         "node": str(root / "node"),
-                        "npm": f"{feature_bin}/npm",
+                        "npm": f"{oci_bin}/npm",
                     },
                     "inside workspace",
                 ),
@@ -1050,13 +1082,13 @@ class DependencyModelTests(unittest.TestCase):
                     "untrusted",
                     {
                         "node": "/tmp/agent-canon-untrusted/node",
-                        "npm": f"{feature_bin}/npm",
+                        "npm": f"{oci_bin}/npm",
                     },
                     "outside trusted Node/system directories",
                 ),
                 (
                     "missing-node",
-                    {"node": None, "npm": f"{feature_bin}/npm"},
+                    {"node": None, "npm": f"{oci_bin}/npm"},
                     "requires a trusted node executable",
                 ),
             )
@@ -1069,8 +1101,27 @@ class DependencyModelTests(unittest.TestCase):
                         self.assertEqual(path, trusted_path)
                         return paths[executable]
 
-                    with mock.patch.object(
-                        dependency_module.shutil, "which", side_effect=fake_which
+                    with (
+                        mock.patch.object(
+                            dependency_module,
+                            "NPM_SYSTEM_BIN_DIRS",
+                            trusted_dirs,
+                        ),
+                        mock.patch.object(
+                            dependency_module,
+                            "NPM_TRUSTED_BIN_DIRS",
+                            trusted_dirs,
+                        ),
+                        mock.patch.object(
+                            dependency_module,
+                            "NPM_TRUSTED_BIN_ROOTS",
+                            trusted_roots,
+                        ),
+                        mock.patch.object(
+                            dependency_module.shutil,
+                            "which",
+                            side_effect=fake_which,
+                        ),
                     ):
                         with self.assertRaisesRegex(DependencyError, message):
                             Installer(FakeRunner()).install_record(
@@ -1078,7 +1129,7 @@ class DependencyModelTests(unittest.TestCase):
                             )
 
     def test_npm_global_rejects_escaped_node_and_npm_symlinks(self) -> None:
-        """Feature-bin symlinks cannot resolve into workspace or temporary roots."""
+        """OCI image bin symlinks cannot resolve into workspace or outside roots."""
         parsed = parse_record(
             record("codex", method="npm-global"),
             path=Path("fixture.toml"),
@@ -1098,8 +1149,9 @@ class DependencyModelTests(unittest.TestCase):
             for escaped, message in cases:
                 with self.subTest(escaped=escaped):
                     case_root = root / escaped
-                    feature_bin = case_root / "current" / "bin"
-                    feature_bin.mkdir(parents=True)
+                    oci_root = case_root / "usr" / "local"
+                    oci_bin = oci_root / "bin"
+                    oci_bin.mkdir(parents=True)
                     workspace = case_root / "workspace"
                     workspace.mkdir()
                     target = (
@@ -1109,14 +1161,14 @@ class DependencyModelTests(unittest.TestCase):
                     )
                     if escaped == "node":
                         target.write_text("workspace target\n", encoding="utf-8")
-                    escaped_path = feature_bin / escaped
+                    escaped_path = oci_bin / escaped
                     escaped_path.symlink_to(target)
-                    other = feature_bin / ("npm" if escaped == "node" else "node")
-                    other.write_text("feature target\n", encoding="utf-8")
+                    other = oci_bin / ("npm" if escaped == "node" else "node")
+                    other.write_text("oci target\n", encoding="utf-8")
 
-                    trusted_dirs = (str(feature_bin), *system_dirs)
+                    trusted_dirs = (str(oci_bin), *system_dirs)
                     trusted_roots = {
-                        str(feature_bin): str(case_root),
+                        str(oci_bin): str(oci_root),
                         **system_roots,
                     }
 
@@ -1124,12 +1176,9 @@ class DependencyModelTests(unittest.TestCase):
                         executable: str, *, path: str | None = None
                     ) -> str:
                         self.assertEqual(path, os.pathsep.join(trusted_dirs))
-                        return str(feature_bin / executable)
+                        return str(oci_bin / executable)
 
                     with (
-                        mock.patch.object(
-                            dependency_module, "NPM_FEATURE_BIN", str(feature_bin)
-                        ),
                         mock.patch.object(
                             dependency_module,
                             "NPM_TRUSTED_BIN_DIRS",
@@ -1149,8 +1198,8 @@ class DependencyModelTests(unittest.TestCase):
                                 parsed, workspace=workspace
                             )
 
-    def test_npm_global_allows_feature_version_symlink(self) -> None:
-        """The Feature's current symlink may resolve within its version root."""
+    def test_npm_global_ignores_legacy_nvm_bin(self) -> None:
+        """A legacy NVM directory is not a Node resolution source."""
         parsed = parse_record(
             record("codex", method="npm-global"),
             path=Path("fixture.toml"),
@@ -1158,35 +1207,22 @@ class DependencyModelTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            feature_root = root / "nvm"
-            version_bin = feature_root / "v22.14.0" / "bin"
-            version_bin.mkdir(parents=True)
-            current = feature_root / "current"
-            current.symlink_to(version_bin.parent)
-            feature_bin = current / "bin"
-            (version_bin / "node").write_text("node\n", encoding="utf-8")
-            (version_bin / "npm").write_text("npm\n", encoding="utf-8")
+            legacy_bin = root / "usr" / "local" / "share" / "nvm" / "current" / "bin"
+            legacy_bin.mkdir(parents=True)
+            (legacy_bin / "node").write_text("node\n", encoding="utf-8")
+            (legacy_bin / "npm").write_text("npm\n", encoding="utf-8")
             workspace = root / "workspace"
             workspace.mkdir()
-            system_dirs = dependency_module.NPM_SYSTEM_BIN_DIRS
-            trusted_dirs = (str(feature_bin), *system_dirs)
-            trusted_roots = {
-                str(feature_bin): str(feature_root),
-                **{
-                    directory: dependency_module.NPM_TRUSTED_BIN_ROOTS[directory]
-                    for directory in system_dirs
-                },
-            }
-
-            def feature_which(
-                executable: str, *, path: str | None = None
-            ) -> str:
-                self.assertEqual(path, os.pathsep.join(trusted_dirs))
-                return str(feature_bin / executable)
+            oci_bin = root / "usr" / "local" / "bin"
+            oci_bin.mkdir(parents=True)
+            trusted_dirs = (str(oci_bin),)
+            trusted_roots = {str(oci_bin): str(root / "usr" / "local")}
 
             with (
                 mock.patch.object(
-                    dependency_module, "NPM_FEATURE_BIN", str(feature_bin)
+                    dependency_module,
+                    "NPM_SYSTEM_BIN_DIRS",
+                    trusted_dirs,
                 ),
                 mock.patch.object(
                     dependency_module,
@@ -1198,11 +1234,13 @@ class DependencyModelTests(unittest.TestCase):
                     "NPM_TRUSTED_BIN_ROOTS",
                     trusted_roots,
                 ),
-                mock.patch.object(
-                    dependency_module.shutil, "which", side_effect=feature_which
-                ),
             ):
-                Installer(FakeRunner()).install_record(parsed, workspace=workspace)
+                with self.assertRaisesRegex(
+                    DependencyError, "requires a trusted node executable"
+                ):
+                    Installer(FakeRunner()).install_record(
+                        parsed, workspace=workspace
+                    )
 
     def test_pipx_installs_and_verifies_one_isolated_cli(self) -> None:
         """Python CLI records use pipx without a shared pip install surface."""
@@ -3432,7 +3470,7 @@ class DependencyModelTests(unittest.TestCase):
                 index=0,
             )
 
-    def test_image_feature_and_shared_post_create_contract(self) -> None:
+    def test_image_owned_dependency_and_shared_post_create_contract(self) -> None:
         devcontainer = json.loads(
             (ROOT / ".devcontainer" / "devcontainer.json").read_text(
                 encoding="utf-8"
@@ -3444,49 +3482,29 @@ class DependencyModelTests(unittest.TestCase):
         post_create = (ROOT / ".devcontainer" / "post-create.sh").read_text(
             encoding="utf-8"
         )
-        self.assertEqual(
-            devcontainer["features"],
-            {
-                "ghcr.io/devcontainers/features/node@sha256:586c9a6f7dd40bd3ba2cd41e7f2f88dcc31fbe5d1442afcbf07ffbc66b686857": {
-                    "version": "22.14.0",
-                    "npmVersion": "10.9.2",
-                    "nodeGypDependencies": False,
-                    "pnpmVersion": "none",
-                }
-            },
+        self.assertNotIn("features", devcontainer)
+        self.assertIn(
+            "node:22.14.0-bullseye-slim@sha256:73a9dfbb6c761aebdf4666cce2627635a30d1d4c20f67ff642d01b8f09e709a3",
+            dockerfile,
         )
+        self.assertIn("COPY --from=node-provider /usr/local/lib/node_modules", dockerfile)
+        self.assertIn("image-install --workspace /opt/agent-canon", dockerfile)
+        self.assertIn("/usr/local/share/agent-canon/image-dependencies", dockerfile)
+        self.assertIn("/etc/profile.d/agent-canon-tools.sh", dockerfile)
         self.assertIn("python3-pip", dockerfile)
         self.assertIn("pipx", dockerfile)
         self.assertIn("python3-packaging", dockerfile)
         self.assertIn("build-essential", dockerfile)
         self.assertIn("ninja-build", dockerfile)
-        self.assertNotIn("bootstrap-dependencies.sh", dockerfile)
-        self.assertNotIn("--install-language-runtime", post_create)
-        self.assertNotIn("npm install -g", post_create)
-        self.assertNotIn("install_github_cli", post_create)
-        self.assertNotIn("install_rust_toolchain", post_create)
-        self.assertIn("STRUCTURED_ANALYSIS_BOOTSTRAP=warn", post_create)
-        self.assertIn("project-install --workspace", post_create)
-        self.assertNotIn("docker/install_python_dependencies.sh", post_create)
-        self.assertIn(
-            'state_home="${XDG_STATE_HOME:-$home/.local/state}"',
-            post_create,
-        )
-        self.assertIn(
-            'dependency_receipts="$state_home/agent-canon/dependency-receipts"',
-            post_create,
-        )
-        self.assertNotIn(".agent-canon/dependency-receipts", post_create)
-        validate_index = post_create.index("validate --workspace")
-        install_index = post_create.index("install --workspace")
-        cache_index = post_create.rindex("\nbuild_agent_canon_cache\n")
-        projection_index = post_create.rindex("\npublish_container_local_runtime\n")
-        self.assertLess(
-            validate_index,
-            install_index,
-        )
-        self.assertLess(cache_index, projection_index)
-        self.assertNotIn("publish_agent_canon_cli", post_create)
+        self.assertIn("image-verify --workspace", post_create)
+        self.assertNotIn("apt-get", post_create)
+        self.assertNotIn("npm install", post_create)
+        self.assertNotIn("pip install", post_create)
+        self.assertNotIn("cargo install", post_create)
+        self.assertNotIn("curl", post_create)
+        self.assertNotIn("sudo", post_create)
+        self.assertNotIn("project-install", post_create)
+        self.assertNotIn("dependency_receipts", post_create)
 
     def test_project_extras_are_ordered_and_installed_then_checked(self) -> None:
         workspace = Path(tempfile.mkdtemp())

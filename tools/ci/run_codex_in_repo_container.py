@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from container_runtime import (
-    PYTHON_EXTRA_RE,
+    SAFE_NAME_RE,
     apply_pack_overrides,
     build_build_command,
     build_run_command,
@@ -63,7 +63,7 @@ NESTED_RUNTIME_OWNED_ENV = frozenset(
 
 def validate_nested_profile_name(profile: CodexProfile) -> None:
     """Reject profile names that cannot be one safe state-path segment."""
-    if PYTHON_EXTRA_RE.fullmatch(profile.name) is None:
+    if SAFE_NAME_RE.fullmatch(profile.name) is None:
         raise ValueError(
             "nested profile name must be one safe path segment: "
             f"{profile.name!r}"

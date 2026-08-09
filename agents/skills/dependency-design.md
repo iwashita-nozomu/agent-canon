@@ -39,7 +39,7 @@ bash tools/docker_dependency_validator.sh
 
 - standalone image が python3 + tomllib/tomli + pipx + python3-packaging と
   native build capability を固定し、Node/npm 22.14.0/10.9.2 は exact
-  digest-pinned devcontainer Feature が所有すること
+  digest-pinned official Node OCI provider image が所有すること
 - parent manifest を先、vendor manifest を後に読み、standalone は自身を
   一度だけ読むこと
 - record の closed method、必須 scalar、method-specific security fields、

@@ -107,14 +107,6 @@ def write_devcontainer(root: Path) -> None:
                 "containerUser": "project",
                 "remoteUser": "project",
                 "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-                "features": {
-                    "ghcr.io/devcontainers/features/node@sha256:586c9a6f7dd40bd3ba2cd41e7f2f88dcc31fbe5d1442afcbf07ffbc66b686857": {
-                        "version": "22.14.0",
-                        "npmVersion": "10.9.2",
-                        "nodeGypDependencies": False,
-                        "pnpmVersion": "none",
-                    }
-                },
                 "postCreateCommand": POST_CREATE_COMMAND,
                 "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
             },
@@ -176,7 +168,6 @@ def write_compose(
     environment_lines = (
         [
             "    environment:",
-            "      AGENT_CANON_PYTHON_EXTRAS: \"\"",
             "      AGENT_CANON_RUNTIME_ROUTE: CONTAINER_LOCAL",
             "      AGENT_CANON_CODEX_SESSION_ROOT: /home/project/.codex/sessions",
             "      AGENT_CANON_SECRET_MOUNT: /mnt/agent-canon-secrets",
@@ -301,16 +292,8 @@ def test_gpu_admission_selector_isolated_from_default_selector() -> None:
     assert "gpu-admission" not in default["dockerComposeFile"]
     assert "gpu-admission" in profile["name"]
     assert profile["dockerComposeFile"] != default["dockerComposeFile"]
-    expected_feature = {
-        "ghcr.io/devcontainers/features/node@sha256:586c9a6f7dd40bd3ba2cd41e7f2f88dcc31fbe5d1442afcbf07ffbc66b686857": {
-            "version": "22.14.0",
-            "npmVersion": "10.9.2",
-            "nodeGypDependencies": False,
-            "pnpmVersion": "none",
-        }
-    }
-    assert default["features"] == expected_feature
-    assert profile["features"] == expected_feature
+    assert "features" not in default
+    assert "features" not in profile
     assert load_container_config_module().validate_gpu_admission_selector(PROJECT_ROOT) == []
 
 
@@ -609,7 +592,7 @@ def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
     assert "-gpu-admission" in compose.splitlines()[0]
     assert "    gpus: all" in compose
     assert "\n      target:" not in compose
-    assert 'AGENT_CANON_PYTHON_EXTRAS: "dev,cuda12"' in compose
+    assert "AGENT_CANON_PYTHON_EXTRAS" not in compose
     assert '        target: "/var/lib/agent-canon/runtime"' in compose
     assert "    group_add:" not in compose
     assert f'        source: "{repo / ".agent-canon/runtime"}"' in compose
@@ -666,7 +649,7 @@ def test_gpu_admission_accepts_absent_or_explicit_pack_target(
     compose = (repo / ".devcontainer/gpu-admission-compose.generated.yml").read_text(
         encoding="utf-8"
     )
-    assert 'AGENT_CANON_PYTHON_EXTRAS: "dev,cuda12"' in compose
+    assert "AGENT_CANON_PYTHON_EXTRAS" not in compose
     if target is None:
         assert "\n      target:" not in compose
     else:
@@ -1231,7 +1214,6 @@ def write_parent_generator_fixture(
     tmp_path: Path,
     *,
     runtime_shell: str = "/bin/zsh",
-    dependency_extras: tuple[str, ...] = (),
     runtime_mounts: tuple[str, ...] = (),
     optional_mount_profiles: tuple[str, ...] = (),
     linked_data_roots: tuple[tuple[str, str], ...] = (),
@@ -1296,7 +1278,6 @@ def write_parent_generator_fixture(
                 f'shell = "{runtime_shell}"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
-                "dependency_extras = " + json.dumps(list(dependency_extras)),
                 optional_mount_profiles_line,
                 linked_data_roots_line,
                 runtime_mounts_line,
@@ -1338,7 +1319,6 @@ def write_gpu_admission_pack(
                 'shell = "/bin/bash"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
-                'dependency_extras = ["dev", "cuda12"]',
                 "",
             ]
         ),
@@ -1357,7 +1337,6 @@ def test_load_pack_reads_optional_platform_when_present_or_omitted(
     assert implicit_findings == []
     assert implicit is not None
     assert implicit.platform == "linux/amd64"
-    assert implicit.dependency_extras == ()
 
     explicit_pack = repo / "docker/packs/explicit-platform.toml"
     explicit_pack.write_text(
@@ -1377,7 +1356,6 @@ def test_load_pack_reads_optional_platform_when_present_or_omitted(
                 'shell = "/bin/bash"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
-                'dependency_extras = ["dev", "cuda12"]',
                 "",
             ]
         ),
@@ -1387,7 +1365,6 @@ def test_load_pack_reads_optional_platform_when_present_or_omitted(
     assert explicit_findings == []
     assert explicit is not None
     assert explicit.platform == "linux/amd64"
-    assert explicit.dependency_extras == ("dev", "cuda12")
 
 
 def test_load_pack_rejects_invalid_optional_profiles(tmp_path: Path) -> None:
@@ -1541,7 +1518,7 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     assert 'HOME: "/home/project"' in compose
     assert "ZDOTDIR:" not in compose
     assert 'SHELL: "/bin/zsh"' in compose
-    assert 'AGENT_CANON_PYTHON_EXTRAS: ""' in compose
+    assert "AGENT_CANON_PYTHON_EXTRAS" not in compose
     assert 'AGENT_CANON_CODEX_SESSION_ROOT: "/home/project/.codex/sessions"' in compose
     assert f'user: "{os.getuid()}:{os.getgid()}"' in compose
     assert 'PROJECT_USER:' not in compose
@@ -2400,24 +2377,15 @@ def test_standalone_vscode_directory_missing_reports_all_source_files(
         assert f".vscode/{name}:missing" in result.stdout
 
 
-def test_load_pack_preserves_ordered_project_extras(tmp_path: Path) -> None:
-    """Typed extras remain ordered and are exposed without a profile alias."""
+def test_load_pack_rejects_image_owned_project_extras(tmp_path: Path) -> None:
+    """Runtime packs cannot route workspace extras into startup runners."""
     module = load_container_config_module()
-    repo = write_parent_generator_fixture(
-        tmp_path, dependency_extras=("dev", "cuda12")
+    repo = write_parent_generator_fixture(tmp_path)
+    pack_path = repo / "docker/packs/default.toml"
+    pack_path.write_text(
+        pack_path.read_text(encoding="utf-8") + 'dependency_extras = ["dev", "cuda12"]\n',
+        encoding="utf-8",
     )
-    pack, findings = module.load_pack(repo, repo / "docker/packs/default.toml")
-    assert findings == []
-    assert pack is not None
-    assert pack.dependency_extras == ("dev", "cuda12")
-
-
-def test_load_pack_rejects_duplicate_project_extras(tmp_path: Path) -> None:
-    """Duplicate extras are rejected case-insensitively at the typed boundary."""
-    module = load_container_config_module()
-    repo = write_parent_generator_fixture(
-        tmp_path, dependency_extras=("dev", "DEV")
-    )
-    pack, findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    pack, findings = module.load_pack(repo, pack_path)
     assert pack is None
-    assert any("dependency_extras-duplicate" in finding.detail for finding in findings)
+    assert any("dependency_extras-forbidden-image-owned" in finding.detail for finding in findings)

@@ -32,7 +32,7 @@ container identity を receipt の十分条件にしません。
 Cargo の AgentCanon CLI record は `source_identity = "active-source"` を選択し、
 SHA を manifest に複製しません。
 
-共有 post-create は次の順で一度だけ読みます。
+image build は次の順で一度だけ manifest を読み、immutable image tree を作ります。
 
 1. `<workspace>/.devcontainer/dependencies.toml`（親、存在する場合）
 2. `<workspace>/vendor/agent-canon/.devcontainer/dependencies.toml`（vendor）
@@ -98,30 +98,32 @@ PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_sou
 ## docker README と ownership
 
 親の `docker/README.md` に、Docker product image/build/runtime と mounted
-devcontainer developer/agent tools の差を明記します。Product image は
-project runtime と project Python dependency の owner、AgentCanon manifest は
-mounted shared tools の owner、親 `pyproject.toml` の optional extras は
-workspace Python packages の owner です。Codex、Node/npm、Rust、Lean、
-Playwright を convenience-only の理由で Dockerfile に追加しません。
+devcontainer developer/agent tools の差を明記します。AgentCanon image は
+Node/npm、Codex、gh、LSP tools を含む manifest-selected image capability の owner
+であり、`/usr/local/share/agent-canon/image-dependencies` に plan と immutable
+receipts を保持します。workspace bind の Python package install は image build または
+親 image の責務であり、post-create は package install、network、repair を行いません。
 
 ## order preservation
 
 親の `postCreateCommand` は次の順を直接保持します。
 
 ```text
-shared post-create
+image build
   parent manifest -> vendor manifest merge
-  full plan validation
-  topological derived execution and per-record receipts in container-local
-  `${XDG_STATE_HOME:-$HOME/.local/state}/agent-canon/dependency-receipts`
-  parent pyproject.toml extras -> editable install -> pip check (when selected)
-  AgentCanon build, cache, and runtime projection
+  full plan validation and topological image-safe execution
+  immutable `/usr/local/share/agent-canon/image-dependencies/{plan.json,receipts}`
+post-create
+  read-only image-verify (stored plan, receipts, live package/executable state)
+  container runtime readback; rootless workspace projection falls back to canonical runtime
 parent .devcontainer/post-create-parent.sh  # final, when present
 ```
 
-Standalone AgentCanon image は固定 OS/Python capability を image build で準備し、Node/npm は
-digest-pinned Feature が所有するため、全 selector は shared post-create から始める。
+Standalone AgentCanon image は固定 OS/Python capability と Node/npm provider を image build
+で準備し、Node 22.14.0 bullseye-slim は digest-pinned official OCI image から取り込む。
+全 selector は source-root wrapper 経由の read-only image-verify から始める。
 
 親 record の manifest order と parent-first merge order は、依存制約がない
 record の安定順として保持します。親 post-create を shared script に吸収したり、
-parent Python installer を Docker image build に移したりしません。
+parent Python installer を post-create に残したり、workspace bind を package repair の
+対象にしたりしません。

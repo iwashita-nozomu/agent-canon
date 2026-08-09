@@ -54,17 +54,6 @@ if str(AGENT_TOOLS_DIR) not in sys.path:
 PARENT_ENVIRONMENT_MANIFEST = ".devcontainer/parent-environment.toml"
 ENVIRONMENT_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 RUNTIME_SHELL_RE = re.compile(r"/[A-Za-z0-9._/-]+\Z")
-PYTHON_EXTRA_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
-NODE_FEATURE_REF = (
-    "ghcr.io/devcontainers/features/node@sha256:"
-    "586c9a6f7dd40bd3ba2cd41e7f2f88dcc31fbe5d1442afcbf07ffbc66b686857"
-)
-NODE_FEATURE_OPTIONS = {
-    "version": "22.14.0",
-    "npmVersion": "10.9.2",
-    "nodeGypDependencies": False,
-    "pnpmVersion": "none",
-}
 BUILD_TARGET_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 OPTIONAL_MOUNT_PROFILES = frozenset(
     {
@@ -107,7 +96,6 @@ class PackConfig:
     workdir: str
     workspace_mount: str
     platform: str | None
-    dependency_extras: tuple[str, ...]
     optional_mount_profiles: tuple[str, ...]
     linked_data_roots: tuple[LinkedDataRoot, ...]
     linked_data_roots_declared: bool
@@ -468,44 +456,14 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
     workdir = runtime.get("workdir", "/workspace")
     workspace_mount = runtime.get("workspace_mount", "/workspace")
     shell = runtime.get("shell", "/bin/bash")
-    raw_dependency_extras = runtime.get("dependency_extras", ())
-    dependency_extras: tuple[str, ...] = ()
-    extras_sequence = as_sequence(raw_dependency_extras)
-    if extras_sequence is None or not all(
-        isinstance(item, str) for item in extras_sequence
-    ):
+    if "dependency_extras" in runtime:
         findings.append(
             Finding(
-                "invalid_manifest",
+                "dependency_contract_violation",
                 source,
-                "runtime.dependency_extras-must-be-string-list",
+                "runtime.dependency_extras-forbidden-image-owned",
             )
         )
-    else:
-        parsed_extras = tuple(cast(Sequence[str], extras_sequence))
-        seen_extras: set[str] = set()
-        valid_extras: list[str] = []
-        for extra in parsed_extras:
-            if PYTHON_EXTRA_RE.fullmatch(extra) is None:
-                findings.append(
-                    Finding(
-                        "invalid_manifest",
-                        source,
-                        f"runtime.dependency_extras-invalid:{extra}",
-                    )
-                )
-            elif extra.casefold() in seen_extras:
-                findings.append(
-                    Finding(
-                        "invalid_manifest",
-                        source,
-                        f"runtime.dependency_extras-duplicate:{extra}",
-                    )
-                )
-            else:
-                seen_extras.add(extra.casefold())
-                valid_extras.append(extra)
-        dependency_extras = tuple(valid_extras)
     if not isinstance(shell, str) or RUNTIME_SHELL_RE.fullmatch(shell) is None:
         findings.append(
             Finding(
@@ -553,7 +511,6 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             workdir=workdir,
             workspace_mount=workspace_mount,
             platform=platform,
-            dependency_extras=dependency_extras,
             optional_mount_profiles=optional_mount_profiles,
             linked_data_roots=linked_data_roots,
             linked_data_roots_declared=linked_data_roots_present,
@@ -684,14 +641,12 @@ def validate_devcontainer_json(
                     f"{key}-expected:{expected}",
                 )
             )
-    if not parent_layout and config.get("features") != {
-        NODE_FEATURE_REF: NODE_FEATURE_OPTIONS
-    }:
+    if "features" in config:
         findings.append(
             Finding(
                 "dependency_contract_violation",
                 ".devcontainer/devcontainer.json",
-                "standalone-node-feature-must-be-exact-digest-and-options",
+                "node-feature-forbidden-image-owned",
             )
         )
     if "remoteUser" in config and config.get("remoteUser") != "project":
@@ -795,7 +750,6 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
         "containerUser": "project",
         "remoteUser": "project",
         "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
-        "features": {NODE_FEATURE_REF: NODE_FEATURE_OPTIONS},
         "postCreateCommand": expected_post_create_command(
             parent_layout=(root / "vendor" / "agent-canon").is_dir()
         ),
@@ -1680,9 +1634,6 @@ def validate_generated_compose(
                 )
             )
     required_environment = {
-        "AGENT_CANON_PYTHON_EXTRAS": (
-            ",".join(pack.dependency_extras) if pack is not None else ""
-        ),
         "AGENT_CANON_WORKSPACE_LAYOUT": expected_workspace_layout or "<invalid>",
         "AGENT_CANON_WORKSPACE_ROOT": "/workspace",
         "AGENT_CANON_REPOSITORY_ROOT": repo_target,
@@ -2146,8 +2097,7 @@ def render_text(report: ValidationReport) -> None:
             "CONTAINER_CONFIG_PACK="
             f"{pack.name}\tpath={pack.path}\tdockerfile={pack.dockerfile}\t"
             f"context={pack.context}\tworkdir={pack.workdir}\t"
-            f"workspace_mount={pack.workspace_mount}\tplatform={pack.platform}\t"
-            f"dependency_extras={','.join(pack.dependency_extras)}"
+            f"workspace_mount={pack.workspace_mount}\tplatform={pack.platform}"
         )
     print(
         f"CONTAINER_CONFIG_CHECKED={','.join(report.checked) if report.checked else 'none'}"

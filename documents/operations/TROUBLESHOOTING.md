@@ -30,7 +30,7 @@ upstream design ../contracts/github-first-module-and-devcontainer-policy.md envi
 
 - `make docker-build-check` を実行して、build と container 起動のどちらで落ちるかを切り分けます。
 - `docker` / `podman` がない環境では、GitHub Actions の `Docker Build` workflow を使います。
-- repo-local `docker/Dockerfile`、`pyproject.toml`、AgentCanon-owned `.devcontainer/` の責務境界に更新漏れがないか確認します。固定 OS/Python capability は image、Node/npm は digest-pinned Feature、tools は typed manifest の owner です。
+- repo-local `docker/Dockerfile`、`pyproject.toml`、AgentCanon-owned `.devcontainer/` の責務境界に更新漏れがないか確認します。固定 OS/Python capability は image、Node/npm は digest-pinned official Node OCI provider stage から Docker build 時に materialize され、tools は typed manifest の owner です。
 - Linux / WSL host の前提が怪しい場合は `documents/contracts/linux-wsl-host-requirements.md` を見ます。
 
 ## WSL / host 前提が怪しい
@@ -41,7 +41,8 @@ upstream design ../contracts/github-first-module-and-devcontainer-policy.md envi
 
 ## import や依存が壊れる
 
-- Python package dependency は `pyproject.toml` optional extras と shared post-create の standard editable install / `pip check` を正本にします。`docker/Dockerfile` は固定 OS/Python capability、Node Feature は Node/npm、`.devcontainer/dependencies.toml` は Agent/Codex tools の正本です。
+- Python package dependency は `pyproject.toml` optional extras と、親が必要とする場合の image-build project-dependency lifecycle を正本にします。Docker image は固定 OS/Python capability、digest-pinned official Node OCI provider から copy した Node/npm、manifest-selected Agent/Codex tools、親 project dependencies を所有します。post-create は `image-verify` と container runtime readback だけを実行し、editable install、pip setup、network、package mutation、workspace repair を行いません。
+- `image-verify` が receipt、manifest、plan、package、または executable の drift を `rebuild-required` と報告した場合は、post-create から install や repair を試さず、manifest/providerを反映した image を再buildします。
 - `python/` 前提のスクリプトでは import path の前提を確認します。
 
 ## 実験が不安定

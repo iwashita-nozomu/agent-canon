@@ -6,14 +6,15 @@
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md typed project-extra ownership
 # upstream design ../../CONTAINER_OPERATIONS.md image versus mounted tool boundary
 # downstream environment ../../.devcontainer/dependencies.toml AgentCanon shared developer/agent records
-# downstream implementation ../../.devcontainer/post-create.sh shared lifecycle orchestration
+# downstream implementation ../../.devcontainer/post-create.sh read-only image verification
 # downstream implementation ../../tools/docker_dependency_validator.sh no-install validation route
 # downstream implementation ../../tests/agent_tools/test_devcontainer_dependencies.py focused model and security tests
 # @dependency-end
 """Declarative, typed devcontainer dependency planning and installation.
 
-The image owns the fixed Python capabilities, while this module owns mounted
-Agent/Codex tools and standard editable project-extra installation.
+The image owns fixed Python and manifest-selected Agent/Codex capabilities. The
+legacy editable project-extra API remains available to explicit callers, while
+the active post-create and runner lifecycle performs read-only image verification.
 """
 
 from __future__ import annotations
@@ -106,19 +107,17 @@ BASE_CAPABILITIES = frozenset(
     }
 )
 NPM_GLOBAL_PREFIX = "/usr/local"
-NPM_FEATURE_BIN = "/usr/local/share/nvm/current/bin"
 NPM_ENV_EXECUTABLE = "/usr/bin/env"
 NPM_SYSTEM_BIN_DIRS = (
-    "/usr/local/sbin",
     "/usr/local/bin",
+    "/usr/local/sbin",
     "/usr/sbin",
     "/usr/bin",
     "/sbin",
     "/bin",
 )
-NPM_TRUSTED_BIN_DIRS = (NPM_FEATURE_BIN, *NPM_SYSTEM_BIN_DIRS)
+NPM_TRUSTED_BIN_DIRS = NPM_SYSTEM_BIN_DIRS
 NPM_TRUSTED_BIN_ROOTS = {
-    NPM_FEATURE_BIN: "/usr/local/share/nvm",
     "/usr/local/sbin": "/usr/local",
     "/usr/local/bin": "/usr/local",
     "/usr/sbin": "/usr",
@@ -151,7 +150,7 @@ class NpmToolchain:
 
 
 def resolve_npm_toolchain(workspace: Path) -> NpmToolchain:
-    """Resolve Feature/system Node tools without accepting ambient PATH entries."""
+    """Resolve OCI image/system Node tools without accepting ambient PATH entries."""
     env_executable = Path(NPM_ENV_EXECUTABLE)
     if not env_executable.is_file() or not os.access(env_executable, os.X_OK):
         raise DependencyError(

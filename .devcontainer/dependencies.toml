@@ -4,14 +4,15 @@
 # upstream design ../CONTAINER_OPERATIONS.md product image and mounted tool boundary
 # upstream design ../documents/design/devcontainer/parent-dependency-manifest-followup.md parent-first merge and follow-up contract
 # downstream implementation ../tools/agent_tools/devcontainer_dependencies.py typed parser and executor
-# downstream implementation post-create.sh executes the validated topological plan
+# downstream implementation Dockerfile image-install executes the validated topological plan
 # @dependency-end
 
 schema = "agent-canon.devcontainer-dependencies"
 schema_version = 2
 
-# This file contains mounted developer/agent tools only. Product image and
-# project Python dependencies remain parent-owned.
+# This file contains image-owned developer/agent tools. The Dockerfile
+# materializes the validated plan and immutable receipts during image build;
+# post-create only performs read-only verification.
 
 [[records]]
 id = "github-cli"

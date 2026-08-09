@@ -19,7 +19,6 @@ from container_runtime import (
     build_build_command,
     build_run_command,
     build_shell_invocation,
-    build_workspace_setup_command,
     join_shell_lines,
     load_or_default_pack,
     print_label_and_command,
@@ -108,12 +107,7 @@ def main() -> int:
             builder,
             pack,
             workspace_root=workspace_root,
-            command=build_workspace_setup_command(
-                build_smoke_command(pack),
-                shell=pack.smoke.shell,
-                container_workspace=pack.runtime.workspace_mount,
-                dependency_extras=pack.runtime.dependency_extras,
-            ),
+            command=build_smoke_command(pack),
         )
         print_label_and_command("smoke", smoke_command)
 
