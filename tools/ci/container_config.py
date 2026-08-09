@@ -12,7 +12,7 @@
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX tooling boundary
 # upstream design ../../documents/tools/lean_proof_env.md Lean proof environment toolchain boundary
 # upstream design ../../agents/skills/environment-maintenance.md environment change workflow
-# upstream implementation ../agent_tools/requirements_lock.py canonical requirements lock parser and result/error model
+# upstream implementation ../agent_tools/devcontainer_dependencies.py typed project-extra validation and install owner
 # upstream implementation ../docker_dependency_validator.sh validates Docker dependency contents
 # upstream implementation ./container_runtime.py loads runtime pack contracts
 # upstream implementation ./run_container_pack.py builds and smokes runtime packs
@@ -50,24 +50,22 @@ AGENT_TOOLS_DIR = Path(__file__).resolve().parents[1] / "agent_tools"
 if str(AGENT_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_DIR))
 
-from requirements_lock import (  # noqa: E402,I001  # pyright: ignore[reportMissingTypeStubs]
-    parse_requirements,
-)
-REQUIRED_REQUIREMENTS = (
-    "jupyterlab",
-    "notebook",
-    "ipykernel",
-    "pydeps",
-    "snakeviz",
-    "pyyaml",
-)
 
 PARENT_ENVIRONMENT_MANIFEST = ".devcontainer/parent-environment.toml"
 ENVIRONMENT_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
 RUNTIME_SHELL_RE = re.compile(r"/[A-Za-z0-9._/-]+\Z")
-DEPENDENCY_PROFILE_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+PYTHON_EXTRA_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+NODE_FEATURE_REF = (
+    "ghcr.io/devcontainers/features/node@sha256:"
+    "586c9a6f7dd40bd3ba2cd41e7f2f88dcc31fbe5d1442afcbf07ffbc66b686857"
+)
+NODE_FEATURE_OPTIONS = {
+    "version": "22.14.0",
+    "npmVersion": "10.9.2",
+    "nodeGypDependencies": False,
+    "pnpmVersion": "none",
+}
 BUILD_TARGET_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
-DEFAULT_DEPENDENCY_PROFILE = "full"
 OPTIONAL_MOUNT_PROFILES = frozenset(
     {
         "host-zshrc",
@@ -109,7 +107,7 @@ class PackConfig:
     workdir: str
     workspace_mount: str
     platform: str | None
-    dependency_profile: str
+    dependency_extras: tuple[str, ...]
     optional_mount_profiles: tuple[str, ...]
     linked_data_roots: tuple[LinkedDataRoot, ...]
     linked_data_roots_declared: bool
@@ -436,13 +434,24 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             )
         )
 
+    runtime_env: tuple[str, ...] = ()
     for table, key, section in (
         (smoke, "commands", "smoke"),
         (runtime, "env", "runtime"),
     ):
-        _, finding = require_string_list(table, key, source, section)
+        values, finding = require_string_list(table, key, source, section)
         if finding is not None:
             findings.append(finding)
+        elif section == "runtime":
+            runtime_env = values
+    if any(item.partition("=")[0] == "AGENT_CANON_PYTHON_EXTRAS" for item in runtime_env):
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                source,
+                "runtime.env-cannot-override:AGENT_CANON_PYTHON_EXTRAS",
+            )
+        )
     runtime_mounts, mounts_finding = require_string_list(
         runtime, "mounts", source, "runtime"
     )
@@ -459,7 +468,44 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
     workdir = runtime.get("workdir", "/workspace")
     workspace_mount = runtime.get("workspace_mount", "/workspace")
     shell = runtime.get("shell", "/bin/bash")
-    dependency_profile = runtime.get("dependency_profile", DEFAULT_DEPENDENCY_PROFILE)
+    raw_dependency_extras = runtime.get("dependency_extras", ())
+    dependency_extras: tuple[str, ...] = ()
+    extras_sequence = as_sequence(raw_dependency_extras)
+    if extras_sequence is None or not all(
+        isinstance(item, str) for item in extras_sequence
+    ):
+        findings.append(
+            Finding(
+                "invalid_manifest",
+                source,
+                "runtime.dependency_extras-must-be-string-list",
+            )
+        )
+    else:
+        parsed_extras = tuple(cast(Sequence[str], extras_sequence))
+        seen_extras: set[str] = set()
+        valid_extras: list[str] = []
+        for extra in parsed_extras:
+            if PYTHON_EXTRA_RE.fullmatch(extra) is None:
+                findings.append(
+                    Finding(
+                        "invalid_manifest",
+                        source,
+                        f"runtime.dependency_extras-invalid:{extra}",
+                    )
+                )
+            elif extra.casefold() in seen_extras:
+                findings.append(
+                    Finding(
+                        "invalid_manifest",
+                        source,
+                        f"runtime.dependency_extras-duplicate:{extra}",
+                    )
+                )
+            else:
+                seen_extras.add(extra.casefold())
+                valid_extras.append(extra)
+        dependency_extras = tuple(valid_extras)
     if not isinstance(shell, str) or RUNTIME_SHELL_RE.fullmatch(shell) is None:
         findings.append(
             Finding(
@@ -489,18 +535,6 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             )
         )
         workspace_mount = ""
-    if (
-        not isinstance(dependency_profile, str)
-        or DEPENDENCY_PROFILE_RE.fullmatch(dependency_profile) is None
-    ):
-        findings.append(
-            Finding(
-                "invalid_manifest",
-                source,
-                "runtime.dependency_profile-must-be-profile-name",
-            )
-        )
-        dependency_profile = DEFAULT_DEPENDENCY_PROFILE
     pack_shell = shell if isinstance(shell, str) else "/bin/bash"
 
     validate_repo_path(root, source, "dockerfile", dockerfile, findings)
@@ -519,45 +553,13 @@ def load_pack(root: Path, path: Path) -> tuple[PackConfig | None, list[Finding]]
             workdir=workdir,
             workspace_mount=workspace_mount,
             platform=platform,
-            dependency_profile=dependency_profile,
+            dependency_extras=dependency_extras,
             optional_mount_profiles=optional_mount_profiles,
             linked_data_roots=linked_data_roots,
             linked_data_roots_declared=linked_data_roots_present,
         ),
         [],
     )
-
-
-def validate_requirements(root: Path) -> list[Finding]:
-    """Validate docker/requirements.txt."""
-    path = root / "docker" / "requirements.txt"
-    relative = "docker/requirements.txt"
-    if not path.is_file():
-        return [Finding("missing_file", relative, "missing")]
-    findings: list[Finding] = []
-    parsed = parse_requirements(path)
-    for error in parsed.errors:
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                relative,
-                f"invalid-line:{error.line_number}",
-            )
-        )
-    if parsed.valid:
-        requirements = {
-            record.normalized_name for record in parsed.records if record.is_active()
-        }
-        for requirement in REQUIRED_REQUIREMENTS:
-            if requirement not in requirements:
-                findings.append(
-                    Finding(
-                        "dependency_contract_violation",
-                        relative,
-                        f"missing:{requirement}",
-                    )
-                )
-    return findings
 
 
 def validate_dockerfile(root: Path) -> list[Finding]:
@@ -630,15 +632,6 @@ def validate_post_create(root: Path) -> list[Finding]:
     return findings
 
 
-def validate_python_dependency_installer(root: Path) -> list[Finding]:
-    """Require the optional dependency installer without fixing shell internals."""
-    path = root / "docker" / "install_python_dependencies.sh"
-    relative = "docker/install_python_dependencies.sh"
-    if not path.is_file():
-        return [Finding("missing_file", relative, "missing")]
-    return []
-
-
 def load_devcontainer_json(
     path: Path,
 ) -> tuple[Mapping[str, object] | None, list[Finding]]:
@@ -663,12 +656,7 @@ def expected_post_create_command(*, parent_layout: bool) -> str:
         f"{resolver} .devcontainer/post-create-entrypoint.sh "
         "/workspace/${localWorkspaceFolderBasename}"
     )
-    if not parent_layout:
-        return entrypoint
-    return (
-        f"{resolver} .devcontainer/bootstrap-dependencies.sh "
-        f"--install-language-runtime && {entrypoint}"
-    )
+    return entrypoint
 
 
 def validate_devcontainer_json(
@@ -696,6 +684,16 @@ def validate_devcontainer_json(
                     f"{key}-expected:{expected}",
                 )
             )
+    if not parent_layout and config.get("features") != {
+        NODE_FEATURE_REF: NODE_FEATURE_OPTIONS
+    }:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                ".devcontainer/devcontainer.json",
+                "standalone-node-feature-must-be-exact-digest-and-options",
+            )
+        )
     if "remoteUser" in config and config.get("remoteUser") != "project":
         findings.append(
             Finding(
@@ -797,6 +795,7 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
         "containerUser": "project",
         "remoteUser": "project",
         "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
+        "features": {NODE_FEATURE_REF: NODE_FEATURE_OPTIONS},
         "postCreateCommand": expected_post_create_command(
             parent_layout=(root / "vendor" / "agent-canon").is_dir()
         ),
@@ -820,7 +819,6 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
             )
         )
     orchestrator = shared_devcontainer_dir(root) / "gpu-admission.sh"
-    bootstrap = shared_devcontainer_dir(root) / "bootstrap-dependencies.sh"
     orchestrator_relative = orchestrator.relative_to(root).as_posix()
     if not orchestrator.is_file() or orchestrator.stat().st_mode & 0o111 == 0:
         findings.append(
@@ -828,15 +826,6 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
                 "missing_file" if not orchestrator.is_file() else "dependency_contract_violation",
                 orchestrator_relative,
                 "executable-profile-orchestrator-required",
-            )
-        )
-    bootstrap_mode = git_index_mode(root, bootstrap)
-    if bootstrap_mode is not None and bootstrap_mode != "100755":
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                bootstrap.relative_to(root).as_posix(),
-                f"bootstrap-dependencies-git-mode:{bootstrap_mode}",
             )
         )
     return findings
@@ -1699,8 +1688,8 @@ def validate_generated_compose(
                 )
             )
     required_environment = {
-        "AGENT_CANON_DEPENDENCY_PROFILE": (
-            pack.dependency_profile if pack is not None else DEFAULT_DEPENDENCY_PROFILE
+        "AGENT_CANON_PYTHON_EXTRAS": (
+            ",".join(pack.dependency_extras) if pack is not None else ""
         ),
         "AGENT_CANON_WORKSPACE_LAYOUT": expected_workspace_layout or "<invalid>",
         "AGENT_CANON_WORKSPACE_ROOT": "/workspace",
@@ -2098,14 +2087,11 @@ def validate(root: Path) -> ValidationReport:
             (
                 ".dockerignore",
                 "docker/Dockerfile",
-                "docker/requirements.txt",
                 "docker/packs",
             )
         )
         findings.extend(validate_dockerignore(root))
         findings.extend(validate_dockerfile(root))
-        findings.extend(validate_python_dependency_installer(root))
-        findings.extend(validate_requirements(root))
         packs_dir = docker_dir / "packs"
         if not packs_dir.is_dir():
             findings.append(Finding("missing_file", "docker/packs", "missing"))
@@ -2169,7 +2155,7 @@ def render_text(report: ValidationReport) -> None:
             f"{pack.name}\tpath={pack.path}\tdockerfile={pack.dockerfile}\t"
             f"context={pack.context}\tworkdir={pack.workdir}\t"
             f"workspace_mount={pack.workspace_mount}\tplatform={pack.platform}\t"
-            f"dependency_profile={pack.dependency_profile}"
+            f"dependency_extras={','.join(pack.dependency_extras)}"
         )
     print(
         f"CONTAINER_CONFIG_CHECKED={','.join(report.checked) if report.checked else 'none'}"

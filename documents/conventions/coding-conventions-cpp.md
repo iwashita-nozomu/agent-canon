@@ -105,4 +105,4 @@ python3 tools/agent_tools/check_hardcoded_numbers.py \
 
 - 再利用する local install tree は `.state/cpp-install/<profile>/` に置きます。
 - optional な local `jax.export` artifact は project-local `.state/<project>/jax-export/<profile>/` のように用途名を含む path に置きます。
-- `docker/Dockerfile`、`docker/requirements.txt`、`cpp/CMakeLists.txt`、`cpp/cmake/`、optional `jax/jaxlib` version、calling convention が変わったら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` から rebuild します。
+- `docker/Dockerfile`、`pyproject.toml` の selected extras、`cpp/CMakeLists.txt`、`cpp/cmake/`、optional `jax/jaxlib` version、calling convention が変わったら、必要な extras を選択した container boundary で `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>"` から rebuild します。

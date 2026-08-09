@@ -210,7 +210,7 @@ def main() -> int:
                 [python_bin, container_python, *python_args],
                 shell="/bin/bash",
                 container_workspace=pack.runtime.workspace_mount,
-                dependency_profile=pack.runtime.dependency_profile,
+                dependency_extras=pack.runtime.dependency_extras,
             ),
             env=tuple(args.env),
             mounts=tuple(args.mount),

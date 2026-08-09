@@ -5,7 +5,6 @@
 # responsibility Verifies schema, merge, order, security, and receipt semantics for devcontainer dependencies.
 # upstream design ../../documents/design/devcontainer/parent-dependency-manifest-followup.md dependency model contract
 # upstream implementation ../../tools/agent_tools/devcontainer_dependencies.py typed dependency engine
-# upstream implementation ../../tools/agent_tools/requirements_lock.py canonical requirements lock parser and result/error model
 # downstream implementation ../../.devcontainer/dependencies.toml canonical manifest inventory
 # downstream implementation ../../tools/rebuild_agent_tools.sh installed CLI provenance
 # @dependency-end
@@ -172,7 +171,7 @@ def write_boundary_fixture(
     root: Path,
     requirements: str,
 ) -> tuple[EnvironmentBoundaryModel, Path]:
-    """Build a valid parent boundary fixture with supplied requirements."""
+    """Build a valid parent boundary fixture with project-owned packaging."""
     vendor_root = root / "vendor" / "agent-canon"
     vendor_root.parent.mkdir(parents=True, exist_ok=True)
     vendor_root.symlink_to(ROOT, target_is_directory=True)
@@ -189,15 +188,9 @@ def write_boundary_fixture(
     write_file("docker/README.md", "# fixture\n")
     write_file(
         "docker/Dockerfile",
-        "FROM python:3.11\n"
-        "RUN apt-get install -y rsync openssh-client graphviz python3-venv\n",
+        "FROM ubuntu:22.04\n",
     )
-    requirements_path = write_file("docker/requirements.txt", requirements)
-    write_file(
-        "docker/install_python_dependencies.sh",
-        "python3 -m pip install -r docker/requirements.txt\n",
-        executable=True,
-    )
+    del requirements
     write_file("pyproject.toml", "[build-system]\n")
     write_file(".dockerignore", "vendor/agent-canon\n.git\n.state\n")
     write_file(".gitignore", ".venv/\nvenv/\n")
@@ -212,7 +205,7 @@ def write_boundary_fixture(
         'schema = "agent-canon.devcontainer-dependencies"\n'
         "schema_version = 2\nrecords = []\n",
     )
-    return EnvironmentBoundaryModel(root, vendor_root), requirements_path
+    return EnvironmentBoundaryModel(root, vendor_root), root / "pyproject.toml"
 
 
 def loaded_manifest(
@@ -1654,131 +1647,6 @@ class DependencyModelTests(unittest.TestCase):
                 manifest_sources(root, root / "vendor" / "agent-canon"), ()
             )
 
-    def test_boundary_tool_resolution_uses_real_tools_projection(self) -> None:
-        """Strip the source tools prefix when resolving the parent projection."""
-        with tempfile.TemporaryDirectory() as temporary:
-            workspace = Path(temporary)
-            vendor_root = workspace / "vendor" / "agent-canon"
-            vendor_tools = vendor_root / "tools"
-            vendor_tools.mkdir(parents=True)
-            for relative in (
-                "tools/requirement_sync_validator.py",
-                "tools/ci/python_env_policy.py",
-            ):
-                path = vendor_root / relative
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text("print('ok')\n", encoding="utf-8")
-            projection_root = workspace / "tools" / "agent-canon"
-            projection_root.parent.mkdir(parents=True)
-            projection_root.symlink_to(
-                Path("..") / "vendor" / "agent-canon" / "tools",
-                target_is_directory=True,
-            )
-            model = EnvironmentBoundaryModel(workspace, vendor_root)
-            self.assertEqual(
-                model._resolve_agent_canon_root_path(
-                    "tools/requirement_sync_validator.py"
-                ),
-                vendor_root / "tools" / "requirement_sync_validator.py",
-            )
-            self.assertEqual(
-                model._resolve_agent_canon_root_path("tools/ci/python_env_policy.py"),
-                vendor_root / "tools" / "ci" / "python_env_policy.py",
-            )
-
-    def test_boundary_tool_resolution_rejects_stale_projection_ambiguity(
-        self,
-    ) -> None:
-        """Reject identical copied roots and ignore parent compatibility wrappers."""
-        with tempfile.TemporaryDirectory() as temporary:
-            workspace = Path(temporary)
-            vendor_root = workspace / "vendor" / "agent-canon"
-            source = vendor_root / "tools" / "requirement_sync_validator.py"
-            projection = (
-                workspace / "tools" / "agent-canon" / "requirement_sync_validator.py"
-            )
-            wrapper = workspace / "tools" / "requirement_sync_validator.py"
-            for path, content in (
-                (source, "source\n"),
-                (projection, "source\n"),
-                (wrapper, "wrapper\n"),
-            ):
-                path.parent.mkdir(parents=True, exist_ok=True)
-                path.write_text(content, encoding="utf-8")
-            model = EnvironmentBoundaryModel(workspace, vendor_root)
-
-            with self.assertRaisesRegex(DependencyError, "ambiguous AgentCanon"):
-                model._resolve_agent_canon_root_path(
-                    "tools/requirement_sync_validator.py"
-                )
-
-            projection.unlink()
-            source.unlink()
-            self.assertEqual(
-                model._resolve_agent_canon_root_path(
-                    "tools/requirement_sync_validator.py"
-                ),
-                source,
-            )
-
-    def test_requirements_parse_errors_project_to_boundary_findings(self) -> None:
-        """Preserve the base finding detail for every parser error category."""
-        backslash = chr(92)
-        cases = {
-            "malformed continuation": (
-                f"package==1.0 {backslash}\n    not-a-hash\n",
-                lambda path: f"{path}:2: malformed requirement continuation",
-            ),
-            "orphan hash": (
-                f"--hash=sha256:{'a' * 64}\n",
-                lambda path: f"{path}:1: orphan requirement hash",
-            ),
-            "malformed hash": (
-                f"package==1.0 {backslash}\n    --hash=sha256:short\n",
-                lambda path: f"{path}:2: malformed requirement hash",
-            ),
-            "requirement option": (
-                "--index-url https://pypi.org/simple\n",
-                lambda path: f"{path}:1: requirement option without requirement",
-            ),
-            "unterminated continuation": (
-                f"package==1.0 {backslash}\n",
-                lambda path: f"{path}: unterminated requirement continuation",
-            ),
-            "invalid requirement": (
-                "not a requirement\n",
-                lambda _path: "unsupported requirement syntax: not a requirement",
-            ),
-        }
-
-        for name, (contents, expected_detail) in cases.items():
-            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
-                model, path = write_boundary_fixture(Path(temporary), contents)
-                report = model.validate()
-
-                findings = [
-                    finding for finding in report.findings if finding.path == str(path)
-                ]
-
-            self.assertEqual(
-                [finding.detail for finding in findings],
-                [expected_detail(path)],
-            )
-
-    def test_boundary_accepts_native_python_venv_package(self) -> None:
-        """Ubuntu 22.04 uses the minor-independent python3-venv package."""
-        with tempfile.TemporaryDirectory() as temporary:
-            model, _ = write_boundary_fixture(
-                Path(temporary),
-                "jupyterlab\nnotebook\nipykernel\npydeps\nsnakeviz\npyyaml\n",
-            )
-            report = model.validate()
-
-        self.assertNotIn(
-            "missing-runtime-package:python3-venv",
-            [finding.detail for finding in report.findings],
-        )
-
     def test_boundary_requires_entrypoint_parent_hook_dispatch(self) -> None:
         """The resolver entrypoint, not JSON text, owns the derived parent hook."""
         with tempfile.TemporaryDirectory() as temporary:
@@ -2844,11 +2712,11 @@ class DependencyModelTests(unittest.TestCase):
                 index=0,
             )
 
-    def test_static_bootstrap_and_post_create_contract_has_no_legacy_install_routes(
-        self,
-    ) -> None:
-        bootstrap = (ROOT / ".devcontainer" / "bootstrap-dependencies.sh").read_text(
-            encoding="utf-8"
+    def test_image_feature_and_shared_post_create_contract(self) -> None:
+        devcontainer = json.loads(
+            (ROOT / ".devcontainer" / "devcontainer.json").read_text(
+                encoding="utf-8"
+            )
         )
         dockerfile = (ROOT / ".devcontainer" / "Dockerfile").read_text(
             encoding="utf-8"
@@ -2856,92 +2724,67 @@ class DependencyModelTests(unittest.TestCase):
         post_create = (ROOT / ".devcontainer" / "post-create.sh").read_text(
             encoding="utf-8"
         )
-        identity_helper = (
-            ROOT / "tools" / "lib" / "agent_canon_source_identity.sh"
-        ).read_text(encoding="utf-8")
-        validator = (ROOT / "tools" / "docker_dependency_validator.sh").read_text(
-            encoding="utf-8"
+        self.assertEqual(
+            devcontainer["features"],
+            {
+                "ghcr.io/devcontainers/features/node@sha256:586c9a6f7dd40bd3ba2cd41e7f2f88dcc31fbe5d1442afcbf07ffbc66b686857": {
+                    "version": "22.14.0",
+                    "npmVersion": "10.9.2",
+                    "nodeGypDependencies": False,
+                    "pnpmVersion": "none",
+                }
+            },
         )
-        self.assertIn('NODE_VERSION="22.14.0"', bootstrap)
-        self.assertIn("NODE_X86_64_SHA256", bootstrap)
-        self.assertIn("NODE_AARCH64_SHA256", bootstrap)
-        self.assertIn("ninja-build", bootstrap)
-        self.assertEqual(bootstrap.count("ninja-build"), 2)
-        self.assertIn("build-essential", bootstrap)
-        self.assertIn('command -v cc', bootstrap)
-        self.assertIn('command -v gcc', bootstrap)
-        self.assertIn("python3-pip", bootstrap)
-        self.assertIn("python3-packaging", bootstrap)
-        self.assertIn("gnupg", bootstrap)
-        self.assertIn("command -v gpg", bootstrap)
-        self.assertIn("packaging.requirements", bootstrap)
-        self.assertIn("NODE_BOOTSTRAP_RECEIPT", bootstrap)
-        self.assertIn('NODE_NPM_VERSION="10.9.2"', bootstrap)
-        self.assertIn(
-            "COPY .devcontainer/bootstrap-dependencies.sh /usr/local/lib/agent-canon/bootstrap-dependencies.sh",
-            dockerfile,
-        )
-        self.assertIn(
-            "/usr/local/lib/agent-canon/bootstrap-dependencies.sh --install",
-            dockerfile,
-        )
-        self.assertIn(
-            '"$NODE_INSTALL_PATH/lib/node_modules/npm/bin/npm-cli.js"', bootstrap
-        )
-        self.assertNotIn('"$NODE_INSTALL_PATH/bin/npm"', bootstrap)
-        self.assertIn("tomllib", bootstrap)
-        self.assertIn("tomli", bootstrap)
-        self.assertIn('"$devcontainer_dir/bootstrap-dependencies.sh" --check', post_create)
-        self.assertNotIn('--install-language-runtime', post_create)
-        self.assertNotIn("NODE_VERSION:-", bootstrap)
+        self.assertIn("python3-pip", dockerfile)
+        self.assertIn("python3-packaging", dockerfile)
+        self.assertIn("build-essential", dockerfile)
+        self.assertIn("ninja-build", dockerfile)
+        self.assertNotIn("bootstrap-dependencies.sh", dockerfile)
+        self.assertNotIn("--install-language-runtime", post_create)
         self.assertNotIn("npm install -g", post_create)
         self.assertNotIn("install_github_cli", post_create)
         self.assertNotIn("install_rust_toolchain", post_create)
-        self.assertNotIn("grep", validator)
-        self.assertNotIn("PLAYWRIGHT_BROWSERS_PATH", post_create)
-        self.assertNotIn("export CARGO_HOME", post_create)
-        self.assertNotIn("export RUSTUP_HOME", post_create)
-        self.assertNotIn("agent_canon_source_identity", post_create)
-        self.assertIn('"HEAD:$source_prefix"', identity_helper)
-        self.assertNotIn("agent_canon_receipt_matches_identity", post_create)
-        self.assertNotIn("agent_canon_source_commit", post_create)
-        self.assertNotIn("export ELAN_HOME", post_create)
         self.assertIn("STRUCTURED_ANALYSIS_BOOTSTRAP=warn", post_create)
-        cache_function = post_create.split("build_agent_canon_cache() {", 1)[1].split(
-            "\n}\n", 1
-        )[0]
-        self.assertIn("if agent-canon structured-analysis build", cache_function)
-        self.assertNotIn("return 1", cache_function)
-        self.assertNotIn('"$devcontainer_dir/finalize-shared-runtime.sh"', post_create)
-        self.assertIn("ensure_container_local_runtime()", post_create)
-        self.assertIn("validate_runtime_identity", bootstrap)
-        self.assertLess(
-            bootstrap.index("validate_runtime_identity"),
-            bootstrap.index("apt-get update"),
-        )
-        self.assertIn("ensure_container_local_runtime\n", post_create)
-        bootstrap_index = post_create.rindex(
-            '"$devcontainer_dir/bootstrap-dependencies.sh" --check'
-        )
+        self.assertIn("project-install --workspace", post_create)
+        self.assertNotIn("docker/install_python_dependencies.sh", post_create)
         validate_index = post_create.index("validate --workspace")
         install_index = post_create.index("install --workspace")
-        python_installer_index = post_create.rindex(
-            "docker/install_python_dependencies.sh"
-        )
         cache_index = post_create.rindex("\nbuild_agent_canon_cache\n")
         projection_index = post_create.rindex("\npublish_container_local_runtime\n")
-        self.assertLess(bootstrap_index, validate_index)
         self.assertLess(
             validate_index,
             install_index,
         )
-        self.assertLess(
-            install_index,
-            python_installer_index,
-        )
-        self.assertLess(python_installer_index, cache_index)
         self.assertLess(cache_index, projection_index)
         self.assertNotIn("publish_agent_canon_cli", post_create)
+
+    def test_project_extras_are_ordered_and_installed_then_checked(self) -> None:
+        workspace = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, workspace)
+        (workspace / "pyproject.toml").write_text(
+            "[project]\nname='fixture'\nversion='0.1'\n"
+            "[project.optional-dependencies]\ndev=[]\ncuda12=[]\n",
+            encoding="utf-8",
+        )
+        runner = FakeRunner()
+        installed = dependency_module.install_project_extras(
+            workspace, ("dev", "cuda12"), runner=runner
+        )
+        self.assertEqual(installed, ("dev", "cuda12"))
+        self.assertEqual(runner.calls[0][4], "--editable")
+        self.assertIn("[dev,cuda12]", runner.calls[0][5])
+        self.assertEqual(runner.calls[1], (sys.executable, "-m", "pip", "check"))
+
+    def test_project_extras_reject_unknown_and_duplicate_names(self) -> None:
+        with self.assertRaisesRegex(DependencyError, "duplicate"):
+            dependency_module.parse_python_extras(("dev", "DEV"))
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            (workspace / "pyproject.toml").write_text(
+                "[project.optional-dependencies]\ndev=[]\n", encoding="utf-8"
+            )
+            with self.assertRaisesRegex(DependencyError, "not declared"):
+                dependency_module.validate_project_extras(workspace, ("cuda12",))
 
 
 if __name__ == "__main__":

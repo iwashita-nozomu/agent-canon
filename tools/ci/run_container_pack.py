@@ -112,7 +112,7 @@ def main() -> int:
                 build_smoke_command(pack),
                 shell=pack.smoke.shell,
                 container_workspace=pack.runtime.workspace_mount,
-                dependency_profile=pack.runtime.dependency_profile,
+                dependency_extras=pack.runtime.dependency_extras,
             ),
         )
         print_label_and_command("smoke", smoke_command)

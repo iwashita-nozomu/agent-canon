@@ -6,7 +6,6 @@
 # upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
 # upstream design ../documents/design/devcontainer/parent-dependency-manifest-followup.md parent manifest merge and post-create order
 # upstream design ../documents/design/rust-agent-tool-migration.md selected CLI provenance format
-# upstream implementation bootstrap-dependencies.sh establishes the fixed base capability set
 # upstream implementation ../tools/agent_tools/devcontainer_dependencies.py validates and executes records
 # downstream implementation ../rust/agent-canon/src/structured_analysis.rs builds the AgentCanon cache
 # @dependency-end
@@ -79,17 +78,6 @@ EOF
   prepend_path "$tools_home/bin"
 }
 
-register_safe_directories() {
-  if [ -f "$workspace/docker/register_safe_directories.sh" ]; then
-    bash "$workspace/docker/register_safe_directories.sh" "$workspace"
-    return
-  fi
-  git config --global --add safe.directory "$workspace" || true
-  if [ -d "$workspace/.git" ]; then
-    git config --global --add safe.directory "$workspace/.git" || true
-  fi
-}
-
 build_agent_canon_cache() {
   local status
   command -v agent-canon >/dev/null 2>&1 || {
@@ -153,21 +141,16 @@ publish_container_local_runtime() {
   echo "ENVIRONMENT_TOOL_AVAILABILITY=$runtime_root/tool-availability.json"
 }
 
-"$devcontainer_dir/bootstrap-dependencies.sh" --check
-
 python3 "$agent_canon_root/tools/agent_tools/devcontainer_dependencies.py" \
   validate --workspace "$workspace" --vendor-root "$agent_canon_root" --format text
-register_safe_directories
 python3 "$agent_canon_root/tools/agent_tools/devcontainer_dependencies.py" \
   install --workspace "$workspace" --vendor-root "$agent_canon_root" --receipts \
   "$workspace/.agent-canon/dependency-receipts" --format text
 
-if [ -f "$workspace/docker/install_python_dependencies.sh" ]; then
-  dependency_profile="${AGENT_CANON_DEPENDENCY_PROFILE:-full}"
-  bash "$workspace/docker/install_python_dependencies.sh" "$workspace" \
-    --profile "$dependency_profile"
-else
-  echo "repo-local Python dependency installer absent; skipping docker/install_python_dependencies.sh"
+python_extras="${AGENT_CANON_PYTHON_EXTRAS:-}"
+if [ -f "$workspace/pyproject.toml" ] && [ -n "$python_extras" ]; then
+  python3 "$agent_canon_root/tools/agent_tools/devcontainer_dependencies.py" \
+    project-install --workspace "$workspace" --extras "$python_extras"
 fi
 
 publish_agent_tools_profile

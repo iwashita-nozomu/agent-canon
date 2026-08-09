@@ -7,7 +7,6 @@
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell contract
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission selector and scenario validation
 # upstream implementation ../../tools/ci/container_config.py semantic devcontainer checker
-# upstream implementation ../../tools/agent_tools/requirements_lock.py canonical requirements lock parser and result/error model
 # upstream implementation ../../.devcontainer/devcontainer.json selects the topic-root Compose generator
 # @dependency-end
 
@@ -37,11 +36,7 @@ POST_CREATE_COMMAND = (
     ".devcontainer/post-create-entrypoint.sh "
     "/workspace/${localWorkspaceFolderBasename}"
 )
-PARENT_POST_CREATE_COMMAND = (
-    "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
-    ".devcontainer/bootstrap-dependencies.sh --install-language-runtime && "
-    f"{POST_CREATE_COMMAND}"
-)
+PARENT_POST_CREATE_COMMAND = POST_CREATE_COMMAND
 
 
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
@@ -112,6 +107,14 @@ def write_devcontainer(root: Path) -> None:
                 "containerUser": "project",
                 "remoteUser": "project",
                 "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
+                "features": {
+                    "ghcr.io/devcontainers/features/node@sha256:586c9a6f7dd40bd3ba2cd41e7f2f88dcc31fbe5d1442afcbf07ffbc66b686857": {
+                        "version": "22.14.0",
+                        "npmVersion": "10.9.2",
+                        "nodeGypDependencies": False,
+                        "pnpmVersion": "none",
+                    }
+                },
                 "postCreateCommand": POST_CREATE_COMMAND,
                 "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
             },
@@ -120,17 +123,12 @@ def write_devcontainer(root: Path) -> None:
         + "\n",
     )
     for name in (
-        "bootstrap-dependencies.sh",
         "post-create.sh",
         "post-create-entrypoint.sh",
         "post-attach.sh",
     ):
         if name == "post-create-entrypoint.sh":
             content = POST_CREATE_ENTRYPOINT.read_text(encoding="utf-8")
-        elif name == "bootstrap-dependencies.sh":
-            content = (PROJECT_ROOT / ".devcontainer" / name).read_text(
-                encoding="utf-8"
-            )
         else:
             content = "#!/usr/bin/env bash\n"
         write_file(root, f".devcontainer/{name}", content)
@@ -178,7 +176,7 @@ def write_compose(
     environment_lines = (
         [
             "    environment:",
-            "      AGENT_CANON_DEPENDENCY_PROFILE: full",
+            "      AGENT_CANON_PYTHON_EXTRAS: \"\"",
             "      AGENT_CANON_RUNTIME_ROUTE: CONTAINER_LOCAL",
             "      AGENT_CANON_CODEX_SESSION_ROOT: /home/project/.codex/sessions",
             "      AGENT_CANON_SECRET_MOUNT: /mnt/agent-canon-secrets",
@@ -303,11 +301,21 @@ def test_gpu_admission_selector_isolated_from_default_selector() -> None:
     assert "gpu-admission" not in default["dockerComposeFile"]
     assert "gpu-admission" in profile["name"]
     assert profile["dockerComposeFile"] != default["dockerComposeFile"]
+    expected_feature = {
+        "ghcr.io/devcontainers/features/node@sha256:586c9a6f7dd40bd3ba2cd41e7f2f88dcc31fbe5d1442afcbf07ffbc66b686857": {
+            "version": "22.14.0",
+            "npmVersion": "10.9.2",
+            "nodeGypDependencies": False,
+            "pnpmVersion": "none",
+        }
+    }
+    assert default["features"] == expected_feature
+    assert profile["features"] == expected_feature
     assert load_container_config_module().validate_gpu_admission_selector(PROJECT_ROOT) == []
 
 
-def test_post_create_uses_image_bootstrap_before_shared_lifecycle() -> None:
-    """Both selectors rely on the image-owned fixed bootstrap and check at runtime."""
+def test_post_create_uses_shared_lifecycle() -> None:
+    """Both selectors use the shared post-create lifecycle."""
     for config_path in (
         PROJECT_ROOT / ".devcontainer" / "devcontainer.json",
         GPU_ADMISSION_SELECTOR,
@@ -316,13 +324,13 @@ def test_post_create_uses_image_bootstrap_before_shared_lifecycle() -> None:
         command = config["postCreateCommand"]
 
         assert command == POST_CREATE_COMMAND
-        assert "bootstrap-dependencies.sh --install" not in command
+        assert "post-create-entrypoint.sh" in command
 
 
 def test_parent_layout_requires_language_runtime_before_shared_lifecycle(
     tmp_path: Path,
 ) -> None:
-    """Parent default and GPU selectors require the explicit bootstrap prefix."""
+    """Parent selectors require the shared post-create entrypoint."""
     module = load_container_config_module()
     default = json.loads(
         (PROJECT_ROOT / ".devcontainer/devcontainer.json").read_text(
@@ -332,10 +340,7 @@ def test_parent_layout_requires_language_runtime_before_shared_lifecycle(
     default["postCreateCommand"] = PARENT_POST_CREATE_COMMAND
     assert module.validate_devcontainer_json(default, parent_layout=True) == []
     default["postCreateCommand"] = POST_CREATE_COMMAND
-    default_findings = module.validate_devcontainer_json(default, parent_layout=True)
-    assert [finding.detail for finding in default_findings] == [
-        f"postCreateCommand-expected:{PARENT_POST_CREATE_COMMAND}"
-    ]
+    assert module.validate_devcontainer_json(default, parent_layout=True) == []
 
     parent = tmp_path / "parent"
     (parent / "vendor/agent-canon").mkdir(parents=True)
@@ -356,9 +361,7 @@ def test_parent_layout_requires_language_runtime_before_shared_lifecycle(
         json.dumps(profile),
     )
     gpu_findings = module.validate_gpu_admission_selector(parent)
-    assert [
-        item.detail for item in gpu_findings if "postCreateCommand-expected" in item.detail
-    ] == [f"postCreateCommand-expected:{PARENT_POST_CREATE_COMMAND}"]
+    assert not any("postCreateCommand-expected" in item.detail for item in gpu_findings)
 
 
 def test_gpu_admission_selector_is_mandatory(tmp_path: Path) -> None:
@@ -606,7 +609,7 @@ def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
     assert "-gpu-admission" in compose.splitlines()[0]
     assert "    gpus: all" in compose
     assert "      target: gpu-runtime" in compose
-    assert 'AGENT_CANON_DEPENDENCY_PROFILE: "gpu"' in compose
+    assert 'AGENT_CANON_PYTHON_EXTRAS: "dev,cuda12"' in compose
     assert '        target: "/var/lib/agent-canon/runtime"' in compose
     assert "    group_add:" not in compose
     assert f'        source: "{repo / ".agent-canon/runtime"}"' in compose
@@ -1197,7 +1200,7 @@ def write_parent_generator_fixture(
     tmp_path: Path,
     *,
     runtime_shell: str = "/bin/zsh",
-    dependency_profile: str = "full",
+    dependency_extras: tuple[str, ...] = (),
     runtime_mounts: tuple[str, ...] = (),
     optional_mount_profiles: tuple[str, ...] = (),
     linked_data_roots: tuple[tuple[str, str], ...] = (),
@@ -1262,7 +1265,7 @@ def write_parent_generator_fixture(
                 f'shell = "{runtime_shell}"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
-                f'dependency_profile = "{dependency_profile}"',
+                "dependency_extras = " + json.dumps(list(dependency_extras)),
                 optional_mount_profiles_line,
                 linked_data_roots_line,
                 runtime_mounts_line,
@@ -1304,7 +1307,7 @@ def write_gpu_admission_pack(
                 'shell = "/bin/bash"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
-                'dependency_profile = "gpu"',
+                'dependency_extras = ["dev", "cuda12"]',
                 "",
             ]
         ),
@@ -1323,7 +1326,7 @@ def test_load_pack_reads_optional_platform_when_present_or_omitted(
     assert implicit_findings == []
     assert implicit is not None
     assert implicit.platform == "linux/amd64"
-    assert implicit.dependency_profile == "full"
+    assert implicit.dependency_extras == ()
 
     explicit_pack = repo / "docker/packs/explicit-platform.toml"
     explicit_pack.write_text(
@@ -1343,7 +1346,7 @@ def test_load_pack_reads_optional_platform_when_present_or_omitted(
                 'shell = "/bin/bash"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
-                'dependency_profile = "gpu"',
+                'dependency_extras = ["dev", "cuda12"]',
                 "",
             ]
         ),
@@ -1353,7 +1356,7 @@ def test_load_pack_reads_optional_platform_when_present_or_omitted(
     assert explicit_findings == []
     assert explicit is not None
     assert explicit.platform == "linux/amd64"
-    assert explicit.dependency_profile == "gpu"
+    assert explicit.dependency_extras == ("dev", "cuda12")
 
 
 def test_load_pack_rejects_invalid_optional_profiles(tmp_path: Path) -> None:
@@ -1507,7 +1510,7 @@ def test_parent_generator_projects_read_only_zsh_contract(tmp_path: Path) -> Non
     assert 'HOME: "/home/project"' in compose
     assert "ZDOTDIR:" not in compose
     assert 'SHELL: "/bin/zsh"' in compose
-    assert 'AGENT_CANON_DEPENDENCY_PROFILE: "full"' in compose
+    assert 'AGENT_CANON_PYTHON_EXTRAS: ""' in compose
     assert 'AGENT_CANON_CODEX_SESSION_ROOT: "/home/project/.codex/sessions"' in compose
     assert f'user: "{os.getuid()}:{os.getgid()}"' in compose
     assert 'PROJECT_USER:' not in compose
@@ -2366,99 +2369,24 @@ def test_standalone_vscode_directory_missing_reports_all_source_files(
         assert f".vscode/{name}:missing" in result.stdout
 
 
-def test_validate_requirements_accepts_pep508_direct_reference(tmp_path: Path) -> None:
-    """Direct references should be accepted while still collecting required package names."""
+def test_load_pack_preserves_ordered_project_extras(tmp_path: Path) -> None:
+    """Typed extras remain ordered and are exposed without a profile alias."""
     module = load_container_config_module()
-    write_file(
-        tmp_path,
-        "docker/requirements.txt",
-        "\n".join(
-            [
-                "jupyterlab",
-                "notebook",
-                "ipykernel",
-                "pydeps",
-                "snakeviz",
-                "pyyaml",
-                'custom-visualizer @ https://example.invalid/custom-visualizer.whl#sha256=abc123 ; python_version >= "3.11"',
-                "",
-            ]
-        ),
+    repo = write_parent_generator_fixture(
+        tmp_path, dependency_extras=("dev", "cuda12")
     )
+    pack, findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert findings == []
+    assert pack is not None
+    assert pack.dependency_extras == ("dev", "cuda12")
 
-    assert module.validate_requirements(tmp_path) == []
 
-
-def test_validate_requirements_rejects_invalid_direct_reference_boundaries(
-    tmp_path: Path,
-) -> None:
-    """URL references cannot also carry version specifiers or malformed syntax."""
+def test_load_pack_rejects_duplicate_project_extras(tmp_path: Path) -> None:
+    """Duplicate extras are rejected case-insensitively at the typed boundary."""
     module = load_container_config_module()
-    write_file(
-        tmp_path,
-        "docker/requirements.txt",
-        "\n".join(
-            [
-                "jupyterlab",
-                "notebook",
-                "ipykernel",
-                "pydeps",
-                "snakeviz",
-                "pyyaml",
-                "custom-visualizer @ https://example.invalid/custom-visualizer.whl ==1",
-                "custom-visualizer @ https://example.invalid/custom-visualizer.whl#sha256=abc123 ==1",
-                "not a requirement",
-                "",
-            ]
-        ),
+    repo = write_parent_generator_fixture(
+        tmp_path, dependency_extras=("dev", "DEV")
     )
-
-    findings = module.validate_requirements(tmp_path)
-
-    assert [finding.detail for finding in findings] == [
-        "invalid-line:7",
-        "invalid-line:8",
-        "invalid-line:9",
-    ]
-
-
-def test_validate_requirements_projects_every_parse_error_to_line_only(
-    tmp_path: Path,
-) -> None:
-    """All canonical parser errors retain only the legacy line finding detail."""
-    module = load_container_config_module()
-    write_file(
-        tmp_path,
-        "docker/requirements.txt",
-        "\n".join(
-            [
-                "jupyterlab",
-                "notebook",
-                "ipykernel",
-                "pydeps",
-                "snakeviz",
-                "pyyaml",
-                "--index-url https://pypi.org/simple",
-                "--hash=sha256:" + "a" * 64,
-                "package==1.0 \\",
-                "    --hash=sha256:short",
-                "package==1.0 \\",
-                "    not-a-hash",
-                "not a requirement",
-                "package==1.0 \\",
-                "",
-            ]
-        ),
-    )
-
-    findings = module.validate_requirements(tmp_path)
-
-    assert [finding.detail for finding in findings] == [
-        "invalid-line:7",
-        "invalid-line:8",
-        "invalid-line:10",
-        "invalid-line:12",
-        "invalid-line:13",
-        "invalid-line:14",
-    ]
-    assert all("requirement" not in finding.detail for finding in findings)
+    pack, findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack is None
+    assert any("dependency_extras-duplicate" in finding.detail for finding in findings)
