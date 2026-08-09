@@ -119,12 +119,20 @@ def write_devcontainer(root: Path) -> None:
         )
         + "\n",
     )
-    for name in ("post-create.sh", "post-create-entrypoint.sh", "post-attach.sh"):
-        content = (
-            POST_CREATE_ENTRYPOINT.read_text(encoding="utf-8")
-            if name == "post-create-entrypoint.sh"
-            else "#!/usr/bin/env bash\n"
-        )
+    for name in (
+        "bootstrap-dependencies.sh",
+        "post-create.sh",
+        "post-create-entrypoint.sh",
+        "post-attach.sh",
+    ):
+        if name == "post-create-entrypoint.sh":
+            content = POST_CREATE_ENTRYPOINT.read_text(encoding="utf-8")
+        elif name == "bootstrap-dependencies.sh":
+            content = (PROJECT_ROOT / ".devcontainer" / name).read_text(
+                encoding="utf-8"
+            )
+        else:
+            content = "#!/usr/bin/env bash\n"
         write_file(root, f".devcontainer/{name}", content)
         (root / ".devcontainer" / name).chmod(0o755)
     write_file(
@@ -434,12 +442,11 @@ def generate_gpu_admission_compose(tmp_path: Path) -> tuple[Path, Path]:
             **os.environ,
             "HOME": str(tmp_path / "missing-home"),
             "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
-            "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
-            "AGENT_CANON_RUNTIME_GID": "4242",
-            "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": "1000 4242 5000",
-            "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
-            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
-            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+            "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+            "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/gpu-admission-compose.generated.yml",
         },
         check=False,
@@ -558,6 +565,8 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     assert 'DEPENDENCY_MODULE_CONTAINER_SOURCE:' in compose
     assert 'DEPENDENCY_MODULE_CONTAINER_TARGET: "/workspace"' in compose
     assert "DEVCONTAINER_GPU_REQUEST" not in compose
+    assert "AGENT_CANON_RUNTIME_GID" not in compose
+    assert "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS" not in compose
     assert "NVIDIA_" not in compose
     assert "gpus: all" not in compose
     assert "group_add:" not in compose
@@ -579,12 +588,11 @@ def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
             **os.environ,
             "HOME": str(tmp_path / "missing-home"),
             "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
-            "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
-            "AGENT_CANON_RUNTIME_GID": "4242",
-            "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": "1000 4242 5000",
-            "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
-            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
-            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+            "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+            "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/gpu-admission-compose.generated.yml",
         },
         check=False,
@@ -600,10 +608,13 @@ def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
     assert "      target: gpu-runtime" in compose
     assert 'AGENT_CANON_DEPENDENCY_PROFILE: "gpu"' in compose
     assert '        target: "/var/lib/agent-canon/runtime"' in compose
-    assert "    group_add:\n      - \"1000\"\n      - \"4242\"\n      - \"5000\"" in compose
+    assert "    group_add:" not in compose
+    assert f'        source: "{repo / ".agent-canon/runtime"}"' in compose
     assert 'DEVCONTAINER_GPU_MODE: "enabled"' in compose
     assert 'DEVCONTAINER_GPU_REQUEST: "all"' in compose
     assert 'AGENT_CANON_RUNTIME_ROUTE: "MANAGED_CONTAINER"' in compose
+    assert "AGENT_CANON_RUNTIME_GID" not in compose
+    assert "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS" not in compose
     module = load_container_config_module()
     pack, pack_findings = module.load_pack(
         repo, repo / "docker/packs/gpu-admission.toml"
@@ -636,12 +647,11 @@ def test_gpu_admission_requires_gpu_runtime_pack_target(
             **os.environ,
             "HOME": str(tmp_path / "missing-home"),
             "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
-            "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
-            "AGENT_CANON_RUNTIME_GID": "4242",
-            "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": "1000 4242 5000",
-            "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
-            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
-            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+            "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+            "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
         },
         check=False,
         capture_output=True,
@@ -682,7 +692,7 @@ def test_default_rejects_gpu_runtime_pack_target(tmp_path: Path) -> None:
     (
         (
             "source",
-            "gpu-admission-runtime-mount-source-must-be-canonical",
+            "gpu-admission-runtime-mount-source-must-be-repository-local",
         ),
         (
             "read_only",
@@ -698,7 +708,7 @@ def test_gpu_admission_validator_rejects_runtime_bind_mutations(
     compose = output_path.read_text(encoding="utf-8")
     if mutation == "source":
         malformed = compose.replace(
-            '        source: "/var/lib/agent-canon/runtime"\n',
+            f'        source: "{repo / ".agent-canon/runtime"}"\n',
             '        source: "/tmp/evil-runtime"\n',
             1,
         )
@@ -721,82 +731,20 @@ def test_gpu_admission_validator_rejects_runtime_bind_mutations(
     assert expected_detail in {finding.detail for finding in findings}
 
 
-@pytest.mark.parametrize(
-    ("mutation", "expected_detail"),
-    (
-        (
-            "runtime-gid-zero",
-            "gpu-admission-runtime-gid-must-be-positive-integer",
-        ),
-        (
-            "host-gid-invalid",
-            "gpu-admission-host-supplementary-gids-must-be-positive-integers",
-        ),
-        (
-            "host-gid-duplicate",
-            "gpu-admission-host-supplementary-gids-must-be-unique",
-        ),
-    ),
-)
-def test_gpu_admission_validator_rejects_malformed_gid_environment(
-    tmp_path: Path, mutation: str, expected_detail: str
-) -> None:
-    """GPU admission validates GID values independently of matching group_add."""
+def test_gpu_admission_validator_rejects_group_add_projection(tmp_path: Path) -> None:
+    """GPU admission uses the primary project identity without group_add."""
     repo, output_path = generate_gpu_admission_compose(tmp_path)
     compose = output_path.read_text(encoding="utf-8")
-    if mutation == "runtime-gid-zero":
-        malformed = compose.replace(
-            'AGENT_CANON_RUNTIME_GID: "4242"',
-            'AGENT_CANON_RUNTIME_GID: "0"',
-            1,
-        )
-    elif mutation == "host-gid-invalid":
-        malformed = compose.replace(
-            'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS: "1000 4242 5000"',
-            'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS: "1000 0 5000"',
-            1,
-        ).replace('      - "5000"\n', '      - "0"\n', 1)
-    else:
-        malformed = compose.replace(
-            'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS: "1000 4242 5000"',
-            'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS: "1000 4242 4242"',
-            1,
-        ).replace('      - "5000"\n', '      - "4242"\n', 1)
-    output_path.write_text(malformed, encoding="utf-8")
-
-    module = load_container_config_module()
-    findings = module.validate_generated_compose(
-        repo,
-        None,
-        profile="gpu-admission",
-        compose_path=output_path,
-    )
-
-    assert expected_detail in {finding.detail for finding in findings}
-
-
-@pytest.mark.parametrize("optional_mounts", ("", "host-git"))
-def test_gpu_admission_validator_requires_shared_runtime_profile(
-    tmp_path: Path, optional_mounts: str
-) -> None:
-    """GPU admission cannot validate without its explicit shared-runtime token."""
-    repo, output_path = generate_gpu_admission_compose(tmp_path)
-    compose = output_path.read_text(encoding="utf-8").replace(
-        'AGENT_CANON_OPTIONAL_MOUNTS: "shared-runtime"',
-        f'AGENT_CANON_OPTIONAL_MOUNTS: "{optional_mounts}"',
+    compose = compose.replace(
+        '    gpus: all\n',
+        '    gpus: all\n    group_add:\n      - "1234"\n',
         1,
     )
     output_path.write_text(compose, encoding="utf-8")
-
-    module = load_container_config_module()
-    findings = module.validate_generated_compose(
-        repo,
-        None,
-        profile="gpu-admission",
-        compose_path=output_path,
+    findings = load_container_config_module().validate_generated_compose(
+        repo, None, profile="gpu-admission", compose_path=output_path
     )
-
-    assert "gpu-admission-shared-runtime-profile-required" in {
+    assert "gpu-admission-group-add-forbidden" in {
         finding.detail for finding in findings
     }
 
@@ -805,14 +753,14 @@ def _docker_host_compose_fixture(tmp_path: Path) -> tuple[Path, Path]:
     """Return a GPU Compose fixture with the canonical docker-host bind selected."""
     repo, output_path = generate_gpu_admission_compose(tmp_path)
     compose = output_path.read_text(encoding="utf-8").replace(
-        'AGENT_CANON_OPTIONAL_MOUNTS: "shared-runtime"',
-        'AGENT_CANON_OPTIONAL_MOUNTS: "shared-runtime,docker-host"',
+        'AGENT_CANON_OPTIONAL_MOUNTS: ""',
+        'AGENT_CANON_OPTIONAL_MOUNTS: "docker-host"',
         1,
     )
     compose = compose.replace(
-        '      - type: bind\n        source: "/var/lib/agent-canon/runtime"',
+        f'      - type: bind\n        source: "{repo / ".agent-canon/runtime"}"',
         '      - /var/run/docker.sock:/var/run/docker.sock\n'
-        '      - type: bind\n        source: "/var/lib/agent-canon/runtime"',
+        f'      - type: bind\n        source: "{repo / ".agent-canon/runtime"}"',
         1,
     )
     output_path.write_text(compose, encoding="utf-8")
@@ -932,7 +880,7 @@ def test_generator_docker_host_fails_closed_without_socket(tmp_path: Path) -> No
     assert "requires an existing Unix socket" in result.stderr
 
 
-def test_default_scenario_rejects_shared_runtime_without_profile_selector(
+def test_optional_mount_rejects_removed_shared_runtime_selector(
     tmp_path: Path,
 ) -> None:
     """The default generator cannot be turned into the opt-in profile by a mount alone."""
@@ -958,7 +906,70 @@ def test_default_scenario_rejects_shared_runtime_without_profile_selector(
     )
 
     assert result.returncode == 1
-    assert "requires the gpu-admission profile" in result.stderr
+    assert "optional mount profile is unsupported: shared-runtime" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "reserved_name",
+    ("AGENT_CANON_RUNTIME_GID", "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS"),
+)
+def test_default_generator_rejects_reserved_runtime_identity_env(
+    tmp_path: Path, reserved_name: str
+) -> None:
+    """The default pack cannot reintroduce removed runtime identity environment."""
+    repo = write_parent_generator_fixture(tmp_path)
+    pack_path = repo / "docker/packs/default.toml"
+    pack_path.write_text(
+        pack_path.read_text(encoding="utf-8")
+        + f'env = ["{reserved_name}=4242"]\n',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={**os.environ, "HOME": str(tmp_path / "missing-home")},
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert f"runtime.env cannot override reserved key: {reserved_name}" in result.stderr
+
+
+@pytest.mark.parametrize(
+    "reserved_name",
+    ("AGENT_CANON_RUNTIME_GID", "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS"),
+)
+def test_gpu_generator_rejects_reserved_runtime_identity_env(
+    tmp_path: Path, reserved_name: str
+) -> None:
+    """The GPU pack cannot reintroduce removed runtime identity environment."""
+    repo = write_parent_generator_fixture(tmp_path)
+    write_gpu_admission_pack(repo)
+    pack_path = repo / "docker/packs/gpu-admission.toml"
+    pack_path.write_text(
+        pack_path.read_text(encoding="utf-8")
+        + f'env = ["{reserved_name}=4242"]\n',
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(tmp_path / "missing-home"),
+            "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert f"runtime.env cannot override reserved key: {reserved_name}" in result.stderr
 
 
 def test_generator_treats_workspace_topic_slug_as_managed(tmp_path: Path) -> None:
@@ -1270,6 +1281,7 @@ def write_gpu_admission_pack(
     dockerfile: str = "docker/Dockerfile",
 ) -> None:
     """Write the opt-in pack selected by the GPU generator profile."""
+    (repo / ".agent-canon/runtime").mkdir(parents=True, exist_ok=True)
     target_line = f'target = "{target}"' if target is not None else ""
     write_file(
         repo,
@@ -1879,7 +1891,6 @@ def test_generator_rejects_public_project_user_override(tmp_path: Path) -> None:
     home = tmp_path / "home"
     write_host_zshrc(home)
     environment = {**os.environ, "HOME": str(home), "PROJECT_USER": "alice"}
-    environment.pop("AGENT_CANON_RUNTIME_GID", None)
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,

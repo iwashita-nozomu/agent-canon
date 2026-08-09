@@ -36,23 +36,16 @@ def write_gpu_admission_fixture(tmp_path: Path) -> tuple[Path, dict[str, str], P
     selector.parent.mkdir(parents=True, exist_ok=True)
     selector.write_text("{}\n", encoding="utf-8")
 
-    raw_host_groups = subprocess.run(
-        ["id", "-G"], check=True, capture_output=True, text=True
-    ).stdout.strip()
-    host_groups = " ".join(
-        str(group_id) for group_id in sorted({int(item) for item in raw_host_groups.split()})
-    )
-    runtime_gid = host_groups.split()[0]
     write_executable(
-        repository / ".devcontainer" / "bootstrap-shared-runtime.sh",
+        repository / "tools/experiments/execution_resource_plan.py",
         "\n".join(
             (
-                "#!/usr/bin/env bash",
-                "set -euo pipefail",
-                f"printf 'AGENT_CANON_RUNTIME_GID=%s\\n' {runtime_gid!r}",
-                f"printf 'AGENT_CANON_HOST_SUPPLEMENTARY_GIDS=%s\\n' {host_groups!r}",
-                "printf 'AGENT_CANON_SHARED_RUNTIME_SOURCE=%s\\n' '/var/lib/agent-canon/runtime'",
-                "printf 'AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT=%s\\n' '/var/lib/agent-canon/runtime/shared-runtime-provision.json'",
+                "import json",
+                "from pathlib import Path",
+                "def write_runtime_receipt_atomic(path, payload):",
+                "    target = Path(path)",
+                "    target.write_text(json.dumps(payload), encoding='utf-8')",
+                "    target.chmod(0o660)",
                 "",
             )
         ),
@@ -60,6 +53,16 @@ def write_gpu_admission_fixture(tmp_path: Path) -> tuple[Path, dict[str, str], P
 
     command_dir = tmp_path / "commands"
     log_path = tmp_path / "commands.log"
+    write_executable(
+        command_dir / "stat",
+        """#!/usr/bin/env bash
+if [ "${1:-}" = "-f" ]; then
+  printf 'ext4\\n'
+  exit 0
+fi
+exec /usr/bin/stat "$@"
+""",
+    )
     write_executable(
         command_dir / "nvidia-smi",
         "#!/usr/bin/env bash\n[ \"${1:-}\" = '-L' ]\n",
@@ -134,6 +137,8 @@ def test_profile_exec_uses_selector_and_source_root_finalize(tmp_path: Path) -> 
         ),
     ]
     assert "GPU_ADMISSION_PROFILE=pass" in result.stdout
+    assert f"source={repository / '.agent-canon/runtime'}" in result.stdout
+    assert "target=/var/lib/agent-canon/runtime" in result.stdout
 
 
 @pytest.mark.parametrize(

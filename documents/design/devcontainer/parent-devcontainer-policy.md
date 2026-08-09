@@ -85,7 +85,6 @@ host runtime state を mount しない。host zshrc は `host-zshrc` optional pr
 - `ssh-agent`: valid socket only -> `/ssh-agent`
 - `host-secrets`: existing `AGENT_CANON_SECRET_DIR` -> fixed `/mnt/agent-canon-secrets`
 - `docker-host`: existing Docker socket -> `/var/run/docker.sock`
-- `shared-runtime`: GPU-admission profile only -> canonical shared runtime namespace
 - `linked-data-roots`: pack-defined repository symlinks -> their declared `/mnt/<letter>/<subpath>`
   targets as structured read-write binds
 
@@ -179,11 +178,11 @@ absent を正本とする。
 
 | clause | operation | resulting state | completion evidence |
 | --- | --- | --- | --- |
-| DEV-DEFAULT-001 | `initializeCommand` から host shared-runtime bootstrap を外し、Compose generator を実行する | 既定起動が `sudo`、`agent-canon-runtime` group、host `/var/lib` に依存しない | `devcontainer.json` の command readback と `devcontainer up` が sudo prompt なしで完了する |
+| DEV-DEFAULT-001 | `initializeCommand` から host runtime provisioning を外し、Compose generator を実行する | 既定起動が `sudo`、system group、host runtime path に依存しない | `devcontainer.json` の command readback と `devcontainer up` が sudo prompt なしで完了する |
 | DEV-DEFAULT-002 | 既定 Compose の shared-runtime `group_add`、bind、provision/readback receipt environment、custom HOME tmpfs、AgentCanon-specific group を生成せず、host UID/GID を canonical build args として親 image に渡す | generator は host の `id -u`/`id -g` を `PROJECT_UID`/`PROJECT_GID` として渡し、user 名 `project` を固定する。公開 caller に override 経路はない。digest-pinned plain `ubuntu:22.04` の親 image は同じ numeric ID の canonical `project` user/group を作り、image の `USER project`、`containerUser: project`、`remoteUser: project` で起動する。container は container-local `/var/lib/agent-canon/runtime` だけを使用し、host の同名 path とは bind/shared しない。host group mutation と host sudo/password prompt は行わない | 生成 Compose/config/image inspection で `PROJECT_UID`/`PROJECT_GID`、`project` passwd/group、`USER project`、`containerUser`/`remoteUser` が canonical values を持ち、`group_add`、host runtime bind、shared receipt env、custom HOME tmpfs、AgentCanon group が absent。bind workspace の成果物 owner が host mapped UID/GID と一致し、container 内 runtime path が作成される |
 | DEV-DEFAULT-003 | 既定 generator は host GPU、`nvidia-smi`、Docker NVIDIA runtime の probing を一切行わず、生成 environment に `DEVCONTAINER_GPU_MODE=disabled` を設定し、`DEVCONTAINER_GPU_REQUEST` は absent とする | GPU の有無に関わらず default container creation は GPU admission から独立し、Compose に GPU request を持たない | generator の command/readback に probing が無く、生成 env が `DEVCONTAINER_GPU_MODE=disabled`、`DEVCONTAINER_GPU_REQUEST` absent、`gpus: all` absent である static inspection と no-GPU launch |
 | DEV-DEFAULT-004 | source-root resolver 経由で呼ぶ standalone-source post-create から GPU admission finalize、post-attach から shared-runtime readback dependency を default stage として外し、`project` の container-local sudo で通常の dependency/build stages を実行する | dependency manifest、Python installer、AgentCanon build/cache/projection、parent hook が `project` user の mapped UID/GID と passwordless `sudo -n` で system dependency operation を行える順序だけが既定 lifecycle に残る。host sudo/password prompt は要求しない | post-create/post-attach command readback と targeted lifecycle tests が finalize/readback absent を示し、`getent passwd/group project`、`id -u`/`id -g` が `PROJECT_UID/GID` と一致、`sudo -n true`、fixed bootstrap の `gpg`/`cc`/`gcc` capability、apt dependency bootstrap が pass |
-| DEV-DEFAULT-005 | `bootstrap-shared-runtime.sh`、`finalize-shared-runtime.sh`、scheduler、managed experiment、receipt parser/writer は source に保持し、既定 profile から非選択にする | 実験機能の wholesale deletion は行わず、`gpu-admission/devcontainer.json` と `gpu-admission.sh` の明示 selector/entrypoint だけが shared-runtime capability を選択する | default selector/config の readback が opt-in fields を持たず、profile selector が別 Compose path/project suffix を使い、Issue #521 の opt-in owner に接続する |
+| DEV-DEFAULT-005 | `finalize-shared-runtime.sh`、scheduler、managed experiment、receipt parser/writer は source に保持し、既定 profile から非選択にする | 実験機能の wholesale deletion は行わず、`gpu-admission/devcontainer.json` と `gpu-admission.sh` の明示 selector/entrypoint だけが runtime capability を選択する | default selector/config の readback が opt-in fields を持たず、profile selector が別 Compose path/project suffix を使い、Issue #521 の opt-in owner に接続する |
 | DEV-DEFAULT-006 | profile boundary、dependency packet、rollback と検証コマンドを owner docs に固定する | 実装者が host bootstrap を復活させずに default/opt-in の責務を判定できる | 本節の DIC trace、dependency-design packet、`container_config.py`/dependency validator/launch smoke の結果を readback する |
 | DEV-DEFAULT-007 | repository path を `managed-topic` または `direct-repo` layout として判定し、layout に対応する mount/status guard を選択する | managed-topic は従来の workspace root bind と topic marker/status guard を保持し、direct-repo は topic marker/status を要求しない | generated env `AGENT_CANON_WORKSPACE_LAYOUT` が layout 名を示し、post-attach が同じ layout を readback する |
 | DEV-DEFAULT-008 | direct-repo では repository root だけを `/workspace/<basename>` に bind し、`devcontainer up --workspace-folder .` を受理する | sibling repository、親 `~/workspace` 全体、topic marker/status を direct default の前提にしない | generated Compose の bind source が exact repo root 一つで、target/env/readback が direct-repo、topic status guard が未実行で起動が完了する |
@@ -195,8 +194,9 @@ absent を正本とする。
 identity を一つの default lifecycle に結合していた点である。host group の存在や
 現在セッションの supplementary group は、親レポの Python 依存や image build の
 前提ではなく、利用者ごとに異なる privileged host state である。既定起動からこれを
-切り離すことで、権限昇格、固定 GID への依存、host `/var/lib` への永続副作用を除去し、
-GPU を持たない CI/開発 host でも同じ container contract を利用できる。
+切り離し、GPU profile でも repository-local source と primary UID/GID だけを使うことで、
+権限昇格、固定 GID への依存、host `/var/lib` への永続副作用を除去し、GPU を持たない
+CI/開発 host でも同じ container contract を利用できる。
 
 GPU admission の scheduler、shared lock、runtime receipt そのものは削除しない。
 これらを必要とする実験は、`gpu-admission.sh` が host capability と receipt contract
@@ -217,8 +217,8 @@ GPU admission の devcontainer capability は親-owned regular
 | clause | operation | resulting state | completion evidence |
 | --- | --- | --- | --- |
 | DEV-GPU-001 | 親-owned profile selector を derived repository で選択し、`gpu-admission.sh` から profile selector を `devcontainer up --config` と `devcontainer exec --config` の両方に渡す | default selector/config/output/container と GPU-admission selector/config/output/container が分離し、exec が別 profile container を選ばない | regular selector、up/exec の exact selector、別 `dockerComposeFile`、`name` suffix、生成 Compose `name` の readback |
-| DEV-GPU-002 | profile orchestrator が `devcontainer`、`nvidia-smi -L`、active repository、selector を確認してから `bootstrap-shared-runtime.sh` を `MANAGED_CONTAINER` / `shared-runtime` / `gpu-admission` で呼ぶ | GPU 不在、CLI 不在、selector 不在、host UID 0、root/sudo 不在、runtime group/session、filesystem、umask、receipt precondition は fallback なしで non-zero fail になる | preflight stderr/exit、bootstrap provision receipt、`AGENT_CANON_RUNTIME_GID`、完全な `AGENT_CANON_HOST_SUPPLEMENTARY_GIDS` readback |
-| DEV-GPU-003 | profile generator が bootstrap の runtime source、receipt、全 host supplementary GID を Compose に投影し、runtime bind、`group_add`、`gpus: all`、GPU/profile environment を生成する | container identity は host UID/GID と host group 集合を保持し、shared runtime bind と GPU request が profile にだけ存在する | profile Compose scenario validation、bind target、group_add ordered set、`DEVCONTAINER_GPU_MODE=enabled`、`DEVCONTAINER_GPU_REQUEST=all`、canonical receipt paths |
+| DEV-GPU-002 | `gpu-admission.sh` が `devcontainer`、`nvidia-smi -L`、active repository、selector を確認し、`${repository_root}/.agent-canon/runtime` を primary UID/GID 所有で作成して provision receipt を発行する | GPU 不在、CLI 不在、selector 不在、host UID 0、repository-local source、filesystem、umask、receipt precondition は fallback なしで non-zero fail になる | preflight stderr/exit、provision receipt、primary UID/GID、repository-local source、umask readback |
+| DEV-GPU-003 | profile generator が repository-local runtime source、container target、receipt を Compose に投影し、primary UID/GID、`gpus: all`、GPU/profile environment を生成する | container primary identity は host UID/GID と一致し、runtime bind と GPU request が profile にだけ存在し、`group_add` と supplementary-GID env は存在しない | profile Compose scenario validation、source/target、`user: UID:GID`、`DEVCONTAINER_GPU_MODE=enabled`、`DEVCONTAINER_GPU_REQUEST=all`、canonical receipt paths |
 | DEV-GPU-004 | `devcontainer up` 完了後に同じ orchestrator が同じ `--config` の `devcontainer exec` と source-root resolver で `finalize-shared-runtime.sh` を一度呼び、up/finalize failure では生成 Compose の検証済み profile project name を指定して `docker compose down --remove-orphans` を実行する | finalize は derived/standalone の AgentCanon source ownerへ解決され、identity 不一致は fail-closed。失敗時は default へ降格せず exact profile project だけを cleanup し、cleanup 成否と独立に元の rc を保持する | exact exec/finalize command、finalize receipt、exact cleanup command、original rc、default/opt-in lifecycle scenario tests |
 | DEV-GPU-005 | receipt の parse/read/write を `tools/experiments/execution_resource_plan.py` に委譲する | profile script は receipt parser/writer や identity repair を複製せず、scheduler/managed-run R5 semantics は保持される | dependency header、symbol readback、provision/readback fingerprint owner、focused owner tests |
 
@@ -228,12 +228,12 @@ provision/readback receipt の欠損または不一致を成功として扱わ�
 up を試行した後の failure で、生成 Compose の `-gpu-admission` project identity を
 検証して exact Compose/project に `down --remove-orphans` を実行する。cleanup failure
 は typed evidence として報告し、entrypoint は常に元の up/finalize rc を返す。
-profile は
-host の全 supplementary GID を bootstrap receipt から再読し、Compose の `group_add`
-へ同じ順序で投影する。この projection は
+profile は repository-local source を Compose の `/var/lib/agent-canon/runtime` target
+へ bind し、primary `PROJECT_UID:PROJECT_GID` identity を維持する。この projection は
 `.devcontainer/gpu-admission.sh`、`.devcontainer/generate-runtime-compose.sh`、
 `tools/ci/container_config.py`、`tests/tools/test_container_config.py` で readback
-され、finalize が比較する complete group set と projection の identity を一致させる。
+され、finalize が source/bind/primary identity と receipt を一致させる。`group_add` と
+supplementary-GID environment は GPU profile にも生成しない。
 
 ## Dependency-design / environment-maintenance packet
 
@@ -256,7 +256,7 @@ host の全 supplementary GID を bootstrap receipt から再読し、Compose �
 | DEV-DEFAULT-002 | `.devcontainer/generate-runtime-compose.sh` / linked config: resolve host UID/GID, pass `PROJECT_UID`/`PROJECT_GID` with fixed user name `project`, retain canonical `containerUser`/`remoteUser`, omit shared runtime group/bind/receipt env and custom HOME tmpfs; parent image creates `project` and runs as `USER project` | generated Compose/config/image inspection plus `project` ID, `USER`, workspace owner, and container path readback; any missing/mismatched build arg, public override, host runtime source, host bind, custom HOME tmpfs, or AgentCanon group is a drift blocker |
 | DEV-DEFAULT-003 | generator GPU branch: default は host GPU/`nvidia-smi`/Docker NVIDIA runtime を probe せず、`DEVCONTAINER_GPU_MODE=disabled` を出力し、`DEVCONTAINER_GPU_REQUEST` を出力しない | command/env readback と no-GPU launch; probing、`DEVCONTAINER_GPU_REQUEST`、または `gpus: all` が default に現れれば drift blocker |
 | DEV-DEFAULT-004 | `.devcontainer/post-create.sh` and `.devcontainer/post-attach.sh`: remove default finalize/readback edges while retaining ordinary dependency/build stages under `project` with container-local sudo | lifecycle tests, `getent`/`id`/`sudo -n`/apt bootstrap readback, and post-attach output; a default receipt readback dependency, host password prompt, or mismatched workspace owner is a drift blocker |
-| DEV-DEFAULT-005 | retain scripts and experiment owners; route shared-runtime capability through the explicit `gpu-admission` selector/orchestrator | source existence, separate selector/output/project identity, and issue linkage; deletion of scheduler/managed experiment is out of scope and a review blocker |
+| DEV-DEFAULT-005 | retain scripts and experiment owners; route managed runtime capability through the explicit `gpu-admission` selector/orchestrator | source existence, separate selector/output/project identity, and issue linkage; deletion of scheduler/managed experiment is out of scope and a review blocker |
 | DEV-DEFAULT-006 | update validators/tests and run the packet-selected validation route | command receipts and parent launch readback; missing evidence blocks closeout |
 | DEV-DEFAULT-007 | layout detector and post-attach readback: select managed-topic or direct-repo without changing topic guard semantics | layout env/readback matches source path; a direct repo must not be rejected for missing topic marker, and a managed topic must not bypass its marker/status guard |
 | DEV-DEFAULT-008 | direct-repo mount projection: bind exact repository root to `/workspace/<basename>` and exclude parent workspace/siblings | Compose source/target inspection plus `devcontainer up --workspace-folder .`; any sibling or `~/workspace` bind is a drift blocker |
@@ -264,8 +264,8 @@ host の全 supplementary GID を bootstrap receipt から再読し、Compose �
 | DEV-DEFAULT-009 | `.devcontainer/generate-runtime-compose.sh`, `tools/ci/container_runtime.py`, and `tools/ci/container_config.py`: parse canonical optional profiles, reject raw runtime mounts, and resolve explicit `docker-host` socket bind | generator/runtime/config tests show pack-first union, empty plain default, raw-mount rejection, and socket missing/collision failure; a profile order, socket, or bypass mismatch is a drift blocker |
 | DEV-DEFAULT-010 | linked root parser/resolver and direct runner: validate typed list, repo-root symlink ownership, `realpath -e` directory/target equality, and collision-free RW binds | missing/file/mismatch, parent-shape, print-only, and CLI collision tests plus generated Compose readback; any host probe bypass, target mismatch, duplicate, or read-only linked bind is a drift blocker |
 | DEV-DEFAULT-011 | standalone/parent generator profile boundary: keep host zsh projection in generator and linked data in explicit pack/runtime routes | standalone plain output and selected profile tests; default host mount or implicit experiment/runtime profile is a drift blocker |
-| DEV-GPU-002 | `.devcontainer/gpu-admission.sh` and `bootstrap-shared-runtime.sh`: validate host GPU/CLI/capability and publish the provision receipt before Compose | host identity and exact shared-runtime namespace are established or the profile stops | preflight, bootstrap, provision receipt, runtime GID/full group readback |
-| DEV-GPU-003 | `.devcontainer/generate-runtime-compose.sh`: profile branch projects bind, complete `group_add`, `gpus: all`, and receipt environment | profile Compose carries the admitted shared runtime and GPU request; default generation remains disabled and receipt-free | default/opt-in scenario validator and generated Compose readback |
+| DEV-GPU-002 | `.devcontainer/gpu-admission.sh`: validate host GPU/CLI/capability, create the repository-local runtime, and publish the provision receipt before Compose | host primary identity and exact repository-local source are established or the profile stops | preflight, source ownership/mode, provision receipt, primary UID/GID readback |
+| DEV-GPU-003 | `.devcontainer/generate-runtime-compose.sh`: profile branch projects repository-local bind source, canonical container target, primary user identity, `gpus: all`, and receipt environment | profile Compose carries the admitted runtime and GPU request; default generation remains disabled and receipt-free; no `group_add` or supplementary-GID env is present | default/opt-in scenario validator and generated Compose readback |
 | DEV-GPU-004 | `.devcontainer/gpu-admission.sh`, source-root resolver, then `.devcontainer/finalize-shared-runtime.sh`: run profile-bound up/exec/finalize and exact profile cleanup on failure | finalize resolves through AgentCanon source, verifies the complete identity/bind/mount contract, and publishes readback; failure cleans only the verified profile project and preserves the original rc | finalize receipt/exit, exact cleanup command/result, original rc; default lifecycle remains without finalize |
 | DEV-GPU-005 | `tools/experiments/execution_resource_plan.py`: preserve receipt parser/writer owner | no second parser/writer or receipt repair path is introduced | dependency headers, symbol readback, focused tests |
 
@@ -322,7 +322,7 @@ resolver 経由で呼ぶ standalone-source post-create の内部順序は
 container-local fixed bootstrap check、（存在する場合の）親 manifest、vendor manifest、全体 validation、
 topological derived execution、親の
 docker/install_python_dependencies.sh、AgentCanon build/cache/projection の順です。
-host shared-runtime bootstrap と GPU admission finalize は既定順序の外側にあり、
+host runtime provisioning と GPU admission finalize は既定順序の外側にあり、
 既定の public lifecycle からは選択しません。GPU-admission profile では
 `gpu-admission.sh` が `devcontainer up` 完了後に finalize を実行します。この resolver-invoked
 standalone-source command の完了後に、devcontainer.json

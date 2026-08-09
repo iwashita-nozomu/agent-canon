@@ -27,9 +27,9 @@ hooks/resource projection の public schema はこの packet の変更対象で�
 この packet は GPU admission 実験を実行する場合の source authority であり、
 既定 devcontainer の起動要件ではない。default profile は host `sudo`、system
 group、shared lock、`/var/lib/agent-canon/runtime` の bind、provision/readback
-receipt、GPU auto-request を選択しない。`bootstrap-shared-runtime.sh` と
-`finalize-shared-runtime.sh`、scheduler、managed experiment、receipt owner は
-AgentCanon source に保持し、GPU capability は
+receipt、GPU auto-request を選択しない。`finalize-shared-runtime.sh`、scheduler、
+managed experiment、receipt owner は AgentCanon source に保持し、GPU capability と
+host runtime provisioning は
 `.devcontainer/gpu-admission/devcontainer.json` と `.devcontainer/gpu-admission.sh`
 の明示 selector/entrypoint からだけ選択する。
 
@@ -37,11 +37,11 @@ AgentCanon source に保持し、GPU capability は
 
 Issue [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) の opt-in owner は
 `.devcontainer/gpu-admission.sh` です。entrypoint は `devcontainer` CLI と
-`nvidia-smi -L` を先に確認し、`bootstrap-shared-runtime.sh` が発行した provision
-receipt、runtime GID、完全な host supplementary GID 集合を保持して、profile selector の
-generator に渡します。profile Compose は host `/var/lib/agent-canon/runtime` を
-container の同じ target に bind し、bootstrap receipt の GID 集合全体を `group_add` に
-投影し、`gpus: all`、`DEVCONTAINER_GPU_MODE=enabled`、
+`nvidia-smi -L` を先に確認し、`${repository_root}/.agent-canon/runtime` を primary
+UID/GID 所有で作成して provision receipt を発行し、profile selector の generator に
+渡します。profile Compose は host source を container の
+`/var/lib/agent-canon/runtime` target に bind し、primary `PROJECT_UID:PROJECT_GID` を
+維持して `gpus: all`、`DEVCONTAINER_GPU_MODE=enabled`、
 `DEVCONTAINER_GPU_REQUEST=all`、`AGENT_CANON_RUNTIME_ROUTE=MANAGED_CONTAINER` を出力
 します。default selector はこれらの fields、host path、GPU probe、receipt に依存しません。
 
@@ -49,15 +49,16 @@ profile output は `.agent-canon/gpu-admission-compose.generated.yml`、Compose 
 identity は `-gpu-admission` suffix とし、default container/project を profile 起動で
 再利用しません。`devcontainer up` が成功した後だけ entrypoint が
 同じ profile `--config` の `devcontainer exec` と source-root resolver で
-`finalize-shared-runtime.sh` を実行します。bootstrap、Compose generation、up、finalize
-のいずれかが失敗した場合は default へ降格せず non-zero で停止します。up/finalize
+`finalize-shared-runtime.sh` を実行します。provision、Compose generation、up、finalize
+のいずれかが失敗した場合は default へ降格せず non-zero で停止します。provision/Compose generation/up/finalize
 failure は検証済み profile Compose/project だけを cleanup し、cleanup 結果と独立に元の
 rc を保持します。finalize の provision/readback parse と atomic publication は
 `tools/experiments/execution_resource_plan.py` が唯一の owner です。
 
 default 境界の authority は linked design/implementation であり、default 経路からの
 非選択は実験機能の wholesale deletion や R5 の runner/lifecycle semantics の変更を
-意味しません。
+意味しません。GPU profile は `group_add`、system group、sudo、session refresh、
+supplementary-GID environment を使用しません。
 
 ## GPU/MIG の証拠と状態
 

@@ -6,7 +6,7 @@
 # upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface ownership
 # upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission profile boundary
 # upstream design ../documents/experiments/gpu-admission-r5-source-packet.md exact readback receipt path and owner boundary
-# upstream implementation bootstrap-shared-runtime.sh publishes the host provision receipt
+# upstream implementation gpu-admission.sh publishes the host provision receipt
 # upstream implementation ../tools/experiments/execution_resource_plan.py owns exact receipt parsing and atomic publication
 # downstream implementation post-attach.sh reports the readback receipt observationally
 # downstream implementation gpu-admission.sh owns the explicit container finalize lifecycle
@@ -15,6 +15,7 @@
 set -euo pipefail
 
 runtime_root="${AGENT_CANON_SHARED_RUNTIME_SOURCE:-/var/lib/agent-canon/runtime}"
+host_runtime_source="${AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE:-}"
 runtime_route="${AGENT_CANON_RUNTIME_ROUTE:-MANAGED_CONTAINER}"
 gpu_profile="${AGENT_CANON_GPU_ADMISSION_PROFILE:-}"
 provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/shared-runtime-provision.json}"
@@ -32,6 +33,7 @@ fail() {
 [ "$runtime_route" = "MANAGED_CONTAINER" ] || fail "runtime route is not MANAGED_CONTAINER"
 [ "$gpu_profile" = "gpu-admission" ] || fail "shared runtime finalize requires the gpu-admission entrypoint"
 [ "$runtime_root" = "/var/lib/agent-canon/runtime" ] || fail "shared runtime target is not canonical"
+[ -n "$host_runtime_source" ] || fail "host runtime source is missing from the profile environment"
 [ "$provision_receipt" = "${runtime_root}/shared-runtime-provision.json" ] || fail "provision receipt path is not canonical"
 [ "$readback_receipt" = "${runtime_root}/shared-runtime-readback.json" ] || fail "readback receipt path is not canonical"
 [ -f "${agent_canon_root}/tools/experiments/execution_resource_plan.py" ] || fail "canonical runtime receipt owner is unavailable"
@@ -39,7 +41,8 @@ fail() {
 container_uid="$(id -u)"
 container_gid="$(id -g)"
 [ "$container_uid" -ne 0 ] || fail "UID 0 is not a valid managed runtime identity"
-container_supplementary_gids="$(id -G | tr ' ' '\n' | sort -n | uniq | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+container_groups="$(id -G | tr ' ' '\n' | sort -n | uniq | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
+[ "$container_groups" = "$container_gid" ] || fail "container session has unexpected supplementary groups"
 
 for directory in "$runtime_root" "$locks_root" "$receipts_root"; do
   [ ! -L "$directory" ] || fail "runtime directory must not be a symlink: $directory"
@@ -47,14 +50,7 @@ for directory in "$runtime_root" "$locks_root" "$receipts_root"; do
   [ "$(stat -c '%a' "$directory")" = "2770" ] || fail "runtime directory mode is not 02770: $directory"
 done
 
-runtime_gid="$(stat -c '%g' "$runtime_root")"
-[ "$runtime_gid" -ne 0 ] || fail "runtime group GID must not be zero"
-case " $container_supplementary_gids " in
-  *" $runtime_gid "*) ;;
-  *) fail "container session is missing runtime group $runtime_gid" ;;
-esac
-
-python3 - "$agent_canon_root" "$provision_receipt" "$readback_receipt" "$runtime_root" "$probe_path" "$runtime_route" "$runtime_gid" "$container_uid" "$container_gid" "$container_supplementary_gids" <<'PY'
+python3 - "$agent_canon_root" "$provision_receipt" "$readback_receipt" "$runtime_root" "$probe_path" "$runtime_route" "$host_runtime_source" "$container_uid" "$container_gid" "$container_groups" <<'PY'
 from __future__ import annotations
 
 import fcntl
@@ -71,7 +67,7 @@ import sys
     runtime_root,
     probe_path,
     runtime_route,
-    raw_runtime_gid,
+    host_runtime_source,
     raw_container_uid,
     raw_container_gid,
     raw_container_groups,
@@ -83,7 +79,6 @@ from tools.experiments.execution_resource_plan import (  # noqa: E402
     write_runtime_receipt_atomic,
 )
 
-runtime_gid = int(raw_runtime_gid)
 container_uid = int(raw_container_uid)
 container_gid = int(raw_container_gid)
 container_groups = tuple(int(value) for value in raw_container_groups.split())
@@ -104,14 +99,20 @@ if provision.runtime_route != runtime_route:
     raise OSError("provision receipt route differs")
 if provision.host_uid != container_uid or provision.host_gid != container_gid:
     raise OSError("Compose user identity differs from host provision identity")
-if provision.host_supplementary_gids != container_groups:
-    raise OSError("Compose supplementary groups differ from host provision identity")
+if provision.host_supplementary_gids != (provision.host_gid,):
+    raise OSError("provision receipt contains non-primary group identity")
+if container_groups != (container_gid,):
+    raise OSError("Compose session contains supplementary groups")
 if provision.host_umask != 0o0007:
     raise OSError("host provision umask is not 0007")
 
+if provision.bind_source_path != host_runtime_source:
+    raise OSError("provision source differs from the repository-local runtime source")
+source_parts = tuple(part for part in host_runtime_source.split("/") if part)
+if len(source_parts) < 2 or source_parts[-2:] != (".agent-canon", "runtime"):
+    raise OSError("provision source is not repository-local .agent-canon/runtime")
+
 root_stat = os.stat(runtime_root, follow_symlinks=False)
-if provision.bind_source_path != runtime_root:
-    raise OSError("provision bind source path differs")
 if provision.bind_source_dev != root_stat.st_dev or provision.bind_source_ino != root_stat.st_ino:
     raise OSError("provision bind source identity differs")
 
@@ -145,7 +146,7 @@ try:
             raise OSError(f"probe {label} has no valid inode")
         if stat.S_IMODE(candidate.st_mode) != 0o660:
             raise OSError(f"probe {label} mode is not 0660")
-        if candidate.st_gid != runtime_gid:
+        if candidate.st_gid != container_gid:
             raise OSError(f"probe {label} group differs")
         if candidate.st_uid != container_uid:
             raise OSError(f"probe {label} owner differs")
@@ -193,12 +194,12 @@ if not stat.S_ISREG(published.st_mode):
     raise OSError("published readback receipt is not a regular file")
 if published.st_dev != root_stat.st_dev or published.st_ino <= 0:
     raise OSError("published readback receipt identity is invalid")
-if stat.S_IMODE(published.st_mode) != 0o660 or published.st_gid != runtime_gid:
-    raise OSError("published readback receipt mode or group differs")
+if stat.S_IMODE(published.st_mode) != 0o660 or published.st_gid != container_gid:
+    raise OSError("published readback receipt mode or primary group differs")
 if published.st_uid != container_uid:
     raise OSError("published readback receipt owner differs")
 PY
 
-printf 'SHARED_RUNTIME_FINALIZE=pass route=%s target=%s readback=%s group=%s\n' \
-  "$runtime_route" "$runtime_root" "$readback_receipt" "$runtime_gid"
+printf 'SHARED_RUNTIME_FINALIZE=pass route=%s target=%s readback=%s uid=%s gid=%s\n' \
+  "$runtime_route" "$runtime_root" "$readback_receipt" "$container_uid" "$container_gid"
 printf 'AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT=%s\n' "$readback_receipt"
