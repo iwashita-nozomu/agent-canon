@@ -112,7 +112,8 @@ Playwright を convenience-only の理由で Dockerfile に追加しません。
 shared post-create
   parent manifest -> vendor manifest merge
   full plan validation
-  topological derived execution and per-record receipts
+  topological derived execution and per-record receipts in container-local
+  `${XDG_STATE_HOME:-$HOME/.local/state}/agent-canon/dependency-receipts`
   parent pyproject.toml extras -> editable install -> pip check (when selected)
   AgentCanon build, cache, and runtime projection
 parent .devcontainer/post-create-parent.sh  # final, when present

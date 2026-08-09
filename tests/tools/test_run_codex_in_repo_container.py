@@ -12,7 +12,9 @@
 
 from __future__ import annotations
 
+import json
 import os
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -36,6 +38,69 @@ def run_cli(
         text=True,
         env={**os.environ, **(env or {})},
     )
+
+
+def write_nested_profile_fixture(
+    tmp_path: Path,
+    *,
+    profile_name: str = "default",
+    pack_env: tuple[str, ...] = (),
+    forward_env: tuple[str, ...] = (),
+) -> tuple[Path, Path]:
+    """Write a minimal nested runner pack/profile pair for contract tests."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    pack = tmp_path / "pack.toml"
+    pack.write_text(
+        "\n".join(
+            [
+                "[pack]",
+                'name = "nested-contract"',
+                'dockerfile = "docker/Dockerfile"',
+                'context = "."',
+                'image_tag = "nested-contract:test"',
+                'platform = "linux/amd64"',
+                "",
+                "[smoke]",
+                'shell = "/bin/bash"',
+                "commands = []",
+                "",
+                "[runtime]",
+                'shell = "/bin/bash"',
+                'workdir = "/workspace"',
+                'workspace_mount = "/workspace"',
+                "dependency_extras = []",
+                f"env = {json.dumps(list(pack_env))}",
+                "mounts = []",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    profiles = tmp_path / "profiles.toml"
+    profiles.write_text(
+        "\n".join(
+            [
+                "[defaults]",
+                'container_home_root = "/workspace/.state/nested-codex"',
+                "use_host_user = false",
+                "tty = false",
+                "mount_host_gitconfig = false",
+                "mount_host_git_credentials = false",
+                "mount_host_ssh_dir = false",
+                "forward_ssh_auth_sock = false",
+                f"forward_env = {json.dumps(list(forward_env))}",
+                "",
+                "[[profile]]",
+                f"name = {json.dumps(profile_name)}",
+                f"pack = {json.dumps(str(pack))}",
+                'description = "nested contract fixture"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    return workspace, profiles
 
 
 def test_print_only_runs_shared_post_create_before_codex() -> None:
@@ -68,6 +133,172 @@ def test_default_does_not_mount_host_docker_socket() -> None:
         in result.stdout
     )
     assert "setpriv --reuid" in result.stdout
+
+
+def test_nested_runner_xdg_state_allows_container_local_receipts(
+    tmp_path: Path,
+) -> None:
+    """Nested generated env lets post-create write receipts outside workspace HOME."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    pack = tmp_path / "pack.toml"
+    pack.write_text(
+        "\n".join(
+            [
+                "[pack]",
+                'name = "nested-receipt"',
+                'dockerfile = "docker/Dockerfile"',
+                'context = "."',
+                'image_tag = "nested-receipt:test"',
+                'platform = "linux/amd64"',
+                "",
+                "[smoke]",
+                'shell = "/bin/bash"',
+                "commands = []",
+                "",
+                "[runtime]",
+                'shell = "/bin/bash"',
+                'workdir = "/workspace"',
+                'workspace_mount = "/workspace"',
+                "dependency_extras = []",
+                "env = []",
+                "mounts = []",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    profile_name = "receipt-regression"
+    profiles = tmp_path / "profiles.toml"
+    profiles.write_text(
+        "\n".join(
+            [
+                "[defaults]",
+                'container_home_root = "/workspace/.state/nested-codex"',
+                "use_host_user = false",
+                "tty = false",
+                "mount_host_gitconfig = false",
+                "mount_host_git_credentials = false",
+                "mount_host_ssh_dir = false",
+                "forward_ssh_auth_sock = false",
+                "forward_env = []",
+                "",
+                "[[profile]]",
+                f'name = "{profile_name}"',
+                f'pack = "{pack}"',
+                'description = "receipt state regression"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    result = run_cli(
+        "--print-only",
+        "--profiles",
+        str(profiles),
+        "--profile",
+        profile_name,
+        "--workspace-root",
+        str(workspace),
+    )
+    assert result.returncode == 0, result.stderr
+    xdg_state = Path(f"/tmp/agent-canon-xdg-state/{profile_name}")
+    assert f"-e XDG_STATE_HOME={xdg_state}" in result.stdout
+    assert f"-e HOME=/workspace/.state/nested-codex/{profile_name}" in result.stdout
+
+    post_create = workspace / "vendor/agent-canon/.devcontainer/post-create.sh"
+    post_create.parent.mkdir(parents=True)
+    post_create.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -euo pipefail\n"
+        'workspace="$1"\n'
+        'state_home="${XDG_STATE_HOME:-$HOME/.local/state}"\n'
+        'workspace_real="$(realpath -m -- "$workspace")"\n'
+        'state_home="$(realpath -m -- "$state_home")"\n'
+        'case "$state_home/" in "$workspace_real/"*) exit 41;; esac\n'
+        'receipts="$state_home/agent-canon/dependency-receipts"\n'
+        'mkdir -p "$receipts"\n'
+        'printf receipt >"$receipts/regression.json"\n'
+        'workspace_state="$workspace/.agent-canon"\n'
+        'test ! -e "$workspace_state/dependency-receipts"\n',
+        encoding="utf-8",
+    )
+    post_create.chmod(0o755)
+    script = build_nested_codex_script(
+        ["sh", "-c", "test -f \"$XDG_STATE_HOME/agent-canon/dependency-receipts/regression.json\""],
+        mount_host_ssh_dir=False,
+        workspace=str(workspace),
+        run_uid=None,
+        run_gid=None,
+    )
+    shutil.rmtree(xdg_state, ignore_errors=True)
+    try:
+        executed = subprocess.run(
+            ["bash", "-c", script],
+            cwd=workspace,
+            check=False,
+            capture_output=True,
+            text=True,
+            env={
+                **os.environ,
+                "HOME": str(workspace / ".state/nested-codex" / profile_name),
+                "XDG_STATE_HOME": str(xdg_state),
+            },
+        )
+        assert executed.returncode == 0, executed.stdout + executed.stderr
+        assert (xdg_state / "agent-canon/dependency-receipts/regression.json").is_file()
+        assert not (workspace / ".agent-canon/dependency-receipts").exists()
+    finally:
+        shutil.rmtree(xdg_state, ignore_errors=True)
+
+
+def test_nested_runner_rejects_owned_environment_overrides(tmp_path: Path) -> None:
+    """Pack, profile, and CLI forwarding cannot shadow owned nested env values."""
+    cases = (
+        (("HOME=/tmp/override",), (), (), "pack runtime.env", "HOME"),
+        ((), ("XDG_STATE_HOME",), (), "profile forward_env", "XDG_STATE_HOME"),
+        ((), (), ("--forward-env", "AGENT_CANON_CONTAINER_USER"), "CLI --forward-env", "AGENT_CANON_CONTAINER_USER"),
+    )
+    for index, (pack_env, profile_env, cli_args, source, name) in enumerate(cases):
+        workspace, profiles = write_nested_profile_fixture(
+            tmp_path / f"case-{index}",
+            pack_env=pack_env,
+            forward_env=profile_env,
+        )
+        result = run_cli(
+            "--print-only",
+            "--profiles",
+            str(profiles),
+            "--workspace-root",
+            str(workspace),
+            *cli_args,
+        )
+        assert result.returncode == 2
+        assert (
+            f"{source} cannot override nested runtime-owned environment: {name}"
+            in result.stderr
+        )
+
+
+def test_nested_runner_rejects_unsafe_profile_state_path(tmp_path: Path) -> None:
+    """Profile names used in the XDG state path are one safe path segment."""
+    for index, profile_name in enumerate(("../escape", "nested/profile", ".", "..")):
+        workspace, profiles = write_nested_profile_fixture(
+            tmp_path / f"unsafe-{index}",
+            profile_name=profile_name,
+        )
+        result = run_cli(
+            "--print-only",
+            "--profiles",
+            str(profiles),
+            "--profile",
+            profile_name,
+            "--workspace-root",
+            str(workspace),
+        )
+        assert result.returncode == 2
+        assert "nested profile name must be one safe path segment" in result.stderr
 
 
 def test_host_uid_setup_chowns_workspace_artifacts_before_setpriv() -> None:
@@ -120,8 +351,7 @@ def test_host_uid_setup_executes_workspace_ownership_handoff(tmp_path: Path) -> 
         'workspace="$1"\n'
         'mkdir -p "$workspace/reports/agents/devcontainer/runtime"\n'
         'printf arbitrary >"$workspace/reports/agents/devcontainer/runtime/output.txt"\n'
-        'mkdir -p "$workspace/.agent-canon/dependency-receipts"\n'
-        'printf receipt >"$workspace/.agent-canon/dependency-receipts/receipt.txt"\n'
+        'mkdir -p "$workspace/.agent-canon"\n'
         'mkdir -p "$workspace/editable-install-output/package"\n'
         'printf editable >"$workspace/editable-install-output/package/module.py"\n'
         'ln -s "${OUTSIDE_TARGET:?}" "$workspace/new-outside-link"\n'
@@ -132,8 +362,6 @@ def test_host_uid_setup_executes_workspace_ownership_handoff(tmp_path: Path) -> 
         '"$workspace/reports/agents" '
         '"$workspace/reports/agents/devcontainer" '
         '"$workspace/.agent-canon" '
-        '"$workspace/.agent-canon/dependency-receipts" '
-        '"$workspace/.agent-canon/dependency-receipts/receipt.txt" '
         '"$workspace/editable-install-output" '
         '"$workspace/editable-install-output/package" '
         '"$workspace/editable-install-output/package/module.py" '
@@ -241,7 +469,6 @@ def test_host_uid_setup_executes_workspace_ownership_handoff(tmp_path: Path) -> 
     assert str(workspace / "reports/agents/devcontainer") in chown_targets
     assert str(workspace / "reports/agents/devcontainer/runtime") in chown_targets
     assert str(workspace / ".agent-canon") in chown_targets
-    assert str(workspace / ".agent-canon/dependency-receipts") in chown_targets
     assert str(workspace / "editable-install-output/package/module.py") in chown_targets
     assert str(workspace / "new-outside-link") in chown_targets
     assert str(workspace / "pre-existing-root-owned.txt") not in chown_targets
@@ -377,6 +604,9 @@ def test_runtime_identity(tmp_path: Path) -> None:
     assert "umask 0007" in post_create
     assert '"$devcontainer_dir/finalize-shared-runtime.sh"' not in post_create
     assert "project-install --workspace" in post_create
+    assert 'state_home="${XDG_STATE_HOME:-$home/.local/state}"' in post_create
+    assert 'dependency_receipts="$state_home/agent-canon/dependency-receipts"' in post_create
+    assert ".agent-canon/dependency-receipts" not in post_create
     assert 'echo "codex-state: ${codex_state_status}"' in post_attach
     assert 'workspace_layout="${AGENT_CANON_WORKSPACE_LAYOUT:-managed-topic}"' in post_attach
     assert 'workspace_source="${DEPENDENCY_MODULE_CONTAINER_SOURCE:-}"' in post_attach

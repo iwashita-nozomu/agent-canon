@@ -27,6 +27,31 @@ workspace="$1"
 workspace="$(cd "$workspace" && pwd)"
 devcontainer_dir="$(cd "$(dirname "$0")" && pwd)"
 agent_canon_root="$(cd -P "$devcontainer_dir/.." && pwd)"
+home="${HOME:-}"
+case "$home" in
+  /*) ;;
+  *)
+    echo "post-create HOME must be an absolute container path: ${home:-<unset>}" >&2
+    exit 1
+    ;;
+esac
+state_home="${XDG_STATE_HOME:-$home/.local/state}"
+case "$state_home" in
+  /*) ;;
+  *)
+    echo "post-create XDG_STATE_HOME must be an absolute container path: $state_home" >&2
+    exit 1
+    ;;
+esac
+workspace_real="$(realpath -m -- "$workspace")"
+state_home="$(realpath -m -- "$state_home")"
+case "$state_home/" in
+  "$workspace_real/"*)
+    echo "post-create XDG state must remain container-local: $state_home" >&2
+    exit 1
+    ;;
+esac
+dependency_receipts="$state_home/agent-canon/dependency-receipts"
 if [ -n "${AGENT_CANON_CONTAINER_USER:-}" ]; then
   [ "$(id -u)" -ne 0 ] || {
     echo "post-create must execute as the dedicated non-root user" >&2
@@ -145,7 +170,7 @@ python3 "$agent_canon_root/tools/agent_tools/devcontainer_dependencies.py" \
   validate --workspace "$workspace" --vendor-root "$agent_canon_root" --format text
 python3 "$agent_canon_root/tools/agent_tools/devcontainer_dependencies.py" \
   install --workspace "$workspace" --vendor-root "$agent_canon_root" --receipts \
-  "$workspace/.agent-canon/dependency-receipts" --format text
+  "$dependency_receipts" --format text
 
 python_extras="${AGENT_CANON_PYTHON_EXTRAS:-}"
 if [ -f "$workspace/pyproject.toml" ] && [ -n "$python_extras" ]; then

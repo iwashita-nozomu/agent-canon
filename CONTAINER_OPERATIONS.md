@@ -296,8 +296,13 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
   recorded and later certified by `EnvironmentCertificate`, not by a second
   environment policy surface.
 - Nested Codex uses container-local state under the selected workspace runtime
-  home. The runner may forward `OPENAI_API_KEY` and `OPENAI_BASE_URL` explicitly;
-  it never mounts or seeds host Codex state.
+  home for Codex session semantics, but the runner sets the profile-scoped
+  `XDG_STATE_HOME=/tmp/agent-canon-xdg-state/<profile>` outside the workspace
+  so shared post-create dependency receipts remain container-local. The runner
+  rejects pack/profile/CLI forwarding of the owned `HOME`, `XDG_STATE_HOME`, and
+  `AGENT_CANON_CONTAINER_USER` keys, then emits those authoritative values last.
+  It may forward `OPENAI_API_KEY` and `OPENAI_BASE_URL` explicitly; it never
+  mounts or seeds host Codex state.
 - 既定 devcontainer は GPU admission の host runtime identity を要求しない。
   固定 OS/Python capability は image、Node/npm は digest-pinned Feature が所有し、
   `finalize-shared-runtime.sh`、shared lock、provision/readback receipt は GPU
@@ -385,6 +390,13 @@ state.
 
 - Select `runtime.dependency_extras` in the pack when project packages are needed;
   `post-create.sh` installs them from the parent `pyproject.toml` when present.
+- Shared post-create passes dependency receipts to the container-local
+  `${XDG_STATE_HOME:-$HOME/.local/state}/agent-canon/dependency-receipts` path;
+  it validates that the state root is absolute and outside the workspace before
+  the installer creates it. Receipts never use the workspace's `.agent-canon`
+  bind state, so rootless mapped users can write them without changing host
+  ownership. The generic dependency CLI fallback remains available for direct
+  callers that do not select the shared post-create path.
 - Host runtime does not create a repository-local virtual environment.
 - Container runtime may create `.venv` only through the canonical policy tool:
 
