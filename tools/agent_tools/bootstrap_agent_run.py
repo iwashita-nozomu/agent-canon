@@ -450,6 +450,8 @@ def emit_bootstrap_output(
     print(f"WORKSPACE_ROOT={workspace_root}")
     for line in capacity_start_output_lines(catalog, workspace_root, context.run_id):
         print(line)
+    print(f"REQUEST_CONTRACT={context.report_dir / 'user_request_contract.md'}")
+    print("REQUEST_CONTRACT_REQUIRED=yes")
     print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
     print(f"RUNTIME_MAX_DEPTH={codex_runtime_max_depth()}")
     print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
@@ -464,6 +466,8 @@ def emit_bootstrap_output(
     if args.task_id is not None:
         print(f"TASK_ID={args.task_id}")
         print("TASK_ID_ROUTE_STATUS=explicit")
+        print(f"WORKFLOW_FAMILY={context.workflow_family_id}")
+        print(f"WORKFLOW_FAMILY_NAME={context.workflow_family_name}")
         print(
             "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet"
         )

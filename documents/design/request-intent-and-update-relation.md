@@ -12,7 +12,7 @@ downstream design ../../agents/canonical/CODEX_SUBAGENTS.md consumes reuse, para
 downstream design ../../agents/skills/worktree-health.md consumes worktree and scratch cleanup clauses.
 downstream design ../../agents/skills/dependency-module-change.md consumes dependency-clone cleanup clause.
 downstream design ../../agents/internal-routines/design-implementation-correspondence.md owns correspondence and related-document closure.
-downstream implementation ../../tools/agent_tools/task_start.py materializes task packets.
+downstream implementation ../../tools/agent_tools/bootstrap_agent_run.py materializes task packets.
 downstream implementation ../../tools/agent_tools/task_close.py materializes closeout receipts.
 downstream implementation ../../tools/agent_tools/dependency_module_change.py executes dependency-clone cleanup.
 downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py archives and checks retained run-bundle reports.
@@ -34,7 +34,7 @@ downstream design ../../AGENTS.md AgentCanon root-view projection.
 | responsibility | canonical owner | この note の境界 |
 | --- | --- | --- |
 | request clause、authority、owner、write set、route | `agents/skills/agent-orchestration.md` | semantic decision を所有し、task packet へ渡す |
-| intake、task packet、workflow、validation | `agents/skills/codex-task-workflow.md`、`tools/agent_tools/task_start.py` | request clauses と active work state を保持する |
+| intake、task packet、workflow、validation | `agents/skills/codex-task-workflow.md`、`tools/agent_tools/bootstrap_agent_run.py` | request clauses と active work state を保持する |
 | active context、handoff、transport | `agents/COMMUNICATION_PROTOCOL.md` | packet/capsule と write scope を運ぶ |
 | agent reuse、必要な並列 handoff、descendant close | `agents/canonical/CODEX_SUBAGENTS.md` | 同じ context の再利用と独立 scope の handoff を所有する |
 | dependency/topic clone cleanup | `agents/skills/dependency-module-change.md`、`tools/agent_tools/dependency_module_change.py` | reconstructibility-gated cleanup を実行し `CLEANUP` receipt を返す |
@@ -146,7 +146,7 @@ checks がこの flow の validation evidence です。 <!-- evidence: `agents/i
 | clause | current/planned owner and files | completion evidence / reverse rule |
 | --- | --- | --- |
 | `QWA-01` | `agents/skills/agent-orchestration.md`; `agents/skills/codex-task-workflow.md`; `agents/COMMUNICATION_PROTOCOL.md`; `ROOT_AGENTS.md`; `AGENTS.md` | read evidence、回答、unchanged write scope の packet readback。質問回答経路の変更はこの clause と既存 owner packet を先に読む |
-| `QWA-02` | `agents/skills/agent-orchestration.md`; `tools/agent_tools/task_start.py`; `agents/COMMUNICATION_PROTOCOL.md` | explicit write clause gate を通った request clause だけが owner/write set/acceptance handoff に接続される |
+| `QWA-02` | `agents/skills/agent-orchestration.md`; `tools/agent_tools/bootstrap_agent_run.py`; `agents/COMMUNICATION_PROTOCOL.md` | explicit write clause gate を通った request clause だけが owner/write set/acceptance handoff に接続される |
 | `UPD-01` | `agents/skills/agent-orchestration.md`; `agents/skills/codex-task-workflow.md`; `agents/COMMUNICATION_PROTOCOL.md` | gate-approved effect が goal/artifact/order/handoff の各 sparse delta として既存 packet に更新される |
 | `UPD-02` | `agents/COMMUNICATION_PROTOCOL.md`; `agents/canonical/CODEX_SUBAGENTS.md` | compatible context は reuse、disjoint scope は必要並列 handoff。追加入力の routing 変更はこの clause と active packet を先に読む |
 | `LIFE-01` | `agents/skills/dependency-module-change.md`; `tools/agent_tools/dependency_module_change.py` | merge/readback 直後に dependency cleanup が dispatch され、`CLEANUP` receipt が read-back される |

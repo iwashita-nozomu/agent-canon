@@ -774,7 +774,6 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "task bootstrap and CLI entrypoints",
                     "vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md",
-                    "task_start.py",
                     "bootstrap_agent_run.py",
                 ),
                 (
@@ -846,7 +845,6 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 ),
                 (
                     "run bundle, declared workflow / skills / review, and dynamic wave ledger",
-                    "task_start.py",
                     "bootstrap_agent_run.py",
                     "workflow_monitor.py",
                 ),

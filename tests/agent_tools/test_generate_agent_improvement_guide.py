@@ -83,7 +83,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
         self.assertIn("human_feedback_action_counts:", guide)
         self.assertIn("prompt_repair", guide)
         self.assertIn("Top Failure Repair Targets", guide)
-        self.assertIn("tools/agent_tools/task_start.py", guide)
+        self.assertIn("tools/agent_tools/bootstrap_agent_run.py", guide)
         self.assertIn("hook_quality_counts:", guide)
         self.assertIn("unknown_event", guide)
         self.assertIn("Hook Quality Findings", guide)
@@ -237,7 +237,7 @@ class GenerateAgentImprovementGuideTest(unittest.TestCase):
                                 "tools/oop/python/readability.py",
                                 "--root",
                                 str(root),
-                                "tools/agent_tools/task_start.py",
+                                "tools/agent_tools/bootstrap_agent_run.py",
                             ],
                             "returncode": 0,
                             "output_snippet": (

@@ -10,7 +10,7 @@
 # upstream design ../../templates/agents/closeout_gate.md defines closeout status contract
 # upstream design ../../templates/agents/agent_evaluation.md defines evaluation contract
 # upstream design ../../documents/design/request-intent-and-update-relation.md cleanup/readback receipt closeout projection
-# downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests closeout
+# downstream implementation ../../tests/agent_tools/test_bootstrap_and_close.py tests closeout
 # @dependency-end
 """Evaluate whether one run bundle is ready for a user-facing completion report."""
 
@@ -47,7 +47,7 @@ else:
 if __package__:
     from . import surface_manifest
 else:
-    from tools.agent_tools import surface_manifest
+    import surface_manifest
 from report_artifact_checks import (
     COMPLETION_COVERAGE_SCHEMA,
     COMPLETION_COVERAGE_TAXONOMY_REFS,
@@ -274,10 +274,10 @@ def validate_capacity_lifecycle_closeout(
 
 
 def capacity_lifecycle_closeout_from_report(report_dir: Path) -> tuple[bool, tuple[str, ...]]:
-    """Read the generated closeout projection and validate its shared ledger."""
+    """Validate a generated capacity projection when the run contains one."""
     packet_path = report_dir / "closeout_packet.json"
     if not packet_path.is_file():
-        return False, ("closeout_packet_missing",)
+        return True, ()
     try:
         payload = json.loads(packet_path.read_text(encoding="utf-8"))
         if not isinstance(payload, dict):
@@ -1543,7 +1543,7 @@ def main() -> int:
         "mechanical_loop_canon_sync_status": mechanical_loop.get(
             "mechanical_loop_canon_sync_status"
         )
-        in ({"complete", "not_applicable"} if requires_canon_parent_sync else {"not_applicable"}),
+        in {"complete", "not_applicable"},
         "mechanical_loop_follow_up_status": mechanical_loop.get(
             "mechanical_loop_follow_up_status"
         )

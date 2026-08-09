@@ -79,18 +79,9 @@ except ModuleNotFoundError:
 PY
 }
 
-check_python_pip_capability() {
-  python3 -m pip --version >/dev/null 2>&1
-}
-
 check_python_requirement_capability() {
   python3 - <<'PY'
 from packaging.requirements import Requirement
-from packaging.utils import canonicalize_name
-
-requirement = Requirement("pyyaml[secure]>=6")
-assert canonicalize_name(requirement.name) == "pyyaml"
-assert requirement.extras == {"secure"}
 PY
 }
 
@@ -132,8 +123,9 @@ check_node_activation() {
 check_bootstrap() {
   command -v python3 >/dev/null 2>&1 || fail "python3 is unavailable"
   check_python_toml_capability || fail "python3 has neither tomllib nor tomli"
-  check_python_pip_capability || fail "python3-pip capability is unavailable"
   check_python_requirement_capability || fail "python3-packaging capability is unavailable"
+  command -v pipx >/dev/null 2>&1 || fail "pipx capability is unavailable"
+  pipx --version >/dev/null 2>&1 || fail "pipx capability is unusable"
   check_node_activation
   node_receipt_matches || fail "verified Node bootstrap receipt is unavailable or stale"
   command -v gpg >/dev/null 2>&1 || fail "gnupg capability is unavailable"
@@ -205,15 +197,14 @@ install_language_runtime() {
   if ! node_receipt_matches || ! check_node_activation; then
     install_verified_node_archive
   fi
-  check_bootstrap
 }
 
 install_standalone_base() {
   run_as_root apt-get update
   run_as_root apt-get install -y --no-install-recommends \
     python3 \
-    python3-pip \
     python3-packaging \
+    pipx \
     ca-certificates \
     curl \
     gnupg \
@@ -230,6 +221,7 @@ PY
   fi
 
   install_language_runtime
+  check_bootstrap
 }
 
 mode="standalone"

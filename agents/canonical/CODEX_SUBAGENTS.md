@@ -281,7 +281,7 @@ and review gates are disjoint, and when each workstream has a replaceable output
 unit. An independent wave boundary changes the implementation, proof, oracle, or
 review decision; other material stays in the same packet to prevent
 over-splitting. Colliding workstreams become ordered waves.
-`task_start.py` and `bootstrap_agent_run.py` emit
+`bootstrap_agent_run.py` emit
 `RECOMMENDED_INITIAL_SUBAGENT_WAVE` and `RECOMMENDED_DYNAMIC_EXPANSION_WAVES`;
 `RECOMMENDED_INITIAL_SUBAGENT_WAVE` is derived from active roles in the catalog
 `stage_waves` `intake` stage, not from a fixed list of registered agent types.
@@ -304,7 +304,7 @@ repo-changing run は `team_manifest.yaml` に
 レビュー要約、handoff guidance、reader-facing docs は日本語で書きます。
 機械可読の key、command、path、role id、schema は正本表記を保ちます。
 
-`task_start.py` と `bootstrap_agent_run.py` は
+`bootstrap_agent_run.py` は
 `USER_FACING_LANGUAGE=ja`、`USER_FACING_LANGUAGE_SOURCE`、
 `USER_FACING_LANGUAGE_SCOPE`、`USER_FACING_MACHINE_FIELDS` を起動時 evidence
 として出します。handoff packet は `run.user_facing_language_policy` を参照し、
@@ -324,7 +324,7 @@ wave、validation profile の signal に留めます。owner boundary や impact
 依存方向、runtime contract の不足が見えた場合は `design_issue_blocker` として
 Gate 5-6 に戻します。
 
-`task_start.py` と `bootstrap_agent_run.py` は
+`bootstrap_agent_run.py` は
 `IMPLEMENTATION_COMPLETENESS_POLICY=contract_complete`、
 `IMPLEMENTATION_COMPLETENESS_SCOPE_BASIS`、
 `IMPLEMENTATION_COMPLETENESS_REQUIRED_INPUTS`、
@@ -345,7 +345,7 @@ implementation surface router、検索結果、checker finding、変更済み pa
 seed です。responsibility search、reuse survey、stale-surface scan、
 dependency expansion の handoff evidence が揃った後で、`allowed_paths`、
 `do_not_read`、`write_scope`、`validation_route`、`review_gate` へ写します。
-`task_start.py` と `bootstrap_agent_run.py` は
+`bootstrap_agent_run.py` は
 `PRE_HANDOFF_SCOPE_POLICY=discovery_before_handoff_scope` と
 `PRE_HANDOFF_SCOPE_STATUS=seed_then_expand_before_handoff` を起動時 evidence
 として出します。
@@ -368,7 +368,7 @@ activation がある場合だけ選ばれます。review と edit handoff packet
 `run.default_quality_check_policy` を含め、parent wave と delegated child wave が
 同じ quality-check route を参照します。
 
-`task_start.py` と `bootstrap_agent_run.py` は
+`bootstrap_agent_run.py` は
 `DEFAULT_QUALITY_CHECKS=candidate_only`、candidate role / agent-type lines、
 selected-stage provenance lines を出します。これらの stdout line は候補の
 ルーティング情報であり、owner-critical decision または distinct unresolved
@@ -707,7 +707,7 @@ Activation Conditions:
 - role ごとの詳細な実行制約は `.codex/agents/*.toml` を見ます
 - この文書では route と inventory だけを決め、各 role の詳細条件は `.codex/agents/*.toml` に集約します
 - parent は stage を暗黙にまとめず、別 role を別 instance で起動します
-- subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `task_start.py` / `bootstrap_agent_run.py` の packet 出力を local/tool context として参照します。prompt へは `agents/COMMUNICATION_PROTOCOL.md` が定義する `Fresh Subagent Context Capsule` を渡し、packet stdout や full artifact は貼りません
+- subagent を起動するときは、`team_manifest.yaml` の `run.subagent_prompt_packet`、該当 role の `prompt_contract`、`document_packet.read_before_work`、または `bootstrap_agent_run.py` の packet 出力を local/tool context として参照します。prompt へは `agents/COMMUNICATION_PROTOCOL.md` が定義する `Fresh Subagent Context Capsule` を渡し、packet stdout や full artifact は貼りません
 - context が増えたら capsule artifact を更新して再配送します
 - workflow family ごとの prompt 正本は `agents/task_catalog.yaml` の `workflow_families[].subagent_prompt` です
 - 一般説明 prose adapter を使う文書では `document_flow_reviewer` に加えて別 reviewer で `docs-completeness-review` を通します

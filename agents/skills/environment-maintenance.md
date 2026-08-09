@@ -77,7 +77,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - 「何となく便利だから」で repo 正本の環境を変えません。必ず code path、command、run profile のどれが詰まっているかを残します。
 - code requirement を host-only の手元 install で回避できても、repo-wide に必要なものは Docker / CI / docs の正本へ入れます。
 - repo の共通環境に入れる tool は、個人環境前提の host-global install を正本にしません。
-- repo-wide に必要な Python tool は `CONTAINER_OPERATIONS.md` の Python dependency rule に従い、repo-local installer contract に載せます。
+- 独立した Python CLI は devcontainer manifest から `pipx` で隔離 install します。project の import/runtime dependency は `CONTAINER_OPERATIONS.md` の Python dependency rule に従い、repo-local installer contract に載せます。
 - Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth、host mount 方針は `CONTAINER_OPERATIONS.md` の devcontainer boundary に従います。
 - environment gate、Docker validation、venv prohibition check は Python に依存しない shell entrypoint を優先します。
 - repo の canonical image では `python3.11-venv` を同梱し、container runtime 内の canonical `.venv` だけを `tools/ci/python_env_policy.py --runtime container --create` で許可します。host runtime では repo-local `.venv` を作らず、`virtualenv`、`conda create`、`uv venv`、`pipenv`、`poetry env` を既定手順にしません。

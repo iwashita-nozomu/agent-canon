@@ -2,7 +2,7 @@
 name: repository-topic-clone
 description: "Use for any parent, dependency, or standalone repository topic clone lifecycle under workspace/<topic>/<repo>; repository kind is a post-clone policy decorator."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"1bd7731806dc40b4fb48b90a17b8db5600393c5805d80e997bdce24b96637624"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"2550e0c6b676e06371be7b827d6ab49d8879f7d8d620c89e9a96736c525bb8b9"} -->
 
 <!--
 @dependency-start

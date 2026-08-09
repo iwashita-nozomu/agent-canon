@@ -74,8 +74,8 @@ Codex の設定は 1 ファイルではなく、複数の runtime surface で構
 `.codex/config.toml` の代表部分です。全 skill / agent registry は正本を参照します。
 
 ```toml
-approval_policy = "never"
-sandbox_mode = "danger-full-access"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
 
 model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
@@ -83,13 +83,8 @@ review_model = "gpt-5.6-luna"
 model_context_window = 1000000
 tool_output_token_limit = 4096
 
-[features]
-hooks = true
-goals = true
-multi_agent = true
-
 [agents]
-max_threads = 26
+max_threads = 27
 max_depth = 2
 job_max_runtime_seconds = 3600
 ```
@@ -98,16 +93,16 @@ job_max_runtime_seconds = 3600
 
 # Template 設定の意味
 
-- 外部 sandbox 前提なので approval は `never`
-- filesystem sandbox は `danger-full-access`
+- approval は `on-request`
+- filesystem sandbox は `workspace-write`
 - 親 orchestrator は `gpt-5.6-sol/high`
 - named child の model / effort / capability / context / return schema は
   `agents/model_profiles.toml` が所有し、role TOML は generated view
 - 1 tool output の context 取り込みは 4096 token まで
-- hooks を有効化し、runtime guardrail を組み込む
-- multi-agent と repo-owned skill / child-agent registry を有効化
-- topology-derived request は direct `20` + nested `6` = `26`。platform-effective
-  / current-available capacity は別入力で、26 を platform cap とは主張しない
+- stable runtime feature は Codex の既定を使う
+- repo-owned skill は `.agents/skills/` から自動探索し、child-agent registry だけを config に置く
+- topology-derived request は direct `21` + nested `6` = `27`。platform-effective
+  / current-available capacity は別入力で、27 を platform cap とは主張しない
 - AgentCanon の repo-local deterministic checks は Rust CLI / Python tool が所有する
 - Codex は project trust、hook context、apps / external connectors / session tool availability を所有する
 
@@ -124,8 +119,6 @@ job_max_runtime_seconds = 3600
 - `review_model`
 - `model_context_window`
 - `tool_output_token_limit`
-- `features`
-- `skills.config`
 - `agents`
 
 それ以外の official schema key は「Codex が受け付けても、この template
@@ -286,9 +279,8 @@ repo runtime は `.codex/config.toml` と role TOML の現在値から開始し�
 
 - `read-only`: review / exploration に向く
 - `workspace-write`: repo 編集に向く
-- `danger-full-access`: 外部 sandbox がある container / CI に限定
 
-この template は外部環境で安全境界を持つ前提で `danger-full-access` を使います。
+この template は `workspace-write` を既定にし、追加権限は実行時の承認で扱います。
 
 ---
 
@@ -319,7 +311,6 @@ Custom agents は次に置けます。
 - `model_reasoning_effort`
 - `sandbox_mode`
 - `mcp_servers`
-- `skills.config`
 - instructions
 
 ---
@@ -392,21 +383,16 @@ Codex は skill metadata で候補を選び、選択後に該当 `SKILL.md` を�
 
 ---
 
-# Skills config
+# Skills discovery
 
-```toml
-[skills]
-include_instructions = true
-
-[skills.bundled]
-enabled = true
-
-[[skills.config]]
-name = "dependency-analysis"
-enabled = true
+```text
+.agents/skills/
+  dependency-analysis/
+    SKILL.md
 ```
 
-大量 skill 環境では初期 context budget を圧迫するため、命名と説明が重要です。
+Codex は repository の `.agents/skills/` を自動探索します。project config に
+同じ inventory を列挙せず、命名と説明を簡潔に保ちます。
 
 ---
 
@@ -491,7 +477,7 @@ prompt / repo data を trace に載せるかは security decision です。既�
 - `mcp_oauth_*`
 - provider auth
 - `otel.log_user_prompt`
-- `sandbox_mode="danger-full-access"`
+- 追加 writable roots / network permission
 
 credential は committed config に直書きしません。
 

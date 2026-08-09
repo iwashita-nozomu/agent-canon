@@ -85,7 +85,7 @@ task 開始時は `make agent-canon-update-plan` と read-only worktree check �
 - 承認済み protected `ensure-latest` は `.gitmodules` の URL と immutable remote branch SHA を見て、parent gitlink と submodule worktree HEAD が remote main と一致するかを判定し、必要な pin と root shared surface を同期します。
 - local submodule commit が remote main に含まれている場合も、read-only plan の後に current-task user approval、destructive authority/reason、および同じ command segment の `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes>` を得た protected `apply` / latest route で parent pin を remote main へ揃えます。route が branch/worktree を作成する場合だけ creation authority/reason も要求します。
 - local submodule history が remote main と diverge している場合は fail-closed とし、`agents/workflows/derived-agent-canon-diff-workflow.md` に従って AgentCanon branch push、AgentCanon PR / merge、派生 repo submodule pin 再同期を完了してから実装へ戻ります。
-- `task_start.py` と `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。template の root symlink view から起動したときに `skipped_source_canon` が出る場合は misconfiguration として扱い、workspace root、`.gitmodules`、`vendor/agent-canon` の状態を確認します。`skipped_source_canon` は standalone AgentCanon source checkout でだけ妥当です。
+- `bootstrap_agent_run.py` の freshness preflight は script path ではなく `--workspace-root` を対象にします。template の root symlink view から起動したときに `skipped_source_canon` が出る場合は misconfiguration として扱い、workspace root、`.gitmodules`、`vendor/agent-canon` の状態を確認します。`skipped_source_canon` は standalone AgentCanon source checkout でだけ妥当です。
 
 ### Branch Reuse Default
 
@@ -216,7 +216,7 @@ role id、schema は正本表記を保ちます。
 
 repo-changing run では `team_manifest.yaml` の
 `run.user_facing_language_policy` を handoff packet に含め、subagent と reviewer
-が同じ方針を参照できる状態で渡します。`task_start.py` と
+が同じ方針を参照できる状態で渡します。`bootstrap_agent_run.py` と
 `bootstrap_agent_run.py` の `USER_FACING_LANGUAGE=ja` を起動時 evidence として
 扱います。
 
@@ -231,7 +231,7 @@ wave、validation profile の signal に留めます。owner boundary や impact
 
 repo-changing run では `team_manifest.yaml` の
 `run.contract_complete_implementation_policy` を handoff packet に含めます。
-`task_start.py` と `bootstrap_agent_run.py` の
+`bootstrap_agent_run.py` の
 `IMPLEMENTATION_COMPLETENESS_POLICY=contract_complete` を起動時 evidence として
 扱います。contract gap、責務境界、API shape、依存方向、runtime contract の不足は
 `design_issue_blocker` として Gate 5-6 に戻します。
@@ -287,7 +287,7 @@ python3 tools/agent_tools/goal_loop.py plan --goal-file goal.md \
   --report-out reports/agents/<run-id>/goal_work_breakdown.md
 ```
 
-- shared config は `.codex/config.toml` の `[features].goals = true` を既定にします。
+- stable な goal 機能は Codex runtime の既定を使い、shared config に feature flag を重ねません。
 - `goal.md` は durable source of truth、Codex goals は session view、`goal_loop.py status` は機械 gate です。
 - `goal.md` は repo-local state として管理します。
 - user が goal-driven intent を示したが exact `/goal <objective>` を渡していない場合は、parent が target-state-complete Objective を作り、`goal.md` に先に固定します。intake draft は read-only discovery として扱い、edit authorization は target-state-complete Objective の固定後に開始します。
@@ -470,7 +470,7 @@ Codex では、まず `$agent-orchestration` を起点にし、`agents/skills/RE
 user が skill を明示したい場合は `$skill-name` を使います。例: `$repo-onboarding`、`$research-workflow`、`$paper-writing`
 細粒度の review pass、CLI adapter、artifact placement、validation helper は public skill ではなく、`documents/conventions/REVIEW_PROCESS.md` と `agents/canonical/` に寄せます。
 repo-changing task では `python3 tools/agent_tools/route.py --prompt "<request>" --format json` の `ACTIVE_SKILLS` を routing declaration に使い、`$codex-task-workflow` は execution stage、`$subagent-bootstrap` は implementation / patch / doc-edit handoff が current stage に入った時点で active にします。
-`task_start.py` と `bootstrap_agent_run.py` は `--task` 文面から prompt-derived
+`bootstrap_agent_run.py` は `--task` 文面から prompt-derived
 skill を追加し、選択済み skill ごとの repo tool route を
 `run.repo_tool_routing_policy` に出します。repo tool route は skill ごとに
 `show_skill_packet`、`required_commands`、
@@ -598,7 +598,7 @@ surface route は source packet seed であり、responsibility search、reuse
 survey、stale-surface scan、dependency expansion を通してから
 `allowed_paths`、`do_not_read`、`write_scope`、`validation_route`、
 `review_gate` の handoff scope にします。
-`task_start.py` と `bootstrap_agent_run.py` は
+`bootstrap_agent_run.py` は
 `run.default_quality_check_policy` も出します。この policy は active な
 `change_reviewer`、`docs_workflow_steward`、
 `python_reviewer`、`cpp_reviewer` と、それらから展開される Codex
@@ -722,7 +722,7 @@ cost を無視して review coverage を優先する run では、research-drive
   route の前に `pre_handoff_gate_status` へ `design_review.md decision=approve`
   と `waterfall-gate-check --gate design` pass evidence を記録する。candidate artifact
   は記録や handoff を自動的に要求しない
-- 詳細設計前に `task_start.py` / `bootstrap_agent_run.py` の `DESIGN_DOCUMENT_PACKET` を読み、その path 群を `design_brief.md` の `Upstream Requirement Packet` に転記する
+- 詳細設計前に `bootstrap_agent_run.py` の `DESIGN_DOCUMENT_PACKET` を読み、その path 群を `design_brief.md` の `Upstream Requirement Packet` に転記する
 - 詳細設計では `design_brief.md` の `Canonical Tree-Head Plan` に、この task の後に tracked tree に残してよい設計文書 path と実装 path を固定し、parallel design doc、implementation copy、snapshot、backup path を残さないことを明記する
 - worker の実装入力は、各 implementation slice の前に明示された design artifact path、design section、request clause ID です。test plan item は、active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ実装入力に含めます
 - worker は docs、workflow、prompt/config、validation output、dependency manifest、user-facing surface へ波及する変更を `Design Side-Effect Map` の item として扱い、implementation summary に owner stage と review gate を残す
@@ -731,7 +731,7 @@ cost を無視して review coverage を優先する run では、research-drive
 - `design_issue_blocker` は local fallback、wrapper、helper、分岐、別経路、test 緩和、docs 上書きではなく、Gate 5-6 の設計更新で閉じる。承認済み design と局所 precedent から一意に導ける typo、format、import、狭い機械的追従だけが同じ implementation pass で修正できる
 - legacy-route drift と duplicate implementation は implementation GuardRail finding として扱い、旧 route、旧 wrapper、旧 helper、config mirror は caller migration で canonical owner へ統合する
 - implementation は current tree head の canonical path だけを更新対象にし、`*_old`、`*_copy`、dated clone、parallel module、duplicate directory のような別 truth surface を作らない
-- `task_start.py` / `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認し、repo-changing implementation / patch / doc-edit work は、別 writer が必要な場合だけ write-capable handoff で進める。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ）、dependency-expanded handoff scope に加え、`--select-agent-type implementer=spark_worker:<evidence>` が stdout / manifest に記録された場合だけ使います。選択済み candidate が blocked の場合は local/tool context に blocker を記録します。明示された bounded owner/path/validation request の parent-direct は通常 route です
+- `bootstrap_agent_run.py` の `IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker` を確認し、repo-changing implementation / patch / doc-edit work は、別 writer が必要な場合だけ write-capable handoff で進める。`worker` が既定で、`spark_worker` は Abstract Design Frame、design trace、naming、test-plan artifact / evidence（active workflow または touched surface が post-implementation test design を選択し、その activation により `test_plan.md` が生成されたか必須になった場合のみ）、dependency-expanded handoff scope に加え、`--select-agent-type implementer=spark_worker:<evidence>` が stdout / manifest に記録された場合だけ使います。選択済み candidate が blocked の場合は local/tool context に blocker を記録します。明示された bounded owner/path/validation request の parent-direct は通常 route です
 - 新規または rename する file、function、class、theorem、artifact、CLI flag、
   config key は、implementation handoff 前に naming plan で固定する。naming plan は
   対象概念、責務語彙、既存 naming family、採用名、avoid-name list を含み、

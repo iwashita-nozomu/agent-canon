@@ -49,7 +49,7 @@ downstream design ./hooks/hook_dispatcher.py RETIRED_HOOK_ROUTES assigns former 
 
 ## Goal And Plan Mode
 
-- `goals` feature は `.codex/config.toml` の `[features].goals = true` で有効にします。
+- stable な goal 機能は Codex runtime の既定を使い、project config で feature flag を再列挙しません。
 - TUI の user-facing command surface は `/goal`, `/goal <objective>`, `/goal pause`, `/goal resume`, `/goal clear` です。
 - `/goal` は session view です。repo-owned durable state は top-level `goal.md`、機械 gate は `tools/agent_tools/goal_loop.py status` に置きます。
 - template repo の active `goal.md` は runtime state であり、派生 repo seed に混入させません。tracked product state に入れず、必要なら `.gitignore` で ignored local file として保持します。
@@ -108,7 +108,7 @@ waive workflow gates and do not authorize dropping decision-relevant context.
 
 ## Hook Context
 
-- `config.toml` の `[features].hooks = true` で project-local hook を有効にします。
+- project-local hook は `.codex/hooks.json` で宣言し、project config に stable feature flag を重ねません。
 - `hooks.json` は active event ごとに dispatcher を一回だけ起動し、コマンド自体に Git の root 探索や child subprocess を含めません。active events は `UserPromptSubmit`、`PreToolUse`、`PostToolUse` だけです。legacy `Stop` は dispatcher が inactive no-op として受け付けますが、`hooks.json` には登録しません。
 - `HOOK_EVENT_CONTRACTS` がイベント、matcher、failure semantics、telemetry を canonical typed table として所有します。`python3 .codex/hooks/hook_dispatcher.py --contract` は active/inactive event、matcher、failure、telemetry、retired route table を readback します。
 - `UserPromptSubmit` は pure owner `tools/agent_tools/hook_safety.py` の secret matcher だけを使い、高確信の private key / API key を block します。`PreToolUse` は同じ owner の destructive Git parser だけを使い、block payload の command 情報は `operation` と `command_sha256` に限定します。retired child tombstones は `tools/agent_tools/hook_retirement.py` が単独で所有します。
@@ -184,6 +184,6 @@ subagent inventory や research perspective pack を触ったら、次で bundle
 
 ```bash
 python3 tools/agent_tools/smoke_test_research_perspective_pack.py
-python3 tools/agent_tools/task_start.py --task "scoped change" --task-id T1 --owner "codex" --dry-run
+python3 tools/agent_tools/bootstrap_agent_run.py --help
 python3 tools/agent_tools/doc_start.py --task "paper writing task" --kind paper --owner "codex" --dry-run
 ```

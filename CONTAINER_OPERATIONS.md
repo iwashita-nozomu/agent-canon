@@ -106,8 +106,8 @@ needed to read a manifest. The standalone AgentCanon image runs that existing
 bootstrap with `--install` during image build; parent images own an equivalent
 fixed bootstrap in their image build. Post-create runs the bootstrap once in
 `--check` mode, so it never performs a runtime network install for these fixed
-capabilities. The bootstrap establishes `python3`/`tomllib` or `tomli`,
-`python3-pip`, `python3-packaging`, pinned Node/npm 22.14.0 with
+capabilities. The bootstrap establishes `python3`/`tomllib` or `tomli`, `pipx`,
+`python3-packaging`, pinned Node/npm 22.14.0 with
 architecture-specific SHA256 verification, `ninja-build`, `build-essential`,
 and the fixed APT-repository prerequisite `gnupg` with a working `gpg`
 executable. It also checks `cc` and `gcc` before any repository-key/source

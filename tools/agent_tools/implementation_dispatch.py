@@ -6,7 +6,7 @@
 # upstream implementation ./implementation_route.py owns implementation eligibility.
 # upstream implementation ./model_profile_registry.py owns prompt/profile materialization.
 # downstream implementation ./agent_team.py facade consumes capacity APIs.
-# downstream implementation ./task_start.py consumes capacity APIs.
+# downstream implementation ./bootstrap_agent_run.py consumes capacity APIs.
 # @dependency-end
 """Own AgentTeam capacity derivation and implementation dispatch."""
 

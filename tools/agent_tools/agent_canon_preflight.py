@@ -10,7 +10,7 @@
 # upstream implementation ./agent_canon_source_root.py resolves parent sync entrypoints
 # upstream implementation agent_canon_update_todos.py reports AgentCanon update TODO state
 # upstream implementation ./report_artifact_checks.py classifies eval transient captures
-# downstream implementation ../../tests/agent_tools/test_task_start_and_close.py tests preflight
+# downstream implementation ../../tests/agent_tools/test_bootstrap_and_close.py tests preflight
 # downstream implementation ../../tests/agent_tools/test_smoke_test_research_perspective_pack.py tests bootstrap smoke workspaces
 # @dependency-end
 
