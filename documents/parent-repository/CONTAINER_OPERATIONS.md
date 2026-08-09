@@ -50,8 +50,12 @@ parent-environment、個別credential/config、SSH agent、previous container st
 `/mnt/git`、Docker socketはdefault create/tool availabilityの入力ではありません。
 
 `AGENT_CANON_OPTIONAL_MOUNTS` の明示profileだけが `host-zshrc`、`host-git`、`host-secrets`,
-`host-credentials`、`ssh-agent`、`docker-host`、`shared-runtime`、
-`linked-data-roots` を有効化できます。`shared-runtime` は `gpu-admission` profile に、
+`host-credentials`、`ssh-agent`、`docker-host`、`linked-data-roots` を有効化できます。
+GPU runtime は optional mount ではなく、明示的な `gpu-admission` selector と
+`.devcontainer/gpu-admission.sh` の lifecycle で選択します。この lifecycle は
+user-owned `${repository_root}/.agent-canon/runtime` を primary UID/GID で provision し、
+`/var/lib/agent-canon/runtime` へ bind/readback します。`agent-canon-runtime` group、
+`group_add`、supplementary GID env、sudo、追加 bootstrap は使用しません。
 Docker-in-Docker/host daemonは`docker-host` profileに限定します。zsh startupは
 `.zshenv`、`ZDOTDIR`、parent-environment sourceに依存せず、Docker `ENV`、
 devcontainer `containerEnv`、明示bootstrapからruntime値を受け取ります。

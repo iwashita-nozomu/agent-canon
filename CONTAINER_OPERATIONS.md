@@ -320,25 +320,26 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
   home. The runner may forward `OPENAI_API_KEY` and `OPENAI_BASE_URL` explicitly;
   it never mounts or seeds host Codex state.
 - 既定 devcontainer は GPU admission の host runtime identity を要求しない。
-  `bootstrap-shared-runtime.sh`、`finalize-shared-runtime.sh`、shared lock、
-  provision/readback receipt、および固定 supplementary group は AgentCanon source
-  に保持するが、linked config の default lifecycle からは非選択とする。既定境界の
-  authority は本 rulebook と linked implementation に置く。experiment scheduler
-  や managed experiment の wholesale deletion を意味しない。
+  `bootstrap-dependencies.sh` だけを固定 dependency bootstrap として保持し、
+  `finalize-shared-runtime.sh`、shared lock、provision/readback receipt は GPU
+  admission の明示 lifecycle に保持する。既定の linked config からは GPU runtime
+  を選択せず、experiment scheduler や managed experiment の wholesale deletion を
+  意味しない。
 - GPU admission を使う場合は親-owned regular `.devcontainer/gpu-admission/devcontainer.json`
   を selector とする `.devcontainer/gpu-admission.sh` を明示実行する。derived repository
   へ AgentCanon の child symlink は投影せず、親が必要な entrypoint を source-root
   resolver 経由で選択する。standalone AgentCanon では同じ resolver を
   `tools/agent_tools/agent_canon_source_root.py` から実行する。profile は
-  `nvidia-smi -L`、`devcontainer` CLI、active repository、host runtime group/session
-  を fail-closed に確認した後でだけ bootstrap を呼ぶ。GPU 不在、host `sudo`/group
-  capability 不在、provision receipt 不一致、Compose/up/finalize failure は default
-  profile へ降格しない。
-- `gpu-admission.sh` は bootstrap の `AGENT_CANON_RUNTIME_GID`、完全な
-  `AGENT_CANON_HOST_SUPPLEMENTARY_GIDS`、canonical source/provision receipt を
-  profile generator へ渡す。profile Compose は host
-  `/var/lib/agent-canon/runtime` を container の同じ target へ bind し、完全な
-  `group_add`、`gpus: all`、`DEVCONTAINER_GPU_MODE=enabled`、
+  `nvidia-smi -L`、`devcontainer` CLI、active repository を fail-closed に確認した後、
+  `${repository_root}/.agent-canon/runtime` を primary UID/GID 所有で作成し、
+  provision receipt を発行する。GPU 不在、provision receipt 不一致、Compose/up/finalize
+  failure は default profile へ降格しない。host `sudo`、system group 作成、session
+  refresh はこの lifecycle の前提ではない。
+- `gpu-admission.sh` は repository-local source/provision receipt を profile generator
+  へ渡す。profile Compose は host
+  `${repository_root}/.agent-canon/runtime` を container の
+  `/var/lib/agent-canon/runtime` へ bind し、primary `PROJECT_UID:PROJECT_GID`、
+  `gpus: all`、`DEVCONTAINER_GPU_MODE=enabled`、
   `DEVCONTAINER_GPU_REQUEST=all`、`MANAGED_CONTAINER` route を出力する。default
   Compose はこれらを出力しない。profile output は
   `.agent-canon/gpu-admission-compose.generated.yml`、project identity は
@@ -346,7 +347,8 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
 - `devcontainer up` の成功後、同じ orchestrator が同じ profile `--config` の
   `devcontainer exec` と source-root resolver で `finalize-shared-runtime.sh` を一度だけ
   実行する。finalize は provision receipt、
-  bind device/inode、mount namespace、probe、complete group/UID/GID、umask を検証し、
+  bind device/inode、mount namespace、probe、repository-local source、primary UID/GID、
+  umask を検証し、
   `shared-runtime-readback.json` を `tools/experiments/execution_resource_plan.py` の
   `read_shared_runtime_provision` / `write_runtime_receipt_atomic` owner 経由で発行する。
   profile script は receipt parser/writer や identity repair を複製しない。

@@ -254,7 +254,6 @@ class SurfaceMigrationTest(unittest.TestCase):
         custom_hook.chmod(0o755)
         unknown_file.write_text("keep this parent-owned file\n", encoding="utf-8")
         parent_devcontainer_files = (
-            "bootstrap-shared-runtime.sh",
             "finalize-shared-runtime.sh",
             "generate-runtime-compose.sh",
             "docker-compose.generated.yml",

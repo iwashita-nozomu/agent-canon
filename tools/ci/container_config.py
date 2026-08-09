@@ -77,7 +77,6 @@ OPTIONAL_MOUNT_PROFILES = frozenset(
         "ssh-agent",
         "docker-host",
         "linked-data-roots",
-        "shared-runtime",
     }
 )
 LINKED_DATA_TARGET_RE = re.compile(r"/mnt/[a-z]/[^/].*\Z")
@@ -792,7 +791,7 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
         return findings
     expected = {
         "name": "${localWorkspaceFolderBasename}-gpu-admission-devcontainer",
-        "initializeCommand": "AGENT_CANON_GPU_ADMISSION_PROFILE=gpu-admission AGENT_CANON_OPTIONAL_MOUNTS=shared-runtime AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/gpu-admission-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
+        "initializeCommand": "AGENT_CANON_GPU_ADMISSION_PROFILE=gpu-admission AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/gpu-admission-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
         "dockerComposeFile": "../../.agent-canon/gpu-admission-compose.generated.yml",
         "service": "workspace",
         "containerUser": "project",
@@ -821,7 +820,7 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
             )
         )
     orchestrator = shared_devcontainer_dir(root) / "gpu-admission.sh"
-    bootstrap = shared_devcontainer_dir(root) / "bootstrap-shared-runtime.sh"
+    bootstrap = shared_devcontainer_dir(root) / "bootstrap-dependencies.sh"
     orchestrator_relative = orchestrator.relative_to(root).as_posix()
     if not orchestrator.is_file() or orchestrator.stat().st_mode & 0o111 == 0:
         findings.append(
@@ -837,7 +836,7 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
             Finding(
                 "dependency_contract_violation",
                 bootstrap.relative_to(root).as_posix(),
-                f"bootstrap-shared-runtime-git-mode:{bootstrap_mode}",
+                f"bootstrap-dependencies-git-mode:{bootstrap_mode}",
             )
         )
     return findings
@@ -1130,22 +1129,12 @@ def validate_generated_compose(
             )
     optional_tokens = set(optional_tokens_list)
     supported_optional_mounts = OPTIONAL_MOUNT_PROFILES
-    if profile != "gpu-admission":
-        supported_optional_mounts = supported_optional_mounts - {"shared-runtime"}
     for token in sorted(optional_tokens - supported_optional_mounts):
         findings.append(
             Finding(
                 "dependency_contract_violation",
                 relative,
                 f"optional-mount-profile-unsupported:{token}",
-            )
-        )
-    if profile == "gpu-admission" and "shared-runtime" not in optional_tokens:
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                relative,
-                "gpu-admission-shared-runtime-profile-required",
             )
         )
     if len(optional_tokens_list) != len(optional_tokens):
@@ -1312,39 +1301,14 @@ def validate_generated_compose(
                 )
             )
     else:
-        group_add = as_sequence(service.get("group_add"))
-        if group_add is None or not group_add:
+        if "group_add" in service:
             findings.append(
                 Finding(
                     "dependency_contract_violation",
                     relative,
-                    "gpu-admission-group-add-required",
+                    "gpu-admission-group-add-forbidden",
                 )
             )
-        else:
-            group_values = tuple(str(value) for value in group_add)
-            if any(re.fullmatch(r"[1-9][0-9]*", value) is None for value in group_values):
-                findings.append(
-                    Finding(
-                        "dependency_contract_violation",
-                        relative,
-                        "gpu-admission-group-add-must-be-positive-integers",
-                    )
-                )
-            host_groups = (
-                environment.get("AGENT_CANON_HOST_SUPPLEMENTARY_GIDS", "")
-                if environment is not None
-                else ""
-            )
-            expected_groups = tuple(str(host_groups).split())
-            if group_values != expected_groups:
-                findings.append(
-                    Finding(
-                        "inconsistency",
-                        relative,
-                        "gpu-admission-group-add-must-preserve-host-groups",
-                    )
-                )
         if service.get("gpus") != "all":
             findings.append(
                 Finding(
@@ -1387,12 +1351,12 @@ def validate_generated_compose(
             )
         else:
             runtime_source, runtime_target = volume_fields(runtime_mounts[0])
-            if runtime_source != "/var/lib/agent-canon/runtime":
+            if runtime_source != str(root / ".agent-canon/runtime"):
                 findings.append(
                     Finding(
                         "dependency_contract_violation",
                         relative,
-                        "gpu-admission-runtime-mount-source-must-be-canonical",
+                        "gpu-admission-runtime-mount-source-must-be-repository-local",
                     )
                 )
             if runtime_target != "/var/lib/agent-canon/runtime":
@@ -1789,6 +1753,8 @@ def validate_generated_compose(
                 "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS",
                 "ZDOTDIR",
                 "AGENT_CANON_SHARED_RUNTIME_SOURCE",
+                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE",
+                "AGENT_CANON_SHARED_RUNTIME_TARGET",
                 "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT",
                 "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT",
             )
@@ -1810,9 +1776,9 @@ def validate_generated_compose(
             required_profile_environment = {
                 "DEVCONTAINER_GPU_REQUEST": "all",
                 "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
-                "AGENT_CANON_RUNTIME_GID": None,
-                "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": None,
                 "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
+                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(root / ".agent-canon/runtime"),
+                "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
                 "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
                 "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
             }
@@ -1833,69 +1799,6 @@ def validate_generated_compose(
                             f"gpu-admission-environment:{name}",
                         )
                     )
-            runtime_gid_value = environment.get("AGENT_CANON_RUNTIME_GID")
-            runtime_gid_valid = isinstance(runtime_gid_value, str) and re.fullmatch(
-                r"[1-9][0-9]*", runtime_gid_value
-            ) is not None
-            if not runtime_gid_valid:
-                findings.append(
-                    Finding(
-                        "dependency_contract_violation",
-                        relative,
-                        "gpu-admission-runtime-gid-must-be-positive-integer",
-                    )
-                )
-
-            host_groups_value = environment.get("AGENT_CANON_HOST_SUPPLEMENTARY_GIDS")
-            host_group_values: tuple[str, ...] = ()
-            host_groups_valid = False
-            if isinstance(host_groups_value, str):
-                host_group_values = tuple(host_groups_value.split())
-                if not host_group_values:
-                    findings.append(
-                        Finding(
-                            "dependency_contract_violation",
-                            relative,
-                            "gpu-admission-host-supplementary-gids-required",
-                        )
-                    )
-                elif any(
-                    re.fullmatch(r"[1-9][0-9]*", value) is None
-                    for value in host_group_values
-                ):
-                    findings.append(
-                        Finding(
-                            "dependency_contract_violation",
-                            relative,
-                            "gpu-admission-host-supplementary-gids-must-be-positive-integers",
-                        )
-                    )
-                elif len(set(host_group_values)) != len(host_group_values):
-                    findings.append(
-                        Finding(
-                            "dependency_contract_violation",
-                            relative,
-                            "gpu-admission-host-supplementary-gids-must-be-unique",
-                        )
-                    )
-                else:
-                    host_groups_valid = True
-            else:
-                findings.append(
-                    Finding(
-                        "dependency_contract_violation",
-                        relative,
-                        "gpu-admission-host-supplementary-gids-required",
-                    )
-                )
-            if runtime_gid_valid and host_groups_valid and runtime_gid_value not in host_group_values:
-                findings.append(
-                    Finding(
-                        "dependency_contract_violation",
-                        relative,
-                        "gpu-admission-runtime-gid-must-be-in-host-supplementary-gids",
-                    )
-                )
         for name, expected in required_environment.items():
             if name not in environment:
                 findings.append(
@@ -1957,15 +1860,15 @@ def validate_generated_compose_scenarios(
                     "gpu-admission",
                     {
                         "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
-                        "AGENT_CANON_OPTIONAL_MOUNTS": "shared-runtime",
-                        "AGENT_CANON_RUNTIME_GID": "4242",
-                        "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS": "1000 4242 5000",
-                        "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
-                        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
-                        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
+                        "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(root / ".agent-canon/runtime"),
+                        "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(root / ".agent-canon/runtime"),
+                        "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+                        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(root / ".agent-canon/runtime/shared-runtime-provision.json"),
+                        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(root / ".agent-canon/runtime/shared-runtime-readback.json"),
                     },
                 )
             )
+            (root / ".agent-canon/runtime").mkdir(parents=True, exist_ok=True)
         for profile, additions in scenarios:
             compose_path = temporary_root / f"{profile}.yml"
             scenario_pack = pack

@@ -1,6 +1,6 @@
 {
   "name": "${localWorkspaceFolderBasename}-gpu-admission-devcontainer",
-  "initializeCommand": "AGENT_CANON_GPU_ADMISSION_PROFILE=gpu-admission AGENT_CANON_OPTIONAL_MOUNTS=shared-runtime AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/gpu-admission-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
+  "initializeCommand": "AGENT_CANON_GPU_ADMISSION_PROFILE=gpu-admission AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/gpu-admission-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
   "dockerComposeFile": "../../.agent-canon/gpu-admission-compose.generated.yml",
   "service": "workspace",
   "containerUser": "project",

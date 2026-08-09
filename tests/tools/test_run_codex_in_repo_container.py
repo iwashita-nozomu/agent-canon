@@ -349,7 +349,10 @@ def test_runtime_identity(tmp_path: Path) -> None:
         encoding="utf-8"
     )
     bootstrap = (
-        PROJECT_ROOT / ".devcontainer" / "bootstrap-shared-runtime.sh"
+        PROJECT_ROOT / ".devcontainer" / "bootstrap-dependencies.sh"
+    ).read_text(encoding="utf-8")
+    gpu_admission = (
+        PROJECT_ROOT / ".devcontainer" / "gpu-admission.sh"
     ).read_text(encoding="utf-8")
     compose = (
         PROJECT_ROOT / ".devcontainer" / "generate-runtime-compose.sh"
@@ -394,16 +397,20 @@ def test_runtime_identity(tmp_path: Path) -> None:
     )
     assert 'if [ -f "$candidate" ]; then' in post_attach
     assert '"schema_version": "shared-runtime-readback/v1"' in finalize
-    assert 'readback_receipt="${runtime_root}/shared-runtime-readback.json"' in finalize
     assert (
-        'provision_receipt="${AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT:-${runtime_root}/shared-runtime-provision.json}"'
-        in bootstrap
+        'readback_receipt="${AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT:-${runtime_root}/shared-runtime-readback.json}"'
+        in finalize
     )
+    assert 'bootstrap-dependencies.sh' not in gpu_admission
+    assert 'runtime_source="$repository_root/.agent-canon/runtime"' in gpu_admission
+    assert 'runtime_target="/var/lib/agent-canon/runtime"' in gpu_admission
+    assert 'write_runtime_receipt_atomic' in gpu_admission
     assert "read_shared_runtime_provision" in finalize
-    assert "write_runtime_receipt_atomic" in bootstrap
+    assert "write_runtime_receipt_atomic" in gpu_admission
     assert "write_runtime_receipt_atomic" in finalize
     assert (PROJECT_ROOT / ".devcontainer" / "finalize-shared-runtime.sh").is_file()
-    assert (PROJECT_ROOT / ".devcontainer" / "bootstrap-shared-runtime.sh").is_file()
+    assert (PROJECT_ROOT / ".devcontainer" / "bootstrap-dependencies.sh").is_file()
+    assert not (PROJECT_ROOT / ".devcontainer" / "bootstrap-shared-runtime.sh").exists()
     assert "bootstrap-shared-runtime.sh" not in devcontainer
     assert "finalize-shared-runtime.sh" not in devcontainer
     assert "nvidia-smi" not in compose

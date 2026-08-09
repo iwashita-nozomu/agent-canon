@@ -66,9 +66,10 @@ upstream design ../design/devcontainer/parent-dependency-manifest-followup.md de
 - `docker version` か `podman version` が通ること
 - Docker を使う場合、現在の shell から daemon socket に到達できること
 - host で `make docker-build-check` を実行できることを推奨します
-- default devcontainer は host `sudo`、`agent-canon-runtime` system group、または
-  `/var/lib/agent-canon/runtime` の事前作成を要求しません。これらは GPU admission
-  `gpu-admission` opt-in profile が選択された場合だけの contract です。
+- default devcontainer は host `sudo`、system group、または runtime directory の
+  事前作成を要求しません。GPU admission `gpu-admission` opt-in profile は
+  repository-local `${repository_root}/.agent-canon/runtime` を user-owned primary
+  UID/GID で作成し、container の `/var/lib/agent-canon/runtime` へ bind します。
 
 補足:
 
@@ -125,10 +126,10 @@ GPU は必須ではありません。
 - NVIDIA GPU host:
   - `nvidia-smi` は GPU 実験を明示的に選択する場合だけ確認します。default generator は probe しません
   - default dev container は GPU を検出しても `gpus: all` を追加せず、`DEVCONTAINER_GPU_MODE=disabled` を出力します
-  - device、driver runtime、shared lock、runtime receipt、host runtime group、GPU
-    scheduler は default の host requirement ではありません。これらを使う場合は
-    明示 `gpu-admission` profile が `nvidia-smi -L`、host runtime group、shared bind、
-    complete group projection、receipt lifecycle、absence/failure semantics を所有します。
+  - device、driver runtime、shared lock、runtime receipt、GPU scheduler は default の
+    host requirement ではありません。これらを使う場合は明示 `gpu-admission` profile
+    が `nvidia-smi -L`、repository-local user-owned source、primary UID/GID bind、
+    receipt lifecycle、absence/failure semantics を所有します。
 
 GPU が無いこと自体を failure 条件にしません。
 
