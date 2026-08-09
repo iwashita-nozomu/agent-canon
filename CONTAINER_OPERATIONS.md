@@ -135,6 +135,15 @@ Production publication requires euid 0, uses the canonical path without a CLI
 root override, and freezes the recursively published tree as root-owned `0555`
 directories and `0444` files.
 
+The standalone source image build context is deny-all. Its root `.dockerignore`
+allowlist admits only the `.devcontainer/Dockerfile`, canonical
+`.devcontainer/dependencies.toml`, and
+`tools/agent_tools/devcontainer_dependencies.py` plus their directory chains.
+The Dockerfile copies those files explicitly into a temporary `/opt/agent-canon`
+layout with a fixed `vendor-root`, runs `image-install`, and removes that layout
+before the final image is exported. Repository `.git`, untracked files, docs,
+tests, and unrelated source never enter the context or image layer.
+
 `image-verify` is a read-only gate. It compares the current role-based plan and
 provider closure with the immutable image snapshot, then checks each live
 package and executable without network, mutation, or repair. Any plan, receipt,

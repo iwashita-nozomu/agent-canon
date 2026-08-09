@@ -297,6 +297,64 @@ def test_gpu_admission_selector_isolated_from_default_selector() -> None:
     assert load_container_config_module().validate_gpu_admission_selector(PROJECT_ROOT) == []
 
 
+def test_standalone_image_context_is_explicit_and_source_owned() -> None:
+    """The standalone build admits only the dependency manifest and engine."""
+    module = load_container_config_module()
+
+    assert module.validate_standalone_docker_context(PROJECT_ROOT) == []
+    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+    assert "COPY . /opt/agent-canon" not in dockerfile
+    assert "vendor/agent-canon" not in dockerfile
+    assert "--workspace /opt/agent-canon --vendor-root /opt/agent-canon" in " ".join(
+        dockerfile.split()
+    )
+
+
+def test_standalone_image_context_rejects_broad_copy_and_leak_allowlist(
+    tmp_path: Path,
+) -> None:
+    """A context fixture cannot admit unrelated source, docs, or test files."""
+    module = load_container_config_module()
+    root = tmp_path / "standalone"
+    write_file(root, "documents/forbidden-secret.txt", "fixture secret\n")
+    write_file(
+        root,
+        ".dockerignore",
+        "\n".join(
+            (
+                "**",
+                "!.devcontainer/",
+                "!.devcontainer/Dockerfile",
+                "!.devcontainer/dependencies.toml",
+                "!tools/",
+                "!tools/agent_tools/",
+                "!tools/agent_tools/devcontainer_dependencies.py",
+                "!documents/forbidden-secret.txt",
+                "",
+            )
+        ),
+    )
+    write_file(
+        root,
+        ".devcontainer/Dockerfile",
+        """FROM ubuntu:22.04
+COPY . /opt/agent-canon
+RUN image-install --workspace /opt/agent-canon --vendor-root /opt/agent-canon
+""",
+    )
+
+    details = {
+        finding.detail
+        for finding in module.validate_standalone_docker_context(root)
+    }
+    assert "standalone-context-copy-dot-forbidden" in details
+    assert "standalone-context-allowlist-mismatch" in details
+    assert any(
+        detail.startswith("standalone-context-required-copy-missing:")
+        for detail in details
+    )
+
+
 def test_post_create_uses_shared_lifecycle() -> None:
     """Both selectors use the shared post-create lifecycle."""
     for config_path in (

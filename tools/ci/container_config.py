@@ -67,6 +67,14 @@ OPTIONAL_MOUNT_PROFILES = frozenset(
     }
 )
 LINKED_DATA_TARGET_RE = re.compile(r"/mnt/[a-z]/[^/].*\Z")
+STANDALONE_DOCKER_CONTEXT_ALLOWLIST = (
+    ".devcontainer/",
+    ".devcontainer/Dockerfile",
+    ".devcontainer/dependencies.toml",
+    "tools/",
+    "tools/agent_tools/",
+    "tools/agent_tools/devcontainer_dependencies.py",
+)
 
 
 @dataclass(frozen=True)
@@ -543,6 +551,84 @@ def validate_dockerignore(root: Path) -> list[Finding]:
                     "dependency_contract_violation",
                     relative,
                     f"missing-ignore:{ignored_path}",
+                )
+            )
+    return findings
+
+
+def validate_standalone_docker_context(root: Path) -> list[Finding]:
+    """Keep the standalone image context limited to its build-time engine files."""
+    dockerfile = root / ".devcontainer" / "Dockerfile"
+    dockerignore = root / ".dockerignore"
+    findings: list[Finding] = []
+    if not dockerignore.is_file():
+        findings.append(Finding("missing_file", ".dockerignore", "missing"))
+    else:
+        patterns = tuple(
+            line.strip()
+            for line in dockerignore.read_text(encoding="utf-8").splitlines()
+            if line.strip() and not line.lstrip().startswith("#")
+        )
+        if not patterns or patterns[0] != "**":
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".dockerignore",
+                    "standalone-context-deny-all-required",
+                )
+            )
+        expected_patterns = ("**",) + tuple(
+            f"!{path}" for path in STANDALONE_DOCKER_CONTEXT_ALLOWLIST
+        )
+        if patterns != expected_patterns:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".dockerignore",
+                    "standalone-context-allowlist-mismatch",
+                )
+            )
+    if dockerfile.is_file():
+        dockerfile_text = dockerfile.read_text(encoding="utf-8")
+        normalized_dockerfile = re.sub(r"\s+", " ", dockerfile_text)
+        if re.search(r"^\s*COPY\s+\.\s", dockerfile_text, flags=re.MULTILINE):
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".devcontainer/Dockerfile",
+                    "standalone-context-copy-dot-forbidden",
+                )
+            )
+        if "image_vendor_root" in dockerfile_text or "vendor/agent-canon" in dockerfile_text:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".devcontainer/Dockerfile",
+                    "standalone-context-conditional-vendor-root-forbidden",
+                )
+            )
+        required_copies = (
+            "COPY .devcontainer/dependencies.toml /opt/agent-canon/.devcontainer/dependencies.toml",
+            "COPY tools/agent_tools/devcontainer_dependencies.py /opt/agent-canon/tools/agent_tools/devcontainer_dependencies.py",
+        )
+        for required_copy in required_copies:
+            if required_copy not in dockerfile_text:
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        ".devcontainer/Dockerfile",
+                        f"standalone-context-required-copy-missing:{required_copy}",
+                    )
+                )
+        if (
+            "image-install --workspace /opt/agent-canon --vendor-root /opt/agent-canon"
+            not in normalized_dockerfile
+        ):
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".devcontainer/Dockerfile",
+                    "standalone-context-fixed-vendor-root-required",
                 )
             )
     return findings
@@ -2056,6 +2142,12 @@ def validate(root: Path) -> ValidationReport:
     if devcontainer_dir.exists():
         checked.append(".devcontainer")
         findings.extend(validate_devcontainer(root))
+        if (
+            is_standalone_source(root)
+            and (devcontainer_dir / "Dockerfile").is_file()
+        ):
+            checked.append(".dockerignore")
+            findings.extend(validate_standalone_docker_context(root))
         findings.extend(validate_devcontainer_pack_alignment(root, default_pack))
     if vscode_configured:
         checked.append(".vscode")

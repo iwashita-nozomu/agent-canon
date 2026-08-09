@@ -49,13 +49,10 @@ RUN ln -sfn ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -sfn ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
     && ln -sfn ../lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
 
-COPY . /opt/agent-canon
-RUN image_vendor_root=/opt/agent-canon; \
-    if [ -d /opt/agent-canon/vendor/agent-canon ]; then \
-      image_vendor_root=/opt/agent-canon/vendor/agent-canon; \
-    fi; \
-    python3 "$image_vendor_root/tools/agent_tools/devcontainer_dependencies.py" \
-      image-install --workspace /opt/agent-canon --vendor-root "$image_vendor_root" --format text \
+COPY .devcontainer/dependencies.toml /opt/agent-canon/.devcontainer/dependencies.toml
+COPY tools/agent_tools/devcontainer_dependencies.py /opt/agent-canon/tools/agent_tools/devcontainer_dependencies.py
+RUN python3 /opt/agent-canon/tools/agent_tools/devcontainer_dependencies.py \
+      image-install --workspace /opt/agent-canon --vendor-root /opt/agent-canon --format text \
     && rm -rf /opt/agent-canon
 
 RUN install -d -o project -g project -m 0755 \
