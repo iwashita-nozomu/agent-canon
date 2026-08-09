@@ -42,6 +42,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
 from packaging.utils import canonicalize_name
+from packaging.version import InvalidVersion, Version
 
 try:  # pragma: no cover - the branch depends on the interpreter image.
     import tomllib
@@ -56,7 +57,7 @@ METHODS = frozenset(
         "apt-package",
         "apt-repository",
         "npm-global",
-        "pip-user",
+        "pipx",
         "release-asset",
         "rust-toolchain",
         "lean-toolchain",
@@ -72,6 +73,7 @@ ACTIVE_SOURCE_IDENTITY = "active-source"
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 APT_PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
 NPM_PACKAGE_RE = re.compile(r"^(?:@[a-z0-9._~-]+/[a-z0-9._~-]+|[a-z0-9._~-]+)$")
+PYTHON_PACKAGE_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?$")
 SEMVER_RE = re.compile(
     r"^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$"
 )
@@ -93,10 +95,9 @@ BASE_CAPABILITIES = frozenset(
         "ninja-build",
         "node",
         "npm",
+        "pipx",
         "python3",
-        "python3-pip",
         "python3-packaging",
-        "pip",
         "tar",
         "tomli",
         "tomllib",
@@ -279,7 +280,7 @@ class Method(str, Enum):
     APT_PACKAGE = "apt-package"
     APT_REPOSITORY = "apt-repository"
     NPM_GLOBAL = "npm-global"
-    PIP_USER = "pip-user"
+    PIPX = "pipx"
     RELEASE_ASSET = "release-asset"
     RUST_TOOLCHAIN = "rust-toolchain"
     LEAN_TOOLCHAIN = "lean-toolchain"
@@ -293,7 +294,7 @@ class VerificationKind(str, Enum):
     APT_PACKAGE = "apt-package"
     APT_REPOSITORY = "apt-repository"
     NPM_PACKAGE = "npm-package"
-    PYTHON_DISTRIBUTION = "python-distribution"
+    PIPX_PACKAGE = "pipx-package"
     ABSOLUTE_EXECUTABLE = "absolute-executable"
     RUST_TOOLCHAIN = "rust-toolchain"
     LEAN_TOOLCHAIN = "lean-toolchain"
@@ -636,7 +637,7 @@ VERIFICATION_KIND_BY_METHOD = {
     Method.APT_PACKAGE: VerificationKind.APT_PACKAGE,
     Method.APT_REPOSITORY: VerificationKind.APT_REPOSITORY,
     Method.NPM_GLOBAL: VerificationKind.NPM_PACKAGE,
-    Method.PIP_USER: VerificationKind.PYTHON_DISTRIBUTION,
+    Method.PIPX: VerificationKind.PIPX_PACKAGE,
     Method.RELEASE_ASSET: VerificationKind.ABSOLUTE_EXECUTABLE,
     Method.RUST_TOOLCHAIN: VerificationKind.RUST_TOOLCHAIN,
     Method.LEAN_TOOLCHAIN: VerificationKind.LEAN_TOOLCHAIN,
@@ -666,7 +667,7 @@ def _parse_verification(
             "args",
             "output_contains",
         },
-        VerificationKind.PYTHON_DISTRIBUTION: {
+        VerificationKind.PIPX_PACKAGE: {
             "executable",
             "args",
             "output_contains",
@@ -743,7 +744,7 @@ def _parse_verification(
             )
     elif kind in {
         VerificationKind.NPM_PACKAGE,
-        VerificationKind.PYTHON_DISTRIBUTION,
+        VerificationKind.PIPX_PACKAGE,
     }:
         if executable is None or not args or output_contains is None:
             raise DependencyError(
@@ -804,9 +805,9 @@ def _validate_package(record: DependencyRecord) -> None:
     if record.method in {Method.APT_PACKAGE, Method.APT_REPOSITORY}:
         if APT_PACKAGE_RE.fullmatch(record.package) is None:
             raise DependencyError(f"{record.id}.package is not an apt package name")
-    elif record.method in {Method.NPM_GLOBAL, Method.PIP_USER}:
+    elif record.method in {Method.NPM_GLOBAL, Method.PIPX}:
         pattern = (
-            NPM_PACKAGE_RE if record.method is Method.NPM_GLOBAL else APT_PACKAGE_RE
+            NPM_PACKAGE_RE if record.method is Method.NPM_GLOBAL else PYTHON_PACKAGE_RE
         )
         if pattern.fullmatch(record.package) is None:
             raise DependencyError(
@@ -847,7 +848,7 @@ def _validate_method_fields(
             "executable_owner_packages",
         },
         Method.NPM_GLOBAL: set(),
-        Method.PIP_USER: set(),
+        Method.PIPX: set(),
         Method.RELEASE_ASSET: {
             "checksum",
             "checksums",
@@ -954,9 +955,17 @@ def _validate_method_values(record: DependencyRecord) -> None:
             record.source
         ) is None and not record.source.startswith("https://"):
             raise DependencyError(f"{record.id}.source has an unsupported apt value")
-    elif record.method in {Method.NPM_GLOBAL, Method.PIP_USER}:
+    elif record.method is Method.NPM_GLOBAL:
         if SEMVER_RE.fullmatch(record.version) is None:
             raise DependencyError(f"{record.id}.version must be an exact version")
+        _validate_https_url(record.source, f"{record.id}.source")
+    elif record.method is Method.PIPX:
+        try:
+            Version(record.version)
+        except InvalidVersion as exc:
+            raise DependencyError(
+                f"{record.id}.version must be an exact PEP 440 version"
+            ) from exc
         _validate_https_url(record.source, f"{record.id}.source")
     elif record.method is Method.RELEASE_ASSET:
         if VERSION_TOKEN_RE.fullmatch(record.version) is None:
@@ -2428,19 +2437,8 @@ class Installer:
             kwargs["env"] = env
         self.runner.run(argv, **kwargs)  # type: ignore[arg-type]
 
-    def _pip_user_bin_dir(self) -> str:
-        """Return the deterministic pip --user script directory for this interpreter."""
-        site_result = self.runner.run(
-            [sys.executable, "-c", "import site; print(site.getuserbase())"],
-            capture_output=True,
-        ).stdout.strip()
-        if not site_result:
-            raise DependencyError("failed to resolve python user site base")
-        return f"{site_result}/bin"
-
     def _with_tool_paths(self, command_env: Mapping[str, str] | None) -> dict[str, str]:
-        """Publish deterministic pip, Rust, and Lean tool paths."""
-        pip_user_bin_dir = self._pip_user_bin_dir()
+        """Publish deterministic Python, Rust, and Lean tool paths."""
         merged: dict[str, str] = dict(os.environ)
         merged.pop("CARGO_TARGET_DIR", None)
         merged.update(command_env or {})
@@ -2449,7 +2447,11 @@ class Installer:
         rustup_home = merged.get("RUSTUP_HOME", str(home / ".rustup"))
         elan_home = merged.get("ELAN_HOME", str(home / ".elan"))
         path_entries = list(filter(None, merged.get("PATH", "").split(os.pathsep)))
-        tool_paths = (f"{cargo_home}/bin", f"{elan_home}/bin", pip_user_bin_dir)
+        tool_paths = (
+            f"{cargo_home}/bin",
+            f"{elan_home}/bin",
+            str(home / ".local" / "bin"),
+        )
         merged["CARGO_HOME"] = cargo_home
         merged["RUSTUP_HOME"] = rustup_home
         merged["ELAN_HOME"] = elan_home
@@ -2514,17 +2516,16 @@ class Installer:
                 workspace=workspace,
                 privileged=True,
             )
-        elif method is Method.PIP_USER:
+        elif method is Method.PIPX:
             command = [
-                "python3",
-                "-m",
-                "pip",
+                "pipx",
                 "install",
-                "--user",
+                "--index-url",
+                record.source,
                 f"{record.package}=={record.version}",
             ]
             if repair:
-                command.insert(4, "--force-reinstall")
+                command.insert(2, "--force")
             self._run(
                 command,
                 workspace=workspace,
@@ -2723,7 +2724,7 @@ class Installer:
             VerificationKind.NPM_PACKAGE: lambda item, *, workspace: self._verify_npm_package(
                 item, workspace=workspace, strict_executable=strict_executables
             ),
-            VerificationKind.PYTHON_DISTRIBUTION: self._verify_python_distribution,
+            VerificationKind.PIPX_PACKAGE: self._verify_pipx_package,
             VerificationKind.ABSOLUTE_EXECUTABLE: self._verify_absolute_executable,
             VerificationKind.RUST_TOOLCHAIN: self._verify_rust_toolchain,
             VerificationKind.LEAN_TOOLCHAIN: self._verify_lean_toolchain,
@@ -2945,11 +2946,12 @@ class Installer:
         )
         self._require_output(executable, spec.output_contains, record.id)
 
-    def _verify_python_distribution(
+    def _verify_pipx_package(
         self, record: DependencyRecord, *, workspace: Path
     ) -> None:
         result = self._capture(
-            ["python3", "-m", "pip", "show", record.package], workspace=workspace
+            ["pipx", "runpip", record.package, "show", record.package],
+            workspace=workspace,
         )
         observed_name: str | None = None
         observed_version: str | None = None
@@ -2963,7 +2965,7 @@ class Installer:
             observed_name != canonicalize_name(record.package)
             or observed_version != record.version
         ):
-            raise DependencyError(f"{record.id}: Python distribution/version mismatch")
+            raise DependencyError(f"{record.id}: pipx package/version mismatch")
         spec = record.verification
         assert spec.executable is not None and spec.output_contains is not None
         executable = self._capture(

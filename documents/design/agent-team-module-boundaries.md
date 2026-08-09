@@ -17,7 +17,7 @@ downstream implementation ../../tools/agent_tools/workspace_scope.py owner sourc
 upstream implementation ../../tools/agent_tools/helper_function_inventory.py function/class inventory producer
 upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh static import-edge producer
 downstream implementation ../../tools/agent_tools/bootstrap_agent_run.py run-bundle caller
-downstream implementation ../../tools/agent_tools/task_start.py task-start caller
+downstream implementation ../../tools/agent_tools/bootstrap_agent_run.py task-start caller
 downstream implementation ../../tools/agent_tools/task_close.py close-agent caller
 downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py runtime alignment caller
 downstream implementation ../../tools/agent_tools/validate_role_write_scope.py write-scope caller
@@ -90,7 +90,7 @@ validation route、rollback 単位を持つ replaceable responsibility unit `too
   です。この token を持つ claim は reviewer が確定した未実装 target であり、current
   behavior の evidence とは分類しません。
 - caller evidence は `tools/agent_tools/bootstrap_agent_run.py`、
-  `tools/agent_tools/task_start.py`、
+  `tools/agent_tools/bootstrap_agent_run.py`、
   `tools/agent_tools/task_close.py`、
   `tools/agent_tools/check_agent_runtime_alignment.py`、
   `tools/agent_tools/doc_start.py`、
@@ -128,7 +128,6 @@ tools/
 └── agent_tools/
     ├── agent_team.py
     ├── bootstrap_agent_run.py
-    ├── task_start.py
     ├── task_close.py
     ├── check_agent_runtime_alignment.py
     ├── validate_role_write_scope.py
@@ -149,7 +148,7 @@ tools/
 
 | set | caller |
 | --- | --- |
-| `STARTER_SET` | `tools/agent_tools/bootstrap_agent_run.py`、`tools/agent_tools/task_start.py` |
+| `STARTER_SET` | `tools/agent_tools/bootstrap_agent_run.py` |
 | `ALIGNMENT_SET` | `tools/agent_tools/check_agent_runtime_alignment.py` |
 | `DOC_START_SET` | `tools/agent_tools/doc_start.py` |
 | `EVALUATE_SET` | `tools/agent_tools/evaluate_codex_agent_roles.py` |
@@ -223,7 +222,7 @@ test caller は `tests/agent_tools/test_agent_team_templates.py` の次の exact
 | `tests/agent_tools/test_agent_team_templates.py` | `render_template`, `suggested_public_skills`, `load_team_config`, `resolve_active_design_packet_config`, `dispatch_fixed_implementation`、`_closeout_projection`、`capacity_handshake`、`implementation_route` | `render_template` は `manifest_rendering.py`、他の承認済み symbol は各 owner を直接 import する。private helper と module object の参照は削除し、公開 behavior で検証する |
 | `tests/agent_tools/test_check_agent_runtime_alignment.py` | `TaskCatalog`, `codex_runtime_max_depth`, `load_team_config`, `resolve_active_design_packet_config`, `resolve_cross_cutting_document_packet`, `resolve_document_section_locators`, `resolve_role`, `resolve_role_document_packet`, `workflow_topology_policy_violations` | owner module を直接 import する |
 | `tests/agent_tools/test_evaluate_codex_agent_roles.py` | `load_task_catalog`, `load_team_config`, `recommended_dynamic_expansion_wave_slots`, `recommended_initial_subagent_wave`, `select_roles` | facade または owner module の explicit API |
-| `tests/agent_tools/test_task_start_and_close.py` | `AgentTypeSelection`, `load_team_config`, `validate_agent_type_selections`, `CloseAgentLifecycleEvidence`, `active_design_packet_mapping`, `default_quality_check_agent_types`, `load_task_catalog`, `materialize_close_agent_tool_call`, `recommended_dynamic_expansion_wave_slots`, `recommended_initial_subagent_wave`, `resolve_active_design_packet_config`, `select_roles`, `unique_codex_agents_for_roles`, `workflow_spawn_budget` | public facade の allowlist または owner module に移す |
+| `tests/agent_tools/test_bootstrap_and_close.py` | `AgentTypeSelection`, `load_team_config`, `validate_agent_type_selections`, `CloseAgentLifecycleEvidence`, `active_design_packet_mapping`, `default_quality_check_agent_types`, `load_task_catalog`, `materialize_close_agent_tool_call`, `recommended_dynamic_expansion_wave_slots`, `recommended_initial_subagent_wave`, `resolve_active_design_packet_config`, `select_roles`, `unique_codex_agents_for_roles`, `workflow_spawn_budget` | public facade の allowlist または owner module に移す |
 | `tests/agent_tools/test_waterfall_gate_check.py` | `ACTIVE_DESIGN_PACKET_SCHEMA`, `RunBundleSpec`, `active_design_packet_mapping`, `active_design_packet_reference_projection`, `load_team_config`, `normalize_active_design_packet_config`, `resolve_active_design_packet_config` | packet/config owner の explicit API に移す |
 
 ### 3.3 direct-script と package import の current contract
@@ -484,7 +483,7 @@ smoke/test、manifest bytes、JSON snapshot、capacity receipt、stdout/stderr/e
 | clause | current evidence | target mechanism | completion evidence |
 | --- | --- | --- | --- |
 | `RC-01` | `tools/agent_tools/agent_team.py` と caller AST | 六 owner module + underscore collaborator alias を持つ facade の一つの DAG | public names と `__all__` の集合一致、旧 forbidden facade names の explicit import failure、cycle-free import readback |
-| `RC-02` | `tools/agent_tools/bootstrap_agent_run.py`、`task_start.py` | `team_config.py` が `WritePolicy`、`workspace_scope.py` が facade re-export なしで `RoleWriteScope`、`implementation_dispatch.py` が capacity を所有 | owner direct import readback と capacity/scope behavior oracle |
+| `RC-02` | `tools/agent_tools/bootstrap_agent_run.py` | `team_config.py` が `WritePolicy`、`workspace_scope.py` が facade re-export なしで `RoleWriteScope`、`implementation_dispatch.py` が capacity を所有 | owner direct import readback と capacity/scope behavior oracle |
 | `RC-03` | `tools/agent_tools/agent_team.py` の packet declarations | `packets.py` が identity/reference/normalization を所有 | packet field/reference equality |
 | `RC-04` | `tools/agent_tools/skill_shim_materializer.py` | `tool_calls.py` が ToolCall materialization を所有 | schema/receipt/stdout-stderr equality |
 | `RC-05` | `tools/agent_tools/validate_role_write_scope.py`、`workflow_monitor.py` | `workspace_scope.py` と `manifest_rendering.py` の side-effect boundary | snapshot/scope/manifest oracle |

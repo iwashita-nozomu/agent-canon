@@ -269,7 +269,7 @@ contract design
 responsibility Documents this file's role so agents can identify why it exists.
 upstream design ../../agents/canonical/CODEX_WORKFLOW.md workflow contract
 upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py consumes workflow metadata
-downstream implementation ../tests/agent_tools/test_task_start_and_close.py verifies emitted output
+downstream implementation ../tests/agent_tools/test_bootstrap_and_close.py verifies emitted output
 @dependency-end
 ```
 
@@ -379,7 +379,7 @@ Python / shell / TOML:
 # contract tool
 # responsibility Implements one repository tool or runtime helper.
 # upstream implementation ../../tools/agent_tools/agent_team.py imports helper contract
-# downstream implementation ../tests/agent_tools/test_task_start_and_close.py verifies CLI behavior
+# downstream implementation ../tests/agent_tools/test_bootstrap_and_close.py verifies CLI behavior
 # @dependency-end
 ```
 
@@ -525,6 +525,11 @@ incomplete graph is inspectable through status but cannot authorize query or
 context evidence. Freshness binds parent HEAD, dirty fingerprint, source
 snapshot, producer hashes, profile pair `default`/`parent`, schema, and tool
 versions; stale state is reported and never silently rebuilt.
+
+`issues/closed/` records are historical evidence, not active dependency
+owners. They remain source identities so active canon may cite a closed issue,
+but their dependency headers do not emit declarations or unresolved-target
+diagnostics. `issues/open/` records retain the ordinary active manifest route.
 
 ### Executable finite-set contract
 

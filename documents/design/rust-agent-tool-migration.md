@@ -200,7 +200,6 @@ Recommended first migrations:
 Keep these Python-first until behavior stabilizes:
 
 - bootstrap_agent_run.py
-- task_start.py
 - task_close.py
 - evaluate_agent_run.py
 - agent_canon_update_todos.py

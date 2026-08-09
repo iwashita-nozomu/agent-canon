@@ -119,11 +119,9 @@ from vendor_skill_adapters import VendorSkillValidator
 UTC = timezone.utc
 
 PROJECT_CONFIG_PATH = ROOT / ".codex" / "config.toml"
-PROJECT_SKILL_CONFIG_PATH = ROOT / ".codex" / "project-config.toml"
 HOOKS_JSON_PATH = ROOT / ".codex" / "hooks.json"
 CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
 SKILL_SHIM_ROOT = ROOT / ".agents" / "skills"
-PROJECT_SKILL_LANE = ".codex/project-skills"
 PUBLIC_SKILL_DOC_ROOT = ROOT / "agents" / "skills"
 INTERNAL_ROUTINE_ROOT = ROOT / "agents" / "internal-routines"
 MAX_VENDOR_SKILL_FINDINGS_IN_MESSAGE = 8
@@ -304,17 +302,6 @@ def load_project_config_toml() -> dict[str, object]:
     return require_mapping(raw_config, ".codex/config.toml must parse as a mapping")
 
 
-def load_project_skill_config_toml() -> dict[str, object]:
-    """Load the optional parent-owned Codex skill overlay."""
-    if not PROJECT_SKILL_CONFIG_PATH.is_file():
-        return {}
-    raw_config: object = tomllib.loads(PROJECT_SKILL_CONFIG_PATH.read_text(encoding="utf-8"))
-    return require_mapping(
-        raw_config,
-        ".codex/project-config.toml must parse as a mapping",
-    )
-
-
 def validate_project_config() -> None:
     """Check that the shared project config exposes the review route."""
     config = load_project_config_toml()
@@ -379,17 +366,30 @@ def validate_project_config() -> None:
         config.get("tool_output_token_limit") == EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT,
         f"tool_output_token_limit must remain {EXPECTED_TOOL_OUTPUT_TOKEN_LIMIT}",
     )
-    features = require_mapping(config.get("features", {}), "features must be a mapping")
-    ensure(features.get("hooks") is True, "features.hooks must be true")
-    ensure(features.get("goals") is True, "features.goals must be true")
-    ensure(features.get("multi_agent") is True, "features.multi_agent must be true")
-    ensure("codex_hooks" not in features, "deprecated features.codex_hooks must be absent")
-    ensure("profiles" not in config, "project-local profiles must stay out of shared config")
+    ensure(
+        config.get("approval_policy") == "on-request",
+        "approval_policy must use the recommended on-request project default",
+    )
+    ensure(
+        config.get("sandbox_mode") == "workspace-write",
+        "sandbox_mode must use the recommended workspace-write project default",
+    )
+    ensure(
+        "features" not in config,
+        "stable Codex features must use runtime defaults instead of project overrides",
+    )
+    ensure(
+        "skills" not in config,
+        "repository skills must use automatic .agents/skills discovery",
+    )
+    ensure(
+        "profiles" not in config,
+        "project-local profiles must stay out of shared config",
+    )
     ensure(
         "agent_model_policy" not in config,
         "agent_model_policy must stay out of .codex/config.toml; use .codex/agents/*.toml",
     )
-    validate_skill_config(config, load_project_skill_config_toml())
     agents = require_mapping(config.get("agents", {}), "agents must be a mapping")
     ensure(
         agents.get("max_threads") == EXPECTED_MAX_THREADS,
@@ -444,17 +444,6 @@ def validate_project_config() -> None:
         )
 
 
-def expected_skill_config_paths() -> tuple[str, ...]:
-    """Return public project-local skill paths that must be enabled in Codex config."""
-    return tuple(
-        sorted(
-            f"../{path.relative_to(ROOT).as_posix()}"
-            for path in SKILL_SHIM_ROOT.glob("*/SKILL.md")
-            if is_public_skill_id(path.parent.name)
-        )
-    )
-
-
 def is_private_skill_id(skill_id: str) -> bool:
     """Return whether one skill id is private and runtime-internal."""
     return skill_id.startswith(PRIVATE_SKILL_PREFIX)
@@ -463,83 +452,6 @@ def is_private_skill_id(skill_id: str) -> bool:
 def is_public_skill_id(skill_id: str) -> bool:
     """Return whether one skill id belongs to the user-facing public catalog."""
     return bool(skill_id) and not is_private_skill_id(skill_id)
-
-
-def validate_skill_config(
-    config: dict[str, object],
-    project_config: dict[str, object] | None = None,
-) -> None:
-    """Check shared and parent-owned skill config lanes."""
-    skills = require_mapping(config.get("skills", {}), "skills must be a mapping")
-    entries = require_list(skills.get("config", []), "skills.config must be a list")
-    observed_agentcanon: list[str] = []
-    for entry in entries:
-        entry = require_mapping(entry, "skills.config entries must be mappings")
-        path_value = validate_skill_config_entry(entry, PROJECT_CONFIG_PATH)
-        resolved = (PROJECT_CONFIG_PATH.parent / path_value).resolve()
-        ensure(
-            resolved.is_relative_to(SKILL_SHIM_ROOT.resolve()),
-            "project-owned skills.config entries must live in .codex/project-config.toml: "
-            f"{path_value}",
-        )
-        ensure(
-            is_public_skill_id(resolved.parent.name),
-            f"private skill shims must stay out of skills.config: {path_value}",
-        )
-        observed_agentcanon.append(path_value)
-    expected = expected_skill_config_paths()
-    ensure(
-        sorted(observed_agentcanon) == list(expected),
-        "skills.config must enable every .agents/skills/*/SKILL.md path",
-    )
-    validate_project_skill_config(project_config or {})
-
-
-def validate_project_skill_config(project_config: dict[str, object]) -> None:
-    """Check optional parent-owned project skill config entries."""
-    skills = require_mapping(project_config.get("skills", {}), "project skills must be a mapping")
-    entries = require_list(
-        skills.get("config", []),
-        "project skills.config must be a list",
-    )
-    observed_project: list[str] = []
-    for entry in entries:
-        entry = require_mapping(entry, "project skills.config entries must be mappings")
-        path_value = validate_skill_config_entry(entry, PROJECT_SKILL_CONFIG_PATH)
-        resolved = (PROJECT_SKILL_CONFIG_PATH.parent / path_value).resolve()
-        ensure(
-            is_project_skill_lane_path(resolved),
-            f"skills.config path is outside allowed skill lanes: {path_value}",
-        )
-        ensure(
-            is_public_skill_id(resolved.parent.name),
-            f"private project skill shims must stay out of skills.config: {path_value}",
-        )
-        observed_project.append(path_value)
-    ensure(
-        len(observed_project) == len(set(observed_project)),
-        "project-owned skills.config entries must not be duplicated",
-    )
-
-
-def validate_skill_config_entry(entry: dict[str, object], config_path: Path) -> str:
-    """Validate one skills.config entry and return its path."""
-    path_value = str(entry.get("path", "")).strip()
-    ensure(bool(path_value), "skills.config entry path must be non-empty")
-    ensure(entry.get("enabled") is True, f"skills.config {path_value} must be enabled")
-    resolved = (config_path.parent / path_value).resolve()
-    ensure(resolved.is_file(), f"skills.config path missing: {path_value}")
-    ensure(resolved.name == "SKILL.md", f"skills.config path must point at SKILL.md: {path_value}")
-    return path_value
-
-
-def is_project_skill_lane_path(path: Path) -> bool:
-    """Return whether one SKILL.md path belongs to the project-owned skill lane."""
-    lane_root = (PROJECT_CONFIG_PATH.parent / "project-skills").resolve()
-    try:
-        return path.is_relative_to(lane_root)
-    except ValueError:
-        return False
 
 
 def validate_retired_command_or_skill(value: str, child: str) -> None:
@@ -895,7 +807,6 @@ def validate_task_catalog_references() -> None:
         == "distinct_unresolved_claim_or_risk_only",
         "review_activation_policy specialist activation must be conditional",
     )
-    runtime_max_threads = codex_runtime_max_threads()
     role_ids = {role.id for role in config.always_on_roles + config.specialist_roles}
     topology = require_mapping(
         catalog.raw.get("role_topology_defaults"),
@@ -1513,7 +1424,6 @@ def validate_subagent_protocol_docs() -> None:
                 "agents/task_catalog.yaml",
                 "agents/agents_config.json",
                 ".codex/agents/*.toml",
-                "task_start.py",
                 "bootstrap_agent_run.py",
                 "workflow_monitor.py",
                 "python3 tools/agent_tools/route.py --prompt",

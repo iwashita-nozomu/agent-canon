@@ -79,12 +79,6 @@ DOC_ALWAYS_REQUIRED_MARKERS = (
     "vendor/agent-canon/tools/",
     "Project-local automation must stay in project-owned paths",
 )
-DOC_MARKERS_BY_MANIFEST_PATH = {
-    ".codex/project-config.toml": (".codex/project-config.toml",),
-    ".codex/project-skills": (".codex/project-skills",),
-}
-
-
 @dataclass(frozen=True)
 class SurfaceEntry:
     """One root runtime surface contract."""
@@ -513,7 +507,7 @@ def check_doc(root: Path, prefix: str, manifest: SurfaceManifest) -> list[str]:
     doc_paths = (root / prefix / DEFAULT_DOC, root / DEFAULT_DOC)
     doc_path = next((path for path in doc_paths if path.is_file()), doc_paths[-1])
     doc_text = doc_path.read_text(encoding="utf-8") if doc_path.is_file() else ""
-    for marker in required_doc_markers(manifest):
+    for marker in DOC_ALWAYS_REQUIRED_MARKERS:
         if marker not in doc_text:
             findings.append(f"SURFACE_MANIFEST_FINDING={marker}:missing-doc-marker")
     sync_path = root / prefix / "tools" / "sync_agent_canon.sh"
@@ -525,16 +519,6 @@ def check_doc(root: Path, prefix: str, manifest: SurfaceManifest) -> list[str]:
     if not manifest.entries:
         findings.append("SURFACE_MANIFEST_FINDING=documents/runtime/shared-runtime-surfaces.toml:empty-manifest")
     return findings
-
-
-def required_doc_markers(manifest: SurfaceManifest) -> tuple[str, ...]:
-    """Return doc markers required by always-on policy and active manifest entries."""
-    markers: list[str] = list(DOC_ALWAYS_REQUIRED_MARKERS)
-    manifest_paths = {entry.path for entry in manifest.entries}
-    for path, path_markers in DOC_MARKERS_BY_MANIFEST_PATH.items():
-        if path in manifest_paths:
-            markers.extend(path_markers)
-    return tuple(markers)
 
 
 def render_command_outputs(manifest: SurfaceManifest, root: Path) -> Mapping[str, str]:

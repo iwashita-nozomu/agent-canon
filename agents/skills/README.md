@@ -90,7 +90,7 @@ GPU profile の admission semantics は `gpu-execution` に残します。
 
 - docs completeness、docs consistency、notation、logic gap、citation/evidence、critical/report、research perspective review は public skill ではなく、workflow が自動で要求する review pass として扱います。
 - artifact placement、CLI adapter、static validation は `agents/internal-routines/`、`agents/canonical/`、`documents/conventions/REVIEW_PROCESS.md` の責務に寄せます。
-- `.agents/skills/<skill>/SKILL.md` shim がない routine は `agents/internal-routines/` に置きます。AgentCanon public skill へ昇格するときだけ `agents/skills/` 文書、catalog entry、shim、AgentCanon-owned `.codex/config.toml` の `[[skills.config]]` を同じ変更で追加します。parent-owned skill は `.codex/project-config.toml` で有効化します。
+- `.agents/skills/<skill>/SKILL.md` shim がない routine は `agents/internal-routines/` に置きます。AgentCanon public skill へ昇格するときだけ `agents/skills/` 文書、catalog entry、shim を同じ変更で追加します。Codex は `.agents/skills/` を自動探索するため、列挙 config は追加しません。
 - agent orchestration は public skill として先頭に出し、task 開始時に runtime が拾えるようにします。
 - subagent bootstrap は public skill として出し、repo-changing task の stage separation で使います。
 - carry-over の吸い上げは `notes/` と worktree log を正本にし、独立 public skill にはしません。
@@ -112,13 +112,11 @@ in the Codex host runtime.
 
 ## Codex Defaults
 
-- AgentCanon public skill discovery is wired through official Codex `[[skills.config]]` entries in AgentCanon-owned `.codex/config.toml`; every `.agents/skills/<skill>/SKILL.md` shim must be enabled there.
-- Parent repositories may add repo-specific skills in
-  `.codex/project-skills/<skill>/SKILL.md` and wire them with additional
-  `[[skills.config]]` entries in parent-owned `.codex/project-config.toml`.
-  Do not put parent-specific skills under
-  AgentCanon-owned `.agents/skills/`; that directory remains catalog-backed
-  shared canon.
+- AgentCanon public skills are discovered automatically from
+  `.agents/skills/<skill>/SKILL.md`; `.codex/config.toml` does not duplicate the
+  catalog as a second registry.
+- Parent repositories add repo-specific skills only through an official
+  parent- or subtree-owned `.agents/skills/<skill>/SKILL.md` surface.
 - AgentCanon-owned public skills appear in `catalog.yaml`; official system skills stay in the host-provided lane above.
 - Codex では `AGENTS.md` と `agents/canonical/CODEX_WORKFLOW.md` を先に読み、repo task の skill 選択は `$agent-orchestration` から始めます。
 - task ごとの skill 選択は `python3 tools/agent_tools/route.py --prompt "<user request>" --format json` の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` を第一候補にし、このディレクトリと `catalog.yaml` は skill の責務確認に使います。依存 module の source clone、lifecycle、cleanup が scope の場合は `$dependency-module-change` を先に通し、AgentCanon 固有の pin/update route はその一般規約を参照する具体例として扱います。

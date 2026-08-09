@@ -5,7 +5,6 @@
 # responsibility Tests workflow monitor accumulation behavior.
 # upstream implementation ../../tools/agent_tools/workflow_monitor.py appends evidence
 # upstream implementation ../../tools/agent_tools/bootstrap_agent_run.py seeds evidence
-# upstream implementation ../../tools/agent_tools/task_start.py seeds evidence
 # upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns update lifecycle evidence identities
 # @dependency-end
 
@@ -23,10 +22,27 @@ from typing import Protocol, cast
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
-TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
 RUNTIME_PROFILE_INVENTORY = (
-    PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
+    PROJECT_ROOT
+    / "documents"
+    / "runtime"
+    / "runtime-profiles-and-check-matrix.json"
 )
+
+
+def seed_bootstrap_workspace(workspace_root: Path) -> None:
+    """Copy the canonical runtime inputs required by the bootstrap fixture."""
+    for relative_path in (
+        ".codex/config.toml",
+        "agents/model_profiles.toml",
+        "agents/canonical/CODEX_WORKFLOW.md",
+        "templates/agents/design_brief.md",
+        "agents/workflows/implementation-waterfall-workflow.md",
+        "documents/design/dependency-manifest-design.md",
+    ):
+        destination = workspace_root / relative_path
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes((PROJECT_ROOT / relative_path).read_bytes())
 
 
 class WorkflowMonitorModule(Protocol):
@@ -374,6 +390,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True)
+            seed_bootstrap_workspace(workspace_root)
             bootstrap = subprocess.run(
                 [
                     sys.executable,
@@ -1095,6 +1112,7 @@ class WorkflowMonitorTest(unittest.TestCase):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True)
+            seed_bootstrap_workspace(workspace_root)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -1121,44 +1139,6 @@ class WorkflowMonitorTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             monitor_path = report_root / "monitor-bootstrap" / "workflow_monitoring.md"
-            text = monitor_path.read_text(encoding="utf-8")
-            self.assertIn("workflow=Owner-Bounded Change", text)
-            self.assertIn("skills=$agent-orchestration", text)
-            self.assertIn("stage owner routing active_roles=", text)
-            self.assertIn("created run bundle", text)
-
-    def test_task_start_seeds_monitoring_with_routing_evidence(self) -> None:
-        """task_start should seed workflow monitoring without manual edits."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            report_root = Path(tmp_dir) / "reports"
-            workspace_root.mkdir(parents=True)
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_START_SCRIPT),
-                    "--task",
-                    "monitor task start",
-                    "--task-id",
-                    "T1",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    "monitor-task-start",
-                    "--workspace-root",
-                    str(workspace_root),
-                    "--report-root",
-                    str(report_root),
-                    "--skip-agent-canon-preflight",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            monitor_path = report_root / "monitor-task-start" / "workflow_monitoring.md"
             text = monitor_path.read_text(encoding="utf-8")
             self.assertIn("workflow=Owner-Bounded Change", text)
             self.assertIn("skills=$agent-orchestration", text)

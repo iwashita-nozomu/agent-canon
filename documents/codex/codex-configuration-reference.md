@@ -79,8 +79,8 @@ representative excerpt; `.codex/config.toml` is the complete machine-readable
 source:
 
 ```toml
-approval_policy = "never"
-sandbox_mode = "danger-full-access"
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
 
 model = "gpt-5.6-sol"
 model_reasoning_effort = "high"
@@ -88,17 +88,8 @@ review_model = "gpt-5.6-luna"
 model_context_window = 1000000
 tool_output_token_limit = 4096
 
-[features]
-hooks = true
-goals = true
-multi_agent = true
-
-[[skills.config]]
-path = "../.agents/skills/agent-orchestration/SKILL.md"
-enabled = true
-
 [agents]
-max_threads = 26
+max_threads = 27
 max_depth = 2
 job_max_runtime_seconds = 3600
 
@@ -109,7 +100,7 @@ config_file = "agents/worker.toml"
 
 Operational interpretation:
 
-- `approval_policy="never"` and `sandbox_mode="danger-full-access"` assume the surrounding environment already provides the safety boundary.
+- `approval_policy="on-request"` and `sandbox_mode="workspace-write"` keep the project default within Codex's standard approval and workspace boundary.
 - `model="gpt-5.6-sol"` with `model_reasoning_effort="high"` is the parent
   orchestrator projection. `agents/model_profiles.toml` owns child model,
   reasoning, capability, context, return-schema, checkpoint, continuation, and
@@ -118,11 +109,10 @@ Operational interpretation:
 - `tool_output_token_limit=4096` bounds individual tool output admitted to
   context; it is not a task token cap or a reason to omit decision-relevant
   evidence.
-- `features.hooks=true` makes hook-defined startup and prompt context part of runtime behavior.
-- `features.goals=true` enables the Codex session goal feature; repo-durable loop state still lives in `goal.md` and `tools/agent_tools/goal_loop.py`.
-- `features.multi_agent=true` enables the registered child-agent surface.
-- `skills.config` and `agents.<role>` register repo-owned skills and child
-  roles; skill workflow authority remains in `SKILL.md`, and role behavior and
+- Stable runtime features use Codex defaults instead of project-level feature overrides.
+- Codex discovers repo-owned skills automatically from `.agents/skills/`;
+  `agents.<role>` registers child roles. Skill workflow authority remains in
+  `SKILL.md`, and role behavior and
   model selection remain in each role TOML.
 - Reusable runtime profiles belong to machine-local user config. This repository
   does not prescribe profile names or values, and workflow routing does not
@@ -143,14 +133,12 @@ listed in [上流限定の Codex CLI API 事実](#上流限定の-codex-cli-api-
 
 | Key | Current Role In This Repo |
 | --- | ------------------------- |
-| `approval_policy` | Non-interactive execution policy; currently `never` because this template assumes an externally controlled workspace. |
-| `sandbox_mode` | Filesystem/runtime sandbox mode; currently `danger-full-access` for externally sandboxed runs. |
+| `approval_policy` | Command approval policy; `on-request` is the shared project default. |
+| `sandbox_mode` | Filesystem/runtime sandbox mode; `workspace-write` is the shared project default. |
 | `model`, `model_reasoning_effort` | Parent orchestrator default: `gpt-5.6-sol/high`. |
 | `review_model` | Parent review projection; named child role settings are generated from `agents/model_profiles.toml`. |
 | `model_context_window` | Explicit parent context-window declaration. |
 | `tool_output_token_limit` | Per-tool output context boundary. |
-| `features` | Hooks, goals, and multi-agent runtime are enabled. |
-| `skills.config` | Repo-owned public skill registry. |
 | `agents` | Capacity limits plus named child-agent registry; role TOMLs own child model and behavior. |
 
 ### Top-Level Keys Not Currently In `.codex/config.toml`
@@ -173,8 +161,8 @@ Interpretation for this template:
 - Additional model/provider keys should usually be placed in user config or profiles unless the repo requires a shared default.
 - Absent UI, history, audio, notice, Windows, credential-store, and OAuth keys are machine-local by default.
 - Absent `hooks` does not mean hooks are unused here; this repo uses the sibling `.codex/hooks.json` surface rather than inline TOML hooks.
-- Registered `skills.config` entries expose repo-owned `.agents/skills/`
-  packages; selecting a skill still precedes reading its `SKILL.md`.
+- Codex automatically discovers repo-owned `.agents/skills/` packages;
+  selecting a skill still precedes reading its `SKILL.md`.
 - Absent experimental keys should stay absent unless a task explicitly owns the risk and rollback path.
 
 ### 上流限定の Codex CLI API 事実
@@ -209,87 +197,9 @@ runtime/config/routing surface として経路化しません。`codex-cli-guide
 | `--local-provider` | `--oss` と組み合わせる上流の provider 選択 flag である。 |
 | `oss_provider` | `--oss` 実行時の上流 provider 選択設定キーである。 |
 
-### Feature Flags Not Currently Enabled Here
+### Runtime Feature Defaults
 
-The schema currently exposes many feature flags under `[features]`.
-This template enables `hooks`, `goals`, and `multi_agent`.
-All other schema-listed flags are currently absent from the shared repo config:
-
-```text
-apply_patch_freeform
-apply_patch_streaming_events
-apps
-browser_use
-child_agents_md
-chronicle
-code_mode
-code_mode_only
-codex_git_commit
-collab
-collaboration_modes
-computer_use
-connectors
-default_mode_request_user_input
-elevated_windows_sandbox
-enable_experimental_windows_sandbox
-enable_fanout
-enable_request_compression
-exec_permission_approvals
-experimental_use_freeform_apply_patch
-experimental_use_unified_exec_tool
-experimental_windows_sandbox
-external_migration
-fast_mode
-general_analytics
-guardian_approval
-image_detail_original
-image_generation
-in_app_browser
-include_apply_patch_tool
-js_repl
-js_repl_tools_only
-memories
-memory_tool
-multi_agent
-multi_agent_v2
-personality
-plugins
-prevent_idle_sleep
-realtime_conversation
-remote_control
-remote_models
-remote_plugin
-request_permissions
-request_permissions_tool
-request_rule
-responses_websockets
-responses_websockets_v2
-runtime_metrics
-search_tool
-shell_snapshot
-shell_tool
-shell_zsh_fork
-skill_env_var_dependency_prompt
-skill_mcp_dependency_install
-sqlite
-steer
-telepathy
-tool_call_mcp_elicitation
-tool_search
-tool_search_always_defer_mcp_tools
-tool_suggest
-tui_app_server
-unavailable_dummy_tools
-undo
-unified_exec
-use_legacy_landlock
-use_linux_sandbox_bwrap
-web_search
-web_search_cached
-web_search_request
-workspace_dependencies
-workspace_owner_usage_nudge
-```
+Stable runtime features use Codex defaults. Add a project-level feature override only when an owning workflow requires a non-default value and names its validation and rollback evidence.
 
 ### Nested Settings Not Currently Used By The Template
 
@@ -297,7 +207,7 @@ workspace_owner_usage_nudge
 | ------- | --------------- | -------------------------------- |
 | `[agents]` | `max_threads`, `max_depth`, `job_max_runtime_seconds`, and inline role entries such as `[agents.<role>]` with `config_file`, `description`, and `nickname_candidates` | task policy strings such as same-role instance rules; keep those in `agents/task_catalog.yaml` and generated `team_manifest.yaml` |
 | `.codex/hooks.json` versus `[hooks]` | hooks are stored in `.codex/hooks.json` | inline `[hooks]` entries for `SessionStart`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `PermissionRequest`, and `Stop` |
-| `.agents/skills/` versus `[skills]` | skills are provided as files under `.agents/skills/` | `[skills] include_instructions`, `[skills.bundled]`, and `[[skills.config]]` name/path enablement entries |
+| `.agents/skills/` | skills are provided as files under `.agents/skills/` and discovered automatically | a project-level skill registry that duplicates the filesystem inventory |
 
 Use this matrix during reviews: if a task proposes adding one of these absent keys, require a short reason for why it belongs in shared repo config rather than user config, a profile, CLI override, hook file, skill file, or machine-local state.
 
@@ -482,9 +392,9 @@ and are not AgentCanon configuration surfaces.
 
 | Setting | Use |
 | ------- | --- |
-| `approval_policy` | Coarse approval behavior. Local CLI help exposes `untrusted`, deprecated `on-failure`, `on-request`, and `never`. |
+| `approval_policy` | Coarse approval behavior. Use `on-request` as the shared project default; broader non-interactive authority belongs to an explicit invocation boundary. |
 | `approvals_reviewer` | Routes approval requests to `user`, `auto_review`, or `guardian_subagent` where supported. |
-| `sandbox_mode` | Filesystem/command sandbox: `read-only`, `workspace-write`, or `danger-full-access`. |
+| `sandbox_mode` | Filesystem/command sandbox. Use `workspace-write` for repository work and `read-only` for review; broader authority is an explicit invocation decision. |
 | `sandbox_workspace_write.writable_roots` | Extra writable roots for workspace-write mode. |
 | `sandbox_workspace_write.network_access` | Network availability in workspace-write mode. |
 | `sandbox_workspace_write.exclude_slash_tmp` | Exclude `/tmp` from writable sandbox assumptions. |
@@ -679,14 +589,12 @@ Skills are loaded from multiple roots. Official docs describe repository, user, 
 | ----- | ------- |
 | `include_instructions` | Whether automatic skills instruction block is injected. |
 | `bundled.enabled` | Enables or disables bundled skills. |
-| `[[skills.config]] name` | Select a skill by name. |
-| `[[skills.config]] path` | Select a skill by path. |
-| `[[skills.config]] enabled` | Enable or disable selected skill. |
-
 Operational guidance:
 
 - Keep reusable workflow logic in skills when it must be invoked repeatedly.
 - Keep current project policy in `AGENTS.md` and workflow docs.
+- Put repository skills in `.agents/skills/<skill>/SKILL.md`; rely on automatic
+  discovery instead of enumerating enabled entries in project config.
 - If many skills exist, descriptions compete for initial prompt budget; names and descriptions must be concise and distinctive.
 
 ## AGENTS.md and Project Docs

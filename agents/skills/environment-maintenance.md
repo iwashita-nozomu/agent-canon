@@ -77,7 +77,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - 「何となく便利だから」で repo 正本の環境を変えません。必ず code path、command、run profile のどれが詰まっているかを残します。
 - code requirement を host-only の手元 install で回避できても、repo-wide に必要なものは Docker / CI / docs の正本へ入れます。
 - repo の共通環境に入れる tool は、個人環境前提の host-global install を正本にしません。
-- project Python dependencies are declared only in `pyproject.toml` selected extras and are installed by the shared standard editable `project-install` command; Agent/Codex tools are declared only in the typed `.devcontainer/dependencies.toml` manifest.
+- 独立した Python CLI は typed `.devcontainer/dependencies.toml` manifest から `pipx` で隔離 install します。project Python dependencies は `pyproject.toml` selected extras だけに宣言し、shared standard editable `project-install` command で導入します。
 - Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth、host mount 方針は `CONTAINER_OPERATIONS.md` の devcontainer boundary に従います。
 - environment gate、Docker validation、venv prohibition check は Python に依存しない shell entrypoint を優先します。
 - Docker images own fixed Python/native capabilities; Node/npm is owned by the exact digest-pinned official Node Feature. A project-owned `VIRTUAL_ENV` may be selected by the project runtime contract, while the shared lifecycle uses the current Python/pip standard editable `project-install` for selected extras. Do not require a distro venv package, host-created virtual environments, or ad hoc `virtualenv`, `conda`, `uv`, `pipenv`, or `poetry` environments.

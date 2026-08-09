@@ -37,8 +37,9 @@ bash tools/docker_dependency_validator.sh
 
 次を owner、replaceable unit、実装機構、validation route として記録します。
 
-- fixed shell bootstrap が python3 + tomllib/tomli + python3-packaging、
-  Node/npm 22.14.0 の arch-specific SHA256、ninja-build だけを確立すること
+- standalone image が python3 + tomllib/tomli + pipx + python3-packaging と
+  native build capability を固定し、Node/npm 22.14.0/10.9.2 は exact
+  digest-pinned devcontainer Feature が所有すること
 - parent manifest を先、vendor manifest を後に読み、standalone は自身を
   一度だけ読むこと
 - record の closed method、必須 scalar、method-specific security fields、

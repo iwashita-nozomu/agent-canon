@@ -459,7 +459,7 @@ exit 条件:
 - 新規・変更する human-authored text file では旧 `Dependency Files:` block を使わず、`documents/design/dependency-manifest-design.md` の `@dependency-start` / `@dependency-end` 形式に統一します
 - 新しい dependency edge を足す場合は reverse edge も同じ pass の file plan に入れます。移行中で reverse edge 追加を同じ pass に含められない場合は、design review に blocker か明示 escalation として出します
 - `Canonical Tree-Head Plan` では、task 完了後に tracked tree に残してよい canonical design path と canonical implementation path を固定し、parallel design doc、implementation copy、dated snapshot、backup file、duplicate directory を作らないことを明示します
-- `bootstrap_agent_run.py` と `task_start.py` は `DESIGN_DOCUMENT_PACKET` と `IMPLEMENTATION_DOCUMENT_PACKET` を出力します。parent は designer / implementer subagent 起動時にその path 群をそのまま渡します
+- `bootstrap_agent_run.py` は `DESIGN_DOCUMENT_PACKET` と `IMPLEMENTATION_DOCUMENT_PACKET` を出力します。parent は designer / implementer subagent 起動時にその path 群をそのまま渡します
 - `Design-To-Implementation Trace` には、各予定差分ごとに design section、request clause ID、source / reuse 文書または code path、validation evidence を対応付けます。test-design route が active な場合だけ test plan item も対応付けます
 - 新規 helper、new module、new dependency、new public API を足す差分では、既存実装や導入済みライブラリでは足りない理由を `Design-To-Implementation Trace` に対応付けます
 - 既存 module boundary、命名、API shape、test style、docs style から逸脱する場合は、理由を明示します

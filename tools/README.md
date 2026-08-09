@@ -331,7 +331,7 @@ findings for resilient test planning.
     `caller_analysis.integration_candidates` を生成します。
 - `agent_tools/`
   - task/doc start、waterfall gate、close gate、work log、runtime smoke
-  - `task_start.py` と `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。
+  - `bootstrap_agent_run.py` は task 入口で `make agent-canon-ensure-latest` preflight を自動実行します。submodule repo では親 repo の無関係な dirty state だけを理由に skip せず、AgentCanon update surface が repairable なら最新化を進めます。unsafe な update surface は machine-readable に route を出します。
   - `agent_canon_update_todos.py` は AgentCanon pin 更新後に親 repo の agent が先に消化する TODO を `documents/agent-canon/agent-canon-update-tasks.toml` から読み、親 repo ローカルの `.agent-canon/update-state.toml` で適用済み boundary を管理します。pending は停止理由ではなく、task-start の `AGENT_CANON_UPDATE_TODO_NEXT=apply_agent_canon_update_todos` として最初の作業に route します。
 - `search.py` は `--purpose` から text / deterministic semantic card / vector / tool catalog / dependency header / Python code facts をまとめて検索し、candidate path と provider evidence を返します。semantic だけを使うときは `--providers semantic` を指定します。
 - `search_index.py` は semantic provider 向けの `semantic-cards.jsonl` を `.agent-canon/search-index/semantic-cards.jsonl` に生成します。生成 index は repo-local ignored state で、commit しません。
@@ -524,7 +524,7 @@ python3 tools/agent_tools/evaluate_agent_run.py \
 `workflow_monitoring.md` is the in-workflow monitoring artifact consumed by the evaluation. Keep it current during the run, not only at closeout.
 `workflow_monitor.py` appends signals, interventions, and improvement decisions to `workflow_monitoring.md`.
 After evidence is verified, `workflow_monitor.py --closeout-token-preset` records the standard behavior tokens consumed by `evaluate_agent_run.py`; it is a recording shortcut, not a substitute for validation evidence.
-`bootstrap_agent_run.py` and `task_start.py` seed routing and preflight signals automatically.
+`bootstrap_agent_run.py` seeds routing and preflight signals automatically.
 `run_repo_dependency_review.sh` can append evidence when given `--report-dir`
 or `AGENT_RUN_REPORT_DIR`.
 `compare_agent_run_paths.py` compares two run bundles when agent behavior can take different execution paths. It emits `RUN_PATH_COMPARISON`, `RUN_PATHS_DIFFER`, `SELECTED_INEFFICIENT_ROUTE`, and `STATIC_ANALYSIS_FEEDBACK` tokens for `workflow_monitoring.md` and fails when the selected candidate route is known inefficient.

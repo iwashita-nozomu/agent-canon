@@ -1925,25 +1925,7 @@ entries:
       - documents/tools/README.md
       - agents/canonical/CODEX_WORKFLOW.md
     tests:
-      - tests/agent_tools/test_task_start_and_close.py
-
-  - id: task-start
-    summary: Starts a lightweight task bundle with routing and preflight evidence.
-    path: tools/agent_tools/task_start.py
-    family: agent_tools
-    role: workflow
-    status: canonical
-    command: python3 tools/agent_tools/task_start.py
-    writes: true
-    default_wiring:
-      ci: false
-      pr_check: false
-    docs:
-      - tools/README.md
-      - documents/tools/README.md
-      - agents/canonical/CODEX_WORKFLOW.md
-    tests:
-      - tests/agent_tools/test_task_start_and_close.py
+      - tests/agent_tools/test_bootstrap_and_close.py
 
   - id: task-close
     summary: Checks closeout evidence before task completion.
@@ -1961,7 +1943,7 @@ entries:
       - documents/tools/README.md
       - agents/canonical/CODEX_WORKFLOW.md
     tests:
-      - tests/agent_tools/test_task_start_and_close.py
+      - tests/agent_tools/test_bootstrap_and_close.py
 
   - id: evaluate-agent-run
     summary: Evaluates an agent run bundle for workflow and evidence completeness.

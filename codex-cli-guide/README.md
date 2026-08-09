@@ -21,11 +21,10 @@ downstream implementation tools/validate_split.py validates split guide reconstr
 
 ## Runtime compatibility note
 
-This split guide normalizes hook flag examples for the current template runtime.
-`codex-cli 0.130.0` reports `features.hooks` as the supported lifecycle hook
-flag and warns that project-local `profiles` are ignored. Keep reusable
-profiles in user-level Codex config and use `[features] hooks = true` in
-project-local config.
+The split body is a preserved generated reference, not the template's current
+configuration recommendation. Current project settings use stable Codex
+defaults, `.codex/hooks.json` for hook declarations, automatic
+`.agents/skills/` discovery, and user-level config for reusable profiles.
 
 ## 原本情報
 

@@ -9,7 +9,6 @@ downstream design ./agent-canon-update-tasks.toml shared parent-repo update TODO
 downstream implementation ../../tools/agent_tools/agent_canon_preflight.py emits checklist evidence at task start
 downstream implementation ../../tools/agent_tools/agent_canon_update_todos.py manages parent update TODO state
 downstream implementation ../../tools/agent_tools/bootstrap_agent_run.py prints checklist evidence
-downstream implementation ../../tools/agent_tools/task_start.py prints checklist evidence
 downstream implementation ../../tools/sync_agent_canon.sh classifies parent pin freshness routes
 downstream implementation ../../tools/ci/check_agent_canon_latest.sh enforces latest-state CI gate
 @dependency-end
@@ -334,7 +333,7 @@ Source window:
 
 ## Agent Task-Start Rule
 
-When an agent starts through `task_start.py` or `bootstrap_agent_run.py`, the output must include:
+When an agent starts through `bootstrap_agent_run.py`, the output must include:
 
 - `AGENT_CANON_PREFLIGHT_COMMAND`
 - `AGENT_CANON_PREFLIGHT_STATUS`

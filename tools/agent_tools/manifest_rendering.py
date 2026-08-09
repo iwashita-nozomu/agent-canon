@@ -7,7 +7,7 @@
 # upstream implementation ./workspace_scope.py provides rendering paths.
 # downstream implementation ./agent_team.py facade consumes rendering APIs.
 # downstream implementation ./code_template_rendering.py owns package-safe code source rendering.
-# downstream implementation ./task_start.py consumes rendering APIs.
+# downstream implementation ./bootstrap_agent_run.py consumes rendering APIs.
 # @dependency-end
 """Own AgentTeam manifest, template, and output rendering."""
 

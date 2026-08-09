@@ -52,7 +52,7 @@ upstream design README.md canonical workflow index
 - 最初の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
 - planning を含む parent session では、parent session 側の plan-mode command を使う。official Codex CLI では `/plan`
 - runtime が `/agent` を提供する場合は subagent inventory の確認に使い、使えない場合は `.codex/agents/*.toml` を直接見る
-- `task_start.py` / `bootstrap_agent_run.py` の出力では
+- `bootstrap_agent_run.py` の出力では
   `REPO_TOOL_ROUTING_SEQUENCE`、`REPO_TOOL_ROUTING_NEXT_COMMAND`、
   `REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` を確認する
 
@@ -69,7 +69,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 ```
 
 nonstandard design packet を run-local input として固定する場合は、
-`bootstrap_agent_run.py` と `task_start.py` の共通 flag
+`bootstrap_agent_run.py` の flag
 `--active-design-packet JSON` を使います。JSON は schema、3 つの相対 artifact
 path、`document_flow_required` からなる closed record です。unknown field を reject
 し、全 field がそろった場合だけ run を作成します。生成後の authority は `team_manifest.yaml` の
