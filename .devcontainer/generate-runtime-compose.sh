@@ -36,6 +36,15 @@ else
 fi
 repo_basename="$(basename "$repo_root")"
 container_repo_root="/workspace/${repo_basename}"
+runtime_identity_mode="${AGENT_CANON_RUNTIME_IDENTITY_MODE:-project}"
+case "$runtime_identity_mode" in
+  project|rootless-root) ;;
+  *)
+    printf 'DEVCONTAINER_IDENTITY_ERROR=RUNTIME_IDENTITY_MODE_UNSUPPORTED:received=%s\n' \
+      "$runtime_identity_mode" >&2
+    exit 1
+    ;;
+esac
 if [[ "${PROJECT_USER+x}" = "x" ]]; then
   printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_USER_OVERRIDE_FORBIDDEN:canonical=project:received=%s\n' "$PROJECT_USER" >&2
   exit 1
@@ -45,13 +54,53 @@ if [[ "${PROJECT_UID+x}" = "x" || "${PROJECT_GID+x}" = "x" ]]; then
   exit 1
 fi
 project_user="project"
+runtime_user_name="$project_user"
 project_uid="$(id -u)"
 project_gid="$(id -g)"
 if [[ ! "$project_uid" =~ ^[1-9][0-9]*$ || ! "$project_gid" =~ ^[1-9][0-9]*$ ]]; then
   printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_MUST_BE_POSITIVE_DECIMAL:uid=%s:gid=%s\n' "$project_uid" "$project_gid" >&2
   exit 1
 fi
-project_home="/home/${project_user}"
+command -v docker >/dev/null 2>&1 || {
+  printf 'DEVCONTAINER_IDENTITY_ERROR=DOCKER_SECURITY_OPTIONS_UNAVAILABLE:docker-command-missing\n' >&2
+  exit 1
+}
+docker_security_options_raw="$(docker info --format '{{json .SecurityOptions}}' 2>/dev/null)" || {
+  printf 'DEVCONTAINER_IDENTITY_ERROR=DOCKER_SECURITY_OPTIONS_UNAVAILABLE:docker-info-failed\n' >&2
+  exit 1
+}
+docker_rootless="$({
+  python3 - "$docker_security_options_raw" <<'PY'
+import json
+import sys
+
+try:
+    options = json.loads(sys.argv[1])
+except json.JSONDecodeError as exc:
+    raise SystemExit(f"invalid Docker SecurityOptions JSON: {exc}") from exc
+if not isinstance(options, list) or not all(isinstance(item, str) for item in options):
+    raise SystemExit("Docker SecurityOptions must be a JSON string array")
+print("true" if any(item == "name=rootless" for item in options) else "false")
+PY
+})"
+if [ "$runtime_identity_mode" = "project" ] && [ "$docker_rootless" = true ]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=ROOTLESS_DAEMON_REQUIRES_ROOTLESS_SELECTOR:mode=project\n' >&2
+  exit 1
+fi
+if [ "$runtime_identity_mode" = "rootless-root" ] && [ "$docker_rootless" != true ]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=ROOTLESS_SELECTOR_REQUIRES_ROOTLESS_DAEMON:mode=rootless-root\n' >&2
+  exit 1
+fi
+runtime_user_uid="$project_uid"
+runtime_user_gid="$project_gid"
+if [ "$runtime_identity_mode" = "rootless-root" ]; then
+  runtime_user_name="root"
+  runtime_user_uid=0
+  runtime_user_gid=0
+  project_home="/root"
+else
+  project_home="/home/${project_user}"
+fi
 gpu_profile="${AGENT_CANON_GPU_ADMISSION_PROFILE:-default}"
 case "$gpu_profile" in
   default|gpu-admission) ;;
@@ -224,6 +273,7 @@ reserved_environment = {
     "AGENT_CANON_REPOSITORY_ROOT",
     "DEPENDENCY_MODULE_CONTAINER_SOURCE",
     "DEPENDENCY_MODULE_CONTAINER_TARGET",
+    "AGENT_CANON_RUNTIME_IDENTITY_MODE",
     "PROJECT_UID",
     "PROJECT_GID",
     "PROJECT_USER",
@@ -624,6 +674,10 @@ environment_lines=(
   "      PYTHONPATH: \"${container_repo_root}/python\""
   "      AGENT_CANON_WORKSPACE_LAYOUT: \"${workspace_layout}\""
   "      AGENT_CANON_CODEX_SESSION_ROOT: \"${project_home}/.codex/sessions\""
+  "      AGENT_CANON_RUNTIME_IDENTITY_MODE: \"${runtime_identity_mode}\""
+  "      HOME: \"${project_home}\""
+  "      SHELL: \"${runtime_shell}\""
+  "      AGENT_CANON_CONTAINER_USER: \"${runtime_user_name}\""
   '      AGENT_CANON_WORKSPACE_ROOT: "/workspace"'
   "      AGENT_CANON_REPOSITORY_ROOT: \"${container_repo_root}\""
   "      DEPENDENCY_MODULE_CONTAINER_SOURCE: ${workspace_mount_source_yaml}"
@@ -641,14 +695,6 @@ if [ "$gpu_profile" = "gpu-admission" ]; then
     "      AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT: \"${runtime_target}/shared-runtime-readback.json\""
   )
 fi
-if [ "$parent_layout" = true ]; then
-  environment_lines=(
-    "      HOME: \"${project_home}\""
-    "      SHELL: \"${runtime_shell}\""
-    "      AGENT_CANON_CONTAINER_USER: \"${project_user}\""
-    "${environment_lines[@]}"
-  )
-fi
 if optional_mount_enabled ssh-agent \
   && [ -n "${SSH_AUTH_SOCK:-}" ] \
   && [ -S "${SSH_AUTH_SOCK}" ]; then
@@ -661,7 +707,7 @@ mkdir -p "$(dirname "$compose_output")"
   printf 'services:\n'
   printf '  workspace:\n'
   printf '    platform: %s\n' "$runtime_platform"
-  printf '    user: "%s:%s"\n' "$project_uid" "$project_gid"
+  printf '    user: "%s:%s"\n' "$runtime_user_uid" "$runtime_user_gid"
   if [ "$gpu_profile" = "gpu-admission" ]; then
     printf '    gpus: all\n'
   fi

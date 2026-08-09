@@ -32,20 +32,50 @@ case "$home" in
     ;;
 esac
 
-if [ -n "${AGENT_CANON_CONTAINER_USER:-}" ]; then
+runtime_identity_mode="${AGENT_CANON_RUNTIME_IDENTITY_MODE:-}"
+case "$runtime_identity_mode" in
+  project)
+    expected_runtime_user="project"
+    expected_runtime_uid="non-root"
+    expected_runtime_home="/home/project"
+    ;;
+  rootless-root)
+    expected_runtime_user="root"
+    expected_runtime_uid="root"
+    expected_runtime_home="/root"
+    ;;
+  *)
+    echo "post-create runtime identity marker is unsupported: ${runtime_identity_mode:-<unset>}" >&2
+    exit 1
+    ;;
+esac
+[ "${AGENT_CANON_CONTAINER_USER:-}" = "$expected_runtime_user" ] || {
+  echo "post-create runtime user marker mismatch: expected $expected_runtime_user" >&2
+  exit 1
+}
+if [ "$expected_runtime_uid" = "non-root" ]; then
   [ "$(id -u)" -ne 0 ] || {
-    echo "post-create must execute as the dedicated non-root user" >&2
+    echo "post-create project identity must be non-root" >&2
     exit 1
   }
-  [ "$(id -un)" = "$AGENT_CANON_CONTAINER_USER" ] || {
-    echo "post-create user mismatch: expected ${AGENT_CANON_CONTAINER_USER}, got $(id -un)" >&2
-    exit 1
-  }
-  [ "$HOME" = "/home/${AGENT_CANON_CONTAINER_USER}" ] || {
-    echo "post-create HOME mismatch: $HOME" >&2
+else
+  [ "$(id -u)" -eq 0 ] || {
+    echo "post-create rootless-root identity must be uid 0" >&2
     exit 1
   }
 fi
+[ "$(id -un)" = "$expected_runtime_user" ] || {
+  echo "post-create user mismatch: expected ${expected_runtime_user}, got $(id -un)" >&2
+  exit 1
+}
+[ "$HOME" = "$expected_runtime_home" ] || {
+  echo "post-create HOME mismatch: expected ${expected_runtime_home}, got ${HOME:-<unset>}" >&2
+  exit 1
+}
+workspace_write_dir="$workspace/.agent-canon"
+mkdir -p "$workspace_write_dir"
+workspace_write_probe="$(mktemp "$workspace_write_dir/identity-write.XXXXXX")"
+rm -f "$workspace_write_probe"
 
 python3 "$agent_canon_root/tools/agent_tools/devcontainer_dependencies.py" \
   image-verify --workspace "$workspace" --vendor-root "$agent_canon_root" --format text

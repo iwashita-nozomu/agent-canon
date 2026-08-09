@@ -14,6 +14,7 @@ downstream implementation ../../../.devcontainer/devcontainer.json selects the d
 downstream implementation ../../../.devcontainer/generate-runtime-compose.sh renders the workspace-only default and typed optional mount profiles
 downstream implementation ../../../.devcontainer/gpu-admission/devcontainer.json selects the explicit GPU-admission profile
 downstream implementation ../../../.devcontainer/gpu-admission.sh owns GPU-admission host preflight/up/finalize sequencing
+downstream implementation ../../../.devcontainer/rootless/devcontainer.json selects the rootless-root identity profile
 downstream design parent-dependency-manifest-followup.md declares the parent manifest, pin, and ordering follow-up
 @dependency-end
 -->
@@ -77,10 +78,12 @@ host runtime state を mount しない。host zshrc は `host-zshrc` optional pr
 `realpath -e` の canonical absolute source から追加する。profile が選択されても
 欠落・broken symlink・型違いでは同じ default runtime を生成する。
 
-- `host-zshrc`: resolved host `~/.zshrc` -> `/home/project/.zshrc` read-only
-  （resolved regular directory `~/.zsh` がある場合は `/home/project/.zsh` も read-only）
+- `host-zshrc`: resolved host `~/.zshrc` -> selected runtime `HOME/.zshrc` read-only
+  （resolved regular directory `~/.zsh` がある場合は selected runtime `HOME/.zsh` も
+  read-only。`project` は `/home/project`、`rootless-root` は `/root`。）
 - `host-git`: existing `/mnt/git` -> `/mnt/git`
-- `host-credentials`: existing `~/.config/gh`/`~/.ssh` -> project home read-only
+- `host-credentials`: existing `~/.config/gh`/`~/.ssh` -> selected runtime `HOME` read-only
+  （`project` は `/home/project`、`rootless-root` は `/root`。）
 - `ssh-agent`: valid socket only -> `/ssh-agent`
 - `host-secrets`: existing `AGENT_CANON_SECRET_DIR` -> fixed `/mnt/agent-canon-secrets`
 - `docker-host`: existing Docker socket -> `/var/run/docker.sock`
@@ -107,7 +110,7 @@ validator は profile と target の一致、bind type、resolved absolute sourc
 fixed secret target を静的に確認する。fresh clone / CI runnerのhost fileは必要条件ではない。
 `ZDOTDIR`、`.zshenv`、`/etc/project-template/zsh`、parent environment source は
 default shell startup に存在しない。user customization は image-ownedまたは
-`/home/project/.zshrc`だけであり、noninteractive command、sudo、post-create は
+selected runtime `HOME/.zshrc`（`project` は `/home/project`、`rootless-root` は `/root`）だけであり、noninteractive command、sudo、post-create は
 `.zshrc`に依存しない。
 
 generator は既存の `pack.runtime.shell` を process boundary として使います。親の
@@ -116,9 +119,9 @@ runtime env は image と generated Compose の明示経路だけで供給し、
 zsh startup に parent environment の source を隠さない。関連する Compose-owned
 environment は `HOME`、`SHELL`、`AGENT_CANON_CONTAINER_USER`、
 `AGENT_CANON_RUNTIME_ROUTE`、`AGENT_CANON_CODEX_SESSION_ROOT` です。後者は
-runtime-log ownerが利用するcontainer-local `/home/project/.codex/sessions` を
+runtime-log ownerが利用するcontainer-local selected `HOME/.codex/sessions` を
 指し、host `~/.codex` のmountやfallbackを意味しません。
-`HOME` は dedicated non-root userの `/home/project` であり、zsh startupはoptional
+`HOME` は `project` では `/home/project`、`rootless-root` では `/root` であり、zsh startupはoptional
 host zshrcの有無にかかわらずimage-owned startup fileから開始します。
 standalone AgentCanon source layout でも `host-zshrc` profile は parent layout と同じ
 host `~/.zshrc`/`~/.zsh` optional projectionを使えます。profile未選択時は host
@@ -126,6 +129,8 @@ host `~/.zshrc`/`~/.zsh` optional projectionを使えます。profile未選択�
 pack-derived command だけを生成します。
 
 Compose の生成先は親レポの `.agent-canon/docker-compose.generated.yml` とする。
+rootless selector の生成先はトップレベルの
+`.agent-canon/docker-compose.rootless.generated.yml` とする。
 `.agent-canon/` は親レポの実行状態用であり、生成 Compose を追跡対象にしない。
 
 ## 既定起動プロファイルの境界
@@ -150,6 +155,28 @@ override する経路は設けない。linked `devcontainer.json` は #524 canon
 として `containerUser: project` と `remoteUser: project` を設定し、image の
 `USER project` と一致させる。generator は custom HOME tmpfs、AgentCanon-specific
 group、host group mutation を生成しない。
+
+### Docker daemon と runtime identity の選択
+
+default の `.devcontainer/devcontainer.json` と GPU-admission selector は
+`AGENT_CANON_RUNTIME_IDENTITY_MODE=project` を明示する rootful Docker selector です。
+generator は `docker info --format '{{json .SecurityOptions}}'` の公式
+`SecurityOptions` に exact `name=rootless` がある場合、project selector を fail-closed
+で拒否します。rootless Docker は standalone source の
+`.devcontainer/rootless/devcontainer.json` を選択し、トップレベルの
+`.agent-canon/docker-compose.rootless.generated.yml` を使います。
+
+rootless selector は `containerUser: root`、`remoteUser: root`、Compose `user: "0:0"`、
+`HOME=/root`、`AGENT_CANON_CONTAINER_USER=root`、
+`AGENT_CANON_RUNTIME_IDENTITY_MODE=rootless-root` を同時に投影します。build 用の
+`PROJECT_UID` / `PROJECT_GID` は host process の正の値を保持し、runtime user とは
+分離します。post-create と post-attach は marker、process uid/name、HOME、workspace
+writability を read back します。
+
+rootless default は workspace bind 以外の credential、SSH、Docker socket、shared
+runtime host mount を生成しません。host zshrc/credentials は明示 optional profile 時だけ
+selected runtime `HOME` 配下へ read-only projection します。host chmod/chown、固定 subuid、
+`userns=host`、tmpfs、特定 workspace path の例外は追加しません。
 
 親 Dockerfile は root phase で system package、wgrib2、Python build-time setup と
 `project` user/group、container-local runtime を準備し、最後に `USER project` へ

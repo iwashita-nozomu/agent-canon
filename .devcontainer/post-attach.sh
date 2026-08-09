@@ -158,24 +158,50 @@ check_dependency_module_runtime() {
 
 check_dependency_module_runtime
 
-if [ -n "${AGENT_CANON_CONTAINER_USER:-}" ]; then
+runtime_identity_mode="${AGENT_CANON_RUNTIME_IDENTITY_MODE:-}"
+case "$runtime_identity_mode" in
+  project)
+    expected_runtime_user="project"
+    expected_runtime_uid="non-root"
+    expected_runtime_home="/home/project"
+    ;;
+  rootless-root)
+    expected_runtime_user="root"
+    expected_runtime_uid="root"
+    expected_runtime_home="/root"
+    ;;
+  *)
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-identity-mode-unsupported:${runtime_identity_mode:-<unset>}" >&2
+    exit 1
+    ;;
+esac
+[ "${AGENT_CANON_CONTAINER_USER:-}" = "$expected_runtime_user" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-user-marker-mismatch:${expected_runtime_user}" >&2
+  exit 1
+}
+if [ "$expected_runtime_uid" = "non-root" ]; then
   [ "$(id -u)" -ne 0 ] || {
-    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=default-user-is-root" >&2
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=project-identity-is-root" >&2
     exit 1
   }
-  [ "$(id -un)" = "$AGENT_CANON_CONTAINER_USER" ] || {
-    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-user-name-mismatch:${AGENT_CANON_CONTAINER_USER}:$(id -un)" >&2
-    exit 1
-  }
-  [ "${HOME:-}" = "/home/${AGENT_CANON_CONTAINER_USER}" ] || {
-    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-home-mismatch:${HOME:-}" >&2
-    exit 1
-  }
-  [ "$(stat -c '%u' "$HOME")" = "$(id -u)" ] || {
-    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-home-ownership-mismatch:${HOME}" >&2
+else
+  [ "$(id -u)" -eq 0 ] || {
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=rootless-root-identity-not-uid-0" >&2
     exit 1
   }
 fi
+[ "$(id -un)" = "$expected_runtime_user" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-user-name-mismatch:${expected_runtime_user}:$(id -un)" >&2
+  exit 1
+}
+[ "${HOME:-}" = "$expected_runtime_home" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-home-mismatch:${HOME:-}:${expected_runtime_home}" >&2
+  exit 1
+}
+workspace_write_dir="$repo_root/.agent-canon"
+mkdir -p "$workspace_write_dir"
+workspace_write_probe="$(mktemp "$workspace_write_dir/identity-write.XXXXXX")"
+rm -f "$workspace_write_probe"
 
 echo
 echo "----------------------------------------"
