@@ -29,6 +29,16 @@ Standalone AgentCanon may retain and validate its own regular `.vscode` source
 files; that standalone source ownership is separate from any parent `.vscode`
 directory, which remains parent-owned regular content.
 
+Standalone AgentCanon's `.devcontainer/` is likewise source-owned environment
+content and is not projected into a parent root. It contains two explicit
+runtime selectors: the default `project` selector for rootful Docker and
+`.devcontainer/rootless/devcontainer.json` for a Docker daemon whose official
+`SecurityOptions` contains `name=rootless`. The selectors use separate generated
+Compose paths. A parent that adopts this contract keeps its regular
+`.devcontainer/` files and must project the same identity marker, user, HOME,
+and workspace-writability checks; synchronization must not silently choose the
+rootless selector or add a host mount workaround.
+
 ## Reader Map
 
 Read Projection Metadata and Manifest Contract to understand synchronization,

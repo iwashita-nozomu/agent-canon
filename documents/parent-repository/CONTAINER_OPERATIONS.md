@@ -42,12 +42,16 @@ default Composeのrequired host bindはworkspace repository topic-rootから`/wo
 
 host `${HOME}/.zshrc` と `${HOME}/.zsh` は optional user-customizationです。
 `host-zshrc` profileが明示された場合、regular fileまたはregular fileへ解決するsymlink
-は `realpath -e` のcanonical absolute sourceから `/home/project/.zshrc` へread-only
-projectionし、regular directoryへ解決する `${HOME}/.zsh` も `/home/project/.zsh` へ
-read-only projectionします。欠落・broken symlink・型違いの場合はmountを省略し、
+は `realpath -e` のcanonical absolute sourceから selected runtime `HOME/.zshrc` へ
+read-only projectionし、regular directoryへ解決する `${HOME}/.zsh` も selected runtime
+`HOME/.zsh` へ read-only projectionします（`project` は `/home/project`、
+`rootless-root` は `/root`）。欠落・broken symlink・型違いの場合はmountを省略し、
 image-owned empty/default startupで同一機能を成立させます。host `~/.codex`、
 parent-environment、個別credential/config、SSH agent、previous container state、
 `/mnt/git`、Docker socketはdefault create/tool availabilityの入力ではありません。
+
+`host-credentials` profileの `~/.config/gh` と `~/.ssh` も selected runtime `HOME` 配下へ
+read-only projectionし、`project` は `/home/project`、`rootless-root` は `/root` を使います。
 
 `AGENT_CANON_OPTIONAL_MOUNTS` の明示profileだけが `host-zshrc`、`host-git`、`host-secrets`,
 `host-credentials`、`ssh-agent`、`docker-host`、`linked-data-roots` を有効化できます。
@@ -86,12 +90,25 @@ standalone AgentCanon source layout でも `host-zshrc` profile は同じ option
 shell projectionを使えます。profile未選択時は pack-derived command だけを生成し、
 host `~/.zshrc`、parent environment mount、`HOME`、tmpfs は要求しません。
 
-Compose がこの境界で直接所有する environment は次の四つです。
+Compose がこの境界で直接所有する environment は runtime identity marker を含む
+次の値です。
 
-- `HOME`: dedicated non-root userの `/home/project` を指します。
+- `AGENT_CANON_RUNTIME_IDENTITY_MODE`: rootful の `project` または
+  rootless selector の `rootless-root` と一致します。
+- `HOME`: `project` では dedicated non-root user の
+  `/home/project`、`rootless-root` では `/root` を指します。
 - `SHELL`: pack の `runtime.shell` と一致します。
-- `AGENT_CANON_CONTAINER_USER`: `project` と一致し、post-create/attachがruntime
-  user、HOME、ownershipをread backします。
+- `AGENT_CANON_CONTAINER_USER`: runtime selector の `project` または
+  `root` と一致し、post-create/attach が process user、HOME、workspace
+  writability を read backします。
+
+default selector は rootful Docker 専用です。generator は Docker の公式
+`SecurityOptions` に `name=rootless` がある場合に default 起動を
+拒否します。rootless Docker は standalone source の
+`.devcontainer/rootless/devcontainer.json` と別の generated Compose path を
+選択し、Compose user `0:0` で起動します。rootless default は workspace bind
+以外の credential、socket、shared-runtime host mount を暗黙に生成せず、build 用の
+正の `PROJECT_UID/GID` は runtime user とは別に保持します。
 
 parent environment pair の両方不在、または両方が file 実体へ解決できることは、値や
 container behavior の十分条件ではありません。最終的な親側検証は、validator、

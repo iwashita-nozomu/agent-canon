@@ -158,24 +158,56 @@ check_dependency_module_runtime() {
 
 check_dependency_module_runtime
 
-if [ -n "${AGENT_CANON_CONTAINER_USER:-}" ]; then
-  [ "$(id -u)" -ne 0 ] || {
-    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=default-user-is-root" >&2
+runtime_identity_mode="${AGENT_CANON_RUNTIME_IDENTITY_MODE:-}"
+runtime_user_name="${AGENT_CANON_CONTAINER_USER:-}"
+case "$runtime_identity_mode" in
+  project)
+    expected_user="project"
+    expected_home="/home/project"
+    [ "$(id -u)" -ne 0 ] || {
+      echo "DEPENDENCY_MODULE_CONTAINER_ERROR=project-identity-is-root" >&2
+      exit 1
+    }
+    ;;
+  rootless-root)
+    expected_user="root"
+    expected_home="/root"
+    [ "$(id -u)" -eq 0 ] || {
+      echo "DEPENDENCY_MODULE_CONTAINER_ERROR=rootless-root-identity-not-uid-0" >&2
+      exit 1
+    }
+    ;;
+  *)
+    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-identity-marker-missing-or-unsupported" >&2
     exit 1
-  }
-  [ "$(id -un)" = "$AGENT_CANON_CONTAINER_USER" ] || {
-    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-user-name-mismatch:${AGENT_CANON_CONTAINER_USER}:$(id -un)" >&2
-    exit 1
-  }
-  [ "${HOME:-}" = "/home/${AGENT_CANON_CONTAINER_USER}" ] || {
-    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-home-mismatch:${HOME:-}" >&2
-    exit 1
-  }
-  [ "$(stat -c '%u' "$HOME")" = "$(id -u)" ] || {
-    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-home-ownership-mismatch:${HOME}" >&2
-    exit 1
-  }
-fi
+    ;;
+esac
+[ "$runtime_user_name" = "$expected_user" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-user-marker-mismatch:$expected_user:${runtime_user_name:-<unset>}" >&2
+  exit 1
+}
+[ "$(id -un)" = "$expected_user" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-user-name-mismatch:$expected_user:$(id -un)" >&2
+  exit 1
+}
+[ "${HOME:-}" = "$expected_home" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-home-mismatch:${HOME:-}" >&2
+  exit 1
+}
+[ -w "$repo_root" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-not-writable:$repo_root" >&2
+  exit 1
+}
+workspace_write_probe_dir="$repo_root/.agent-canon"
+mkdir -p "$workspace_write_probe_dir" || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-write-probe-directory-failed:$workspace_write_probe_dir" >&2
+  exit 1
+}
+workspace_write_probe="$(mktemp "$workspace_write_probe_dir/.runtime-identity-write.XXXXXX")" || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-write-probe-failed:$repo_root" >&2
+  exit 1
+}
+rm -f "$workspace_write_probe"
 
 echo
 echo "----------------------------------------"

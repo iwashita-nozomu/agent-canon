@@ -28,20 +28,57 @@ workspace="$1"
 workspace="$(cd "$workspace" && pwd)"
 devcontainer_dir="$(cd "$(dirname "$0")" && pwd)"
 agent_canon_root="$(cd -P "$devcontainer_dir/.." && pwd)"
-if [ -n "${AGENT_CANON_CONTAINER_USER:-}" ]; then
-  [ "$(id -u)" -ne 0 ] || {
-    echo "post-create must execute as the dedicated non-root user" >&2
+runtime_identity_mode="${AGENT_CANON_RUNTIME_IDENTITY_MODE:-}"
+runtime_user_name="${AGENT_CANON_CONTAINER_USER:-}"
+case "$runtime_identity_mode" in
+  project)
+    expected_user="project"
+    expected_home="/home/project"
+    [ "$(id -u)" -ne 0 ] || {
+      echo "post-create project identity must be non-root" >&2
+      exit 1
+    }
+    ;;
+  rootless-root)
+    expected_user="root"
+    expected_home="/root"
+    [ "$(id -u)" -eq 0 ] || {
+      echo "post-create rootless-root identity must be uid 0" >&2
+      exit 1
+    }
+    ;;
+  *)
+    echo "post-create runtime identity marker is missing or unsupported" >&2
     exit 1
+    ;;
+esac
+[ "$runtime_user_name" = "$expected_user" ] || {
+  echo "post-create user mismatch: expected $expected_user, got ${runtime_user_name:-<unset>}" >&2
+  exit 1
+}
+[ "$(id -un)" = "$expected_user" ] || {
+  echo "post-create process name mismatch: expected $expected_user, got $(id -un)" >&2
+  exit 1
+}
+[ "${HOME:-}" = "$expected_home" ] || {
+  echo "post-create HOME mismatch: ${HOME:-<unset>}" >&2
+  exit 1
+}
+validate_workspace_writable() {
+  local marker_dir="$workspace/.agent-canon"
+  local marker
+  mkdir -p "$marker_dir"
+  [ -w "$workspace" ] && [ -w "$marker_dir" ] || {
+    echo "post-create workspace is not writable: $workspace" >&2
+    return 1
   }
-  [ "$(id -un)" = "$AGENT_CANON_CONTAINER_USER" ] || {
-    echo "post-create user mismatch: expected ${AGENT_CANON_CONTAINER_USER}, got $(id -un)" >&2
-    exit 1
+  marker="$(mktemp "$marker_dir/.runtime-identity-write.XXXXXX")" || {
+    echo "post-create workspace write probe failed: $workspace" >&2
+    return 1
   }
-  [ "${HOME:-}" = "/home/${AGENT_CANON_CONTAINER_USER}" ] || {
-    echo "post-create HOME mismatch: ${HOME:-<unset>}" >&2
-    exit 1
-  }
-fi
+  rm -f "$marker"
+}
+validate_workspace_writable
 tools_home="$HOME/.tools"
 runtime_root="/var/lib/agent-canon/runtime"
 source_projection_root="$workspace/reports/agents/devcontainer/runtime"
