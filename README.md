@@ -39,6 +39,104 @@ source tree が project root のときの repo instruction entrypoint は
 `agents/canonical/README.md` は layout appendix として扱い、最初の hub にはしません。
 AgentCanon 自体の source、shared runtime、sync、PR 運用、責務 scope を確認するときにこの README を読みます。
 
+## 全体設計
+
+この section は AgentCanon 自身の shared runtime、policy、tool、配布境界を
+所有します。Template や派生 project の domain 構造と active contract は扱わず、
+親 repository の `README.md` がそれぞれ所有します。
+
+### 設計目的
+
+AgentCanon は、Codex が repository task を再現可能な責務単位で進めるための
+policy、workflow、skill、role、tool、validation contract を一つの source tree
+で管理する shared agent runtime です。個別 project の domain logic を所有せず、
+request から owner、設計、実装 handoff、検証、closeout までを接続する共通基盤を
+提供します。
+
+設計上の中心は、人が読む規約、機械可読 contract、runtime adapter、実行 tool を
+分離しながら、同じ責務 graph で結ぶことです。規約だけ、checker だけ、生成された
+runtime view だけが独立して正本になる状態を避け、変更理由から実装と検証までを
+dependency edge で追跡できる構造にします。
+
+### システムモデル
+
+```mermaid
+flowchart TB
+  request[Repository request]
+
+  subgraph policy[Policy and design]
+    instructions[AGENTS and ROOT_AGENTS]
+    agents[agents workflows skills roles]
+    documents[documents contracts conventions]
+  end
+
+  subgraph runtime[Runtime and execution]
+    adapters[dot agents and dot codex]
+    tools[Python shell and Rust tools]
+    validators[structure runtime and review checks]
+  end
+
+  subgraph distribution[Distribution]
+    source[AgentCanon source]
+    pin[parent submodule pin]
+    views[parent root views]
+  end
+
+  request --> instructions
+  instructions --> agents
+  agents --> documents
+  documents --> adapters
+  adapters --> tools
+  tools --> validators
+  validators --> source
+  source --> pin
+  pin --> views
+```
+
+`AGENTS.md` と `ROOT_AGENTS.md` は repository instruction の入口です。
+`agents/` は workflow family、skill dependency、subagent role、communication
+protocol を所有します。`documents/` は設計、規約、runtime profile、構造、tool
+contract を責務 directory ごとに所有します。
+
+`.agents/` と `.codex/` は Codex が発見する runtime adapter です。`tools/` と
+`rust/` は contract を実行可能な command と checker にします。`tests/` は
+AgentCanon 自身の tool、workflow、policy mechanism を検証し、`evidence/`、
+`reports/`、`memory/`、`notes/` はそれぞれ定義された保持期間と読者目的に従って
+判断材料を保存します。
+
+### Task の流れ
+
+1. Repository instruction が user request と現在の構造を読み、責務 owner を選びます。
+1. Workflow と skill dependency が、設計、実装 handoff、review、validation の順序を構成します。
+1. Tool と runtime adapter が、選択された contract を決定論的な操作へ変換します。
+1. Validator が変更した責務と対応する property を確認し、finding を owner に戻します。
+1. Accepted source change を AgentCanon の branch と PR で統合し、parent は commit pin と root view を更新します。
+
+### 配布境界
+
+AgentCanon 単体 repository は、この tree 全体を source of truth として扱います。
+Template と派生 repository は `vendor/agent-canon/` の commit pin を shared source
+identity とし、root view から必要な runtime surface を公開します。Project 固有の
+source、active contract、実験、private state は親 repository が所有し、AgentCanon
+の共有 policy に取り込みません。
+
+配布と root view の詳細は
+[Shared Runtime Surfaces](documents/runtime/SHARED_RUNTIME_SURFACES.md)、親側の
+最低限構造は [親レポ構造](documents/parent-repository/README.md)、利用能力と検証範囲は
+[Runtime Profiles And Check Matrix](documents/runtime/runtime-profiles-and-check-matrix.md)
+が所有します。
+
+### 設計上の不変条件
+
+- 各 policy、schema、tool、artifact は一つの責務 owner を持ちます。
+- Human-readable policy と machine-readable contract は同じ設計判断を表し、生成物を別正本にしません。
+- Workflow は owner と依存関係から実行順を導き、prompt keyword や file 数から scope を決めません。
+- Tool は contract を実行し、tool 固有の policy を追加しません。
+- Validation は変更した property に対応し、無関係な full check を完了条件にしません。
+- Parent repository は pin と view を通して共有 runtime を利用し、AgentCanon source を複製しません。
+- Project 固有の code、secret、raw log、実験状態は AgentCanon の共有 source から分離します。
+- AgentCanon source の変更は branch、review、PR、main readback を経てから parent pin に反映します。
+
 ## このディレクトリの役割
 
 - workflow canon の正本
