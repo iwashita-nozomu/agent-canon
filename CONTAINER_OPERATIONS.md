@@ -187,7 +187,12 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
   shape; do not require parent repositories to commit generated `tree` output
   unless a task-specific design explicitly asks for that artifact.
 - Codex CLI setup is a pinned `npm-global` record for `@openai/codex` 0.145.0
-  with an exact npm package identity and executable verification contract.
+  with an exact npm package identity and executable verification contract. Its
+  installer resolves absolute `node`/`npm` paths only from the digest-pinned
+  Feature directory and fixed system bin directories, rejects workspace or
+  untrusted paths, and invokes the absolute npm path through `sudo env` with
+  that minimal trusted PATH; ambient or workspace PATH entries are never
+  forwarded.
 - Every dependency record has one method-compatible typed verification
   contract. A matching receipt is reusable only while that contract proves the
   current owner artifact. Missing package files, apt repository key/source
