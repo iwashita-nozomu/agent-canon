@@ -248,8 +248,13 @@ def build_nested_codex_script(
 ) -> str:
     """Return the shell prelude that prepares the mounted workspace before Codex."""
     quoted_command = shlex.join(command)
+    workspace_root = workspace.rstrip("/")
+    workspace_artifacts = (
+        f"{workspace_root}/reports/agents/devcontainer/runtime",
+        f"{workspace_root}/.agent-canon/dependency-receipts",
+    )
     post_create = shlex.quote(
-        f"{workspace.rstrip('/')}/vendor/agent-canon/.devcontainer/post-create.sh"
+        f"{workspace_root}/vendor/agent-canon/.devcontainer/post-create.sh"
     )
     lines = [
         "set -euo pipefail",
@@ -282,6 +287,13 @@ def build_nested_codex_script(
             [
                 'if [ "$(id -u)" -eq 0 ]; then',
                 f'  chown -R {run_uid}:{run_gid} "$HOME" || true',
+                "  for workspace_artifact in "
+                + " ".join(shlex.quote(path) for path in workspace_artifacts)
+                + "; do",
+                '    if [ -e "$workspace_artifact" ]; then',
+                f'      chown -R {run_uid}:{run_gid} "$workspace_artifact"',
+                "    fi",
+                "  done",
                 "  if command -v setpriv >/dev/null 2>&1; then",
                 f"    exec setpriv --reuid {run_uid} --regid {run_gid} --clear-groups {quoted_command}",
                 "  fi",

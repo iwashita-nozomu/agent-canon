@@ -68,6 +68,29 @@ def test_host_docker_keeps_socket_mount_with_root_setup() -> None:
     assert "setpriv --reuid" in result.stdout
 
 
+def test_host_uid_setup_chowns_workspace_artifacts_before_setpriv() -> None:
+    """Host-UID setup hands mounted post-create artifacts back to the host user."""
+    result = run_cli("--print-only")
+
+    assert result.returncode == 0, result.stderr
+    output = result.stdout
+    post_create = output.index(
+        "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
+    )
+    workspace_chown = (
+        f'chown -R {os.getuid()}:{os.getgid()} "$workspace_artifact"'
+    )
+    workspace_ownership = output.index(workspace_chown, post_create)
+    setpriv = output.index("setpriv --reuid", workspace_ownership)
+    assert (
+        "for workspace_artifact in "
+        "/workspace/reports/agents/devcontainer/runtime "
+        "/workspace/.agent-canon/dependency-receipts; do"
+    ) in output
+    assert workspace_chown in output
+    assert workspace_ownership < setpriv
+
+
 def test_standalone_dockerfile_uses_canonical_project_identity() -> None:
     """Standalone source builds provide project UID/GID and container-local sudo."""
     dockerfile = (PROJECT_ROOT / ".devcontainer" / "Dockerfile").read_text(
