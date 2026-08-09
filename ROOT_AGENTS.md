@@ -333,7 +333,7 @@ proof obligation, or replacement unit together even when the chunk is long.
 | Contract | Owner Surface | Evidence / Checker |
 | -------- | ------------- | ------------------ |
 | workflow family, spawn budget, role topology | `vendor/agent-canon/agents/task_catalog.yaml` | `bootstrap_agent_run.py`; `check_agent_runtime_alignment.py` |
-| task bootstrap and CLI entrypoint | `vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md`; `bootstrap_agent_run.py` | generated task packet |
+| task bootstrap and CLI entrypoints | `vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md`; `bootstrap_agent_run.py` | generated task packet |
 | subagent lifecycle, same-role instances, wave ledger | `vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md`; `team_manifest.yaml`; `schedule.md`; `workflow_monitoring.md` | `workflow_monitor.py`; closeout lifecycle evidence |
 | role behavior and stage conditions | `vendor/agent-canon/.codex/agents/*.toml`; `vendor/agent-canon/agents/agents_config.json` | `check_agent_runtime_alignment.py` |
 | skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml`; `vendor/agent-canon/.agents/skills/*/SKILL.md` | `python3 tools/agent_tools/route.py --prompt`; `check_agent_runtime_alignment.py` |
