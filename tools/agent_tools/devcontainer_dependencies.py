@@ -6,14 +6,15 @@
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md typed project-extra ownership
 # upstream design ../../CONTAINER_OPERATIONS.md image versus mounted tool boundary
 # downstream environment ../../.devcontainer/dependencies.toml AgentCanon shared developer/agent records
-# downstream implementation ../../.devcontainer/post-create.sh shared lifecycle orchestration
+# downstream implementation ../../.devcontainer/post-create.sh read-only image verification
 # downstream implementation ../../tools/docker_dependency_validator.sh no-install validation route
 # downstream implementation ../../tests/agent_tools/test_devcontainer_dependencies.py focused model and security tests
 # @dependency-end
 """Declarative, typed devcontainer dependency planning and installation.
 
-The image owns the fixed Python capabilities, while this module owns mounted
-Agent/Codex tools and standard editable project-extra installation.
+The image owns fixed Python and manifest-selected Agent/Codex capabilities. The
+legacy editable project-extra API remains available to explicit callers, while
+the active post-create and runner lifecycle performs read-only image verification.
 """
 
 from __future__ import annotations
@@ -27,6 +28,7 @@ import platform
 import re
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -105,19 +107,17 @@ BASE_CAPABILITIES = frozenset(
     }
 )
 NPM_GLOBAL_PREFIX = "/usr/local"
-NPM_FEATURE_BIN = "/usr/local/share/nvm/current/bin"
 NPM_ENV_EXECUTABLE = "/usr/bin/env"
 NPM_SYSTEM_BIN_DIRS = (
-    "/usr/local/sbin",
     "/usr/local/bin",
+    "/usr/local/sbin",
     "/usr/sbin",
     "/usr/bin",
     "/sbin",
     "/bin",
 )
-NPM_TRUSTED_BIN_DIRS = (NPM_FEATURE_BIN, *NPM_SYSTEM_BIN_DIRS)
+NPM_TRUSTED_BIN_DIRS = NPM_SYSTEM_BIN_DIRS
 NPM_TRUSTED_BIN_ROOTS = {
-    NPM_FEATURE_BIN: "/usr/local/share/nvm",
     "/usr/local/sbin": "/usr/local",
     "/usr/local/bin": "/usr/local",
     "/usr/sbin": "/usr",
@@ -126,6 +126,14 @@ NPM_TRUSTED_BIN_ROOTS = {
     "/bin": "/usr",
 }
 STRUCTURAL_BINDING_OUTPUT_PREFIX = "agent-canon.executable-binding.structural.v1"
+IMAGE_DEPENDENCIES_ROOT = Path("/usr/local/share/agent-canon/image-dependencies")
+IMAGE_PLAN_SCHEMA = "agent-canon.devcontainer-image-dependencies"
+IMAGE_PLAN_SCHEMA_VERSION = 1
+IMAGE_INSTALL_METHODS = frozenset(
+    {"apt-package", "apt-repository", "npm-global", "release-asset"}
+)
+IMAGE_DIRECTORY_MODE = 0o555
+IMAGE_FILE_MODE = 0o444
 
 
 class DependencyError(ValueError):
@@ -142,7 +150,7 @@ class NpmToolchain:
 
 
 def resolve_npm_toolchain(workspace: Path) -> NpmToolchain:
-    """Resolve Feature/system Node tools without accepting ambient PATH entries."""
+    """Resolve OCI image/system Node tools without accepting ambient PATH entries."""
     env_executable = Path(NPM_ENV_EXECUTABLE)
     if not env_executable.is_file() or not os.access(env_executable, os.X_OK):
         raise DependencyError(
@@ -493,6 +501,7 @@ class DependencyPlan:
     sources: tuple[Path, ...]
     dependency_providers: tuple[tuple[str, tuple[str, ...]], ...]
     fingerprint: str
+    source_roles: tuple[str, ...] = ()
 
     def by_id(self) -> dict[str, DependencyRecord]:
         """Return records indexed by their stable IDs."""
@@ -1443,6 +1452,11 @@ def manifest_sources(
     vendor = (vendor_root or workspace / "vendor" / "agent-canon").resolve()
     parent_path = workspace / ".devcontainer" / "dependencies.toml"
     vendor_path = vendor / ".devcontainer" / "dependencies.toml"
+    if vendor_root is None and not vendor_path.is_file() and parent_path.is_file():
+        # A standalone source root has the canonical manifest at its workspace
+        # path.  Preserve that role when resolving receipts from a fresh root.
+        vendor = workspace
+        vendor_path = parent_path
     if vendor == workspace and parent_path == vendor_path:
         return (
             (ManifestSource(vendor_path, ManifestRole.CANONICAL),)
@@ -1639,8 +1653,11 @@ def build_plan(
         remaining = sorted(set(by_id) - set(ordered), key=order_index.__getitem__)
         raise DependencyError(f"dependency cycle: {', '.join(remaining)}")
     sources = tuple(manifest.path for manifest in manifests)
+    source_roles = tuple(manifest.source.role.value for manifest in manifests)
     payload = {
-        "sources": [str(path) for path in sources],
+        # Absolute manifest paths are diagnostic data only.  Role identity keeps
+        # the plan stable across standalone roots, fresh clones, and image builds.
+        "source_roles": list(source_roles),
         "records": [record.payload() for record in records],
         "order": ordered,
         "dependency_providers": [
@@ -1658,6 +1675,7 @@ def build_plan(
             for record_id, providers in dependency_providers.items()
         ),
         fingerprint=fingerprint,
+        source_roles=source_roles,
     )
 
 
@@ -1667,6 +1685,441 @@ def load_plan(workspace: Path, vendor_root: Path | None = None) -> DependencyPla
     if not sources:
         raise DependencyError("no devcontainer dependency manifest found")
     return build_plan(tuple(load_manifest(source) for source in sources))
+
+
+def select_record_ids(
+    plan: DependencyPlan, requested: Sequence[str] | str | None = None
+) -> tuple[str, ...]:
+    """Return a deterministic record selection closed over its providers."""
+    if requested is None:
+        return plan.order
+    raw_values = [requested] if isinstance(requested, str) else list(requested)
+    if not raw_values:
+        raise DependencyError("--records must select at least one record")
+    requested_ids: list[str] = []
+    for raw_value in raw_values:
+        if not isinstance(raw_value, str):
+            raise DependencyError("--records values must be strings")
+        for value in raw_value.split(","):
+            record_id = value.strip()
+            if not record_id:
+                raise DependencyError("--records must not contain empty record IDs")
+            if record_id not in plan.by_id():
+                raise DependencyError(f"unknown dependency record: {record_id}")
+            if record_id not in requested_ids:
+                requested_ids.append(record_id)
+    selected = set(requested_ids)
+    pending = deque(requested_ids)
+    while pending:
+        record_id = pending.popleft()
+        for provider in plan.providers_for(record_id):
+            if provider not in selected:
+                selected.add(provider)
+                pending.append(provider)
+    return tuple(record_id for record_id in plan.order if record_id in selected)
+
+
+def _image_plan_payload(
+    plan: DependencyPlan, selected_ids: Sequence[str]
+) -> dict[str, Any]:
+    """Return the immutable, path-independent image plan projection."""
+    selected = tuple(selected_ids)
+    by_id = plan.by_id()
+    return {
+        "schema": IMAGE_PLAN_SCHEMA,
+        "schema_version": IMAGE_PLAN_SCHEMA_VERSION,
+        "plan_fingerprint": plan.fingerprint,
+        "source_roles": list(plan.source_roles),
+        "order": list(selected),
+        "records": [by_id[record_id].payload() for record_id in selected],
+        "provider_closure": [
+            [record_id, list(plan.providers_for(record_id))]
+            for record_id in selected
+        ],
+        "receipts": [f"receipts/{record_id}.json" for record_id in selected],
+    }
+
+
+def _image_target(
+    test_root: Path | None, *, require_root: bool = False
+) -> tuple[Path, bool]:
+    """Resolve the canonical image target or the private test-only seam."""
+    production = test_root is None
+    if production:
+        if require_root and os.geteuid() != 0:
+            raise DependencyError("image-install requires euid=0")
+        return IMAGE_DEPENDENCIES_ROOT, True
+    return test_root.absolute(), False
+
+
+def _image_owner(production: bool) -> tuple[int, int]:
+    """Return the ownership contract for a production or test image tree."""
+    if production:
+        return 0, 0
+    return os.geteuid(), os.getegid()
+
+
+def _lstat_image_path(path: Path, *, description: str) -> os.stat_result:
+    """Read one image path without following symlinks."""
+    try:
+        observed = path.lstat()
+    except OSError as exc:
+        raise DependencyError(f"{description} is unreadable: {path}: {exc}") from exc
+    if stat.S_ISLNK(observed.st_mode):
+        raise DependencyError(f"{description} must not be a symlink: {path}")
+    return observed
+
+
+def _validate_image_parent_chain(
+    target: Path,
+    *,
+    production: bool,
+    owner_uid: int,
+    owner_gid: int,
+    create: bool,
+) -> None:
+    """Validate canonical parent components before image publication."""
+    parent = target.parent
+    if production and not str(parent).startswith("/usr/local/"):
+        raise DependencyError(f"image target escaped canonical root: {target}")
+    if production:
+        root_observed = _lstat_image_path(Path("/"), description="image parent")
+        if not stat.S_ISDIR(root_observed.st_mode) or (
+            root_observed.st_uid != owner_uid
+            or root_observed.st_gid != owner_gid
+            or stat.S_IMODE(root_observed.st_mode) & 0o022
+        ):
+            raise DependencyError("image parent ownership or mode is unsafe: /")
+    current = Path(parent.anchor or "/")
+    for component in parent.parts[1:]:
+        current /= component
+        try:
+            observed = _lstat_image_path(current, description="image parent")
+        except DependencyError as exc:
+            if not create or "is unreadable" not in str(exc):
+                raise
+            try:
+                current.mkdir(mode=0o755)
+                os.chown(current, owner_uid, owner_gid)
+                os.chmod(current, 0o755)
+            except OSError as create_exc:
+                raise DependencyError(
+                    f"image parent cannot be created safely: {current}: {create_exc}"
+                ) from create_exc
+            observed = _lstat_image_path(current, description="image parent")
+        if not stat.S_ISDIR(observed.st_mode):
+            raise DependencyError(f"image parent must be a directory: {current}")
+        if production and (
+            observed.st_uid != owner_uid
+            or observed.st_gid != owner_gid
+            or stat.S_IMODE(observed.st_mode) & 0o022
+        ):
+            raise DependencyError(
+                f"image parent ownership or mode is unsafe: {current}"
+            )
+
+
+def _freeze_image_tree(
+    staging: Path, *, owner_uid: int, owner_gid: int
+) -> None:
+    """Freeze every staging node to the immutable image ownership contract."""
+    pending = [staging]
+    nodes: list[tuple[Path, os.stat_result]] = []
+    while pending:
+        path = pending.pop()
+        observed = _lstat_image_path(path, description="image staging path")
+        if stat.S_ISDIR(observed.st_mode):
+            try:
+                pending.extend(path.iterdir())
+            except OSError as exc:
+                raise DependencyError(
+                    f"image staging directory is unreadable: {path}: {exc}"
+                ) from exc
+        elif not stat.S_ISREG(observed.st_mode):
+            raise DependencyError(f"image staging node is not regular: {path}")
+        nodes.append((path, observed))
+    for path, observed in sorted(
+        nodes, key=lambda item: len(item[0].parts), reverse=True
+    ):
+        mode = IMAGE_DIRECTORY_MODE if stat.S_ISDIR(observed.st_mode) else IMAGE_FILE_MODE
+        try:
+            os.chown(path, owner_uid, owner_gid)
+            os.chmod(path, mode)
+        except OSError as exc:
+            raise DependencyError(
+                f"image staging freeze failed: {path}: {exc}"
+            ) from exc
+
+
+def _assert_frozen_image_node(
+    path: Path,
+    *,
+    directory: bool,
+    owner_uid: int,
+    owner_gid: int,
+    description: str,
+) -> None:
+    """Require one exact regular, owned, non-writable image node."""
+    observed = _lstat_image_path(path, description=description)
+    expected_kind = stat.S_ISDIR(observed.st_mode) if directory else stat.S_ISREG(observed.st_mode)
+    expected_mode = IMAGE_DIRECTORY_MODE if directory else IMAGE_FILE_MODE
+    if not expected_kind:
+        raise DependencyError(f"{description} has the wrong type: {path}")
+    if (
+        observed.st_uid != owner_uid
+        or observed.st_gid != owner_gid
+        or stat.S_IMODE(observed.st_mode) != expected_mode
+    ):
+        raise DependencyError(f"{description} ownership or mode is unsafe: {path}")
+
+
+def _verify_frozen_image_layout(
+    target: Path,
+    selected_ids: Sequence[str] | None,
+    *,
+    production: bool,
+    owner_uid: int,
+    owner_gid: int,
+) -> tuple[Path, Path]:
+    """Read-only verify the exact frozen image tree layout."""
+    try:
+        _validate_image_parent_chain(
+            target,
+            production=production,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            create=False,
+        )
+        _assert_frozen_image_node(
+            target,
+            directory=True,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            description="image dependency root",
+        )
+        entries = list(target.iterdir())
+        if {entry.name for entry in entries} != {"plan.json", "receipts"}:
+            raise DependencyError("image root contents mismatch")
+        plan_path = target / "plan.json"
+        receipts = target / "receipts"
+        _assert_frozen_image_node(
+            plan_path,
+            directory=False,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            description="image plan",
+        )
+        _assert_frozen_image_node(
+            receipts,
+            directory=True,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            description="image receipts",
+        )
+        receipt_entries = list(receipts.iterdir())
+        if selected_ids is not None:
+            expected_receipts = {f"{record_id}.json" for record_id in selected_ids}
+            if {entry.name for entry in receipt_entries} != expected_receipts:
+                raise DependencyError("receipt set mismatch")
+        for entry in receipt_entries:
+            if entry.relative_to(target).parts[0] != "receipts":
+                raise DependencyError("image receipt escaped its root")
+            _assert_frozen_image_node(
+                entry,
+                directory=False,
+                owner_uid=owner_uid,
+                owner_gid=owner_gid,
+                description="image receipt",
+            )
+        return plan_path, receipts
+    except (DependencyError, OSError) as exc:
+        if "image-verify rebuild-required" in str(exc):
+            raise
+        raise DependencyError(f"image-verify rebuild-required: {exc}") from exc
+
+
+def image_install_plan(
+    plan: DependencyPlan,
+    *,
+    workspace: Path,
+    records: Sequence[str] | str | None = None,
+    runner: CommandRunner | None = None,
+    identity: RuntimeIdentity | None = None,
+    _test_image_root: Path | None = None,
+) -> tuple[str, ...]:
+    """Build and publish an immutable image dependency plan and receipts."""
+    target, production = _image_target(_test_image_root, require_root=True)
+    if os.path.lexists(target):
+        raise DependencyError(
+            f"image dependency root already exists; rebuild-required: {target}"
+        )
+    selected_ids = select_record_ids(plan, records)
+    by_id = plan.by_id()
+    image_unsafe = [
+        record_id
+        for record_id in selected_ids
+        if by_id[record_id].method.value not in IMAGE_INSTALL_METHODS
+    ]
+    if image_unsafe:
+        raise DependencyError(
+            "image-install contains methods outside the image-safe whitelist: "
+            + ", ".join(image_unsafe)
+        )
+    validate_runtime_identity(plan, identity)
+    owner_uid, owner_gid = _image_owner(production)
+    if production:
+        _validate_image_parent_chain(
+            target,
+            production=True,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            create=True,
+        )
+    else:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        _validate_image_parent_chain(
+            target,
+            production=False,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+            create=False,
+        )
+    with tempfile.TemporaryDirectory(
+        prefix=".agent-canon-image-", dir=target.parent
+    ) as temporary:
+        staging = Path(temporary)
+        receipts = staging / "receipts"
+        completed = Installer(runner).install(
+            plan,
+            workspace=workspace,
+            receipts=receipts,
+            records=selected_ids,
+        )
+        expected = set(selected_ids)
+        if set(completed) != expected:
+            raise DependencyError(
+                "image-install did not complete the selected record closure: "
+                f"expected={sorted(expected)} completed={sorted(completed)}"
+            )
+        missing_receipts = [
+            record_id
+            for record_id in selected_ids
+            if not _receipt_path(receipts, record_id).is_file()
+        ]
+        if missing_receipts:
+            raise DependencyError(
+                "image-install requires immutable receipts for: "
+                + ", ".join(missing_receipts)
+            )
+        if {path.name for path in staging.iterdir()} != {"receipts"}:
+            raise DependencyError("image-install staging contents are unexpected")
+        (staging / "plan.json").write_text(
+            json.dumps(_image_plan_payload(plan, selected_ids), indent=2, sort_keys=True)
+            + "\n",
+            encoding="utf-8",
+        )
+        _freeze_image_tree(
+            staging,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+        )
+        if os.path.lexists(target):
+            raise DependencyError(
+                f"image dependency root already exists; rebuild-required: {target}"
+            )
+        os.replace(staging, target)
+    return tuple(completed)
+
+
+def image_verify_plan(
+    plan: DependencyPlan,
+    *,
+    workspace: Path,
+    records: Sequence[str] | str | None = None,
+    runner: CommandRunner | None = None,
+    _test_image_root: Path | None = None,
+) -> tuple[str, ...]:
+    """Read and verify an image plan without writes, network, or repair."""
+    target, production = _image_target(_test_image_root)
+    owner_uid, owner_gid = _image_owner(production)
+    try:
+        # Read the stored order only after validating the frozen tree layout.
+        plan_path, receipts = _verify_frozen_image_layout(
+            target,
+            None,
+            production=production,
+            owner_uid=owner_uid,
+            owner_gid=owner_gid,
+        )
+        payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+        raise DependencyError(f"image-verify rebuild-required: unreadable plan: {exc}") from exc
+    if (
+        not isinstance(payload, dict)
+        or plan_path.is_symlink()
+        or not plan_path.is_file()
+    ):
+        raise DependencyError("image-verify rebuild-required: image plan is malformed")
+    requested = payload.get("order") if records is None else records
+    if requested is None or not isinstance(requested, (str, Sequence)):
+        raise DependencyError("image-verify rebuild-required: image selection is malformed")
+    try:
+        selected_ids = select_record_ids(plan, requested)
+    except DependencyError as exc:
+        raise DependencyError(
+            f"image-verify rebuild-required: image selection is invalid: {exc}"
+        ) from exc
+    expected_plan = json.loads(
+        canonical_json(_image_plan_payload(plan, selected_ids))
+    )
+    if payload != expected_plan:
+        raise DependencyError("image-verify rebuild-required: image plan mismatch")
+    # Re-check the exact receipt set after the stored order has been read.
+    _verify_frozen_image_layout(
+        target,
+        selected_ids,
+        production=production,
+        owner_uid=owner_uid,
+        owner_gid=owner_gid,
+    )
+    by_id = plan.by_id()
+    installer = Installer(runner)
+    for record_id in selected_ids:
+        receipt = _receipt_path(receipts, record_id)
+        record = by_id[record_id]
+        try:
+            receipt_payload = json.loads(receipt.read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+            raise DependencyError(
+                f"image-verify rebuild-required: unreadable receipt: {record_id}"
+            ) from exc
+        if not Installer._receipt_matches(receipt, plan, record):
+            raise DependencyError(
+                f"image-verify rebuild-required: stale receipt: {record_id}"
+            )
+        try:
+            installer.verify(
+                record,
+                workspace=workspace,
+                expected_source_identity=Installer._receipt_source_identity(receipt),
+                strict_executables=True,
+                allow_network=False,
+            )
+            bindings = receipt_payload.get("executable_bindings")
+            if bindings and (
+                installer._executable_bindings(record, workspace=workspace) != bindings
+            ):
+                raise DependencyError(
+                    f"image-verify rebuild-required: executable drift: {record_id}"
+                )
+        except (DependencyError, OSError, subprocess.CalledProcessError) as exc:
+            if "rebuild-required" in str(exc):
+                raise
+            raise DependencyError(
+                f"image-verify rebuild-required: live verification failed: "
+                f"{record_id}: {exc}"
+            ) from exc
+    return selected_ids
 
 
 @dataclass(frozen=True)
@@ -2276,14 +2729,26 @@ class Installer:
         }
 
     def install(
-        self, plan: DependencyPlan, *, workspace: Path, receipts: Path
+        self,
+        plan: DependencyPlan,
+        *,
+        workspace: Path,
+        receipts: Path,
+        records: Sequence[str] | None = None,
     ) -> tuple[str, ...]:
         """Install records in order, resuming only after live receipt verification."""
         receipts.mkdir(parents=True, exist_ok=True)
         completed: list[str] = []
         by_id = plan.by_id()
+        order = tuple(records) if records is not None else plan.order
+        unknown = sorted(set(order) - set(by_id))
+        if unknown:
+            raise DependencyError(
+                "selected dependency records are not in the plan: "
+                + ", ".join(unknown)
+            )
         unavailable: set[str] = set()
-        for record_id in plan.order:
+        for record_id in order:
             record = by_id[record_id]
             receipt = _receipt_path(receipts, record.id)
             active_source = (
@@ -2378,7 +2843,7 @@ class Installer:
             return False
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, OSError, json.JSONDecodeError):
+        except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError):
             return False
         bindings = payload.get("executable_bindings")
         if not isinstance(bindings, dict):
@@ -2453,7 +2918,7 @@ class Installer:
         """Read validated executable bindings from one receipt."""
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, OSError, json.JSONDecodeError) as exc:
+        except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError) as exc:
             raise DependencyError("executable receipt is unreadable") from exc
         bindings = payload.get("executable_bindings")
         if not isinstance(bindings, dict):
@@ -2475,7 +2940,7 @@ class Installer:
         """Read the selected source identity recorded with a Cargo receipt."""
         try:
             payload = json.loads(path.read_text(encoding="utf-8"))
-        except (FileNotFoundError, OSError, json.JSONDecodeError):
+        except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError):
             return None
         value = payload.get("source_identity")
         return value if isinstance(value, str) else None
@@ -2803,6 +3268,7 @@ class Installer:
         workspace: Path,
         expected_source_identity: str | None = None,
         strict_executables: bool = False,
+        allow_network: bool = True,
     ) -> str | None:
         """Dispatch the record's typed owner-specific live verifier."""
         source_identity = None
@@ -2821,7 +3287,10 @@ class Installer:
                 item, workspace=workspace, strict_executable=strict_executables
             ),
             VerificationKind.APT_REPOSITORY: lambda item, *, workspace: self._verify_apt_repository(
-                item, workspace=workspace, strict_executable=strict_executables
+                item,
+                workspace=workspace,
+                strict_executable=strict_executables,
+                allow_network=allow_network,
             ),
             VerificationKind.NPM_PACKAGE: lambda item, *, workspace: self._verify_npm_package(
                 item, workspace=workspace, strict_executable=strict_executables
@@ -2917,6 +3386,7 @@ class Installer:
         *,
         workspace: Path,
         strict_executable: bool = False,
+        allow_network: bool = True,
     ) -> None:
         self._verify_apt_package(
             record, workspace=workspace, strict_executable=strict_executable
@@ -2951,7 +3421,8 @@ class Installer:
             ) from exc
         if observed_source != expected_source:
             raise DependencyError(f"{record.id}: apt repository source is stale")
-        self._verify_repository_packages_digest(record)
+        if allow_network:
+            self._verify_repository_packages_digest(record)
 
     @staticmethod
     def _apt_repository_line(record: DependencyRecord, keyring: Path) -> str:
@@ -3594,12 +4065,28 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the dependency model CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "command", choices=("validate", "dry-run", "install", "boundary", "project-install")
+        "command",
+        choices=(
+            "validate",
+            "dry-run",
+            "install",
+            "boundary",
+            "project-install",
+            "image-install",
+            "image-verify",
+        ),
     )
     parser.add_argument("--workspace", default=".")
     parser.add_argument("--vendor-root")
     parser.add_argument("--receipts")
     parser.add_argument("--extras", default="")
+    parser.add_argument(
+        "--records",
+        action="append",
+        nargs="+",
+        default=None,
+        help="record IDs (comma-separated or repeated) for image commands",
+    )
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -3610,6 +4097,10 @@ def main(argv: Sequence[str] | None = None) -> int:
     exit_status = 0
     payload: dict[str, Any]
     try:
+        if args.command not in {"image-install", "image-verify"} and args.records:
+            raise DependencyError(
+                "--records is only supported by image-install and image-verify"
+            )
         if args.command == "project-install":
             workspace = Path(args.workspace).resolve()
             extras = parse_python_extras(args.extras)
@@ -3633,7 +4124,38 @@ def main(argv: Sequence[str] | None = None) -> int:
             exit_status = 0 if not report.findings else 1
         else:
             plan = _cli_plan(args)
-            if args.command == "validate":
+            if args.command in {"image-install", "image-verify"}:
+                workspace = Path(args.workspace).resolve()
+                selected_records = (
+                    None
+                    if args.records is None
+                    else [value for group in args.records for value in group]
+                )
+                if args.command == "image-install":
+                    completed = image_install_plan(
+                        plan,
+                        workspace=workspace,
+                        records=selected_records,
+                    )
+                    payload = {
+                        "status": "pass",
+                        "completed": list(completed),
+                        "image_root": str(IMAGE_DEPENDENCIES_ROOT),
+                        "plan_fingerprint": plan.fingerprint,
+                    }
+                else:
+                    verified = image_verify_plan(
+                        plan,
+                        workspace=workspace,
+                        records=selected_records,
+                    )
+                    payload = {
+                        "status": "pass",
+                        "verified": list(verified),
+                        "image_root": str(IMAGE_DEPENDENCIES_ROOT),
+                        "plan_fingerprint": plan.fingerprint,
+                    }
+            elif args.command == "validate":
                 payload = {
                     "status": "pass",
                     "sources": [str(path) for path in plan.sources],
@@ -3666,12 +4188,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         urllib.error.URLError,
         subprocess.CalledProcessError,
     ) as exc:
+        if args.command == "image-verify":
+            if args.format == "json":
+                print(
+                    json.dumps(
+                        {"status": "rebuild-required", "error": str(exc)},
+                        sort_keys=True,
+                    )
+                )
+            else:
+                print("DEVCONTAINER_IMAGE_VERIFY=rebuild-required", file=sys.stderr)
         print(f"DEVCONTAINER_DEPENDENCY_ERROR={exc}", file=sys.stderr)
         return 1
     if args.format == "json":
         print(json.dumps(payload, indent=2, sort_keys=True))
     else:
         print(f"DEVCONTAINER_DEPENDENCY={payload.get('status', 'pass')}")
+        if args.command == "image-install":
+            print("DEVCONTAINER_IMAGE_INSTALL=pass")
+        if args.command == "image-verify":
+            print("DEVCONTAINER_IMAGE_VERIFY=pass")
         if args.command == "boundary":
             for finding in payload.get("findings", []):
                 print(

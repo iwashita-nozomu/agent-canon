@@ -113,19 +113,6 @@ runtime = data.get("runtime", {})
 runtime_shell = runtime.get("shell", "/bin/bash")
 if not isinstance(runtime_shell, str) or re.fullmatch(r"/[A-Za-z0-9._/-]+", runtime_shell) is None:
     raise SystemExit("runtime.shell must be one absolute executable path")
-dependency_extras = runtime.get("dependency_extras", [])
-if not isinstance(dependency_extras, list) or not all(
-    isinstance(item, str) for item in dependency_extras
-):
-    raise SystemExit("runtime.dependency_extras must be a string array")
-seen_extras = set()
-for extra in dependency_extras:
-    if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", extra) is None:
-        raise SystemExit(f"runtime.dependency_extras contains invalid name: {extra}")
-    key = extra.casefold()
-    if key in seen_extras:
-        raise SystemExit(f"runtime.dependency_extras contains duplicate name: {extra}")
-    seen_extras.add(key)
 runtime_platform = pack.get("platform", "linux/amd64")
 if runtime_platform != "linux/amd64":
     raise SystemExit("pack.platform must be linux/amd64")
@@ -254,8 +241,6 @@ if target is not None and (
 if target is not None:
     print(f"target={target}")
 print(f"runtime_shell={runtime_shell}")
-for extra in dependency_extras:
-    print(f"dependency_extra={extra}")
 print(f"platform={runtime_platform}")
 print(f"workdir={runtime.get('workdir', '/workspace')}")
 print(f"workspace_mount={runtime.get('workspace_mount', '/workspace')}")
@@ -282,7 +267,6 @@ PY
   dockerfile=""
   build_target=""
   runtime_shell="/bin/bash"
-  dependency_extras=()
   runtime_platform="linux/amd64"
   workdir="/workspace"
   workspace_mount="/workspace"
@@ -296,7 +280,6 @@ PY
       dockerfile=*) dockerfile="${pack_value#dockerfile=}" ;;
       target=*) build_target="${pack_value#target=}" ;;
       runtime_shell=*) runtime_shell="${pack_value#runtime_shell=}" ;;
-      dependency_extra=*) dependency_extras+=("${pack_value#dependency_extra=}") ;;
       platform=*) runtime_platform="${pack_value#platform=}" ;;
       workdir=*) workdir="${pack_value#workdir=}" ;;
       workspace_mount=*) workspace_mount="${pack_value#workspace_mount=}" ;;
@@ -312,7 +295,6 @@ else
   dockerfile=""
   build_target=""
   runtime_shell="/bin/bash"
-  dependency_extras=()
   runtime_platform="linux/amd64"
   workdir="/workspace"
   workspace_mount="/workspace"
@@ -323,7 +305,6 @@ else
   pack_environment_lines=()
 fi
 
-dependency_extras_csv="$(IFS=,; printf '%s' "${dependency_extras[*]}")"
 if [ "$gpu_profile" = "gpu-admission" ]; then
   if [ ! -f "$pack" ]; then
     printf 'devcontainer GPU admission profile requires pack: %s\n' "$pack" >&2
@@ -638,8 +619,9 @@ environment_lines=(
   "      AGENT_CANON_SECRET_MOUNT: \"${secret_target}\""
   "      AGENT_CANON_SECRET_DIR_MODE: \"${secret_mode}\""
   "      AGENT_CANON_OPTIONAL_MOUNTS: \"${optional_mounts}\""
-  "      AGENT_CANON_PYTHON_EXTRAS: \"${dependency_extras_csv}\""
   "      AGENT_CANON_RUNTIME_ROUTE: \"${runtime_route}\""
+  "      PYTHONDONTWRITEBYTECODE: \"1\""
+  "      PYTHONPATH: \"${container_repo_root}/python\""
   "      AGENT_CANON_WORKSPACE_LAYOUT: \"${workspace_layout}\""
   "      AGENT_CANON_CODEX_SESSION_ROOT: \"${project_home}/.codex/sessions\""
   '      AGENT_CANON_WORKSPACE_ROOT: "/workspace"'

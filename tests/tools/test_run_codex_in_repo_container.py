@@ -69,7 +69,6 @@ def write_nested_profile_fixture(
                 'shell = "/bin/bash"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
-                "dependency_extras = []",
                 f"env = {json.dumps(list(pack_env))}",
                 "mounts = []",
                 "",
@@ -160,7 +159,6 @@ def test_nested_runner_xdg_state_allows_container_local_receipts(
                 'shell = "/bin/bash"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
-                "dependency_extras = []",
                 "env = []",
                 "mounts = []",
                 "",
@@ -496,7 +494,7 @@ def test_standalone_dockerfile_uses_canonical_project_identity() -> None:
         encoding="utf-8"
     )
 
-    assert "FROM ubuntu:22.04@sha256:" in dockerfile
+    assert "ubuntu:22.04@sha256:" in dockerfile
     assert "ARG PROJECT_UID" in dockerfile
     assert "ARG PROJECT_GID" in dockerfile
     assert "groupadd --gid \"${PROJECT_GID}\" project" in dockerfile
@@ -525,7 +523,6 @@ def test_runtime_identity(tmp_path: Path) -> None:
                 'shell = "/bin/bash"',
                 'workdir = "/workspace"',
                 'workspace_mount = "/workspace"',
-                'dependency_extras = ["dev", "cuda12"]',
                 "env = []",
                 "mounts = []",
                 "",
@@ -599,13 +596,13 @@ def test_runtime_identity(tmp_path: Path) -> None:
     )
     assert "-e OPENAI_API_KEY=test-api-key" in result.stdout
     assert "-e OPENAI_BASE_URL=https://api.example.test/v1" in result.stdout
-    assert "-e AGENT_CANON_PYTHON_EXTRAS=dev,cuda12" in result.stdout
+    assert "AGENT_CANON_PYTHON_EXTRAS" not in result.stdout
     assert "/root/.codex" not in result.stdout
     assert "umask 0007" in post_create
     assert '"$devcontainer_dir/finalize-shared-runtime.sh"' not in post_create
-    assert "project-install --workspace" in post_create
-    assert 'state_home="${XDG_STATE_HOME:-$home/.local/state}"' in post_create
-    assert 'dependency_receipts="$state_home/agent-canon/dependency-receipts"' in post_create
+    assert "project-install --workspace" not in post_create
+    assert "image-verify --workspace" in post_create
+    assert "dependency_receipts" not in post_create
     assert ".agent-canon/dependency-receipts" not in post_create
     assert 'echo "codex-state: ${codex_state_status}"' in post_attach
     assert 'workspace_layout="${AGENT_CANON_WORKSPACE_LAYOUT:-managed-topic}"' in post_attach
