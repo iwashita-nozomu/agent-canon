@@ -53,8 +53,7 @@ LOCAL_FLOCK_FILESYSTEMS = ("btrfs", "ext4", "xfs")
 PROVISION_RECEIPT_NAME = "shared-runtime-provision.json"
 READBACK_RECEIPT_NAME = "shared-runtime-readback.json"
 RUNTIME_ROUTE = "MANAGED_CONTAINER"
-PYTHON_EXTRAS_ENV = "AGENT_CANON_PYTHON_EXTRAS"
-PYTHON_EXTRA_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
+SAFE_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*\Z")
 OPTIONAL_MOUNT_PROFILES = frozenset(
     {
         "host-zshrc",
@@ -87,7 +86,6 @@ class RuntimeSpec:
     env: tuple[str, ...] = ()
     mounts: tuple[str, ...] = ()
     gpus: str | None = None
-    dependency_extras: tuple[str, ...] = ()
     optional_mount_profiles: tuple[str, ...] = ()
     linked_data_roots: tuple[LinkedDataRoot, ...] = ()
     linked_data_roots_declared: bool = False
@@ -546,21 +544,6 @@ def load_pack(path_like: str | Path) -> ContainerPack:
     gpus = runtime_section.get("gpus")
     if gpus is not None and not isinstance(gpus, str):
         raise ValueError(f"{path}: [runtime].gpus must be a string if present")
-    raw_dependency_extras = runtime_section.get("dependency_extras", [])
-    if not isinstance(raw_dependency_extras, list) or not all(
-        isinstance(item, str) for item in raw_dependency_extras
-    ):
-        raise ValueError(f"{path}: [runtime].dependency_extras must be a string array")
-    dependency_extras: list[str] = []
-    seen_extras: set[str] = set()
-    for extra in raw_dependency_extras:
-        if PYTHON_EXTRA_RE.fullmatch(extra) is None:
-            raise ValueError(f"{path}: invalid [runtime].dependency_extras name: {extra}")
-        key = extra.casefold()
-        if key in seen_extras:
-            raise ValueError(f"{path}: duplicate [runtime].dependency_extras name: {extra}")
-        seen_extras.add(key)
-        dependency_extras.append(extra)
     optional_mount_profiles = _parse_optional_mount_profiles(runtime_section, path)
     linked_data_roots, linked_data_roots_declared = _parse_linked_data_roots(
         runtime_section, path
@@ -574,12 +557,6 @@ def load_pack(path_like: str | Path) -> ContainerPack:
         raise ValueError(
             f"{path}: [runtime].mounts is not supported; use an explicit optional mount profile"
         )
-    if any(
-        item.partition("=")[0] == PYTHON_EXTRAS_ENV
-        for item in require_string_list(runtime_section, "env", path, "runtime")
-    ):
-        raise ValueError(f"{path}: [runtime].env cannot override {PYTHON_EXTRAS_ENV}")
-
     return ContainerPack(
         name=name,
         dockerfile=dockerfile,
@@ -598,7 +575,6 @@ def load_pack(path_like: str | Path) -> ContainerPack:
             env=require_string_list(runtime_section, "env", path, "runtime"),
             mounts=(),
             gpus=gpus,
-            dependency_extras=tuple(dependency_extras),
             optional_mount_profiles=optional_mount_profiles,
             linked_data_roots=linked_data_roots,
             linked_data_roots_declared=linked_data_roots_declared,
@@ -690,7 +666,6 @@ def build_run_command(
         for item in (*pack.runtime.env, *env)
         if "=" in item
     )
-    combined[PYTHON_EXTRAS_ENV] = ",".join(pack.runtime.dependency_extras)
     combined_env = tuple(f"{name}={value}" for name, value in combined.items())
     optional_profiles = _canonical_optional_mount_profiles(pack)
     linked_data_mounts = resolve_linked_data_mounts(pack, resolved_workspace)
@@ -747,41 +722,6 @@ def build_run_command(
 def build_shell_invocation(shell: str, script: str) -> list[str]:
     """Return a shell invocation for a multi-line script."""
     return [shell, "-lc", script]
-
-
-def build_workspace_setup_command(
-    command: list[str],
-    *,
-    shell: str,
-    container_workspace: str,
-    dependency_extras: tuple[str, ...],
-    skip_setup: bool = False,
-) -> list[str]:
-    """Run standard editable project installation before one command."""
-    if skip_setup or not dependency_extras:
-        return command
-    source_installer = (
-        f"{container_workspace.rstrip('/')}/vendor/agent-canon/tools/agent_tools/devcontainer_dependencies.py"
-    )
-    standalone_installer = (
-        f"{container_workspace.rstrip('/')}/tools/agent_tools/devcontainer_dependencies.py"
-    )
-    workspace = container_workspace.rstrip("/")
-    lines = [
-        "set -euo pipefail",
-        (
-            f"if [ -f {shlex.quote(workspace + '/pyproject.toml')} ] "
-            f"&& [ -n \"${{{PYTHON_EXTRAS_ENV}:-}}\" ]; then "
-            f"installer={shlex.quote(source_installer)}; "
-            f"[ -f \"$installer\" ] || installer={shlex.quote(standalone_installer)}; "
-            f"[ -f \"$installer\" ] || {{ echo 'project installer is unavailable' >&2; exit 1; }}; "
-            f"python3 \"$installer\" project-install --workspace {shlex.quote(container_workspace)} "
-            f"--extras \"${{{PYTHON_EXTRAS_ENV}}}\"; "
-            "fi"
-        ),
-        f"exec {shlex.join(command)}",
-    ]
-    return build_shell_invocation(shell, join_shell_lines(lines))
 
 
 def join_shell_lines(lines: list[str]) -> str:

@@ -20,7 +20,6 @@ from container_runtime import (
     build_build_command,
     build_run_command,
     build_shell_invocation,
-    build_workspace_setup_command,
     join_shell_lines,
     load_or_default_pack,
     print_label_and_command,
@@ -224,7 +223,6 @@ def main() -> int:
             dockerfile=args.dockerfile,
         )
         builder = resolve_builder(args.builder, print_only=args.print_only)
-        container_workspace = pack.runtime.workspace_mount
         build_command = build_build_command(builder, pack)
         print_label_and_command("build", build_command)
 
@@ -234,12 +232,7 @@ def main() -> int:
                 builder,
                 pack,
                 workspace_root=workspace_path("."),
-                command=build_workspace_setup_command(
-                    build_env_check_command(),
-                    shell="/bin/bash",
-                    container_workspace=container_workspace,
-                    dependency_extras=pack.runtime.dependency_extras,
-                ),
+                command=build_env_check_command(),
                 env=tuple(args.env),
                 mounts=tuple(args.mount),
             )
@@ -249,12 +242,7 @@ def main() -> int:
             builder,
             pack,
             workspace_root=workspace_path("."),
-            command=build_workspace_setup_command(
-                resolution.command,
-                shell="/bin/bash",
-                container_workspace=container_workspace,
-                dependency_extras=pack.runtime.dependency_extras,
-            ),
+            command=resolution.command,
             env=tuple(args.env),
             mounts=tuple(args.mount),
             workdir=resolution.workdir,

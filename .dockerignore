@@ -1,0 +1,8 @@
+# The standalone image receives only its explicit dependency engine and manifest.
+**
+!.devcontainer/
+!.devcontainer/Dockerfile
+!.devcontainer/dependencies.toml
+!tools/
+!tools/agent_tools/
+!tools/agent_tools/devcontainer_dependencies.py

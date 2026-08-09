@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from container_runtime import (
+    SAFE_NAME_RE,
     apply_pack_overrides,
     build_build_command,
     build_run_command,
@@ -52,6 +53,46 @@ class CodexProfile:
     name: str
     pack: str
     description: str
+
+
+NESTED_XDG_STATE_ROOT = "/tmp/agent-canon-xdg-state"
+NESTED_RUNTIME_OWNED_ENV = frozenset(
+    {"HOME", "XDG_STATE_HOME", "AGENT_CANON_CONTAINER_USER"}
+)
+
+
+def validate_nested_profile_name(profile: CodexProfile) -> None:
+    """Reject profile names that cannot be one safe state-path segment."""
+    if SAFE_NAME_RE.fullmatch(profile.name) is None:
+        raise ValueError(
+            "nested profile name must be one safe path segment: "
+            f"{profile.name!r}"
+        )
+
+
+def nested_xdg_state_home(profile: CodexProfile) -> str:
+    """Return the profile-scoped container-local XDG state root."""
+    validate_nested_profile_name(profile)
+    return f"{NESTED_XDG_STATE_ROOT}/{profile.name}"
+
+
+def validate_nested_owned_environment(
+    pack_env: tuple[str, ...],
+    profile_forward_env: tuple[str, ...],
+    cli_forward_env: tuple[str, ...],
+) -> None:
+    """Reject pack/profile/CLI attempts to override nested runtime ownership."""
+    for source, values in (
+        ("pack runtime.env", pack_env),
+        ("profile forward_env", profile_forward_env),
+        ("CLI --forward-env", cli_forward_env),
+    ):
+        for value in values:
+            name = value.partition("=")[0]
+            if name in NESTED_RUNTIME_OWNED_ENV:
+                raise ValueError(
+                    f"{source} cannot override nested runtime-owned environment: {name}"
+                )
 
 
 def parse_bool(data: dict[str, object], key: str, default: bool) -> bool:
@@ -318,16 +359,24 @@ def main() -> int:
             return 0
 
         profile = find_profile(profiles, args.profile)
+        xdg_state_home = nested_xdg_state_home(profile)
         workspace_root = workspace_path(args.workspace_root)
         _, container_home = host_to_container_home(defaults, profile, workspace_root)
         pack = apply_pack_overrides(load_or_default_pack(profile.pack))
+        profile_forward_env = defaults.forward_env
+        cli_forward_env = tuple(args.forward_env)
+        validate_nested_owned_environment(
+            pack.runtime.env,
+            profile_forward_env,
+            cli_forward_env,
+        )
         builder = resolve_builder(args.builder, print_only=args.print_only)
 
         mount_host_ssh_dir = defaults.mount_host_ssh_dir or args.mount_host_ssh_dir
         forward_ssh_auth_sock = (
             defaults.forward_ssh_auth_sock and not args.no_forward_ssh_auth_sock
         )
-        forward_env = tuple(dict.fromkeys((*defaults.forward_env, *args.forward_env)))
+        forward_env = tuple(dict.fromkeys((*profile_forward_env, *cli_forward_env)))
         use_host_user = defaults.use_host_user
         tty = defaults.tty
 
@@ -336,10 +385,7 @@ def main() -> int:
         # dedicated image identity HOME.  Clear the dedicated identity contract
         # so shared post-create performs the rest of setup without rejecting the
         # nested session as a runtime-user mismatch.
-        envs: list[str] = [
-            f"HOME={container_home}",
-            "AGENT_CANON_CONTAINER_USER=",
-        ]
+        envs: list[str] = []
 
         host_gitconfig = Path.home() / ".gitconfig"
         if defaults.mount_host_gitconfig and host_gitconfig.is_file():
@@ -362,6 +408,16 @@ def main() -> int:
             value = os.environ.get(env_name)
             if value:
                 envs.append(f"{env_name}={value}")
+
+        # Keep owned values last so build_run_command's merged environment cannot
+        # let a later forwarding entry shadow the nested runtime contract.
+        envs.extend(
+            [
+                f"HOME={container_home}",
+                f"XDG_STATE_HOME={xdg_state_home}",
+                "AGENT_CANON_CONTAINER_USER=",
+            ]
+        )
 
         shell_script = build_nested_codex_script(
             normalize_command(args.command),
