@@ -352,6 +352,36 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
             script,
         )
 
+    def test_fresh_clone_attaches_the_staged_pin_when_remote_main_advanced(self) -> None:
+        """A newer remote main must not invalidate a reproducible parent gitlink."""
+        script = (AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_fresh_clone.sh").read_text(
+            encoding="utf-8"
+        )
+        self.assertNotIn("fresh_clone_submodule_attach=main_pin_mismatch", script)
+        self.assertIn(
+            'git -C "$submodule_path" branch -f main "$pinned_oid"',
+            script,
+        )
+        self.assertLess(
+            script.index('git -C "$submodule_path" branch -f main "$pinned_oid"'),
+            script.index('git -C "$submodule_path" switch main'),
+        )
+
+    def test_fresh_clone_rebinds_tracking_ref_with_the_fixture_remote(self) -> None:
+        """The disposable remote replacement must replace its stale tracking identity."""
+        script = (AGENT_CANON_SOURCE_ROOT / "tools" / "ci" / "check_fresh_clone.sh").read_text(
+            encoding="utf-8"
+        )
+        remote_rebind = (
+            'git -C vendor/agent-canon fetch --force origin \\\n'
+            '    "refs/heads/main:refs/remotes/origin/main"'
+        )
+        self.assertIn(remote_rebind, script)
+        self.assertLess(
+            script.index(remote_rebind),
+            script.index("materialize_current_lifecycle_projection"),
+        )
+
     def test_merge_invocations_disable_configured_autostash(self) -> None:
         """Every AgentCanon update merge must refuse config-driven autostash."""
         for relative_path in ("tools/sync_agent_canon.sh", "tools/update_agent_canon.sh"):
