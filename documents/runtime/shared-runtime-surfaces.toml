@@ -63,6 +63,7 @@ paths = [
   ".codex/hooks",
   ".devcontainer/devcontainer.json",
   ".devcontainer/gpu-admission",
+  ".devcontainer/rootless",
   ".vscode",
   "evidence",
   "memory",

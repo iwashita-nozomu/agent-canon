@@ -1,10 +1,10 @@
 {
-  "name": "${localWorkspaceFolderBasename}-devcontainer",
-  "initializeCommand": "AGENT_CANON_RUNTIME_IDENTITY_MODE=project AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
-  "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
+  "name": "${localWorkspaceFolderBasename}-rootless-devcontainer",
+  "initializeCommand": "AGENT_CANON_RUNTIME_IDENTITY_MODE=rootless-root AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.rootless.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
+  "dockerComposeFile": "../../.agent-canon/docker-compose.rootless.generated.yml",
   "service": "workspace",
-  "containerUser": "project",
-  "remoteUser": "project",
+  "containerUser": "root",
+  "remoteUser": "root",
   "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
   "features": {
     "ghcr.io/devcontainers/features/node@sha256:586c9a6f7dd40bd3ba2cd41e7f2f88dcc31fbe5d1442afcbf07ffbc66b686857": {

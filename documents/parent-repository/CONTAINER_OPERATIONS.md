@@ -42,9 +42,9 @@ default Composeのrequired host bindはworkspace repository topic-rootから`/wo
 
 host `${HOME}/.zshrc` と `${HOME}/.zsh` は optional user-customizationです。
 `host-zshrc` profileが明示された場合、regular fileまたはregular fileへ解決するsymlink
-は `realpath -e` のcanonical absolute sourceから `/home/project/.zshrc` へread-only
-projectionし、regular directoryへ解決する `${HOME}/.zsh` も `/home/project/.zsh` へ
-read-only projectionします。欠落・broken symlink・型違いの場合はmountを省略し、
+は `realpath -e` のcanonical absolute sourceから selected runtime `HOME/.zshrc` へread-only
+projectionし、regular directoryへ解決する `${HOME}/.zsh` も selected runtime `HOME/.zsh` へ
+read-only projectionします（`project` は `/home/project`、`rootless-root` は `/root`）。欠落・broken symlink・型違いの場合はmountを省略し、
 image-owned empty/default startupで同一機能を成立させます。host `~/.codex`、
 parent-environment、個別credential/config、SSH agent、previous container state、
 `/mnt/git`、Docker socketはdefault create/tool availabilityの入力ではありません。
@@ -86,12 +86,19 @@ standalone AgentCanon source layout でも `host-zshrc` profile は同じ option
 shell projectionを使えます。profile未選択時は pack-derived command だけを生成し、
 host `~/.zshrc`、parent environment mount、`HOME`、tmpfs は要求しません。
 
-Compose がこの境界で直接所有する environment は次の四つです。
+Compose がこの境界で直接所有する environment は runtime identity marker を含む次の値です。
 
-- `HOME`: dedicated non-root userの `/home/project` を指します。
+- `AGENT_CANON_RUNTIME_IDENTITY_MODE`: rootful の `project` または rootless selector の
+  `rootless-root` と一致します。
+- `HOME`: `project` では `/home/project`、`rootless-root` では `/root` を指します。
 - `SHELL`: pack の `runtime.shell` と一致します。
-- `AGENT_CANON_CONTAINER_USER`: `project` と一致し、post-create/attachがruntime
-  user、HOME、ownershipをread backします。
+- `AGENT_CANON_CONTAINER_USER`: selector の `project` または `root` と一致し、post-create/attach が
+  process user、HOME、workspace writability を read backします。
+
+default selector は rootful Docker 専用です。rootless Docker は
+`.devcontainer/rootless/devcontainer.json` と
+`.agent-canon/docker-compose.rootless.generated.yml` を選択し、Compose `user: "0:0"`
+で起動します。build 用 `PROJECT_UID/GID` は正の値を維持し、runtime user と混同しません。
 
 parent environment pair の両方不在、または両方が file 実体へ解決できることは、値や
 container behavior の十分条件ではありません。最終的な親側検証は、validator、
