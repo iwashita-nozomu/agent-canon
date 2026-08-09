@@ -21801,62 +21801,6 @@
       "surface": "tool"
     },
     {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DOCKER_REQUIREMENTS_NOT_IN_PYPROJECT",
-      "line": 273,
-      "path": "tools/requirement_sync_validator.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "DOCKER_REQUIREMENTS_PACKAGES",
-      "line": 271,
-      "path": "tools/requirement_sync_validator.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PYPROJECT_ALL_DEPENDENCIES",
-      "line": 270,
-      "path": "tools/requirement_sync_validator.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PYPROJECT_DEPENDENCY_GROUPS",
-      "line": 268,
-      "path": "tools/requirement_sync_validator.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PYPROJECT_DOCKER_DEPENDENCY_SUMMARY",
-      "line": 267,
-      "path": "tools/requirement_sync_validator.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PYPROJECT_DOCKER_RUNTIME_MISSING",
-      "line": 272,
-      "path": "tools/requirement_sync_validator.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "PYPROJECT_RUNTIME_DEPENDENCIES",
-      "line": 269,
-      "path": "tools/requirement_sync_validator.py",
-      "surface": "tool"
-    },
-    {
       "certainty": "dynamic",
       "emitter": "shell_key_value_stdout",
       "field": "<dynamic>",
@@ -24538,7 +24482,6 @@
     "tools/oop/shared/rule_inventory_core.py",
     "tools/push_origin.sh",
     "tools/rebuild_agent_tools.sh",
-    "tools/requirement_sync_validator.py",
     "tools/run_comprehensive_review.sh",
     "tools/run_pytest_with_logs.sh",
     "tools/setup_worktree.sh",

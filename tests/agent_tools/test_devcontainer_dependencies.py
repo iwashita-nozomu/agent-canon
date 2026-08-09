@@ -2724,9 +2724,6 @@ class DependencyModelTests(unittest.TestCase):
         post_create = (ROOT / ".devcontainer" / "post-create.sh").read_text(
             encoding="utf-8"
         )
-        identity_helper = (
-            ROOT / "tools" / "lib" / "agent_canon_source_identity.sh"
-        ).read_text(encoding="utf-8")
         self.assertEqual(
             devcontainer["features"],
             {
