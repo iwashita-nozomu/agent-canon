@@ -801,6 +801,119 @@ def test_gpu_admission_validator_requires_shared_runtime_profile(
     }
 
 
+def _docker_host_compose_fixture(tmp_path: Path) -> tuple[Path, Path]:
+    """Return a GPU Compose fixture with the canonical docker-host bind selected."""
+    repo, output_path = generate_gpu_admission_compose(tmp_path)
+    compose = output_path.read_text(encoding="utf-8").replace(
+        'AGENT_CANON_OPTIONAL_MOUNTS: "shared-runtime"',
+        'AGENT_CANON_OPTIONAL_MOUNTS: "shared-runtime,docker-host"',
+        1,
+    )
+    compose = compose.replace(
+        '      - type: bind\n        source: "/var/lib/agent-canon/runtime"',
+        '      - /var/run/docker.sock:/var/run/docker.sock\n'
+        '      - type: bind\n        source: "/var/lib/agent-canon/runtime"',
+        1,
+    )
+    output_path.write_text(compose, encoding="utf-8")
+    return repo, output_path
+
+
+def test_docker_host_validator_accepts_canonical_rw_bind(tmp_path: Path) -> None:
+    """Selected docker-host accepts exactly one canonical read-write bind."""
+    repo, output_path = _docker_host_compose_fixture(tmp_path)
+    module = load_container_config_module()
+    findings = module.validate_generated_compose(
+        repo,
+        None,
+        profile="gpu-admission",
+        compose_path=output_path,
+    )
+    assert not any(finding.detail.startswith("docker-host-mount-") for finding in findings)
+
+
+@pytest.mark.parametrize(
+    ("mutation", "expected_detail"),
+    (
+        ("source", "docker-host-mount-source-must-be-canonical"),
+        ("read_only", "docker-host-mount-must-be-read-write"),
+        ("type", "docker-host-mount-type-must-be-bind"),
+        ("duplicate", "docker-host-mount-count:2"),
+    ),
+)
+def test_docker_host_validator_rejects_socket_bind_tampering(
+    tmp_path: Path, mutation: str, expected_detail: str
+) -> None:
+    """Selected docker-host rejects source, type, read-only, and duplicate tampering."""
+    repo, output_path = _docker_host_compose_fixture(tmp_path)
+    compose = output_path.read_text(encoding="utf-8")
+    if mutation == "source":
+        compose = compose.replace(
+            "      - /var/run/docker.sock:/var/run/docker.sock\n",
+            "      - /tmp/evil.sock:/var/run/docker.sock\n",
+            1,
+        )
+    elif mutation == "read_only":
+        compose = compose.replace(
+            "      - /var/run/docker.sock:/var/run/docker.sock\n",
+            "      - /var/run/docker.sock:/var/run/docker.sock:ro\n",
+            1,
+        )
+    elif mutation == "type":
+        compose = compose.replace(
+            "      - /var/run/docker.sock:/var/run/docker.sock\n",
+            '      - type: volume\n        source: "/var/run/docker.sock"\n'
+            '        target: "/var/run/docker.sock"\n',
+            1,
+        )
+    else:
+        compose = compose.replace(
+            "      - /var/run/docker.sock:/var/run/docker.sock\n",
+            "      - /var/run/docker.sock:/var/run/docker.sock\n"
+            "      - /var/run/docker.sock:/var/run/docker.sock\n",
+            1,
+        )
+    output_path.write_text(compose, encoding="utf-8")
+    module = load_container_config_module()
+    findings = module.validate_generated_compose(
+        repo,
+        None,
+        profile="gpu-admission",
+        compose_path=output_path,
+    )
+    assert expected_detail in {finding.detail for finding in findings}
+
+
+def test_generator_docker_host_fails_closed_without_socket(tmp_path: Path) -> None:
+    """Selected docker-host fails before output when the host socket is unavailable."""
+    repo = write_parent_generator_fixture(tmp_path)
+    generator = repo / ".devcontainer/generate-runtime-compose.sh"
+    missing_socket = tmp_path / "missing-docker.sock"
+    generator.write_text(
+        generator.read_text(encoding="utf-8").replace(
+            "if [ ! -S /var/run/docker.sock ]; then",
+            f"if [ ! -S {missing_socket} ]; then",
+            1,
+        ),
+        encoding="utf-8",
+    )
+    generator.chmod(0o755)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "AGENT_CANON_OPTIONAL_MOUNTS": "docker-host",
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "requires an existing Unix socket" in result.stderr
+
+
 def test_default_scenario_rejects_shared_runtime_without_profile_selector(
     tmp_path: Path,
 ) -> None:

@@ -1640,6 +1640,56 @@ def validate_generated_compose(
                 seen_linked_sources.add(source)
             if isinstance(target, str):
                 seen_linked_targets.add(target)
+    docker_host_mounts = [
+        raw_volume
+        for raw_volume in volumes
+        if volume_fields(raw_volume)[1] == "/var/run/docker.sock"
+    ]
+    if "docker-host" in optional_tokens:
+        if len(docker_host_mounts) != 1:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    f"docker-host-mount-count:{len(docker_host_mounts)}",
+                )
+            )
+        else:
+            docker_host_mount = docker_host_mounts[0]
+            docker_source, docker_target = volume_fields(docker_host_mount)
+            if docker_source != "/var/run/docker.sock":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "docker-host-mount-source-must-be-canonical",
+                    )
+                )
+            if docker_target != "/var/run/docker.sock":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "docker-host-mount-target-must-be-canonical",
+                    )
+                )
+            docker_volume = as_mapping(docker_host_mount)
+            if docker_volume is not None and volume_type(docker_host_mount) != "bind":
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "docker-host-mount-type-must-be-bind",
+                    )
+                )
+            if volume_is_read_only(docker_host_mount):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "docker-host-mount-must-be-read-write",
+                    )
+                )
     allowed_targets = {"/workspace", repo_target}
     if "host-zshrc" in optional_tokens:
         allowed_targets.add("/home/project/.zshrc")

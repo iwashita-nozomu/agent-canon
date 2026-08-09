@@ -562,7 +562,11 @@ if optional_mount_enabled ssh-agent \
   && [ -S "${SSH_AUTH_SOCK}" ]; then
   volume_lines+=("      - ${SSH_AUTH_SOCK}:/ssh-agent")
 fi
-if optional_mount_enabled docker-host && [ -S /var/run/docker.sock ]; then
+if optional_mount_enabled docker-host; then
+  if [ ! -S /var/run/docker.sock ]; then
+    printf 'devcontainer docker-host profile requires an existing Unix socket: /var/run/docker.sock\n' >&2
+    exit 1
+  fi
   volume_lines+=("      - /var/run/docker.sock:/var/run/docker.sock")
 fi
 
