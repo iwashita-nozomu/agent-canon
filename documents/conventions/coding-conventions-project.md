@@ -61,27 +61,26 @@ downstream implementation ../../tools/agent_tools/convention_compliance_contract
 ## 4. 開発環境
 
 - 共通実行環境が必要な場合は、`CONTAINER_OPERATIONS.md` を正本として repo-local `docker/` と AgentCanon-owned `.devcontainer/` の責務を分けます。
-- Python 依存を追加する場合は `docker/requirements.txt` と `docker/install_python_dependencies.sh` の契約を基準にします。Python requirements の install / copy はこの 2 ファイルルートで実施し、`docker/Dockerfile` はその処理を担わない運用です。
-- `docker/Dockerfile` または `docker/requirements.txt` を更新した変更では、`make docker-build-check` を実行します。
+- Python 依存を追加する場合は親 `pyproject.toml` の optional extras と shared post-create の標準 editable install / `pip check` を契約の基準にします。固定 OS/Python capability は image、Node/npm は exact digest-pinned official Feature、Agent/Codex tools は typed `.devcontainer/dependencies.toml` が所有します。
+- `docker/Dockerfile`、`pyproject.toml`、または `.devcontainer/` を更新した変更では、`python3 tools/ci/container_config.py` と対象 container validation を実行します。
 - 開発環境の更新では、必要な README と運用文書も同じ変更で更新します。
 - Python を使う場合でも、repo 全体の入口は language-neutral に保ちます。
-- canonical container の `safe.directory` は `docker/register_safe_directories.sh` で管理します。Docker image build 時は repo workspace の `/workspace` を登録し、devcontainer 作成時や smoke test では mount 済み workspace の `vendor/*` を列挙して `/workspace/vendor/<name>` を動的に登録します。
+- canonical container の safe-directory は shared post-create が mounted workspace の実体を検証して管理します。image build や host runtime で repository-specific な登録スクリプトを呼び出しません。
 - Template / AgentCanon 固有の machine-local remote path は `documents/contracts/template-github-remote.md` と `documents/agent-canon/agent-canon-github-remote.md` を正本にします。
-- Docker container 内から Docker を使う手順を正本にする場合は、同梱する CLI、host socket mount、または別 daemon の要件を文書へ明記します。
-- canonical container では `tools/ci/check_fresh_clone.sh` が使う `rsync` を `docker/Dockerfile` に同梱します。host runtime で `rsync` が不足する場合は、環境構築手順で `rsync` を導入してから同じ検証を再実行します。
+- Docker container 内から Docker を使う手順を正本にする場合は、明示した `docker-host` optional profile の socket bind または別 daemon の要件を文書へ明記します。default lifecycle は host Docker CLI/socket に依存しません。
 - Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth setup、host mount 方針の具体的な境界、例外、validation は `CONTAINER_OPERATIONS.md` を正本にします。
 
 ## 4.5 環境依存ツール導入提案のルール
 
 - repo-wide に使う環境依存ツールの導入提案では、`templates/agents/environment_change_proposal.md` を使って理由、影響範囲、validation、rollback を記録します。
 - host-global install 由来の要件は、必要時に `CONTAINER_OPERATIONS.md` または `docker/` の運用境界へ反映します。
-- repo-wide に必要な Python tool は、原則として `CONTAINER_OPERATIONS.md` の Python dependency rule と repo-local installer contract に反映します。Dockerfile へ入れるのは OS package、runtime library、build tool、image-level helper だけです。
+- repo-wide に必要な Python tool は、`pyproject.toml` の selected extras と shared standard `project-install` / `pip check` contract に反映します。Agent/Codex tools は typed `.devcontainer/dependencies.toml` manifest が所有し、Dockerfile へ入れるのは fixed OS/Python/native capability だけです。
 - CI でも使う tool は手元だけの補助 install に留めず、共有運用手順へ反映してから利用します。
 - 1 回限りの調査や個人補助にとどまる tool は、repo 正本へ追加する前に container 実行、checked-in script、既存依存での代替可否を確認します。
 - 導入提案では、少なくとも次を明記します。
   - 何の workflow を支えるのか
   - host / Docker / CI のどこを更新するのか
-  - `docker/Dockerfile`、`docker/requirements.txt`、`.devcontainer/` の更新要否
+  - `docker/Dockerfile`、`pyproject.toml`、`.devcontainer/` の更新要否
   - どのコマンドで validate するのか
   - 不採用または撤回するときの rollback 手順
 

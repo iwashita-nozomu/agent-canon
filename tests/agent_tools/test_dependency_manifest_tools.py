@@ -19,7 +19,6 @@ import hashlib
 import json
 import os
 import subprocess
-import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -33,7 +32,6 @@ CODE_SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "scan_code_dependencies.sh"
 DESIGN_CLAIMS = PROJECT_ROOT / "tools" / "agent_tools" / "check_design_doc_claims.py"
 WORKFLOW_MONITOR = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 AGENT_TEAM = PROJECT_ROOT / "tools" / "agent_tools" / "agent_team.py"
-REQUIREMENT_SYNC = PROJECT_ROOT / "tools" / "requirement_sync_validator.py"
 DOCKER_VALIDATOR = PROJECT_ROOT / "tools" / "docker_dependency_validator.sh"
 
 
@@ -1091,73 +1089,8 @@ class DependencyManifestToolTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_requirement_sync_reports_pyproject_docker_summary(self) -> None:
-        """The Python dependency validator reports pyproject/docker ownership summary."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            (root / "python").mkdir()
-            (root / "docker").mkdir()
-            (root / "pyproject.toml").write_text(
-                "\n".join(
-                    [
-                        "[project]",
-                        'dependencies = ["requests>=2"]',
-                        "[project.optional-dependencies]",
-                        'dev = ["pytest>=8"]',
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            (root / "docker" / "requirements.txt").write_text(
-                "requests>=2\npytest>=8\n",
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [sys.executable, str(REQUIREMENT_SYNC)],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("PYPROJECT_DOCKER_DEPENDENCY_SUMMARY=pass", result.stdout)
-            self.assertIn("PYPROJECT_RUNTIME_DEPENDENCIES=1", result.stdout)
-            self.assertIn("PYPROJECT_DOCKER_RUNTIME_MISSING=0", result.stdout)
-
-    def test_requirement_sync_fails_when_runtime_dependency_missing_from_docker(
-        self,
-    ) -> None:
-        """Runtime package declarations in pyproject must be present in docker requirements."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            (root / "python").mkdir()
-            (root / "docker").mkdir()
-            (root / "pyproject.toml").write_text(
-                '[project]\ndependencies = ["requests>=2"]\n',
-                encoding="utf-8",
-            )
-            (root / "docker" / "requirements.txt").write_text("", encoding="utf-8")
-
-            result = subprocess.run(
-                [sys.executable, str(REQUIREMENT_SYNC)],
-                cwd=root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("PYPROJECT_DOCKER_DEPENDENCY_SUMMARY=fail", result.stdout)
-            self.assertIn(
-                "pyproject project dependency 'requests' missing from docker/requirements.txt",
-                result.stdout,
-            )
-
-    def test_docker_validator_accepts_requirement_extras_in_parent_layout(self) -> None:
-        """The parent boundary should preserve valid PEP 508 extras."""
+    def test_docker_validator_accepts_project_extras_in_parent_layout(self) -> None:
+        """The parent boundary accepts typed project extras without legacy locks."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             vendor = root / "vendor" / "agent-canon"
@@ -1173,9 +1106,9 @@ class DependencyManifestToolTest(unittest.TestCase):
                 PROJECT_ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
             )
             for relative in (
-                ".devcontainer/bootstrap-dependencies.sh",
                 ".devcontainer/dependencies.toml",
                 ".devcontainer/post-create.sh",
+                ".devcontainer/post-create-entrypoint.sh",
                 "CONTAINER_OPERATIONS.md",
             ):
                 (vendor / relative).symlink_to(PROJECT_ROOT / relative)
@@ -1206,41 +1139,15 @@ class DependencyManifestToolTest(unittest.TestCase):
             )
             os.chmod(root / ".devcontainer" / "post-create-parent.sh", 0o755)
             (root / "pyproject.toml").write_text(
-                "[project]\ndependencies = []\n",
-                encoding="utf-8",
-            )
-            (root / "docker" / "requirements.txt").write_text(
-                "\n".join(
-                    [
-                        "jupyterlab",
-                        "notebook",
-                        "ipykernel",
-                        "pydeps",
-                        "snakeviz",
-                        "pyyaml[secure]>=6",
-                        "",
-                    ]
-                ),
+                "[project]\ndependencies = []\n[project.optional-dependencies]\ndev = []\n",
                 encoding="utf-8",
             )
             (root / "docker" / "Dockerfile").write_text(
-                "RUN apt-get update && apt-get install -y rsync openssh-client graphviz python3-venv\n",
+                "FROM ubuntu:22.04\n",
                 encoding="utf-8",
             )
-            (root / "docker" / "install_python_dependencies.sh").write_text(
-                "\n".join(
-                    [
-                        "python3 -m pip install --no-cache-dir -r docker/requirements.txt",
-                        "sha256sum docker/requirements.txt",
-                        "python3 -m pip check",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            os.chmod(root / "docker" / "install_python_dependencies.sh", 0o755)
             (root / ".devcontainer" / "devcontainer.json").write_text(
-                '{"postCreateCommand": "bash vendor/agent-canon/.devcontainer/post-create.sh /workspace && bash .devcontainer/post-create-parent.sh"}\n',
+                '{"postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}"}\n',
                 encoding="utf-8",
             )
             (root / ".dockerignore").write_text(
@@ -1256,14 +1163,6 @@ class DependencyManifestToolTest(unittest.TestCase):
                 "Parent product image dependencies.\n",
                 encoding="utf-8",
             )
-            (root / "tools" / "ci" / "python_env_policy.py").write_text(
-                "# env policy fixture\n",
-                encoding="utf-8",
-            )
-            (root / "tools" / "requirement_sync_validator.py").symlink_to(
-                REQUIREMENT_SYNC
-            )
-
             result = subprocess.run(
                 ["bash", str(DOCKER_VALIDATOR)],
                 cwd=root,

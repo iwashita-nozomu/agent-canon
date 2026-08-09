@@ -58,7 +58,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - 導入理由
 - 影響範囲
 - host / Docker / CI のどこを正本にするか
-- `docker/Dockerfile`、`docker/requirements.txt`、`.devcontainer/` の更新要否
+- `pyproject.toml` selected extras、Docker image fixed Python/native capabilities、exact Node Feature、typed `.devcontainer/dependencies.toml`、`.devcontainer/` の更新要否
 - devcontainer / runtime pack / compose 相当面の更新要否
 - validation plan
 - rollback plan
@@ -66,7 +66,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 ## Operating Rules
 
 - Consume a passing `dependency-design` packet before changing dependency
-  manifests, bootstrap, devcontainer install order, or related validators.
+  manifests, devcontainer lifecycle order, or related validators.
   Carry its owner, record inventory, merge/order evidence, and security fields
   into the environment change.
 
@@ -77,13 +77,13 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - 「何となく便利だから」で repo 正本の環境を変えません。必ず code path、command、run profile のどれが詰まっているかを残します。
 - code requirement を host-only の手元 install で回避できても、repo-wide に必要なものは Docker / CI / docs の正本へ入れます。
 - repo の共通環境に入れる tool は、個人環境前提の host-global install を正本にしません。
-- 独立した Python CLI は devcontainer manifest から `pipx` で隔離 install します。project の import/runtime dependency は `CONTAINER_OPERATIONS.md` の Python dependency rule に従い、repo-local installer contract に載せます。
+- 独立した Python CLI は typed `.devcontainer/dependencies.toml` manifest から `pipx` で隔離 install します。project Python dependencies は `pyproject.toml` selected extras だけに宣言し、shared standard editable `project-install` command で導入します。
 - Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth、host mount 方針は `CONTAINER_OPERATIONS.md` の devcontainer boundary に従います。
 - environment gate、Docker validation、venv prohibition check は Python に依存しない shell entrypoint を優先します。
-- repo の canonical image では `python3.11-venv` を同梱し、container runtime 内の canonical `.venv` だけを `tools/ci/python_env_policy.py --runtime container --create` で許可します。host runtime では repo-local `.venv` を作らず、`virtualenv`、`conda create`、`uv venv`、`pipenv`、`poetry env` を既定手順にしません。
+- Docker images own fixed Python/native capabilities; Node/npm is owned by the exact digest-pinned official Node Feature. A project-owned `VIRTUAL_ENV` may be selected by the project runtime contract, while the shared lifecycle uses the current Python/pip standard editable `project-install` for selected extras. Do not require a distro venv package, host-created virtual environments, or ad hoc `virtualenv`, `conda`, `uv`, `pipenv`, or `poetry` environments.
 - 1 回限りの手元補助なら、repo 正本に昇格させず代替案を先に検討します。
 - Docker、CI、README、workflow command が変わる場合は、同じ変更でそろえます。
-- Docker 変更では `docker/Dockerfile` だけで閉じず、`docker/requirements.txt`、runtime pack、AgentCanon-owned devcontainer、関連 README の要否を同じ pass で判定します。
+- Docker 変更では image fixed capabilities、exact Node Feature、`pyproject.toml` selected extras、runtime pack、typed Agent tool manifest、AgentCanon-owned devcontainer、関連 README の要否を同じ pass で判定します。
 - `host / docker image / CI / shared script` のどこが source of truth かを曖昧にしたまま実装へ進めません。
 - 依存追加の提案だけで終わらせず、validate と rollback まで記録します。
 - canonical container の `safe.directory` 方針は `CONTAINER_OPERATIONS.md` と repo-local Docker runbook に従います。
@@ -93,8 +93,10 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 
 - `bash tools/docker_dependency_validator.sh`
 - `python3 tools/ci/container_config.py`
+- exact Node Feature ref/options and typed dependency extras readback
+- `pyproject.toml` selected-extra project-install / `pip check` readback
+- Agent tool manifest validation and explicit GPU host-orchestration checks
 - `make docker-build-check`
-- `make docker-build-check-host-docker`
 - `python3 tools/ci/run_container_pack.py --pack docker/packs/default.toml --print-only`
 - `make server-check`
 - `make ci-quick`

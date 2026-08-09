@@ -3,7 +3,7 @@
 # contract implementation
 # responsibility Owns the typed declarative devcontainer dependency model, merge, plan, and receipt installer.
 # upstream design ../../documents/design/devcontainer/parent-dependency-manifest-followup.md parent-first merge and lifecycle order
-# upstream implementation ./requirements_lock.py canonical requirements lock parser and result/error model
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md typed project-extra ownership
 # upstream design ../../CONTAINER_OPERATIONS.md image versus mounted tool boundary
 # downstream environment ../../.devcontainer/dependencies.toml AgentCanon shared developer/agent records
 # downstream implementation ../../.devcontainer/post-create.sh shared lifecycle orchestration
@@ -12,8 +12,8 @@
 # @dependency-end
 """Declarative, typed devcontainer dependency planning and installation.
 
-The fixed bootstrap provides ``packaging`` and bootstrapped ``tomli`` for the
-Ubuntu 22.04/Python 3.10 image; newer interpreters may use stdlib ``tomllib``.
+The image owns the fixed Python capabilities, while this module owns mounted
+Agent/Codex tools and standard editable project-extra installation.
 """
 
 from __future__ import annotations
@@ -43,14 +43,6 @@ from typing import Any, Protocol
 
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
-
-try:
-    from .requirements_lock import RequirementErrorCode, parse_requirements
-except ImportError:  # pragma: no cover - direct script execution path.
-    from requirements_lock import (  # type: ignore[no-redef]
-        RequirementErrorCode,
-        parse_requirements,
-    )
 
 try:  # pragma: no cover - the branch depends on the interpreter image.
     import tomllib
@@ -88,6 +80,7 @@ SEMVER_RE = re.compile(
 VERSION_TOKEN_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9.+:~_-]*$")
 PLATFORM_RE = re.compile(r"^linux/(?:amd64|arm64)$")
 SAFE_MEMBER_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+PYTHON_EXTRA_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 TRAVERSAL_RE = re.compile(r"(?:^|[/\\])\.\.(?:[/\\]|$)")
 SHELL_EXECUTABLES = frozenset(
     {"bash", "dash", "fish", "ksh", "sh", "tcsh", "zsh", "eval"}
@@ -117,6 +110,76 @@ STRUCTURAL_BINDING_OUTPUT_PREFIX = "agent-canon.executable-binding.structural.v1
 
 class DependencyError(ValueError):
     """Base error for schema, merge, plan, and execution failures."""
+
+
+def parse_python_extras(raw: str | Sequence[str]) -> tuple[str, ...]:
+    """Parse ordered comma-separated or sequence-form Python extras."""
+    values = raw.split(",") if isinstance(raw, str) else list(raw)
+    extras: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        if not isinstance(value, str) or not value or value != value.strip():
+            raise DependencyError(
+                "Python extras must be non-empty names without surrounding whitespace"
+            )
+        if PYTHON_EXTRA_RE.fullmatch(value) is None:
+            raise DependencyError(f"invalid Python extra name: {value}")
+        canonical = canonicalize_name(value)
+        if canonical in seen:
+            raise DependencyError(f"duplicate Python extra: {value}")
+        seen.add(canonical)
+        extras.append(value)
+    return tuple(extras)
+
+
+def validate_project_extras(
+    workspace: Path, extras: Sequence[str]
+) -> tuple[str, ...]:
+    """Validate requested extras against ``project.optional-dependencies``."""
+    validated = parse_python_extras(extras)
+    pyproject = workspace / "pyproject.toml"
+    if not pyproject.is_file():
+        raise DependencyError(f"project packaging manifest is missing: {pyproject}")
+    try:
+        with pyproject.open("rb") as stream:
+            document = tomllib.load(stream)
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise DependencyError(f"cannot parse project packaging manifest: {pyproject}") from exc
+    project = document.get("project") if isinstance(document, dict) else None
+    optional = project.get("optional-dependencies") if isinstance(project, dict) else None
+    if not isinstance(optional, dict):
+        raise DependencyError(
+            f"project.optional-dependencies is missing: {pyproject}"
+        )
+    available = {
+        canonicalize_name(name)
+        for name in optional
+        if isinstance(name, str) and PYTHON_EXTRA_RE.fullmatch(name)
+    }
+    missing = [extra for extra in validated if canonicalize_name(extra) not in available]
+    if missing:
+        raise DependencyError(
+            "project extras are not declared in pyproject.toml: " + ", ".join(missing)
+        )
+    return validated
+
+
+def install_project_extras(
+    workspace: Path,
+    extras: Sequence[str],
+    *,
+    runner: CommandRunner | None = None,
+) -> tuple[str, ...]:
+    """Install one project editable with validated extras, then run pip check."""
+    validated = validate_project_extras(workspace, extras)
+    command_runner = runner or SubprocessRunner()
+    requirement = f"{workspace}[{','.join(validated)}]"
+    command_runner.run(
+        [sys.executable, "-m", "pip", "install", "--editable", requirement],
+        cwd=workspace,
+    )
+    command_runner.run([sys.executable, "-m", "pip", "check"], cwd=workspace)
+    return validated
 
 
 @dataclass(frozen=True)
@@ -1672,72 +1735,9 @@ class EnvironmentBoundaryModel:
         self._require(findings, checked, "README.md", "parent")
         self._require(findings, checked, "docker/README.md", "docker")
         dockerfile = self._require(findings, checked, "docker/Dockerfile", "docker")
-        requirements = self._require(
-            findings, checked, "docker/requirements.txt", "python"
-        )
-        installer = self._require(
-            findings,
-            checked,
-            "docker/install_python_dependencies.sh",
-            "python",
-            executable=True,
-        )
         self._require(findings, checked, "pyproject.toml", "python")
-        for required_tool in (
-            "tools/requirement_sync_validator.py",
-            "tools/ci/python_env_policy.py",
-        ):
-            path = self._resolve_agent_canon_root_path(required_tool)
-            checked.append(str(path.relative_to(self.workspace)))
-            if not path.is_file():
-                findings.append(BoundaryFinding("python", str(path), "missing-file"))
         dockerignore = self._require(findings, checked, ".dockerignore", "docker")
         gitignore = self._require(findings, checked, ".gitignore", "python")
-        if requirements is not None:
-            parsed_requirements = parse_requirements(requirements)
-            for error in parsed_requirements.errors:
-                if error.code is RequirementErrorCode.INVALID_REQUIREMENT:
-                    detail = error.detail
-                elif error.code is RequirementErrorCode.UNTERMINATED_CONTINUATION:
-                    detail = f"{requirements}: {error.detail}"
-                else:
-                    detail = error.render()
-                findings.append(BoundaryFinding("python", str(requirements), detail))
-            if parsed_requirements.valid:
-                declared_requirements = tuple(
-                    record
-                    for record in parsed_requirements.records
-                    if record.is_active()
-                )
-                declared = frozenset(
-                    requirement.normalized_name for requirement in declared_requirements
-                )
-                required = frozenset(
-                    {
-                        "jupyterlab",
-                        "notebook",
-                        "ipykernel",
-                        "pydeps",
-                        "snakeviz",
-                        "pyyaml",
-                    }
-                )
-                for name in sorted(required - declared):
-                    findings.append(
-                        BoundaryFinding(
-                            "python", str(requirements), f"missing-requirement:{name}"
-                        )
-                    )
-        if installer is not None:
-            text = installer.read_text(encoding="utf-8")
-            if "docker/requirements.txt" not in text or "python3" not in text:
-                findings.append(
-                    BoundaryFinding(
-                        "python",
-                        str(installer),
-                        "must-own-workspace-python-installation",
-                    )
-                )
         if dockerignore is not None:
             ignored = frozenset(
                 line.strip()
@@ -1766,21 +1766,6 @@ class EnvironmentBoundaryModel:
             except DependencyError as exc:
                 findings.append(BoundaryFinding("docker", str(dockerfile), str(exc)))
             else:
-                packages = self._installed_apt_packages(instructions)
-                for package in (
-                    "rsync",
-                    "openssh-client",
-                    "graphviz",
-                    "python3-venv",
-                ):
-                    if package not in packages:
-                        findings.append(
-                            BoundaryFinding(
-                                "docker",
-                                str(dockerfile),
-                                f"missing-runtime-package:{package}",
-                            )
-                        )
                 for keyword, tokens in instructions:
                     if keyword != "RUN":
                         continue
@@ -1792,18 +1777,6 @@ class EnvironmentBoundaryModel:
                                 "must-not-install-workspace-requirements",
                             )
                         )
-                for keyword, tokens in instructions:
-                    if keyword == "COPY" and any(
-                        "docker/requirements.txt" in token for token in tokens
-                    ):
-                        findings.append(
-                            BoundaryFinding(
-                                "docker",
-                                str(dockerfile),
-                                "must-not-copy-workspace-requirements",
-                            )
-                        )
-
     def _check_parent_devcontainer(
         self, findings: list[BoundaryFinding], checked: list[str]
     ) -> None:
@@ -1878,9 +1851,6 @@ class EnvironmentBoundaryModel:
             else "."
         )
         for relative in (
-            f"{vendor_prefix}/.devcontainer/bootstrap-dependencies.sh"
-            if not self.standalone
-            else ".devcontainer/bootstrap-dependencies.sh",
             f"{vendor_prefix}/.devcontainer/dependencies.toml"
             if not self.standalone
             else ".devcontainer/dependencies.toml",
@@ -3523,11 +3493,12 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the dependency model CLI parser."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "command", choices=("validate", "dry-run", "install", "boundary")
+        "command", choices=("validate", "dry-run", "install", "boundary", "project-install")
     )
     parser.add_argument("--workspace", default=".")
     parser.add_argument("--vendor-root")
     parser.add_argument("--receipts")
+    parser.add_argument("--extras", default="")
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -3538,7 +3509,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     exit_status = 0
     payload: dict[str, Any]
     try:
-        if args.command == "boundary":
+        if args.command == "project-install":
+            workspace = Path(args.workspace).resolve()
+            extras = parse_python_extras(args.extras)
+            installed = install_project_extras(workspace, extras)
+            payload = {"status": "pass", "extras": list(installed)}
+        elif args.command == "boundary":
             workspace = Path(args.workspace).resolve()
             vendor_root = (
                 Path(args.vendor_root).resolve()
