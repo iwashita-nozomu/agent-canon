@@ -46,10 +46,14 @@ AgentCanon 自体の source、shared runtime、sync、PR 運用、責務 scope �
 [AGENTS.md](AGENTS.md)、[ROOT_AGENTS.md](ROOT_AGENTS.md)、
 [Codex Workflow](agents/canonical/CODEX_WORKFLOW.md)、
 [Codex Subagents](agents/canonical/CODEX_SUBAGENTS.md)、
-[Communication Protocol](agents/COMMUNICATION_PROTOCOL.md)、
-[Shared Runtime Surfaces](documents/runtime/SHARED_RUNTIME_SURFACES.md)、および
-[Runtime Profiles And Check Matrix](documents/runtime/runtime-profiles-and-check-matrix.md)
-がそれぞれ所有します。Template や派生 project の domain 構造と active contract は
+[Communication Protocol](agents/COMMUNICATION_PROTOCOL.md) がそれぞれ所有します。
+共有 runtime の reader/owner route は [Shared Runtime Surfaces](documents/runtime/SHARED_RUNTIME_SURFACES.md)
+であり、その機械可読 canonical source は
+[shared-runtime-surfaces.toml](documents/runtime/shared-runtime-surfaces.toml) です。Runtime
+profile の reader/owner route は [Runtime Profiles And Check Matrix](documents/runtime/runtime-profiles-and-check-matrix.md)
+であり、その機械可読 canonical source は
+[runtime-profiles-and-check-matrix.json](documents/runtime/runtime-profiles-and-check-matrix.json) です。
+Template や派生 project の domain 構造と active contract は
 親 repository の owner surface が所有します。
 
 ### 設計目的
@@ -72,18 +76,20 @@ flowchart LR
   request[Repository request]
 
   subgraph owners[Peer canonical owners]
-    instructions[AGENTS.md and ROOT_AGENTS.md]
+    source_entry[AGENTS.md standalone source-tree entrypoint]
+    parent_entry[parent-root AGENTS.md projected from vendor/agent-canon/ROOT_AGENTS.md]
     workflow[CODEX_WORKFLOW.md]
     subagents[CODEX_SUBAGENTS.md]
     communication[COMMUNICATION_PROTOCOL.md]
     documents[documents contracts and conventions]
-    profiles[Runtime Profiles And Check Matrix]
+    surfaces[Shared runtime route + surface TOML]
+    profiles[Runtime profile route + matrix JSON]
   end
 
   subgraph execution[Adapters and execution]
     adapters[.agents skills and .codex projections]
     tools[Python shell and Rust tools]
-    validators[Validators findings and evidence only]
+    validators[Validators checks/readback; findings and evidence only]
   end
 
   evidence[Findings and evidence artifacts]
@@ -93,19 +99,23 @@ flowchart LR
   pin[Parent submodule pin]
   views[Parent root views]
 
-  request --> instructions
+  request --> source_entry
+  request --> parent_entry
   request --> workflow
   request --> documents
   request --> profiles
-  instructions -.-> adapters
+  source_entry -.-> adapters
+  parent_entry -.-> adapters
   workflow -.-> tools
   subagents -.-> adapters
   communication -.-> evidence
   documents -.-> tools
+  surfaces -. projection metadata .-> adapters
   profiles -. validation route .-> validators
   tools --> validators
   validators --> evidence
-  evidence -. feedback .-> instructions
+  evidence -. feedback .-> source_entry
+  evidence -. feedback .-> parent_entry
   evidence -. feedback .-> workflow
   evidence -. feedback .-> documents
   workflow -. source owner .-> change
@@ -116,8 +126,10 @@ flowchart LR
 ```
 
 Standalone AgentCanon checkout では `AGENTS.md` が source-tree の repository
-instruction entrypoint です。Template または derived parent root では
-`ROOT_AGENTS.md` が projected root instruction entrypoint になります。
+instruction entrypoint です。Template または derived parent root では、parent-root の
+`AGENTS.md` が projected root instruction entrypoint であり、その source/backing view は
+`vendor/agent-canon/ROOT_AGENTS.md` です。`ROOT_AGENTS.md` 自体は parent root に配置
+されません。
 `agents/` は workflow family、skill dependency、subagent role、communication
 protocol を所有します。`documents/` は設計、規約、runtime profile、構造、tool
 contract を責務 directory ごとに所有します。
@@ -141,7 +153,7 @@ main readback、parent pin/root-view projection は AgentCanon source update の
 
 1. Repository instruction が user request と現在の構造を読み、責務 owner を選びます。
 1. Workflow と skill dependency が、設計、実装 handoff、review、validation の順序を構成します。
-1. Tool と runtime adapter が、選択された contract を決定論的な操作へ変換します。
+1. Tool と runtime adapter は、選択された contract に基づく check/readback を決定論的な操作へ変換し、mutation は選択された owner route に委ねます。
 1. Validator が変更した責務と対応する property を確認し、finding を owner に戻します。
 1. AgentCanon source update のときだけ、accepted source change を branch、review/PR、main readback の順で統合し、その後 parent が commit pin と root view を更新します。
 
@@ -149,9 +161,11 @@ main readback、parent pin/root-view projection は AgentCanon source update の
 
 AgentCanon 単体 repository は shared runtime の source tree と、その canonical policy、
 contract、tool implementation を所有します。Generated runtime projections、parent
-root views、run reports、evaluation evidence、memory、notes、experiment results は
-対応する owner が生成・保持する例外 surface であり、source tree の独立した正本では
-ありません。Template と派生 repository は `vendor/agent-canon/` の commit pin を
+root views、run reports、evaluation evidence、experiment results は対応する owner が
+生成・保持する例外 surface です。`memory/` と `notes/` は tracked durable owner
+surface になり得ますが、shared policy source の代替ではありません。これらの surface
+はいずれも source tree の canonical policy、contract、tool implementation を置き換え
+ません。Template と派生 repository は `vendor/agent-canon/` の commit pin を
 shared source identity とし、root view から必要な runtime surface を公開します。
 Project 固有の source、active contract、実験、private state は親 repository が所有し、
 AgentCanon の共有 policy に取り込みません。
