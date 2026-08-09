@@ -608,7 +608,7 @@ def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
     assert "name: parent-" in compose
     assert "-gpu-admission" in compose.splitlines()[0]
     assert "    gpus: all" in compose
-    assert "      target: gpu-runtime" in compose
+    assert "\n      target:" not in compose
     assert 'AGENT_CANON_PYTHON_EXTRAS: "dev,cuda12"' in compose
     assert '        target: "/var/lib/agent-canon/runtime"' in compose
     assert "    group_add:" not in compose
@@ -635,14 +635,48 @@ def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
     )
 
 
-@pytest.mark.parametrize("target", [None, "cpu-runtime", "gpu/runtime"])
-def test_gpu_admission_requires_gpu_runtime_pack_target(
+@pytest.mark.parametrize("target", [None, "cpu-runtime"])
+def test_gpu_admission_accepts_absent_or_explicit_pack_target(
     tmp_path: Path,
     target: str | None,
 ) -> None:
-    """The GPU profile fails closed unless its selected pack names gpu-runtime."""
+    """The GPU profile treats Docker build target as an optional generic pack field."""
     repo = write_parent_generator_fixture(tmp_path)
     write_gpu_admission_pack(repo, target=target)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(tmp_path / "missing-home"),
+            "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+            "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+            "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+            "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+            "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-provision.json"),
+            "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(repo / ".agent-canon/runtime/shared-runtime-readback.json"),
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".devcontainer/gpu-admission-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".devcontainer/gpu-admission-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert 'AGENT_CANON_PYTHON_EXTRAS: "dev,cuda12"' in compose
+    if target is None:
+        assert "\n      target:" not in compose
+    else:
+        assert f"      target: {target}" in compose
+
+
+def test_gpu_admission_rejects_unsafe_pack_target(tmp_path: Path) -> None:
+    """An explicit Docker target still follows the generic safe-name contract."""
+    repo = write_parent_generator_fixture(tmp_path)
+    write_gpu_admission_pack(repo, target="gpu/runtime")
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,
@@ -662,10 +696,7 @@ def test_gpu_admission_requires_gpu_runtime_pack_target(
     )
 
     assert result.returncode == 1, result.stdout + result.stderr
-    assert (
-        "pack target must be gpu-runtime" in result.stderr
-        or "safe Docker build stage name" in result.stderr
-    )
+    assert "safe Docker build stage name" in result.stderr
 
 
 def test_default_rejects_gpu_runtime_pack_target(tmp_path: Path) -> None:
@@ -1280,7 +1311,7 @@ def write_parent_generator_fixture(
 def write_gpu_admission_pack(
     repo: Path,
     *,
-    target: str | None = "gpu-runtime",
+    target: str | None = None,
     dockerfile: str = "docker/Dockerfile",
 ) -> None:
     """Write the opt-in pack selected by the GPU generator profile."""

@@ -329,10 +329,6 @@ if [ "$gpu_profile" = "gpu-admission" ]; then
     printf 'devcontainer GPU admission profile requires pack: %s\n' "$pack" >&2
     exit 1
   fi
-  if [ "$build_target" != "gpu-runtime" ]; then
-    printf 'devcontainer GPU admission pack target must be gpu-runtime: %s\n' "${build_target:-missing}" >&2
-    exit 1
-  fi
 elif [ "$build_target" = "gpu-runtime" ]; then
   printf 'devcontainer default profile rejects GPU build target: %s\n' "$build_target" >&2
   exit 1
