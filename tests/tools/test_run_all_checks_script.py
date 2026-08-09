@@ -177,18 +177,25 @@ class RunAllChecksScriptTest(unittest.TestCase):
             ci_text,
         )
 
-    def test_pr_gate_keeps_gitlink_and_projection_integrity_checks(self) -> None:
-        """Graph completeness is optional, but publication/projection integrity remains required."""
+    def test_pr_gate_keeps_structure_and_projection_checks_without_pin_integrity(self) -> None:
+        """Pin freshness is not a parent gate, while structure/projection checks remain."""
         pr_text = PR_SCRIPT.read_text(encoding="utf-8")
 
-        self.assertIn("agentcanon_pr_branch_integrity", pr_text)
-        self.assertIn("submodule-gitlink-worktree-mismatch", pr_text)
-        self.assertIn(
+        self.assertNotIn("agentcanon_pr_branch_integrity", pr_text)
+        self.assertNotIn("agentcanon_pr_submodule_remote_reachable", pr_text)
+        self.assertNotIn("agentcanon_pr_branch_pending", pr_text)
+        self.assertNotIn("run_pr_integrity_check", pr_text)
+        self.assertNotIn("submodule-gitlink-worktree-mismatch", pr_text)
+        self.assertNotIn(
             "submodule-pinned-commit-unreachable-from-configured-remote", pr_text
         )
+        self.assertIn("agentcanon_pr_submodule_snapshot", pr_text)
+        self.assertIn("AGENT_CANON_SUBMODULE_EVIDENCE=pass", pr_text)
         self.assertIn("run_shared_surface_check", pr_text)
         self.assertIn("AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required", pr_text)
-        self.assertNotIn("blocked_dirty_agentcanon_branch", pr_text)
+        self.assertIn("agentcanon_pr_branch_dirty", pr_text)
+        self.assertIn("AGENT_CANON_PR_LATEST_DIRTY_AGENTCANON_WORKTREE=yes", pr_text)
+        self.assertNotIn("deferred_branch_pr", pr_text)
 
     def test_pr_gate_delegates_profile_surface_and_diff_selection(self) -> None:
         """The shell gate delegates selection to the canonical fail-closed helper."""

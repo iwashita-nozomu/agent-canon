@@ -280,96 +280,14 @@ agentcanon_pr_branch_dirty() {
   [[ -n "${submodule_dirty}" ]]
 }
 
-agentcanon_pr_branch_pending() {
-  local remote_main=""
-  if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
-    return 1
-  fi
-  if agentcanon_pr_branch_dirty; then
-    return 1
-  fi
-  agentcanon_pr_submodule_snapshot || return 1
-  if [[ -z "${AGENT_CANON_PR_SUBMODULE_HEAD}" || -z "${AGENT_CANON_PR_SUBMODULE_PIN}" ]]; then
-    return 1
-  fi
-  if [[ "${AGENT_CANON_PR_SUBMODULE_HEAD}" != "${AGENT_CANON_PR_SUBMODULE_PIN}" ]]; then
-    return 1
-  fi
-
-  remote_main="$(git ls-remote --exit-code "${REMOTE_URL}" refs/heads/main 2>/dev/null | awk '{print $1}')"
-  if [[ -z "${remote_main}" ]]; then
-    return 1
-  fi
-  [[ "${AGENT_CANON_PR_SUBMODULE_PIN}" != "${remote_main}" ]]
-}
-
-agentcanon_pr_submodule_remote_reachable() {
-  local remote_url="$1"
-  local pin_ref="$2"
-  if [[ -z "${remote_url}" || -z "${pin_ref}" ]]; then
-    return 1
-  fi
-  if ! git -C vendor/agent-canon cat-file -e "${pin_ref}^{commit}" >/dev/null 2>&1; then
-    git -C vendor/agent-canon fetch --no-write-fetch-head "${remote_url}" "${pin_ref}" >/dev/null 2>&1 || return 1
-  fi
-  git -C vendor/agent-canon cat-file -e "${pin_ref}^{commit}" >/dev/null 2>&1
-}
-
-agentcanon_pr_branch_integrity() {
-  local remote_url="${REMOTE_URL}"
-  if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
-    return 0
-  fi
-  agentcanon_pr_submodule_snapshot || return 3
-  if [[ -z "${AGENT_CANON_PR_SUBMODULE_HEAD}" || -z "${AGENT_CANON_PR_SUBMODULE_PIN}" ]]; then
-    echo "AGENT_CANON_PR_LATEST_GATE=blocked_agentcanon_submodule_state"
-    echo "AGENT_CANON_PR_LATEST_NEXT=repair_submodule_state_and_rerun_agent-canon-pr-check"
-    return 3
-  fi
-  if [[ "${AGENT_CANON_PR_SUBMODULE_HEAD}" != "${AGENT_CANON_PR_SUBMODULE_PIN}" ]]; then
-    echo "AGENT_CANON_PR_LATEST_GATE=blocked_submodule_gitlink_mismatch"
-    echo "AGENT_CANON_PR_LATEST_REASON=submodule-gitlink-worktree-mismatch"
-    echo "AGENT_CANON_PR_LATEST_NEXT=run_make_agent-canon-ensure-latest_then_commit_updated_submodule_pin_with_request_evidence"
-    return 4
-  fi
-  if ! agentcanon_pr_submodule_remote_reachable "${remote_url}" "${AGENT_CANON_PR_SUBMODULE_PIN}"; then
-    echo "AGENT_CANON_PR_LATEST_GATE=blocked_submodule_pin_unreachable"
-    echo "AGENT_CANON_PR_LATEST_REASON=submodule-pinned-commit-unreachable-from-configured-remote"
-    echo "AGENT_CANON_PR_LATEST_NEXT=run_agent_canon_update_or_update_agent-canon-remote_reference"
-    return 5
-  fi
-  return 0
-}
-
-run_pr_integrity_check() {
-  local rc=0
-  set +e
-  agentcanon_pr_branch_integrity
-  rc=$?
-  set -e
-  return $rc
-}
-
 run_pr_agent_checks() {
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
     run_standalone_static_gate_ci
     return
   fi
-  local integrity_rc=0
-  run_pr_integrity_check
-  integrity_rc=$?
-  if [[ "$integrity_rc" -ne 0 ]]; then
-    echo "AGENT_CANON_PR_LATEST_GATE=${AGENT_CANON_PR_LATEST_GATE:-blocked_submodule_integrity}"
-    echo "AGENT_CANON_PR_LATEST_NEXT=${AGENT_CANON_PR_LATEST_NEXT:-repair_submodule_state_and_rerun_agent-canon-pr-check}"
-    return 1
-  fi
   if agentcanon_pr_branch_dirty; then
     echo "AGENT_CANON_PR_LATEST_DIRTY_AGENTCANON_WORKTREE=yes"
     echo "AGENT_CANON_PR_LATEST_NEXT=run_make_agent-canon-ensure-latest_with_dirty_worktree_preserved"
-  fi
-  if agentcanon_pr_branch_pending; then
-    echo "AGENT_CANON_PR_LATEST_GATE=deferred_branch_pr"
-    echo "AGENT_CANON_PR_LATEST_NEXT=commit_push_agentcanon_branch_then_after_merge_run_make_agent-canon-ensure-latest"
   fi
   # Derived parents delegate project tests/type/lint to the parent's selected
   # CI job; this route owns only shared AgentCanon surfaces.

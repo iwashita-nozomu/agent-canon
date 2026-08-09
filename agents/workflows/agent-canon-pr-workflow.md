@@ -192,12 +192,14 @@ does not invoke them or apply their diagnostics to parent-owned documents.
 ### Parent Gate Necessary Conditions
 
 For `template_or_derived` repositories, the PR gate always requires the
-published gitlink to be reachable from the configured AgentCanon remote, the
-staged gitlink to equal the `vendor/agent-canon` worktree `HEAD`, and every
-changed shared/root projection to pass its existing projection check. A local
-parent branch being ahead, behind, diverged, or dirty is preserved as state and
-does not fail this gate by itself. An actual materialization collision remains
-a blocker in the projection and generated-artifact checks.
+submodule's configured URL, gitlink mode, and pinned commit to be present, and
+every changed shared/root projection to pass its existing projection check. A
+local parent branch being ahead, behind, diverged, or dirty is preserved as
+state and does not fail this gate by itself. An actual materialization collision
+remains a blocker in the projection and generated-artifact checks. The gate
+does not require the pinned commit to be reachable from the configured remote
+or the worktree `HEAD` to equal the staged gitlink; those pin lifecycle checks
+belong to the parent pin/root projection route.
 
 Parent-root strict dependency graph completeness is conditional. The caller
 sets `AGENT_CANON_PR_PARENT_GRAPH_MIGRATION=yes`, touches a dependency manifest
@@ -320,8 +322,7 @@ second report/archive materializer.
 - exact rebind/freeze/review/CAS predecessor chain is valid;
 - one independent exact-candidate APPROVE exists;
 - G1-G3 and source PR CI pass for the same RecordBinding;
-- parent gitlink reachability, gitlink/worktree identity, and changed
-  shared/root projection checks pass;
+- submodule structure evidence and changed shared/root projection checks pass;
 - strict parent graph completeness passes when migration, a touched manifest,
   or a selected profile requires it; otherwise the matching skipped receipt is
   retained;
