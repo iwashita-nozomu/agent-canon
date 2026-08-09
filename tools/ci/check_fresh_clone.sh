@@ -108,12 +108,8 @@ attach_submodule_main_to_staged_pin() {
     return 1
   fi
   main_oid="$(git -C "$submodule_path" rev-parse --verify refs/heads/main 2>/dev/null || true)"
-  if [[ -n "$main_oid" && "$main_oid" != "$pinned_oid" ]]; then
-    echo "fresh_clone_submodule_attach=main_pin_mismatch" >&2
-    return 1
-  fi
-
   if [[ -n "$main_oid" ]]; then
+    git -C "$submodule_path" branch -f main "$pinned_oid" >/dev/null
     git -C "$submodule_path" switch main >/dev/null
   else
     git -C "$submodule_path" switch -c main "$pinned_oid" >/dev/null
