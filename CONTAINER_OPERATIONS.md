@@ -296,7 +296,9 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
   home for Codex session semantics, but the runner sets the profile-scoped
   `XDG_STATE_HOME=/tmp/agent-canon-xdg-state/<profile>` outside the workspace
   so shared post-create dependency receipts remain container-local. The runner
-  may forward `OPENAI_API_KEY` and `OPENAI_BASE_URL` explicitly; it never
+  rejects pack/profile/CLI forwarding of the owned `HOME`, `XDG_STATE_HOME`, and
+  `AGENT_CANON_CONTAINER_USER` keys, then emits those authoritative values last.
+  It may forward `OPENAI_API_KEY` and `OPENAI_BASE_URL` explicitly; it never
   mounts or seeds host Codex state.
 - 既定 devcontainer は GPU admission の host runtime identity を要求しない。
   固定 OS/Python capability は image、Node/npm は digest-pinned Feature が所有し、
