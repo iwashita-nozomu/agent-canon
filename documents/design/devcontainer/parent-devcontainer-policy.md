@@ -332,6 +332,17 @@ PyYAML、browser、TeX/PDF、proof、full Rust、security scanner は default st
 image、Node/npm は Feature、プロジェクト依存は `pyproject.toml`、Agent/Codex tools は
 `dependencies.toml` が所有し、依存 manifest の plan validation が pass するまで install は開始しません。
 
+Image build が typed engine の build-only `image-install --records` を選ぶ場合、選択は
+provider closure まで閉じ、role-based plan fingerprint は絶対 manifest path を含めません。
+standalone source root と fresh clone は同じ image identity を生成し、immutable な plan と
+receipts を `/usr/local/share/agent-canon/image-dependencies/{plan.json,receipts}` に公開します。
+image-install は APT package/repository、npm-global、release-asset の whitelist に限定し、
+既存の mounted `install` と `project-install` lifecycle は変更しません。対応する
+production publication は euid 0 と canonical path を要求し、CLI の root override を持たず、
+公開 tree を root-owned の directory `0555`、file `0444` に freeze します。
+`image-verify` は network、mutation、repair を行わない read-only gate で、plan、receipt、
+package、または executable の drift を `rebuild-required` として返します。
+
 ## project extras の parser ownership
 
 `tools/agent_tools/devcontainer_dependencies.py` は requested extras の名前・順序・重複を検証し、

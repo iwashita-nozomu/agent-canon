@@ -121,6 +121,26 @@ The standalone-source post-create invoked via the source-root resolver validates
 manifest before the canonical AgentCanon manifest, validates the complete graph,
 and executes it only after that validation succeeds.
 
+### Image dependency snapshot
+
+The image build may select a deterministic subset of the typed plan with
+`image-install --records`. Selection includes the complete provider closure and
+uses a role-based, path-independent plan fingerprint, so standalone roots and
+fresh clones produce the same image identity. This build-only command publishes
+the immutable plan and receipts under
+`/usr/local/share/agent-canon/image-dependencies/{plan.json,receipts}`; it does
+not include methods outside the image-safe APT package/repository, npm-global,
+and release-asset whitelist, and does not replace the mounted `install` or
+`project-install` lifecycle.
+Production publication requires euid 0, uses the canonical path without a CLI
+root override, and freezes the recursively published tree as root-owned `0555`
+directories and `0444` files.
+
+`image-verify` is a read-only gate. It compares the current role-based plan and
+provider closure with the immutable image snapshot, then checks each live
+package and executable without network, mutation, or repair. Any plan, receipt,
+package, or executable mismatch is reported as `rebuild-required`.
+
 ## Manifest Source Roles And Cardinality
 
 Schema v2 uses structured manifest-source roles rather than filename guesses.

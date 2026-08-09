@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tarfile
@@ -40,11 +41,15 @@ from tools.agent_tools.devcontainer_dependencies import (
     _repository_package_filename,
     _repository_packages_url,
     build_plan,
+    build_parser,
+    image_install_plan,
+    image_verify_plan,
     install_plan,
     load_plan,
     manifest_sources,
     parse_record,
     safe_extract_tar,
+    select_record_ids,
     validate_runtime_identity,
 )
 
@@ -478,6 +483,477 @@ class DependencyModelTests(unittest.TestCase):
             "npm-package",
         )
         self.assertNotIn("commands", dry_run["actions"][0])
+
+    def test_plan_fingerprint_is_path_independent_but_role_bound(self) -> None:
+        parsed = parse_record(
+            record("tool", method="apt-package"),
+            path=Path("one.toml"),
+            index=0,
+        )
+        first = build_plan(
+            (loaded_manifest(Path("/tmp/first/.devcontainer/dependencies.toml"), (parsed,)),)
+        )
+        second = build_plan(
+            (loaded_manifest(Path("/tmp/second/.devcontainer/dependencies.toml"), (parsed,)),)
+        )
+        parent_role = build_plan(
+            (
+                loaded_manifest(
+                    Path("/tmp/second/.devcontainer/dependencies.toml"),
+                    (parsed,),
+                    role=ManifestRole.PARENT_OVERLAY,
+                ),
+            )
+        )
+
+        self.assertEqual(first.fingerprint, second.fingerprint)
+        self.assertNotEqual(first.fingerprint, parent_role.fingerprint)
+        self.assertEqual(first.source_roles, (ManifestRole.CANONICAL.value,))
+
+    def test_record_selection_is_deterministic_and_provider_closed(self) -> None:
+        provider = parse_record(
+            record("provider", method="apt-package", provides=["runtime"]),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        selected = parse_record(
+            record("selected", method="apt-package", deps=["runtime"]),
+            path=Path("fixture.toml"),
+            index=1,
+        )
+        unrelated = parse_record(
+            record("unrelated", method="apt-package"),
+            path=Path("fixture.toml"),
+            index=2,
+        )
+        plan = build_plan(
+            (loaded_manifest(Path("fixture.toml"), (provider, selected, unrelated)),)
+        )
+
+        self.assertEqual(select_record_ids(plan, ("selected",)), ("provider", "selected"))
+        self.assertEqual(
+            select_record_ids(plan, ("selected", "provider", "selected")),
+            ("provider", "selected"),
+        )
+        self.assertEqual(select_record_ids(plan, None), plan.order)
+        with self.assertRaisesRegex(DependencyError, "at least one"):
+            select_record_ids(plan, [])
+        with self.assertRaisesRegex(DependencyError, "at least one"):
+            select_record_ids(plan, ())
+        with self.assertRaisesRegex(DependencyError, "empty record IDs"):
+            select_record_ids(plan, [""])
+
+    def test_image_install_and_verify_are_immutable_and_read_only(self) -> None:
+        parsed = parse_record(
+            record("image-tool", method="apt-package"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        unrelated = parse_record(
+            record("unrelated", method="apt-package"),
+            path=Path("fixture.toml"),
+            index=1,
+        )
+        plan = build_plan(
+            (loaded_manifest(Path("fixture.toml"), (parsed, unrelated)),)
+        )
+        identity = RuntimeIdentity("ubuntu", "22.04", "linux/amd64")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            image_root = root / "image-dependencies"
+            install_runner = FakeRunner()
+            self.assertEqual(
+                image_install_plan(
+                    plan,
+                    workspace=root,
+                    records=("image-tool",),
+                    _test_image_root=image_root,
+                    runner=install_runner,
+                    identity=identity,
+                ),
+                ("image-tool",),
+            )
+            before = {
+                path.relative_to(image_root): path.read_bytes()
+                for path in image_root.rglob("*")
+                if path.is_file()
+            }
+            verify_runner = FakeRunner()
+            self.assertEqual(
+                image_verify_plan(
+                    plan,
+                    workspace=root,
+                    records=("image-tool",),
+                    _test_image_root=image_root,
+                    runner=verify_runner,
+                ),
+                ("image-tool",),
+            )
+            self.assertEqual(
+                image_verify_plan(
+                    plan,
+                    workspace=root,
+                    _test_image_root=image_root,
+                    runner=FakeRunner(),
+                ),
+                ("image-tool",),
+            )
+            with self.assertRaisesRegex(DependencyError, "at least one"):
+                image_verify_plan(
+                    plan,
+                    workspace=root,
+                    records=[],
+                    _test_image_root=image_root,
+                    runner=FakeRunner(),
+                )
+            after = {
+                path.relative_to(image_root): path.read_bytes()
+                for path in image_root.rglob("*")
+                if path.is_file()
+            }
+            self.assertEqual(before, after)
+            self.assertNotIn("apt-get", [call[0] for call in verify_runner.calls])
+            plan_path = image_root / "plan.json"
+            plan_path.chmod(0o644)
+            with self.assertRaisesRegex(DependencyError, "rebuild-required"):
+                image_verify_plan(
+                    plan,
+                    workspace=root,
+                    records=("image-tool",),
+                    _test_image_root=image_root,
+                    runner=FakeRunner(),
+                )
+            plan_path.chmod(0o444)
+            receipts_path = image_root / "receipts"
+            receipts_path.chmod(0o755)
+            with self.assertRaisesRegex(DependencyError, "rebuild-required"):
+                image_verify_plan(
+                    plan,
+                    workspace=root,
+                    records=("image-tool",),
+                    _test_image_root=image_root,
+                    runner=FakeRunner(),
+                )
+            receipts_path.chmod(0o555)
+            with self.assertRaisesRegex(DependencyError, "rebuild-required"):
+                image_verify_plan(
+                    plan,
+                    workspace=root,
+                    records=("image-tool",),
+                    _test_image_root=image_root,
+                    runner=FakeRunner(fail_on="dpkg-query"),
+                )
+            with self.assertRaisesRegex(DependencyError, "already exists"):
+                image_install_plan(
+                    plan,
+                    workspace=root,
+                    records=("image-tool",),
+                    _test_image_root=image_root,
+                    runner=FakeRunner(),
+                    identity=identity,
+                )
+
+            image_plan = json.loads(
+                (image_root / "plan.json").read_text(encoding="utf-8")
+            )
+            image_plan["plan_fingerprint"] = "0" * 64
+            (image_root / "plan.json").chmod(0o644)
+            (image_root / "plan.json").write_text(
+                json.dumps(image_plan), encoding="utf-8"
+            )
+            (image_root / "plan.json").chmod(0o444)
+            with self.assertRaisesRegex(DependencyError, "rebuild-required"):
+                image_verify_plan(
+                    plan,
+                    workspace=root,
+                    records=("image-tool",),
+                    _test_image_root=image_root,
+                    runner=FakeRunner(),
+                )
+
+    def test_image_install_requires_root_and_image_safe_method_whitelist(self) -> None:
+        unsafe = parse_record(
+            record("unsafe", method="pipx", source="https://pypi.example.test/simple"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (unsafe,)),))
+        identity = RuntimeIdentity("ubuntu", "22.04", "linux/amd64")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with mock.patch.object(dependency_module.os, "geteuid", return_value=1000):
+                with self.assertRaisesRegex(DependencyError, "euid=0"):
+                    image_install_plan(
+                        plan,
+                        workspace=root,
+                        identity=identity,
+                        runner=FakeRunner(),
+                    )
+            image_root = root / "image-dependencies"
+            with self.assertRaisesRegex(DependencyError, "image-safe whitelist"):
+                image_install_plan(
+                    plan,
+                    workspace=root,
+                    _test_image_root=image_root,
+                    identity=identity,
+                    runner=FakeRunner(),
+                )
+            self.assertFalse(image_root.exists())
+
+    def test_image_install_failure_does_not_publish_target_and_freezes_tree(self) -> None:
+        parsed = parse_record(
+            record("image-tool", method="apt-package"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+        identity = RuntimeIdentity("ubuntu", "22.04", "linux/amd64")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            failed_root = root / "failed-image"
+            with self.assertRaises(DependencyError):
+                image_install_plan(
+                    plan,
+                    workspace=root,
+                    _test_image_root=failed_root,
+                    runner=FakeRunner(fail_on="apt-get"),
+                    identity=identity,
+                )
+            self.assertFalse(failed_root.exists())
+
+            publish_failure_root = root / "publish-failure"
+            original_replace = dependency_module.os.replace
+
+            def fail_target_publish(source: Path, destination: Path) -> None:
+                if destination == publish_failure_root:
+                    raise OSError("publish")
+                original_replace(source, destination)
+
+            with mock.patch.object(
+                dependency_module.os, "replace", side_effect=fail_target_publish
+            ):
+                with self.assertRaises(OSError):
+                    image_install_plan(
+                        plan,
+                        workspace=root,
+                        _test_image_root=publish_failure_root,
+                        runner=FakeRunner(),
+                        identity=identity,
+                    )
+            self.assertFalse(publish_failure_root.exists())
+
+            image_root = root / "image-dependencies"
+            image_install_plan(
+                plan,
+                workspace=root,
+                _test_image_root=image_root,
+                runner=FakeRunner(),
+                identity=identity,
+            )
+            for path in (image_root, *image_root.rglob("*")):
+                observed = path.stat()
+                self.assertEqual(observed.st_uid, os.geteuid())
+                self.assertEqual(observed.st_gid, os.getegid())
+                expected_mode = (
+                    0o555 if stat.S_ISDIR(observed.st_mode) else 0o444
+                )
+                self.assertEqual(stat.S_IMODE(observed.st_mode), expected_mode)
+
+    def test_image_install_rejects_symlinked_parent_component(self) -> None:
+        parsed = parse_record(
+            record("image-tool", method="apt-package"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+        identity = RuntimeIdentity("ubuntu", "22.04", "linux/amd64")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            real_parent = root / "real"
+            real_parent.mkdir()
+            linked_parent = root / "linked"
+            linked_parent.symlink_to(real_parent, target_is_directory=True)
+            with self.assertRaisesRegex(DependencyError, "must not be a symlink"):
+                image_install_plan(
+                    plan,
+                    workspace=root,
+                    _test_image_root=linked_parent / "image-dependencies",
+                    runner=FakeRunner(),
+                    identity=identity,
+                )
+            self.assertFalse((real_parent / "image-dependencies").exists())
+
+    def test_image_verify_apt_repository_disables_network_digest(self) -> None:
+        fingerprint = "2C6106201985B60E6C7AC87323F3D4EA75716059"
+        parsed = parse_record(
+            record(
+                "repo",
+                method="apt-repository",
+                key_url="https://apt.example.test/key",
+                key_fingerprint=fingerprint,
+                repository_suite="jammy",
+                repository_components=["main"],
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+        installer = Installer(runner)
+        keyring = Path("/etc/apt/keyrings/repo.gpg")
+        expected_source = Installer._apt_repository_line(parsed, keyring)
+        result = subprocess.CompletedProcess(
+            ("gpg",), 0, f"fpr:::::::::{fingerprint}:\n", ""
+        )
+        with (
+            mock.patch.object(installer, "_verify_apt_package"),
+            mock.patch.object(installer, "_capture", return_value=result),
+            mock.patch.object(Path, "is_symlink", return_value=False),
+            mock.patch.object(Path, "is_file", return_value=True),
+            mock.patch.object(Path, "read_text", return_value=expected_source),
+            mock.patch.object(
+                dependency_module, "_download", side_effect=AssertionError("network")
+            ),
+        ):
+            installer._verify_apt_repository(
+                parsed,
+                workspace=Path("/tmp/workspace"),
+                allow_network=False,
+            )
+
+    def test_image_freeze_requests_production_root_ownership_and_modes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            staging = Path(temporary) / "staging"
+            receipts = staging / "receipts"
+            receipts.mkdir(parents=True)
+            (staging / "plan.json").write_text("{}", encoding="utf-8")
+            (receipts / "tool.json").write_text("{}", encoding="utf-8")
+            with mock.patch.object(dependency_module.os, "chown") as chown:
+                dependency_module._freeze_image_tree(
+                    staging,
+                    owner_uid=0,
+                    owner_gid=0,
+                )
+            self.assertEqual(chown.call_count, 4)
+            self.assertTrue(
+                all(call.args[1:] == (0, 0) for call in chown.call_args_list)
+            )
+            self.assertEqual(stat.S_IMODE(staging.stat().st_mode), 0o555)
+            self.assertEqual(stat.S_IMODE(receipts.stat().st_mode), 0o555)
+            self.assertEqual(stat.S_IMODE((staging / "plan.json").stat().st_mode), 0o444)
+            self.assertEqual(
+                stat.S_IMODE((receipts / "tool.json").stat().st_mode), 0o444
+            )
+
+    def test_image_verify_plan_apt_repository_is_read_only_and_offline(self) -> None:
+        parsed = parse_record(
+            record(
+                "repo",
+                method="apt-repository",
+                key_url="https://apt.example.test/key",
+                key_fingerprint="2C6106201985B60E6C7AC87323F3D4EA75716059",
+                platform="linux/amd64",
+                repository_suite="jammy",
+                repository_components=["main"],
+                repository_packages_sha256="a" * 64,
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+        identity = RuntimeIdentity("ubuntu", "22.04", "linux/amd64")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            image_root = root / "image-dependencies"
+            with (
+                mock.patch.object(Installer, "install_record"),
+                mock.patch.object(Installer, "verify", return_value=None) as verify,
+                mock.patch.object(
+                    dependency_module,
+                    "_download",
+                    side_effect=AssertionError("network"),
+                ),
+            ):
+                image_install_plan(
+                    plan,
+                    workspace=root,
+                    _test_image_root=image_root,
+                    runner=FakeRunner(),
+                    identity=identity,
+                )
+                verify.reset_mock()
+                self.assertEqual(
+                    image_verify_plan(
+                        plan,
+                        workspace=root,
+                        _test_image_root=image_root,
+                        runner=FakeRunner(),
+                    ),
+                    ("repo",),
+                )
+                verify.assert_called_once()
+                self.assertFalse(verify.call_args.kwargs["allow_network"])
+
+    def test_image_commands_accept_records_without_root_override(self) -> None:
+        args = build_parser().parse_args(
+            [
+                "image-install",
+                "--records",
+                "provider,selected",
+                "--records",
+                "unrelated",
+            ]
+        )
+        self.assertEqual(args.records, [["provider,selected"], ["unrelated"]])
+        self.assertIsNone(build_parser().parse_args(["image-install"]).records)
+
+    def test_cli_omitted_records_passes_none_and_blank_records_fail(self) -> None:
+        parsed = parse_record(
+            record("image-tool", method="apt-package"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                mock.patch.object(dependency_module, "_cli_plan", return_value=plan),
+                mock.patch.object(
+                    dependency_module,
+                    "image_install_plan",
+                    return_value=("image-tool",),
+                ) as install,
+            ):
+                self.assertEqual(
+                    dependency_module.main(
+                        ["image-install", "--workspace", str(root)]
+                    ),
+                    0,
+                )
+                self.assertIsNone(install.call_args.kwargs["records"])
+
+            def select_cli_records(plan_arg: Any, **kwargs: Any) -> tuple[str, ...]:
+                return select_record_ids(plan_arg, kwargs["records"])
+
+            with (
+                mock.patch.object(dependency_module, "_cli_plan", return_value=plan),
+                mock.patch.object(
+                    dependency_module,
+                    "image_install_plan",
+                    side_effect=select_cli_records,
+                ),
+            ):
+                self.assertEqual(
+                    dependency_module.main(
+                        [
+                            "image-install",
+                            "--workspace",
+                            str(root),
+                            "--records",
+                            "",
+                        ]
+                    ),
+                    1,
+                )
 
     def test_npm_global_uses_stable_prefix_for_install_and_verification(self) -> None:
         parsed = parse_record(
@@ -1849,6 +2325,17 @@ class DependencyModelTests(unittest.TestCase):
             self.assertEqual(
                 manifest_sources(agent_root, agent_root),
                 (ManifestSource(vendor, ManifestRole.CANONICAL),),
+            )
+
+    def test_manifest_sources_recognizes_standalone_source_root(self) -> None:
+        """A standalone root keeps its workspace manifest canonical."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            manifest = root / ".devcontainer" / "dependencies.toml"
+            write_manifest(manifest, [record("standalone")])
+            self.assertEqual(
+                manifest_sources(root),
+                (ManifestSource(manifest, ManifestRole.CANONICAL),),
             )
 
     def test_manifest_sources_rejects_stale_tools_agent_canon_duplicate(self) -> None:
