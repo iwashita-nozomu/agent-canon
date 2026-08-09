@@ -5,7 +5,7 @@
 # upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md shared-first default lifecycle and parent customization boundary
 # upstream implementation ../tools/agent_tools/agent_canon_source_root.py resolves the public source-root command entrypoint
 # downstream implementation ./post-create.sh executes shared dependency installation and runtime projection
-# downstream implementation ../.devcontainer/post-create-parent.sh provides the derived-repository customization hook when present
+# downstream design ../documents/design/devcontainer/parent-devcontainer-policy.md owns the optional derived-repository customization hook contract
 # @dependency-end
 
 set -euo pipefail

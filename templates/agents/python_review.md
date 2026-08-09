@@ -17,8 +17,9 @@ upstream design ../../agents/canonical/ARTIFACT_PLACEMENT.md artifact placement 
 
 ## Python Findings（Python の指摘）
 
-| File | Finding | Severity | Status |
-| ---- | ------- | -------- | ------ |
+| File | Finding | Severity | Status | Evidence |
+| ---- | ------- | -------- | ------ | -------- |
+<!-- Status is finding-level: blocking, non-blocking, question, not-applicable, or accepted-risk. -->
 
 ## Expected Evidence（必要な証跡）
 

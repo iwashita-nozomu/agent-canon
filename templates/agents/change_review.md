@@ -18,8 +18,9 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 
 ## Chunk Findings（chunk の指摘）
 
-| Chunk | Finding | Severity | Status |
-| ----- | ------- | -------- | ------ |
+| Chunk | Finding | Severity | Status | Evidence |
+| ----- | ------- | -------- | ------ | -------- |
+<!-- `blocking`, `non-blocking`, `question`, `not-applicable`, and `accepted-risk` are finding-level statuses. -->
 
 ## Hypothesis Adjudication（仮説の判定）
 
@@ -75,3 +76,8 @@ upstream design ../../documents/design/dependency-manifest-design.md dependency 
 ## Follow-Up（後続対応）
 
 <!-- 次の chunk に進む前に implementer が改訂する内容を記録します。 -->
+
+## Decision（判定）
+
+<!-- `accept` is valid when no unresolved finding has status `blocking`; use
+     `changes-required` only when a blocking finding remains. -->

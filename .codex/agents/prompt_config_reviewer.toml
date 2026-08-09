@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: e26e35c63898843f16041d103c4844eae5a0e77d092ceba763d59b4ec9213228
+# source canonical digest: 07853e06d549ad0a021208668bdeb6342c1e4eec59fda994c71373e77c0f3786
 
 name = "prompt_config_reviewer"
 description = "Read-only reviewer for prompt, routing, and subagent-config drift."

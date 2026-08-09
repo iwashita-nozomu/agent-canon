@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 1e50e4a6cec4b8fa59afd8d84118e816cea24a3bb500e6a78238e9e01097449e
+# source canonical digest: 42f8ee47eda7a2049008ca98759a0ea40424116eade758579dbf69f5adaf82ce
 
 name = "detailed_design_reviewer"
 description = "Read-only reviewer for detailed design docs, implementation readiness, side-effect mapping, reuse-first discipline, and style continuity."

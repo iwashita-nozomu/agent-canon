@@ -662,11 +662,11 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("task-routing", decision["matched_skills"])
         self.assertIn("task-routing", decision["active_skills"])
-        self.assertIn("owner-bounded-routing", decision["related_skill_candidates"])
-        self.assertNotIn("owner-bounded-routing", decision["active_skills"])
+        self.assertNotIn("bounded-owner-route", decision["related_skill_candidates"])
+        self.assertNotIn("bounded-owner-route", decision["active_skills"])
         self.assertIn("task-routing", decision["related_skills"])
-        self.assertIn(
-            "owner-bounded-routing", decision["related_skills"]["task-routing"]
+        self.assertNotIn(
+            "bounded-owner-route", decision["related_skills"].get("task-routing", ())
         )
 
     def test_prompt_preserves_test_design_related_skills_for_validation_failure(
@@ -754,7 +754,7 @@ class RouteToolTest(unittest.TestCase):
                     dependency_expected,
                 )
                 if ".gitignore" in prompt:
-                    self.assertNotIn("owner-bounded-routing", decision["matched_skills"])
+                    self.assertNotIn("bounded-owner-route", decision["matched_skills"])
 
     def test_prompt_routes_patch_only_no_validation_as_implementation(self) -> None:
         """No-validation clauses after patch-only work should not mean no patch."""
@@ -1232,18 +1232,18 @@ class RouteToolTest(unittest.TestCase):
         self.assertIsNone(decision.visualization_tool_call)
 
     def test_code_visualization_small_model_route_is_exact_and_early(self) -> None:
-        """The runtime skill exposes the exact renderer route before generic guidance."""
+        """The canonical owner exposes the exact renderer route."""
         runtime_text = (
             PROJECT_ROOT / ".agents" / "skills" / "code-visualization" / "SKILL.md"
         ).read_text(encoding="utf-8")
-        direct_start = runtime_text.index("## Small-Model Direct Route")
-        canonical_read = runtime_text.index(
-            "1. Read `agents/skills/code-visualization.md`."
-        )
-        generic_tree = runtime_text.index("1. Infer the context question")
-        direct_text = runtime_text[direct_start:canonical_read]
-        self.assertLess(direct_start, canonical_read)
-        self.assertLess(canonical_read, generic_tree)
+        self.assertIn("Canonical workflow and policy", runtime_text)
+        canonical_text = (
+            PROJECT_ROOT / "agents" / "skills" / "code-visualization.md"
+        ).read_text(encoding="utf-8")
+        direct_start = canonical_text.index("## Source Evidence Routes")
+        renderer_choice = canonical_text.index("## Renderer Choice")
+        direct_text = canonical_text[direct_start:renderer_choice]
+        self.assertLess(direct_start, renderer_choice)
         for command in (
             "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope full --bundle-dir reports/dependency-graph --format json",
             "python3 tools/agent_tools/render_dependency_manifest_graph.py --root . --scope changed --bundle-dir reports/dependency-graph --format json",
@@ -1252,7 +1252,7 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("<path>", direct_text)
         self.assertNotIn("<provided-path>", direct_text)
         self.assertIn(
-            "--scope changed` only when the request explicitly asks for changed scope",
+            "Use this exact changed-scope command only when changed scope is explicit",
             direct_text,
         )
         self.assertIn("`--json` is invalid", direct_text)
@@ -1903,8 +1903,8 @@ class RouteToolTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         decision = json.loads(result.stdout)
-        self.assertIn("owner-bounded-routing", decision["matched_skills"])
-        self.assertIn("owner-bounded-routing", decision["active_skills"])
+        self.assertNotIn("bounded-owner-route", decision["matched_skills"])
+        self.assertNotIn("bounded-owner-route", decision["active_skills"])
         self.assertIn("python-review", decision["matched_skills"])
         self.assertIn("python-review", decision["deferred_skills"])
         self.assertNotEqual(decision["evidence"], "mode=repo-changing;matched=none")

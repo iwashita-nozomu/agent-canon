@@ -97,7 +97,14 @@ def create_parent(
     (parent_source / "owner-evidence.md").write_text(
         "source edit required\n", encoding="utf-8"
     )
-    run_git(parent_source, "add", ".gitmodules", "owner-evidence.md")
+    (parent_source / ".gitignore").write_text("workspace/\n", encoding="utf-8")
+    run_git(
+        parent_source,
+        "add",
+        ".gitmodules",
+        ".gitignore",
+        "owner-evidence.md",
+    )
     subprocess.run(
         [
             "git",
@@ -337,15 +344,16 @@ def test_relative_module_url_and_merge_main_use_generic_lifecycle(
     assert run_git(clone, "merge-base", "--is-ancestor", "origin/main", "HEAD") == ""
 
 
-def test_cleanup_rejects_adapter_path_identity_before_publication(
+def test_cleanup_without_publication_packet_uses_computed_clone(
     tmp_path: Path,
 ) -> None:
-    """Adapter delegates cleanup only for the lifecycle-owned clone path."""
+    """Adapter cleanup needs no materialized packet or duplicated clone path."""
     remote = create_remote(tmp_path)
     parent = create_parent(tmp_path, remote)
     prepared = prepare(parent)
     assert prepared.returncode == 0, prepared.stderr
-    wrong = parent / "workspace" / TOPIC / "other"
+    clone = module_clone(parent)
+    run_git(clone, "push", "-u", "origin", "feature/foo")
 
     result = invoke(
         parent,
@@ -358,15 +366,11 @@ def test_cleanup_rejects_adapter_path_identity_before_publication(
         "feature/foo",
         "--owner-evidence",
         "owner-evidence.md",
-        "--expected-clone",
-        str(wrong),
-        "--candidate-cas",
-        str(parent / "missing-cas.json"),
-        "--pr-lifecycle",
-        str(parent / "missing-lifecycle.json"),
+        "--apply",
     )
-    assert result.returncode == 2
-    assert "--expected-clone must equal" in result.stderr
+    assert result.returncode == 0, result.stderr
+    assert "action=removed" in result.stdout
+    assert not clone.exists()
 
 
 def test_prepare_requires_owner_evidence_and_returns_typed_topic_identity_error(
@@ -389,7 +393,7 @@ def test_prepare_requires_owner_evidence_and_returns_typed_topic_identity_error(
         "missing.md",
     )
     assert missing.returncode == 2
-    assert "topic-identity-required" in missing.stderr
+    assert "owner evidence must be a non-empty file" in missing.stderr
 
 
 @pytest.mark.parametrize("forbidden", ("path", "base", "merge", "cleanup"))

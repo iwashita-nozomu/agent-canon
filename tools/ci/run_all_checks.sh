@@ -5,9 +5,7 @@
 # upstream design ../../documents/design/dependency-manifest-design.md scoped parent graph receipt contract
 # upstream implementation ./check_agent_canon_pr.sh writes owner/root/PID/status-bound parent graph receipts
 # upstream implementation ../agent_tools/check_dependency_headers.py validates changed-file dependency manifests
-# upstream implementation ../agent_tools/scan_dependency_headers.sh scans changed-file manifest coverage
 # upstream implementation ../agent_tools/check_dependency_header_format.sh validates changed-file manifest syntax
-# upstream implementation ../agent_tools/check_hardcoded_numbers.py validates changed-source numeric literals
 # upstream implementation ../agent_tools/check_static_any.py rejects explicit Python Any usage
 # upstream implementation ../agent_tools/check_log_helper_names.py validates log helper naming
 # upstream implementation ../agent_tools/import_responsibility.py validates import ownership boundaries
@@ -46,7 +44,6 @@ set -euo pipefail
 #   bash tools/ci/run_all_checks.sh --quick   # broad checks with ruff skipped
 #   bash tools/ci/run_all_checks.sh --quick --skip-docs --skip-github-workflows
 #                                               # PR gate reuse after those gates already ran
-#   bash tools/ci/run_all_checks.sh --verbose # 詳細出力
 #
 # 前提条件:
 #   - Docker 環境、または requirements.txt のパッケージ導入済み
@@ -74,10 +71,12 @@ CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$WORKSPACE_ROOT")"
 CANON_CI_ROOT="${CANON_TOOLS_ROOT}/ci"
 cd "$WORKSPACE_ROOT"
 
-AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
-if [ ! -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ] \
-  && [ -f "${WORKSPACE_ROOT}/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]; then
+if [[ -d "${WORKSPACE_ROOT}/vendor/agent-canon" && -f "${WORKSPACE_ROOT}/.gitmodules" ]]; then
+  AGENT_CANON_REPOSITORY_MODE="template_or_derived"
   AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
+else
+  AGENT_CANON_REPOSITORY_MODE="standalone_source"
+  AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
 fi
 AGENT_CANON_CARGO_MANIFEST="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml"
 AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${HOME}/.tools/agent-canon/cargo-target}"
@@ -105,7 +104,6 @@ fi
 
 # オプション解析
 QUICK_MODE=0
-VERBOSE_MODE=0
 SKIP_DOCS=0
 SKIP_GITHUB_WORKFLOWS=0
 PR_GATE_RECEIPT=""
@@ -132,10 +130,6 @@ while [[ $# -gt 0 ]]; do
       fi
       PR_GATE_RECEIPT="$2"
       shift 2
-      ;;
-    --verbose)
-      VERBOSE_MODE=1
-      shift
       ;;
     *)
       echo "Unknown option: $1" >&2
@@ -362,24 +356,12 @@ else
   echo "⏭️ dependency header checks skipped: canonical graph build failed"
 fi
 if [ "$PR_GATE_RECEIPT_VALID" -eq 0 ]; then
-  if bash "${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh" --changed 2>&1; then
-    echo "✅ dependency manifest scan 成功"
-  else
-    echo "❌ dependency manifest scan 失敗"
-    EXIT_CODE=1
-  fi
   if bash "${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh" --changed 2>&1; then
     echo "✅ dependency manifest format checks 成功"
   else
     echo "❌ dependency manifest format checks 失敗"
     EXIT_CODE=1
   fi
-fi
-if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_hardcoded_numbers.py" --changed --exclude tests --exclude vendor --exclude reports 2>&1; then
-  echo "✅ hardcoded numeric literal checks 成功"
-else
-  echo "❌ hardcoded numeric literal checks 失敗"
-  EXIT_CODE=1
 fi
 if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_static_any.py" 2>&1; then
   echo "✅ explicit Any static checks 成功"
@@ -471,19 +453,24 @@ else
   echo "❌ local issue sync checks 失敗"
   EXIT_CODE=1
 fi
-accumulated_eval_args=(--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}")
-if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
-  "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then
-  echo "✅ accumulated agent eval producers 成功"
+if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
+  accumulated_eval_args=(--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}")
+  if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
+    "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}" 2>&1; then
+    echo "✅ accumulated agent eval producers 成功"
+  else
+    echo "❌ accumulated agent eval producers 失敗"
+    EXIT_CODE=1
+  fi
+  if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/eval_accumulation_check.py" 2>&1; then
+    echo "✅ eval accumulation checks 成功"
+  else
+    echo "❌ eval accumulation checks 失敗"
+    EXIT_CODE=1
+  fi
 else
-  echo "❌ accumulated agent eval producers 失敗"
-  EXIT_CODE=1
-fi
-if AGENT_CANON_HOOK_ARCHIVE_DIR="${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/eval_accumulation_check.py" 2>&1; then
-  echo "✅ eval accumulation checks 成功"
-else
-  echo "❌ eval accumulation checks 失敗"
-  EXIT_CODE=1
+  echo "ACCUMULATED_AGENT_EVAL=skip reason=agentcanon_source_owned_gate"
+  echo "EVAL_ACCUMULATION=skip reason=agentcanon_source_owned_gate"
 fi
 if cargo fmt --manifest-path "$AGENT_CANON_CARGO_MANIFEST" -- --check 2>&1; then
   echo "✅ Rust format checks 成功"

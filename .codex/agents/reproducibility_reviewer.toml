@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: c352d794b5666b560ce7ca1393856322bce9a460a4b15f844634966ecfc1eea3
+# source canonical digest: e505e11a2740cb1bf7fe637d838c356d3306fac3c442a1b973446b17f3439a82
 
 name = "reproducibility_reviewer"
 description = "Read-only reviewer for provenance, seeds, commands, environments, and rerunability."

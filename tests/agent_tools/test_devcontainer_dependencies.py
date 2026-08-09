@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import Any
 from unittest import mock
 
+from tools.agent_tools import devcontainer_dependencies as dependency_module
 from tools.agent_tools.devcontainer_dependencies import (
     BASE_CAPABILITIES,
     DependencyError,
@@ -36,6 +37,9 @@ from tools.agent_tools.devcontainer_dependencies import (
     ManifestRole,
     ManifestSource,
     RuntimeIdentity,
+    _parse_dpkg_owned_paths,
+    _repository_package_filename,
+    _repository_packages_url,
     build_plan,
     install_plan,
     load_plan,
@@ -235,6 +239,21 @@ class FakeRunner:
         self.fail_on = fail_on
         self.fail_once_on = fail_once_on
         self.emulate_non_root_sudo = emulate_non_root_sudo
+        self.ownership_lists: dict[str, tuple[str, ...]] = {}
+        self.resolved_paths: dict[str, str] = {}
+        self.virtual_executables: set[str] = set()
+        self.non_executable_paths: set[str] = set()
+
+    def resolve_executable(self, path: Path) -> Path:
+        """Resolve virtual symlink targets for deterministic ownership fixtures."""
+        return Path(self.resolved_paths.get(str(path), str(path)))
+
+    def is_regular_executable(self, path: Path) -> bool:
+        """Model executable file state without touching host `/usr` paths."""
+        path_text = str(path)
+        if path_text in self.non_executable_paths:
+            return False
+        return path_text in self.virtual_executables or path_text.startswith("/usr/bin/")
 
     def run(
         self,
@@ -251,16 +270,21 @@ class FakeRunner:
             command = ("sudo", *command)
         self.calls.append(command)
         self.environments.append(dict(env) if env is not None else None)
-        if self.fail_once_on and command[0] == self.fail_once_on:
+        if self.fail_once_on and (
+            command[0] == self.fail_once_on
+            or Path(command[0]).name == self.fail_once_on
+        ):
             self.fail_once_on = None
             raise subprocess.CalledProcessError(1, command)
-        if self.fail_on and command[0] == self.fail_on:
+        if self.fail_on and (
+            command[0] == self.fail_on or Path(command[0]).name == self.fail_on
+        ):
             raise subprocess.CalledProcessError(1, command)
         if command == (sys.executable, "-c", "import site; print(site.getuserbase())"):
             return subprocess.CompletedProcess(
                 command, 0, "/tmp/fake-python-user-base\n", ""
             )
-        if command[:2] == ("dpkg-query", "--show"):
+        if Path(command[0]).name == "dpkg-query" and command[1:2] == ("--show",):
             package = command[-1]
             return subprocess.CompletedProcess(
                 command,
@@ -268,6 +292,10 @@ class FakeRunner:
                 f"install ok installed\t1.0.0\t{package}\n",
                 "",
             )
+        if command[:2] == ("/usr/bin/dpkg-query", "--listfiles"):
+            package = command[-1]
+            owned = self.ownership_lists.get(package, (f"/usr/bin/{package}",))
+            return subprocess.CompletedProcess(command, 0, "\n".join(owned) + "\n", "")
         if command[:3] == ("npm", "ls", "--global") and "--json" in command:
             package = command[-1]
             return subprocess.CompletedProcess(
@@ -293,6 +321,7 @@ class FakeRunner:
             return subprocess.CompletedProcess(
                 command,
                 0,
+                "rust-src-x86_64-unknown-linux-gnu (installed)\n"
                 "rustfmt-x86_64-unknown-linux-gnu (installed)\n"
                 "clippy-x86_64-unknown-linux-gnu (installed)\n",
                 "",
@@ -639,6 +668,717 @@ class DependencyModelTests(unittest.TestCase):
                 parsed.verification.kind.value,
                 value["verification"]["kind"],
             )
+        apt_with_owner = parse_record(
+            record(
+                "apt-owner",
+                method="apt-package",
+                executable_owner_packages=["apt", "apt-tools"],
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        self.assertEqual(
+            apt_with_owner.executable_owner_packages, ("apt", "apt-tools")
+        )
+        apt_default_owner = parse_record(
+            record("apt-default", method="apt-package"), path=Path("fixture.toml"), index=1
+        )
+        self.assertEqual(apt_default_owner.executable_owner_packages, ("apt-default",))
+        self.assertEqual(
+            apt_default_owner.payload()["executable_owner_packages"],
+            ("apt-default",),
+        )
+        non_apt_ownerless = parse_record(
+            record("npm-default", method="npm-global"),
+            path=Path("fixture.toml"),
+            index=2,
+        )
+        self.assertEqual(non_apt_ownerless.executable_owner_packages, ())
+        self.assertEqual(non_apt_ownerless.payload()["executable_owner_packages"], ())
+        self.assertNotEqual(
+            non_apt_ownerless.fingerprint(),
+            apt_default_owner.fingerprint(),
+        )
+        explicit_apt_owner = parse_record(
+            record(
+                "apt-default",
+                method="apt-package",
+                executable_owner_packages=["apt-default", "apt-tools"],
+            ),
+            path=Path("fixture.toml"),
+            index=3,
+        )
+        self.assertEqual(
+            explicit_apt_owner.executable_owner_packages,
+            ("apt-default", "apt-tools"),
+        )
+
+    def test_non_apt_executable_owner_packages_is_rejected(self) -> None:
+        with self.assertRaisesRegex(
+            DependencyError, "unsupported fields for npm-global: executable_owner_packages"
+        ):
+            parse_record(
+                record(
+                    "npm-with-owners",
+                    method="npm-global",
+                    executable_owner_packages=["npm", "nodejs"],
+                ),
+                path=Path("fixture.toml"),
+                index=0,
+            )
+
+    def test_apt_repository_suite_components_digest_and_executable_are_typed(self) -> None:
+        """Repository records derive one signed source and Packages index identity."""
+        packages = b"Package: clangd-18\nVersion: pinned\n"
+        digest = hashlib.sha256(packages).hexdigest()
+        package_url = (
+            "https://apt.example.test/jammy/pool/main/c/clangd-18/"
+            "clangd-18_1.2.3_amd64.deb"
+        )
+        package_sha = hashlib.sha256(b"immutable deb").hexdigest()
+        parsed = parse_record(
+            record(
+                "clangd-language-server",
+                method="apt-repository",
+                package="clangd-18",
+                version="1:18.1.8~exp1",
+                platform="linux/amd64",
+                source="https://apt.llvm.org/jammy/",
+                repository_suite="llvm-toolchain-jammy-18",
+                repository_components=["main"],
+                repository_packages_sha256=digest,
+                repository_package_url=package_url,
+                repository_package_sha256=package_sha,
+                key_url="https://apt.llvm.org/llvm-snapshot.gpg.key",
+                key_fingerprint="6084F3CF814B57C1CF12EFD515CF4D18AF4F7421",
+                verification={
+                    "kind": "apt-repository",
+                    "executable": "clangd-18",
+                    "args": ["--version"],
+                    "output_contains": "clangd version 18.1.8",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        self.assertEqual(parsed.repository_suite, "llvm-toolchain-jammy-18")
+        self.assertEqual(parsed.repository_components, ("main",))
+        self.assertEqual(parsed.repository_packages_sha256, digest)
+        self.assertEqual(parsed.repository_package_url, package_url)
+        self.assertEqual(parsed.repository_package_sha256, package_sha)
+        self.assertEqual(
+            _repository_package_filename(parsed), "clangd-18_1.2.3_amd64.deb"
+        )
+        self.assertEqual(
+            _repository_packages_url(parsed),
+            "https://apt.llvm.org/jammy/dists/llvm-toolchain-jammy-18/main/"
+            "binary-amd64/Packages",
+        )
+        self.assertEqual(
+            Installer._apt_repository_line(parsed, Path("/etc/apt/keyrings/clangd.gpg")),
+            "deb [signed-by=/etc/apt/keyrings/clangd.gpg] "
+            "https://apt.llvm.org/jammy/ llvm-toolchain-jammy-18 main\n",
+        )
+
+    def test_apt_repository_packages_digest_fails_closed(self) -> None:
+        """Derived Packages bytes must match the typed digest before acceptance."""
+        payload = b"signed Packages fixture\n"
+        parsed = parse_record(
+            record(
+                "repo",
+                method="apt-repository",
+                platform="linux/amd64",
+                source="https://apt.example.test/jammy/",
+                repository_suite="jammy",
+                repository_components=["main"],
+                repository_packages_sha256=hashlib.sha256(payload).hexdigest(),
+                key_url="https://apt.example.test/key",
+                key_fingerprint="2C6106201985B60E6C7AC87323F3D4EA75716059",
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+
+        def write_fixture(url: str, destination: Path) -> None:
+            self.assertEqual(
+                url,
+                "https://apt.example.test/jammy/dists/jammy/main/"
+                "binary-amd64/Packages",
+            )
+            destination.write_bytes(payload)
+
+        with mock.patch(
+            "tools.agent_tools.devcontainer_dependencies._download",
+            side_effect=write_fixture,
+        ):
+            Installer._verify_repository_packages_digest(parsed)
+
+        mismatched = replace(
+            parsed, repository_packages_sha256=hashlib.sha256(b"different").hexdigest()
+        )
+        with mock.patch(
+            "tools.agent_tools.devcontainer_dependencies._download",
+            side_effect=write_fixture,
+        ):
+            with self.assertRaisesRegex(DependencyError, "Packages index SHA256 mismatch"):
+                Installer._verify_repository_packages_digest(mismatched)
+
+    def test_apt_repository_artifact_pair_and_url_sha_validation_fail_closed(self) -> None:
+        base = record(
+            "repo",
+            method="apt-repository",
+            key_url="https://example.test/key",
+            key_fingerprint="2C6106201985B60E6C7AC87323F3D4EA75716059",
+        )
+        for field in ("repository_package_url", "repository_package_sha256"):
+            with self.subTest(field=field):
+                incomplete = dict(base)
+                incomplete[field] = (
+                    "https://example.test/repo/tool_1.0.0_amd64.deb"
+                    if field == "repository_package_url"
+                    else "0" * 64
+                )
+                with self.assertRaisesRegex(DependencyError, "provided together"):
+                    parse_record(incomplete, path=Path("fixture.toml"), index=0)
+        invalid_url = dict(base)
+        invalid_url.update(
+            repository_package_url="http://example.test/tool.deb",
+            repository_package_sha256="0" * 64,
+        )
+        with self.assertRaisesRegex(DependencyError, "https"):
+            parse_record(invalid_url, path=Path("fixture.toml"), index=0)
+        invalid_sha = dict(base)
+        invalid_sha.update(
+            repository_package_url="https://example.test/tool.deb",
+            repository_package_sha256="not-a-sha",
+        )
+        with self.assertRaisesRegex(DependencyError, "64-character SHA256"):
+            parse_record(invalid_sha, path=Path("fixture.toml"), index=0)
+
+    def test_apt_repository_installs_verified_immutable_deb_and_separates_rolling_hash(
+        self,
+    ) -> None:
+        rolling = b"rolling Packages index"
+        immutable = b"immutable clangd deb"
+        rolling_sha = hashlib.sha256(rolling).hexdigest()
+        immutable_sha = hashlib.sha256(immutable).hexdigest()
+        package_url = "https://apt.example.test/clangd-18_1.2.3_amd64.deb"
+        fingerprint = "2C6106201985B60E6C7AC87323F3D4EA75716059"
+        parsed = parse_record(
+            record(
+                "clangd-language-server",
+                method="apt-repository",
+                package="clangd-18",
+                version="1.2.3",
+                platform="linux/amd64",
+                source="https://apt.example.test/jammy/",
+                repository_suite="jammy",
+                repository_components=["main"],
+                repository_packages_sha256=rolling_sha,
+                repository_package_url=package_url,
+                repository_package_sha256=immutable_sha,
+                key_url="https://apt.example.test/key",
+                key_fingerprint=fingerprint,
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+
+        def write_download(url: str, destination: Path) -> None:
+            if url == package_url:
+                destination.write_bytes(immutable)
+            elif url.endswith("/Packages"):
+                destination.write_bytes(rolling)
+            else:
+                destination.write_bytes(b"key")
+
+        original_run = runner.run
+
+        def run_with_key_fingerprint(
+            argv: Sequence[str],
+            *,
+            cwd: Path | None = None,
+            privileged: bool = False,
+            capture_output: bool = False,
+            env: Mapping[str, str] | None = None,
+        ) -> subprocess.CompletedProcess[str]:
+            result = original_run(
+                argv,
+                cwd=cwd,
+                privileged=privileged,
+                capture_output=capture_output,
+                env=env,
+            )
+            if tuple(argv[:3]) == ("gpg", "--show-keys", "--with-colons"):
+                return subprocess.CompletedProcess(
+                    argv, 0, f"fpr:::::::::{fingerprint}:\n", ""
+                )
+            return result
+
+        with (
+            mock.patch.object(runner, "run", side_effect=run_with_key_fingerprint),
+            mock.patch(
+                "tools.agent_tools.devcontainer_dependencies._download",
+                side_effect=write_download,
+            ),
+        ):
+            Installer(runner)._install_apt_repository(
+                parsed, Path("/tmp/workspace"), repair=False
+            )
+            successful_calls = tuple(runner.calls)
+            runner.calls.clear()
+            runner.environments.clear()
+            mismatched = replace(
+                parsed,
+                repository_package_sha256=hashlib.sha256(b"different deb").hexdigest(),
+            )
+            with self.assertRaisesRegex(
+                DependencyError, "immutable apt package SHA256 mismatch"
+            ):
+                Installer(runner)._install_apt_repository(
+                    mismatched, Path("/tmp/workspace"), repair=False
+                )
+            self.assertFalse(
+                any(command[:2] == ("apt-get", "install") for command in runner.calls)
+            )
+
+        local_installs = [
+            command
+            for command in successful_calls
+            if command[:2] == ("apt-get", "install")
+        ]
+        self.assertEqual(len(local_installs), 1)
+        self.assertEqual(Path(local_installs[0][-1]).name, "clangd-18_1.2.3_amd64.deb")
+        self.assertNotIn("clangd-18=1.2.3", local_installs[0])
+        self.assertIn(("apt-get", "update"), runner.calls)
+
+    def test_apt_repository_receipt_keeps_immutable_and_rolling_hashes_distinct(self) -> None:
+        rolling_sha = "1" * 64
+        immutable_sha = "2" * 64
+        parsed = parse_record(
+            record(
+                "repo",
+                method="apt-repository",
+                platform="linux/amd64",
+                source="https://apt.example.test/jammy/",
+                repository_suite="jammy",
+                repository_components=["main"],
+                repository_packages_sha256=rolling_sha,
+                repository_package_url="https://apt.example.test/repo_1.0_amd64.deb",
+                repository_package_sha256=immutable_sha,
+                key_url="https://apt.example.test/key",
+                key_fingerprint="2C6106201985B60E6C7AC87323F3D4EA75716059",
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+        with tempfile.TemporaryDirectory() as temporary:
+            receipt = Path(temporary) / "repo.json"
+            Installer._write_receipt(receipt, plan, parsed)
+            payload = json.loads(receipt.read_text(encoding="utf-8"))
+            self.assertEqual(payload["repository_packages"]["sha256"], rolling_sha)
+            self.assertEqual(payload["repository_package"]["sha256"], immutable_sha)
+            self.assertTrue(Installer._receipt_matches(receipt, plan, parsed))
+            payload["repository_package"]["sha256"] = rolling_sha
+            receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+            self.assertFalse(Installer._receipt_matches(receipt, plan, parsed))
+
+    def test_apt_executable_ownership_resolves_symlink_with_same_package(self) -> None:
+        parsed = parse_record(
+            record(
+                "clangd-language-server",
+                method="apt-repository",
+                package="clangd-18",
+                version="1.2.3",
+                platform="linux/amd64",
+                source="https://apt.example.test/jammy/",
+                repository_suite="jammy",
+                repository_components=["main"],
+                key_url="https://apt.example.test/key",
+                key_fingerprint="2C6106201985B60E6C7AC87323F3D4EA75716059",
+                verification={
+                    "kind": "apt-repository",
+                    "executable": "clangd-18",
+                    "args": ["--version"],
+                    "output_contains": "clangd version 18.1.8",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+        lexical = "/usr/bin/clangd-18"
+        resolved = "/usr/lib/llvm-18/bin/clangd"
+        runner.ownership_lists["clangd-18"] = (lexical, resolved)
+        runner.resolved_paths[lexical] = resolved
+        runner.virtual_executables.add(resolved)
+        lexical_path, resolved_path = Installer(runner)._resolve_executable_binding(
+            parsed, "clangd-18", workspace=Path("/tmp/workspace")
+        )
+        self.assertEqual(lexical_path, Path(lexical))
+        self.assertEqual(resolved_path, Path(resolved))
+        self.assertIn(("/usr/bin/dpkg-query", "--listfiles", "clangd-18"), runner.calls)
+
+    def test_apt_executable_ownership_resolves_symlink_across_owner_union(self) -> None:
+        parsed = parse_record(
+            record(
+                "clang-format",
+                method="apt-package",
+                package="clang-format",
+                version="1.2.3",
+                platform="linux/amd64",
+                source="ubuntu:22.04",
+                verification={
+                    "kind": "apt-package",
+                    "executable": "clang-format",
+                    "args": ["--version"],
+                    "output_contains": "clang-format version 14.0.0",
+                },
+                executable_owner_packages=["clang-format", "clang-format-14"],
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+        lexical = "/usr/bin/clang-format"
+        resolved = "/usr/lib/clang-format-14/bin/clang-format"
+        runner.ownership_lists["clang-format"] = ("/usr/bin/clangd-18",)
+        runner.ownership_lists["clang-format-14"] = (lexical, resolved)
+        runner.resolved_paths[lexical] = resolved
+        runner.virtual_executables.add(resolved)
+        lexical_path, resolved_path = Installer(runner)._resolve_executable_binding(
+            parsed, "clang-format", workspace=Path("/tmp/workspace")
+        )
+        self.assertEqual(lexical_path, Path(lexical))
+        self.assertEqual(resolved_path, Path(resolved))
+        self.assertEqual(
+            [command for command in runner.calls if command[0] == "/usr/bin/dpkg-query"],
+            [
+                ("/usr/bin/dpkg-query", "--listfiles", "clang-format"),
+                ("/usr/bin/dpkg-query", "--listfiles", "clang-format-14"),
+            ],
+        )
+
+    def test_dpkg_owned_paths_normalize_leading_dot_entry(self) -> None:
+        owned = _parse_dpkg_owned_paths("/.\n/usr/bin/jq\n", "jq")
+        self.assertIn("/", owned)
+        self.assertIn("/usr/bin/jq", owned)
+        with self.assertRaisesRegex(DependencyError, "unsafe path"):
+            _parse_dpkg_owned_paths("relative/path\n", "jq")
+        with self.assertRaisesRegex(DependencyError, "unsafe path"):
+            _parse_dpkg_owned_paths("/usr/bin/jq\x00evil\n", "jq")
+
+    def test_strict_apt_verify_uses_absolute_dpkg_query_for_version_and_ownership(self) -> None:
+        parsed = parse_record(
+            record(
+                "tool",
+                method="apt-package",
+                verification={
+                    "kind": "apt-package",
+                    "executable": "tool",
+                    "args": ["--version"],
+                    "output_contains": "1.0.0",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+        Installer(runner).verify(
+            parsed, workspace=Path("/tmp/workspace"), strict_executables=True
+        )
+        dpkg_calls = [
+            command for command in runner.calls if Path(command[0]).name == "dpkg-query"
+        ]
+        self.assertEqual(len(dpkg_calls), 2)
+        self.assertTrue(all(command[0] == "/usr/bin/dpkg-query" for command in dpkg_calls))
+
+    def test_apt_executable_ownership_rejects_unowned_cross_package_target(self) -> None:
+        parsed = parse_record(
+            record(
+                "clangd-language-server",
+                method="apt-repository",
+                package="clangd-18",
+                version="1.2.3",
+                platform="linux/amd64",
+                source="https://apt.example.test/jammy/",
+                repository_suite="jammy",
+                repository_components=["main"],
+                key_url="https://apt.example.test/key",
+                key_fingerprint="2C6106201985B60E6C7AC87323F3D4EA75716059",
+                verification={
+                    "kind": "apt-repository",
+                    "executable": "clangd-18",
+                    "args": ["--version"],
+                    "output_contains": "clangd version 18.1.8",
+                },
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+        lexical = "/usr/bin/clangd-18"
+        resolved = "/usr/lib/llvm-18/bin/clangd"
+        runner.ownership_lists["clangd-18"] = (lexical, "/usr/lib/other/clangd")
+        runner.resolved_paths[lexical] = resolved
+        runner.virtual_executables.add(resolved)
+        with self.assertRaisesRegex(DependencyError, "not owned"):
+            Installer(runner)._resolve_executable_binding(
+                parsed, "clangd-18", workspace=Path("/tmp/workspace")
+            )
+
+        runner.ownership_lists["clangd-18"] = ("relative/clangd",)
+        with self.assertRaisesRegex(DependencyError, "unsafe path"):
+            Installer(runner)._resolve_executable_binding(
+                parsed, "clangd-18", workspace=Path("/tmp/workspace")
+            )
+
+    def test_verified_executable_requires_receipt_binding_and_rejects_path_drift(self) -> None:
+        """Manifest executable resolution is receipt-bound and independent of PATH."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            prefix = root / "npm"
+            bin_dir = prefix / "bin"
+            bin_dir.mkdir(parents=True)
+            target_dir = prefix / "lib"
+            target_dir.mkdir(parents=True)
+            target_v1 = target_dir / "pyright-v1"
+            target_v2 = target_dir / "pyright-v2"
+            for target in (target_v1, target_v2, bin_dir / "pyright-langserver"):
+                target.write_text("#!/usr/bin/env true\n", encoding="utf-8")
+                target.chmod(0o755)
+            (bin_dir / "pyright").symlink_to(target_v1)
+            manifest = root / ".devcontainer" / "dependencies.toml"
+            write_manifest(
+                manifest,
+                [
+                    record(
+                        "pyright-language-server",
+                        package="pyright",
+                        version="1.0.0",
+                        provides=["pyright", "pyright-langserver"],
+                        verification={
+                            "kind": "npm-package",
+                            "executable": "pyright",
+                            "args": ["--version"],
+                            "output_contains": "1.0.0",
+                        },
+                    )
+                ],
+            )
+            fake = FakeRunner()
+            receipts = root / "receipts"
+            parsed = parse_record(
+                record(
+                    "pyright-language-server",
+                    package="pyright",
+                    version="1.0.0",
+                    provides=["pyright", "pyright-langserver"],
+                    verification={
+                        "kind": "npm-package",
+                        "executable": "pyright",
+                        "args": ["--version"],
+                        "output_contains": "1.0.0",
+                    },
+                ),
+                path=manifest,
+                index=0,
+            )
+            plan = build_plan((loaded_manifest(manifest, (parsed,)),))
+            with mock.patch.object(
+                dependency_module, "NPM_GLOBAL_PREFIX", str(prefix)
+            ):
+                Installer(fake).install(
+                    plan,
+                    workspace=root,
+                    receipts=receipts,
+                )
+                with mock.patch.object(
+                    dependency_module,
+                    "Installer",
+                    lambda: Installer(fake),
+                ):
+                    resolved = dependency_module.resolve_verified_executable(
+                        root, None, receipts, "pyright-language-server", "pyright"
+                    )
+                self.assertEqual(resolved.absolute_path, str(target_v1.resolve()))
+                self.assertEqual(resolved.executable, "pyright")
+                self.assertIn((str(target_v1.resolve()), "--version"), fake.calls)
+                payload = json.loads(
+                    (receipts / "pyright-language-server.json").read_text(
+                        encoding="utf-8"
+                    )
+                )
+                self.assertEqual(
+                    set(payload["executable_bindings"]),
+                    {"pyright", "pyright-langserver"},
+                )
+                payload["record_fingerprint"] = "0" * 64
+                (receipts / "pyright-language-server.json").write_text(
+                    json.dumps(payload) + "\n", encoding="utf-8"
+                )
+                with mock.patch.object(
+                    dependency_module,
+                    "Installer",
+                    lambda: Installer(fake),
+                ):
+                    with self.assertRaisesRegex(
+                        DependencyError, "executable receipt binding is stale"
+                    ):
+                        dependency_module.resolve_verified_executable(
+                            root,
+                            None,
+                            receipts,
+                            "pyright-language-server",
+                            "pyright",
+                        )
+                payload["record_fingerprint"] = plan.by_id()[
+                    "pyright-language-server"
+                ].fingerprint()
+                (receipts / "pyright-language-server.json").write_text(
+                    json.dumps(payload) + "\n", encoding="utf-8"
+                )
+                (bin_dir / "pyright").unlink()
+                (bin_dir / "pyright").symlink_to(target_v2)
+                with mock.patch.object(
+                    dependency_module,
+                    "Installer",
+                    lambda: Installer(fake),
+                ):
+                    with self.assertRaisesRegex(
+                        DependencyError, "receipt path or output drift"
+                    ):
+                        dependency_module.resolve_verified_executable(
+                            root,
+                            None,
+                            receipts,
+                            "pyright-language-server",
+                            "pyright",
+                        )
+
+    def test_secondary_npm_binding_is_structural_not_a_help_probe(self) -> None:
+        """A secondary provider may reject generic help while remaining bound."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            prefix = root / "npm"
+            bin_dir = prefix / "bin"
+            bin_dir.mkdir(parents=True)
+            primary = bin_dir / "pyright"
+            secondary = bin_dir / "pyright-langserver"
+            marker = root / "secondary-called"
+            primary.write_text("#!/bin/sh\nprintf 'pyright 1.0.0\\n'\n", encoding="utf-8")
+            secondary.write_text(
+                f"#!/bin/sh\ntouch '{marker}'\nprintf 'usage is intentionally nonzero\\n' >&2\nexit 1\n",
+                encoding="utf-8",
+            )
+            primary.chmod(0o755)
+            secondary.chmod(0o755)
+            parsed = parse_record(
+                record(
+                    "pyright-language-server",
+                    package="pyright",
+                    version="1.0.0",
+                    provides=["pyright", "pyright-langserver"],
+                    verification={
+                        "kind": "npm-package",
+                        "executable": "pyright",
+                        "args": ["--version"],
+                        "output_contains": "1.0.0",
+                    },
+                ),
+                path=Path("fixture.toml"),
+                index=0,
+            )
+            plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+            with mock.patch.object(dependency_module, "NPM_GLOBAL_PREFIX", str(prefix)):
+                installer = Installer()
+                bindings = installer._executable_bindings(parsed, workspace=root)
+                receipt = root / "receipts" / "pyright-language-server.json"
+                installer._write_receipt(receipt, plan, parsed, executable_bindings=bindings)
+
+                self.assertEqual(
+                    bindings["pyright-langserver"]["verification_output"],
+                    "agent-canon.executable-binding.structural.v1:npm-global:pyright-langserver",
+                )
+                self.assertFalse(marker.exists())
+                self.assertTrue(installer._receipt_matches(receipt, plan, parsed))
+
+    def test_secondary_npm_binding_rejects_escape_and_missing_provider(self) -> None:
+        """Secondary providers remain fail-closed on escape, missing, or non-exec path."""
+        for case in ("escape", "missing", "non_executable"):
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary)
+                prefix = root / "npm"
+                bin_dir = prefix / "bin"
+                bin_dir.mkdir(parents=True)
+                primary = bin_dir / "pyright"
+                primary.write_text("#!/bin/sh\nprintf 'pyright 1.0.0\\n'\n", encoding="utf-8")
+                primary.chmod(0o755)
+                secondary = bin_dir / "pyright-langserver"
+                if case == "escape":
+                    outside = root / "outside-provider"
+                    outside.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+                    outside.chmod(0o755)
+                    secondary.symlink_to(outside)
+                elif case == "non_executable":
+                    secondary.write_text("#!/bin/sh\necho blocked\\n", encoding="utf-8")
+                    secondary.chmod(0o644)
+                parsed = parse_record(
+                    record(
+                        "pyright-language-server",
+                        package="pyright",
+                        version="1.0.0",
+                        provides=["pyright", "pyright-langserver"],
+                        verification={
+                            "kind": "npm-package",
+                            "executable": "pyright",
+                            "args": ["--version"],
+                            "output_contains": "1.0.0",
+                        },
+                    ),
+                    path=Path("fixture.toml"),
+                    index=0,
+                )
+                with mock.patch.object(dependency_module, "NPM_GLOBAL_PREFIX", str(prefix)):
+                    with self.assertRaisesRegex(
+                        DependencyError,
+                        "(escapes its method-owned root|executable is missing|executable is not executable)",
+                    ):
+                        Installer()._executable_bindings(parsed, workspace=root)
+
+    def test_rust_analyzer_binding_uses_cargo_home_not_path(self) -> None:
+        """Rust executable bindings stay inside the pinned Cargo home."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            cargo_home = root / "cargo"
+            rust_analyzer = cargo_home / "bin" / "rust-analyzer"
+            rust_analyzer.parent.mkdir(parents=True)
+            rust_analyzer.write_text("#!/usr/bin/env true\n", encoding="utf-8")
+            rust_analyzer.chmod(0o755)
+            parsed = parse_record(
+                record(
+                    "rust-toolchain",
+                    method="rust-toolchain",
+                    version="1.89.0",
+                    source="https://static.rust-lang.org/dist",
+                    components=["rust-analyzer"],
+                    verification={"kind": "rust-toolchain"},
+                    provides=["rust-analyzer"],
+                ),
+                path=Path("fixture.toml"),
+                index=0,
+            )
+            with mock.patch.dict(
+                os.environ,
+                {"CARGO_HOME": str(cargo_home), "PATH": str(root / "ambient-bin")},
+                clear=False,
+            ):
+                self.assertEqual(
+                    dependency_module._current_executable_path(parsed, "rust-analyzer"),
+                    rust_analyzer.resolve(),
+                )
 
     def test_binary_release_asset_accepts_pinned_architecture_paths(self) -> None:
         parsed = parse_record(
@@ -761,6 +1501,39 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(merged.deps, ("node", "ninja-build"))
         self.assertEqual(merged.provides, ("codex", "shared-cli"))
         self.assertEqual(merged.verification.kind.value, "npm-package")
+
+    def test_incompatible_executable_owner_packages_fail_merge(self) -> None:
+        parent = parse_record(
+            record(
+                "shared",
+                method="apt-package",
+                source="ubuntu:22.04",
+                executable_owner_packages=["clang-format", "clang-format-14"],
+            ),
+            path=Path("parent.toml"),
+            index=0,
+        )
+        vendor = parse_record(
+            record(
+                "shared",
+                method="apt-package",
+                source="ubuntu:22.04",
+                executable_owner_packages=["clang-format", "llvm"],
+            ),
+            path=Path("vendor.toml"),
+            index=0,
+        )
+        with self.assertRaisesRegex(DependencyError, "incompatible duplicate"):
+            build_plan(
+                (
+                    loaded_manifest(
+                        Path("parent.toml"),
+                        (parent,),
+                        role=ManifestRole.PARENT_OVERLAY,
+                    ),
+                    loaded_manifest(Path("vendor.toml"), (vendor,)),
+                )
+            )
 
     def test_incompatible_duplicate_provider_missing_and_cycle_fail(self) -> None:
         parent = parse_record(record("shared"), path=Path("parent.toml"), index=0)
@@ -1031,19 +1804,61 @@ class DependencyModelTests(unittest.TestCase):
             )
         )
 
-    def test_canonical_manifest_owns_pinned_pyyaml_independently(self) -> None:
-        """AgentCanon's mounted validators receive their own exact PyYAML record."""
-        plan = load_plan(ROOT, ROOT)
-        pyyaml = next(item for item in plan.records if item.id == "pyyaml")
+    def test_boundary_accepts_absent_parent_overlay_and_hook(self) -> None:
+        """A derived repository may omit all parent-owned devcontainer overlays."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            model, _ = write_boundary_fixture(
+                root,
+                "jupyterlab\nnotebook\nipykernel\npydeps\nsnakeviz\npyyaml\n",
+            )
+            (root / ".devcontainer/dependencies.toml").unlink()
+            (root / ".devcontainer/post-create-parent.sh").unlink()
 
-        self.assertEqual(pyyaml.package, "pyyaml")
-        self.assertEqual(pyyaml.method.value, "pip-user")
-        self.assertEqual(pyyaml.version, "6.0.3")
-        self.assertEqual(pyyaml.deps, ("python3-pip",))
-        self.assertEqual(pyyaml.verification.executable, "python3")
-        self.assertTrue(
-            any("yaml.__version__" in arg for arg in pyyaml.verification.args)
+            report = model.validate()
+
+        self.assertFalse(
+            any(
+                finding.path.endswith(
+                    (".devcontainer/dependencies.toml", ".devcontainer/post-create-parent.sh")
+                )
+                and finding.detail == "missing-file"
+                for finding in report.findings
+            )
         )
+
+    def test_canonical_manifest_is_a_small_default_tool_set(self) -> None:
+        """Default startup retains only LSP and small structure/agent tools."""
+        plan = load_plan(ROOT, ROOT)
+        ids = {item.id for item in plan.records}
+        self.assertEqual(
+            ids,
+            {
+                "github-cli",
+                "codex-cli",
+                "pyright-language-server",
+                "bash-language-server",
+                "jq",
+                "tree",
+                "clang-format",
+                "clangd-language-server",
+            },
+        )
+        for removed in (
+            "playwright",
+            "playwright-chromium",
+            "pdflatex",
+            "gitleaks",
+            "trufflehog",
+            "detect-secrets",
+            "elan",
+            "rustup-init",
+            "rust-toolchain",
+            "lean-toolchain",
+            "agent-canon-cli",
+            "pyyaml",
+        ):
+            self.assertNotIn(removed, ids)
 
     def test_canonical_apt_records_are_jammy_amd64_owned(self) -> None:
         """The shared apt tool records target the canonical Ubuntu 22.04 base."""
@@ -1309,7 +2124,7 @@ class DependencyModelTests(unittest.TestCase):
                 ("tool",),
             )
             self.assertNotIn(("dpkg", "--verify", "tool"), resumed.calls)
-            self.assertIn(("tool", "--version"), resumed.calls)
+            self.assertIn(("/usr/bin/tool", "--version"), resumed.calls)
             self.assertFalse(any(command[0] == "apt-get" for command in resumed.calls))
 
             rebuilt = FakeRunner(fail_once_on="dpkg-query")
@@ -1322,8 +2137,8 @@ class DependencyModelTests(unittest.TestCase):
                 1,
             )
             self.assertEqual(
-                sum(command[0] == "dpkg-query" for command in rebuilt.calls),
-                2,
+                sum(Path(command[0]).name == "dpkg-query" for command in rebuilt.calls),
+                4,
             )
             apt_install = next(
                 command for command in rebuilt.calls if command[0] == "apt-get"
@@ -1623,8 +2438,9 @@ class DependencyModelTests(unittest.TestCase):
             )
             self.assertNotEqual(receipt_check.returncode, 0)
             self.assertIn("receipt source identity mismatch", receipt_check.stderr)
-            fake_bin = root / "fake-bin"
-            fake_bin.mkdir()
+            fake_cargo_home = root / "fake-cargo-home"
+            fake_bin = fake_cargo_home / "bin"
+            fake_bin.mkdir(parents=True)
             cargo = fake_bin / "cargo"
             cargo.write_text(
                 "#!/usr/bin/env bash\n"
@@ -1645,7 +2461,7 @@ class DependencyModelTests(unittest.TestCase):
             plan = build_plan((loaded_manifest(Path("fixture.toml"), (active,)),))
             receipts = root / "receipts"
             environment = dict(os.environ)
-            environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
+            environment["CARGO_HOME"] = str(fake_cargo_home)
             with mock.patch.dict(os.environ, environment, clear=True):
                 Installer().install(plan, workspace=root, receipts=receipts)
             self.assertFalse((receipts / "agent-canon-cli.json").exists())
@@ -2034,6 +2850,9 @@ class DependencyModelTests(unittest.TestCase):
         bootstrap = (ROOT / ".devcontainer" / "bootstrap-dependencies.sh").read_text(
             encoding="utf-8"
         )
+        dockerfile = (ROOT / ".devcontainer" / "Dockerfile").read_text(
+            encoding="utf-8"
+        )
         post_create = (ROOT / ".devcontainer" / "post-create.sh").read_text(
             encoding="utf-8"
         )
@@ -2047,6 +2866,10 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("NODE_X86_64_SHA256", bootstrap)
         self.assertIn("NODE_AARCH64_SHA256", bootstrap)
         self.assertIn("ninja-build", bootstrap)
+        self.assertEqual(bootstrap.count("ninja-build"), 2)
+        self.assertIn("build-essential", bootstrap)
+        self.assertIn('command -v cc', bootstrap)
+        self.assertIn('command -v gcc', bootstrap)
         self.assertIn("python3-pip", bootstrap)
         self.assertIn("python3-packaging", bootstrap)
         self.assertIn("gnupg", bootstrap)
@@ -2055,26 +2878,34 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("NODE_BOOTSTRAP_RECEIPT", bootstrap)
         self.assertIn('NODE_NPM_VERSION="10.9.2"', bootstrap)
         self.assertIn(
+            "COPY .devcontainer/bootstrap-dependencies.sh /usr/local/lib/agent-canon/bootstrap-dependencies.sh",
+            dockerfile,
+        )
+        self.assertIn(
+            "/usr/local/lib/agent-canon/bootstrap-dependencies.sh --install",
+            dockerfile,
+        )
+        self.assertIn(
             '"$NODE_INSTALL_PATH/lib/node_modules/npm/bin/npm-cli.js"', bootstrap
         )
         self.assertNotIn('"$NODE_INSTALL_PATH/bin/npm"', bootstrap)
         self.assertIn("tomllib", bootstrap)
         self.assertIn("tomli", bootstrap)
-        self.assertIn('"$devcontainer_dir/bootstrap-dependencies.sh" --install-language-runtime', post_create)
+        self.assertIn('"$devcontainer_dir/bootstrap-dependencies.sh" --check', post_create)
+        self.assertNotIn('--install-language-runtime', post_create)
         self.assertNotIn("NODE_VERSION:-", bootstrap)
         self.assertNotIn("npm install -g", post_create)
         self.assertNotIn("install_github_cli", post_create)
         self.assertNotIn("install_rust_toolchain", post_create)
         self.assertNotIn("grep", validator)
-        self.assertIn("PLAYWRIGHT_BROWSERS_PATH", post_create)
-        self.assertIn('export CARGO_HOME="$cargo_home"', post_create)
-        self.assertIn('export RUSTUP_HOME="$rustup_home"', post_create)
+        self.assertNotIn("PLAYWRIGHT_BROWSERS_PATH", post_create)
+        self.assertNotIn("export CARGO_HOME", post_create)
+        self.assertNotIn("export RUSTUP_HOME", post_create)
         self.assertNotIn("agent_canon_source_identity", post_create)
         self.assertIn('"HEAD:$source_prefix"', identity_helper)
         self.assertNotIn("agent_canon_receipt_matches_identity", post_create)
         self.assertNotIn("agent_canon_source_commit", post_create)
-        self.assertIn("agent_canon_source_root", post_create)
-        self.assertIn('export ELAN_HOME="$elan_home"', post_create)
+        self.assertNotIn("export ELAN_HOME", post_create)
         self.assertIn("STRUCTURED_ANALYSIS_BOOTSTRAP=warn", post_create)
         cache_function = post_create.split("build_agent_canon_cache() {", 1)[1].split(
             "\n}\n", 1
@@ -2092,7 +2923,6 @@ class DependencyModelTests(unittest.TestCase):
         bootstrap_index = post_create.rindex(
             '"$devcontainer_dir/bootstrap-dependencies.sh" --check'
         )
-        pip_user_path_index = post_create.index('pip_user_script_dir="$(')
         validate_index = post_create.index("validate --workspace")
         install_index = post_create.index("install --workspace")
         python_installer_index = post_create.rindex(
@@ -2100,8 +2930,7 @@ class DependencyModelTests(unittest.TestCase):
         )
         cache_index = post_create.rindex("\nbuild_agent_canon_cache\n")
         projection_index = post_create.rindex("\npublish_container_local_runtime\n")
-        self.assertLess(bootstrap_index, pip_user_path_index)
-        self.assertLess(pip_user_path_index, validate_index)
+        self.assertLess(bootstrap_index, validate_index)
         self.assertLess(
             validate_index,
             install_index,
@@ -2112,10 +2941,7 @@ class DependencyModelTests(unittest.TestCase):
         )
         self.assertLess(python_installer_index, cache_index)
         self.assertLess(cache_index, projection_index)
-        self.assertLess(
-            python_installer_index,
-            post_create.rindex("\npublish_agent_canon_cli\n"),
-        )
+        self.assertNotIn("publish_agent_canon_cli", post_create)
 
 
 if __name__ == "__main__":

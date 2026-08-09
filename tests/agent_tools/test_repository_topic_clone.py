@@ -71,6 +71,49 @@ def init_remote(tmp_path: Path) -> tuple[Path, str]:
     return remote, str(remote)
 
 
+def init_workspace_parent(
+    path: Path,
+    *,
+    ignore_content: str = "workspace/\n",
+    tracked_ignore: bool = True,
+    global_ignore: bool = False,
+    info_ignore: bool = False,
+) -> None:
+    """Create a selected parent repository with its workspace ownership evidence."""
+    path.mkdir()
+    subprocess.run(
+        ["git", "init", "-b", "main", str(path)], check=True, capture_output=True
+    )
+    (path / ".gitignore").write_text(ignore_content, encoding="utf-8")
+    (path / "parent.txt").write_text("parent\n", encoding="utf-8")
+    run_git(path, "add", "parent.txt", *(('.gitignore',) if tracked_ignore else ()))
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(path),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "parent",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    if global_ignore:
+        global_file = path / "global-excludes"
+        global_file.write_text("workspace/\n", encoding="utf-8")
+        run_git(path, "config", "core.excludesFile", str(global_file))
+    if info_ignore:
+        (path / ".git" / "info" / "exclude").write_text(
+            "workspace/\n", encoding="utf-8"
+        )
+
+
 def init_file(path: Path, filename: str, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
@@ -211,11 +254,55 @@ def publication_artifacts(
     return cas, lifecycle, readback
 
 
+def install_legacy_module_markers(
+    clone: Path,
+    request: rtc.RepositoryTopicCloneRequest,
+    owner_sha: str,
+    *,
+    role: str = "module",
+    module: str | None = None,
+    placement: str = "workspace-continuation",
+) -> None:
+    """Replace canonical markers with the historical module marker namespace."""
+    for field in (*rtc.CANONICAL_MARKER_FIELDS, "branch-source"):
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(clone),
+                "config",
+                "--local",
+                "--unset-all",
+                f"{rtc.MARKER_PREFIX}.{field}",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    values = {
+        "topic": rtc.topic_slug(request.topic),
+        "role": role,
+        "module": module or f"vendor/{request.repository}",
+        "url": request.url.removesuffix(".git"),
+        "branch": request.branch,
+        "placement": placement,
+        "owner-evidence-sha256": owner_sha,
+    }
+    for field, value in values.items():
+        run_git(
+            clone,
+            "config",
+            "--local",
+            f"{rtc.LEGACY_MARKER_PREFIX}.{field}",
+            value,
+        )
+
+
 def test_request_reuses_local_and_remote_branch(tmp_path: Path) -> None:
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     repo_name = "repo-one"
     topic = "topic-one"
@@ -260,13 +347,44 @@ def test_request_reuses_local_and_remote_branch(tmp_path: Path) -> None:
     )
 
 
+def test_local_branch_reuse_does_not_fetch_main_when_main_is_unavailable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Existing clean local branches remain reusable without an origin/main fetch."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    initial = rtc.request(
+        remote_url, "repo-offline", workspace, "topic-offline", "feature/local", evidence
+    )
+    original_run_git = rtc._run_git
+
+    def fail_main_fetch(path: Path, args: list[str]) -> str:
+        if list(args) == ["fetch", "origin", "main"]:
+            raise rtc.GitCommandError(path, args, "offline")
+        return original_run_git(path, args)
+
+    monkeypatch.setattr(rtc, "_run_git", fail_main_fetch)
+    reused = rtc.request(
+        remote_url, "repo-offline", workspace, "topic-offline", "feature/local", evidence
+    )
+    assert reused.clone == initial.clone
+
+    with pytest.raises(rtc.GitCommandError, match="offline"):
+        rtc.request(
+            remote_url, "repo-offline", workspace, "topic-offline", "feature/new", evidence
+        )
+
+
 def test_prepare_rejects_unsafe_repository_name_and_symlink_workspace(
     tmp_path: Path,
 ) -> None:
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     with pytest.raises(rtc.RepositoryTopicCloneError, match="safe path component"):
         rtc.request(
@@ -281,11 +399,59 @@ def test_prepare_rejects_unsafe_repository_name_and_symlink_workspace(
     assert list(external.iterdir()) == []
 
 
+@pytest.mark.parametrize(
+    "root_kind",
+    ("non-repository", "nested", "missing-ignore", "untracked-ignore", "global-ignore", "info-ignore"),
+)
+def test_prepare_rejects_invalid_workspace_roots_before_creation(
+    tmp_path: Path, root_kind: str
+) -> None:
+    """Reject every non-canonical parent before creating workspace/topic paths."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    if root_kind == "non-repository":
+        workspace = tmp_path / "non-repository"
+        workspace.mkdir()
+    elif root_kind == "nested":
+        parent = tmp_path / "parent"
+        init_workspace_parent(parent)
+        workspace = parent / "nested"
+        workspace.mkdir()
+    elif root_kind == "missing-ignore":
+        workspace = tmp_path / "parent"
+        init_workspace_parent(workspace)
+        (workspace / ".gitignore").unlink()
+    elif root_kind == "untracked-ignore":
+        workspace = tmp_path / "parent"
+        init_workspace_parent(workspace, tracked_ignore=False)
+    elif root_kind == "global-ignore":
+        workspace = tmp_path / "parent"
+        init_workspace_parent(
+            workspace, ignore_content="# repository has no workspace rule\n", global_ignore=True
+        )
+    else:
+        workspace = tmp_path / "parent"
+        init_workspace_parent(
+            workspace, ignore_content="# repository has no workspace rule\n", info_ignore=True
+        )
+
+    with pytest.raises(rtc.RepositoryTopicCloneError):
+        rtc.request(
+            remote_url,
+            "invalid-root",
+            workspace,
+            f"invalid-{root_kind}",
+            "feature/invalid",
+            evidence,
+        )
+    assert not (workspace / "workspace").exists()
+
+
 def test_merge_main_before_publication_receipt_is_created(tmp_path: Path) -> None:
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     topic = "topic-merge"
     repo_name = "repo-two"
@@ -350,7 +516,7 @@ def test_merge_main_preserves_conflict_with_typed_state(tmp_path: Path) -> None:
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
     source = tmp_path / "source"
 
     receipt = rtc.request(
@@ -385,13 +551,153 @@ def test_merge_main_preserves_conflict_with_typed_state(tmp_path: Path) -> None:
         )
 
 
-def test_cleanup_uses_canonical_pr_and_merged_receipts_and_preserves_siblings(
+def test_cleanup_without_publication_packet_matches_remote_head(tmp_path: Path) -> None:
+    """A clean pushed topic head is sufficient for dry-run and apply cleanup."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    request = rtc.request(
+        remote_url, "repo-no-packet", workspace, "topic-no-packet", "feature/cleanup", evidence
+    )
+    run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
+
+    dry_run = rtc.cleanup(request.request, apply=False)
+    assert not dry_run.removed
+    assert dry_run.evidence == "remote-head"
+    assert request.clone.exists()
+
+    removed = rtc.cleanup(request.request, apply=True)
+    assert removed.removed
+    assert removed.evidence == "remote-head"
+    assert not request.clone.exists()
+
+
+def test_cleanup_accepts_exact_legacy_module_markers_read_only(
+    tmp_path: Path,
+) -> None:
+    """Historical module markers authorize cleanup without being rewritten."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    request = rtc.request(
+        remote_url, "repo-legacy", workspace, "topic-legacy", "feature/cleanup", evidence
+    )
+    run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
+    owner_sha = rtc._evidence_sha256(evidence)
+    install_legacy_module_markers(request.clone, request.request, owner_sha)
+    before = run_git(request.clone, "config", "--local", "--list")
+
+    dry_run = rtc.cleanup(request.request, apply=False)
+    assert not dry_run.removed
+    assert dry_run.evidence == "remote-head"
+    assert run_git(request.clone, "config", "--local", "--list") == before
+
+    removed = rtc.cleanup(request.request, apply=True)
+    assert removed.removed
+    assert not request.clone.exists()
+
+
+def test_cleanup_rejects_partial_or_mismatched_legacy_module_markers(
+    tmp_path: Path,
+) -> None:
+    """Legacy compatibility is exact and never accepts unknown role/placement."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    request = rtc.request(
+        remote_url, "repo-legacy-invalid", workspace, "topic-legacy-invalid", "feature/cleanup", evidence
+    )
+    owner_sha = rtc._evidence_sha256(evidence)
+
+    install_legacy_module_markers(
+        request.clone, request.request, owner_sha, role="unknown"
+    )
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-mismatch"):
+        rtc.cleanup(request.request, apply=False)
+
+    install_legacy_module_markers(
+        request.clone, request.request, owner_sha, placement="unknown"
+    )
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-mismatch"):
+        rtc.cleanup(request.request, apply=False)
+
+    install_legacy_module_markers(
+        request.clone, request.request, owner_sha, module="vendor/other"
+    )
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-mismatch"):
+        rtc.cleanup(request.request, apply=False)
+
+    install_legacy_module_markers(request.clone, request.request, owner_sha)
+    run_git(
+        request.clone,
+        "config",
+        "--local",
+        "--unset-all",
+        f"{rtc.LEGACY_MARKER_PREFIX}.placement",
+    )
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="legacy-marker-incomplete"):
+        rtc.cleanup(request.request, apply=False)
+
+
+def test_cleanup_rejects_remote_head_mismatch_without_publication_packet(
+    tmp_path: Path,
+) -> None:
+    """A remote branch advance is a reconstructibility hold, not a delete signal."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    request = rtc.request(
+        remote_url, "repo-remote-mismatch", workspace, "topic-remote-mismatch", "feature/cleanup", evidence
+    )
+    run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
+
+    source = tmp_path / "source"
+    run_git(source, "fetch", "origin", "feature/cleanup")
+    run_git(source, "checkout", "-B", "feature/cleanup", "origin/feature/cleanup")
+    run_git(source, "-c", "user.name=Test", "-c", "user.email=test@example.invalid", "commit", "--allow-empty", "-m", "remote advance")
+    run_git(source, "push", "origin", "feature/cleanup")
+
+    with pytest.raises(rtc.RepositoryTopicCloneError, match="remote branch head mismatch"):
+        rtc.cleanup(request.request, apply=False)
+    assert request.clone.exists()
+
+
+def test_cleanup_rejects_partial_optional_publication_packet(tmp_path: Path) -> None:
+    """Lifecycle packet fields are optional together, never as an invented half-set."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+
+    request = rtc.request(
+        remote_url, "repo-partial", workspace, "topic-partial", "feature/cleanup", evidence
+    )
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError,
+        match="candidate CAS and PR lifecycle evidence must be provided together",
+    ):
+        rtc.cleanup(
+            request.request,
+            candidate_cas=tmp_path / "missing-cas.json",
+            apply=False,
+        )
+
+
+def test_cleanup_uses_canonical_pr_and_merged_receipts_after_root_ignore_drifts(
     tmp_path: Path,
 ) -> None:
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     repo_name = "repo-three"
     topic = "topic-cleanup"
@@ -409,6 +715,25 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_and_preserves_siblings(
     topic_root = workspace / "workspace" / topic
     sibling = topic_root / "keep.txt"
     sibling.write_text("keep", encoding="utf-8")
+    (workspace / ".gitignore").write_text("# placement ownership drift\n", encoding="utf-8")
+    drift_probe = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(workspace),
+            "-c",
+            "core.excludesFile=/dev/null",
+            "check-ignore",
+            "-v",
+            "--no-index",
+            "--",
+            "workspace/.agent-canon-workspace-probe",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert drift_probe.returncode == 1, drift_probe.stdout + drift_probe.stderr
 
     cas, lifecycle, _ = publication_artifacts(
         request.clone,
@@ -423,7 +748,6 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_and_preserves_siblings(
 
     proof = rtc.cleanup(
         request.request,
-        expected_clone=request.clone,
         candidate_cas=cas_path,
         pr_lifecycle=lifecycle_path,
         apply=False,
@@ -440,7 +764,6 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_and_preserves_siblings(
     with pytest.raises(rtc.RepositoryTopicCloneError, match="repository-mismatch"):
         rtc.cleanup(
             request.request,
-            expected_clone=request.clone,
             candidate_cas=cas_path,
             pr_lifecycle=lifecycle_path,
             apply=False,
@@ -495,7 +818,6 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_and_preserves_siblings(
     ):
         rtc.cleanup(
             request.request,
-            expected_clone=request.clone,
             candidate_cas=cas_path,
             pr_lifecycle=lifecycle_path,
             apply=False,
@@ -503,7 +825,6 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_and_preserves_siblings(
 
     proof = rtc.cleanup(
         request.request,
-        expected_clone=request.clone,
         candidate_cas=cas_path,
         pr_lifecycle=lifecycle_path,
         publication_readback=readback_path,
@@ -515,11 +836,13 @@ def test_cleanup_uses_canonical_pr_and_merged_receipts_and_preserves_siblings(
     assert sibling.exists()
 
 
-def test_failure_when_receipt_is_arbitrary_mapping_or_missing(tmp_path: Path) -> None:
+def test_failure_when_receipt_is_arbitrary_mapping_or_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     request = rtc.request(
         remote_url, "repo-four", workspace, "topic-fail", "feature/fail", evidence
@@ -528,6 +851,15 @@ def test_failure_when_receipt_is_arbitrary_mapping_or_missing(tmp_path: Path) ->
     run_git(request.clone, "config", "user.email", "test@example.invalid")
     invalid = tmp_path / "invalid.json"
     invalid.write_text("{}", encoding="utf-8")
+
+    original_run_git = rtc._run_git
+    calls: list[tuple[str, ...]] = []
+
+    def track_git(path: Path, args: list[str]) -> str:
+        calls.append(tuple(args))
+        return original_run_git(path, args)
+
+    monkeypatch.setattr(rtc, "_run_git", track_git)
 
     with pytest.raises(rtc.RepositoryTopicCloneError):
         rtc.verify_publication(
@@ -539,16 +871,15 @@ def test_failure_when_receipt_is_arbitrary_mapping_or_missing(tmp_path: Path) ->
     with pytest.raises(rtc.RepositoryTopicCloneError):
         rtc.cleanup(
             request.request,
-            expected_clone=request.clone,
             candidate_cas=invalid,
             pr_lifecycle=invalid,
             apply=False,
         )
+    assert not any(call[:2] == ("fetch", "origin") for call in calls)
 
     with pytest.raises(rtc.RepositoryTopicCloneError):
         rtc.cleanup(
             request.request,
-            expected_clone=request.clone,
             apply=False,
         )
 
@@ -559,7 +890,7 @@ def test_prepare_dirty_collision_and_cleanup_rejects_detached_branch(
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     clone = rtc.request(
         remote_url, "repo-five", workspace, "topic-clean", "feature/clean", evidence
@@ -586,7 +917,7 @@ def test_repository_policy_decorator_runs_for_prepare_merge_only(
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
-    workspace.mkdir()
+    init_workspace_parent(workspace)
 
     events: list[str] = []
 

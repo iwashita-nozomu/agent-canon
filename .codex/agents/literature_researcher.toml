@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 460ea2610226ca9243f006cd7294f20aac7436b319744497b6b6d89b9a6e51c7
+# source canonical digest: 7cff6ad79b30828241c26ab5bbaff9aab7c7a2def1a3817d0f1e13e6b575b1f5
 
 name = "literature_researcher"
 description = "Read-only agent for paper search, prior-art mapping, and contradictory-source hunting."

@@ -69,9 +69,10 @@ tool は AgentCanon source root を `agent_canon_source_root.RootResolution` で
 `documents/parent-repository-audit/audit-unit/*.md` を filename の昇順で読みます。各 file に
 required section、`surface:<stable-id>`、`pattern:<parent-relative-glob>`、legacy migration
 ID が一つずつ以上あることを確認します。`--scope` は親 root 配下の tracked file/directory
-だけに限定でき、path escape と missing scope は failure です。`repository-structure` の
-`all-tracked` が親 `git ls-files -z` の全 path を被覆し、他 unit の overlap は許可された
-cross-reference evidence です。submodule 内部は親 tracked universe に展開しません。
+だけに限定でき、path escape と missing scope は failure です。`repository-structure` は
+structure contract の required path kind だけを確認し、一般 path owner/class は親の
+`responsibility-scope.toml` を参照します。`all-tracked` fallback や audit unit 間の二重
+ownership を判定 source にしません。submodule 内部は親 tracked universe に展開しません。
 
 readback が必要な check packet は次です。
 
@@ -79,9 +80,10 @@ readback が必要な check packet は次です。
 python3 tools/agent_tools/parent_repository_audit.py check --root <parent-root> --format text
 ```
 
-`source_root_missing`、invalid unit、path escape、uncovered tracked path は audit start の
+`source_root_missing`、invalid unit、path escape、uncovered selected path は audit start の
 typed failure です。`repair_blocked` は unit を閉じず、owner、blocker、attempted repair、
 readback 欠落を closure record に残して次 unit へ進み、最終 status を blocked にします。
+failed または deferred check が残る状態は `closed` や `pass` に昇格しません。
 
 ## Sequential Audit And Repair Loop
 
@@ -101,18 +103,15 @@ close、admin override、最終 integration decision は親 integrator の責務
 
 | Unit | owner route | static-first evidence |
 | --- | --- | --- |
-| `repository-structure` | `structure-refactor` | structure contract、scope、tracked coverage |
+| `repository-structure` | `structure-refactor` | structure contract、scope、required path kind |
 | `ownership-root-views` | `agent-canon-update` | source root、pin、root-view sync |
 | `environment-containers` | `environment-maintenance` | Ubuntu/base、cold-build、user/sudo、owner split、host driver、config |
 | `dependency-integrity` | `dependency-analysis` | headers、dependency graph、full-tree review |
-| `code-type-boundaries` | `oop-type-design`、language review | type/API、static Any、literal、design trace |
-| `oop-responsibility` | `oop-type-design`、`oop-readability-check` | OOP inventory と reviewer judgement |
+| `code-type-boundaries` | `oop-type-design`、`oop-readability-check` | OOP inventory と reviewer judgement |
 | `tests-and-oracles` | `test-design`、language review | necessary/sufficient oracle と targeted test |
 | `docs-design-trace` | `long-form-writing`、`md-style-check` | reader route、formatter、design correspondence |
 | `ci-hooks-skills` | `agent-orchestration` と owner tooling | catalog、capability、shim、dependency graph |
 | `templates-generated-boundaries` | `document-canon-cleanup`、`result-artifact-writeout` | source/evidence classification |
-| `git-pr-lifecycle` | `pr-processing`、`agent-canon-update` | branch/remote/PR/CI/push receipts |
-| `audit-evidence-closeout` | `tool-finding-report`、`result-artifact-writeout` | metadata、finding closure、truthful status |
 
 各 unit の `Repair Route` が個別の owner/tool を追加で指定します。この表を新しい分類へ
 拡張せず、owner responsibility の変更は該当 unit だけを更新します。
@@ -141,7 +140,7 @@ dependency→shim/graph→対象 unit の順で readback します。
 ## Closeout Tokens
 
 親側の completion report には少なくとも `audit_status`、selected unit list、各 unit の
-`pass|closed|blocked`、finding/repair/readback receipt、uncovered/overlap count、source root
+`pass|closed|blocked`、finding/repair/readback receipt、selected-scope uncovered count、source root
 resolution、実行した validation、未実行項目を記録します。blocked があれば全体を pass とせず、
 次の owner action と parent-only integration decision を残します。
 

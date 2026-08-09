@@ -209,36 +209,6 @@ skill_families:
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
-  - id: owner-bounded-routing
-    purpose: Route repository edits through the owner-bounded path only when external public API, behavior, and schema are invariant.
-    canonical_doc: agents/skills/owner-bounded-routing.md
-    shim: .agents/skills/owner-bounded-routing/SKILL.md
-    discovery:
-      name: owner-bounded-routing
-      description: "Use for owner-bounded repository edits only after routing evidence shows a bounded owner, replaceable unit, targeted validation route, and `external public API/behavior/schema unchanged`; route every public-surface addition, contraction, removal, rename, restriction, deprecation, or semantic change to `scoped_change` or a broader route with dependency/consumer/migration/docs closure. Also use for typo/link/format-only edits and Owner-Bounded Change work where Codex should run existing tools directly and record owner/tool/validation evidence."
-    tool_commands:
-      required: []
-      conditional:
-      - tools/bin/agent-canon docs check <changed-docs>
-      maintenance:
-      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
-      - python3 tools/agent_tools/skill_tool_commands.py check
-    routing:
-      stage_policy: active
-      reason: public-surface-invariant owner-bounded edit needs an existing-tool route and targeted-validation evidence
-      triggers:
-        - ["owner-bounded"]
-        - ["bounded", "route"]
-        - ["bounded", "edit"]
-        - ["targeted", "validation"]
-        - ["Owner-Bounded Change"]
-        - ["コードファイル", "順序"]
-        - ["定義順"]
-        - ["コード", "順序", "わかりにく"]
-        - ["typo", "link"]
-        - ["format-only"]
-        - ["existing-tool", "route"]
-        - ["tool", "first"]
   - id: subagent-bootstrap
     purpose: Start the right specialist run bundle and make stage subagents explicit before implementation.
     canonical_doc: agents/skills/subagent-bootstrap.md
@@ -755,7 +725,7 @@ skill_families:
       conditional:
       - python3 tools/agent_tools/repository_topic_clone.py prepare --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path>
       - python3 tools/agent_tools/repository_topic_clone.py merge-main --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path>
-      - python3 tools/agent_tools/repository_topic_clone.py cleanup --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path> --expected-clone <path> --candidate-cas <path> --pr-lifecycle <path>
+      - python3 tools/agent_tools/repository_topic_clone.py cleanup --url <url> --repo-name <repo> --workspace-root <root> --topic <topic> --branch <branch> --owner-evidence <path> [--candidate-cas <path> --pr-lifecycle <path> [--publication-readback <path>]] [--apply]
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
@@ -783,7 +753,10 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepare --topic <topic> --module <path> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> merge-main --topic <topic> --module <path> --branch <branch> --owner-evidence <path>
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> status --topic <topic> [--module <path>]
+      - python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup --topic <topic> --module <path> --branch <branch> --owner-evidence <path> [--candidate-cas <path> --pr-lifecycle <path> [--publication-readback <path>]] [--apply]
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check

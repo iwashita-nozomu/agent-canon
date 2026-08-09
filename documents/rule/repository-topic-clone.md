@@ -27,6 +27,12 @@ gitlink/pin/projection の共有責務を担い、この文書の clone 実装�
 
 - `--url`、`--repo-name`、`--workspace-root`、`--topic`、`--branch`、
   `--owner-evidence` が完全一致する状態。
+- `--workspace-root` は selected repository の Git toplevel と一致し、root の regular な
+  tracked `.gitignore` が `workspace/` を repository-owned boundary として ignore する状態。
+- `prepare` と `merge-main` は workspace/topic directory を作る前に root、symlink、
+  `.gitignore` ownership、ignore probe を検証し、検証 receipt を残した後だけ clone lifecycle
+  に進みます。non-repository、nested root、missing/untracked `.gitignore`、global/info
+  exclude のみの ignore は typed failure として既存 state を保持します。
 - marker が同一 topic/repo/branch/url/evidence で一致し、`git status` が clean かつ
   detached/merge-conflict でないこと。
 - local/remote の branch 不在時のみ fresh 作成に進める。存在する branch は
@@ -41,6 +47,13 @@ gitlink/pin/projection の共有責務を担い、この文書の clone 実装�
   collision として状態を保持する。
 - requested branch が local/remote のどちらにも無い場合だけ、最新 `origin/main` から作る。
 - merge 前に PR/PR head 更新を前倒しせず、`merge-main` は通常 merge を要求する。
+- task owner の非空 `--owner-evidence` と computed path、remote、branch identity が一致
+  する限り、canonical `prepare` と `merge-main` は operation-level の追加承認なしで
+  実行できます。reuse は `prepare` に含まれます。これは repo-local workspace lifecycle
+  にだけ適用し、共有 checkout の raw Git mutation authority を変更しません。
+
+  `dependency_module_change.py status` は adapter-only の read command であり、generic
+  lifecycle、owner-evidence、または operation-level approval carve-out には含めません。
 
 ```bash
 python3 tools/agent_tools/repository_topic_clone.py prepare \
@@ -54,20 +67,35 @@ python3 tools/agent_tools/repository_topic_clone.py merge-main \
 
 ## クリーンアップ
 
-- cleanup は `--expected-clone` に対する既知 identity を受理し、proof が一致しない
-  ものは削除しない。
-- PR 作成後は canonical candidate CAS と PR lifecycle を読み、local head、remote head、
-  PR head の一致を検証する。integration 後は canonical publication readback transition、
-  merge commit/tree、`origin/main` containment も検証する。
+- `cleanup` は selected Git toplevel と computed clone identity を検証してから proof preflight
+  を開始します。既存 clone の proof-gated removal は root `.gitignore` の後続 drift だけでは
+  停止せず、ignore ownership の create preconditionと cleanup の exact-root gateを分離します。
+- marker は canonical `repository-topic-clone.*` namespace の全項目が一致する状態を優先します。
+  canonical marker が完全に欠ける既存 dependency clone に限り、legacy
+  `agent-canon.topic.*` の topic、role=`module`、module basename、normalized URL、branch、
+  placement=`workspace-continuation`、owner-evidence SHA がすべて一致する場合だけ read-only
+  compatibility として ready を認めます。partial/mismatch/unknown role・placement は typed
+  hold とし、dry-run は Git config marker を書き換えません。
+- cleanup は closeout の明示 dispatch として canonical tool を呼び、request から計算した
+  exact clone path、owner evidence/marker、URL、branch、clean non-detached state を検証します。
+  通常の cleanup は publication packet を作らず、fetch した `origin/<branch>` の commit/tree と
+  local `HEAD` の commit/tree が一致する reconstructibility proof だけで dry-run/apply できます。
+  proof が一致しないものは削除しません。
+- candidate CAS、PR lifecycle、publication readback は任意の追加 evidence です。いずれかを
+  渡す場合は candidate CAS と PR lifecycle を一組で渡し、merged state の publication readback
+  を含む coherent transition を検証します。integration 後は canonical publication readback
+  transition、merge commit/tree、`origin/main` containment を追加検証します。
 - clone と topic root は同一 receipt で扱う。管理外 path へ退避しない。
+- preflight が通った `--apply` だけが `CleanupProof` / cleanup receipt を返して computed
+  clone と空の topic root を削除します。proof 不足、衝突、unknown dirty/staged/untracked
+  state は typed hold として保持し、manual deletion へ迂回しません。
 
 ```bash
 python3 tools/agent_tools/repository_topic_clone.py cleanup \
   --url <remote-url> --repo-name <repo-name> --workspace-root <parent-root> \
   --topic <topic> --branch <task-branch> --owner-evidence <evidence-file> \
-  --expected-clone <absolute-clone> \
-  --candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
-  [--publication-readback <publication-readback.json>] [--apply]
+  [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
+  [--publication-readback <publication-readback.json>]] [--apply]
 ```
 
 ## 例外/フォールバック
@@ -85,3 +113,10 @@ repository-topic clone は依存モジュールの branch 特化パスを使わ�
 - `documents/rule/dependency-module-changes.md`: gitlink/pin/projection の所有責務
 - `agents/skills/repository-topic-clone.md`: 実行ルート
 - `documents/tools/repository_topic_clone.md`: CLI 参照
+
+## Evidence And Assumption Ledger
+
+| kind | statement | evidence / owner | status |
+| --- | --- | --- | --- |
+| assumption | `workspace/` は selected repository root の regular/tracked `.gitignore` が所有する repository-owned boundary です。 | `tools/agent_tools/repository_topic_clone.py` の root/ignore gate、`tests/agent_tools/test_repository_topic_clone.py` の invalid-root regression | explicit |
+| evidence | `git check-ignore -v --no-index -- workspace/.agent-canon-workspace-probe` の source path が root `.gitignore` と一致します。 | create/merge precondition; global/info exclude source は拒否 | required |

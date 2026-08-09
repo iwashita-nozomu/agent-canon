@@ -113,7 +113,8 @@ class DependencyHeaderCheckTest(unittest.TestCase):
         self.assertIn(provenance, text.split("@dependency-end", 1)[1])
 
     def test_visualization_completion_queue_has_canonical_contract_edges(self) -> None:
-        """Every queue surface declares its canonical visualization dependency."""
+        """Only routed architecture surfaces require visualization dependency edges."""
+        patterns = graph_checker.declared_surface_patterns(PROJECT_ROOT)
         for relative_path in VISUALIZATION_QUEUE_PATHS:
             with self.subTest(path=relative_path):
                 header = "\n".join(
@@ -123,12 +124,13 @@ class DependencyHeaderCheckTest(unittest.TestCase):
                 )
                 self.assertIn("@dependency-start", header)
                 self.assertIn("@dependency-end", header)
-                self.assertTrue(
-                    "code-visualization.md" in header
-                    or "visualization_contract.py" in header
-                    or "visualization_contract.md" in header,
-                    relative_path,
-                )
+                if graph_checker.matches_declared_surface(relative_path, patterns):
+                    self.assertTrue(
+                        "code-visualization.md" in header
+                        or "visualization_contract.py" in header
+                        or "visualization_contract.md" in header,
+                        relative_path,
+                    )
 
     def test_accepts_skill_frontmatter_before_dependency_manifest(self) -> None:
         """SKILL.md may keep YAML frontmatter before the dependency manifest."""
@@ -376,6 +378,27 @@ class DependencyHeaderGraphConsumerTest(unittest.TestCase):
             result = graph_checker.main()
         return result, output.getvalue()
 
+    def run_argv(
+        self,
+        root: Path,
+        graph: FakeDependencyGraphClient,
+        argv: list[str],
+        changed: list[Path],
+    ) -> tuple[int, str]:
+        """Run the CLI with an explicit argv and optional changed-path oracle."""
+        output = io.StringIO()
+        patches = [
+            patch.object(sys, "argv", ["check_dependency_headers.py", *argv]),
+            patch.object(graph_checker, "GraphClient", lambda _root: graph),
+        ]
+        patches.append(patch.object(graph_checker, "changed_paths", lambda _root: changed))
+        with contextlib.ExitStack() as stack:
+            for active_patch in patches:
+                stack.enter_context(active_patch)
+            with contextlib.redirect_stdout(output):
+                result = graph_checker.main()
+        return result, output.getvalue()
+
     def test_consumes_fresh_manifest_node(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
@@ -423,6 +446,93 @@ class DependencyHeaderGraphConsumerTest(unittest.TestCase):
             )
             self.assertNotEqual(result, 0)
             self.assertIn("graph snapshot is not fresh", output)
+
+    def test_changed_mode_takes_precedence_over_positional_paths(self) -> None:
+        """The --changed selection remains authoritative when paths are also passed."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / ".git").mkdir()
+            (root / "responsibility-scope.toml").write_text(
+                'dependency_header_surfaces = ["scoped.py"]\n', encoding="utf-8"
+            )
+            scoped = root / "scoped.py"
+            scoped.write_text("# scoped\n", encoding="utf-8")
+            graph = FakeDependencyGraphClient(
+                root,
+                nodes=[
+                    {
+                        "id": "node:scoped",
+                        "path": "scoped.py",
+                        "payload": {"manifest_present": True, "contract_kind": "design"},
+                    }
+                ],
+            )
+            result, output = self.run_argv(
+                root,
+                graph,
+                ["--root", str(root), "--changed", "missing.py"],
+                changed=[scoped],
+            )
+            self.assertEqual(result, 0, output)
+            self.assertIn("DEPENDENCY_HEADERS=pass", output)
+
+    def test_no_path_mode_uses_changed_untracked_selection(self) -> None:
+        """Omitting paths does not trigger an implicit full-repository scan."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / ".git").mkdir()
+            (root / "responsibility-scope.toml").write_text(
+                'dependency_header_surfaces = ["scoped.py"]\n', encoding="utf-8"
+            )
+            unchanged = root / "scoped.py"
+            unchanged.write_text("# no header\n", encoding="utf-8")
+            result, output = self.run_argv(
+                root,
+                FakeDependencyGraphClient(root),
+                ["--root", str(root)],
+                changed=[],
+            )
+            self.assertEqual(result, 0, output)
+            self.assertIn("DEPENDENCY_HEADERS=pass", output)
+
+    def test_changed_mode_fails_closed_without_scope_manifest(self) -> None:
+        """Changed-file classification fails when the sole scope source is absent."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            (root / ".git").mkdir()
+            changed = root / "scoped.py"
+            changed.write_text("# scoped\n", encoding="utf-8")
+            result, output = self.run_argv(
+                root,
+                FakeDependencyGraphClient(root),
+                ["--root", str(root), "--changed"],
+                changed=[changed],
+            )
+            self.assertNotEqual(result, 0)
+            self.assertIn("scope manifest is missing", output)
+
+    def test_changed_mode_fails_closed_for_invalid_or_empty_scope(self) -> None:
+        """Malformed and empty scope declarations cannot silently select zero files."""
+        for declaration in (
+            "dependency_header_surfaces = [\n",
+            "dependency_header_surfaces = []\n",
+        ):
+            with self.subTest(declaration=declaration), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                (root / ".git").mkdir()
+                (root / "responsibility-scope.toml").write_text(
+                    declaration, encoding="utf-8"
+                )
+                changed = root / "scoped.py"
+                changed.write_text("# scoped\n", encoding="utf-8")
+                result, output = self.run_argv(
+                    root,
+                    FakeDependencyGraphClient(root),
+                    ["--root", str(root), "--changed"],
+                    changed=[changed],
+                )
+                self.assertNotEqual(result, 0)
+                self.assertIn("scope manifest", output)
 
 
 if __name__ == "__main__":

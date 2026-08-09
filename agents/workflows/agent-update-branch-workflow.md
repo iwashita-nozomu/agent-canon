@@ -27,10 +27,12 @@ of these conditions:
 - continuing would mix incompatible pin, memory, eval, or protected-surface work
 - the user explicitly asks for a separate branch
 
-The reason and workflow condition only bound the approval request. Creation
-also requires creation authority/reason and destructive authority/reason in the
-same command segment. Ambient variables and prior segments do not authorize
-it. A collision keeps the current checkout unchanged and returns to the user.
+The reason and workflow condition only bound the approval request. Normal
+creation requires creation authority/reason in the same command segment.
+Force-create or ref-overwrite routes additionally require destructive
+authority/reason in that segment. Ambient variables and prior segments do not
+authorize it. A collision keeps the current checkout unchanged and returns to
+the user.
 
 ## Branch Lanes
 
@@ -41,7 +43,7 @@ it. A collision keeps the current checkout unchanged and returns to the user.
 ## Memory/Eval Branch
 
 1. Reuse the current branch if it already owns this memory/eval lane.
-1. Otherwise request user direction and approval for `agent-updates/memory-eval/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the four-field same-segment guard contract.
+1. Otherwise request user direction and approval for `agent-updates/memory-eval/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the same-segment creation-authority guard contract. Add the destructive authority/reason pair only when the route force-creates or overwrites a ref.
 1. Change only `memory/`, `evidence/agent-evals/`, `.agents/skills/*/SKILL.md`, or run-local evaluation artifacts that document feedback.
 1. Run `bash tools/agent_tools/agent_update_branch.sh validate memory-eval`.
 1. Commit with a message that states this is a memory/eval-only agent update branch.
@@ -50,7 +52,7 @@ it. A collision keeps the current checkout unchanged and returns to the user.
 ## Canon Pin Branch
 
 1. Reuse the current branch if it already owns this canon-pin lane.
-1. Otherwise request user direction and approval for `agent-updates/canon-pin/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the four-field same-segment guard contract.
+1. Otherwise request user direction and approval for `agent-updates/canon-pin/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the same-segment creation-authority guard contract. Add the destructive authority/reason pair only when the route force-creates or overwrites a ref.
 1. Update the AgentCanon submodule pin, `.agent-canon/update-state.toml`, and root runtime links.
 1. Run `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh plan`, `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check`, and `bash tools/agent_tools/agent_update_branch.sh validate canon-pin`.
 1. Commit with the AgentCanon target commit in the message.
@@ -59,7 +61,7 @@ it. A collision keeps the current checkout unchanged and returns to the user.
 ## Integration Branch
 
 1. Reuse the current integration branch if it already owns this integration lane.
-1. Otherwise request user direction and approval for `agent-updates/integration/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the four-field same-segment guard contract.
+1. Otherwise request user direction and approval for `agent-updates/integration/<slug>` after recording `branch_creation_reason=<reason>`; create it only through the same-segment creation-authority guard contract. Add the destructive authority/reason pair only when the route force-creates or overwrites a ref.
 1. Fetch the update branches and merge them one by one.
 1. Resolve conflicts in the integration branch, not on `main`.
 1. Run:

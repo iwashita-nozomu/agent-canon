@@ -8,7 +8,7 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 829092681e2bf0913d47ab74003e16c950ede8a539557f8f76b95347f6a2b801
+# source canonical digest: 782b9259f35489b2e335463031258d6e47a9300f8f349c79d73f0c4d34221dd8
 
 name = "notation_definition_reviewer"
 description = "Read-only reviewer for symbol, abbreviation, terminology, unit, and definition-before-use discipline in academic documents."

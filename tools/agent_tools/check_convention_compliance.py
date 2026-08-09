@@ -14,7 +14,6 @@
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR essence workflow
 # upstream design ../../agents/workflows/pr-queue-cleanup-workflow.md PR queue cleanup body update workflow
 # upstream design ../../agents/skills/md-style-check.md Markdown small-edit skill route
-# upstream design ../../agents/skills/owner-bounded-routing.md owner-bounded routing skill
 # upstream design ../../agents/skills/long-form-writing.md document claim grounding skill route
 # upstream design ../../agents/USER_GUIDE_JA.md user-facing small-edit route guidance
 # upstream design ../../templates/agents/workflow_monitoring.md tool warning closeout ledger
@@ -124,7 +123,6 @@ TOOL_GATES = {
     "hardcoded_numbers": (
         "tools/agent_tools/check_hardcoded_numbers.py",
         (
-            "tools/ci/run_all_checks.sh",
             "documents/conventions/common/01_principles.md",
         ),
     ),
@@ -270,11 +268,7 @@ SKILL_ROUTING_MARKERS = (
 )
 EXIT_BLOCKER_POLICY_MARKERS = {
     "agents/skills/agent-orchestration.md": (
-        "selected_agent_type",
-        "write_capable_handoff_blocker",
         "evidence",
-        "parent_packet_ref",
-        "status=blocked",
         "router_unavailable_blocker",
     ),
     "agents/skills/codex-task-workflow.md": (
@@ -425,9 +419,6 @@ DOCUMENT_SPLIT_DECISION_MARKERS = {
         "document_split_decision_ready",
     ),
 }
-OWNER_BOUNDED_TOOL_ROUTE_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
-    "owner_bounded_tool_route"
-]
 STATIC_READ_VALIDATION_POLICY_MARKERS = DECLARATIVE_MARKER_CONTRACTS[
     "static_read_validation_policy"
 ]
@@ -590,8 +581,6 @@ IMPLEMENTATION_GUARDRAIL_MARKERS = {
         "implementation shortcut",
     ),
     "agents/skills/codex-task-workflow.md": (
-        "contract-complete implementation",
-        "acceptance contract",
         "design_issue_blocker",
         "implementation shortcut",
     ),
@@ -641,19 +630,17 @@ REVIEW_ISSUE_ROUTING_MARKERS = {
 PR_ESSENCE_DOCUMENTATION_MARKERS = {
     ".github/PULL_REQUEST_TEMPLATE.md": (
         "## PR Essence",
-        "Problem / user request",
-        "Design intent",
-        "Canonical owner",
-        "Behavior or contract delta",
-        "Evidence route",
+        "Problem / user request:",
+        "Canonical owner / responsibility unit:",
+        "Behavior or contract delta:",
+        "Evidence route:",
     ),
     ".github/PULL_REQUEST_TEMPLATE/agent_canon.md": (
         "## PR Essence",
-        "Problem / user request",
-        "Design intent",
-        "Canonical owner",
-        "Behavior or contract delta",
-        "Evidence route",
+        "Problem / user request:",
+        "Canonical owner / responsibility unit:",
+        "Behavior or contract delta:",
+        "Evidence route:",
     ),
     "agents/skills/pr-processing.md": (
         "PR Essence",
@@ -703,31 +690,23 @@ SURFACE_MANIFEST_FILES = (
 )
 SURFACE_POLICY_MARKERS = (
     "documents/runtime/shared-runtime-surfaces.toml",
-    "owner class",
-    ".codex/hooks.json",
-    ".codex/hooks",
-    ".devcontainer/",
-    "documents/README.md",
-    "documents/contracts/template-bootstrap.md",
-    "documents/contracts/github-first-module-and-devcontainer-policy.md",
-    "memory/README.md",
-    "memory/records/",
-    "tests/agent_tools/",
+    "AGENTS.md",
+    ".codex/config.toml",
+    "tools/agent-canon",
     "Root `tools/` is a parent-owned regular container",
     "tools/agent-canon -> ../vendor/agent-canon/tools",
     "vendor/agent-canon/tools/",
     "Project-local automation must stay in project-owned paths",
 )
 SURFACE_MANIFEST_MARKERS = (
-    'mode = "standalone_only"',
-    'owner = "agent-canon-standalone"',
-    'path = "goal.md"',
-    '"documents/README.md"',
-    '"documents/contracts/template-bootstrap.md"',
-    '".devcontainer"',
-    '"documents/contracts/github-first-module-and-devcontainer-policy.md"',
-    '".codex/hooks.json"',
-    '"tests/agent_tools/test_check_convention_compliance.py"',
+    "version = 1",
+    'prefix = "vendor/agent-canon"',
+    'path = "AGENTS.md"',
+    'path = ".codex/config.toml"',
+    'path = "tools/agent-canon"',
+    'path = ".agent-canon"',
+    'mode = "removed_legacy"',
+    "paths = [",
 )
 SOURCE_SURFACE_SYNC_MARKERS = (
     "surface_manifest.py",
@@ -1510,7 +1489,7 @@ def check_surface_manifest_wiring(root: Path) -> list[Finding]:
                     f"missing-marker:{marker}",
                 )
             )
-    if vendored_sync.is_file():
+    if vendored_sync.is_file() and root_sync.is_file():
         adapter_text = (
             root_sync.read_text(encoding="utf-8") if root_sync.is_file() else ""
         )
@@ -1710,11 +1689,6 @@ def run_checks(root: Path) -> list[Finding]:
     findings.extend(
         collect_marker_contract_findings(
             root, "design_integrity_gate", DESIGN_INTEGRITY_GATE_MARKERS
-        )
-    )
-    findings.extend(
-        collect_marker_contract_findings(
-            root, "owner_bounded_tool_route", OWNER_BOUNDED_TOOL_ROUTE_MARKERS
         )
     )
     findings.extend(

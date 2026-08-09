@@ -731,25 +731,6 @@ def _gitlink_update_candidates(workspace: Path) -> tuple[str | None, str | None]
     return _parse_gitlink_ref_updates(tuple(outputs))
 
 
-def _sync_control_paths(workspace: Path, prefix: str = AGENT_CANON_PREFIX) -> tuple[str, ...]:
-    """Return manifest entries that are explicitly marked as sync-control."""
-    try:
-        manifest = surface_manifest.load_manifest(
-            workspace,
-            prefix,
-            surface_manifest.DEFAULT_MANIFEST,
-        )
-    except (FileNotFoundError, OSError, ValueError, TypeError):
-        return tuple()
-    return tuple(
-        sorted(
-            _normalize_path(entry.path)
-            for entry in manifest.entries
-            if entry.sync_control
-        )
-    )
-
-
 def _gitlink_target_commit_resolvable(workspace: Path) -> str | None:
     """Return the targeted gitlink commit object only when vendor/agent-canon is changed."""
     old_hash, new_hash = _gitlink_update_candidates(workspace)
@@ -779,15 +760,12 @@ def agent_canon_parent_sync_gate_required(
     resolved_workspace = workspace or Path.cwd()
     normalized = {_normalize_path(item) for item in changed_paths}
     sync_targets = set(_sync_gate_manifest_prefixes(resolved_workspace))
-    sync_control_targets = set(_sync_control_paths(resolved_workspace))
     exact_root_symlink_paths = set(agent_canon_parent_sync_manifest_exact_paths(resolved_workspace))
     symlink_sources = set(
         agent_canon_parent_sync_symlink_source_paths(resolved_workspace)
     )
 
     for path in normalized:
-        if path in sync_control_targets:
-            return True
         if path in exact_root_symlink_paths:
             return True
         if _path_in_prefix(path, symlink_sources):

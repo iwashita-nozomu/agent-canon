@@ -56,6 +56,12 @@ before / after impact を同じ source packet で結びます。
 
 ## Finding Packet
 
+Normalize findings through `tools/agent_tools/issue_sync.py` before ranking or
+issue handoff. The default scope is changed/user/owner-bounded; `repo-wide`
+requires an explicit caller choice. Group identical owner/root-cause/fix
+records once and retain all evidence paths in that group. A warning is a
+closeout obligation only when it is actionable or blocking.
+
 tool finding report は次を 1 つの packet として残します。finding はこの skill
 内で勝手に削らず、既定では repository 全体を対象 scope にした full artifact
 として出します。mechanical

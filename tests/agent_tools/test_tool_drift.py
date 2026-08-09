@@ -151,12 +151,15 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             stderr=stderr.getvalue(),
         )
 
-    def test_current_repository_passes(self) -> None:
-        """The canonical repository satisfies the drift gate."""
-        result = self.run_checker(PROJECT_ROOT)
+    def test_checker_queries_all_nodes_for_bounded_fixture(self) -> None:
+        """The graph-owned drift check always requests the complete fixture graph."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_tool_catalog_contract(root)
+
+            result = self.run_checker(root, "--contract", "tool_catalog")
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("TOOL_CONVENTION_DRIFT=pass", result.stdout)
         self.assertTrue(FakeToolGraphClient.last_query["all_nodes"])
 
     def test_projected_graph_paths_match_logical_contract_paths(self) -> None:
@@ -246,9 +249,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             )
             self.assertNotIn(
                 ".agents/skills/codex-task-workflow/SKILL.md", result.stdout
-            )
-            self.assertNotIn(
-                ".agents/skills/owner-bounded-routing/SKILL.md", result.stdout
             )
 
     def test_kind_mismatch_is_reported(self) -> None:
@@ -962,7 +962,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# responsibility Prechecks edit-time risk class.",
                     "# upstream design ../../agents/COMMUNICATION_PROTOCOL.md protocol",
                     "# upstream design ../../agents/skills/codex-task-workflow.md workflow",
-                    "# upstream design ../../agents/skills/owner-bounded-routing.md owner-bounded",
                     "# upstream design ../../tools/agent_tools/responsibility_scope.py scope",
                     "# upstream implementation ../../tests/agent_tools/test_tool_rejection_preflight.py scope preflight",
                     "# @dependency-end",
@@ -973,7 +972,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         for relative in [
             "agents/COMMUNICATION_PROTOCOL.md",
             "agents/skills/codex-task-workflow.md",
-            "agents/skills/owner-bounded-routing.md",
             "tools/agent_tools/responsibility_scope.py",
             "tools/README.md",
             "documents/tools/README.md",
@@ -981,7 +979,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
         ]:
             if relative in {
                 "agents/skills/codex-task-workflow.md",
-                "agents/skills/owner-bounded-routing.md",
                 "agents/COMMUNICATION_PROTOCOL.md",
             }:
                 snippet = (

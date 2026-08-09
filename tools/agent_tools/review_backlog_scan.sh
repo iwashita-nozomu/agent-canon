@@ -316,7 +316,9 @@ run_scope_checks() {
       record_command \
         "code-dependencies:${scope_name}" \
         "$REPORT_DIR/code_dependencies_${scope_name}.txt" \
-        bash "$TOOL_DIR/scan_code_dependencies.sh" --root "$scope_root"
+        bash "$TOOL_DIR/scan_code_dependencies.sh" \
+          --root "$scope_root" \
+          --analysis-json "$REPORT_DIR/code_analysis_${scope_name}.json"
     fi
     if has_check dependency-review; then
       record_command \

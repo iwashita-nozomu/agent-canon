@@ -6,7 +6,7 @@ downstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface o
 downstream design ../rule/dependency-module-changes.md general dependency source-clone rule
 downstream design ../conventions/coding-conventions-project.md project environment rules
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-downstream environment ../../.devcontainer/devcontainer.json shared devcontainer entrypoint
+downstream environment ../../.devcontainer/devcontainer.json parent-owned devcontainer entrypoint; standalone source is invoked through the source-root resolver
 downstream implementation ../../tools/ci/container_config.py validates Dockerfile and devcontainer boundaries
 @dependency-end
 -->
@@ -88,10 +88,11 @@ Docker docs and validation. Agent convenience is not enough.
 
 ## Devcontainer Boundary
 
-`.devcontainer/` is AgentCanon-owned runtime ergonomics. Template and derived
-repos expose it as a root symlink view into `vendor/agent-canon/.devcontainer`.
+`.devcontainer/` is parent-owned regular environment content in template and
+derived repositories. Standalone AgentCanon keeps its own `.devcontainer/`
+source contract; that source is not projected into parent roots.
 
-The shared devcontainer owns:
+The standalone AgentCanon devcontainer source owns:
 
 - declarative `.devcontainer/dependencies.toml` records for Codex, npm/Node
   when needed for Codex, and GitHub CLI / `gh`;
@@ -112,8 +113,10 @@ The shared devcontainer owns:
 - agent bootstrap ergonomics that should stay consistent across template
   clones.
 
-The shared devcontainer consumes repo-local Docker runtime contracts instead of
-owning them. It reads `docker/packs/default.toml`, builds the repo-local
+The standalone source consumes repo-local Docker runtime contracts instead of
+owning parent files. A template or derived parent keeps its own regular
+`.devcontainer/` contract and may invoke source entrypoints through the resolver.
+The standalone source reads `docker/packs/default.toml`, builds the repo-local
 `docker/Dockerfile`, forwards the pack runtime environment into the generated
 Compose service, and runs repo-local `docker/install_python_dependencies.sh`
 after the workspace is mounted.
@@ -147,6 +150,18 @@ allocate the project network automatically.
 `prepare` の前にこの ignore rule を確認し、満たさない親 repository では
 dependency source work を開始しません。
 
+task owner の非空 owner evidence、computed path、remote、branch、module identity が
+一致する場合、canonical `repository_topic_clone.py` / `dependency_module_change.py` の
+repo-local `prepare` と `merge-main` は operation-level の追加承認なしで実行します。
+reuse は `prepare` に含まれます。これはこの管理領域の作成・再利用・使用に限定された
+route です。`dependency_module_change.py status` は adapter-only の read command であり、
+generic lifecycle、owner-evidence、または operation-level approval carve-out ではありません。
+共有 checkout に対する raw Git の checkout/switch、branch/worktree、reset/restore/clean/stash、
+protected update wrapper は既存の明示 authority gate を維持し、canonical lifecycle
+command の carve-out を継承しません。作業完了後の clone/topic root 削除は candidate CAS、
+PR lifecycle、必要な publication readback、owner evidence、expected identity を検証する
+canonical cleanup と `CleanupProof` receipt に限定します。
+
 ここでいう topic workspace は filesystem / lifecycle と devcontainer mount の
 用語です。VS Code workspace を意味しません。devcontainer は topic workspace
 root を一度だけ `/workspace` に bind mountし、`AGENT_CANON_WORKSPACE_ROOT=/workspace`
@@ -178,13 +193,11 @@ startup design failure です。
 `prepare` が返す `SOURCE_CLONE` は filesystem / lifecycle と devcontainer
 mount の path contract であり、VS Code workspace の構成入力ではありません。
 
-この禁止は `.vscode/` の共有 extension/settings/tasks surface を変更しません。
-`.vscode/` は親所有の regular directory container とし、template と derived repo
-には `vendor/agent-canon/.vscode` の共有ファイルを個別 symlink として公開します。
-共有面は推奨 extension、repository 間で安全な editor defaults、共有 validation
-task を所有しますが、dependency clone 群の構成責務は所有しません。個人の
-editor state、machine-local settings、host-specific path、project/product 固有の
-command は共有面に置きません。
+この禁止は `.vscode/` の shared projection を作りません。`.vscode/` は存在する
+場合に親が所有する regular directory であり、追加ファイル、editor state、
+machine-local settings、host-specific path、project/product 固有 command は親の
+contract に残します。Standalone AgentCanon は自身の regular 4-file `.vscode`
+source を検証できますが、親へ mirror しません。
 
 ## Validation
 

@@ -5,7 +5,8 @@ responsibility Defines code dependency analysis scope for the structured analysi
 upstream design README.md structured analysis package index
 upstream design database-design.md defines SQLite tables and DB artifact placement
 upstream design ../design/dependency-manifest-design.md separates code dependency evidence from manifest graph evidence
-upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extracts code dependency evidence
+upstream implementation ../../tools/agent_tools/lsp_code_analysis.py extracts canonical LSP code facts
+upstream implementation ../../tools/agent_tools/scan_code_dependencies.sh preserves compatibility evidence
 downstream design dependency-header-analysis.md joins code evidence with report trace without merging edge semantics
 @dependency-end
 -->
@@ -27,7 +28,24 @@ structured analysis に取り込む adapter contract を定義する。
 ## Scope
 
 Code analysis は、実装 surface がどの symbol、file、module、include、source script を
-参照しているかを扱う。これは dependency header manifest とは別の evidence である。
+参照しているかを扱う。実行時の正本は LSP 3.17 JSON-RPC の
+`lsp_code_analysis.py analyze --format json` であり、これは dependency header
+manifest とは別の evidence である。`scan_code_dependencies.sh` は明示的な
+`--lexical-only` または成功した canonical LSP projection に限定し、LSP 不在時は
+fail closed する。Rust の `mod`/`use` は analysis-json/search sidecar に保持し、
+legacy TSV へは投影しない。
+
+Canonical report schema は `agent-canon.lsp-code-analysis.v1` である。report は
+root-relative POSIX locator、UTF-16 position、language server record、capability
+matrix、symbols、relations、diagnostics、lexical candidates、lifecycle/status、
+provenance を deterministic order で保持する。required
+`documentSymbolProvider` が失敗した report は部分的な成功として扱わず、
+typed error として返す。optional definition/references/call hierarchy/diagnostics
+は `supported_facts`、`supported_empty`、`unsupported` のいずれかを記録する。
+server executable は devcontainer manifest の
+`resolve_verified_executable` と receipt/live verification を通った absolute path
+だけを受け付ける。caller override は absolute executable として provenance に残り、
+ambient PATH discovery は code analysis の実行経路にならない。
 
 | Language family | MVP evidence |
 | --- | --- |
@@ -38,6 +56,20 @@ Code analysis は、実装 surface がどの symbol、file、module、include、
 
 MVP は precise compiler-grade dependency graph を目標にしない。既存 scanner で取れる
 best-effort edge を report trace と impact packet に渡す。
+
+## Evidence And Assumption Ledger
+
+- Evidence sources: `documents/structured-analysis/code-analysis.md` owns this scope.
+- Evidence sources: `tools/agent_tools/lsp_code_analysis.py` owns the LSP adapter and report.
+- Evidence sources: `.devcontainer/dependencies.toml` and `documents/design/dependency-manifest-design.md` provide manifest, receipt, and live-verification evidence.
+- Evidence sources: `tests/agent_tools/test_lsp_code_analysis.py`, `tests/agent_tools/test_dependency_manifest_tools.py`, `tests/agent_tools/test_search.py`, and `tests/agent_tools/test_git_dependency_diff_summary.py` cover protocol, scanner, consumer, and summary behavior.
+- Assumptions: the manifest receipt/live verifier is the authority for executable selection.
+- Assumptions: LSP 3.17 server responses are runtime evidence.
+- Assumptions: lexical candidates are compatibility and impact evidence, not compiler completeness.
+- Assumptions: explicit `--lexical-only` does not trigger automatic downgrade.
+- Parent-doc alignment: `documents/design/dependency-manifest-design.md` owns manifest/dependency evidence.
+- Parent-doc alignment: `documents/tools/lsp_code_analysis.md` owns the tool and report contract.
+- Parent-doc alignment: `documents/tools/search-coordination.md` owns the in-memory `code-deps` consumer boundary.
 
 ## Boundary
 

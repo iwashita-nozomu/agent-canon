@@ -179,6 +179,182 @@ class DependencyManifestToolTest(unittest.TestCase):
             self.assertIn("realpath=doc.md", result.stdout)
             self.assertIn("owner=product_file", result.stdout)
 
+    def test_code_scan_can_write_lexical_lsp_report(self) -> None:
+        """Compatibility scanner can persist the canonical lexical report."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "main.py"
+            source.write_text("import package\n", encoding="utf-8")
+            analysis = root / "reports" / "analysis.json"
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(CODE_SCAN),
+                    "--root",
+                    str(root),
+                    "--lexical-only",
+                    "--analysis-json",
+                    str(analysis),
+                    "main.py",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CODE_DEPENDENCY_SCAN=pass", result.stdout)
+            payload = json.loads(analysis.read_text(encoding="utf-8"))
+            self.assertEqual(payload["schema_version"], "agent-canon.lsp-code-analysis.v1")
+            self.assertEqual(payload["lifecycle"]["state"], "lexical-only")
+
+    def test_code_scan_default_uses_lsp_and_fails_closed(self) -> None:
+        """The normal scanner route does not silently downgrade to lexical facts."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "main.py"
+            source.write_text("import package\n", encoding="utf-8")
+            result = subprocess.run(
+                ["bash", str(CODE_SCAN), "--root", str(root), "main.py"],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("CODE_DEPENDENCY_SCAN=pass", result.stdout)
+
+    def test_code_scan_lexical_wrapper_rejects_symlink_ancestor(self) -> None:
+        """The lexical wrapper delegates explicit path validation to LSP."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            real = root / "real"
+            real.mkdir()
+            (real / "main.py").write_text("import package\n", encoding="utf-8")
+            (root / "linked").symlink_to(real, target_is_directory=True)
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(CODE_SCAN),
+                    "--root",
+                    str(root),
+                    "--lexical-only",
+                    "linked/main.py",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(result.returncode, 0)
+            self.assertNotIn("CODE_DEPENDENCY_SCAN=pass", result.stdout)
+            self.assertIn("path-escape", result.stderr)
+
+            paths_file = root / "paths.txt"
+            paths_file.write_text("linked/main.py\n", encoding="utf-8")
+            paths_result = subprocess.run(
+                [
+                    "bash",
+                    str(CODE_SCAN),
+                    "--root",
+                    str(root),
+                    "--lexical-only",
+                    "--paths-file",
+                    str(paths_file),
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(paths_result.returncode, 0)
+            self.assertIn("path-escape", paths_result.stderr)
+
+    def test_code_scan_no_selector_delegates_bounded_discovery(self) -> None:
+        """No-selector wrapper calls LSP without pre-expanding repository paths."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            for relative in (
+                "python/main.py",
+                "workspace/leak.py",
+                "vendor/leak.py",
+                "reports/leak.py",
+                "build/leak.py",
+                ".venv/leak.py",
+            ):
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("x = 1\n", encoding="utf-8")
+            (root / "linked.py").symlink_to(root / "python" / "main.py")
+            fake_bin = root / "bin"
+            fake_bin.mkdir()
+            args_file = root / "lsp-args.txt"
+            fake_python = fake_bin / "python3"
+            fake_python.write_text(
+                "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"$SCAN_ARGS_FILE\"\n",
+                encoding="utf-8",
+            )
+            os.chmod(fake_python, 0o755)
+            environment = dict(os.environ)
+            environment["PATH"] = f"{fake_bin}:{environment['PATH']}"
+            environment["SCAN_ARGS_FILE"] = str(args_file)
+
+            result = subprocess.run(
+                ["bash", str(CODE_SCAN), "--root", str(root), "--lexical-only"],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            forwarded = args_file.read_text(encoding="utf-8").splitlines()
+            self.assertIn("--lexical-only", forwarded)
+            self.assertNotIn("--files", forwarded)
+            self.assertNotIn("workspace/leak.py", forwarded)
+            self.assertNotIn("vendor/leak.py", forwarded)
+            self.assertNotIn("reports/leak.py", forwarded)
+            self.assertNotIn("build/leak.py", forwarded)
+            self.assertNotIn(".venv/leak.py", forwarded)
+            self.assertNotIn("linked.py", forwarded)
+
+    def test_code_scan_rust_is_sidecar_only(self) -> None:
+        """Rust lexical facts stay in the sidecar without fabricated TSV rows."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            source = root / "main.rs"
+            source.write_text("mod helper;\nuse crate::helper;\n", encoding="utf-8")
+            analysis = root / "reports" / "analysis.json"
+            result = subprocess.run(
+                [
+                    "bash",
+                    str(CODE_SCAN),
+                    "--root",
+                    str(root),
+                    "--lexical-only",
+                    "--analysis-json",
+                    str(analysis),
+                    "main.rs",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(result.stdout.strip(), "CODE_DEPENDENCY_SCAN=pass files=1")
+            legacy_rows = [
+                line for line in result.stdout.splitlines() if line.startswith("CODE_DEPENDENCY\t")
+            ]
+            self.assertFalse(legacy_rows)
+            self.assertTrue(all(len(line.split("\t")) == 7 for line in legacy_rows))
+            payload = json.loads(analysis.read_text(encoding="utf-8"))
+            self.assertEqual(payload["status"], "complete")
+            self.assertEqual(payload["files"], ["main.rs"])
+            self.assertTrue(payload["lexical_candidates"])
+            self.assertTrue(any(item["token"] == "helper" for item in payload["lexical_candidates"]))
+
     def test_trusted_packet_reports_unchanged_missing_as_baseline(self) -> None:
         """Unchanged missing headers are evidence and do not fail the PR scan."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -877,6 +1053,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 str(CODE_SCAN),
                 "--root",
                 str(root),
+                "--lexical-only",
                 str(source),
                 root=root,
             )
@@ -903,6 +1080,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 str(CODE_SCAN),
                 "--root",
                 str(root),
+                "--lexical-only",
                 str(source),
                 root=root,
             )
@@ -1157,6 +1335,102 @@ class DependencyManifestToolTest(unittest.TestCase):
 
             result = run_tool(str(FORMAT), "--root", str(root), str(issue), root=root)
 
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
+    def test_format_prefers_direct_template_target_for_vendor_path(self) -> None:
+        """Template header paths that point through the vendored source resolve directly."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
+            vendor_agent = root / "vendor" / "agent-canon" / ".github"
+            vendor_agent.mkdir(parents=True)
+            (vendor_agent / "AGENTS.md").write_text("# AGENTS\n", encoding="utf-8")
+            workflow.parent.mkdir(parents=True)
+            (root / "vendor" / "agent-canon" / ".github" / "workflows").mkdir(
+                parents=True
+            )
+            (root / "vendor" / "agent-canon" / ".github" / "workflows" / "agent-improvement-guide.yml").write_text(
+                "name: Agent Improvement Guide\n", encoding="utf-8"
+            )
+            workflow.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# contract test",
+                        "# responsibility Exercises vendored path resolution preference.",
+                        "# upstream design ../../vendor/agent-canon/.github/AGENTS.md vendor header path",
+                        "# @dependency-end",
+                        "name: Agent Improvement Guide",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
+
+    def test_format_rejects_dependency_path_escaping_root(self) -> None:
+        """Dependency targets that resolve above ROOT_DIR are rejected."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
+            outside = root / "outside.md"
+            outside.write_text("# Outside\n", encoding="utf-8")
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# contract test",
+                        "# responsibility Rejects root-escaping dependency paths.",
+                        "# upstream design ../../../outside.md escapes root",
+                        "# @dependency-end",
+                        "name: Agent Improvement Guide",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("dependency target escapes repository root", result.stdout)
+            self.assertIn("DEPENDENCY_HEADER_FORMAT=fail", result.stdout)
+
+    def test_format_falls_back_to_template_source_context_when_direct_missing(self) -> None:
+        """Fallback context is still used when direct dependency target does not exist."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow = root / ".github" / "workflows" / "agent-improvement-guide.yml"
+            workflow.parent.mkdir(parents=True)
+            (root / "vendor" / "agent-canon" / ".github" / "workflows").mkdir(
+                parents=True
+            )
+            (root / "vendor" / "agent-canon" / ".github" / "AGENTS.md").write_text(
+                "# Vendor AGENTS\n", encoding="utf-8"
+            )
+            (
+                root / "vendor" / "agent-canon" / ".github" / "workflows" / "agent-improvement-guide.yml"
+            ).write_text("name: Agent Improvement Guide\n", encoding="utf-8")
+            workflow.write_text(
+                "\n".join(
+                    [
+                        "# @dependency-start",
+                        "# contract test",
+                        "# responsibility Exercises fallback source-context resolution.",
+                        "# upstream design ../../.github/AGENTS.md context fallback",
+                        "# @dependency-end",
+                        "name: Agent Improvement Guide",
+                        "",
+                    ]
+                ),
+                encoding="utf-8",
+            )
+
+            result = run_tool(str(FORMAT), "--root", str(root), str(workflow), root=root)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DEPENDENCY_HEADER_FORMAT=pass", result.stdout)
 

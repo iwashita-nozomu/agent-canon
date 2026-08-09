@@ -248,8 +248,9 @@ def build_nested_codex_script(
 ) -> str:
     """Return the shell prelude that prepares the mounted workspace before Codex."""
     quoted_command = shlex.join(command)
+    workspace_root = workspace.rstrip("/")
     post_create = shlex.quote(
-        f"{workspace.rstrip('/')}/vendor/agent-canon/.devcontainer/post-create.sh"
+        f"{workspace_root}/vendor/agent-canon/.devcontainer/post-create.sh"
     )
     lines = [
         "set -euo pipefail",
@@ -267,6 +268,15 @@ def build_nested_codex_script(
         lines.append(
             'if [ -d /tmp/host-ssh-dir ] && [ ! -e "$HOME/.ssh" ]; then ln -s /tmp/host-ssh-dir "$HOME/.ssh"; fi'
         )
+    if run_uid is not None and run_gid is not None:
+        lines.extend(
+            [
+                'workspace_marker="$(mktemp)"',
+                'trap \'rm -f "$workspace_marker"\' EXIT',
+                "# Separate marker and post-create mtimes on coarse timestamp filesystems.",
+                "sleep 1",
+            ]
+        )
     lines.extend(
         [
             f"if [ -f {post_create} ]; then",
@@ -282,6 +292,9 @@ def build_nested_codex_script(
             [
                 'if [ "$(id -u)" -eq 0 ]; then',
                 f'  chown -R {run_uid}:{run_gid} "$HOME" || true',
+                f'  find -P {shlex.quote(workspace)} -xdev -mindepth 1 -uid 0 -newer "$workspace_marker" '
+                f'-exec chown -h {run_uid}:{run_gid} {{}} +',
+                '  rm -f "$workspace_marker"',
                 "  if command -v setpriv >/dev/null 2>&1; then",
                 f"    exec setpriv --reuid {run_uid} --regid {run_gid} --clear-groups {quoted_command}",
                 "  fi",
@@ -319,7 +332,14 @@ def main() -> int:
         tty = defaults.tty
 
         mounts: list[str] = []
-        envs: list[str] = [f"HOME={container_home}"]
+        # Nested Codex deliberately uses a profile-specific HOME rather than the
+        # dedicated image identity HOME.  Clear the dedicated identity contract
+        # so shared post-create performs the rest of setup without rejecting the
+        # nested session as a runtime-user mismatch.
+        envs: list[str] = [
+            f"HOME={container_home}",
+            "AGENT_CANON_CONTAINER_USER=",
+        ]
 
         host_gitconfig = Path.home() / ".gitconfig"
         if defaults.mount_host_gitconfig and host_gitconfig.is_file():
@@ -358,6 +378,7 @@ def main() -> int:
             command=build_shell_invocation(pack.runtime.shell, shell_script),
             env=tuple(envs),
             mounts=tuple(mounts),
+            user="root" if use_host_user else None,
             tty=tty,
         )
 

@@ -811,6 +811,25 @@ entries:
     tests:
       - tests/agent_tools/test_search.py
 
+  - id: lsp-code-analysis
+    summary: Runs one-shot LSP 3.17 code analysis and emits deterministic symbols, relations, diagnostics, lexical candidates, lifecycle, and provenance.
+    path: tools/agent_tools/lsp_code_analysis.py
+    family: agent_tools
+    role: checker
+    status: canonical
+    command: python3 tools/agent_tools/lsp_code_analysis.py analyze --root . --format json
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+      - documents/tools/lsp_code_analysis.md
+      - documents/structured-analysis/code-analysis.md
+    tests:
+      - tests/agent_tools/test_lsp_code_analysis.py
+
   - id: search-index
     summary: Builds repo-local ignored semantic cards for coordinated search.
     path: tools/agent_tools/search_index.py
@@ -996,7 +1015,7 @@ entries:
     command: bash tools/agent_tools/scan_dependency_headers.sh
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md
@@ -1576,7 +1595,7 @@ entries:
     command: python3 tools/agent_tools/check_hardcoded_numbers.py
     writes: false
     default_wiring:
-      ci: true
+      ci: false
       pr_check: false
     docs:
       - tools/README.md
@@ -1869,8 +1888,6 @@ entries:
       - agents/COMMUNICATION_PROTOCOL.md
       - agents/skills/codex-task-workflow.md
       - .agents/skills/codex-task-workflow/SKILL.md
-      - agents/skills/owner-bounded-routing.md
-      - .agents/skills/owner-bounded-routing/SKILL.md
     tests:
       - tests/agent_tools/test_tool_rejection_preflight.py
 

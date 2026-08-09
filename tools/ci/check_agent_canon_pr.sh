@@ -151,6 +151,28 @@ PR_GATE_DEPENDENCY_GRAPH_REASON=""
 PR_GATE_DEPENDENCY_GRAPH_EVIDENCE=""
 PR_GATE_DEPENDENCY_GRAPH_BASE_SHA=""
 PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET=""
+AGENT_CANON_PR_SUBMODULE_SNAPSHOT_READY=0
+AGENT_CANON_PR_SUBMODULE_STATUS=""
+AGENT_CANON_PR_SUBMODULE_GITMODULES_URL=""
+AGENT_CANON_PR_SUBMODULE_MODE=""
+AGENT_CANON_PR_SUBMODULE_PIN=""
+AGENT_CANON_PR_SUBMODULE_HEAD=""
+
+agentcanon_pr_submodule_snapshot() {
+  if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
+    return 1
+  fi
+  if [[ "${AGENT_CANON_PR_SUBMODULE_SNAPSHOT_READY}" -eq 1 ]]; then
+    return 0
+  fi
+  AGENT_CANON_PR_SUBMODULE_STATUS="$(git submodule status vendor/agent-canon 2>/dev/null || true)"
+  AGENT_CANON_PR_SUBMODULE_GITMODULES_URL="$(git config -f .gitmodules --get submodule.vendor/agent-canon.url 2>/dev/null || true)"
+  AGENT_CANON_PR_SUBMODULE_MODE="$(git ls-tree HEAD vendor/agent-canon 2>/dev/null | awk '{print $1}')"
+  AGENT_CANON_PR_SUBMODULE_PIN="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
+  AGENT_CANON_PR_SUBMODULE_HEAD="$(git -C vendor/agent-canon rev-parse HEAD 2>/dev/null || true)"
+  AGENT_CANON_PR_SUBMODULE_SNAPSHOT_READY=1
+}
+
 agentcanon_pr_dependency_graph_required() {
   local base_fetch_output=""
   local base_fetch_rc=0
@@ -191,6 +213,22 @@ agentcanon_pr_dependency_graph_required() {
       echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON=${PR_GATE_DEPENDENCY_GRAPH_REASON:-pr_base_fetch_failed}"
       echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE=${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE:-base_fetch_status_missing}"
       echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail rc=${base_fetch_rc} status=${base_fetch_status:-missing}" >&2
+      return 2
+    fi
+    selector_args+=(--trusted-base-sha "${trusted_base_sha}")
+  else
+    if ! trusted_base_sha="$(
+      git rev-parse --verify --end-of-options 'origin/main^{commit}' 2>/dev/null
+    )"; then
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=fail"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON=local_trusted_base_tracking_ref_unavailable"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE=source=origin/main"
+      return 2
+    fi
+    if [[ ! "${trusted_base_sha}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=fail"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON=local_trusted_base_tracking_ref_invalid"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE=source=origin/main"
       return 2
     fi
     selector_args+=(--trusted-base-sha "${trusted_base_sha}")
@@ -243,8 +281,6 @@ agentcanon_pr_branch_dirty() {
 }
 
 agentcanon_pr_branch_pending() {
-  local submodule_head=""
-  local parent_pin=""
   local remote_main=""
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
     return 1
@@ -252,12 +288,11 @@ agentcanon_pr_branch_pending() {
   if agentcanon_pr_branch_dirty; then
     return 1
   fi
-  submodule_head="$(git -C vendor/agent-canon rev-parse HEAD 2>/dev/null || true)"
-  parent_pin="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
-  if [[ -z "${submodule_head}" || -z "${parent_pin}" ]]; then
+  agentcanon_pr_submodule_snapshot || return 1
+  if [[ -z "${AGENT_CANON_PR_SUBMODULE_HEAD}" || -z "${AGENT_CANON_PR_SUBMODULE_PIN}" ]]; then
     return 1
   fi
-  if [[ "${submodule_head}" != "${parent_pin}" ]]; then
+  if [[ "${AGENT_CANON_PR_SUBMODULE_HEAD}" != "${AGENT_CANON_PR_SUBMODULE_PIN}" ]]; then
     return 1
   fi
 
@@ -265,7 +300,7 @@ agentcanon_pr_branch_pending() {
   if [[ -z "${remote_main}" ]]; then
     return 1
   fi
-  [[ "${parent_pin}" != "${remote_main}" ]]
+  [[ "${AGENT_CANON_PR_SUBMODULE_PIN}" != "${remote_main}" ]]
 }
 
 agentcanon_pr_submodule_remote_reachable() {
@@ -281,62 +316,26 @@ agentcanon_pr_submodule_remote_reachable() {
 }
 
 agentcanon_pr_branch_integrity() {
-  local submodule_head=""
-  local parent_pin=""
   local remote_url="${REMOTE_URL}"
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
     return 0
   fi
-  submodule_head="$(git -C vendor/agent-canon rev-parse HEAD 2>/dev/null || true)"
-  parent_pin="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
-  if [[ -z "${submodule_head}" || -z "${parent_pin}" ]]; then
+  agentcanon_pr_submodule_snapshot || return 3
+  if [[ -z "${AGENT_CANON_PR_SUBMODULE_HEAD}" || -z "${AGENT_CANON_PR_SUBMODULE_PIN}" ]]; then
     echo "AGENT_CANON_PR_LATEST_GATE=blocked_agentcanon_submodule_state"
     echo "AGENT_CANON_PR_LATEST_NEXT=repair_submodule_state_and_rerun_agent-canon-pr-check"
     return 3
   fi
-  if [[ "${submodule_head}" != "${parent_pin}" ]]; then
+  if [[ "${AGENT_CANON_PR_SUBMODULE_HEAD}" != "${AGENT_CANON_PR_SUBMODULE_PIN}" ]]; then
     echo "AGENT_CANON_PR_LATEST_GATE=blocked_submodule_gitlink_mismatch"
     echo "AGENT_CANON_PR_LATEST_REASON=submodule-gitlink-worktree-mismatch"
     echo "AGENT_CANON_PR_LATEST_NEXT=run_make_agent-canon-ensure-latest_then_commit_updated_submodule_pin_with_request_evidence"
     return 4
   fi
-  if ! agentcanon_pr_submodule_remote_reachable "${remote_url}" "${parent_pin}"; then
+  if ! agentcanon_pr_submodule_remote_reachable "${remote_url}" "${AGENT_CANON_PR_SUBMODULE_PIN}"; then
     echo "AGENT_CANON_PR_LATEST_GATE=blocked_submodule_pin_unreachable"
     echo "AGENT_CANON_PR_LATEST_REASON=submodule-pinned-commit-unreachable-from-configured-remote"
     echo "AGENT_CANON_PR_LATEST_NEXT=run_agent_canon_update_or_update_agent-canon-remote_reference"
-    return 5
-  fi
-  return 0
-}
-
-agentcanon_pr_update_precondition() {
-  local submodule_head=""
-  local parent_pin=""
-  local remote_url="${REMOTE_URL}"
-  if [[ "${AGENT_CANON_REPOSITORY_MODE}" != "template_or_derived" ]]; then
-    return 0
-  fi
-  if [[ -n "${REMOTE_URL:-}" && -n "${REMOTE_URL#<unset>}" ]] && agentcanon_pr_branch_dirty; then
-    echo "AGENT_CANON_PR_UPDATE_STATE=dirty_agentcanon_worktree_preserved"
-    echo "AGENT_CANON_PR_UPDATE_NEXT=run_make_agent-canon-ensure-latest_with_dirty_worktree_preserved"
-  fi
-  submodule_head="$(git -C vendor/agent-canon rev-parse HEAD 2>/dev/null || true)"
-  parent_pin="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
-  if [[ -z "${submodule_head}" || -z "${parent_pin}" ]]; then
-    echo "AGENT_CANON_PR_UPDATE_GATE=blocked_agentcanon_submodule_state"
-    echo "AGENT_CANON_PR_UPDATE_NEXT=repair_submodule_state_and_rerun_agent-canon-pr-check"
-    return 3
-  fi
-  if [[ "${submodule_head}" != "${parent_pin}" ]]; then
-    echo "AGENT_CANON_PR_UPDATE_GATE=blocked_submodule_gitlink_mismatch"
-    echo "AGENT_CANON_PR_UPDATE_REASON=submodule-gitlink-worktree-mismatch"
-    echo "AGENT_CANON_PR_UPDATE_NEXT=run_make_agent-canon-ensure-latest_then_commit_updated_submodule_pin_with_request_evidence"
-    return 4
-  fi
-  if ! agentcanon_pr_submodule_remote_reachable "${remote_url}" "${parent_pin}"; then
-    echo "AGENT_CANON_PR_UPDATE_GATE=blocked_submodule_pin_unreachable"
-    echo "AGENT_CANON_PR_UPDATE_REASON=submodule-pinned-commit-unreachable-from-configured-remote"
-    echo "AGENT_CANON_PR_UPDATE_NEXT=run_agent_canon_update_or_update_agent-canon-remote_reference"
     return 5
   fi
   return 0
@@ -542,14 +541,12 @@ echo "agent_canon_repository_mode=${AGENT_CANON_REPOSITORY_MODE}"
 echo "agent_canon_remote=${REMOTE_URL}"
 consume_source_correctness_receipt
 if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "template_or_derived" ]]; then
-  echo "agent_canon_submodule_status=$(git submodule status vendor/agent-canon 2>/dev/null || true)"
-  agent_canon_gitmodules_url="$(git config -f .gitmodules --get submodule.vendor/agent-canon.url 2>/dev/null || true)"
-  agent_canon_submodule_mode="$(git ls-tree HEAD vendor/agent-canon 2>/dev/null | awk '{print $1}')"
-  agent_canon_submodule_pin="$(git rev-parse HEAD:vendor/agent-canon 2>/dev/null || true)"
-  echo "agent_canon_gitmodules_url=${agent_canon_gitmodules_url:-<missing>}"
-  echo "agent_canon_submodule_mode=${agent_canon_submodule_mode:-<missing>}"
-  echo "agent_canon_submodule_pin=${agent_canon_submodule_pin:-<missing>}"
-  if [[ -z "$agent_canon_gitmodules_url" || "$agent_canon_submodule_mode" != "160000" || -z "$agent_canon_submodule_pin" ]]; then
+  agentcanon_pr_submodule_snapshot
+  echo "agent_canon_submodule_status=${AGENT_CANON_PR_SUBMODULE_STATUS}"
+  echo "agent_canon_gitmodules_url=${AGENT_CANON_PR_SUBMODULE_GITMODULES_URL:-<missing>}"
+  echo "agent_canon_submodule_mode=${AGENT_CANON_PR_SUBMODULE_MODE:-<missing>}"
+  echo "agent_canon_submodule_pin=${AGENT_CANON_PR_SUBMODULE_PIN:-<missing>}"
+  if [[ -z "$AGENT_CANON_PR_SUBMODULE_GITMODULES_URL" || "$AGENT_CANON_PR_SUBMODULE_MODE" != "160000" || -z "$AGENT_CANON_PR_SUBMODULE_PIN" ]]; then
     echo "AGENT_CANON_SUBMODULE_EVIDENCE=fail"
     exit 1
   fi
@@ -674,9 +671,7 @@ if [[ "${PR_GATE_DEPENDENCY_GRAPH_REQUIRED}" -eq 1 ]]; then
       --status-result "${graph_status_result}"
       --report-out "${PR_DEPENDENCY_REVIEW_DIR}/changed-responsibility-acceptance.json"
     )
-    if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
-      graph_acceptance_args+=(--trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}")
-    fi
+    graph_acceptance_args+=(--trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}")
     if graph_acceptance_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
       "${graph_acceptance_args[@]}")"; then
       graph_acceptance_rc=0

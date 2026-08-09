@@ -138,6 +138,14 @@ required behavior-event fields.
 | Code checker results | `tool_call=pyright code_checker=pass`, `tool_call=ruff code_checker=pass`, `tool_call=oop-readability-check code_checker=pass`, or `code_checker_not_required`. |
 | Run comparison | execution path comparison and token footprint comparison when the task makes those comparisons relevant. |
 
+New behavior-event rows use the namespaced `agent-canon.behavior-event.v1`
+schema. `eval_accumulation_check.py` validates the bounded fields structurally:
+`workflow_attribution_kind` is `owner`, `context`, or `missing` with matching
+owner/context lists, and `prompt_capture_status` is `present` or `missing` with
+coherent redacted excerpt, fingerprint, character-count, and truncation fields.
+Legacy behavior-shaped rows remain readable as non-blocking migration warnings;
+they are not promoted to canonical evidence.
+
 ## Protocol Feedback Boundary
 
 | Protocol boundary | Required record |
@@ -210,11 +218,11 @@ Agent Improvement Guide on PRs and branch pushes.
 | Human feedback | human feedback labels and targets plus explicit human feedback labels. |
 | Skill and hook coverage | skill usage entries, skill/event coverage, hook source files, hook tool names, and hook-quality counters. |
 | Code and run evidence | code-checker target paths, repeated failure fingerprints, and `workflow_monitoring.md` tokens from run comparison tools. |
-| Token reduction | compare Codex session footprints when token reduction is part of the objective; otherwise record `token_efficiency_not_required`. |
+| Token reduction | compare Codex session footprints only when token reduction is selected as the objective; otherwise record `token_efficiency_not_required`. |
 
 | Run evidence concern | Required action |
 | --- | --- |
 | Prompt privacy | store bounded, redacted prompt excerpts, fingerprints, and counts instead of transcript text. |
 | Alternative paths | compare runs with `tools/agent_tools/compare_agent_run_paths.py` and record `execution_path_comparison`, `route_efficiency`, `selected_inefficient_route`, and `static_analysis_feedback`. |
-| Token reduction | compare footprints with `tools/agent_tools/compare_codex_token_footprints.py` when token reduction is part of the objective. |
+| Token reduction | compare footprints with `tools/agent_tools/compare_codex_token_footprints.py` when token reduction is part of the objective. No global count, ratio, or improvement threshold is required. |
 | During-run recording | Record these events during the run with `tools/agent_tools/workflow_monitor.py --behavior-event "..."` instead of reconstructing them only at closeout. |

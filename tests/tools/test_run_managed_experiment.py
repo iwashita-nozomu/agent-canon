@@ -915,6 +915,63 @@ def test_check_experiment_registry_accepts_valid_registry(tmp_path: Path) -> Non
     assert "OK: experiment registry is valid" in result.stdout
 
 
+def test_check_experiment_registry_reports_missing_required_field(
+    tmp_path: Path,
+) -> None:
+    """The checker should retain required-field diagnostics after extraction is split."""
+    repo_root = build_repo(tmp_path)
+    registry_path = repo_root / "experiments" / "registry.toml"
+    registry_path.write_text(
+        registry_path.read_text(encoding="utf-8").replace('status = "active"\n', ""),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(CHECK_SCRIPT),
+            "--repo-root",
+            str(repo_root),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "demo_topic: missing required string field: status" in result.stdout
+
+
+def test_check_experiment_registry_reports_invalid_eval_artifact_item(
+    tmp_path: Path,
+) -> None:
+    """The checker should retain optional-list diagnostics after normalization is split."""
+    repo_root = build_repo(tmp_path)
+    registry_path = repo_root / "experiments" / "registry.toml"
+    registry_path.write_text(
+        registry_path.read_text(encoding="utf-8").replace(
+            'required_eval_artifacts = ["summary.json", "cases.jsonl"]',
+            'required_eval_artifacts = ["summary.json", ""]',
+        ),
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(CHECK_SCRIPT),
+            "--repo-root",
+            str(repo_root),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 1
+    assert "defaults: required_eval_artifacts[1] must be a non-empty string" in result.stdout
+
+
 def test_check_experiment_registry_accepts_valid_branch_topic(tmp_path: Path) -> None:
     """The registry checker should accept branch-only topic entries."""
     repo_root = build_repo(tmp_path)

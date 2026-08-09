@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import re
-import shlex
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -46,106 +45,51 @@ AGENT_CANON_CREDENTIALS = (
     "AGENT_CANON_REPO_TOKEN",
     "AGENT_CANON_REPO_SSH_KEY",
 )
+ISSUE_MIRROR_CHECK_JOB = "issue-mirror-check"
+ISSUE_MIRROR_CHECKOUT_OUTCOME = "steps.checkout.outcome"
+ISSUE_MIRROR_CHECKOUT_FAILURE_GUARD = "failure() && "
 AGENT_CANON_PR_READ_CREDENTIAL = "AGENT_CANON_PR_READ_TOKEN"
 GITHUB_TOKEN_EXPRESSION = "${{ github.token }}"
-TEMPLATE_AGENT_CANON_PR_GATE_COMMAND = "make agent-canon-pr-check"
-OBSOLETE_TEMPLATE_AGENT_CANON_INTERNAL_COMMAND_PREFIXES = (
-    ("bash", "tools/agent_tools/run_repo_dependency_review.sh", "--fail-missing"),
-    (
-        "bash",
-        "tools/agent-canon/agent_tools/run_repo_dependency_review.sh",
-        "--fail-missing",
-    ),
-)
-HTML_COMMENT_PATTERN = re.compile(r"<!--.*?-->", re.DOTALL)
-MARKDOWN_FENCE_PATTERN = re.compile(r"^[ \t]{0,3}(?P<fence>`{3,}|~{3,})")
-CHECKLIST_ITEM_PATTERN = re.compile(
-    r"^(?P<indent>[ \t]{0,3})[-+*][ \t]+\[[ xX]\][ \t]*(?P<body>.*)$"
-)
 WORKFLOW_DISPATCH_INPUT_PATTERN = re.compile(
     r"\$\{\{\s*(?:inputs|github\.event\.inputs)"
     r"\s*(?:\.\s*[A-Za-z_][A-Za-z0-9_-]*|\[\s*['\"][^'\"]+['\"]\s*\])"
     r"\s*\}\}"
 )
 WORKFLOW_DISPATCH_INPUT_CHECK_WORKFLOW = "agent-coordination.yml"
-TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS = (
-    "Validation Evidence",
-    "Plan Mode Evidence",
-    "Agent Orchestration Evidence",
-    "workflow=<family>",
-    "skills=$agent-orchestration",
-    "review=<...>",
-    "python3 tools/agent_tools/route.py --prompt",
-    "PR Mutation Authority",
-    "Authority / blocker notes",
-    "Operational Findings / Issues",
-    "vendor/agent-canon/issues/README.md",
-    "vendor/agent-canon/issues/closed/",
-    "Agent Improvement Guide artifact",
-    "Issue Mirror artifact",
-    "run_repo_dependency_review.sh --search-hits-file",
-    "Template / derived project PR",
-    "bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing",
-    "make ci",
-    "AgentCanon Evidence",
-    "template submodule SHA:",
+
+# PR templates record only the evidence that changes the publication decision.
+# The historical plan, issue-sweep, and fixed-checklist fields remain rejected
+# by the semantic checker below instead of becoming another required checklist.
+PR_TEMPLATE_REQUIRED_TEXT = (
+    "## PR Essence",
+    "Problem / user request:",
+    "Canonical owner / responsibility unit:",
+    "Behavior or contract delta:",
+    "Evidence route:",
+    "Explicit non-goals:",
+    "canonical route",
+    "changed surfaces:",
+    "source_commit:",
+    "template_pin:",
+    "pr_head:",
+    "identity relation (source_commit -> template_pin -> pr_head):",
+    "changed-surface validation:",
+    "mutation authority:",
+    "risk:",
+    "follow-up owner or issue:",
 )
-TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
-    TEMPLATE_AGENT_CANON_PR_GATE_COMMAND,
-    "make agent-canon-ensure-latest",
+PR_TEMPLATE_FORBIDDEN_TEXT = (
     "Plan Mode Evidence",
     "Agent Orchestration Evidence",
-    "workflow=<family>",
-    "skills=$agent-orchestration",
-    "review=<...>",
-    "python3 tools/agent_tools/route.py --prompt",
-    "PR Mutation Authority",
-    "Authority / blocker notes",
-    "Branch And Change Route",
-    "Operational Findings / Issues",
-    "vendor/agent-canon/issues/README.md",
-    "vendor/agent-canon/issues/open/AC-YYYYMMDD-<slug>.md",
-    "vendor/agent-canon/issues/closed/",
-    "Agent Improvement Guide artifact",
+    "paused until",
+    "Existing durable findings were searched",
     "Issue Mirror artifact",
-    "AgentCanon source PR",
-    "Direct `bash tools/sync_agent_canon.sh push` was not used",
-    "agentcanon_structure_followup=required",
-    "agentcanon_structure_followup=pass",
-    "python3 tools/agent_tools/check_agent_runtime_alignment.py",
-    "python3 tools/agent_tools/check_convention_compliance.py",
-    "Submodule Pin Change",
+    "issue_sync.py --repo",
+    "Copilot Configuration Impact",
+    "Candidate Commit And Publication Identity",
     "GitHub Mirror / Submodule Evidence",
-    "template submodule SHA:",
-)
-STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS = (
-    "Validation Evidence",
-    "Plan Mode Evidence",
-    "Agent Orchestration Evidence",
-    "workflow=<family>",
-    "skills=$agent-orchestration",
-    "review=<...>",
-    "python3 tools/agent_tools/route.py --prompt",
-    "PR Mutation Authority",
-    "Authority / blocker notes",
-    "Branch And Change Route",
-    "Operational Findings / Issues",
-    "issues/README.md",
-    "issues/open/AC-YYYYMMDD-<slug>.md",
-    "issues/closed/",
-    "Agent Improvement Guide artifact",
-    "Issue Mirror artifact",
-    "AgentCanon Static Gates",
-    "run_repo_dependency_review.sh --search-hits-file",
-    "standalone AgentCanon repository",
-    "make agent-canon-ensure-latest",
     "agentcanon_structure_followup=required",
-    "agentcanon_structure_followup=pass",
-    "python3 tools/agent_tools/check_agent_runtime_alignment.py",
-    "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",
-    "python3 tools/agent_tools/check_convention_compliance.py",
-    "Submodule Pin Impact",
-    "expected template submodule SHA:",
+    "template submodule SHA:",
 )
 SUBMODULE_CHECKOUT_SCRIPT_REQUIREMENTS = (
     "AGENT_CANON_SUBMODULE_AUTH=missing",
@@ -163,13 +107,22 @@ SUBMODULE_CHECKOUT_WRAPPER_REQUIREMENTS = (
     "exec bash",
 )
 ROOT_COORDINATION_WORKFLOW_REQUIREMENTS = (
-    "Synced to /.github/workflows/agent-coordination.yml",
-    "Edit vendor/agent-canon/.github/workflows/agent-coordination.yml",
+    "Standalone AgentCanon coordination workflow",
+    "selected roles",
+    "team_manifest.yaml",
+    "run.capacity_request.lineage.role_ids",
+    "GITHUB_STEP_SUMMARY",
+    "SCHEDULED_SPECIALISTS=",
+    "executed_role=coordination",
+    "finding=none at intake",
+    "result=bundle_ready",
 )
 ROOT_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
-    "Synced to /.github/workflows/agent-improvement-guide.yml",
-    "Edit vendor/agent-canon/.github/workflows/agent-improvement-guide.yml",
     "generate_agent_improvement_guide.py",
+)
+ROOT_IMPROVEMENT_GUIDE_WORKFLOW_ALLOWED_TAGS = (
+    "Standalone AgentCanon improvement guidance workflow",
+    "Template AgentCanon improvement guidance workflow",
 )
 STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
     "Standalone-only workflow",
@@ -189,10 +142,21 @@ STANDALONE_ISSUE_MIRROR_WORKFLOW_REQUIREMENTS = (
 )
 VENDOR_COORDINATION_WORKFLOW_REQUIREMENTS = (
     "agents/workflows/agent-canon-pr-workflow.md",
+    "Standalone AgentCanon coordination workflow",
+    "selected roles",
+    "team_manifest.yaml",
+    "run.capacity_request.lineage.role_ids",
+    "GITHUB_STEP_SUMMARY",
+    "SCHEDULED_SPECIALISTS=",
+    "executed_role=coordination",
+    "finding=none at intake",
+    "result=bundle_ready",
 )
 VENDOR_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
     "pull_request:",
-    "push:",
+    "paths:",
+    "workflow_dispatch:",
+    "Standalone AgentCanon improvement guidance workflow",
     "generate_agent_improvement_guide.py",
     "GITHUB_STEP_SUMMARY",
     "actions/upload-artifact@v4",
@@ -292,11 +256,6 @@ def load_workflow(path: Path) -> dict[str, object]:
     if workflow is None:
         return {}
     return workflow
-
-
-def is_true(value: object) -> bool:
-    """Return whether a YAML value means true for GitHub action inputs."""
-    return value is True or str(value).lower() == "true"
 
 
 def is_false(value: object) -> bool:
@@ -534,6 +493,167 @@ def checkout_step_findings(path: Path, workflow: dict[str, object]) -> list[Find
     return findings
 
 
+def issue_mirror_checkout_policy_findings(
+    path: Path,
+    workflow: dict[str, object],
+) -> list[Finding]:
+    """Return findings for issue-mirror checkout failure truthfulness and fallback."""
+    if path.name != "issue-mirror.yml":
+        return []
+    contexts = [
+        context
+        for context in step_contexts(workflow)
+        if context.job_name == ISSUE_MIRROR_CHECK_JOB
+    ]
+    if not contexts:
+        return []
+    findings: list[Finding] = []
+    findings.extend(issue_mirror_checkout_step_findings(path, contexts))
+    findings.extend(issue_mirror_checker_step_findings(path, contexts))
+    findings.extend(issue_mirror_fallback_step_findings(path, contexts))
+    return findings
+
+
+def issue_mirror_checkout_step_findings(
+    path: Path,
+    contexts: list[StepContext],
+) -> list[Finding]:
+    """Return issue-mirror checkout step-specific findings."""
+    findings: list[Finding] = []
+    for context in issue_mirror_checkout_steps(contexts):
+        if context.step.get("continue-on-error"):
+            findings.append(
+                Finding(
+                    "error",
+                    path,
+                    "issue_mirror_checkout_continue_on_error_not_allowed",
+                )
+            )
+    return findings
+
+
+def issue_mirror_checker_step_findings(
+    path: Path,
+    contexts: list[StepContext],
+) -> list[Finding]:
+    """Return issue-sync checker step-specific findings."""
+    for context in issue_mirror_issue_sync_checker_steps(contexts):
+        if context.step.get("if") != f"{ISSUE_MIRROR_CHECKOUT_OUTCOME} == 'success'":
+            return [
+                Finding(
+                    "error",
+                    path,
+                    "issue_mirror_checker_step_must_require_checkout_success",
+                )
+            ]
+    return []
+
+
+def issue_mirror_fallback_step_findings(
+    path: Path,
+    contexts: list[StepContext],
+) -> list[Finding]:
+    """Return issue-mirror fallback step-specific findings."""
+    fallback_steps = issue_mirror_checkout_failure_summary_steps(contexts)
+    if not fallback_steps:
+        return [
+            Finding("error", path, "issue_mirror_checkout_failure_summary_missing")
+        ]
+    findings: list[Finding] = []
+    for context in fallback_steps:
+        run = context.step.get("run")
+        if not isinstance(run, str):
+            findings.append(
+                Finding(
+                    "error",
+                    path,
+                    "issue_mirror_checkout_failure_summary_missing_run",
+                )
+            )
+            continue
+        if not issue_mirror_failure_summary_guard_valid(context):
+            findings.append(
+                Finding(
+                    "error",
+                    path,
+                    "issue_mirror_checkout_failure_summary_must_be_gated_by_failure",
+                )
+            )
+        if "ISSUE_SYNC=pass" in run:
+            findings.append(
+                Finding(
+                    "error",
+                    path,
+                    "issue_mirror_checkout_failure_fallback_must_fail",
+                )
+            )
+        normalized_run = run.replace("\\`", "`")
+        if (
+            "status: `fail`" not in normalized_run
+            or "reason: `checkout-failed`" not in normalized_run
+        ):
+            findings.append(
+                Finding(
+                    "error",
+                    path,
+                    "issue_mirror_checkout_failure_summary_must_be_fail",
+                )
+            )
+        if "exit 1" not in run:
+            findings.append(
+                Finding(
+                    "error",
+                    path,
+                    "issue_mirror_checkout_failure_must_be_nonzero",
+                )
+            )
+    return findings
+
+
+def issue_mirror_checkout_steps(contexts: list[StepContext]) -> list[StepContext]:
+    """Return issue-mirror checkout steps in the check job."""
+    return [
+        context
+        for context in contexts
+        if context.step.get("uses") == "actions/checkout@v4"
+    ]
+
+
+def issue_mirror_issue_sync_checker_steps(
+    contexts: list[StepContext],
+) -> list[StepContext]:
+    """Return issue-sync checker steps in the check job."""
+    return [
+        context
+        for context in contexts
+        if isinstance(context.step.get("run"), str)
+        and "tools/agent_tools/issue_sync.py" in str(context.step.get("run"))
+    ]
+
+
+def issue_mirror_checkout_failure_summary_steps(
+    contexts: list[StepContext],
+) -> list[StepContext]:
+    """Return issue-mirror fallback summary steps in the check job."""
+    return [
+        context
+        for context in contexts
+        if ISSUE_MIRROR_CHECKOUT_OUTCOME in str(context.step.get("if"))
+        and " != 'success'" in str(context.step.get("if"))
+    ]
+
+
+def issue_mirror_failure_summary_guard_valid(context: StepContext) -> bool:
+    """Return whether fallback summary step has the required failure guard."""
+    step_if = context.step.get("if")
+    return (
+        isinstance(step_if, str)
+        and ISSUE_MIRROR_CHECKOUT_FAILURE_GUARD in step_if
+        and ISSUE_MIRROR_CHECKOUT_OUTCOME in step_if
+        and " != 'success'" in step_if
+    )
+
+
 def check_workflow(root: Path, path: Path) -> list[Finding]:
     """Check one GitHub Actions workflow."""
     workflow = load_workflow(path)
@@ -550,9 +670,119 @@ def check_workflow(root: Path, path: Path) -> list[Finding]:
             if path.name == "agent-canon-static-gates.yml"
             else []
         ),
+        *(
+            improvement_guide_trigger_findings(path, workflow_text)
+            if path.name == "agent-improvement-guide.yml"
+            else []
+        ),
+        *(
+            coordination_summary_findings(path, workflow_text)
+            if path.name == "agent-coordination.yml"
+            else []
+        ),
+        *(
+            coordination_relay_findings(path, workflow)
+            if path.name == "agent-coordination.yml"
+            else []
+        ),
         *agent_canon_checkout_policy_findings(root, path, workflow, workflow_text),
+        *issue_mirror_checkout_policy_findings(path, workflow),
         *checkout_step_findings(path, workflow),
     ]
+
+
+def coordination_relay_findings(
+    path: Path, workflow: dict[str, object]
+) -> list[Finding]:
+    """Reject the fixed manager reviewer/response pass-through chain."""
+    findings: list[Finding] = []
+    jobs = dict(job_items(workflow))
+    if "coordinate" not in jobs:
+        findings.append(Finding("error", path, "coordination_job_missing"))
+    if set(jobs) != {"coordinate"}:
+        findings.append(
+            Finding("error", path, f"coordination_job_count:{len(jobs)}")
+        )
+    if "manager" in jobs:
+        findings.append(Finding("error", path, "fixed_manager_relay_job:manager"))
+    for relay_job in ("manager_reviewer", "manager_response"):
+        if relay_job in jobs:
+            findings.append(Finding("error", path, f"fixed_manager_relay_job:{relay_job}"))
+    for job_name, job in jobs.items():
+        needs = job.get("needs")
+        if isinstance(needs, str):
+            need_names: set[str] = {needs}
+        elif isinstance(needs, list):
+            need_names = {
+                item for item in cast(list[object], needs) if isinstance(item, str)
+            }
+        else:
+            need_names = set()
+        for relay_job in ("manager_reviewer", "manager_response"):
+            if relay_job in need_names:
+                findings.append(
+                    Finding(
+                        "error",
+                        path,
+                        f"fixed_manager_relay_dependency:{job_name}:{relay_job}",
+                    )
+                )
+    coordinate = jobs.get("coordinate")
+    if coordinate is not None:
+        steps = coordinate.get("steps")
+        upload_count = 0
+        if isinstance(steps, list):
+            for item in cast(list[object], steps):
+                step = as_string_dict(item)
+                if isinstance(step, dict) and str(step.get("uses", "")).startswith(
+                    "actions/upload-artifact@"
+                ):
+                    upload_count += 1
+        if upload_count != 1:
+            findings.append(
+                Finding("error", path, f"coordination_bundle_upload_count:{upload_count}")
+            )
+    return findings
+
+
+def improvement_guide_trigger_findings(
+    path: Path, workflow_text: str
+) -> list[Finding]:
+    """Keep improvement guidance bounded to selected paths or manual dispatch."""
+    findings: list[Finding] = []
+    if re.search(r"(?m)^  push:\s*$", workflow_text):
+        findings.append(Finding("error", path, "improvement_guide_push_trigger_forbidden"))
+    if not re.search(r"(?ms)^  pull_request:\s*\n\s+paths:\s*\n", workflow_text):
+        findings.append(Finding("error", path, "improvement_guide_pull_request_paths_required"))
+    if not re.search(r"(?m)^  workflow_dispatch:\s*$", workflow_text):
+        findings.append(Finding("error", path, "improvement_guide_manual_dispatch_required"))
+    return findings
+
+
+def coordination_summary_findings(path: Path, workflow_text: str) -> list[Finding]:
+    """Require truthful packet readback and one write-scope validation boundary."""
+    findings: list[Finding] = []
+    for required in (
+        "team_manifest.yaml",
+        "run.capacity_request.lineage.role_ids",
+        "GITHUB_STEP_SUMMARY",
+        "SCHEDULED_SPECIALISTS=",
+        "executed_role=coordination",
+        "finding=none at intake",
+        "result=bundle_ready",
+    ):
+        if required not in workflow_text:
+            findings.append(Finding("error", path, f"coordination_summary_missing:{required}"))
+    role_validation_count = workflow_text.count("--role manager")
+    if role_validation_count != 1:
+        findings.append(
+            Finding(
+                "error",
+                path,
+                f"coordination_write_scope_validation_count:{role_validation_count}",
+            )
+        )
+    return findings
 
 
 def agent_canon_static_gate_findings(
@@ -701,6 +931,18 @@ def require_text(path: Path, required: Sequence[str]) -> list[Finding]:
     ]
 
 
+def require_text_any_of(path: Path, options: Sequence[str]) -> list[Finding]:
+    """Check that a file contains one of the allowed snippets."""
+    if not path.exists():
+        return [Finding("error", path, "missing_file")]
+    text = read_text(path)
+    normalized_text = re.sub(r"/{2,}", "/", text)
+    if any(option in text or option in normalized_text for option in options):
+        return []
+    joined = " | ".join(options)
+    return [Finding("error", path, f"missing_text_any_of:{joined}")]
+
+
 def projected_template_requirements(
     root: Path, required: Sequence[str]
 ) -> tuple[str, ...]:
@@ -734,6 +976,12 @@ def check_root_copy_headers(root: Path) -> list[Finding]:
         )
     for path, required in workflow_header_requirement_specs(root):
         if path.exists():
+            if path == root / ".github" / "workflows" / "agent-improvement-guide.yml":
+                findings.extend(
+                    require_text_any_of(
+                        path, ROOT_IMPROVEMENT_GUIDE_WORKFLOW_ALLOWED_TAGS
+                    )
+                )
             findings.extend(require_text(path, required))
     return findings
 
@@ -803,9 +1051,7 @@ def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]
         specs: list[tuple[Path, Sequence[str]]] = [
             (
                 root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md",
-                projected_template_requirements(
-                    root, TEMPLATE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS
-                ),
+                projected_template_requirements(root, PR_TEMPLATE_REQUIRED_TEXT),
             ),
             (
                 root
@@ -813,110 +1059,49 @@ def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]
                 / "agent-canon"
                 / ".github"
                 / "PULL_REQUEST_TEMPLATE.md",
-                STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS,
+                PR_TEMPLATE_REQUIRED_TEXT,
             ),
         ]
         root_template = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
         if root_template.exists():
-            specs.append((root_template, TEMPLATE_ROOT_PR_TEMPLATE_REQUIREMENTS))
+            specs.append((root_template, PR_TEMPLATE_REQUIRED_TEXT))
         return specs
     return [
         (
             root / ".github" / "PULL_REQUEST_TEMPLATE.md",
-            STANDALONE_AGENT_CANON_PR_TEMPLATE_REQUIREMENTS,
+            PR_TEMPLATE_REQUIRED_TEXT,
         )
     ]
 
 
-def markdown_checklist_authority_commands(text: str) -> tuple[str, ...]:
-    """Return leading inline-code commands from Markdown checklist items."""
-    without_comments = HTML_COMMENT_PATTERN.sub(
-        lambda match: "\n" * match.group(0).count("\n"),
-        text,
-    )
-    lines = without_comments.splitlines()
-    commands: list[str] = []
-    active_fence: tuple[str, int] | None = None
-    index = 0
-    while index < len(lines):
-        line = lines[index]
-        fence_match = MARKDOWN_FENCE_PATTERN.match(line)
-        if fence_match:
-            fence = fence_match.group("fence")
-            if active_fence is None:
-                active_fence = (fence[0], len(fence))
-            elif fence[0] == active_fence[0] and len(fence) >= active_fence[1]:
-                active_fence = None
-            index += 1
-            continue
-        if active_fence is not None:
-            index += 1
-            continue
-
-        item_match = CHECKLIST_ITEM_PATTERN.match(line)
-        if item_match is None:
-            index += 1
-            continue
-        body = item_match.group("body").lstrip()
-        if not body.startswith("`"):
-            index += 1
-            continue
-        delimiter_length = len(body) - len(body.lstrip("`"))
-        delimiter = "`" * delimiter_length
-        command_text = body[delimiter_length:]
-        closing_index = command_text.find(delimiter)
-        item_indent = len(item_match.group("indent").expandtabs(4))
-        while closing_index < 0 and index + 1 < len(lines):
-            continuation = lines[index + 1]
-            continuation_indent = len(continuation) - len(continuation.lstrip(" \t"))
-            if not continuation.strip() or continuation_indent <= item_indent:
-                break
-            index += 1
-            command_text += "\n" + continuation.strip()
-            closing_index = command_text.find(delimiter)
-        if closing_index >= 0:
-            commands.append(" ".join(command_text[:closing_index].split()))
-        index += 1
-    return tuple(commands)
-
-
-def is_obsolete_template_agentcanon_command(command: str) -> bool:
-    """Return whether shell tokens begin with an obsolete internal command."""
-    try:
-        tokens = tuple(shlex.split(command))
-    except ValueError:
-        return False
-    return any(
-        tokens[: len(prefix)] == prefix
-        for prefix in OBSOLETE_TEMPLATE_AGENT_CANON_INTERNAL_COMMAND_PREFIXES
-    )
-
-
 def check_template_agentcanon_pr_gate(path: Path) -> list[Finding]:
-    """Require one public parent gate and reject internal command authority."""
+    """Check the concise PR evidence contract and reject legacy gate loops."""
     if not path.exists():
         return [Finding("error", path, "missing_file")]
     text = read_text(path)
-    checklist_commands = markdown_checklist_authority_commands(text)
-    canonical_count = checklist_commands.count(TEMPLATE_AGENT_CANON_PR_GATE_COMMAND)
     findings: list[Finding] = []
-    if canonical_count != 1:
-        findings.append(
-            Finding(
-                "error",
-                path,
-                f"canonical_parent_pr_gate_count:{canonical_count}",
-            )
-        )
-    for command in checklist_commands:
-        if is_obsolete_template_agentcanon_command(command):
+    for item in PR_TEMPLATE_FORBIDDEN_TEXT:
+        if item in text:
             findings.append(
                 Finding(
                     "error",
                     path,
-                    f"obsolete_internal_pr_gate_authority:{command}",
+                    f"forbidden_universal_pr_gate:{item}",
                 )
             )
+    for field in ("source_commit", "template_pin", "pr_head"):
+        count = len(re.findall(rf"(?m)^\s*-\s*{re.escape(field)}:", text))
+        if count != 1:
+            findings.append(
+                Finding("error", path, f"identity_field_count:{field}:{count}")
+            )
+    relation_count = text.count(
+        "identity relation (source_commit -> template_pin -> pr_head):"
+    )
+    if relation_count != 1:
+        findings.append(
+            Finding("error", path, f"identity_relation_count:{relation_count}")
+        )
     return findings
 
 
@@ -935,6 +1120,9 @@ def check_pr_templates(root: Path) -> list[Finding]:
         / "agent_canon.md",
         root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md",
     }
+    optional_root_template = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
+    if optional_root_template.exists():
+        semantic_templates.add(optional_root_template)
     for path in sorted(semantic_templates):
         findings.extend(check_template_agentcanon_pr_gate(path))
     return findings

@@ -8,12 +8,12 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 732a021da775136cec0f7aa322cd4a7307937de8cb71dd923ead6a5ae975cd6e
+# source canonical digest: f8c0d306e98286c6a639b0227518b1de544de91b40cd16a211cb1c6da9302fb9
 
 name = "long_form_writer"
 description = "Long-form document author for README, workflow, guide, migration, and other reader-facing documents that need roadmap-first drafting."
 nickname_candidates = ["long_form_writer"]
-sandbox_mode = "workspace-write"
+sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"

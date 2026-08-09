@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import hashlib
 
+import pytest
+
 from tools.agent_tools import capacity_handshake
 from tools.agent_tools import implementation_route as route
 from tools.agent_tools import update_lifecycle_contract
@@ -223,6 +225,10 @@ def test_closed_fixed_packet_routes_to_one_spark_and_preserves_evidence(monkeypa
     assert result.source_anchors[1].manifest_canonicalization == "sorted-paths-v1"
     assert result.acceptance_checks[0].command == VALIDATION[0]
     assert result.static_validation_commands == (VALIDATION[1],)
+    common = route.route_result_as_claim_evidence(result)
+    assert common["status"] == "pass"
+    assert route.validate_route_result_common(result).valid
+    assert route.validate_route_result_common(result).schema_id == "claim_evidence_v1"
     eligibility = route.resolve_implementation_candidate(packet, _capacity(), _continuity())
     assert eligibility.evidence is not None
     assert eligibility.evidence.evidence_refs[3:8] == (
@@ -232,6 +238,21 @@ def test_closed_fixed_packet_routes_to_one_spark_and_preserves_evidence(monkeypa
         "replacement://generic-route",
         "implementation-execution://v1",
     )
+
+
+def test_blocked_route_output_adapts_to_common_claim_evidence_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _registry(monkeypatch)
+    packet = _packet()
+    packet["acceptance_checks"] = []
+    result = route.route_implementation(_request(packet))
+    assert result.status == "blocked"
+    common = route.route_result_as_claim_evidence(result)
+    assert common["status"] == "blocked"
+    validation = route.validate_route_result_common(result)
+    assert validation.valid
+    assert validation.schema_id == "claim_evidence_v1"
 
 
 def test_unknown_missing_empty_or_mismatched_packet_evidence_fails_before_profile(monkeypatch) -> None:

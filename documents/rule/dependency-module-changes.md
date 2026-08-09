@@ -47,6 +47,10 @@ python3 tools/agent_tools/dependency_module_change.py --root <parent-root> prepa
 manifest identity を generic request へ写像し、exact clone/branch を再利用するか、不在
 branch を最新 `origin/main` から作成します。`PrepareReceipt`、module path/URL readback、
 computed clone path の一致が完了証拠です。
+owner evidence、manifest identity、computed path が一致する canonical prepare は
+operation-level の追加承認なしで実行できます。この扱いは repo-local topic workspace
+の lifecycle command にだけ適用し、共有 checkout の protected raw Git route には継承
+されません。
 
 ### Merge main
 
@@ -65,16 +69,20 @@ dirty state と conflict は破棄せず typed evidence として保持します
 ```bash
 python3 tools/agent_tools/dependency_module_change.py --root <parent-root> cleanup \
   --topic <topic> --module <module-path> --branch <branch> \
-  --owner-evidence <file> --expected-clone <absolute-clone> \
-  --candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
-  [--publication-readback <publication-readback.json>] [--apply]
+  --owner-evidence <file> \
+  [--candidate-cas <candidate-cas.json> --pr-lifecycle <pr-lifecycle.json> \
+  [--publication-readback <publication-readback.json>]] [--apply]
 ```
 
-PR-head cleanup は canonical candidate CAS と PR lifecycle を検証し、local/remote/PR head
-の exact identity を証明します。integration 後は canonical publication readback transition
-を追加し、merge commit/tree と `origin/main` containment を証明します。dry-run も同じ
-authority を検証し、全 preflight 後だけ computed clone を削除します。unknown sibling は
-保持し、topic directory は空の場合だけ削除します。
+通常の cleanup は manifest から解決した computed clone を再計算し、selected Git toplevel、
+owner evidence/marker、URL、branch、clean non-detached state、および fetch した
+`origin/<branch>` の commit/tree と local `HEAD` の commit/tree の一致だけを検証します。
+publication packet を作らなくても dry-run/apply でき、unknown sibling は保持し、topic directory
+は空の場合だけ削除します。candidate CAS、PR lifecycle、publication readback は任意の追加
+evidence ですが、いずれかを指定する場合は candidate CAS と PR lifecycle を一組で指定し、
+merged state では publication readback transition、merge commit/tree、`origin/main`
+containment も検証します。proof 不一致または unknown dirty/collision は typed hold として
+保持します。
 
 ## Scope と failure
 

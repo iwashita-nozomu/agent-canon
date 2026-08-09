@@ -21,16 +21,16 @@
     {
       "skill_id": "task-routing",
       "path": "../.agents/skills/task-routing/SKILL.md",
-      "index": 53,
-      "order": 53,
+      "index": 52,
+      "order": 52,
       "enabled": true,
       "host_config_entry_digest": "394ff3acb2242f455b3d1429afa06782f887bf88aca34d9039a1405025068c42"
     },
     {
       "skill_id": "start-repository",
       "path": "../.agents/skills/start-repository/SKILL.md",
-      "index": 49,
-      "order": 49,
+      "index": 48,
+      "order": 48,
       "enabled": true,
       "host_config_entry_digest": "640ca8ee221fa8687af3532c3ed7e3946174cbc3159db72bcc64e066c76be70c"
     },
@@ -43,18 +43,10 @@
       "host_config_entry_digest": "331959a55a170456b4147d13058534a60b19e793127abfaa38c57c3c2316a058"
     },
     {
-      "skill_id": "owner-bounded-routing",
-      "path": "../.agents/skills/owner-bounded-routing/SKILL.md",
-      "index": 48,
-      "order": 48,
-      "enabled": true,
-      "host_config_entry_digest": "40cfe1d93973989cebb3cd40d230250738c41f82e3c12a0c38a076ebd4750c30"
-    },
-    {
       "skill_id": "subagent-bootstrap",
       "path": "../.agents/skills/subagent-bootstrap/SKILL.md",
-      "index": 52,
-      "order": 52,
+      "index": 51,
+      "order": 51,
       "enabled": true,
       "host_config_entry_digest": "35374e14178a863d506b218db710d6a0ad5e2d30c8848e127b93ab3d04a9e07a"
     },
@@ -117,8 +109,8 @@
     {
       "skill_id": "tool-finding-report",
       "path": "../.agents/skills/tool-finding-report/SKILL.md",
-      "index": 55,
-      "order": 55,
+      "index": 54,
+      "order": 54,
       "enabled": true,
       "host_config_entry_digest": "752712b9092f56360a7cd962f0afa9c1a7d53fbe19f1619c9bb341aa60debbbf"
     },
@@ -165,8 +157,8 @@
     {
       "skill_id": "repository-topic-clone",
       "path": "../.agents/skills/repository-topic-clone/SKILL.md",
-      "index": 65,
-      "order": 65,
+      "index": 64,
+      "order": 64,
       "enabled": true,
       "host_config_entry_digest": "30b465fd837b6329c8f1d95c3fe67c81a8f0e61792407fc8840467dcfb1a47ec"
     },
@@ -213,8 +205,8 @@
     {
       "skill_id": "structure-planning",
       "path": "../.agents/skills/structure-planning/SKILL.md",
-      "index": 50,
-      "order": 50,
+      "index": 49,
+      "order": 49,
       "enabled": true,
       "host_config_entry_digest": "1000f2083ee4f5d109d68123bc299fd159218407e01a156738bd338bb0074e05"
     },
@@ -245,8 +237,8 @@
     {
       "skill_id": "test-design",
       "path": "../.agents/skills/test-design/SKILL.md",
-      "index": 54,
-      "order": 54,
+      "index": 53,
+      "order": 53,
       "enabled": true,
       "host_config_entry_digest": "91079aa77cf92012bdc204fe02e5fb6331ff8deeb15528378023c6d2f39fdbae"
     },
@@ -261,16 +253,16 @@
     {
       "skill_id": "structure-refactor",
       "path": "../.agents/skills/structure-refactor/SKILL.md",
-      "index": 51,
-      "order": 51,
+      "index": 50,
+      "order": 50,
       "enabled": true,
       "host_config_entry_digest": "0d0f31c01a0fcb1202cfa0d16440c329173225a63725d3e57fe68f3c893ab8a0"
     },
     {
       "skill_id": "user-guided-debugging",
       "path": "../.agents/skills/user-guided-debugging/SKILL.md",
-      "index": 56,
-      "order": 56,
+      "index": 55,
+      "order": 55,
       "enabled": true,
       "host_config_entry_digest": "ff72171095201f0aad11cc75bcc2b648cc0a33d56c12307a79120981e44738c5"
     },
@@ -325,8 +317,8 @@
     {
       "skill_id": "parent-repository-audit",
       "path": "../.agents/skills/parent-repository-audit/SKILL.md",
-      "index": 64,
-      "order": 64,
+      "index": 63,
+      "order": 63,
       "enabled": true,
       "host_config_entry_digest": "ff94391182c533372064a1233f788f4ae42b8bc710796debfd7f8562e80e4bac"
     },
@@ -341,16 +333,16 @@
     {
       "skill_id": "worktree-start",
       "path": "../.agents/skills/worktree-start/SKILL.md",
-      "index": 59,
-      "order": 59,
+      "index": 58,
+      "order": 58,
       "enabled": true,
       "host_config_entry_digest": "71c574ba3e80788dfd5df899f1722608b7ba9306939ddce50ae93f37732f76b7"
     },
     {
       "skill_id": "worktree-health",
       "path": "../.agents/skills/worktree-health/SKILL.md",
-      "index": 57,
-      "order": 57,
+      "index": 56,
+      "order": 56,
       "enabled": true,
       "host_config_entry_digest": "c9412634358e928f06f3272452702f0c21cb5de4147c8bbeb047067fdb7923ee"
     },
@@ -493,40 +485,40 @@
     {
       "skill_id": "wiki-publication",
       "path": "../.agents/skills/wiki-publication/SKILL.md",
-      "index": 58,
-      "order": 58,
+      "index": 57,
+      "order": 57,
       "enabled": true,
       "host_config_entry_digest": "7b386bf9576224a68550e04ca96f3c5a495f43c3a433919eee547306402c9ecc"
     },
     {
       "skill_id": "responsibility-cleanup",
       "path": "../.agents/skills/responsibility-cleanup/SKILL.md",
-      "index": 60,
-      "order": 60,
+      "index": 59,
+      "order": 59,
       "enabled": true,
       "host_config_entry_digest": "491a6e61b2f48de29ca7772b4395f6391534affa3c19bcbf4955e677c66bda16"
     },
     {
       "skill_id": "environment-cleanup",
       "path": "../.agents/skills/environment-cleanup/SKILL.md",
-      "index": 61,
-      "order": 61,
+      "index": 60,
+      "order": 60,
       "enabled": true,
       "host_config_entry_digest": "92079abce1d7ce280c6b6a578324b0f4b886598efc8165382e99be03afba13e9"
     },
     {
       "skill_id": "code-cleanup",
       "path": "../.agents/skills/code-cleanup/SKILL.md",
-      "index": 62,
-      "order": 62,
+      "index": 61,
+      "order": 61,
       "enabled": true,
       "host_config_entry_digest": "965694a921d7f51724efb938d6e228af0ce8fc540d60e04dac3bfedfc250e8fc"
     },
     {
       "skill_id": "skill-cleanup",
       "path": "../.agents/skills/skill-cleanup/SKILL.md",
-      "index": 63,
-      "order": 63,
+      "index": 62,
+      "order": 62,
       "enabled": true,
       "host_config_entry_digest": "d58afb7f316511f560de5f666d7423d0aacaf786e3da422b829e77d04f027654"
     }

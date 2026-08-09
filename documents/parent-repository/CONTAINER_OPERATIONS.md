@@ -4,7 +4,7 @@ contract reference
 responsibility Defines parent-repository container operations for the reconstructible non-root devcontainer contract.
 upstream design ../design/devcontainer/parent-devcontainer-policy.md parent devcontainer ownership and startup boundary
 upstream design ../structure/repo-structure-contract.toml expected parent paths
-downstream implementation ../../.devcontainer/generate-runtime-compose.sh shared Compose generator
+downstream implementation ../../.devcontainer/generate-runtime-compose.sh parent-owned Compose generator; standalone source entrypoints are invoked through the source-root resolver
 downstream implementation ../../tools/ci/container_config.py static container contract validation
 downstream implementation ../../tools/agent_tools/parent_repo_readiness.py parent readiness validation
 @dependency-end
@@ -29,9 +29,10 @@ AgentCanon は mounted developer/agent tool と共有 runtime の source を所�
   mounted tool を独立して宣言します。AgentCanon の pinned PyYAML record は、親が
   宣言する PyYAML の ownership を置き換えません。
 
-親の `.devcontainer/` は regular directory のまま保持します。shared
-`devcontainer.json` だけを symlink し、shared script のコピーや wrapper は作りません。
-生成 Compose と dependency receipt は親の実行状態であり、追跡対象にしません。
+親の `.devcontainer/` は親が所有する regular directory のまま保持します。
+`devcontainer.json` を含む regular files は親の environment contract で管理し、
+AgentCanon source からの symlink・コピー・削除は行いません。生成 Compose と
+dependency receipt は親の実行状態であり、追跡対象にしません。
 
 ## host mount inventory と zsh startup
 
@@ -94,12 +95,12 @@ readiness、runtime pack、image startup の各 owner が担当します。
 
 ## lifecycle と validation
 
-shared post-create は fixed bootstrap、親 manifest と AgentCanon manifest の merge、
+親の post-create lifecycle は fixed bootstrap、親 manifest と AgentCanon manifest の merge、
 full plan validation、derived execution、親 Python installer、AgentCanon build/cache/
 projection の順に進み、最後に親の `post-create-parent.sh` を呼びます。manifest の
 validation が pass する前に install や build を開始しません。
 
-source と親の pin を変更する順序、root projection、regular/symlink surface は
+source と親の pin を変更する順序、active root view、regular/symlink surface は
 [`../design/devcontainer/parent-devcontainer-policy.md`](../design/devcontainer/parent-devcontainer-policy.md)
 と shared surface manifest が所有します。親側では次を targeted readback として使います。
 

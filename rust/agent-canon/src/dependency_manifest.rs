@@ -204,11 +204,10 @@ struct SurfaceManifestEntry {
     path: String,
     mode: String,
     source: String,
-    owner: String,
-    surface_class: String,
+    projection_producer: String,
+    projection_kind: String,
     local_override_allowed: bool,
     optional: bool,
-    sync_control: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -616,14 +615,13 @@ fn load_surface_manifest_snapshot(
         require_exact_json_keys(
             entry,
             &[
-                "class",
+                "projection_kind",
                 "local_override_allowed",
                 "mode",
                 "optional",
-                "owner",
+                "projection_producer",
                 "path",
                 "source",
-                "sync_control",
             ],
             &owner,
         )?;
@@ -643,8 +641,8 @@ fn load_surface_manifest_snapshot(
                 ))
             })?
             .to_string();
-        let owner_value = required_json_string(entry, "owner", &owner)?;
-        let surface_class = required_json_string(entry, "class", &owner)?;
+        let projection_producer = required_json_string(entry, "projection_producer", &owner)?;
+        let projection_kind = required_json_string(entry, "projection_kind", &owner)?;
         if matches!(mode.as_str(), "symlink" | "copy") && source.is_empty() {
             return Err(ManifestError::SurfaceManifest(format!(
                 "surface_manifest_snapshot: {path} projection source is empty"
@@ -654,11 +652,10 @@ fn load_surface_manifest_snapshot(
             path,
             mode,
             source,
-            owner: owner_value,
-            surface_class,
+            projection_producer,
+            projection_kind,
             local_override_allowed: required_json_bool(entry, "local_override_allowed", &owner)?,
             optional: required_json_bool(entry, "optional", &owner)?,
-            sync_control: required_json_bool(entry, "sync_control", &owner)?,
         });
     }
     Ok(SurfaceManifestSnapshot {
@@ -1437,7 +1434,10 @@ fn manifest_surface_relations(
             target_identity_id: target.identity_id.clone(),
             source_path: entry.path.clone(),
             target_path,
-            owner_class: format!("{}:{}", entry.owner, entry.surface_class),
+            owner_class: format!(
+                "projection_producer={};projection_kind={}",
+                entry.projection_producer, entry.projection_kind
+            ),
             surface_mode: entry.mode.clone(),
             content_hash_equal: entry.mode == "copy" && source.content_hash == target.content_hash,
             evidence_id: hash_text(&format!(

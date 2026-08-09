@@ -18,11 +18,13 @@ downstream implementation ../../../tools/sync_agent_canon.sh pin and root projec
 
 ## 親 root の依存 manifest
 
-親 root に `.devcontainer/dependencies.toml` を作成し、親固有の
-developer/agent tool record だけを置きます。schema は
+親固有の developer/agent tool がある場合だけ、親 root に
+`.devcontainer/dependencies.toml` を作成し、その record だけを置きます。
+親固有の依存が無い場合はファイルを作成せず、不在を parent overlay なしとして
+扱います。schema は
 `agent-canon.devcontainer-dependencies` version `2`、record は
 `id/package/method/version/source/verification/deps/provides/failure_policy` を
-必須とし、method-specific な key fingerprint、checksum、
+必須とし、method-specific な key fingerprint、checksum、`executable_owner_packages`、
 repo/commit/source_identity/locked、browser fields も型付きで記録します。
 `verification` は method と一致する
 closed kind と owner-specific fields を持ち、generic command 配列や
@@ -32,12 +34,15 @@ SHA を manifest に複製しません。
 
 共有 post-create は次の順で一度だけ読みます。
 
-1. `<workspace>/.devcontainer/dependencies.toml`（親）
+1. `<workspace>/.devcontainer/dependencies.toml`（親、存在する場合）
 2. `<workspace>/vendor/agent-canon/.devcontainer/dependencies.toml`（vendor）
 
 standalone AgentCanon では `.devcontainer/dependencies.toml` 自身を一度だけ
 読みます。親 record の値は常に保持し、vendor は欠落値を補い、互換な
 `deps/provides/components/checksums/assets` だけを union します。
+`apt-package` と `apt-repository` は `executable_owner_packages` を必須とします。
+`receipt` 上の executable binding に対する所有境界検証は `tools/agent_tools/devcontainer_dependencies.py` で行います。
+検証対象は所有者集合を列挙する `.devcontainer/dependencies.toml` です。
 `verification` は同一でなければ incompatible duplicate として fail します。
 scalar の不一致、重複 provider、missing dependency、cycle は fail です。
 manifest の全体 validation が pass するまで、derived install に進めません。
@@ -46,8 +51,11 @@ manifest の全体 validation が pass するまで、derived install に進め�
 
 schema v2 の manifest source role は filename の推測ではなく構造から解決します。
 親と vendor がある構成では
-`<workspace>/.devcontainer/dependencies.toml` を `parent-overlay` とし、親
-Template が親所有の derived tool を持たない場合は `records = []` を明示できます。
+`<workspace>/.devcontainer/dependencies.toml` が存在するときだけ
+`parent-overlay` とします。親 Template が親所有の derived tool を持たない
+新規または派生 repo は空 manifest や sentinel を作成せず、不在で parent
+overlay なしを表現します。移行中の既存 repo に残る `records = []` の
+overlay は parser が互換入力として受理します。
 `vendor/agent-canon/.devcontainer/dependencies.toml` は `canonical` であり、
 空にはできません。standalone AgentCanon の workspace manifest も
 `canonical` であり、空にはできません。source を読み込んだ後の merge 済み plan
@@ -70,10 +78,10 @@ identity receipt を保持し、選択した commit と異なる source を受�
 
 ## pin と root projection
 
-親側で AgentCanon submodule pin を更新し、`.devcontainer/devcontainer.json`
-と shared root view がその pin を直接参照することを確認します。親の
-`.devcontainer/` は実ディレクトリのまま保持し、shared file の全体コピーや
-wrapper を追加しません。生成された
+親側で AgentCanon submodule pin を更新し、active root views がその pin と
+一致することを確認します。親の `.devcontainer/` は実ディレクトリのまま保持し、
+`devcontainer.json` を含む regular files の shared copy、symlink、wrapper は
+追加しません。生成された
 `.agent-canon/docker-compose.generated.yml` と dependency receipts は追跡対象にしません。
 
 AgentCanon source update 後の親側 follow-up は request-evidence を付けた
@@ -101,6 +109,7 @@ Playwright を convenience-only の理由で Dockerfile に追加しません。
 親の `postCreateCommand` は次の順を直接保持します。
 
 ```text
+fixed bootstrap --install-language-runtime  # parent selector only
 shared post-create
   fixed bootstrap validation
   parent manifest -> vendor manifest merge
@@ -108,8 +117,14 @@ shared post-create
   topological derived execution and per-record receipts
   parent docker/install_python_dependencies.sh
   AgentCanon build, cache, and runtime projection
-parent .devcontainer/post-create-parent.sh  # final
+parent .devcontainer/post-create-parent.sh  # final, when present
 ```
+
+Standalone AgentCanon image は build 時に同じ fixed bootstrap を materialize 済みのため、
+standalone selector は shared post-create から始める。Template / derived parent selector は
+product image が所有しない Node/npm と Ninja を明示的な
+`--install-language-runtime` で先に materialize し、その後の shared `--check` を
+fail-closed validation として使う。
 
 親 record の manifest order と parent-first merge order は、依存制約がない
 record の安定順として保持します。親 post-create を shared script に吸収したり、

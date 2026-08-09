@@ -28,12 +28,14 @@ they do not restate the transaction.
 
 Every mutating route that can stage, checkout, update a submodule, mutate a root
 view, park eval logs, or create an automatic sync commit must validate the
-existing four Git authority/reason fields and the additional
+Git authority/reason fields selected by operation risk and the additional
 `AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<64 lowercase hex>` input before
 the first mutation. The evidence digest is the SHA-256 of the exact bytes of
 the user request record or canonical workflow authorization packet. Missing,
 uppercase, malformed, or fallback evidence is rejected; there is no actor or
-authority compatibility input.
+authority compatibility input. Update wrappers use the destructive pair;
+normal branch/worktree creation uses the creation pair; force-create or
+ref-overwrite uses both pairs.
 
 AgentCanon source の
 `tools/sync_agent_canon.sh::commit_sync_paths_if_needed` が automatic sync
@@ -110,7 +112,7 @@ eligibility remains the separate clean-`main` contract after source publication.
 | runtime state | `.agent-canon/update-lifecycle/state/` | resumable transaction pointer and typed GitHub/source-publication packets; never source canon |
 | generated evidence | `reports/agents/<run-id>/` and `.agent-canon/update-lifecycle/evidence/` | immutable receipts, timings, review and readback evidence |
 | projection queue | `.agent-canon/update-lifecycle/projection-queue/` | accepted QueueReceipt and pending/accepted DependencyFrontier |
-| parent projection | parent `vendor/agent-canon` gitlink and AgentCanon-owned root views | downstream view after frontier acceptance only |
+| parent projection | parent `vendor/agent-canon` gitlink and the active root views `AGENTS.md`, `.codex/config.toml`, `tools/agent-canon` | downstream view after frontier acceptance only; regular parent paths are preserved |
 
 Unknown shared state is outside the task-owned namespace and remains unchanged.
 There is no legacy subtree, snapshot, wrapper, or alternate owner route.
@@ -136,22 +138,26 @@ There is no legacy subtree, snapshot, wrapper, or alternate owner route.
    `SourceMainRebindReceipt`. Append, without mutating it:
    `CandidateFreezeReceipt -> CandidateReviewReceipt -> CandidateCasReceipt`.
 1. G3 binds immutable remote/base/head/fork/permission identity and the exact
-   candidate/tree. `PullRequestLifecycle` carries PR Essence, reviews, and
-   contributor diff through draft/ready/review/closed/conflict states. Only
-   verified-true permission permits publication.
+   candidate/tree for merge authority. `PullRequestLifecycle` carries PR
+   Essence, reviews, and contributor diff through draft/ready/review/closed/
+   conflict states. Only verified-true permission permits publication.
 1. Merge the source PR by expected-old CAS. Authoritative PR readback keeps the
    post-merge base ref separate from the merge-parent commit/tree and requires
    that merge-parent identity to equal the rebind/CAS base. A distinct
-   source-main publication readback follows. Push, PR, and checks consume one
-   sealed G3 authority; post-publication checks additionally consume sealed,
-   same-binding G5 evidence.
+   source-main publication readback follows. Ordinary push, PR create/update,
+   and checks consume the current user task, verified remote/permission/topology,
+   and exact identities/readback; packet/G3 evidence is optional enrichment for
+   those operations. Merge remains G3-bound, and post-publication checks may
+   additionally consume same-binding G5 evidence.
    Standalone `github_publish.py push` without a packet is reversible branch
    transport only: verified remote identity/permission, named current branch,
    captured local `HEAD`/tree, exact SHA refspec, remote `ls-remote` readback,
    and push-spanning local identity invariance. It does not generate or claim
    G1/G2/G3 or PR lifecycle evidence. Packet-bound push may additionally check
-   its sealed candidate identity; `publish-pr`, PR mutation, and merge remain
-   sealed packet/G1/G2/G3-bound.
+   its sealed candidate identity as optional enrichment. PR create/update and
+   check readback consume the current user task, verified
+   remote/permission/topology, and exact head/base identities; merge remains
+   sealed G3-bound.
 1. Enqueue exactly one accepted `QueueReceipt` keyed by
    `(source_namespace,candidate_sha,tree_sha,input_digest,
    publication_merge_sha,publication_merge_tree)`. Create a pending
@@ -205,7 +211,7 @@ identity and ordering only; they do not rerun the owned check.
 ## Centralized Template Parent Follow-Up
 
 When a source update changes centralized template owners under source-root
-`templates/`, the parent projection packet is incomplete until it records all
+`templates/`, the parent follow-up packet is incomplete until it records all
 of the following:
 
 - parent-integration `git rm templates` after confirming that the tracked
@@ -215,8 +221,8 @@ of the following:
 - deletion of parent `experiments/_template/`;
 - deletion of only the `_template` entry in the parent project registry;
 - deletion of parent docs/tests that only exercise that removed scaffold; and
-- regeneration and validation of GitHub Issue/PR projections from
-  `vendor/agent-canon/templates/documents/github/`.
+- preservation of parent-owned regular `.github` content without regenerating
+  AgentCanon GitHub targets into the parent root.
 
 The parent registry remains project-owned. AgentCanon source validation uses a
 temporary parent-shaped registry fixture and never mutates a source or parent

@@ -46,7 +46,8 @@ owner surfaces it names.
 質問・明示 write clause・進行中 update・integration cleanup の compact flow は
 [`documents/design/request-intent-and-update-relation.md`](documents/design/request-intent-and-update-relation.md)
 から各 canonical owner へ投影する。
-Related Document Closure は DIC-010 の path+section+clause/ref receipt を owner packet が消費する。
+Related Document Closure は active DIC route でだけ DIC-010 の path+section+clause/ref receipt を
+owner packet が消費する。bounded owner/path/targeted-validation route には適用しない。
 
 この projection は `operation -> resulting state -> completion evidence` の順で
 materialize します。質問は read scope と evidence を読み、evidence-backed answer
@@ -59,11 +60,14 @@ readback および context reuse または必要並列 handoff を完了 evidenc
 completed integration は tree/remote readback を受け、既存 cleanup executor dispatch state
 に到達し、executor receipt、CleanupProof、closeout packet readback を完了 evidence にします。
 
-Repository-changing implementation の全 stage は、
+public API / behavior / schema、algorithm、ownership / path、runtime contract の変更、または
+明示的に選択した design workflow の implementation stage は、
 [`agents/internal-routines/design-implementation-correspondence.md`](agents/internal-routines/design-implementation-correspondence.md)
 を先に通ります。これは各 skill に共通規則を複製するための新しい policy
 source ではなく、owning design の read、clause fingerprint、handoff、
 forward/reverse review coverage、design drift block の内部 route です。
+owner、path、targeted validation が固定された bounded edit は通常の owner route として
+短い owner/path/validation note で完了し、この routine の fingerprint/closure を要求しません。
 - After context compaction, invoke the final-objective declaration required by
   `agents/COMMUNICATION_PROTOCOL.md` section `Post-Compaction Objective
   Re-Declaration Contract` before any work resumes.
@@ -120,16 +124,35 @@ unknown dirty, staged, untracked, branch, and worktree state as owned by the
 user or another chat, and preserve that state across routing and repair.
 Protected Git operations include `git restore`, `git reset`, forced `git clean`,
 mutating `git stash`, checkout/switch, and branch/worktree create, delete, move,
-rename, or prune. Proven exact task ownership only bounds which paths may be
-named in an approval request; explicit destructive approval remains required.
-A protected mutation proceeds only when the user
-explicitly approves it and the same command segment carries
+rename, or prune. Normal branch/worktree creation records creation authority and
+reason; force-create/ref overwrite additionally requires destructive authority and
+reason. Existing checkout/switch, delete/rename/reset, and other history/ref
+mutations require destructive authority and reason. Reversible tracking metadata
+and `git worktree lock/unlock` do not mutate refs, history, or worktrees and are
+not destructive. Proven exact task ownership only bounds which paths may be
+named in an approval request; explicit destructive approval remains required for
+destructive operations.
+A protected destructive mutation proceeds only when the user explicitly approves
+it and the same command segment carries
 `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` plus a nonempty
-`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Branch/worktree creation additionally
-requires same-segment `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` or
+`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Normal branch/worktree creation instead
+requires same-segment
+`AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` or
 `agent_canon_workflow` plus a nonempty `AGENT_CANON_BRANCH_WORKTREE_REASON`;
-the creation and destructive requirements are an AND gate. Collision handling keeps the current
+force-create/ref overwrite requires both authority pairs. `latest` / `apply` /
+merge wrappers require destructive authority only unless their owner route
+actually creates a branch/worktree. Collision handling keeps the current
 branch/worktree and requests user direction.
+
+Canonical repo-local lifecycle commands are bounded to a separate workspace route:
+`repository_topic_clone.py` and `dependency_module_change.py` may prepare, reuse, and use
+`<project-root>/workspace/<topic-slug>/<repo-name>` without operation-level approval when
+non-empty owner evidence and exact computed identity are present. This does not authorize raw
+shared-checkout Git mutations or bypass the hook. At closeout, lifecycle skills dispatch proof-
+gated cleanup with computed clone identity, owner/marker evidence, clean state, and remote
+head/tree readback; publication artifacts are optional coherent enrichment. Only ordinary
+`CleanupProof` / cleanup receipt authorizes deletion. Collisions,
+unknown dirty state, and proof mismatch remain preserved typed holds.
 
 ## Runtime Owner Map
 
@@ -142,7 +165,7 @@ branch/worktree and requests user direction.
 | internal routine placement | `agents/internal-routines/README.md`; `documents/structure/repo-structure-contract.toml` | `repo_structure_contract.py` |
 | design-to-implementation correspondence | `agents/internal-routines/design-implementation-correspondence.md`; `documents/design/*.md` | `check_design_doc_claims.py`; design/review readback |
 | implementation flow and handoff packet | `agents/workflows/implementation-waterfall-workflow.md`; `agents/COMMUNICATION_PROTOCOL.md` | task run bundle review |
-| shared-checkout Git mutation and branch/worktree creation route | `agents/canonical/CODEX_WORKFLOW.md`; `tools/agent_tools/hook_safety.py`; `agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
+| shared-checkout Git mutation and branch/worktree creation route | `agents/canonical/CODEX_WORKFLOW.md`; `tools/agent_tools/hook_safety.py`; `agents/skills/worktree-health.md` | operation-risk Git authority matrix; critical PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation routing | `documents/runtime/runtime-profiles-and-check-matrix.md` | profile-specific checks |
 | closeout evidence | `tools/agent_tools/task_close.py`; `tools/agent_tools/report_artifact_checks.py` | closeout artifact gate |
 | AgentCanon update transaction | `documents/agent-canon/agent-canon-update-route.md`; `tools/agent_tools/update_lifecycle_contract.py` | boundary-owned G1-G6 receipts; `tools/agent_tools/task_close.py` |
@@ -159,8 +182,11 @@ ToolCall records are owned by `tools/agent_tools/update_lifecycle_contract.py`;
 the Decision Sufficiency policy remains owned by
 `agents/skills/agent-orchestration.md#Decision Sufficiency Packet`.
 
-For repo-changing work, create or reuse the run bundle and follow the
-machine-readable packet emitted by:
+For repo-changing work, create or reuse a run bundle only when coordination,
+resumption, or the selected workflow requires durable lifecycle evidence. A
+bounded owner/path/validation request may use a direct structured handoff and
+targeted validation without `task_start.py` or a bundle. When a packet is
+selected, follow the machine-readable output emitted by:
 
 ```bash
 python3 tools/agent_tools/task_start.py \

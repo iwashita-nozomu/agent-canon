@@ -73,11 +73,14 @@ and lifecycle behavior is projected from the canonical owners:
 [implementation contract](documents/design/codex-spark-implementation-routing.md).
 This entrypoint does not create a second policy source.
 
-Repository-changing implementation の前には、owning design を read して
+public API / behavior / schema、algorithm、ownership / path、runtime contract の変更、または
+明示的に選択した design workflow の implementation の前には、owning design を read して
 [`agents/internal-routines/design-implementation-correspondence.md`](agents/internal-routines/design-implementation-correspondence.md)
 の clause fingerprint と対応 route を作ります。実装 handoff と review は
 その routine の forward/reverse coverage と drift block を参照し、個別
-skill に同じ universal policy を複製しません。
+skill に同じ universal policy を複製しません。owner、path、targeted validation が固定された
+bounded edit は通常の owner route として短い owner/path/validation note で完了し、DIC の
+fingerprint/closure を要求しません。
 
 ## Positive Rule Contract
 
@@ -92,7 +95,8 @@ skill に同じ universal policy を複製しません。
 質問・明示 write clause・進行中 update・integration cleanup の compact flow は
 [`documents/design/request-intent-and-update-relation.md`](documents/design/request-intent-and-update-relation.md)
 から各 canonical owner へ投影する。
-Related Document Closure は DIC-010 の path+section+clause/ref receipt を owner packet が消費する。
+Related Document Closure は active DIC route でだけ DIC-010 の path+section+clause/ref receipt を
+owner packet が消費する。bounded owner/path/targeted-validation route には適用しない。
 
 この projection は `operation -> resulting state -> completion evidence` の順で
 materialize します。質問は read scope と evidence を読み、evidence-backed answer
@@ -146,15 +150,35 @@ unknown dirty, staged, untracked, branch, and worktree state as owned by the
 user or another chat, and preserve that state across routing and repair.
 Protected Git operations include `git restore`, `git reset`, forced `git clean`,
 mutating `git stash`, checkout/switch, and branch/worktree create, delete, move,
-rename, or prune. Proven exact task ownership only bounds which paths may be
-named in an approval request; explicit destructive approval remains required.
-A protected mutation proceeds only when the user
-explicitly approves it and the same command segment carries
+rename, or prune. Normal branch/worktree creation records creation authority and
+reason; force-create/ref overwrite additionally requires destructive authority and
+reason. Existing checkout/switch, delete/rename/reset, and other history/ref
+mutations require destructive authority and reason. Reversible tracking metadata
+and `git worktree lock/unlock` do not mutate refs, history, or worktrees and are
+not destructive. Proven exact task ownership only bounds which paths may be
+named in an approval request; explicit destructive approval remains required for
+destructive operations.
+
+Canonical repo-local lifecycle commands are bounded to a separate workspace route:
+`repository_topic_clone.py` and `dependency_module_change.py` may prepare, reuse, and use
+`<project-root>/workspace/<topic-slug>/<repo-name>` without operation-level approval when
+non-empty owner evidence and exact computed identity are present. This does not authorize raw
+shared-checkout Git mutations or bypass the hook. At closeout, lifecycle skills dispatch proof-
+gated cleanup with computed clone identity, owner/marker evidence, clean state, and remote
+head/tree readback; publication artifacts are optional coherent enrichment. Only ordinary
+`CleanupProof` / cleanup receipt authorizes deletion. Collisions,
+unknown dirty state, and proof mismatch remain preserved typed holds.
+
+A protected destructive mutation proceeds only when the user explicitly approves
+it and the same command segment carries
 `AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval` plus a nonempty
-`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Branch/worktree creation additionally
-requires same-segment `AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` or
+`AGENT_CANON_DESTRUCTIVE_GIT_REASON`. Normal branch/worktree creation instead
+requires same-segment
+`AGENT_CANON_BRANCH_WORKTREE_AUTHORITY=user_request` or
 `agent_canon_workflow` plus a nonempty `AGENT_CANON_BRANCH_WORKTREE_REASON`;
-the creation and destructive requirements are an AND gate. Collision handling keeps the current
+force-create/ref overwrite requires both authority pairs. `latest` / `apply` /
+merge wrappers require destructive authority only unless their owner route
+actually creates a branch/worktree. Collision handling keeps the current
 branch/worktree and requests user direction.
 
 ## Structure-First Scope Formation
@@ -208,10 +232,9 @@ evidence, and closeout. After owner boundary, replaceable responsibility
 unit, context packet, and validation route are evidenced, implementation/doc-edit
 slices are handed to `spark_worker` or `worker`.
 
-Parent-direct repository edits are an exception with recorded evidence:
-`PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes` and
-`PARENT_DIRECT_WRITE_EXCEPTION=<explicit_user_approval|runtime_blocker>`, plus
-owner boundary, exception rationale, targeted validation, and fallback status.
+Explicit bounded owner/path/targeted-validation requests use the normal parent-direct route with a
+short owner/path/design-boundary note. The exception environment markers are reserved for a
+genuinely out-of-scope or unbounded parent-direct route, with explicit rationale and fallback status.
 
 Split work only when coordination requires it; otherwise keep one replaceable
 responsibility unit in one packet and one writer unless independent workstreams
@@ -238,9 +261,9 @@ coordination/resumption needs durable transport, use the `Abstract Design
 Frame`, `Implementation Source Packet`, `Design Side-Effect Map`, and
 `Design-To-Implementation Trace`. A structured handoff, approved source packet,
 or tool result is sufficient when those file artifacts are not selected. A
-parent-direct write exception may use the short owner/path/design-boundary note
-only after the exception route is recorded; the note is exception evidence and
-not authorization to bypass `spark_worker` or `worker`.
+  An explicit bounded request with fixed owner/path/validation may use the short
+  owner/path/design-boundary note as the normal parent-direct route. The note is
+  handoff context, not a requirement to create a run bundle or separate public skill.
 
 Treat API shape, responsibility boundary, path layout, naming, algorithm,
 test oracle, dependency direction, runtime contract, and config-surface gaps as
@@ -320,7 +343,7 @@ proof obligation, or replacement unit together even when the chunk is long.
 | implementation flow graph and source packet | run bundle design packet; `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`; `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` | design review; dependency review |
 | search, read scope, and reuse survey | semantic-index, deterministic `search.py` / `search_index.py`, dependency review artifacts | `run_repo_dependency_review.sh`; bounded search artifacts |
 | repo structure and root views | `vendor/agent-canon/documents/structure/repo-structure-contract.toml`; `responsibility-scope.toml`; `vendor/agent-canon/documents/runtime/shared-runtime-surfaces.toml` | structure/scope/import tools; `vendor/agent-canon/tools/sync_agent_canon.sh` |
-| shared-checkout Git mutation and branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/tools/agent_tools/hook_safety.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | explicit destructive approval AND `branch_creation_reason=<reason>` / `worktree_creation_reason=<reason>`; critical PreToolUse guard; `check_convention_compliance.py` |
+| shared-checkout Git mutation and branch/worktree creation route | `vendor/agent-canon/agents/canonical/CODEX_WORKFLOW.md`; `vendor/agent-canon/tools/agent_tools/hook_safety.py`; `vendor/agent-canon/agents/skills/worktree-health.md` | operation-risk Git authority matrix; critical PreToolUse guard; `check_convention_compliance.py` |
 | runtime profile and validation route | `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md` | profile-selected validation |
 | report and closeout structure | `task_close.py`; `report_artifact_checks.py`; run bundle `closeout_gate.md` | profile-selected closeout gate |
 | shared AgentCanon update | `vendor/agent-canon/tools/update_agent_canon.sh`; `vendor/agent-canon/tools/sync_agent_canon.sh`; AgentCanon PR workflow | submodule pin and PR evidence |
@@ -400,11 +423,8 @@ AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent
   PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
 ```
 
-Run these commands when this owner's follow-up contract says parent sync
-evidence is required, after the AgentCanon source / submodule pin / shared
-root / root-copy / sync-control surfaces are changed. Keep the trigger surface
-definition in this owner route only and reference
-`agents/skills/agent-canon-update.md` for the canonical trigger matrix.
+Run these commands when `agents/skills/agent-canon-update.md` (active root
+projection owner) indicates parent sync evidence is required.
 Record `agentcanon_structure_followup=required` and `agentcanon_structure_followup=pass`
 only after `link-root` and `check` pass from the template / derived parent root.
 
@@ -419,16 +439,15 @@ For repo-changing implementation, patch, or doc-edit work, closeout cites the
 write-capable handoff route, integration result, review gate, validation
 evidence, and subagent lifecycle evidence.
 
-For AgentCanon source, submodule pin, root runtime view, root-copy surface,
-parent root sync, and sync-control updates, closeout also cites
+For active root projection updates and parent root sync, closeout also cites
 `agentcanon_structure_followup=required` and
 `agentcanon_structure_followup=pass`, including the parent-root
 request-evidence-authorized `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` link-root and
 `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` check evidence.
 
-A no-subagents closeout is valid only for routing-only/advisory tasks, read-only
-audits, or recorded parent-direct write exceptions; cite the advisory/read-only
-reason or recorded `PARENT_DIRECT_WRITE_EXCEPTION` evidence.
+A no-subagents closeout is valid for routing-only/advisory tasks, read-only audits, or a bounded
+parent-direct route with owner/path/validation evidence. An out-of-scope or unbounded exception
+also cites its recorded `PARENT_DIRECT_WRITE_EXCEPTION` evidence.
 
 If write-capable handoff was blocked, closeout records one of:
 `WRITE_SUBAGENT_AUTHORIZATION=required` or `write_capable_handoff_blocker=<gate>`

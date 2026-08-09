@@ -141,7 +141,7 @@ class FileSurfaceInventoryTest(unittest.TestCase):
         """Manifest-owned root copies and test mirrors should not look product-owned."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            manifest = root / "vendor" / "agent-canon" / "documents" / "shared-runtime-surfaces.toml"
+            manifest = root / "vendor" / "agent-canon" / "documents" / "runtime" / "shared-runtime-surfaces.toml"
             manifest.parent.mkdir(parents=True)
             manifest.write_text(
                 "\n".join(
@@ -151,14 +151,14 @@ class FileSurfaceInventoryTest(unittest.TestCase):
                         '',
                         '[[group]]',
                         'mode = "copy"',
-                        'owner = "github-path-constraint"',
-                        'class = "github_copy"',
+                        'projection_producer = "github-path-constraint"',
+                        'projection_kind = "github_copy"',
                         'paths = [".github/workflows/agent-coordination.yml"]',
                         '',
                         '[[group]]',
                         'mode = "symlink"',
-                        'owner = "agent-canon"',
-                        'class = "test_mirror"',
+                        'projection_producer = "agent-canon"',
+                        'projection_kind = "test_mirror"',
                         'paths = ["tests/tools/test_check_bootstrap_docs.py"]',
                     ]
                 ),
@@ -199,14 +199,18 @@ class FileSurfaceInventoryTest(unittest.TestCase):
             entries = {entry["path"]: entry for entry in payload["scopes"][0]["entries"]}
             github_copy = entries[".github/workflows/agent-coordination.yml"]
             self.assertEqual(github_copy["kind"], "github_copy")
-            self.assertEqual(github_copy["owner"], "github-path-constraint")
+            self.assertEqual(
+                github_copy["projection_producer"], "github-path-constraint"
+            )
+            self.assertNotIn("owner", github_copy)
+            self.assertNotIn("surface_class", github_copy)
             self.assertEqual(
                 github_copy["canonical_source_path"],
                 "vendor/agent-canon/.github/workflows/agent-coordination.yml",
             )
             test_mirror = entries["tests/tools/test_check_bootstrap_docs.py"]
             self.assertEqual(test_mirror["kind"], "symlink_view")
-            self.assertEqual(test_mirror["surface_class"], "test_mirror")
+            self.assertEqual(test_mirror["projection_kind"], "test_mirror")
 
     def write_file(self, root: Path, relative: str, text: str) -> None:
         """Write one fixture file."""

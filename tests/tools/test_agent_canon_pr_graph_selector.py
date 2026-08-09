@@ -493,7 +493,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 acceptance = selector.evaluate_built_graph(
                     root,
                     graph_result,
-                    {"AGENT_CANON_PR_BASE_REF": base},
+                    {},
+                    trusted_base_sha=base,
                 )
 
         self.assertEqual(acceptance.status, "fail")
@@ -548,7 +549,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 acceptance = selector.evaluate_built_graph(
                     root,
                     graph_result,
-                    {"AGENT_CANON_PR_BASE_REF": base},
+                    {},
+                    trusted_base_sha=base,
                 )
 
         self.assertEqual(acceptance.status, "pass")
@@ -602,7 +604,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 acceptance = selector.evaluate_built_graph(
                     root,
                     graph_result,
-                    {"AGENT_CANON_PR_BASE_REF": base},
+                    {},
+                    trusted_base_sha=base,
                 )
 
         self.assertEqual(acceptance.status, "fail")
@@ -653,7 +656,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             acceptance = selector.evaluate_built_graph(
                 root,
                 graph_result,
-                {"AGENT_CANON_PR_BASE_REF": base},
+                {},
+                trusted_base_sha=base,
             )
 
         partitions = (
@@ -715,7 +719,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         """A legacy diagnostics table without payload_json is rejected at readback."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            base = graph_change_fixture(root, {})
+            graph_change_fixture(root, {})
             graph_result = write_graph_result(
                 root,
                 ("changed.py",),
@@ -872,7 +876,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             selection = selector.select(
                 root,
                 PROJECT_ROOT,
-                {"AGENT_CANON_PR_BASE_REF": base},
+                {},
+                trusted_base_sha=base,
                 changed_path_packet=packet,
             )
 
@@ -951,7 +956,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                     selector.evaluate_built_graph(
                         root,
                         graph_result,
-                        {"AGENT_CANON_PR_BASE_REF": base},
+                        {},
+                        trusted_base_sha=base,
                     )
 
         self.assertEqual(raised.exception.reason, "graph_identity_mismatch")
@@ -1098,7 +1104,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 acceptance = selector.evaluate_built_graph(
                     parent,
                     graph_result,
-                    {"AGENT_CANON_PR_BASE_REF": base},
+                    {},
+                    trusted_base_sha=base,
                     source_root=PROJECT_ROOT,
                 )
 
@@ -1124,10 +1131,6 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             'graph_acceptance_args+=(--trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}")',
             entrypoint,
         )
-        self.assertIn(
-            'if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then\n      graph_acceptance_args+=',
-            entrypoint,
-        )
 
     def test_pin_only_diff_is_skipped_with_reason_and_evidence(self) -> None:
         """A pin-only parent diff does not select strict parent graph completeness."""
@@ -1138,7 +1141,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             selection = selector.select(
                 root,
                 PROJECT_ROOT,
-                {"AGENT_CANON_PR_BASE_REF": base},
+                {},
+                trusted_base_sha=base,
             )
 
         self.assertEqual(selection.status, "skipped")
@@ -1157,9 +1161,9 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 root,
                 PROJECT_ROOT,
                 {
-                    "AGENT_CANON_PR_BASE_REF": base,
                     "AGENT_CANON_PR_VALIDATION_PROFILE": "maintenance",
                 },
+                trusted_base_sha=base,
             )
 
         self.assertEqual(selection.status, "required")
@@ -1176,9 +1180,9 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 root,
                 PROJECT_ROOT,
                 {
-                    "AGENT_CANON_PR_BASE_REF": base,
                     "AGENT_CANON_PR_VALIDATION_PROFILE": "agent-runtime",
                 },
+                trusted_base_sha=base,
             )
 
         self.assertEqual(selection.status, "skipped")
@@ -1195,9 +1199,9 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                     root,
                     PROJECT_ROOT,
                     {
-                        "AGENT_CANON_PR_BASE_REF": base,
                         "AGENT_CANON_PR_VALIDATION_PROFILE": "strict-dependency",
                     },
+                    trusted_base_sha=base,
                 )
 
         self.assertEqual(raised.exception.reason, "unknown_validation_profile")
@@ -1226,7 +1230,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             selection = selector.select(
                 root,
                 PROJECT_ROOT,
-                {"AGENT_CANON_PR_BASE_REF": base},
+                {},
+                trusted_base_sha=base,
             )
 
         self.assertEqual(selection.status, "required")
@@ -1249,7 +1254,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                     selection = selector.select(
                         root,
                         PROJECT_ROOT,
-                        {"AGENT_CANON_PR_BASE_REF": base},
+                        {},
+                        trusted_base_sha=base,
                     )
 
                 self.assertEqual(selection.status, "required")
@@ -1275,7 +1281,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             selection = selector.select(
                 root,
                 PROJECT_ROOT,
-                {"AGENT_CANON_PR_BASE_REF": base},
+                {},
+                trusted_base_sha=base,
             )
 
         self.assertEqual(selection.status, "required")
@@ -1306,7 +1313,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             acceptance = selector.evaluate_built_graph(
                 root,
                 graph_result,
-                {"AGENT_CANON_PR_BASE_REF": base},
+                {},
+                trusted_base_sha=base,
             )
             head = git(root, "rev-parse", "HEAD")
 
@@ -1375,7 +1383,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                     selector.evaluate_built_graph(
                         root,
                         graph_result,
-                        {"AGENT_CANON_PR_BASE_REF": base},
+                        {},
+                        trusted_base_sha=base,
                     )
 
         self.assertEqual(raised.exception.reason, "graph_identity_replaced")
@@ -1406,7 +1415,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             acceptance = selector.evaluate_built_graph(
                 root,
                 graph_result,
-                {"AGENT_CANON_PR_BASE_REF": base},
+                {},
+                trusted_base_sha=base,
             )
 
         self.assertEqual(acceptance.status, "fail")
@@ -1462,7 +1472,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 acceptance = selector.evaluate_built_graph(
                     root,
                     graph_result,
-                    {"AGENT_CANON_PR_BASE_REF": base},
+                    {},
+                    trusted_base_sha=base,
                 )
 
         self.assertEqual(acceptance.status, "pass")
@@ -1521,7 +1532,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 acceptance = selector.evaluate_built_graph(
                     root,
                     graph_result,
-                    {"AGENT_CANON_PR_BASE_REF": base},
+                    {},
+                    trusted_base_sha=base,
                 )
 
         self.assertEqual(acceptance.status, "fail")
@@ -1554,7 +1566,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             acceptance = selector.evaluate_built_graph(
                 root,
                 graph_result,
-                {"AGENT_CANON_PR_BASE_REF": base},
+                {},
+                trusted_base_sha=base,
             )
 
         self.assertEqual(acceptance.status, "fail")
@@ -1597,7 +1610,8 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             acceptance = selector.evaluate_built_graph(
                 root,
                 graph_result,
-                {"AGENT_CANON_PR_BASE_REF": base},
+                {},
+                trusted_base_sha=base,
             )
 
         self.assertEqual(acceptance.status, "fail")
@@ -1631,9 +1645,9 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 root,
                 graph_result,
                 {
-                    "AGENT_CANON_PR_BASE_REF": base,
                     "AGENT_CANON_PR_PARENT_GRAPH_MIGRATION": "yes",
                 },
+                trusted_base_sha=base,
             )
 
         self.assertEqual(acceptance.status, "fail")
@@ -1659,16 +1673,28 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             head = git(root, "rev-parse", "HEAD")
 
             with self.assertRaises(selector.SelectorFailure) as raised:
-                selector.load_diff(root, {"AGENT_CANON_PR_BASE_REF": head})
+                selector.load_diff(root, {}, head)
 
         self.assertEqual(raised.exception.reason, "pr_base_equals_head")
 
-    def test_local_base_override_is_required(self) -> None:
+    def test_local_trusted_base_sha_is_required(self) -> None:
         """Local callers cannot fall back to origin/main or HEAD parents."""
         with self.assertRaises(selector.SelectorFailure) as raised:
             selector.trusted_base_ref({})
 
-        self.assertEqual(raised.exception.reason, "local_base_override_required")
+        self.assertEqual(raised.exception.reason, "local_trusted_base_argument_required")
+
+    def test_local_trusted_base_sha_is_consumed_without_environment_override(self) -> None:
+        """The owner-provided SHA is sufficient without a base environment variable."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            base = commit_change(root, "vendor/agent-canon")
+            resolved, source = selector.trusted_base_ref({}, base)
+            diff = selector.load_diff(root, {}, base)
+
+        self.assertEqual(resolved, base)
+        self.assertEqual(source, "owner_trusted_base_sha")
+        self.assertEqual(diff.base_sha, base)
 
     def test_history_unreachable_base_is_typed_failure(self) -> None:
         """A resolvable commit without common history cannot define the PR diff."""
@@ -1679,7 +1705,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             unrelated = git(root, "commit-tree", empty_tree, input_text="unrelated\n")
 
             with self.assertRaises(selector.SelectorFailure) as raised:
-                selector.load_diff(root, {"AGENT_CANON_PR_BASE_REF": unrelated})
+                selector.load_diff(root, {}, unrelated)
 
         self.assertEqual(raised.exception.reason, "pr_base_unreachable_from_head")
 
@@ -1706,7 +1732,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
 
             with patch.object(selector, "run_git", side_effect=fail_diff):
                 with self.assertRaises(selector.SelectorFailure) as raised:
-                    selector.load_diff(root, {"AGENT_CANON_PR_BASE_REF": base})
+                    selector.load_diff(root, {}, base)
 
         self.assertEqual(raised.exception.reason, "pr_changed_paths_diff_failed")
 
@@ -1862,25 +1888,6 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
 
         self.assertEqual(missing.exception.reason, "trusted_pr_base_argument_invalid")
         self.assertEqual(mismatch.exception.reason, "trusted_pr_base_argument_mismatch")
-
-    def test_ci_rejects_base_override_before_fetch(self) -> None:
-        """CI accepts only its event base and never an environment override."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            _checkout, event, base = shallow_pr_checkout(root)
-            with self.assertRaises(selector.SelectorFailure) as raised:
-                selector.prepare_ci_base(
-                    _checkout,
-                    {
-                        "GITHUB_ACTIONS": "true",
-                        "GITHUB_EVENT_NAME": "pull_request",
-                        "GITHUB_EVENT_PATH": str(event),
-                        "AGENT_CANON_PR_BASE_REF": base,
-                    },
-                )
-
-        self.assertEqual(raised.exception.reason, "ci_base_override_forbidden")
-
 
 if __name__ == "__main__":
     unittest.main()

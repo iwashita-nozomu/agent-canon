@@ -51,7 +51,9 @@ PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_sou
 ```
 
 If the plan requires mutation, request current-task user approval before
-running protected `apply` with all four inline Git authority/reason fields.
+running protected `apply` with inline destructive authority/reason fields. Add
+creation authority/reason only when the route creates a branch or worktree;
+force-create or ref-overwrite routes require both authority pairs.
 
 派生 repo 側で shared canon を直す場合は、
 `documents/rule/dependency-module-changes.md` に従って
@@ -60,14 +62,16 @@ running protected `apply` with all four inline Git authority/reason fields.
 親 repo の `vendor/agent-canon/` は clean pin projection のままです。
 
 Reuse the current AgentCanon branch. If no suitable branch exists, keep the
-checkout unchanged and request user direction; branch creation requires the
-same-segment four-field approval contract. After committing only task-owned
-paths, invoke the protected merge wrapper with those fields and push the
-already-current branch.
+checkout unchanged and request user direction; normal branch creation requires
+same-segment creation authority/reason, while force-create or ref-overwrite
+requires the destructive authority/reason pair as well. After committing only
+task-owned paths, invoke the protected merge wrapper with destructive
+authority/reason and push the already-current branch.
 
-AgentCanon PR merge 後に派生 repo 側へ戻り、current-task user approval と全
-4 inline Git authority/reason field を得て protected `apply` を実行し、root
-view を修復します。
+AgentCanon PR merge 後に派生 repo 側へ戻り、current-task user approval と
+inline destructive authority/reason を得て protected `apply` を実行し、root
+view を修復します。Route が branch/worktree を作成する場合だけ creation
+authority/reason を追加し、force-create/ref-overwrite では両方を置きます。
 
 GitHub 管理では template の canonical remote を
 `https://github.com/iwashita-nozomu/project_template.git` にします。`.gitmodules` の AgentCanon URL は

@@ -773,14 +773,6 @@ def join_shell_lines(lines: list[str]) -> str:
     return "\n".join(line for line in lines if line.strip())
 
 
-def run_or_print(command: list[str], *, print_only: bool) -> int:
-    """Run one command or print it."""
-    print(shlex.join(command))
-    if print_only:
-        return 0
-    return subprocess.run(command, cwd=WORKSPACE_ROOT, check=False).returncode
-
-
 def print_label_and_command(label: str, command: list[str]) -> None:
     """Print one labeled command."""
     print(f"{label}:")

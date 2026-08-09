@@ -16,13 +16,11 @@ skill_dependencies:
     routing_candidates:
     - task-routing
     - codex-task-workflow
-    - owner-bounded-routing
     - subagent-bootstrap
     - dependency-analysis
     successors:
     - task-routing
     - codex-task-workflow
-    - owner-bounded-routing
     - subagent-bootstrap
     - dependency-analysis
     order_constraints:
@@ -44,7 +42,6 @@ skill_dependencies:
     - agent-orchestration
     routing_candidates:
     - agent-orchestration
-    - owner-bounded-routing
     - structure-refactor
     - agent-log-analysis
     - issue-finding-report
@@ -52,7 +49,6 @@ skill_dependencies:
     - result-artifact-writeout
     - agent-learning
     successors:
-    - owner-bounded-routing
     - structure-refactor
     - dependency-analysis
     order_constraints: []
@@ -79,7 +75,6 @@ skill_dependencies:
     routing_candidates:
     - agent-orchestration
     - task-routing
-    - owner-bounded-routing
     - result-artifact-writeout
     - change-review
     successors:
@@ -87,26 +82,9 @@ skill_dependencies:
     order_constraints: []
     parallel_independent:
     - task-routing
-    - owner-bounded-routing
     - change-review
     - result-artifact-writeout
     - comprehensive-development
-  owner-bounded-routing:
-    responsibility_group: orchestration
-    required_prerequisites:
-    - agent-orchestration
-    - task-routing
-    routing_candidates:
-    - task-routing
-    - md-style-check
-    - change-review
-    successors: []
-    order_constraints: []
-    parallel_independent:
-    - codex-task-workflow
-    - change-review
-    - md-style-check
-    - wiki-publication
   subagent-bootstrap:
     responsibility_group: orchestration
     required_prerequisites:
@@ -129,7 +107,6 @@ skill_dependencies:
     order_constraints: []
     parallel_independent:
     - codex-task-workflow
-    - owner-bounded-routing
     - tool-finding-report
     - pr-processing
     - report-writing
@@ -563,7 +540,6 @@ skill_dependencies:
     successors: []
     order_constraints: []
     parallel_independent:
-    - owner-bounded-routing
     - prose-reasoning-graph
     - document-canon-cleanup
   mvp-skeleton:
@@ -910,10 +886,8 @@ skill_dependencies:
     responsibility_group: lifecycle
     required_prerequisites: []
     routing_candidates:
-    - owner-bounded-routing
     - result-artifact-writeout
     successors: []
     order_constraints: []
     parallel_independent:
-    - owner-bounded-routing
     - result-artifact-writeout

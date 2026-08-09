@@ -16,12 +16,16 @@ import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "generate_agent_runtime_dashboard.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from generate_agent_runtime_dashboard import (  # noqa: E402
     HookWorkflowBreakdownReader,
+    TokenUsageBreakdownReader,
+    token_usage_lines,
+    token_usage_next_action,
     tool_source_path_candidates,
 )
 from runtime_log_paths import mounted_log_archive_root, repo_log_key  # noqa: E402
@@ -40,6 +44,108 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             entries = HookWorkflowBreakdownReader.iter_entries(missing_log)
 
         self.assertEqual(entries, ())
+
+    def test_canonical_candidate_only_workflow_stays_missing(self) -> None:
+        """Candidate fields must not become owner attribution in canonical rows."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            hook = root / "behavior_events.jsonl"
+            hook.write_text(
+                json.dumps(
+                    {
+                        "schema": "agent-canon.behavior-event.v1",
+                        "event_id": "a" * 64,
+                        "hook_invocation_id": "candidate-only",
+                        "hook_event_name": "UserPromptSubmit",
+                        "event_kind": "behavior_snapshot",
+                        "timestamp": "2026-05-17T00:00:00Z",
+                        "hook_log_namespace": "test",
+                        "workflow_attribution_kind": "missing",
+                        "candidate_workflows": ["scoped-change"],
+                        "selected_workflows": [],
+                        "workflow_owner_workflows": [],
+                        "workflow_context_workflows": [],
+                        "status": "pass",
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            breakdown = HookWorkflowBreakdownReader.read((hook,), root)
+
+        self.assertEqual(breakdown.entries_with_workflow, 0)
+        self.assertEqual(breakdown.entries_without_workflow, 1)
+        self.assertEqual(breakdown.workflow_attribution["missing"], 1)
+
+    def test_legacy_candidate_only_workflow_stays_missing(self) -> None:
+        """Legacy candidate fields must not become owner attribution either."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            hook = root / "legacy.jsonl"
+            hook.write_text(
+                json.dumps(
+                    {
+                        "hook_run_id": "legacy-candidate-only",
+                        "hook_log_namespace": "test",
+                        "event": "UserPromptSubmit",
+                        "timestamp": "2026-05-17T00:00:00Z",
+                        "status": "pass",
+                        "candidate_workflows": ["scoped-change"],
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            breakdown = HookWorkflowBreakdownReader.read((hook,), root)
+
+        self.assertEqual(breakdown.entries_with_workflow, 0)
+        self.assertEqual(breakdown.entries_without_workflow, 1)
+        self.assertEqual(breakdown.workflow_attribution["missing"], 1)
+
+    def test_token_objective_selected_without_evidence_is_missing(self) -> None:
+        """A selected token objective reports missing evidence and an action."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report = root / "reports" / "agents" / "run" / "workflow_monitoring.md"
+            report.parent.mkdir(parents=True)
+            report.write_text("token_reduction_objective=selected\n", encoding="utf-8")
+
+            breakdown = TokenUsageBreakdownReader.read(root)
+
+        self.assertTrue(breakdown.objective_selected)
+        self.assertEqual(breakdown.comparison_count, 0)
+        summary = SimpleNamespace(
+            token_usage_breakdown=breakdown,
+            evidence=SimpleNamespace(open_issues=(), closed_issues=()),
+            root=root,
+        )
+        lines = token_usage_lines(summary)
+        self.assertIn("- token_comparison_status: `missing`", lines)
+        self.assertTrue(token_usage_next_action(summary))
+
+    def test_token_objective_not_selected_has_no_action(self) -> None:
+        """An explicit opt-out is truthful and does not invent a global gap."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            report = root / "reports" / "agents" / "run" / "workflow_monitoring.md"
+            report.parent.mkdir(parents=True)
+            report.write_text("token_efficiency_not_required reason=single-route\n", encoding="utf-8")
+
+            breakdown = TokenUsageBreakdownReader.read(root)
+
+        self.assertFalse(breakdown.objective_selected)
+        summary = SimpleNamespace(
+            token_usage_breakdown=breakdown,
+            evidence=SimpleNamespace(open_issues=(), closed_issues=()),
+            root=root,
+        )
+        self.assertFalse(token_usage_next_action(summary))
 
     def test_generates_log_location_dashboard(self) -> None:
         """The dashboard should show canonical paths and accumulated counts."""
@@ -106,7 +212,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "AGENT_RUNTIME_DASHBOARD_WAVE_COMPLETED=1",
             "| `completed_events` | `1` |",
             "| `spawned_roles` | `requirements_organizer=1, explorer=1, execution_planner=1` |",
-            "| `missing_namespaces` | `test-container=5` |",
+            "| `missing_namespaces` | `test-container=6` |",
             "| `missing_urls` | `https://example.com/paper.pdf=1` |",
             "| `registered_urls` | `https://example.com/reference.html=1` |",
             "Do not read raw JSONL during normal agent log analysis.",
@@ -126,7 +232,7 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "## Problem Components",
             "AGENT_RUNTIME_DASHBOARD_PROBLEM_COMPONENTS=6",
             "| `workflow` | `_unattributed_hook_entries` | `attention` | "
-            "`5 hook entries lack workflow attribution` | "
+            "`6 hook entries lack workflow attribution` | "
             "`compact report Workflow Attribution Drilldown` | "
             "`repair workflow attribution logging` |",
             "| `hook` | `reference_capture_guard` | `attention` | "
@@ -174,8 +280,8 @@ class GenerateAgentRuntimeDashboardTest(unittest.TestCase):
             "## Skill Eval Failure Analysis",
             "| `agent-orchestration` | `1` | `1` | `100.0%` |",
             "## Hook Workflow Attribution",
-            "| `environment-maintenance@UserPromptSubmit` | `1` |",
-            "hook_entries_missing_workflow_attribution: `5`",
+            "| `_none` | `0` |",
+            "hook_entries_missing_workflow_attribution: `6`",
             "hook_entries_context_attributed: `0`",
             "## Token Consumption Evidence",
             "token_comparison_status: `present`",

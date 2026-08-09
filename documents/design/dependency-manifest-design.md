@@ -66,6 +66,47 @@ questions.
 - すべての generated / binary artifact を同じ manifest で管理しない
 - write-capable subagent の並列数を増やすための設計ではない
 
+## Mounted Language-Server Dependency Contract
+
+共有 code analysis の LSP サーバーは product image の依存ではなく、
+`.devcontainer/dependencies.toml` の mounted developer/agent tool record
+として管理します。各 record は registry/repository の exact version、
+source、provider、typed executable verification、`failure_policy = "fail"`
+を持ち、検証済みの executable 以外を PATH から選択しません。Canonical
+mapping は `python → pyright-langserver --stdio`、`c`/`cpp → clangd-18`、
+`shellscript → bash-language-server start`、`rust → rust-analyzer` です。
+
+`apt-repository` には `repository_suite` と
+`repository_components` を明示します。`repository_packages_sha256` がある
+record は source、suite、単一 component、`platform` から uncompressed
+Packages index URL を決定し、取得 bytes の SHA-256 を source-line/apt
+package の受入れ前に照合します。URL の欠落、取得失敗、digest 不一致、
+署名付き source line の drift、または executable/version の drift は
+warning に降格せず typed failure とします。Rust の `rust-src` は component
+verification の対象ですが、独立 executable probe は持ちません。
+Immutable な apt artifact を固定する record は
+`repository_package_url` と `repository_package_sha256` を必ず対で持ちます。
+URL は HTTPS の `.deb`、SHA-256 は 64 桁 hex とし、installer は signed
+source/key の update 後に exact URL を safe temporary path へ取得し、artifact
+SHA を照合してから local-file `apt-get install` を実行します。receipt は
+rolling Packages index identity と immutable artifact identity を別フィールド
+として保存し、両者を混同した変更を stale receipt として拒否します。
+
+依存 receipt の executable identity は manifest の install method が所有します。
+`VerifiedExecutable(record_id, manifest_version, executable, absolute_path,
+record_fingerprint, plan_fingerprint, verification_output)` と
+`resolve_verified_executable(workspace, vendor_root, receipts, record_id,
+executable)` が公開境界です。解決は exact record、receipt schema/fingerprint/
+requested-provided binding、Installer の live verify、method-specific absolute
+path、receipt の absolute path/output readback の順で行い、どれか一つでも
+不一致なら fail closed とします。npm は `pyright` と
+`pyright-langserver` を同一 package の bindings として保存し、apt は
+`executable_owner_packages` で宣言された所有者群の lexical path と
+resolved path を `/usr/bin/dpkg-query --listfiles` ownership で照合します。いずれかの
+所有者が所有境界に失敗した場合は fail-closed です。Rust は pinned
+toolchain の `rust-analyzer` path を保存します。ambient `PATH` や `shutil.which`
+はこの境界に入りません。
+
 ## Design Claim Evidence Contract
 
 Design documents state implementation-facing claims within the evidence exposed
@@ -202,9 +243,10 @@ history. It does not persist the credential in checkout or repository Git config
 and `actions/checkout` keeps `persist-credentials: false`. Public, private, and
 fork PRs all use that same trusted event-SHA route. The emitted SHA is passed back
 through `--trusted-base-sha`, and normal selection accepts the argument only when
-it exactly matches the event SHA. CI `AGENT_CANON_PR_BASE_REF` overrides and local
-trusted-base arguments are typed failures. Local and fixture selection supplies
-an explicit, credential-free `AGENT_CANON_PR_BASE_REF`. Equal-to-HEAD, unresolved,
+it exactly matches the event SHA. The normal local `check_agent_canon_pr.sh` owner
+reads the verified `origin` `refs/heads/main` SHA and passes that immutable value
+through `--trusted-base-sha`; the lower selector consumes that value without
+selecting or re-reading a comparison base. Equal-to-HEAD, unresolved,
 history-unreachable, missing-fetch-credential, fetch, or diff failures do not
 become an empty change set. Unknown profile IDs and malformed canonical
 profile/surface owners fail by the same rule.
@@ -652,11 +694,15 @@ Example: A `upstream` B plus B `upstream` A is an upstream cycle and should fail
 
 ## Tool Split
 
-Tools are Bash-first.
-Python is not required for the first implementation because the DSL is line-oriented.
-
 Code dependency extraction is deliberately separate from dependency manifest validation.
-`scan_code_dependencies.sh` reads language syntax such as Python imports, local C/C++ includes, and shell source statements.
+`scan_code_dependencies.sh` is the compatibility command surface, while
+`lsp_code_analysis.py scan-legacy` owns the canonical code-relation projection.
+The shell wrapper delegates normal scans to that LSP command and uses its
+lexical extractor only when `--lexical-only` is explicit.
+The LSP adapter reads language syntax through server capabilities such as
+document symbols, definitions, references, and call hierarchy; the explicit
+lexical route still reads Python imports, local C/C++ includes, and shell source
+statements.
 The manifest tools read only `@dependency-start` / `@dependency-end` blocks.
 Do not combine these outputs into one graph: code dependency evidence answers "what does this code reference", while header dependency evidence answers "which design, implementation, environment, and test context must be read".
 
@@ -664,11 +710,12 @@ Do not combine these outputs into one graph: code dependency evidence answers "w
 
 Responsibilities:
 
-- extract best-effort code edges from import / include / source statements
+- delegate the normal scan to the canonical LSP `scan-legacy` report
 - keep output independent from manifest upstream/downstream edges
 - support explicit path lists and `--changed`
 - provide pre-edit evidence for `agents/workflows/hypothesis-validation-workflow.md`
-- remain Bash-first and lightweight; deeper language-specific precision can be added later without changing the header manifest DSL
+- require `--lexical-only` for the compatibility extractor and fail closed when
+  the canonical LSP server is unavailable
 
 ### `scan_dependency_headers.sh`
 

@@ -8,12 +8,12 @@
 # generated role view: generated_role_view_v1
 # generated from agents/model_profiles.toml plus canonical team/runtime role metadata
 # materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 04b88bc705194b571d8b10ae90998c81b0bdbcab4659f8296744e488f95b1d2d
+# source canonical digest: 3d7e48f58a4c647656dac1a6781cab05d2b9ca5a5ae540739d59e49c97007188
 
 name = "detailed_designer"
 description = "Detailed-design authoring agent for writing implementation-ready design docs with reuse-first, side-effect mapping, and style-continuity guidance."
 nickname_candidates = ["detailed_designer"]
-sandbox_mode = "workspace-write"
+sandbox_mode = "read-only"
 approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"

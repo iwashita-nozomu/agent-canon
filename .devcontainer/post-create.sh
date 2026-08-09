@@ -45,12 +45,6 @@ fi
 tools_home="$HOME/.tools"
 runtime_root="/var/lib/agent-canon/runtime"
 source_projection_root="$workspace/reports/agents/devcontainer/runtime"
-playwright_browsers_path="/usr/local/share/ms-playwright"
-cargo_home="${CARGO_HOME:-$HOME/.cargo}"
-rustup_home="${RUSTUP_HOME:-$HOME/.rustup}"
-elan_home="${ELAN_HOME:-$HOME/.elan}"
-pip_user_script_dir=""
-export PLAYWRIGHT_BROWSERS_PATH="$playwright_browsers_path"
 
 prepend_path() {
   case ":$PATH:" in
@@ -67,25 +61,9 @@ publish_agent_tools_profile() {
 export AGENT_CANON_TOOLS_HOME="$tools_home"
 export AGENT_CANON_RUNTIME_ROOT="$runtime_root"
 export AGENT_CANON_SOURCE_PROJECTION_ROOT="$source_projection_root"
-export PLAYWRIGHT_BROWSERS_PATH="$playwright_browsers_path"
-export CARGO_HOME="$cargo_home"
-export RUSTUP_HOME="$rustup_home"
-export ELAN_HOME="$elan_home"
 case ":\$PATH:" in
   *:"$tools_home/bin":*) ;;
   *) export PATH="$tools_home/bin:\$PATH" ;;
-esac
-case ":\$PATH:" in
-  *:"$cargo_home/bin":*) ;;
-  *) export PATH="$cargo_home/bin:\$PATH" ;;
-esac
-case ":\$PATH:" in
-  *:"$elan_home/bin":*) ;;
-  *) export PATH="$elan_home/bin:\$PATH" ;;
-esac
-case ":\$PATH:" in
-  *:"$pip_user_script_dir":*) ;;
-  *) export PATH="$pip_user_script_dir:\$PATH" ;;
 esac
 EOF
   if [ "$(id -u)" -eq 0 ]; then
@@ -110,42 +88,6 @@ register_safe_directories() {
   if [ -d "$workspace/.git" ]; then
     git config --global --add safe.directory "$workspace/.git" || true
   fi
-}
-
-agent_canon_source_root() {
-  if [ -f "$workspace/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]; then
-    printf '%s\n' "$workspace/vendor/agent-canon"
-  elif [ -f "$workspace/rust/agent-canon/Cargo.toml" ]; then
-    printf '%s\n' "$workspace"
-  else
-    echo "AgentCanon Rust source is unavailable" >&2
-    return 1
-  fi
-}
-
-publish_agent_canon_cli() {
-  local canon_root
-  local binary
-  canon_root="$(agent_canon_source_root)"
-  binary="$canon_root/rust/agent-canon/target/release/agent-canon"
-  [ -x "$binary" ] || {
-    echo "AgentCanon cargo-source-build did not produce $binary" >&2
-    return 1
-  }
-  install -d -m 755 "$tools_home/agent-canon/bin" "$tools_home/bin"
-  install -m 755 "$binary" "$tools_home/agent-canon/bin/agent-canon"
-  printf 'agent_canon_source_root=%s\n' "$canon_root" \
-    >"$tools_home/agent-canon/.build-state"
-  ln -sfn "$tools_home/agent-canon/bin/agent-canon" "$tools_home/bin/agent-canon"
-  if [ "$(id -u)" -eq 0 ]; then
-    ln -sfn "$tools_home/bin/agent-canon" /usr/local/bin/agent-canon
-  elif command -v sudo >/dev/null 2>&1; then
-    sudo ln -sfn "$tools_home/bin/agent-canon" /usr/local/bin/agent-canon
-  else
-    echo "post-create requires root or sudo for /usr/local/bin/agent-canon" >&2
-    return 1
-  fi
-  "$tools_home/bin/agent-canon" --version
 }
 
 build_agent_canon_cache() {
@@ -204,7 +146,6 @@ publish_container_local_runtime() {
     printf '  "schema_version": "container-tool-availability/v2",\n'
     printf '  "runtime_root": %s,\n' "$(printf '%s' "$runtime_root" | jq -R .)"
     printf '  "source_projection_root": %s,\n' "$(printf '%s' "$source_projection_root" | jq -R .)"
-    printf '  "playwright_browsers_path": %s,\n' "$(printf '%s' "$playwright_browsers_path" | jq -R .)"
     printf '  "tools": {\n%s\n  }\n}\n' "$tool_status"
   } >"$runtime_root/tool-availability.json"
   cp "$runtime_root/tool-availability.json" "$source_projection_root/tool-availability.json"
@@ -212,22 +153,7 @@ publish_container_local_runtime() {
   echo "ENVIRONMENT_TOOL_AVAILABILITY=$runtime_root/tool-availability.json"
 }
 
-"$devcontainer_dir/bootstrap-dependencies.sh" --install-language-runtime
 "$devcontainer_dir/bootstrap-dependencies.sh" --check
-
-pip_user_script_dir="$(python3 - <<'PY'
-import site
-from pathlib import Path
-
-print(Path(site.getuserbase()) / "bin")
-PY
-)"
-export CARGO_HOME="$cargo_home"
-export RUSTUP_HOME="$rustup_home"
-export ELAN_HOME="$elan_home"
-prepend_path "$pip_user_script_dir"
-prepend_path "$elan_home/bin"
-prepend_path "$cargo_home/bin"
 
 python3 "$agent_canon_root/tools/agent_tools/devcontainer_dependencies.py" \
   validate --workspace "$workspace" --vendor-root "$agent_canon_root" --format text
@@ -245,6 +171,5 @@ else
 fi
 
 publish_agent_tools_profile
-publish_agent_canon_cli
 build_agent_canon_cache
 publish_container_local_runtime

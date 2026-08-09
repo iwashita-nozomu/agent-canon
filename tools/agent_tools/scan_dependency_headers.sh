@@ -22,6 +22,7 @@ declare -a CHANGED_PATHS=()
 declare -a BASELINE_MISSING_PATHS=()
 declare -a CHANGED_MISSING_PATHS=()
 declare -A CHANGED_PATH_SET=()
+declare -a DECLARED_SURFACES=()
 
 usage() {
   cat <<'EOF'
@@ -83,6 +84,39 @@ done
 
 cd "$ROOT_DIR"
 ROOT_DIR="$(pwd -P)"
+
+load_declared_surfaces() {
+  local manifest="$ROOT_DIR/responsibility-scope.toml"
+  [[ -f "$manifest" ]] || return 0
+  awk '
+    /^dependency_header_surfaces[[:space:]]*=[[:space:]]*\[/ { in_block = 1; next }
+    in_block && /^[[:space:]]*\]/ { exit }
+    in_block {
+      line = $0
+      while (match(line, /"[^"]+"/)) {
+        print substr(line, RSTART + 1, RLENGTH - 2)
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }
+  ' "$manifest"
+}
+mapfile -t DECLARED_SURFACES < <(load_declared_surfaces)
+
+matches_declared_surface() {
+  local path="$1"
+  local pattern=""
+  for pattern in "${DECLARED_SURFACES[@]}"; do
+    case "$pattern" in
+      "$path") return 0 ;;
+      */**)
+        local prefix="${pattern%/**}"
+        [[ "$path" == "$prefix"/* ]] && return 0
+        ;;
+      *) [[ "$path" == $pattern ]] && return 0 ;;
+    esac
+  done
+  return 1
+}
 
 packet_fail() {
   echo "DEPENDENCY_HEADER_SCAN=fail"
@@ -319,12 +353,29 @@ is_changed_path() {
   [[ -n "$CHANGED_PATH_PACKET" && -n "${CHANGED_PATH_SET[$1]+present}" ]]
 }
 
+is_selected_surface() {
+  local path="$1"
+  if [[ ${#INPUT_PATHS[@]} -gt 0 ]]; then
+    return 0
+  fi
+  # A trusted changed-path packet supplies the complete baseline universe;
+  # retain unchanged files so missing headers remain baseline evidence.
+  if [[ -n "$CHANGED_PATH_PACKET" ]]; then
+    return 0
+  fi
+  if matches_declared_surface "$path"; then
+    return 0
+  fi
+  is_changed_path "$path"
+}
+
 while IFS= read -r raw_path; do
   [[ -n "$raw_path" ]] || continue
   path="$(to_repo_path "$raw_path")"
   [[ -f "$path" && ! -L "$path" ]] || { skipped=$((skipped + 1)); continue; }
   is_skip_path "$path" && { skipped=$((skipped + 1)); continue; }
   is_checkable_suffix "$path" || { skipped=$((skipped + 1)); continue; }
+  is_selected_surface "$path" || { skipped=$((skipped + 1)); continue; }
   is_binary_file "$path" || { skipped=$((skipped + 1)); continue; }
   checked=$((checked + 1))
   if ! has_manifest_markers "$path"; then

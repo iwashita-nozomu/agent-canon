@@ -138,6 +138,8 @@ check_bootstrap() {
   node_receipt_matches || fail "verified Node bootstrap receipt is unavailable or stale"
   command -v gpg >/dev/null 2>&1 || fail "gnupg capability is unavailable"
   command -v ninja >/dev/null 2>&1 || fail "ninja-build capability is unavailable"
+  command -v cc >/dev/null 2>&1 || fail "build-essential capability is unavailable: cc"
+  command -v gcc >/dev/null 2>&1 || fail "build-essential capability is unavailable: gcc"
   printf 'DEVCONTAINER_BASE_BOOTSTRAP=pass\n'
 }
 
@@ -216,7 +218,7 @@ install_standalone_base() {
     curl \
     gnupg \
     xz-utils \
-    ninja-build
+    build-essential
   if ! python3 - <<'PY'
 try:
     import tomllib

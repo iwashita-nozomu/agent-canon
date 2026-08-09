@@ -22,6 +22,7 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import lsp_code_analysis  # noqa: E402
 import search_index  # noqa: E402
 import vector_search  # noqa: E402
 
@@ -77,6 +78,7 @@ class SearchCorpus:
     dependency_edges: tuple[vector_search.DependencyEdge, ...]
     python_symbols: tuple[vector_search.PythonSymbol, ...]
     python_edges: tuple[vector_search.PythonCallEdge, ...]
+    lsp_report: lsp_code_analysis.CodeAnalysisReport | None = None
 
 
 @dataclass(frozen=True)
@@ -212,6 +214,15 @@ def load_index_cards(request: SearchRequest) -> tuple[search_index.SearchCard, .
     return cards
 
 
+def discover_lsp_files(
+    root: Path,
+    requested_files: Sequence[str],
+    excludes: Sequence[str],
+) -> tuple[Path, ...]:
+    """Delegate LSP discovery to the shared vector/search path policy."""
+    return vector_search.discover_lsp_files(root, requested_files, excludes)
+
+
 def load_corpus(request: SearchRequest) -> SearchCorpus:
     """Load shared facts for providers."""
     documents = tuple(
@@ -223,6 +234,22 @@ def load_corpus(request: SearchRequest) -> SearchCorpus:
         )
     )
     symbols = vector_search.read_python_symbols(documents)
+    lsp_report = None
+    if "code-deps" in request.providers:
+        analysis_files = discover_lsp_files(
+            request.root,
+            request.surfaces,
+            request.excludes,
+        )
+        if analysis_files:
+            candidate = lsp_code_analysis.analyze(request.root, analysis_files)
+            if candidate.status == "complete" and (
+                candidate.symbols
+                or candidate.relations
+                or candidate.lexical_candidates
+                or not symbols
+            ):
+                lsp_report = candidate
     return SearchCorpus(
         documents=documents,
         tool_entries=search_index.load_tool_entries(request.root),
@@ -230,6 +257,7 @@ def load_corpus(request: SearchRequest) -> SearchCorpus:
         dependency_edges=tuple(vector_search.parse_dependency_edges(request.root, documents)),
         python_symbols=symbols,
         python_edges=vector_search.build_python_call_edges(symbols),
+        lsp_report=lsp_report,
     )
 
 
@@ -391,6 +419,25 @@ def code_edge_hits(
 
 def code_dependency_hits(request: SearchRequest, corpus: SearchCorpus) -> tuple[ProviderHit, ...]:
     """Return code dependency hits."""
+    if corpus.lsp_report is not None:
+        hits: list[ProviderHit] = []
+        for symbol in corpus.lsp_report.symbols:
+            path = lsp_code_analysis._uri_path(request.root, symbol.uri)
+            searchable = f"{path} {symbol.name} {symbol.container or ''}"
+            score = request.query.score_text(searchable)
+            if score > 0.0:
+                hits.append(ProviderHit("code-deps", path, score, "lsp-symbol", snippet(searchable)))
+        for relation in corpus.lsp_report.relations:
+            searchable = f"{relation.source} {relation.orientation} {relation.target}"
+            score = request.query.score_text(searchable)
+            if score > 0.0:
+                hits.append(ProviderHit("code-deps", relation.source, score, f"lsp-{relation.orientation}", snippet(searchable)))
+        for candidate in corpus.lsp_report.lexical_candidates:
+            searchable = f"{candidate.source} {candidate.token} {candidate.target}"
+            score = request.query.score_text(searchable)
+            if score > 0.0:
+                hits.append(ProviderHit("code-deps", candidate.source, score, "lsp-lexical-candidate", snippet(searchable)))
+        return tuple(sorted(hits, key=lambda hit: (-hit.score, hit.path))[: request.top])
     hits = (
         *code_symbol_hits(request, corpus.python_symbols),
         *code_edge_hits(request, corpus.python_symbols, corpus.python_edges),

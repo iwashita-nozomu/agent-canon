@@ -15,6 +15,7 @@ status: resolved
 source: runtime
 severity: S2
 evidence: reports/agents/oop-readability-20260621-refactor-issues/oop_readability_check_design_doc_claims.md
+github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/584
 affected_surfaces: tools/agent_tools/check_design_doc_claims.py, documents/tools/check_design_doc_claims.md, tests/agent_tools/test_check_design_doc_claims.py
 edit_scope: tools/agent_tools/check_design_doc_claims.py token_polarities, polarity_for_line, check_parent_contradictions, reports/agents/oop-readability-20260621-refactor-issues/oop_readability_check_design_doc_claims.md
 required_action: Refactor `token_polarities` so token extraction, polarity classification, and map accumulation are explicit named steps.

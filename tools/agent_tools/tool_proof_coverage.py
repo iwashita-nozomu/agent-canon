@@ -85,6 +85,7 @@ class ProofCoverageReport:
     findings: tuple[Finding, ...]
     rows: tuple[ToolProofRow, ...]
     require_lean_verified: bool
+    selected_tool_ids: tuple[str, ...]
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -95,7 +96,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--require-lean-verified",
         action="store_true",
-        help="Fail unless every behavior and performance claim is Lean verified.",
+        help="Require Lean evidence for the explicitly selected tools.",
+    )
+    parser.add_argument(
+        "--tool-id",
+        action="append",
+        default=[],
+        help="Select a catalog tool for proof validation; repeat for multiple tools.",
     )
     return parser
 
@@ -287,21 +294,41 @@ def row_from_entry(root: Path, entry: Mapping[str, object]) -> tuple[ToolProofRo
     return row, behavior_findings + performance_findings
 
 
-def build_report(root: Path, require_lean_verified: bool = False) -> ProofCoverageReport:
-    """Build a proof coverage report for all cataloged tools."""
+def build_report(
+    root: Path,
+    require_lean_verified: bool = False,
+    selected_tool_ids: Sequence[str] = (),
+) -> ProofCoverageReport:
+    """Build proof coverage, enforcing Lean only for selected tools."""
     root = root.resolve()
     entries, findings = load_catalog_entries(root)
+    selected = tuple(dict.fromkeys(tool_id for tool_id in selected_tool_ids if tool_id))
+    available = {str(entry.get("id") or "<missing-id>") for entry in entries}
+    for tool_id in selected:
+        if tool_id not in available:
+            findings.append(Finding("selection", tool_id, "unknown-tool-id"))
+    if require_lean_verified and not selected:
+        findings.append(
+            Finding(
+                "selection",
+                "<none>",
+                "explicit-tool-selection-required; universal-proof-backlog-retired",
+            )
+        )
     rows: list[ToolProofRow] = []
     for entry in entries:
+        tool_id = str(entry.get("id") or "<missing-id>")
+        if selected and tool_id not in selected:
+            continue
         row, row_findings = row_from_entry(root, entry)
         rows.append(row)
         findings.extend(row_findings)
-        if require_lean_verified and row.behavior.status != LEAN_VERIFIED:
+        if require_lean_verified and selected and row.behavior.status != LEAN_VERIFIED:
             findings.append(Finding("coverage", row.tool_id, "behavior-not-lean-verified"))
-        if require_lean_verified and row.performance.status != LEAN_VERIFIED:
+        if require_lean_verified and selected and row.performance.status != LEAN_VERIFIED:
             findings.append(Finding("coverage", row.tool_id, "performance-not-lean-verified"))
     findings = sorted(findings, key=lambda finding: (finding.check, finding.tool_id, finding.detail))
-    return ProofCoverageReport(tuple(findings), tuple(rows), require_lean_verified)
+    return ProofCoverageReport(tuple(findings), tuple(rows), require_lean_verified, selected)
 
 
 def render_json(report: ProofCoverageReport) -> str:
@@ -309,6 +336,7 @@ def render_json(report: ProofCoverageReport) -> str:
     payload = {
         "status": "pass" if not report.findings else "fail",
         "require_lean_verified": report.require_lean_verified,
+        "selected_tool_ids": list(report.selected_tool_ids),
         "findings": [asdict(finding) for finding in report.findings],
         "rows": [asdict(row) for row in report.rows],
     }
@@ -329,6 +357,7 @@ def render_markdown(report: ProofCoverageReport) -> str:
         f"- Tools: `{len(report.rows)}`",
         f"- Findings: `{len(report.findings)}`",
         f"- Require Lean verified: `{'yes' if report.require_lean_verified else 'no'}`",
+        f"- Selected tools: `{','.join(report.selected_tool_ids) if report.selected_tool_ids else 'all (observational)'}`",
         "",
         "| Tool | Behavior Status | Performance Status | Performance Model | Next Witness |",
         "| ---- | --------------- | ------------------ | ----------------- | ------------ |",
@@ -375,6 +404,7 @@ def render_text(report: ProofCoverageReport) -> str:
             f"TOOL_PROOF_COVERAGE_BEHAVIOR_TEST_EVIDENCE_ONLY={behavior_counts[TEST_EVIDENCE_ONLY]}",
             f"TOOL_PROOF_COVERAGE_PERFORMANCE_EXTERNAL_ASSUMPTION={performance_counts[EXTERNAL_ASSUMPTION]}",
             f"TOOL_PROOF_COVERAGE_REQUIRE_LEAN_VERIFIED={'yes' if report.require_lean_verified else 'no'}",
+            f"TOOL_PROOF_COVERAGE_SELECTED_TOOLS={','.join(report.selected_tool_ids)}",
             f"TOOL_PROOF_COVERAGE_FINDINGS={len(report.findings)}",
             f"TOOL_PROOF_COVERAGE={'pass' if not report.findings else 'fail'}",
         ]
@@ -385,7 +415,11 @@ def render_text(report: ProofCoverageReport) -> str:
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the proof coverage reporter."""
     args = build_parser().parse_args(argv)
-    report = build_report(Path(args.root), require_lean_verified=bool(args.require_lean_verified))
+    report = build_report(
+        Path(args.root),
+        require_lean_verified=bool(args.require_lean_verified),
+        selected_tool_ids=tuple(args.tool_id),
+    )
     if args.format == "json":
         print(render_json(report))
     elif args.format == "markdown":
