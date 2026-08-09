@@ -25,7 +25,6 @@ from typing import cast
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-CONFIG = PROJECT_ROOT / ".codex" / "config.toml"
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
@@ -357,11 +356,6 @@ class CodexHooksTest(unittest.TestCase):
 
     def test_active_hook_config_has_exact_three_events(self) -> None:
         """Project config and hooks JSON expose only the three active dispatcher events."""
-        config_text = CONFIG.read_text(encoding="utf-8")
-        self.assertIn("[features]", config_text)
-        self.assertIn("hooks = true", config_text)
-        self.assertNotIn("codex_hooks", config_text)
-
         hooks = cast("dict[str, object]", json.loads(HOOKS_JSON.read_text(encoding="utf-8")))
         self.assertEqual(set(hooks), {"hooks"})
         hook_groups = cast("dict[str, object]", hooks["hooks"])

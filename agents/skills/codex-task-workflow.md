@@ -120,7 +120,7 @@ route are ready.
 ## Required Output
 
 - 着手時の作業 update で `workflow=<family>`, `skills=<...>`, `review=<...>` を宣言する
-- `task_start.py` / `bootstrap_agent_run.py` が出す
+- `bootstrap_agent_run.py` が出す
   `REPO_TOOL_ROUTING_SEQUENCE`、`REPO_TOOL_ROUTING_NEXT_COMMAND`、
   `REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES` は、選択された route が必要と
   する場合にだけ handoff または durable packet へ渡す。構造化された
@@ -247,7 +247,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Before touching files, record a provisional workflow route from `agents/TASK_WORKFLOWS.md` and keep it revisable until owner boundary, replaceable unit, validation route, and public behavior / schema impact are evidenced.
 1. In the first work update, declare `workflow=<provisional-or-final-family>`, `skills=<...>`, `review=<...>` with `$agent-orchestration` first in the skill list, and present apparent breadth only as provisional routing context.
 1. When skills are explicitly named in the task or handoff, use `$skill-name` notation and preserve it in `skills=<...>`.
-1. Treat `run.repo_tool_routing_policy` from `task_start.py` or `bootstrap_agent_run.py` as the selected repo-owned tool route. Carry `tool_route`, `tool_commands`, and `tool_evidence` into subagent handoff packets, and run each selected skill packet in the manifest order before replacing it with prose review.
+1. Treat `run.repo_tool_routing_policy` from `bootstrap_agent_run.py` as the selected repo-owned tool route. Carry `tool_route`, `tool_commands`, and `tool_evidence` into subagent handoff packets, and run each selected skill packet in the manifest order before replacing it with prose review.
 1. For repo-changing edits, existing tool execution and bounded owner patching
    proceed from tool-owned evidence. Runtime `SKILL.md` reading is optional
    follow-up context after the existing tool or selected command packet runs for

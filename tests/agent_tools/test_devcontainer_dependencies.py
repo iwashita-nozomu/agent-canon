@@ -70,9 +70,9 @@ def default_verification(
             "args": ["--version"],
             "output_contains": version,
         }
-    if method == "pip-user":
+    if method == "pipx":
         return {
-            "kind": "python-distribution",
+            "kind": "pipx-package",
             "executable": record_id,
             "args": ["--version"],
             "output_contains": version,
@@ -273,10 +273,6 @@ class FakeRunner:
             command[0] == self.fail_on or Path(command[0]).name == self.fail_on
         ):
             raise subprocess.CalledProcessError(1, command)
-        if command == (sys.executable, "-c", "import site; print(site.getuserbase())"):
-            return subprocess.CompletedProcess(
-                command, 0, "/tmp/fake-python-user-base\n", ""
-            )
         if Path(command[0]).name == "dpkg-query" and command[1:2] == ("--show",):
             package = command[-1]
             return subprocess.CompletedProcess(
@@ -297,7 +293,7 @@ class FakeRunner:
                 json.dumps({"dependencies": {package: {"version": "1.0.0"}}}),
                 "",
             )
-        if command[:4] == ("python3", "-m", "pip", "show"):
+        if command[:2] == ("pipx", "runpip") and command[3:4] == ("show",):
             return subprocess.CompletedProcess(
                 command,
                 0,
@@ -528,6 +524,39 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(runner.calls[executable_index], ("codex", "--version"))
         self.assertIsNotNone(runner.environments[executable_index])
 
+    def test_pipx_installs_and_verifies_one_isolated_cli(self) -> None:
+        """Python CLI records use pipx without a shared pip install surface."""
+        parsed = parse_record(
+            record(
+                "python-tool",
+                method="pipx",
+                source="https://pypi.example.test/simple",
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        runner = FakeRunner()
+        installer = Installer(runner)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            installer.install_record(parsed, workspace=root)
+            installer.verify(parsed, workspace=root)
+
+        self.assertIn(
+            (
+                "pipx",
+                "install",
+                "--index-url",
+                "https://pypi.example.test/simple",
+                "python-tool==1.0.0",
+            ),
+            runner.calls,
+        )
+        self.assertIn(
+            ("pipx", "runpip", "python-tool", "show", "python-tool"),
+            runner.calls,
+        )
+
     def test_cargo_source_prefers_vendored_canonical_and_rejects_escape(self) -> None:
         cargo = parse_record(
             record(
@@ -620,7 +649,7 @@ class DependencyModelTests(unittest.TestCase):
                 key_fingerprint="2C6106201985B60E6C7AC87323F3D4EA75716059",
             ),
             record("npm", method="npm-global"),
-            record("pip", method="pip-user"),
+            record("python-tool", method="pipx"),
             record(
                 "asset",
                 method="release-asset",
@@ -1904,7 +1933,7 @@ class DependencyModelTests(unittest.TestCase):
             parse_record(unsafe, path=Path("fixture.toml"), index=0)
         for method, verification_kind in (
             ("npm-global", "npm-package"),
-            ("pip-user", "python-distribution"),
+            ("pipx", "pipx-package"),
         ):
             for verification in (
                 {"kind": verification_kind},
@@ -2634,7 +2663,7 @@ class DependencyModelTests(unittest.TestCase):
         self.assertEqual(tool_environment["ELAN_HOME"], f"{root}/.elan")
         self.assertEqual(
             tool_environment["PATH"],
-            f"{root}/.cargo/bin:{root}/.elan/bin:/tmp/fake-python-user-base/bin:/usr/bin",
+            f"{root}/.cargo/bin:{root}/.elan/bin:{root}/.local/bin:/usr/bin",
         )
 
     def test_lean_retry_uses_live_toolchain_without_receipt(self) -> None:
@@ -2736,6 +2765,7 @@ class DependencyModelTests(unittest.TestCase):
             },
         )
         self.assertIn("python3-pip", dockerfile)
+        self.assertIn("pipx", dockerfile)
         self.assertIn("python3-packaging", dockerfile)
         self.assertIn("build-essential", dockerfile)
         self.assertIn("ninja-build", dockerfile)

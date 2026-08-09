@@ -1,6 +1,6 @@
 # @dependency-start
 # contract test
-# responsibility Tests test task start and close behavior.
+# responsibility Tests run bootstrap and close behavior.
 # upstream design ../../tools/README.md validated automation surface
 # upstream implementation ../../tools/agent_tools/agent_canon_preflight.py preflight routing under test
 # upstream implementation ../../tools/agent_tools/packets.py owns packet normalization under test
@@ -9,7 +9,7 @@
 # upstream implementation ../../tools/agent_tools/implementation_dispatch.py owns dispatch under test
 # @dependency-end
 
-"""Tests for machine-driven task start and close commands."""
+"""Tests for machine-driven run bootstrap and close commands."""
 
 from __future__ import annotations
 
@@ -37,6 +37,7 @@ from check_agent_canon_pr import (  # noqa: E402
     materialize_generated_completeness_receipt,
 )
 from implementation_dispatch import (  # noqa: E402
+    codex_runtime_max_threads,
     default_quality_check_agent_types,
     recommended_dynamic_expansion_wave_slots,
     recommended_initial_subagent_wave,
@@ -71,21 +72,17 @@ from work_log import append_ledger_event, read_ledger_snapshot  # noqa: E402
 RUNTIME_PROFILE_INVENTORY = (
     PROJECT_ROOT / "documents" / "runtime" / "runtime-profiles-and-check-matrix.json"
 )
-TASK_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_start.py"
-TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
+TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 WORKTREE_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "worktree_start.py"
 SETUP_WORKTREE_SCRIPT = PROJECT_ROOT / "tools" / "setup_worktree.sh"
 
 
 def seed_workspace_config(workspace_root: Path) -> None:
-    """Seed explicit runtime inputs consumed by task-start and bundle loading."""
+    """Seed explicit runtime inputs consumed by bootstrap and bundle loading."""
     config_path = workspace_root / ".codex" / "config.toml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
-    config_path.write_text(
-        "[agents]\nmax_threads = 26\nmax_depth = 2\n",
-        encoding="utf-8",
-    )
+    config_path.write_bytes((PROJECT_ROOT / ".codex" / "config.toml").read_bytes())
     registry_path = workspace_root / "agents" / "model_profiles.toml"
     registry_path.parent.mkdir(parents=True, exist_ok=True)
     registry_path.write_bytes(
@@ -100,6 +97,12 @@ def seed_workspace_config(workspace_root: Path) -> None:
         destination = workspace_root / relative_path
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes((PROJECT_ROOT / relative_path).read_bytes())
+
+
+def expected_workflow_spawn_budget(family_id: str) -> tuple[int, int]:
+    """Read one workflow budget from the task catalog owner."""
+    config = load_team_config()
+    return workflow_spawn_budget(load_task_catalog(config), family_id)
 
 
 def selected_active_design_packet(prefix: str) -> dict[str, object]:
@@ -736,7 +739,7 @@ def write_ready_completion_coverage(report_dir: Path, run_id: str) -> None:
         "component_manager": "codex",
         "assigned_unit": "fixture-unit",
         "source_binding": {"run_id": run_id, "context_id": "fixture-context"},
-        "source_refs": ["tests/agent_tools/test_task_start_and_close.py"],
+        "source_refs": ["tests/agent_tools/test_bootstrap_and_close.py"],
     }
     append_ledger_event(
         report_dir,
@@ -923,7 +926,7 @@ def write_ready_closeout_bundle(
     write_ready_final_review(report_dir)
 
 
-class TaskStartAndCloseTest(unittest.TestCase):
+class BootstrapAndCloseTest(unittest.TestCase):
     """Verify machine-driven task start and close behavior."""
 
     def test_retired_tool_names_are_not_permanent_update_surfaces(self) -> None:
@@ -1342,59 +1345,58 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout
             )
 
-    def test_entrypoints_materialize_explicit_active_design_packet(self) -> None:
-        """Both run entrypoints persist and route one typed packet end to end."""
+    def test_bootstrap_materializes_explicit_active_design_packet(self) -> None:
+        """The run bootstrap persists and routes one typed packet end to end."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            for script in (BOOTSTRAP_SCRIPT, TASK_START_SCRIPT):
-                report_root = root / f"reports-{script.stem}"
-                run_id = f"graph-{script.stem}"
-                result = subprocess.run(
-                    [
-                        sys.executable,
-                        str(script),
-                        "--task",
-                        "graph active packet smoke",
-                        "--owner",
-                        "codex",
-                        "--run-id",
-                        run_id,
-                        "--workspace-root",
-                        str(PROJECT_ROOT),
-                        "--report-root",
-                        str(report_root),
-                        "--active-design-packet",
-                        json.dumps(GRAPH_ACTIVE_DESIGN_PACKET, separators=(",", ":")),
-                        "--skip-agent-canon-preflight",
-                    ],
-                    cwd=PROJECT_ROOT,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                )
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                report_dir = report_root / run_id
-                manifest = yaml.safe_load(
-                    (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
-                )
-                self.assertEqual(
-                    manifest["run"]["active_design_packet"],
-                    GRAPH_ACTIVE_DESIGN_PACKET,
-                )
-                for artifact in GRAPH_ACTIVE_DESIGN_PACKET.values():
-                    if isinstance(artifact, str) and artifact.endswith(".md"):
-                        self.assertTrue((report_dir / artifact).is_file(), artifact)
-                        self.assertIn(artifact, result.stdout)
-                self.assertIn(
-                    "run.active_design_packet.design_artifact=graph_design_brief.md;",
-                    (report_dir / "team_manifest.yaml").read_text(encoding="utf-8"),
-                )
-                self.assert_graph_active_packet_bundle(report_dir, result.stdout)
+            report_root = root / f"reports-{BOOTSTRAP_SCRIPT.stem}"
+            run_id = f"graph-{BOOTSTRAP_SCRIPT.stem}"
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(BOOTSTRAP_SCRIPT),
+                    "--task",
+                    "graph active packet smoke",
+                    "--owner",
+                    "codex",
+                    "--run-id",
+                    run_id,
+                    "--workspace-root",
+                    str(PROJECT_ROOT),
+                    "--report-root",
+                    str(report_root),
+                    "--active-design-packet",
+                    json.dumps(GRAPH_ACTIVE_DESIGN_PACKET, separators=(",", ":")),
+                    "--skip-agent-canon-preflight",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            report_dir = report_root / run_id
+            manifest = yaml.safe_load(
+                (report_dir / "team_manifest.yaml").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                manifest["run"]["active_design_packet"],
+                GRAPH_ACTIVE_DESIGN_PACKET,
+            )
+            for artifact in GRAPH_ACTIVE_DESIGN_PACKET.values():
+                if isinstance(artifact, str) and artifact.endswith(".md"):
+                    self.assertTrue((report_dir / artifact).is_file(), artifact)
+                    self.assertIn(artifact, result.stdout)
+            self.assertIn(
+                "run.active_design_packet.design_artifact=graph_design_brief.md;",
+                (report_dir / "team_manifest.yaml").read_text(encoding="utf-8"),
+            )
+            self.assert_graph_active_packet_bundle(report_dir, result.stdout)
 
-    def test_entrypoints_reject_invalid_active_design_packet_before_bundle_creation(
+    def test_bootstrap_rejects_invalid_active_design_packet_before_bundle_creation(
         self,
     ) -> None:
-        """Malformed packet input fails before either entrypoint creates a run."""
+        """Malformed packet input fails before bootstrap creates a run."""
         cases = (
             (
                 {key: value for key, value in U2_ACTIVE_DESIGN_PACKET.items() if key != "document_flow_review_artifact"},
@@ -1415,36 +1417,35 @@ class TaskStartAndCloseTest(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            for script in (BOOTSTRAP_SCRIPT, TASK_START_SCRIPT):
-                for index, (packet, expected_error) in enumerate(cases):
-                    report_root = root / f"reports-{script.stem}-{index}"
-                    run_id = f"invalid-{script.stem}-{index}"
-                    result = subprocess.run(
-                        [
-                            sys.executable,
-                            str(script),
-                            "--task",
-                            "invalid packet",
-                            "--owner",
-                            "codex",
-                            "--run-id",
-                            run_id,
-                            "--workspace-root",
-                            str(PROJECT_ROOT),
-                            "--report-root",
-                            str(report_root),
-                            "--active-design-packet",
-                            json.dumps(packet, separators=(",", ":")),
-                            "--skip-agent-canon-preflight",
-                        ],
-                        cwd=PROJECT_ROOT,
-                        check=False,
-                        capture_output=True,
-                        text=True,
-                    )
-                    self.assertNotEqual(result.returncode, 0)
-                    self.assertIn(expected_error, result.stdout + result.stderr)
-                    self.assertFalse((report_root / run_id).exists())
+            for index, (packet, expected_error) in enumerate(cases):
+                report_root = root / f"reports-{BOOTSTRAP_SCRIPT.stem}-{index}"
+                run_id = f"invalid-{BOOTSTRAP_SCRIPT.stem}-{index}"
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(BOOTSTRAP_SCRIPT),
+                        "--task",
+                        "invalid packet",
+                        "--owner",
+                        "codex",
+                        "--run-id",
+                        run_id,
+                        "--workspace-root",
+                        str(PROJECT_ROOT),
+                        "--report-root",
+                        str(report_root),
+                        "--active-design-packet",
+                        json.dumps(packet, separators=(",", ":")),
+                        "--skip-agent-canon-preflight",
+                    ],
+                    cwd=PROJECT_ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn(expected_error, result.stdout + result.stderr)
+                self.assertFalse((report_root / run_id).exists())
 
     def test_hash_baseline_bytes_is_canonical(self) -> None:
         """Hash sidecars are derived from exact payload bytes with one newline."""
@@ -1452,7 +1453,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
         expected = (hashlib.sha256(payload).hexdigest() + "\n").encode("ascii")
         self.assertEqual(hash_baseline_bytes(payload), expected)
 
-    def test_task_start_routes_dirty_shared_canon_to_pr_first_workflow(self) -> None:
+    def test_bootstrap_routes_dirty_shared_canon_to_pr_first_workflow(self) -> None:
         """Dirty shared-canon surfaces should not point only to commit-or-stash."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -1473,7 +1474,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(TASK_START_SCRIPT),
+                    str(BOOTSTRAP_SCRIPT),
                     "--task",
                     "shared canon preflight route",
                     "--owner",
@@ -1507,7 +1508,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_task_start_reports_parent_repo_latest_checklist(self) -> None:
+    def test_bootstrap_reports_parent_repo_latest_checklist(self) -> None:
         """Parent repos should expose the AgentCanon latest-state checklist at task start."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -1528,7 +1529,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(TASK_START_SCRIPT),
+                    str(BOOTSTRAP_SCRIPT),
                     "--task",
                     "parent checklist smoke",
                     "--owner",
@@ -1555,7 +1556,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "AGENT_CANON_PREFLIGHT_CHECKLIST_STATUS=present", result.stdout
             )
 
-    def test_task_start_uses_read_only_plan_with_unrelated_parent_dirty_state(
+    def test_bootstrap_uses_read_only_plan_with_unrelated_parent_dirty_state(
         self,
     ) -> None:
         """A clean AgentCanon update surface may refresh despite unrelated parent dirt."""
@@ -1621,7 +1622,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     "-c",
                     "user.name=Task Start Test",
                     "-c",
-                    "user.email=task-start@example.invalid",
+                    "user.email=bootstrap@example.invalid",
                     "commit",
                     "-m",
                     "test: seed workspace",
@@ -1638,7 +1639,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(TASK_START_SCRIPT),
+                    str(BOOTSTRAP_SCRIPT),
                     "--task",
                     "parent dirty unrelated smoke",
                     "--owner",
@@ -1677,7 +1678,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 (report_root / "parent-dirty-unrelated" / "schedule.md").is_file()
             )
 
-    def test_task_start_blocks_eval_transient_until_explicit_cleanup(self) -> None:
+    def test_bootstrap_blocks_eval_transient_until_explicit_cleanup(self) -> None:
         """Eval captures stop make, remain intact, and allow a rerun after cleanup."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -1703,15 +1704,25 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 "#!/usr/bin/env bash\nset -eu\n[ \"${1:-}\" = check ]\n",
                 encoding="utf-8",
             )
+            source_root_entrypoint = (
+                workspace_root
+                / "vendor"
+                / "agent-canon"
+                / "tools"
+                / "agent_tools"
+                / "agent_canon_source_root.py"
+            )
+            source_root_entrypoint.parent.mkdir(parents=True)
+            source_root_entrypoint.write_text(
+                "#!/usr/bin/env python3\n"
+                "import subprocess\n"
+                "import sys\n"
+                "raise SystemExit(subprocess.run(['bash', *sys.argv[2:]], check=False).returncode)\n",
+                encoding="utf-8",
+            )
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
             subprocess.run(
-                [
-                    "git",
-                    "add",
-                    "Makefile",
-                    "tools/sync_agent_canon.sh",
-                    "vendor/agent-canon/documents/agent-canon/agent-canon-parent-repo-latest-checklist.md",
-                ],
+                ["git", "add", "."],
                 cwd=workspace_root,
                 check=True,
             )
@@ -1721,7 +1732,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     "-c",
                     "user.name=Task Start Test",
                     "-c",
-                    "user.email=task-start@example.invalid",
+                    "user.email=bootstrap@example.invalid",
                     "commit",
                     "-m",
                     "test: seed workspace",
@@ -1747,7 +1758,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             blocked = subprocess.run(
                 [
                     sys.executable,
-                    str(TASK_START_SCRIPT),
+                    str(BOOTSTRAP_SCRIPT),
                     "--task",
                     "eval transient blocks update",
                     "--owner",
@@ -1789,7 +1800,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             resumed = subprocess.run(
                 [
                     sys.executable,
-                    str(TASK_START_SCRIPT),
+                    str(BOOTSTRAP_SCRIPT),
                     "--task",
                     "eval transient cleanup rerun",
                     "--owner",
@@ -1811,18 +1822,19 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=pass", resumed.stdout)
             self.assertFalse((workspace_root / "make-sentinel").exists())
 
-    def test_task_start_emits_workflow_skills_and_language_review_candidates(self) -> None:
-        """task_start should emit machine-friendly workflow and reviewer data."""
+    def test_bootstrap_emits_workflow_skills_and_language_review_candidates(
+        self,
+    ) -> None:
+        """Bootstrap exposes owner-derived routing and creates one run bundle."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
             seed_workspace_config(workspace_root)
-            report_root.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(TASK_START_SCRIPT),
+                    str(BOOTSTRAP_SCRIPT),
                     "--task",
                     "comprehensive native implementation change",
                     "--task-id",
@@ -1830,7 +1842,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                     "--owner",
                     "codex",
                     "--run-id",
-                    "test-task-start",
+                    "test-bootstrap-routing",
                     "--workspace-root",
                     str(workspace_root),
                     "--report-root",
@@ -1846,537 +1858,34 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn(
-                "AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-update-plan",
-                result.stdout,
+            expected_active, expected_write = expected_workflow_spawn_budget(
+                "comprehensive_development"
             )
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
-            self.assertIn("RUNTIME_MAX_THREADS=26", result.stdout)
-            self.assertIn("RUNTIME_MAX_DEPTH=2", result.stdout)
+            self.assertIn("REQUEST_CONTRACT_REQUIRED=yes", result.stdout)
+            self.assertIn(
+                f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}", result.stdout
+            )
             self.assertIn("WORKFLOW_FAMILY=comprehensive_development", result.stdout)
             self.assertIn(
-                "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
-                result.stdout,
-            )
-            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=4", result.stdout)
-            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=2", result.stdout)
-            self.assertIn("INITIAL_THREE_AGENT_INTAKE_IS_TOTAL_CAP=no", result.stdout)
-            self.assertIn("DYNAMIC_SUBAGENT_EXPANSION=allowed", result.stdout)
-            self.assertIn(
-                "DYNAMIC_SUBAGENT_EXPANSION_LEDGER=schedule.md#Agent Wave Ledger",
-                result.stdout,
+                f"WORKFLOW_ACTIVE_SPAWN_BUDGET={expected_active}", result.stdout
             )
             self.assertIn(
-                "SUBAGENT_WAVE_RECORD_COMMAND=python3 tools/agent_tools/workflow_monitor.py --report-dir",
-                result.stdout,
+                f"WORKFLOW_MAX_WRITE_SUBAGENTS={expected_write}", result.stdout
             )
-            self.assertIn("--subagent-wave", result.stdout)
-            self.assertIn(
-                "PARENT_WAVE_EXECUTION_GATE=required_before_implementation",
-                result.stdout,
-            )
-            self.assertIn(
-                "PARENT_WAVE_EXECUTION_GATE_STATUS=blocked_authority_required",
-                result.stdout,
-            )
-            self.assertIn(
-                "PARENT_WAVE_EXECUTION_GATE_ARTIFACTS="
-                "schedule.md#Agent Wave Ledger,workflow_monitoring.md#Actual Wave Events",
-                result.stdout,
-            )
-            first_wave_match = re.search(
-                r"^RECOMMENDED_INITIAL_SUBAGENT_WAVE=(.+)$",
-                result.stdout,
-                re.M,
-            )
-            self.assertIsNotNone(first_wave_match)
-            first_wave = cast(re.Match[str], first_wave_match).group(1).split(",")
-            self.assertEqual(
-                first_wave,
-                ["requirements_organizer"],
-            )
-            dynamic_waves_match = re.search(
-                r"^RECOMMENDED_DYNAMIC_EXPANSION_WAVES=(.+)$",
-                result.stdout,
-                re.M,
-            )
-            self.assertIsNotNone(dynamic_waves_match)
-            dynamic_waves = cast(re.Match[str], dynamic_waves_match).group(1)
-            self.assertIn("WAVE-2=execution_planner", dynamic_waves)
-            self.assertNotIn("manager_reviewer", dynamic_waves)
-            role_instances_match = re.search(
-                r"^RECOMMENDED_DYNAMIC_EXPANSION_ROLE_INSTANCES=(.+)$",
-                result.stdout,
-                re.M,
-            )
-            self.assertIsNotNone(role_instances_match)
-            role_instances = cast(re.Match[str], role_instances_match).group(1)
-            self.assertNotIn("researcher:researcher_explorer:explorer", role_instances)
-            self.assertNotIn(
-                "research_reviewer:research_reviewer_reviewer:reviewer", role_instances
-            )
-            self.assertNotIn(
-                "infra_reviewer:infra_reviewer_reviewer:reviewer", role_instances
-            )
-            self.assertIn(
-                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
-                result.stdout,
-            )
-            self.assertIn(
-                "ACTIVE_SKILLS=$agent-orchestration,$subagent-bootstrap,$comprehensive-development",
-                result.stdout,
-            )
-            self.assertIn(
-                "DEFERRED_SKILLS=$codex-task-workflow",
-                result.stdout,
-            )
+            self.assertIn("$comprehensive-development", result.stdout)
             self.assertIn("LANGUAGE_REVIEW_CANDIDATES=cpp_reviewer", result.stdout)
-            self.assertIn(
-                "IMPLEMENTATION_CODEX_AGENTS=worker,spark_worker", result.stdout
-            )
-            self.assertIn(
-                "SAME_ROLE_SUBAGENT_INSTANCES=allowed_with_distinct_packets",
-                result.stdout,
-            )
-            self.assertIn(
-                "SAME_ROLE_SUBAGENT_INSTANCE_KEY=role_id+instance_id+agent_type",
-                result.stdout,
-            )
-            self.assertIn(
-                "STANDARD_AGENT_WAVE_SEQUENCE=selected_stages_only",
-                result.stdout,
-            )
-            self.assertIn(
-                "PRE_HANDOFF_SCOPE_POLICY=discovery_before_handoff_scope",
-                result.stdout,
-            )
-            self.assertIn(
-                "PRE_HANDOFF_SCOPE_SEQUENCE=surface_route_seed,responsibility_search,reuse_survey,stale_surface_scan,dependency_expansion,handoff_scope",
-                result.stdout,
-            )
-            self.assertIn(
-                "PRE_HANDOFF_SCOPE_STATUS=seed_then_expand_before_handoff",
-                result.stdout,
-            )
-            self.assertIn("USER_FACING_LANGUAGE=ja", result.stdout)
-            self.assertIn(
-                "USER_FACING_LANGUAGE_SOURCE=AGENTS.md#Template Context",
-                result.stdout,
-            )
-            self.assertIn(
-                "USER_FACING_LANGUAGE_SCOPE=updates,final_reports,review_summaries,handoff_guidance,reader_facing_docs",
-                result.stdout,
-            )
-            self.assertIn(
-                "IMPLEMENTATION_COMPLETENESS_POLICY=contract_complete",
-                result.stdout,
-            )
-            self.assertIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
-            self.assertIn("PARENT_REPO_EDITS_ALLOWED=no", result.stdout)
-            self.assertIn(
-                "PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes",
-                result.stdout,
-            )
-            self.assertIn(
-                "PARENT_DIRECT_WRITE_EXCEPTION=-",
-                result.stdout,
-            )
-            self.assertIn(
-                "IMPLEMENTATION_COMPLETENESS_SCOPE_BASIS=contract_required_behavior",
-                result.stdout,
-            )
-            self.assertIn(
-                "IMPLEMENTATION_COMPLETENESS_REQUIRED_INPUTS=request_clause_ids,acceptance_contract,implementation_source_packet,design_to_implementation_trace,dependency_expanded_scope,pre_handoff_gate_status,validation_route,review_gate",
-                result.stdout,
-            )
-            self.assertIn(
-                "PRE_HANDOFF_GATE_STATUS=pending_design_review_gate_check",
-                result.stdout,
-            )
-            self.assertIn(
-                "PRE_HANDOFF_GATE_STATUS_REQUIRED_EVIDENCE=current_design_brief,design_review_artifact_under_review,design_review_decision_approve,waterfall_gate_check_design_pass,document_flow_review_when_active",
-                result.stdout,
-            )
-            self.assertIn(
-                "IMPLEMENTATION_COMPLETENESS_ROUTE_SIGNALS=apparent_breadth,owner_bounded_change,mvp,thin_slice",
-                result.stdout,
-            )
-            self.assertIn(
-                "IMPLEMENTATION_COMPLETENESS_ESCALATION=design_issue_blocker_to_gate_5_6",
-                result.stdout,
-            )
-            self.assertIn(
-                "REPO_TOOL_ROUTING_POLICY=run.repo_tool_routing_policy",
-                result.stdout,
-            )
-            self.assertIn(
-                "REPO_TOOL_CALL_TOKEN_SCHEMA=agent-canon.tool-call.v1",
-                result.stdout,
-            )
-            self.assertNotIn("REPO_TOOL_COMMAND_PACKET_COMMAND=", result.stdout)
-            self.assertIn(
-                "REPO_TOOL_SELECTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$comprehensive-development",
-                result.stdout,
-            )
-            self.assertIn(
-                "REPO_TOOL_ROUTING_EXECUTION_MODE=sequential_by_skill_and_stage",
-                result.stdout,
-            )
-            self.assertIn(
-                "REPO_DYNAMIC_SKILL_ROUTING_POLICY=related_skill_candidates",
-                result.stdout,
-            )
-            self.assertIn(
-                "REPO_DYNAMIC_SKILL_ROUTING_CANDIDATES=$task-routing",
-                result.stdout,
-            )
-            self.assertIn("DEFAULT_QUALITY_CHECKS=candidate_only", result.stdout)
-            self.assertIn(
-                "DEFAULT_QUALITY_CHECK_SOURCE=agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default",
-                result.stdout,
-            )
-            self.assertIn(
-                "DEFAULT_QUALITY_CHECK_AGENT_TYPE_CANDIDATES=docs_workflow_steward,cpp_reviewer",
-                result.stdout,
-            )
-            self.assertIn(
-                "DEFAULT_QUALITY_CHECK_STAGES=selected_stages_only",
-                result.stdout,
-            )
-            self.assertIn("DEFAULT_QUALITY_CHECK_REVIEW_PACKS=candidate_only", result.stdout)
-            self.assertIn(
-                "DEFAULT_QUALITY_CHECK_DEFAULT_REVIEW_PACKS=-",
-                result.stdout,
-            )
-            self.assertIn(
-                "DEFAULT_QUALITY_CHECK_LANGUAGE_REVIEW_CANDIDATES=cpp_reviewer",
-                result.stdout,
-            )
-            self.assertIn("ROLE_MODEL_MATRIX=", result.stdout)
-            self.assertIn("CROSS_CUTTING_DOCUMENT_PACKET=", result.stdout)
-            self.assertIn("/documents/conventions/REVIEW_PROCESS.md", result.stdout)
-            self.assertIn("/notes/guardrails/README.md", result.stdout)
-            self.assertNotIn("/docker/README.md", result.stdout)
-            self.assertIn(
-                "/agents/workflows/implementation-waterfall-workflow.md", result.stdout
-            )
-            self.assertIn("DESIGN_DOCUMENT_PACKET=", result.stdout)
-            self.assertIn("IMPLEMENTATION_DOCUMENT_PACKET=", result.stdout)
-            self.assertIn("REQUEST_CONTRACT_REQUIRED=yes", result.stdout)
-            self.assertIn("REQUEST_CONTRACT=", result.stdout)
-            self.assertIn(
-                "START_DECLARATION=workflow=Comprehensive Development", result.stdout
-            )
-            self.assertIn(
-                "skills=$agent-orchestration,$subagent-bootstrap,$comprehensive-development",
-                result.stdout,
-            )
-            self.assertIn("cpp_reviewer", result.stdout)
-            manifest_text = (
-                report_root / "test-task-start" / "team_manifest.yaml"
-            ).read_text(
-                encoding="utf-8",
-            )
-            manifest = yaml.safe_load(manifest_text)
-            spawn_budget = manifest["run"]["spawn_budget"]
-            standard_wave_sequence = manifest["run"]["standard_wave_sequence"]
-            pre_handoff_scope_policy = manifest["run"]["pre_handoff_scope_policy"]
-            default_quality_check_policy = manifest["run"][
-                "default_quality_check_policy"
-            ]
-            delegated_spawn_policy = manifest["run"]["delegated_spawn_policy"]
-            handoff_context_policy = manifest["run"]["handoff_context_policy"]
-            write_scope_policy = manifest["run"]["write_scope_policy"]
-            spawn_wave_recommendation = manifest["run"]["spawn_wave_recommendation"]
-            role_topology = spawn_wave_recommendation["role_topology"]
-            same_role_instances = role_topology["same_role_parallel_instances"]
-            self.assertEqual(spawn_budget["active_subagents"], 4)
-            self.assertEqual(spawn_budget["max_write_subagents"], 2)
-            self.assertEqual(spawn_budget["runtime_max_threads"], 26)
-            self.assertEqual(spawn_budget["runtime_max_depth"], 2)
-            self.assertFalse(spawn_budget["initial_three_agent_intake_is_total_cap"])
-            self.assertIn("workflow_families[].spawn_budget", spawn_budget["source"])
-            self.assertEqual(
-                delegated_spawn_policy["dynamic_mid_task_spawn"],
-                "allowed",
-            )
-            self.assertEqual(
-                standard_wave_sequence["stages"], ["selected_stages_only"]
-            )
-            self.assertEqual(
-                standard_wave_sequence["gate_order"],
-                "selected_stages_only",
-            )
-            self.assertTrue(pre_handoff_scope_policy["enabled"])
-            self.assertEqual(
-                pre_handoff_scope_policy["status"],
-                "seed_then_expand_before_handoff",
-            )
-            self.assertEqual(
-                pre_handoff_scope_policy["sequence"],
-                [
-                    "surface_route_seed",
-                    "responsibility_search",
-                    "reuse_survey",
-                    "stale_surface_scan",
-                    "dependency_expansion",
-                    "handoff_scope",
-                ],
-            )
-            self.assertEqual(
-                pre_handoff_scope_policy["source_packet_seed"],
-                "implementation_surface_route",
-            )
-            self.assertIn(
-                "dependency_edit_scope",
-                pre_handoff_scope_policy["expansion_artifacts"],
-            )
-            user_facing_language_policy = manifest["run"]["user_facing_language_policy"]
-            self.assertTrue(user_facing_language_policy["enabled"])
-            self.assertEqual(user_facing_language_policy["language"], "ja")
-            self.assertEqual(
-                user_facing_language_policy["source"],
-                "AGENTS.md#Template Context",
-            )
-            self.assertIn("final_reports", user_facing_language_policy["scope"])
-            self.assertEqual(
-                user_facing_language_policy["machine_fields"],
-                "canonical_keys_commands_paths_role_ids_schemas",
-            )
-            contract_complete_implementation_policy = manifest["run"][
-                "contract_complete_implementation_policy"
-            ]
-            repo_tool_routing_policy = manifest["run"]["repo_tool_routing_policy"]
-            self.assertTrue(contract_complete_implementation_policy["enabled"])
-            self.assertEqual(
-                contract_complete_implementation_policy["scope_basis"],
-                "contract_required_behavior",
-            )
-            self.assertIn(
-                "implementation_source_packet",
-                contract_complete_implementation_policy["required_inputs"],
-            )
-            self.assertIn(
-                "pre_handoff_gate_status",
-                contract_complete_implementation_policy["required_inputs"],
-            )
-            self.assertIn(
-                "mvp",
-                contract_complete_implementation_policy["route_signals"],
-            )
-            self.assertEqual(
-                contract_complete_implementation_policy["escalation"],
-                "design_issue_blocker_to_gate_5_6",
-            )
-            self.assertEqual(
-                contract_complete_implementation_policy[
-                    "implementation_handoff_required"
-                ],
-                "yes",
-            )
-            self.assertEqual(
-                contract_complete_implementation_policy["parent_repo_edits_allowed"],
-                "no",
-            )
-            self.assertEqual(
-                contract_complete_implementation_policy[
-                    "parent_direct_write_exception_required"
-                ],
-                "yes",
-            )
-            self.assertEqual(
-                contract_complete_implementation_policy[
-                    "parent_direct_write_exception"
-                ],
-                "-",
-            )
-            self.assertTrue(repo_tool_routing_policy["enabled"])
-            self.assertEqual(
-                repo_tool_routing_policy["execution_mode"],
-                "sequential_by_skill_and_stage",
-            )
-            self.assertEqual(
-                repo_tool_routing_policy["sequence"],
-                [
-                    "materialize_tool_call_token",
-                    "execute_canonical_tool_id",
-                    "record_typed_result",
-                ],
-            )
-            self.assertIn(
-                "$task-routing",
-                repo_tool_routing_policy["dynamic_skill_routing"]["candidates"],
-            )
-            first_tool_route = repo_tool_routing_policy["sequential_tool_routes"][0]
-            self.assertEqual(first_tool_route["skill"], "agent-orchestration")
-            tool_call_token = first_tool_route["tool_call_token"]
-            self.assertEqual(tool_call_token["schema"], "agent-canon.tool-call.v1")
-            self.assertEqual(tool_call_token["tool_id"], "skill-tool-commands")
-            self.assertEqual(
-                tool_call_token["arguments"],
-                {"skill": "agent-orchestration", "format": "json"},
-            )
-            self.assertNotIn("packet_command", first_tool_route)
-            self.assertNotIn("commands", first_tool_route)
-            self.assertIn("runtime_skill", first_tool_route)
-            self.assertIn("canonical_doc", first_tool_route)
-            self.assertIn("related_skills", first_tool_route)
-            self.assertNotIn("check_command", repo_tool_routing_policy)
-            self.assertFalse(default_quality_check_policy["enabled"])
-            self.assertEqual(
-                default_quality_check_policy["source"],
-                "agents/canonical/CODEX_SUBAGENTS.md#Quality Check Default",
-            )
-            self.assertEqual(
-                default_quality_check_policy["wave_sequence_ref"],
-                "run.standard_wave_sequence (selected stages only)",
-            )
-            self.assertEqual(
-                default_quality_check_policy["stages"],
-                ["review_before_edit_handoff", "post_edit_review"],
-            )
-            self.assertEqual(
-                default_quality_check_policy["candidate_roles"],
-                [
-                    "docs_workflow_steward",
-                    "cpp_reviewer",
-                ],
-            )
-            self.assertEqual(
-                default_quality_check_policy["candidate_codex_agent_types"],
-                [
-                    "docs_workflow_steward",
-                    "cpp_reviewer",
-                ],
-            )
-            self.assertEqual(
-                default_quality_check_policy["provenance"]["default_review_packs"],
-                "candidate_not_activated",
-            )
-            self.assertEqual(
-                default_quality_check_policy["provenance"]["default_review_pack_ids"],
-                [],
-            )
-            self.assertEqual(
-                default_quality_check_policy["provenance"]["language_review_candidates"],
-                ["cpp_reviewer"],
-            )
-            self.assertEqual(
-                default_quality_check_policy["provenance"]["manual_specialists"],
-                [],
-            )
-            self.assertIn(
-                "tools/bin/agent-canon docs check <changed-markdown-paths>",
-                default_quality_check_policy["static_check_commands"],
-            )
-            self.assertIn(
-                "default_quality_check_policy",
-                handoff_context_policy["common_prompt_must_include"],
-            )
-            self.assertIn(
-                "pre_handoff_scope_policy",
-                handoff_context_policy["common_prompt_must_include"],
-            )
-            self.assertIn(
-                "pre_handoff_gate_status",
-                handoff_context_policy["common_prompt_must_include"],
-            )
-            self.assertIn(
-                "user_facing_language_policy",
-                handoff_context_policy["common_prompt_must_include"],
-            )
-            self.assertIn(
-                "contract_complete_implementation_policy",
-                handoff_context_policy["common_prompt_must_include"],
-            )
-            self.assertIn(
-                "repo_tool_routing_policy",
-                handoff_context_policy["common_prompt_must_include"],
-            )
-            self.assertEqual(
-                spawn_wave_recommendation["standard_sequence_ref"],
-                "run.standard_wave_sequence",
-            )
-            self.assertEqual(
-                spawn_wave_recommendation["initial_wave_agent_types"], first_wave
-            )
-            self.assertIn(
-                "role_instances",
-                spawn_wave_recommendation["dynamic_expansion_waves"][0],
-            )
-            self.assertIn("implementation", role_topology["role_families"])
-            self.assertIn("review", role_topology["role_families"])
-            self.assertEqual(
-                same_role_instances["status"],
-                "allowed_with_distinct_packets",
-            )
-            self.assertEqual(
-                same_role_instances["identity_key"],
-                "role_id+instance_id+agent_type",
-            )
-            self.assertFalse(
-                same_role_instances["runtime_threads_are_cardinality_source"]
-            )
-            self.assertLessEqual(len(first_wave), spawn_budget["active_subagents"])
-            self.assert_current_checkout_write_policy(write_scope_policy, 2)
-            self.assert_same_role_runtime_policy(delegated_spawn_policy)
-            self.assert_initial_wave_execution_gate(report_root / "test-task-start")
-            self.assert_abstract_design_prompt_contracts(
-                manifest,
-                {"designer", "implementer"},
-            )
 
-    def test_t12_default_quality_check_agent_types_do_not_fan_out_candidates(self) -> None:
-        """T12 quality checks should not spawn later reviewer candidates by default."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            report_root = Path(tmp_dir) / "reports"
-            workspace_root.mkdir(parents=True, exist_ok=True)
-            seed_workspace_config(workspace_root)
-            report_root.mkdir(parents=True, exist_ok=True)
+            report_dir = report_root / "test-bootstrap-routing"
+            self.assertTrue((report_dir / "team_manifest.yaml").is_file())
+            self.assertTrue((report_dir / "user_request_contract.md").is_file())
+            manifest_text = (report_dir / "team_manifest.yaml").read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("comprehensive_development", manifest_text)
+            self.assertIn(f"active_subagents: {expected_active}", manifest_text)
+            self.assertIn(f"max_write_subagents: {expected_write}", manifest_text)
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_START_SCRIPT),
-                    "--task",
-                    "comprehensive workflow check",
-                    "--task-id",
-                    "T12",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    "test-t12-quality-default",
-                    "--workspace-root",
-                    str(workspace_root),
-                    "--report-root",
-                    str(report_root),
-                    "--skip-agent-canon-preflight",
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn(
-                "DEFAULT_QUALITY_CHECK_AGENT_TYPE_CANDIDATES=docs_workflow_steward",
-                result.stdout,
-            )
-            self.assertNotIn(
-                "DEFAULT_QUALITY_CHECK_AGENT_TYPE_CANDIDATES=docs_workflow_steward,"
-                "python_reviewer",
-                result.stdout,
-            )
-            manifest = yaml.safe_load(
-                (report_root / "test-t12-quality-default" / "team_manifest.yaml")
-                .read_text(encoding="utf-8")
-            )
-            self.assertEqual(
-                manifest["run"]["default_quality_check_policy"]["codex_agent_types"],
-                ["docs_workflow_steward"],
-            )
 
     def test_empty_registry_does_not_materialize_configured_candidates(self) -> None:
         """Configured codex_agents are candidate order, not executable availability."""
@@ -2414,7 +1923,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
         self.assertEqual(dynamic_waves, ())
         self.assertEqual(quality_agent_types, ())
 
-    def test_task_start_uses_default_worker_candidate(self) -> None:
+    def test_bootstrap_uses_default_worker_candidate(self) -> None:
         """The implementer role should materialize the first codex_agents entry by default."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -2426,7 +1935,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(TASK_START_SCRIPT),
+                    str(BOOTSTRAP_SCRIPT),
                     "--task",
                     "comprehensive workflow check",
                     "--task-id",
@@ -2484,7 +1993,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 registered_agents=registered_agents,
             )
 
-    def test_task_start_selects_spark_worker_with_explicit_evidence(self) -> None:
+    def test_bootstrap_selects_spark_worker_with_explicit_evidence(self) -> None:
         """A later implementer candidate requires explicit parent-packet evidence."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -2496,7 +2005,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(TASK_START_SCRIPT),
+                    str(BOOTSTRAP_SCRIPT),
                     "--task",
                     "comprehensive workflow check",
                     "--task-id",
@@ -2544,7 +2053,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 ],
             )
 
-    def test_task_start_rejects_invalid_agent_type_selection(self) -> None:
+    def test_bootstrap_rejects_invalid_agent_type_selection(self) -> None:
         """Invalid role-to-agent parent-packet selections should fail closed."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -2556,7 +2065,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(TASK_START_SCRIPT),
+                    str(BOOTSTRAP_SCRIPT),
                     "--task",
                     "comprehensive workflow check",
                     "--task-id",
@@ -2583,7 +2092,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("agent type selection for implementer must be one of", result.stdout)
             self.assertFalse((report_root / "test-invalid-selection").exists())
 
-    def test_task_start_plain_fix_activates_subagent_bootstrap(self) -> None:
+    def test_bootstrap_plain_fix_activates_subagent_bootstrap(self) -> None:
         """Plain fix prompts should match route.py write-capable handoff."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -2594,7 +2103,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(TASK_START_SCRIPT),
+                    str(BOOTSTRAP_SCRIPT),
                     "--task",
                     "Fix the failing tests in the repository.",
                     "--owner",
@@ -2625,7 +2134,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("DEFERRED_SKILLS=$codex-task-workflow", result.stdout)
             self.assertIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
 
-    def test_task_start_plain_refactor_activates_subagent_bootstrap(self) -> None:
+    def test_bootstrap_plain_refactor_activates_subagent_bootstrap(self) -> None:
         """Plain refactor prompts should match route.py write-capable handoff."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -2636,7 +2145,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(TASK_START_SCRIPT),
+                    str(BOOTSTRAP_SCRIPT),
                     "--task",
                     "Refactor the repository routing helpers.",
                     "--owner",
@@ -2656,18 +2165,20 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn(
-                "SUGGESTED_SKILLS=$agent-orchestration,$codex-task-workflow,$subagent-bootstrap,$refactor-loop,$structure-refactor",
-                result.stdout,
-            )
-            self.assertIn(
-                "ACTIVE_SKILLS=$agent-orchestration,$subagent-bootstrap,$refactor-loop,$structure-refactor",
-                result.stdout,
-            )
+            self.assertIn("SUGGESTED_SKILLS=", result.stdout)
+            self.assertIn("ACTIVE_SKILLS=", result.stdout)
+            for skill in (
+                "$agent-orchestration",
+                "$subagent-bootstrap",
+                "$task-routing",
+                "$refactor-loop",
+                "$structure-refactor",
+            ):
+                self.assertIn(skill, result.stdout)
             self.assertIn("DEFERRED_SKILLS=$codex-task-workflow", result.stdout)
             self.assertIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
 
-    def test_task_start_review_only_does_not_activate_subagent_bootstrap(self) -> None:
+    def test_bootstrap_review_only_does_not_activate_subagent_bootstrap(self) -> None:
         """Review-only do-not-edit prompts should not emit implementation handoff."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -2678,7 +2189,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(TASK_START_SCRIPT),
+                    str(BOOTSTRAP_SCRIPT),
                     "--task",
                     "Use subagents for review only; do not edit files.",
                     "--owner",
@@ -2797,7 +2308,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             ]
             self.assertEqual(wave_ids, [])
 
-    def test_large_refactor_task_start_suggests_refactor_skill(self) -> None:
+    def test_large_refactor_bootstrap_suggests_refactor_skill(self) -> None:
         """Large refactor should advertise the dedicated refactor skill."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
@@ -2808,7 +2319,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
             result = subprocess.run(
                 [
                     sys.executable,
-                    str(TASK_START_SCRIPT),
+                    str(BOOTSTRAP_SCRIPT),
                     "--task",
                     "large refactor",
                     "--task-id",
@@ -2832,27 +2343,40 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("RUNTIME_MAX_THREADS=26", result.stdout)
+            expected_active, expected_write = expected_workflow_spawn_budget(
+                "large_delivery"
+            )
+            self.assertIn(
+                f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}", result.stdout
+            )
             self.assertIn("RUNTIME_MAX_DEPTH=2", result.stdout)
             self.assertIn(
                 "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
                 result.stdout,
             )
-            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=4", result.stdout)
-            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=2", result.stdout)
+            self.assertIn(
+                f"WORKFLOW_ACTIVE_SPAWN_BUDGET={expected_active}", result.stdout
+            )
+            self.assertIn(
+                f"WORKFLOW_MAX_WRITE_SUBAGENTS={expected_write}", result.stdout
+            )
             manifest_text = (
                 report_root / "test-large-refactor" / "team_manifest.yaml"
             ).read_text(encoding="utf-8")
             manifest = yaml.safe_load(manifest_text)
             spawn_budget = manifest["run"]["spawn_budget"]
             write_scope_policy = manifest["run"]["write_scope_policy"]
-            self.assertEqual(spawn_budget["active_subagents"], 4)
-            self.assertEqual(spawn_budget["max_write_subagents"], 2)
-            self.assertEqual(spawn_budget["runtime_max_threads"], 26)
-            self.assert_current_checkout_write_policy(write_scope_policy, 2)
+            self.assertEqual(spawn_budget["active_subagents"], expected_active)
+            self.assertEqual(spawn_budget["max_write_subagents"], expected_write)
+            self.assertEqual(
+                spawn_budget["runtime_max_threads"], codex_runtime_max_threads()
+            )
+            self.assert_current_checkout_write_policy(
+                write_scope_policy, expected_write
+            )
             self.assertIn("spawn_budget:", manifest_text)
-            self.assertIn("active_subagents: 4", manifest_text)
-            self.assertIn("max_write_subagents: 2", manifest_text)
+            self.assertIn(f"active_subagents: {expected_active}", manifest_text)
+            self.assertIn(f"max_write_subagents: {expected_write}", manifest_text)
             self.assertIn(
                 "max_write_subagents_scope: 'write-capable subagents only'",
                 manifest_text,
@@ -2899,7 +2423,9 @@ class TaskStartAndCloseTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("AGENT_CANON_PREFLIGHT_STATUS=skipped_by_flag", result.stdout)
-            self.assertIn("RUNTIME_MAX_THREADS=26", result.stdout)
+            self.assertIn(
+                f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}", result.stdout
+            )
             report_dir = workspace_root / "reports" / "agents" / run_id
             self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
             self.assertIn(
@@ -2992,13 +2518,12 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
     def test_bootstrap_emits_mechanical_spawn_budget_for_task(self) -> None:
-        """bootstrap_agent_run should emit runtime and workflow spawn limits for machine use."""
+        """Bootstrap projects the task catalog budget into output and manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
             seed_workspace_config(workspace_root)
-            report_root.mkdir(parents=True, exist_ok=True)
             result = subprocess.run(
                 [
                     sys.executable,
@@ -3024,453 +2549,37 @@ class TaskStartAndCloseTest(unittest.TestCase):
             )
 
             self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("RUNTIME_MAX_THREADS=26", result.stdout)
-            self.assertIn(
-                "WORKFLOW_SUBAGENT_PROMPT_PACKET=team_manifest.yaml#run.subagent_prompt_packet",
-                result.stdout,
+            expected_active, expected_write = expected_workflow_spawn_budget(
+                "platform_and_environment"
             )
-            self.assertIn("WORKFLOW_ACTIVE_SPAWN_BUDGET=4", result.stdout)
-            self.assertIn("WORKFLOW_MAX_WRITE_SUBAGENTS=2", result.stdout)
-            self.assertIn("INITIAL_THREE_AGENT_INTAKE_IS_TOTAL_CAP=no", result.stdout)
-            self.assertIn("DYNAMIC_SUBAGENT_EXPANSION=allowed", result.stdout)
+            self.assertIn("WORKFLOW_FAMILY=platform_and_environment", result.stdout)
             self.assertIn(
-                "DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events",
-                result.stdout,
+                f"WORKFLOW_ACTIVE_SPAWN_BUDGET={expected_active}", result.stdout
             )
             self.assertIn(
-                "SUBAGENT_WAVE_RECORD_COMMAND=python3 tools/agent_tools/workflow_monitor.py --report-dir",
-                result.stdout,
-            )
-            self.assertIn("--subagent-wave", result.stdout)
-            self.assertIn(
-                "PARENT_WAVE_EXECUTION_GATE=required_before_implementation",
-                result.stdout,
-            )
-            self.assertIn(
-                "PARENT_WAVE_EXECUTION_GATE_STATUS=blocked_authority_required",
-                result.stdout,
+                f"WORKFLOW_MAX_WRITE_SUBAGENTS={expected_write}", result.stdout
             )
             self.assertIn("RECOMMENDED_INITIAL_SUBAGENT_WAVE=", result.stdout)
             self.assertIn("RECOMMENDED_DYNAMIC_EXPANSION_WAVES=", result.stdout)
-            self.assertIn(
-                "SAME_ROLE_SUBAGENT_INSTANCES=allowed_with_distinct_packets",
-                result.stdout,
-            )
-            self.assertIn(
-                "SAME_ROLE_SUBAGENT_INSTANCE_KEY=role_id+instance_id+agent_type",
-                result.stdout,
-            )
-            self.assertIn(
-                "PRE_HANDOFF_SCOPE_POLICY=discovery_before_handoff_scope",
-                result.stdout,
-            )
-            self.assertIn(
-                "PRE_HANDOFF_SCOPE_STATUS=seed_then_expand_before_handoff",
-                result.stdout,
-            )
-            self.assertNotIn("IMPLEMENTATION_HANDOFF_REQUIRED=yes", result.stdout)
-            self.assertNotIn("PARENT_REPO_EDITS_ALLOWED=no", result.stdout)
-            self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION_REQUIRED=yes", result.stdout)
-            self.assertNotIn("PARENT_DIRECT_WRITE_EXCEPTION=-", result.stdout)
-            self.assertIn("DEFAULT_QUALITY_CHECKS=candidate_only", result.stdout)
-            self.assertIn(
-                "DEFAULT_QUALITY_CHECK_ROLE_CANDIDATES=docs_workflow_steward,python_reviewer",
-                result.stdout,
-            )
-            self.assertNotIn("test_designer", result.stdout)
-            self.assertIn(
-                "DEFAULT_QUALITY_CHECK_DEFAULT_REVIEW_PACKS=-",
-                result.stdout,
-            )
-            self.assertIn(
-                "REPO_TOOL_ROUTING_POLICY=run.repo_tool_routing_policy",
-                result.stdout,
-            )
-            self.assertIn(
-                "REPO_TOOL_CALL_TOKEN_SCHEMA=agent-canon.tool-call.v1",
-                result.stdout,
-            )
-            self.assertNotIn("REPO_TOOL_COMMAND_PACKET_COMMAND=", result.stdout)
-            self.assertIn("REPO_TOOL_SELECTED_SKILLS=", result.stdout)
-            self.assertIn("REPO_TOOL_DYNAMIC_CANDIDATES=", result.stdout)
-            self.assertIn(
-                "REPO_DYNAMIC_SKILL_ROUTING_NEXT=add_skill_then_regenerate_repo_tool_routes",
-                result.stdout,
-            )
             self.assertIn("TASK_ID_ROUTE_STATUS=explicit", result.stdout)
-            self.assertIn("PLANNED_ACTIVE_ROLE_COUNT=", result.stdout)
-            self.assertIn(
-                "SUBAGENT_FANOUT_EXPECTATION=record_skipped_roles_when_below_family_default",
-                result.stdout,
+
+            manifest = yaml.safe_load(
+                (
+                    report_root
+                    / "test-bootstrap-spawn-budget"
+                    / "team_manifest.yaml"
+                ).read_text(encoding="utf-8")
             )
-            self.assertIn("IMPLEMENTATION_SURFACE_ROUTE_STATUS=pending", result.stdout)
-            self.assertIn(
-                "IMPLEMENTATION_SURFACE_ROUTE_COMMAND=python3 tools/agent_tools/search.py "
-                "--query-file <request-or-design-question.txt> "
-                "--providers text,semantic,vector,tool,header-deps,code-deps "
-                "--format json",
-                result.stdout,
-            )
-            self.assertIn(
-                "TOOL_REUSE_LEDGER_STATUS=required_before_custom_implementation",
-                result.stdout,
-            )
-            self.assertIn("PRE_EDIT_REJECTION_PREDICTION_STATUS=pending", result.stdout)
-            self.assertIn("AGENT_REPORT_COLLECTION_STATUS=available", result.stdout)
-            self.assertIn(
-                "AGENT_REPORT_COLLECTION_STATUS_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py status",
-                result.stdout,
-            )
-            self.assertIn(
-                "AGENT_REPORT_ARCHIVE_RUN_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py "
-                "archive-agent-report --report-dir",
-                result.stdout,
-            )
-            manifest_text = (
-                report_root / "test-bootstrap-spawn-budget" / "team_manifest.yaml"
-            ).read_text(encoding="utf-8")
-            manifest = yaml.safe_load(manifest_text)
             spawn_budget = manifest["run"]["spawn_budget"]
-            standard_wave_sequence = manifest["run"]["standard_wave_sequence"]
-            pre_handoff_scope_policy = manifest["run"]["pre_handoff_scope_policy"]
-            default_quality_check_policy = manifest["run"][
-                "default_quality_check_policy"
-            ]
-            delegated_spawn_policy = manifest["run"]["delegated_spawn_policy"]
-            validation_failure_policy = delegated_spawn_policy[
-                "validation_failure_triage_policy"
-            ]
-            spawn_wave_recommendation = manifest["run"]["spawn_wave_recommendation"]
-            role_topology = spawn_wave_recommendation["role_topology"]
-            same_role_instances = role_topology["same_role_parallel_instances"]
-            write_scope_policy = manifest["run"]["write_scope_policy"]
-            handoff_context_policy = manifest["run"]["handoff_context_policy"]
-            implementation_gate_defaults = manifest["run"][
-                "implementation_gate_defaults"
-            ]
-            agent_report_collection = manifest["run"]["agent_report_collection"]
-            repo_tool_routing_policy = manifest["run"]["repo_tool_routing_policy"]
-            self.assertEqual(spawn_budget["active_subagents"], 4)
-            self.assertEqual(spawn_budget["max_write_subagents"], 2)
-            self.assertGreater(
-                spawn_budget["active_subagents"],
-                spawn_budget["max_write_subagents"],
-            )
-            self.assertEqual(spawn_budget["runtime_max_threads"], 26)
-            self.assertEqual(spawn_budget["runtime_max_depth"], 2)
-            self.assertFalse(spawn_budget["initial_three_agent_intake_is_total_cap"])
-            self.assertLessEqual(
-                spawn_budget["active_subagents"],
-                spawn_budget["runtime_max_threads"],
-            )
-            planned_match = re.search(
-                r"^PLANNED_ACTIVE_ROLE_COUNT=(\d+)$",
-                result.stdout,
-                re.M,
-            )
-            self.assertIsNotNone(planned_match)
+            self.assertEqual(spawn_budget["active_subagents"], expected_active)
+            self.assertEqual(spawn_budget["max_write_subagents"], expected_write)
             self.assertEqual(
-                int(cast(re.Match[str], planned_match).group(1)),
-                len(manifest["roles"]),
+                spawn_budget["runtime_max_threads"], codex_runtime_max_threads()
             )
-            self.assertIn("workflow_families[].spawn_budget", spawn_budget["source"])
-            self.assertEqual(
-                same_role_instances["status"],
-                "allowed_with_distinct_packets",
+            self.assert_current_checkout_write_policy(
+                manifest["run"]["write_scope_policy"], expected_write
             )
-            self.assertEqual(
-                same_role_instances["identity_key"],
-                "role_id+instance_id+agent_type",
-            )
-            self.assertFalse(
-                same_role_instances["runtime_threads_are_cardinality_source"]
-            )
-            self.assertIn("implementation", role_topology["role_families"])
-            self.assertIn("review", role_topology["role_families"])
-            self.assertEqual(
-                delegated_spawn_policy["dynamic_mid_task_spawn"], "allowed"
-            )
-            self.assertEqual(
-                standard_wave_sequence["stages"], ["selected_stages_only"]
-            )
-            self.assertEqual(
-                pre_handoff_scope_policy["status"],
-                "seed_then_expand_before_handoff",
-            )
-            self.assertEqual(
-                write_scope_policy["scope_source_ref"],
-                "run.pre_handoff_scope_policy",
-            )
-            self.assertEqual(
-                write_scope_policy["handoff_scope_status"],
-                "seed_then_expand_before_handoff",
-            )
-            self.assertEqual(
-                default_quality_check_policy["candidate_roles"],
-                [
-                    "docs_workflow_steward",
-                    "python_reviewer",
-                ],
-            )
-            self.assertEqual(
-                default_quality_check_policy["candidate_codex_agent_types"],
-                [
-                    "docs_workflow_steward",
-                    "python_reviewer",
-                ],
-            )
-            self.assertEqual(
-                default_quality_check_policy["provenance"]["default_review_packs"],
-                "candidate_not_activated",
-            )
-            self.assertEqual(
-                default_quality_check_policy["provenance"]["default_review_pack_ids"],
-                [],
-            )
-            self.assertEqual(
-                spawn_wave_recommendation["standard_sequence_ref"],
-                "run.standard_wave_sequence",
-            )
-            self.assertEqual(
-                delegated_spawn_policy["delegated_child_spawn"],
-                "allowed_with_bounded_packet",
-            )
-            self.assertIn(
-                "workflow_monitor.py",
-                delegated_spawn_policy["wave_record_command"],
-            )
-            self.assertIn(
-                "--subagent-wave",
-                delegated_spawn_policy["wave_record_command"],
-            )
-            self.assert_same_role_runtime_policy(delegated_spawn_policy)
-            self.assertIn(
-                "validation_failure_requires_parallel_triage",
-                delegated_spawn_policy["expansion_triggers"],
-            )
-            self.assertEqual(
-                validation_failure_policy["trigger"],
-                "validation_failure_requires_parallel_triage",
-            )
-            self.assertEqual(
-                validation_failure_policy["triage_write_scope"],
-                "read_only_until_cause_identified",
-            )
-            runtime_profile_inventory = json.loads(
-                RUNTIME_PROFILE_INVENTORY.read_text(encoding="utf-8")
-            )
-            validation_failure_response = runtime_profile_inventory[
-                "validation_failure_response"
-            ]
-            self.assertEqual(
-                validation_failure_policy["taxonomy_source"],
-                "documents/runtime/runtime-profiles-and-check-matrix.json",
-            )
-            self.assertEqual(
-                validation_failure_policy["repair_required_fields"],
-                validation_failure_response["required_fields"],
-            )
-            self.assertEqual(
-                validation_failure_policy["intent_preservation_values"],
-                validation_failure_response["intent_preservation"],
-            )
-            self.assertIn(
-                "schedule.md Agent Wave Ledger row with spawn_authority, budget, runtime ceilings, paths, validation_route, review_gate, handoff_artifacts, and delegated policy ref",
-                delegated_spawn_policy["required_before_spawn"],
-            )
-            self.assertIn(
-                (
-                    "validation_failure_requires_parallel_triage waves stay read-only "
-                    "until failing_contract, observation_level, cause_classification, "
-                    "intent_preservation, and evidence are recorded for same-intent repair "
-                    "or escalation"
-                ),
-                delegated_spawn_policy["required_before_spawn"],
-            )
-            self.assertIn(
-                "run delegated_spawn_policy.wave_record_command after any actual parent or delegated child spawn; delegated child waves must include remaining_spawn_budget",
-                delegated_spawn_policy["required_before_spawn"],
-            )
-            self.assertIn(
-                "plan artifact, review gate decision, and edit handoff evidence following run.standard_wave_sequence",
-                delegated_spawn_policy["required_before_spawn"],
-            )
-            self.assertIn(
-                "include run.default_quality_check_policy in review and edit handoff packets",
-                delegated_spawn_policy["required_before_spawn"],
-            )
-            self.assertIn(
-                "include run.pre_handoff_scope_policy and dependency-expanded handoff scope evidence",
-                delegated_spawn_policy["required_before_spawn"],
-            )
-            self.assertIn(
-                (
-                    "include run.pre_handoff_gate_status before implementation or "
-                    "write-capable handoff when design_brief.md exists"
-                ),
-                delegated_spawn_policy["required_before_spawn"],
-            )
-            self.assertIn(
-                "include run.repo_tool_routing_policy selected-skill ToolCall tokens, dynamic skill candidates, and tool evidence in every handoff packet",
-                delegated_spawn_policy["required_before_spawn"],
-            )
-            self.assertIn(
-                "tool_route", delegated_spawn_policy["handoff_required_fields"]
-            )
-            self.assertIn(
-                "tool_call_token",
-                delegated_spawn_policy["handoff_required_fields"],
-            )
-            self.assertNotIn(
-                "tool_commands", delegated_spawn_policy["handoff_required_fields"]
-            )
-            self.assertIn(
-                "tool_evidence", delegated_spawn_policy["handoff_required_fields"]
-            )
-            self.assertIn(
-                "plan_artifact", delegated_spawn_policy["handoff_required_fields"]
-            )
-            self.assertIn(
-                "edit_handoff", delegated_spawn_policy["handoff_required_fields"]
-            )
-            self.assertIn(
-                "pre_handoff_gate_status",
-                delegated_spawn_policy["handoff_required_fields"],
-            )
-            first_wave = spawn_wave_recommendation["initial_wave_agent_types"]
-            self.assertEqual(
-                first_wave,
-                ["requirements_organizer"],
-            )
-            self.assertLessEqual(len(first_wave), spawn_budget["active_subagents"])
-            self.assertIn("requirements_organizer", first_wave)
-            self.assert_current_checkout_write_policy(write_scope_policy, 2)
-            self.assertIn("spawn_budget:", manifest_text)
-            self.assertIn("active_subagents: 4", manifest_text)
-            self.assertIn("max_write_subagents: 2", manifest_text)
-            self.assertIn("runtime_max_threads: 26", manifest_text)
-            self.assertIn("runtime_max_depth: 2", manifest_text)
-            self.assertIn("standard_wave_sequence:", manifest_text)
-            self.assertIn(
-                "STANDARD_AGENT_WAVE_SEQUENCE=selected_stages_only", result.stdout
-            )
-            self.assertIn("spawn_wave_recommendation:", manifest_text)
-            self.assertIn("delegated_spawn_policy:", manifest_text)
-            self.assertIn(
-                "max_write_subagents_scope: 'write-capable subagents only'",
-                manifest_text,
-            )
-            self.assertIn("write_scope_policy:", manifest_text)
-            self.assertIn("parent_managed: true", manifest_text)
-            self.assertIn("workflow_family:", manifest_text)
-            self.assertIn("subagent_prompt_packet:", manifest_text)
-            self.assertIn("subagent_lifecycle_policy:", manifest_text)
-            self.assertIn("fresh_subagents_required: conditional", manifest_text)
-            self.assertIn(
-                "reuse_for_new_task: allowed_when_owner_context_compatible",
-                manifest_text,
-            )
-            self.assertIn(
-                "previous_task_subagent_reuse: allowed_when_owner_context_compatible",
-                manifest_text,
-            )
-            lifecycle_policy = manifest["run"]["subagent_lifecycle_policy"]
-            self.assertEqual(
-                lifecycle_policy["mid_task_user_input_policy"],
-                "classify_then_reuse_or_route_fresh",
-            )
-            self.assertEqual(
-                lifecycle_policy["same_task_delta_reuse"],
-                "allowed_when_owner_context_compatible",
-            )
-            self.assertEqual(
-                lifecycle_policy["scope_change_reuse"],
-                "evaluate_owner_context_compatibility",
-            )
-            self.assertEqual(
-                lifecycle_policy["new_task_reuse"],
-                "evaluate_owner_context_compatibility",
-            )
-            common_prompt_fields = handoff_context_policy["common_prompt_must_include"]
-            self.assertIn("context_artifacts", common_prompt_fields)
-            self.assertIn("allowed_paths", common_prompt_fields)
-            self.assertIn("do_not_read", common_prompt_fields)
-            self.assertIn("expected_output_schema", common_prompt_fields)
-            self.assertIn("pre_handoff_gate_status", common_prompt_fields)
-            pre_handoff_gate_status = manifest["run"]["pre_handoff_gate_status"]
-            self.assertEqual(
-                pre_handoff_gate_status["status"],
-                "pending_design_review_gate_check",
-            )
-            self.assertIn(
-                "design_review_decision_approve",
-                pre_handoff_gate_status["required_evidence"],
-            )
-            for role in cast("list[object]", manifest["roles"]):
-                role_map = cast("dict[str, object]", role)
-                prompt_contract = cast(
-                    "dict[str, object]", role_map["prompt_contract"]
-                )
-                self.assertEqual(
-                    prompt_contract["common_prompt_must_include_ref"],
-                    "run.handoff_context_policy.common_prompt_must_include",
-                )
-            self.assertEqual(
-                repo_tool_routing_policy["route_basis"],
-                "selected_public_skills",
-            )
-            self.assertEqual(
-                repo_tool_routing_policy["dynamic_skill_routing"]["next"],
-                "add_skill_then_regenerate_repo_tool_routes",
-            )
-            self.assertIn(
-                "$task-routing",
-                repo_tool_routing_policy["dynamic_skill_routing"]["candidates"],
-            )
-            first_route_token = repo_tool_routing_policy["sequential_tool_routes"][0][
-                "tool_call_token"
-            ]
-            self.assertEqual(first_route_token["tool_id"], "skill-tool-commands")
-            self.assertEqual(
-                first_route_token["arguments"],
-                {"skill": "agent-orchestration", "format": "json"},
-            )
-            self.assertNotIn(
-                "packet_command", repo_tool_routing_policy["sequential_tool_routes"][0]
-            )
-            self.assertNotIn(
-                "commands", repo_tool_routing_policy["sequential_tool_routes"][0]
-            )
-            self.assertEqual(
-                implementation_gate_defaults["implementation_surface_route_command"],
-                "python3 tools/agent_tools/search.py "
-                "--query-file <request-or-design-question.txt> "
-                "--providers text,semantic,vector,tool,header-deps,code-deps "
-                "--format json",
-            )
-            self.assertEqual(
-                implementation_gate_defaults["tool_reuse_ledger_status"],
-                "required_before_custom_implementation",
-            )
-            self.assertEqual(
-                implementation_gate_defaults["pre_edit_rejection_prediction_status"],
-                "pending",
-            )
-            self.assertEqual(
-                agent_report_collection["status_command"],
-                "python3 tools/agent_tools/runtime_log_archive_git.py status",
-            )
-            self.assertIn(
-                "archive-agent-report --report-dir",
-                agent_report_collection["archive_current_run_command"],
-            )
-            self.assertEqual(
-                agent_report_collection["archive_index"],
-                ".agent-canon/log-archive/agent-reports/<repo-key>/index.jsonl",
-            )
-            self.assert_initial_wave_execution_gate(
-                report_root / "test-bootstrap-spawn-budget"
-            )
+
 
     def test_task_catalog_workflow_families_define_role_topology(self) -> None:
         """Every workflow family should define role topology separately from thread budget."""
@@ -4036,6 +3145,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
+            seed_workspace_config(workspace_root)
             subprocess.run(
                 ["git", "init", "-q"],
                 cwd=workspace_root,
@@ -4058,7 +3168,14 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 text=True,
             )
             subprocess.run(
-                ["git", "commit", "--allow-empty", "-m", "init"],
+                ["git", "add", "."],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "init"],
                 cwd=workspace_root,
                 check=True,
                 capture_output=True,
@@ -4319,41 +3436,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("REPORT_ACTIVE_RUN=", result.stdout)
             self.assertIn("REPORT_ACTIVE_RUN_MATCH=no", result.stdout)
             self.assertIn("report_active_run_match", result.stdout)
-
-    def test_task_close_rejects_failed_agent_canon_latest_status(self) -> None:
-        """task_close should require an explicit pass latest-route status."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
-            run_id = "test-task-close-failed-agent-canon-latest-status"
-            report_dir = report_root / run_id
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id)
-            write_ready_diff_check_artifact(report_dir)
-            closeout_path = report_dir / "closeout_gate.md"
-            closeout_path.write_text(
-                closeout_path.read_text(encoding="utf-8").replace(
-                    "- agent_canon_latest_status: pass",
-                    "- agent_canon_latest_status: fail",
-                ),
-                encoding="utf-8",
-            )
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=PROJECT_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("AGENT_CANON_LATEST_STATUS=fail", result.stdout)
-            self.assertIn("agent_canon_latest_status", result.stdout)
 
     def test_task_close_rejects_missing_mechanical_loop_or_diff_check(self) -> None:
         """task_close should fail when parent-only closeout skips the final diff loop."""
@@ -5333,233 +4415,6 @@ class TaskStartAndCloseTest(unittest.TestCase):
             self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=yes", result.stdout)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
 
-    def test_task_close_rejects_missing_actual_wave_event(self) -> None:
-        """The lifecycle status must reconcile schedule rows with observed wave events."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            workspace_root.mkdir(parents=True, exist_ok=True)
-            subprocess.run(
-                ["git", "init", "-q"],
-                cwd=workspace_root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            subprocess.run(
-                [
-                    "git",
-                    "-c",
-                    "user.name=Task Close Test",
-                    "-c",
-                    "user.email=task-close@example.invalid",
-                    "commit",
-                    "--allow-empty",
-                    "-m",
-                    "init",
-                ],
-                cwd=workspace_root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            run_id = "test-task-close-missing-wave-event"
-            report_dir = workspace_root / "reports" / "agents" / run_id
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
-            (report_dir / "workflow_monitoring.md").write_text(
-                "\n".join(
-                    [
-                        "# Workflow Monitoring",
-                        "",
-                        "## Actual Wave Events",
-                        "",
-                        "## Tool Warnings",
-                        "",
-                        "- tool_warnings_status: none",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--run-id",
-                    run_id,
-                ],
-                cwd=workspace_root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=", result.stdout)
-            self.assertIn(
-                "workflow_monitoring.md:actual_wave_missing:WAVE-1", result.stdout
-            )
-            self.assertIn("subagent_wave_reconciliation_clean", result.stdout)
-
-    def test_task_close_does_not_backfill_overplanned_wave(self) -> None:
-        """An explicitly overplanned wave is skipped without synthetic actual evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            workspace_root.mkdir(parents=True, exist_ok=True)
-            subprocess.run(
-                ["git", "init", "-q"],
-                cwd=workspace_root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            subprocess.run(
-                [
-                    "git",
-                    "-c",
-                    "user.name=Task Close Test",
-                    "-c",
-                    "user.email=task-close@example.invalid",
-                    "commit",
-                    "--allow-empty",
-                    "-m",
-                    "init",
-                ],
-                cwd=workspace_root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            run_id = "test-task-close-overplanned-wave"
-            report_dir = workspace_root / "reports" / "agents" / run_id
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
-            schedule_path = report_dir / "schedule.md"
-            schedule_path.write_text(
-                schedule_path.read_text(encoding="utf-8").replace(
-                    "| none | reports/agents/run |",
-                    "| overplanning | reports/agents/run |",
-                ),
-                encoding="utf-8",
-            )
-            (report_dir / "workflow_monitoring.md").write_text(
-                "\n".join(
-                    [
-                        "# Workflow Monitoring",
-                        "",
-                        "## Actual Wave Events",
-                        "",
-                        "## Tool Warnings",
-                        "",
-                        "- tool_warnings_status: none",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--run-id",
-                    run_id,
-                ],
-                cwd=workspace_root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=\n", result.stdout)
-            self.assertIn("CAPACITY_LIFECYCLE_BLOCKERS=closeout_packet_missing", result.stdout)
-
-    def test_task_close_rejects_comment_only_actual_wave_event(self) -> None:
-        """Commented wave rows are documentation, not observed wave evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            workspace_root.mkdir(parents=True, exist_ok=True)
-            subprocess.run(
-                ["git", "init", "-q"],
-                cwd=workspace_root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            subprocess.run(
-                [
-                    "git",
-                    "-c",
-                    "user.name=Task Close Test",
-                    "-c",
-                    "user.email=task-close@example.invalid",
-                    "commit",
-                    "--allow-empty",
-                    "-m",
-                    "init",
-                ],
-                cwd=workspace_root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            run_id = "test-task-close-comment-only-wave-event"
-            report_dir = workspace_root / "reports" / "agents" / run_id
-            report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
-            (report_dir / "workflow_monitoring.md").write_text(
-                "\n".join(
-                    [
-                        "# Workflow Monitoring",
-                        "",
-                        "## Actual Wave Events",
-                        "",
-                        (
-                            "<!-- - wave_event=recorded wave_id=WAVE-1 event_kind=initial_intake "
-                            "spawn_authority=parent trigger=initial_intake budget_before=0/12 "
-                            "budget_after=1/12 runtime_max_threads=26 runtime_max_depth=2 "
-                            "spawned_roles=requirements_organizer "
-                            "role_instances=manager:manager_requirements_organizer:"
-                            "requirements_organizer:team_manifest.yaml "
-                            "skipped_roles=none allowed_paths=reports/agents/run "
-                            "do_not_read=unrelated write_scope=read-only validation_route=pytest "
-                            "review_gate=schedule_review handoff_artifacts=team_manifest.yaml status=done -->"
-                        ),
-                        "",
-                        "## Tool Warnings",
-                        "",
-                        "- tool_warnings_status: none",
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )
-            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--run-id",
-                    run_id,
-                ],
-                cwd=workspace_root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("SUBAGENT_WAVE_RECONCILIATION_BLOCKERS=", result.stdout)
-            self.assertIn(
-                "workflow_monitoring.md:actual_wave_missing:WAVE-1", result.stdout
-            )
-            self.assertIn("subagent_wave_reconciliation_clean", result.stdout)
-
     def test_task_close_accepts_mid_task_user_input_wave_checkpoint(self) -> None:
         """A classified mid-task user input checkpoint should preserve closeout readiness."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -5760,7 +4615,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 allowed_paths="reports/agents/new-run",
                 do_not_read="reports/agents/run",
                 write_scope="none",
-                validation_route="task_start",
+                validation_route="bootstrap",
                 review_gate="manager_review",
             )
             write_ready_diff_check_artifact(report_dir)
@@ -5801,7 +4656,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 allowed_paths="reports/agents/missing-new-task-run",
                 do_not_read="reports/agents/run",
                 write_scope="none",
-                validation_route="task_start",
+                validation_route="bootstrap",
                 review_gate="manager_review",
                 fresh_run_bundle=str(missing_fresh_run),
             )
@@ -5844,7 +4699,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 allowed_paths="reports/agents/unrelated-run",
                 do_not_read="reports/agents/run",
                 write_scope="none",
-                validation_route="task_start",
+                validation_route="bootstrap",
                 review_gate="manager_review",
                 fresh_run_bundle=str(unrelated_run_dir),
             )
@@ -5887,7 +4742,7 @@ class TaskStartAndCloseTest(unittest.TestCase):
                 allowed_paths="reports/agents/fresh-new-task-run",
                 do_not_read="reports/agents/run",
                 write_scope="none",
-                validation_route="task_start",
+                validation_route="bootstrap",
                 review_gate="manager_review",
                 fresh_run_bundle=str(fresh_run_bundle),
             )

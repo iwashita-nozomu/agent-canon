@@ -103,6 +103,9 @@ developer convenience.
 The mounted workspace devcontainer contract is separate. The standalone image
 installs fixed OS/Python capabilities directly in its Dockerfile. Node/npm
 22.14.0/10.9.2 is owned by the exact digest-pinned Node devcontainer Feature.
+The image provides `pipx` for isolated manifest-defined Python CLIs; project
+dependencies use selected `pyproject.toml` extras through the standard editable
+`project-install` path.
 `.devcontainer/dependencies.toml` then describes the small default set of
 mounted developer/agent tools. Browser, TeX/PDF, proof, full Rust, and security
 scanner capabilities are selected by their owning workflow or CI image rather

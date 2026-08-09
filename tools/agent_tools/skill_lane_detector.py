@@ -106,13 +106,12 @@ class ValidationFailureRepairMatch:
 
 PROJECT_SKILL_LANE_CONCEPTS: tuple[StructuralSkillLaneConcept, ...] = (
     StructuralSkillLaneConcept(
-        name="parent_repo_project_skill_lane",
+        name="repository_skill_discovery_surface",
         required_evidence_categories=("project_owner", "skill_lane_surface"),
         route_skills=("task-routing", "structure-refactor"),
         evidence_groups={
             "project_owner": (
-                (".codex/project-skills",),
-                ("project-skills",),
+                (".agents/skills",),
                 ("parent", "repo"),
                 ("parent-repo",),
                 ("project-owned",),
@@ -122,9 +121,8 @@ PROJECT_SKILL_LANE_CONCEPTS: tuple[StructuralSkillLaneConcept, ...] = (
             "skill_lane_surface": (
                 ("skill", "lane"),
                 ("skill", "surface"),
-                ("skill", "config"),
-                ("skills.config",),
-                ("[[skills.config]]",),
+                ("skill", "discovery"),
+                ("automatic", "discovery"),
                 ("skill.md",),
                 ("固有スキル",),
                 ("スキル", "置"),

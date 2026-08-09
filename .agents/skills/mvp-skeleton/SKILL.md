@@ -2,7 +2,7 @@
 name: mvp-skeleton
 description: "Use when creating, scaffolding, planning, or implementing an MVP, prototype, runnable vertical slice, product skeleton, v0, or thin vertical slice and the agent must prevent overbuilding. Trigger for MVP作成, プロトタイプ, 骨格だけ, core runnable path, thin vertical slice, scope creep, over-polish, and cases where early implementation is getting unnecessary UI, architecture, features, or tests."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":1,"record_digest":"759342d16a0098847d9d5c8a6800002f75c0f298f1aaca40930c3f6f5fab2125"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"a95bfe71b5347a79381f7982aefc3b3372c28b84d4b896223f7445689c9dd199"} -->
 
 <!--
 @dependency-start

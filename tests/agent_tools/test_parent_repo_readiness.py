@@ -71,7 +71,6 @@ class ParentRepoReadinessTest(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("PARENT_REPO_READINESS=pass", result.stdout)
-            self.assertFalse((root / ".codex" / "project-skills").exists())
 
     def test_skip_container_config_skips_parent_environment_semantics(self) -> None:
         """Readiness skip mode leaves parent-environment semantics to container_config."""
@@ -153,19 +152,6 @@ class ParentRepoReadinessTest(unittest.TestCase):
                     os.path.relpath(root / target, projection.parent),
                     path,
                 )
-
-    def test_regular_specs_skip_optional_project_skill_lane(self) -> None:
-        """Optional project content should not be materialized by link-root."""
-        manifest = load_manifest(
-            PROJECT_ROOT,
-            ".",
-            "documents/runtime/shared-runtime-surfaces.toml",
-        )
-
-        regular_specs = render_regular_specs(manifest.entries, manifest.prefix)
-
-        self.assertNotIn(".codex/project-skills", regular_specs)
-        self.assertNotIn(".codex/project-config.toml", regular_specs)
 
     def test_tree_present_adds_checked_token_and_command(self) -> None:
         """Tree availability should be reported without relying on the host tool."""

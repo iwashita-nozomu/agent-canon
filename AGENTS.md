@@ -185,17 +185,8 @@ the Decision Sufficiency policy remains owned by
 For repo-changing work, create or reuse a run bundle only when coordination,
 resumption, or the selected workflow requires durable lifecycle evidence. A
 bounded owner/path/validation request may use a direct structured handoff and
-targeted validation without `task_start.py` or a bundle. When a packet is
-selected, follow the machine-readable output emitted by:
-
-```bash
-python3 tools/agent_tools/task_start.py \
-  --task "short task summary" \
-  --owner "codex" \
-  --workspace-root "$PWD"
-```
-
-For a new run directory:
+targeted validation without a bundle. When a packet is selected, follow the
+machine-readable output emitted by:
 
 ```bash
 python3 tools/agent_tools/bootstrap_agent_run.py \

@@ -20,6 +20,7 @@ RUN set -eux; \
       sudo \
       python3 \
       python3-pip \
+      pipx \
       python3-packaging \
       python3-tomli \
       curl \

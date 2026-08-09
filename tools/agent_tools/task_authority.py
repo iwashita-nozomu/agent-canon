@@ -6,7 +6,7 @@
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md requires request clauses before repo edits.
 # downstream implementation ./responsibility_scope.py consumes helper change authority.
 # downstream implementation ../../tests/agent_tools/test_codex_hooks.py validates hook integration.
-# downstream implementation ../../tests/agent_tools/test_task_start_and_close.py validates bundle generation.
+# downstream implementation ../../tests/agent_tools/test_bootstrap_and_close.py validates bundle generation.
 # @dependency-end
 """Request-local task authority helpers shared by AgentCanon hooks."""
 
