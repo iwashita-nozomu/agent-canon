@@ -21,6 +21,23 @@ from typing import TypeAlias, cast
 
 import yaml
 
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+
 AUTHORITY_FILE_NAME = "task_authority.yaml"
 AUTHORITY_ENV = "AGENT_CANON_TASK_AUTHORITY"
 ACTIVE_RUN_POINTER = Path("reports") / "agents" / ".active_run"
@@ -36,6 +53,22 @@ VALID_RISKY_AUTHORITY_KEYS = {
 }
 AuthorityPayload: TypeAlias = dict[str, object]
 AuthorityEntry: TypeAlias = dict[str, object]
+
+
+def _write_parent_file(path: Path, data: bytes, purpose: str) -> None:
+    """Publish authority evidence through the selected parent root."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, data, purpose)
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        f"{purpose}: explicit parent root is required for publication",
+    )
 
 
 @dataclass(frozen=True)
@@ -120,8 +153,11 @@ def hash_baseline_bytes(payload: bytes) -> bytes:
 
 def write_hash_baseline(path: Path, baseline_path: Path) -> None:
     """Write a hash baseline sidecar for a runtime authority file."""
-    baseline_path.parent.mkdir(parents=True, exist_ok=True)
-    baseline_path.write_bytes(hash_baseline_bytes(path.read_bytes()))
+    _write_parent_file(
+        baseline_path,
+        hash_baseline_bytes(path.read_bytes()),
+        "task-authority-baseline",
+    )
 
 
 def path_changed_from_baseline(path: Path, baseline_path: Path) -> bool:

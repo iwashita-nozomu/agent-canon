@@ -24,6 +24,7 @@ import json
 import os
 import re
 import shutil
+import secrets
 import subprocess
 import sys
 import tempfile
@@ -59,6 +60,14 @@ from runtime_log_paths import (  # noqa: E402
     repo_log_key,
     runtime_event_publication_outcome_spool_root,
     source_git_head,
+)
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootAttestationReceipt,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
 )
 from task_authority import ACTIVE_RUN_POINTER  # noqa: E402
 
@@ -924,6 +933,54 @@ def default_source_root(canon_root: Path) -> Path:
     return superproject_root(canon_root) or cwd_git_root or Path.cwd().resolve()
 
 
+def _parent_boundary() -> tuple[ParentRootSideEffectBoundary, ParentRootAttestationReceipt] | None:
+    """Return the parent capability for a bounded child invocation."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        return None
+    parent = Path(configured).resolve(strict=True)
+    receipt = attest_parent_root(
+        ParentRootAttestationRequest(
+            cwd=parent,
+            explicit_root=parent,
+            purpose="runtime-log-archive",
+        )
+    )
+    return ParentRootSideEffectBoundary(), receipt
+
+
+def _parent_archive_path(path: Path, purpose: str) -> Path:
+    """Resolve an archive candidate through the parent path capability."""
+    bound = _parent_boundary()
+    if bound is None:
+        return path
+    boundary, attestation = bound
+    return boundary.resolve_parent_owned_path(
+        attestation, path, purpose, create=False
+    ).physical_path
+
+
+def _parent_ensure_directory(path: Path, purpose: str) -> Path:
+    """Create/validate one archive directory beneath the attested parent."""
+    bound = _parent_boundary()
+    if bound is None:
+        path.mkdir(parents=True, exist_ok=True)
+        return path
+    boundary, attestation = bound
+    return boundary.ensure_parent_owned_directory(attestation, path, purpose).physical_path
+
+
+def _parent_copy_file(source: Path, target: Path, purpose: str) -> None:
+    """Copy bytes into the archive through atomic parent publication."""
+    bound = _parent_boundary()
+    if bound is None:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source, target)
+        return
+    boundary, attestation = bound
+    boundary.write_parent_owned_file(attestation, target, source.read_bytes(), purpose)
+
+
 def build_context(args: argparse.Namespace) -> ArchiveContext:
     """Resolve source/canon/archive paths and branch names."""
     canon_root = args.canon_root.resolve()
@@ -933,6 +990,7 @@ def build_context(args: argparse.Namespace) -> ArchiveContext:
         if args.archive_root
         else mounted_log_archive_root(canon_root).resolve()
     )
+    archive_root = _parent_archive_path(archive_root, "runtime-log-archive")
     try:
         key = source_repository_id_for_write(source_root)
         branch_key = key
@@ -2081,8 +2139,21 @@ def _readback_runtime_event(target: Path) -> RuntimeEventRecord:
     return RuntimeEventRecord(cast(dict[str, object], json.loads(raw[:-1].decode("utf-8"))))
 
 
-def _renameat2_noreplace(source: Path, target: Path) -> None:
-    """Atomically rename one identity-owned temp without replacing a target."""
+@dataclass
+class _SecurePublicationParent:
+    """Keep the authenticated parent directory open for one publication."""
+
+    root: Path
+    parent: Path
+    fd: int
+    components: tuple[tuple[int, int], ...]
+    relative_parts: tuple[str, ...]
+
+
+def _renameat2_noreplace_at(
+    source_name: str, target_name: str, directory_fd: int
+) -> None:
+    """Atomically rename two names in one already-open directory."""
     libc = ctypes.CDLL(None, use_errno=True)
     renameat2 = getattr(libc, "renameat2", None)
     if renameat2 is None:
@@ -2096,20 +2167,299 @@ def _renameat2_noreplace(source: Path, target: Path) -> None:
     ]
     renameat2.restype = ctypes.c_int
     result = renameat2(
-        AT_FDCWD,
-        os.fsencode(source),
-        AT_FDCWD,
-        os.fsencode(target),
+        directory_fd,
+        os.fsencode(source_name),
+        directory_fd,
+        os.fsencode(target_name),
         RENAME_NOREPLACE,
     )
     if result == 0:
         return
     error_number = ctypes.get_errno()
     if error_number == errno.EEXIST:
-        raise FileExistsError(error_number, os.strerror(error_number), target)
+        raise FileExistsError(error_number, os.strerror(error_number), target_name)
     if error_number in {errno.ENOSYS, errno.EINVAL, errno.ENOTSUP}:
-        raise OSError(error_number, os.strerror(error_number), target)
-    raise OSError(error_number, os.strerror(error_number), target)
+        raise OSError(error_number, os.strerror(error_number), target_name)
+    raise OSError(error_number, os.strerror(error_number), target_name)
+def _find_publication_parent_root(target: Path) -> Path | None:
+    """Find a Git parent for an explicitly supplied publication target."""
+    candidate = target.parent.absolute()
+    for directory in (candidate, *candidate.parents):
+        if directory.is_dir():
+            root = git_root(directory)
+            if root is not None:
+                return root
+    return None
+
+
+def _open_secure_publication_parent(
+    target: Path, purpose: str
+) -> tuple[_SecurePublicationParent, Path]:
+    """Attest and open the target parent with no-follow component traversal."""
+    bound = _parent_boundary()
+    if bound is None:
+        root = _find_publication_parent_root(target)
+        if root is None:
+            raise RuntimeEventMaterializationError(
+                "parent_boundary_invalid",
+                "publication requires an attested Git parent root",
+            )
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=root, explicit_root=root, purpose=purpose
+            )
+        )
+        boundary = ParentRootSideEffectBoundary()
+    else:
+        boundary, attestation = bound
+    try:
+        parent_receipt = boundary.ensure_parent_owned_directory(
+            attestation, target.parent, purpose
+        )
+        parent = parent_receipt.physical_path
+        root = attestation.parent_root
+        relative_parts = tuple(parent.relative_to(root).parts)
+        fd = os.open(
+            root,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+        )
+        components: list[tuple[int, int]] = []
+        try:
+            root_info = os.fstat(fd)
+            components.append((root_info.st_dev, root_info.st_ino))
+            for component in relative_parts:
+                child = os.open(
+                    component,
+                    os.O_RDONLY
+                    | os.O_DIRECTORY
+                    | os.O_NOFOLLOW
+                    | os.O_CLOEXEC,
+                    dir_fd=fd,
+                )
+                os.close(fd)
+                fd = child
+                info = os.fstat(fd)
+                components.append((info.st_dev, info.st_ino))
+        except Exception:
+            os.close(fd)
+            raise
+        return (
+            _SecurePublicationParent(
+                root, parent, fd, tuple(components), relative_parts
+            ),
+            parent,
+        )
+    except ParentRootSideEffectError as exc:
+        raise RuntimeEventMaterializationError(
+            "parent_boundary_invalid", str(exc)
+        ) from exc
+    except OSError as exc:
+        raise RuntimeEventMaterializationError(
+            "parent_boundary_invalid", "publication parent open failed"
+        ) from exc
+
+
+def _verify_secure_publication_parent(context: _SecurePublicationParent) -> None:
+    """Reject replacement of any authenticated root-to-parent component."""
+    fd = os.open(
+        context.root,
+        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+    )
+    observed: list[tuple[int, int]] = []
+    try:
+        info = os.fstat(fd)
+        observed.append((info.st_dev, info.st_ino))
+        for component in context.relative_parts:
+            child = os.open(
+                component,
+                os.O_RDONLY
+                | os.O_DIRECTORY
+                | os.O_NOFOLLOW
+                | os.O_CLOEXEC,
+                dir_fd=fd,
+            )
+            os.close(fd)
+            fd = child
+            info = os.fstat(fd)
+            observed.append((info.st_dev, info.st_ino))
+    finally:
+        os.close(fd)
+    if tuple(observed) != context.components:
+        raise RuntimeEventMaterializationError(
+            "parent_boundary_race", "publication parent component identity changed"
+        )
+    current = os.fstat(context.fd)
+    if (current.st_dev, current.st_ino) != context.components[-1]:
+        raise RuntimeEventMaterializationError(
+            "parent_boundary_race", "persistent publication parent identity changed"
+        )
+
+
+def _read_secure_publication_target(
+    context: _SecurePublicationParent, target_name: str
+) -> bytes | None:
+    """Read a regular target through the authenticated parent fd."""
+    descriptor = -1
+    try:
+        descriptor = os.open(
+            target_name,
+            os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC,
+            dir_fd=context.fd,
+        )
+        metadata = os.fstat(descriptor)
+        if not S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise RuntimeEventMaterializationError(
+                "publication_collision", "publication target is not a regular file"
+            )
+        chunks: list[bytes] = []
+        while True:
+            chunk = os.read(descriptor, 1024 * 1024)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        return b"".join(chunks)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        raise RuntimeEventMaterializationError(
+            "publication_uncertain", "publication target readback failed"
+        ) from exc
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+
+
+def _secure_publish_noreplace(
+    target: Path,
+    payload: bytes,
+    purpose: str,
+    collision_code: str,
+) -> tuple[Path, bytes, bool]:
+    """Publish bytes via attested dirfds and return path, bytes, and recovery state."""
+    context, parent = _open_secure_publication_parent(target, purpose)
+    temporary_name: str | None = None
+    descriptor = -1
+    published = False
+    primary_error: BaseException | None = None
+    try:
+        _verify_secure_publication_parent(context)
+        existing = _read_secure_publication_target(context, target.name)
+        if existing is not None:
+            if existing != payload:
+                raise RuntimeEventMaterializationError(
+                    collision_code, "publication target has different bytes"
+                )
+            return parent / target.name, existing, True
+        if not getattr(os, "O_NOFOLLOW", 0):
+            raise RuntimeEventMaterializationError(
+                "publication_failure", "O_NOFOLLOW is unavailable"
+            )
+        for _ in range(32):
+            temporary_name = f".{target.name}.{secrets.token_hex(12)}.tmp"
+            try:
+                descriptor = os.open(
+                    temporary_name,
+                    os.O_RDWR
+                    | os.O_CREAT
+                    | os.O_EXCL
+                    | os.O_NOFOLLOW
+                    | os.O_CLOEXEC,
+                    0o600,
+                    dir_fd=context.fd,
+                )
+                break
+            except FileExistsError:
+                temporary_name = None
+        if descriptor < 0 or temporary_name is None:
+            raise RuntimeEventMaterializationError(
+                "publication_failure", "temporary publication name exhausted"
+            )
+        os.fchmod(descriptor, 0o600)
+        metadata = os.fstat(descriptor)
+        identity = (metadata.st_dev, metadata.st_ino)
+        if (
+            not S_ISREG(metadata.st_mode)
+            or metadata.st_uid != os.geteuid()
+            or metadata.st_nlink != 1
+            or not _owner_mutation_exclusive_mode(metadata.st_mode, 0o600)
+        ):
+            raise RuntimeEventMaterializationError(
+                "publication_failure", "identity-owned temp metadata is invalid"
+            )
+        view = memoryview(payload)
+        while view:
+            written = os.write(descriptor, view)
+            if written <= 0:
+                raise OSError(errno.EIO, "temporary write made no progress")
+            view = view[written:]
+        os.fsync(descriptor)
+        if os.pread(descriptor, len(payload) + 1, 0) != payload:
+            raise OSError(errno.EIO, "temporary readback differs from canonical bytes")
+        latest = os.fstat(descriptor)
+        if (
+            not S_ISREG(latest.st_mode)
+            or latest.st_uid != os.geteuid()
+            or latest.st_nlink != 1
+            or (latest.st_dev, latest.st_ino) != identity
+            or not _owner_mutation_exclusive_mode(latest.st_mode, 0o600)
+        ):
+            raise RuntimeEventMaterializationError(
+                "publication_failure", "identity-owned temp verification failed"
+            )
+        os.close(descriptor)
+        descriptor = -1
+        _verify_secure_publication_parent(context)
+        try:
+            _renameat2_noreplace_at(temporary_name, target.name, context.fd)
+        except FileExistsError:
+            existing = _read_secure_publication_target(context, target.name)
+            if existing is None or existing != payload:
+                raise RuntimeEventMaterializationError(
+                    collision_code, "publication target collision"
+                )
+            return parent / target.name, existing, True
+        published = True
+        os.fsync(context.fd)
+        _verify_secure_publication_parent(context)
+        committed = _read_secure_publication_target(context, target.name)
+        if committed is None or committed != payload:
+            raise RuntimeEventMaterializationError(
+                "publication_uncertain", "publication target readback differs"
+            )
+        return parent / target.name, committed, False
+    except RuntimeEventMaterializationError as exc:
+        primary_error = exc
+        raise
+    except OSError as exc:
+        primary_error = exc
+        raise RuntimeEventMaterializationError(
+            "publication_failure", "secure publication failed"
+        ) from exc
+    finally:
+        cleanup_error: OSError | None = None
+        if descriptor >= 0:
+            try:
+                os.close(descriptor)
+            except OSError as exc:
+                cleanup_error = exc
+        if temporary_name is not None and not published:
+            try:
+                os.unlink(temporary_name, dir_fd=context.fd)
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                cleanup_error = cleanup_error or exc
+        try:
+            os.close(context.fd)
+        except OSError as exc:
+            cleanup_error = cleanup_error or exc
+        if cleanup_error is not None:
+            error = RuntimeEventMaterializationError(
+                "publication_cleanup_failed", "secure publication cleanup failed"
+            )
+            if primary_error is not None:
+                raise error from primary_error
+            raise error from cleanup_error
 
 
 def _owner_mutation_exclusive_mode(mode: int, required_owner_bits: int) -> bool:
@@ -2216,7 +2566,9 @@ def acquire_publication_attempt_lock(
     body_error: BaseException | None = None
     try:
         source_root = source_root.resolve(strict=True)
-        relative_spool = spool_root.relative_to(source_root)
+        configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+        spool_base = Path(configured_parent).resolve(strict=True) if configured_parent else source_root
+        relative_spool = spool_root.relative_to(spool_base)
         if relative_spool.parts != (
             ".agent-canon",
             "runtime-event-spool",
@@ -2226,11 +2578,11 @@ def acquire_publication_attempt_lock(
                 "publication_attempt_lock_invalid",
                 "publication spool root is not canonical",
             )
-        directory = source_root
+        directory = spool_base
         for component in (*relative_spool.parts, attempt_id):
             directory /= component
             try:
-                directory.mkdir(mode=0o700)
+                _parent_ensure_directory(directory, "publication-outcome-directory")
             except FileExistsError:
                 pass
             metadata = directory.lstat()
@@ -2320,124 +2672,30 @@ def acquire_publication_attempt_lock(
 def _publish_context_discovery_noreplace(target: Path, bytes_: bytes) -> None:
     """Publish one immutable context certificate with exact readback."""
     try:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if target.is_symlink() or (target.exists() and not target.is_file()):
-            raise RuntimeEventMaterializationError(
-                "context_record_collision", "certificate target is not a regular file"
-            )
-        if target.is_file():
-            existing = target.read_bytes()
-            if existing != bytes_:
-                raise RuntimeEventMaterializationError(
-                    "context_record_collision", "certificate target has different bytes"
-                )
-            validate_context_discovery_certificate(existing)
-            return
-    except RuntimeEventMaterializationError:
-        raise
-    except OSError as exc:
-        raise RuntimeEventMaterializationError(
-            "context_publication_failure", "certificate target preparation failed"
-        ) from exc
-
-    fd = -1
-    temporary: Path | None = None
-    identity: tuple[int, int] | None = None
-    published = False
-    try:
-        fd, temporary_name = tempfile.mkstemp(
-            prefix=f".{target.name}.", suffix=".tmp", dir=target.parent
+        validate_context_discovery_certificate(bytes_)
+        published_path, committed, recovered = _secure_publish_noreplace(
+            target,
+            bytes_,
+            "runtime-context-publication",
+            "context_record_collision",
         )
-        temporary = Path(temporary_name)
-        os.fchmod(fd, 0o600)
-        nofollow = getattr(os, "O_NOFOLLOW", 0)
-        if not nofollow:
-            raise RuntimeEventMaterializationError(
-                "context_publication_failure", "O_NOFOLLOW is unavailable"
-            )
-        os.close(fd)
-        fd = os.open(temporary, os.O_RDWR | nofollow)
-        metadata = os.fstat(fd)
-        identity = (metadata.st_dev, metadata.st_ino)
-        if (
-            not S_ISREG(metadata.st_mode)
-            or metadata.st_uid != os.geteuid()
-            or metadata.st_nlink != 1
-            or not _owner_mutation_exclusive_mode(metadata.st_mode, 0o600)
-        ):
-            raise RuntimeEventMaterializationError(
-                "context_publication_failure", "identity-owned temp metadata is invalid"
-            )
-        view = memoryview(bytes_)
-        while view:
-            written = os.write(fd, view)
-            if written <= 0:
-                raise RuntimeEventMaterializationError(
-                    "context_publication_failure", "certificate write made no progress"
-                )
-            view = view[written:]
-        os.fsync(fd)
-        if os.pread(fd, len(bytes_) + 1, 0) != bytes_:
-            raise RuntimeEventMaterializationError(
-                "context_publication_failure", "certificate temporary readback differs"
-            )
-        os.close(fd)
-        fd = -1
-        latest = temporary.lstat()
-        if (
-            not S_ISREG(latest.st_mode)
-            or latest.st_uid != os.geteuid()
-            or identity != (latest.st_dev, latest.st_ino)
-            or latest.st_nlink != 1
-            or not _owner_mutation_exclusive_mode(latest.st_mode, 0o600)
-        ):
-            raise RuntimeEventMaterializationError(
-                "context_publication_failure", "identity-owned temp verification failed"
-            )
-        try:
-            _renameat2_noreplace(temporary, target)
-        except FileExistsError:
-            if target.is_symlink() or not target.is_file():
-                raise RuntimeEventMaterializationError(
-                    "context_record_collision", "certificate target collision"
-                )
-            existing = target.read_bytes()
-            if existing != bytes_:
-                raise RuntimeEventMaterializationError(
-                    "context_record_collision", "certificate target collision"
-                )
-            validate_context_discovery_certificate(existing)
-            return
-        published = True
-        temporary = None
-        _fsync_directory(target.parent, "artifact-parent")
-        committed = target.read_bytes()
-        if committed != bytes_:
-            raise RuntimeEventMaterializationError(
-                "context_publication_failure", "certificate target readback differs"
-            )
+        if not recovered:
+            _fsync_directory(published_path.parent, "artifact-parent")
         validate_context_discovery_certificate(committed)
-    except RuntimeEventMaterializationError:
+    except RuntimeEventMaterializationError as exc:
+        if exc.code in {
+            "publication_failure",
+            "publication_observation_invalid",
+            "context_schema_invalid",
+        }:
+            raise RuntimeEventMaterializationError(
+                "context_publication_failure", str(exc)
+            ) from exc
         raise
     except OSError as exc:
         raise RuntimeEventMaterializationError(
             "context_publication_failure", "certificate publication failed"
         ) from exc
-    finally:
-        if fd >= 0:
-            try:
-                os.close(fd)
-            except OSError as exc:
-                raise RuntimeEventMaterializationError(
-                    "context_publication_failure", "certificate temporary close failed"
-                ) from exc
-        if temporary is not None:
-            try:
-                current = temporary.stat()
-                if not published and identity == (current.st_dev, current.st_ino):
-                    temporary.unlink()
-            except OSError:
-                pass
 
 
 def _certificate_record(
@@ -2662,208 +2920,62 @@ def command_append_context_discovery(
 
 
 def _publish_runtime_event_noreplace(target: Path, bytes_: bytes) -> dict[str, object]:
-    """Publish prepared artifact bytes and return only observed target evidence."""
+    """Publish one runtime event through the authenticated parent dirfd."""
     try:
-        target.parent.mkdir(parents=True, exist_ok=True)
-        if target.is_symlink() or (target.exists() and not target.is_file()):
+        validate_runtime_event_schema(bytes_)
+        published_path, committed, recovered = _secure_publish_noreplace(
+            target,
+            bytes_,
+            "runtime-event-publication",
+            "record_collision",
+        )
+    except RuntimeEventMaterializationError as exc:
+        if exc.code in {
+            "publication_observation_invalid",
+            "publication_uncertain",
+            "schema_invalid",
+        }:
             raise RuntimeEventMaterializationError(
-                "record_collision", "publication target is not a regular file"
-            )
-        if target.is_file():
-            try:
-                existing = target.read_bytes()
-            except OSError as exc:
-                raise RuntimeEventMaterializationError(
-                    "publication_uncertain", "publication target readback failed"
-                ) from exc
-            if existing != bytes_:
-                try:
-                    candidate = json.loads(existing[:-1].decode("utf-8"))
-                except (UnicodeDecodeError, json.JSONDecodeError, IndexError):
-                    candidate = None
-                if (
-                    isinstance(candidate, dict)
-                    and candidate.get("schema") == RUNTIME_EVENT_SCHEMA
-                ):
-                    try:
-                        validate_runtime_event_schema(existing)
-                    except RuntimeEventMaterializationError as exc:
-                        raise RuntimeEventMaterializationError(
-                            "schema_invalid", "existing artifact schema is invalid"
-                        ) from exc
-                raise RuntimeEventMaterializationError(
-                    "record_collision", "publication target has different bytes"
-                )
-            validate_runtime_event_schema(existing)
-            recovered_record = RuntimeEventRecord(
-                cast(
-                    dict[str, object],
-                    json.loads(existing[:-1].decode("utf-8")),
-                )
-            )
-            return {
-                "source": "recovery",
-                "causal_gap": True,
-                "target_presence": "present",
-                "rename_status": "recovered_present",
-                "target_directory_fsync_status": "unknown",
-                "readback_status": "verified",
-                "readback_sha256": cast(
-                    str, recovered_record["artifact_sha256"]
-                ),
-            }
-    except RuntimeEventMaterializationError:
+            "publication_observation_invalid" if exc.code == "publication_uncertain" else "publication_failure", str(exc)
+            ) from exc
         raise
     except OSError as exc:
         raise RuntimeEventMaterializationError(
-            "publication_failure", "artifact target preparation failed"
+            "publication_failure", "artifact publication failed"
         ) from exc
-
-    fd = -1
-    temporary: Path | None = None
-    identity: tuple[int, int] | None = None
-    published = False
     try:
-        fd, temporary_name = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=target.parent)
-        temporary = Path(temporary_name)
-        os.fchmod(fd, 0o600)
-        flags = getattr(os, "O_NOFOLLOW", 0)
-        if not flags:
-            raise RuntimeEventMaterializationError(
-                "publication_failure", "O_NOFOLLOW is unavailable"
-            )
-        os.close(fd)
-        fd = os.open(temporary, os.O_RDWR | flags)
-        metadata = os.fstat(fd)
-        identity = (metadata.st_dev, metadata.st_ino)
-        if (
-            not S_ISREG(metadata.st_mode)
-            or metadata.st_uid != os.geteuid()
-            or metadata.st_nlink != 1
-            or not _owner_mutation_exclusive_mode(metadata.st_mode, 0o600)
-        ):
-            raise RuntimeEventMaterializationError("publication_failure", "identity-owned temp metadata is invalid")
-        view = memoryview(bytes_)
-        while view:
-            written = os.write(fd, view)
-            if written <= 0:
-                raise RuntimeEventMaterializationError("publication_failure", "runtime event write made no progress")
-            view = view[written:]
-        os.fsync(fd)
-        if os.pread(fd, len(bytes_) + 1, 0) != bytes_:
-            raise RuntimeEventMaterializationError("publication_failure", "temporary readback differs from canonical bytes")
-        os.close(fd)
-        fd = -1
-        latest = temporary.lstat()
-        if (
-            not S_ISREG(latest.st_mode)
-            or latest.st_uid != os.geteuid()
-            or identity != (latest.st_dev, latest.st_ino)
-            or latest.st_nlink != 1
-            or not _owner_mutation_exclusive_mode(latest.st_mode, 0o600)
-        ):
-            raise RuntimeEventMaterializationError("publication_failure", "identity-owned temp verification failed")
-        try:
-            _renameat2_noreplace(temporary, target)
-        except FileExistsError:
-            if target.is_symlink() or not target.is_file():
-                raise RuntimeEventMaterializationError("record_collision", "publication target collision")
-            try:
-                existing = target.read_bytes()
-            except OSError as exc:
-                raise RuntimeEventMaterializationError(
-                    "publication_uncertain", "publication target readback failed"
-                ) from exc
-            if existing != bytes_:
-                try:
-                    candidate = json.loads(existing[:-1].decode("utf-8"))
-                except (UnicodeDecodeError, json.JSONDecodeError, IndexError):
-                    candidate = None
-                if (
-                    isinstance(candidate, dict)
-                    and candidate.get("schema") == RUNTIME_EVENT_SCHEMA
-                ):
-                    try:
-                        validate_runtime_event_schema(existing)
-                    except RuntimeEventMaterializationError as exc:
-                        raise RuntimeEventMaterializationError(
-                            "schema_invalid", "existing artifact schema is invalid"
-                        ) from exc
-                raise RuntimeEventMaterializationError("record_collision", "publication target collision")
-            validate_runtime_event_schema(existing)
-            recovered_record = RuntimeEventRecord(
-                cast(
-                    dict[str, object],
-                    json.loads(existing[:-1].decode("utf-8")),
-                )
-            )
-            return {
-                "source": "recovery",
-                "causal_gap": True,
-                "target_presence": "present",
-                "rename_status": "recovered_present",
-                "target_directory_fsync_status": "unknown",
-                "readback_status": "verified",
-                "readback_sha256": cast(
-                    str, recovered_record["artifact_sha256"]
-                ),
-            }
-        published = True
-        temporary = None
-        try:
-            _fsync_directory(target.parent, "artifact-parent")
-            fsync_status = "succeeded"
-        except OSError:
-            fsync_status = "failed"
-        try:
-            committed = target.read_bytes()
-        except OSError:
-            readback_status = "failed"
-            readback_sha256 = None
-        else:
-            if committed != bytes_:
-                raise RuntimeEventMaterializationError(
-                    "publication_observation_invalid",
-                    "artifact target readback differs after publication",
-                )
-            try:
-                validate_runtime_event_schema(committed)
-                committed_value = json.loads(committed[:-1].decode("utf-8"))
-            except RuntimeEventMaterializationError as exc:
-                raise RuntimeEventMaterializationError(
-                    "publication_observation_invalid",
-                    "artifact target readback is malformed after publication",
-                ) from exc
-            readback_status = "verified"
-            readback_sha256 = cast(str, committed_value["artifact_sha256"])
+        validate_runtime_event_schema(committed)
+        committed_value = json.loads(committed[:-1].decode("utf-8"))
+        readback_sha256 = cast(str, committed_value["artifact_sha256"])
+    except (RuntimeEventMaterializationError, OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError) as exc:
+        raise RuntimeEventMaterializationError(
+            "publication_failure",
+            "artifact target readback is malformed",
+        ) from exc
+    if recovered:
         return {
-            "source": "publish",
-            "causal_gap": False,
+            "source": "recovery",
+            "causal_gap": True,
             "target_presence": "present",
-            "rename_status": "completed",
-            "target_directory_fsync_status": fsync_status,
-            "readback_status": readback_status,
+            "rename_status": "recovered_present",
+            "target_directory_fsync_status": "unknown",
+            "readback_status": "verified",
             "readback_sha256": readback_sha256,
         }
-    except RuntimeEventMaterializationError:
-        raise
-    except OSError as exc:
-        raise RuntimeEventMaterializationError("publication_failure", str(exc)) from exc
-    finally:
-        if fd >= 0:
-            try:
-                os.close(fd)
-            except OSError as exc:
-                raise RuntimeEventMaterializationError(
-                    "publication_failure", "artifact temporary close failed"
-                ) from exc
-        if temporary is not None:
-            try:
-                current = temporary.stat()
-                if not published and identity == (current.st_dev, current.st_ino):
-                    temporary.unlink()
-            except OSError:
-                pass
+    try:
+        _fsync_directory(published_path.parent, "artifact-parent")
+        fsync_status = "succeeded"
+    except OSError:
+        fsync_status = "failed"
+    return {
+        "source": "publish",
+        "causal_gap": False,
+        "target_presence": "present",
+        "rename_status": "completed",
+        "target_directory_fsync_status": fsync_status,
+        "readback_status": "verified",
+        "readback_sha256": readback_sha256,
+    }
 
 
 def classify_publication_outcome(
@@ -3171,7 +3283,7 @@ def confirm_publication_outcome_observation(
 def spool_publication_outcome(
     attempt_lock: PublicationAttemptLock, observation: dict[str, object]
 ) -> tuple[Path, dict[str, object]]:
-    """Atomically append and confirm one publication outcome observation."""
+    """Atomically append and confirm one observation through a parent dirfd."""
     raw = (
         json.dumps(
             observation,
@@ -3190,103 +3302,35 @@ def spool_publication_outcome(
         f"{cast(int, validated['sequence']):06d}-"
         f"{validated['observation_sha256']}.json"
     )
-    if path.exists() or path.is_symlink():
-        if path.is_symlink() or not path.is_file():
-            raise RuntimeEventMaterializationError(
-                "publication_observation_invalid", "observation target is invalid"
-            )
-        try:
-            existing = path.read_bytes()
-        except OSError as exc:
-            raise RuntimeEventMaterializationError(
-                "publication_observation_uncertain",
-                "observation target readback failed",
-            ) from exc
-        if existing != raw:
-            raise RuntimeEventMaterializationError(
-                "publication_observation_collision", "observation target differs"
-            )
-        return path, confirm_publication_outcome_observation(
-            attempt_lock, path, raw
-        )
-    fd = -1
-    temporary: Path | None = None
-    identity: tuple[int, int] | None = None
-    candidate_exists = False
     try:
-        fd, temporary_name = tempfile.mkstemp(
-            prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+        published_path, committed, _recovered = _secure_publish_noreplace(
+            path,
+            raw,
+            "runtime-observation-publication",
+            "publication_observation_collision",
         )
-        temporary = Path(temporary_name)
-        os.fchmod(fd, 0o600)
-        metadata = os.fstat(fd)
-        identity = (metadata.st_dev, metadata.st_ino)
-        view = memoryview(raw)
-        while view:
-            written = os.write(fd, view)
-            if written <= 0:
-                raise OSError(errno.EIO, "observation write made no progress")
-            view = view[written:]
-        os.fsync(fd)
-        if os.pread(fd, len(raw) + 1, 0) != raw:
-            raise OSError(errno.EIO, "observation temporary readback mismatch")
-        os.close(fd)
-        fd = -1
-        _renameat2_noreplace(temporary, path)
-        candidate_exists = True
-        temporary = None
-    except FileExistsError:
-        if path.is_symlink() or not path.is_file():
+        if committed != raw:
             raise RuntimeEventMaterializationError(
-                "publication_observation_collision", "observation target collision"
+                "publication_observation_collision", "observation readback differs"
             )
-        try:
-            existing = path.read_bytes()
-        except OSError as exc:
+        _fsync_directory(published_path.parent, "observation-parent")
+    except RuntimeEventMaterializationError as exc:
+        if exc.code == "publication_failure":
             raise RuntimeEventMaterializationError(
-                "publication_observation_uncertain",
-                "observation target readback failed",
+                "publication_observation_failed", str(exc)
             ) from exc
-        if existing != raw:
+        if exc.code == "publication_uncertain":
             raise RuntimeEventMaterializationError(
-                "publication_observation_collision", "observation target collision"
-            )
-        candidate_exists = True
-    except RuntimeEventMaterializationError:
-        raise
-    except OSError as exc:
-        raise RuntimeEventMaterializationError(
-            "publication_observation_failed", "observation publication failed"
-        ) from exc
-    finally:
-        if fd >= 0:
-            try:
-                os.close(fd)
-            except OSError as exc:
-                raise RuntimeEventMaterializationError(
-                    "publication_observation_failed",
-                    "observation temporary close failed",
-                ) from exc
-        if temporary is not None:
-            try:
-                current = temporary.stat()
-                if not candidate_exists and identity == (current.st_dev, current.st_ino):
-                    temporary.unlink()
-            except OSError:
-                pass
-    try:
-        _fsync_directory(path.parent, "observation-parent")
-        if path.read_bytes() != raw:
-            raise RuntimeEventMaterializationError(
-                "publication_observation_invalid", "observation readback differs"
-            )
-    except RuntimeEventMaterializationError:
+                "publication_observation_uncertain", str(exc)
+            ) from exc
         raise
     except OSError as exc:
         raise RuntimeEventMaterializationError(
             "publication_observation_uncertain", "observation durability is uncertain"
         ) from exc
-    return path, confirm_publication_outcome_observation(attempt_lock, path, raw)
+    return published_path, confirm_publication_outcome_observation(
+        attempt_lock, published_path, raw
+    )
 
 
 def _canonical_publication_outcome_receipt_bytes(
@@ -3616,106 +3660,34 @@ def _publish_publication_outcome_receipt_noreplace(
     observations: list[dict[str, object]],
     prior_receipts: list[dict[str, object]],
 ) -> DurablePublicationOutcomeReceipt:
-    """Publish and confirm one immutable outcome receipt without replacement."""
+    """Publish and confirm one receipt through the authenticated parent dirfd."""
     raw = _canonical_publication_outcome_receipt_bytes(receipt)
     validated = validate_publication_outcome_receipt(raw)
     path = artifact_target.with_name(
         f"{artifact_target.stem}.outcome.{validated['attempt_id']}."
         f"{cast(int, validated['sequence']):06d}.json"
     )
-    if path.exists() or path.is_symlink():
-        if path.is_symlink() or not path.is_file():
-            raise RuntimeEventMaterializationError(
-                "publication_receipt_invalid", "receipt target is invalid"
-            )
-        try:
-            existing = path.read_bytes()
-        except OSError as exc:
-            raise RuntimeEventMaterializationError(
-                "publication_receipt_uncertain", "receipt target readback failed"
-            ) from exc
-        if existing != raw:
-            raise RuntimeEventMaterializationError(
-                "publication_receipt_collision", "receipt target differs"
-            )
-        return confirm_publication_outcome_receipt(
-            attempt_lock,
+    try:
+        published_path, committed, _recovered = _secure_publish_noreplace(
             path,
             raw,
-            record,
-            observations,
-            prior_receipts,
+            "runtime-receipt-publication",
+            "publication_receipt_collision",
         )
-    fd = -1
-    temporary: Path | None = None
-    identity: tuple[int, int] | None = None
-    candidate_exists = False
-    try:
-        fd, temporary_name = tempfile.mkstemp(
-            prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
-        )
-        temporary = Path(temporary_name)
-        os.fchmod(fd, 0o600)
-        metadata = os.fstat(fd)
-        identity = (metadata.st_dev, metadata.st_ino)
-        view = memoryview(raw)
-        while view:
-            written = os.write(fd, view)
-            if written <= 0:
-                raise OSError(errno.EIO, "receipt write made no progress")
-            view = view[written:]
-        os.fsync(fd)
-        if os.pread(fd, len(raw) + 1, 0) != raw:
-            raise OSError(errno.EIO, "receipt temporary readback mismatch")
-        os.close(fd)
-        fd = -1
-        _renameat2_noreplace(temporary, path)
-        candidate_exists = True
-        temporary = None
-    except FileExistsError:
-        if path.is_symlink() or not path.is_file():
-            raise RuntimeEventMaterializationError(
-                "publication_receipt_collision", "receipt target collision"
-            )
-        try:
-            existing = path.read_bytes()
-        except OSError as exc:
-            raise RuntimeEventMaterializationError(
-                "publication_receipt_uncertain", "receipt target readback failed"
-            ) from exc
-        if existing != raw:
-            raise RuntimeEventMaterializationError(
-                "publication_receipt_collision", "receipt target collision"
-            )
-        candidate_exists = True
-    except RuntimeEventMaterializationError:
-        raise
-    except OSError as exc:
-        raise RuntimeEventMaterializationError(
-            "publication_receipt_failed", "receipt publication failed"
-        ) from exc
-    finally:
-        if fd >= 0:
-            try:
-                os.close(fd)
-            except OSError as exc:
-                raise RuntimeEventMaterializationError(
-                    "publication_receipt_failed", "receipt temporary close failed"
-                ) from exc
-        if temporary is not None:
-            try:
-                current = temporary.stat()
-                if not candidate_exists and identity == (current.st_dev, current.st_ino):
-                    temporary.unlink()
-            except OSError:
-                pass
-    try:
-        _fsync_directory(path.parent, "receipt-parent")
-        if path.read_bytes() != raw:
+        if committed != raw:
             raise RuntimeEventMaterializationError(
                 "publication_receipt_collision", "receipt readback differs"
             )
-    except RuntimeEventMaterializationError:
+        _fsync_directory(published_path.parent, "receipt-parent")
+    except RuntimeEventMaterializationError as exc:
+        if exc.code == "publication_failure":
+            raise RuntimeEventMaterializationError(
+                "publication_receipt_failed", str(exc)
+            ) from exc
+        if exc.code == "publication_uncertain":
+            raise RuntimeEventMaterializationError(
+                "publication_receipt_uncertain", str(exc)
+            ) from exc
         raise
     except OSError as exc:
         raise RuntimeEventMaterializationError(
@@ -3723,7 +3695,7 @@ def _publish_publication_outcome_receipt_noreplace(
         ) from exc
     return confirm_publication_outcome_receipt(
         attempt_lock,
-        path,
+        published_path,
         raw,
         record,
         observations,
@@ -4489,7 +4461,7 @@ def ensure_archive(
     """Ensure the ignored clone exists and is on the runtime log branch."""
     created = False
     if not context.archive_root.exists():
-        context.archive_root.parent.mkdir(parents=True, exist_ok=True)
+        _parent_ensure_directory(context.archive_root.parent, "runtime-archive-clone")
         run(["git", "clone", context.remote, str(context.archive_root)])
         created = True
     if not is_archive_clone(context.archive_root):
@@ -4544,7 +4516,7 @@ def prepare_archive_transaction(
     lock_path = (context.source_root / HOOK_SPOOL_LOCK_RELATIVE).resolve()
     if lock_path in _ACTIVE_ARCHIVE_LOCKS:
         raise ArchiveGitError("archive_transaction_busy")
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    _parent_ensure_directory(lock_path.parent, "runtime-archive-lock")
     lock_handle = lock_path.open("a+b")
     try:
         fcntl.flock(lock_handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -4617,6 +4589,14 @@ def _fsync_archive_directory(path: Path) -> None:
 
 
 def _atomic_write_bytes(path: Path, payload: bytes) -> None:
+    bound = _parent_boundary()
+    if bound is not None:
+        boundary, attestation = bound
+        receipt = boundary.resolve_parent_owned_path(
+            attestation, path, "runtime-log-publication", create=False
+        )
+        boundary.atomic_publish(receipt, payload)
+        return
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     temporary = Path(temporary_name)
@@ -4637,6 +4617,18 @@ def _atomic_write_bytes(path: Path, payload: bytes) -> None:
 def _restore_atomic_file(path: Path, prior: bytes | None) -> None:
     """Restore one managed file to its exact pre-transaction state."""
     if prior is None:
+        bound = _parent_boundary()
+        if bound is not None:
+            boundary, attestation = bound
+            receipt = boundary.resolve_parent_owned_path(
+                attestation, path, "runtime-log-rollback", create=False
+            )
+            try:
+                boundary.remove_parent_owned_file(receipt)
+            except ParentRootSideEffectError as exc:
+                if exc.reject is not ParentRootReject.ROOT_MISSING:
+                    raise
+            return
         try:
             path.unlink()
         except FileNotFoundError:
@@ -5330,7 +5322,7 @@ def _legacy_import_plan(
         )
         target = context.archive_root / destination if destination else None
         if target is not None:
-            target.parent.mkdir(parents=True, exist_ok=True)
+            _parent_ensure_directory(target.parent, "legacy-archive-destination")
             if target.exists():
                 if target.read_bytes() != payload:
                     raise ArchiveGitError(
@@ -5338,7 +5330,7 @@ def _legacy_import_plan(
                     )
                 existing += 1
             else:
-                shutil.copy2(source, target)
+                _parent_copy_file(source, target, "legacy-archive-file")
                 imported += 1
         records.append(
             LegacyImportRecord(
@@ -5680,6 +5672,37 @@ def report_snapshot_digest(report_dir: Path, files: list[Path]) -> str:
 
 def write_jsonl_once(path: Path, payload: dict[str, object], key: str) -> bool:
     """Append a JSON object unless a line with the same key already exists."""
+    bound = _parent_boundary()
+    if bound is not None:
+        boundary, attestation = bound
+        receipt = boundary.resolve_parent_owned_path(
+            attestation, path, "runtime-archive-index", create=False
+        )
+        try:
+            prior = boundary.read_parent_owned_file(receipt)
+        except ParentRootSideEffectError as exc:
+            if exc.reject is not ParentRootReject.ROOT_MISSING:
+                raise
+            prior = b""
+        for line in prior.decode("utf-8").splitlines():
+            if not line.strip():
+                continue
+            try:
+                existing_value = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(existing_value, dict):
+                continue
+            existing = cast(dict[str, object], existing_value)
+            if existing.get("archive_id") == key:
+                return False
+        boundary.write_parent_owned_file(
+            attestation,
+            path,
+            prior + (json.dumps(payload, sort_keys=True) + "\n").encode("utf-8"),
+            "runtime-archive-index",
+        )
+        return True
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         for line in path.read_text(encoding="utf-8").splitlines():
@@ -5730,7 +5753,7 @@ def _archive_agent_report_prepared(
     snapshot_id = report_snapshot_digest(report_dir, files)
     archive_id = f"{run_id}-{snapshot_id}"
     destination = agent_report_archive_dir(context.source_root, context.canon_root) / run_id / snapshot_id
-    destination.mkdir(parents=True, exist_ok=True)
+    _parent_ensure_directory(destination, "agent-report-archive")
 
     file_entries: list[dict[str, object]] = []
     copied = 0
@@ -5738,14 +5761,14 @@ def _archive_agent_report_prepared(
     for source in files:
         relative = source.relative_to(report_dir)
         target = destination / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
+        _parent_ensure_directory(target.parent, "agent-report-file")
         source_bytes = source.read_bytes()
         if target.exists():
             if target.read_bytes() != source_bytes:
                 raise ArchiveGitError(f"archive destination has conflicting content: {target}")
             existing += 1
         else:
-            shutil.copy2(source, target)
+            _parent_copy_file(source, target, "agent-report-file")
             copied += 1
         file_entries.append(
             {
@@ -5786,7 +5809,7 @@ def _archive_agent_report_prepared(
         if existing_manifest_payload.get("archive_id") != archive_id:
             raise ArchiveGitError(f"archive manifest conflict: {manifest_path}")
     else:
-        manifest_path.write_text(manifest_text, encoding="utf-8")
+        _atomic_write_bytes(manifest_path, manifest_text.encode("utf-8"))
 
     index_path = agent_report_archive_dir(context.source_root, context.canon_root) / "index.jsonl"
     index_appended = write_jsonl_once(
@@ -6042,7 +6065,9 @@ def _rebase_to_remote(context: ArchiveContext) -> tuple[bool, str]:
                 if line not in seen:
                     merged.append(line)
                     seen.add(line)
-            Path(context.archive_root / path).write_text("".join(merged), encoding="utf-8")
+            _atomic_write_bytes(
+                Path(context.archive_root / path), "".join(merged).encode("utf-8")
+            )
             git(context.archive_root, ["add", "--", path])
         continued = run(
             [

@@ -29,6 +29,23 @@ UTC = timezone.utc
 from pathlib import Path
 from typing import cast
 
+try:
+    from .parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -559,16 +576,39 @@ def summary_index_payload(
     }
 
 
+def _append_parent_jsonl(path: Path, record: dict[str, object], purpose: str) -> None:
+    """Append one record using parent-local atomic publication when attested."""
+    line = (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+        )
+        boundary = ParentRootSideEffectBoundary()
+        existing = b""
+        try:
+            existing = boundary.read_parent_owned_file(
+                boundary.resolve_parent_owned_path(attestation, path, purpose, create=False)
+            )
+        except ParentRootSideEffectError as exc:
+            if exc.reject is not ParentRootReject.ROOT_MISSING:
+                raise
+        boundary.write_parent_owned_file(attestation, path, existing + line, purpose)
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        f"{purpose}: explicit parent root is required",
+    )
+
+
 def write_summary_index(path: Path, record: dict[str, object], *, dry_run: bool = False) -> str:
     """Append one idempotent cross-chat index record."""
     if record["summary_id"] in read_existing_summary_ids(path):
         return "already-present"
     if dry_run:
         return "dry-run"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as stream:
-        json.dump(record, stream, sort_keys=True, separators=(",", ":"))
-        stream.write("\n")
+    _append_parent_jsonl(path, record, "codex-runtime-summary-index")
     return "appended"
 
 
@@ -578,10 +618,7 @@ def write_summary(path: Path, payload: dict[str, object], *, dry_run: bool = Fal
         return "already-present"
     if dry_run:
         return "dry-run"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as stream:
-        json.dump(payload, stream, sort_keys=True, separators=(",", ":"))
-        stream.write("\n")
+    _append_parent_jsonl(path, payload, "codex-runtime-summary")
     return "appended"
 
 

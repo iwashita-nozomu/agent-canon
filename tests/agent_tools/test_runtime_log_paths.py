@@ -11,10 +11,16 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
+# Put the current AgentCanon clone ahead of any parent template namespace
+# package before importing the implementation under test.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT))
 
 from tools.agent_tools.runtime_log_paths import (
     agent_report_archive_dir,
@@ -34,7 +40,23 @@ class RuntimeLogPathsTest(unittest.TestCase):
     def setUp(self) -> None:
         """Set the stable source remote used by path fixtures."""
         self._old_source_remote = os.environ.get("AGENT_CANON_SOURCE_REPOSITORY_REMOTE")
+        self._old_parent_root = os.environ.get("AGENT_CANON_PARENT_ROOT")
+        self._old_hook_archive_dir = os.environ.get("AGENT_CANON_HOOK_ARCHIVE_DIR")
+        self._old_hook_event_spool_dir = os.environ.get(
+            "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"
+        )
+        self._old_git_ceiling = os.environ.get("GIT_CEILING_DIRECTORIES")
         os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = "https://github.com/test/source.git"
+        # Temporary fixture paths live below the repository checkout.  Stop
+        # Git discovery at the fixture temp root so a non-Git fixture cannot
+        # accidentally inherit the checkout's HEAD or archive overrides.
+        os.environ["GIT_CEILING_DIRECTORIES"] = tempfile.gettempdir()
+        for env_name in (
+            "AGENT_CANON_PARENT_ROOT",
+            "AGENT_CANON_HOOK_ARCHIVE_DIR",
+            "AGENT_CANON_HOOK_EVENT_SPOOL_DIR",
+        ):
+            os.environ.pop(env_name, None)
 
     def tearDown(self) -> None:
         """Restore the caller's source remote environment."""
@@ -42,6 +64,16 @@ class RuntimeLogPathsTest(unittest.TestCase):
             os.environ.pop("AGENT_CANON_SOURCE_REPOSITORY_REMOTE", None)
         else:
             os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = self._old_source_remote
+        for env_name, old_value in (
+            ("AGENT_CANON_PARENT_ROOT", self._old_parent_root),
+            ("AGENT_CANON_HOOK_ARCHIVE_DIR", self._old_hook_archive_dir),
+            ("AGENT_CANON_HOOK_EVENT_SPOOL_DIR", self._old_hook_event_spool_dir),
+            ("GIT_CEILING_DIRECTORIES", self._old_git_ceiling),
+        ):
+            if old_value is None:
+                os.environ.pop(env_name, None)
+            else:
+                os.environ[env_name] = old_value
 
     def make_git_commit(self, root: Path) -> str:
         """Create one commit in root and return its HEAD SHA."""

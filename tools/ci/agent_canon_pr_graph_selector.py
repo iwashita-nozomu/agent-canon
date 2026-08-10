@@ -27,6 +27,23 @@ from pathlib import Path
 from typing import TypedDict, cast
 from urllib.parse import quote
 
+try:
+    from tools.agent_tools.parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from agent_tools.parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+
 PROFILE_INVENTORY = Path("documents/runtime/runtime-profiles-and-check-matrix.json")
 DEPENDENCY_SURFACE_OWNER = Path("documents/design/dependency-manifest-design.md")
 EXIT_REQUIRED = 0
@@ -47,6 +64,39 @@ PRODUCER_IDENTITY_VERSION = "agent-canon.surface-manifest-producer.v1"
 PRODUCER_IDENTITY_CONTRACT = "agent-canon.surface-manifest.v1"
 CHANGED_PATH_PACKET_SCHEMA = "agent-canon.pr-changed-paths.v1"
 GRAPH_STATUS_SCHEMA = "agent-canon.graph.status.v1"
+
+
+def _selector_write(path: Path, payload: bytes, purpose: str) -> None:
+    """Publish selector evidence through the outer parent capability."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, payload, purpose)
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        f"{purpose}: explicit parent root is required",
+    )
+
+
+def _selector_temp_dir(root: Path) -> str:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "pr-graph-staging: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="pr-graph-staging")
+    )
+    directory = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
+        attestation, parent / ".agent-canon" / "tmp" / "pr-graph", "pr-graph-staging"
+    )
+    return str(directory.physical_path)
 
 
 class SelectorFailure(RuntimeError):
@@ -796,10 +846,10 @@ def write_changed_path_packet(
         "changed_paths_sha256": changed_paths_digest(diff.changed_paths),
     }
     try:
-        packet_path.parent.mkdir(parents=True, exist_ok=True)
-        packet_path.write_text(
-            json.dumps(packet, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
+        _selector_write(
+            packet_path,
+            (json.dumps(packet, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+            "pr-changed-path-packet",
         )
     except OSError as error:
         raise SelectorFailure(
@@ -2499,7 +2549,7 @@ def build_trusted_base_graph(
     producer = surface_manifest_producer(authorized_root)
     with tempfile.TemporaryDirectory(
         prefix="agent-canon-pr-base-",
-        dir=root.parent,
+        dir=_selector_temp_dir(root),
     ) as temp_dir:
         base_root = Path(temp_dir) / "checkout"
         clone = run_git(
@@ -2586,7 +2636,7 @@ def build_trusted_base_graph(
             base_root / ".agent-canon" / "knowledge-graph" / "graph-build.json"
         )
         try:
-            result_path.write_text(build.stdout, encoding="utf-8")
+            _selector_write(result_path, build.stdout.encode("utf-8"), "pr-graph-result")
         except OSError:
             raise SelectorFailure(
                 "trusted_base_graph_build_failed",
@@ -2653,7 +2703,7 @@ def build_trusted_base_graph(
             base_root / ".agent-canon" / "knowledge-graph" / "graph-status.json"
         )
         try:
-            status_path.write_text(status.stdout, encoding="utf-8")
+            _selector_write(status_path, status.stdout.encode("utf-8"), "pr-graph-status")
         except OSError:
             raise SelectorFailure(
                 "trusted_base_graph_status_unavailable",
@@ -2897,10 +2947,10 @@ def main() -> int:
                 Path(args.status_result).resolve(),
             )
             report_out = Path(args.report_out)
-            report_out.parent.mkdir(parents=True, exist_ok=True)
-            report_out.write_text(
-                json.dumps(acceptance.report, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
+            _selector_write(
+                report_out,
+                (json.dumps(acceptance.report, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+                "pr-graph-acceptance",
             )
         except (OSError, SelectorFailure) as error:
             if isinstance(error, SelectorFailure):

@@ -126,6 +126,13 @@ if [[ -z "$REPORT_DIR" ]]; then
   REPORT_DIR="$ROOT_DIR/reports/agents/review-backlog-scan"
 fi
 REPORT_DIR="$(realpath -m "$REPORT_DIR")"
+if [[ -n "${AGENT_CANON_PARENT_ROOT:-}" ]]; then
+  parent_root_real="$(realpath -m "$AGENT_CANON_PARENT_ROOT")"
+  case "$REPORT_DIR" in
+    "$parent_root_real"|"$parent_root_real"/*) ;;
+    *) echo "REVIEW_BACKLOG_SCAN=fail reason=report_dir_outside_parent"; exit 2 ;;
+  esac
+fi
 if [[ -n "$SEMANTIC_QUERY_FILE" ]]; then
   SEMANTIC_QUERY_FILE="$(realpath -m "$SEMANTIC_QUERY_FILE")"
 fi
@@ -206,17 +213,17 @@ record_command() {
 
 run_agent_canon() {
   if command -v cargo >/dev/null 2>&1 && [[ -f "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/Cargo.toml" ]]; then
-    CARGO_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-/tmp/agent-canon-review-scan-target}" \
+    CARGO_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}/.agent-canon/cache/review-scan-target}" \
       cargo run --quiet --manifest-path "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/Cargo.toml" -- "$@"
     return
   fi
   if command -v cargo >/dev/null 2>&1 && [[ -f "$ROOT_DIR/rust/agent-canon/Cargo.toml" ]]; then
-    CARGO_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-/tmp/agent-canon-review-scan-target}" \
+    CARGO_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}/.agent-canon/cache/review-scan-target}" \
       cargo run --quiet --manifest-path "$ROOT_DIR/rust/agent-canon/Cargo.toml" -- "$@"
     return
   fi
   if command -v cargo >/dev/null 2>&1 && [[ -f "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]]; then
-    CARGO_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-/tmp/agent-canon-review-scan-target}" \
+    CARGO_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}/.agent-canon/cache/review-scan-target}" \
       cargo run --quiet --manifest-path "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/Cargo.toml" -- "$@"
     return
   fi

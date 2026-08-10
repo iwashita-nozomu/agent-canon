@@ -19,8 +19,31 @@ set -euo pipefail
 
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+REVIEW_PARENT_ROOT=""
 # shellcheck source=../lib/repo_paths.sh
 source "${script_dir}/../lib/repo_paths.sh"
+
+parent_temp_base() {
+  REVIEW_PARENT_ROOT="$(realpath -e "${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}")" || {
+    echo "REPO_DEPENDENCY_REVIEW=fail reason=parent_root_missing" >&2
+    return 2
+  }
+  ROOT_PHYSICAL="$(realpath -e "$ROOT_DIR")" || {
+    echo "REPO_DEPENDENCY_REVIEW=fail reason=root_missing" >&2
+    return 2
+  }
+  case "$ROOT_PHYSICAL" in
+    "$REVIEW_PARENT_ROOT"|"$REVIEW_PARENT_ROOT"/*) ;;
+    *)
+      echo "REPO_DEPENDENCY_REVIEW=fail reason=parent_root_not_ancestor" >&2
+      return 2
+      ;;
+  esac
+  python3 "${script_dir}/parent_root_side_effects.py" temp-dir \
+    --root "$REVIEW_PARENT_ROOT" \
+    --candidate "$REVIEW_PARENT_ROOT/.agent-canon/tmp/dependency-review" \
+    --prefix review --purpose dependency-review-temp
+}
 CHECK_BIDIRECTIONAL=0
 CYCLE_REPORT_ONLY=0
 FAIL_MISSING=0
@@ -149,9 +172,27 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-ROOT_DIR="$(realpath -m "$ROOT_DIR")"
+ROOT_DIR="$(realpath -e "$ROOT_DIR")" || {
+  echo "REPO_DEPENDENCY_REVIEW=fail reason=root_missing"
+  exit 2
+}
 SCRIPT_TOOLS_ROOT="$(dirname "$(realpath -m "$script_dir")")"
 cd "$ROOT_DIR"
+
+if [[ -n "${AGENT_CANON_PARENT_ROOT:-}" ]]; then
+  parent_root_real="$(realpath -e "$AGENT_CANON_PARENT_ROOT")" || {
+    echo "REPO_DEPENDENCY_REVIEW=fail reason=parent_root_missing"
+    exit 2
+  }
+  root_real="$(realpath -e "$ROOT_DIR")" || {
+    echo "REPO_DEPENDENCY_REVIEW=fail reason=root_missing"
+    exit 2
+  }
+  case "$root_real" in
+    "$parent_root_real"|"$parent_root_real"/*) ;;
+    *) echo "REPO_DEPENDENCY_REVIEW=fail reason=root_outside_parent"; exit 2 ;;
+  esac
+fi
 
 if [[ "$HEADER_SCAN_ONLY" -eq 1 && ( -z "$CHANGED_PATH_PACKET" || -z "$TRUSTED_BASE_SHA" ) ]]; then
   echo "REPO_DEPENDENCY_REVIEW=fail reason=header_scan_trusted_packet_required"
@@ -186,10 +227,17 @@ if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
     exit 1
   fi
 
-  status_file="$(mktemp)"
-  dependency_query_file="$(mktemp)"
-  owner_query_file="$(mktemp)"
-  trap 'rm -f "$status_file" "$dependency_query_file" "$owner_query_file"' EXIT
+  tmp_base="$(parent_temp_base)"
+  status_file="$(mktemp "$tmp_base/status.XXXXXX")"
+  dependency_query_file="$(mktemp "$tmp_base/dependency-query.XXXXXX")"
+  owner_query_file="$(mktemp "$tmp_base/owner-query.XXXXXX")"
+  cleanup_review_tmp() {
+    rm -f "$status_file" "$dependency_query_file" "$owner_query_file"
+    python3 "${script_dir}/parent_root_side_effects.py" remove-tree \
+      --root "$REVIEW_PARENT_ROOT" --candidate "$tmp_base" \
+      --purpose dependency-review-temp >/dev/null 2>&1 || true
+  }
+  trap cleanup_review_tmp EXIT
 
   run_graph_status() {
     local status_rc=0
@@ -324,6 +372,14 @@ if [[ "$HEADER_SCAN_ONLY" -eq 1 ]]; then
 fi
 
 if [[ -n "$REPORT_DIR" ]]; then
+  if [[ -n "${AGENT_CANON_PARENT_ROOT:-}" ]]; then
+    parent_root_real="$(realpath -m "$AGENT_CANON_PARENT_ROOT")"
+    report_real="$(realpath -m "$REPORT_DIR")"
+    case "$report_real" in
+      "$parent_root_real"|"$parent_root_real"/*) ;;
+      *) echo "REPO_DEPENDENCY_REVIEW=fail reason=report_dir_outside_parent"; exit 2 ;;
+    esac
+  fi
   mkdir -p "$REPORT_DIR"
 fi
 if [[ -z "$GRAPH_TSV_OUTPUT" && -n "$REPORT_DIR" ]]; then

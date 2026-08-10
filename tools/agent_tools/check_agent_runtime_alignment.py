@@ -20,6 +20,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -34,6 +35,23 @@ from collections.abc import Collection
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
@@ -2168,7 +2186,23 @@ def validate_bundle_outputs() -> None:
     catalog = load_task_catalog(config)
     created_at_iso = current_utc_iso()
 
-    with tempfile.TemporaryDirectory(prefix="agent-runtime-alignment-") as tmp_dir:
+    temp_parent: str | None = None
+    configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured_parent:
+        parent = Path(configured_parent).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="runtime-alignment")
+        )
+        base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
+            attestation, parent / ".agent-canon" / "tmp" / "runtime-alignment", "runtime-alignment-temp"
+        )
+        temp_parent = str(base.physical_path)
+    else:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "runtime-alignment-temp: explicit parent root is required",
+        )
+    with tempfile.TemporaryDirectory(prefix="agent-runtime-alignment-", dir=temp_parent) as tmp_dir:
         workspace = alignment_workspace(Path(tmp_dir))
         initialize_alignment_workspace(workspace)
 

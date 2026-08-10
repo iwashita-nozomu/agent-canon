@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 from collections.abc import Mapping
@@ -21,6 +22,23 @@ from pathlib import Path
 from typing import cast
 
 import yaml
+
+if __package__:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+else:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
 
 if __package__:
     from .agent_canon_source_root import resolve_agent_canon_source_root
@@ -1058,7 +1076,21 @@ def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
         while insert_at > 0 and not lines[insert_at - 1].strip():
             insert_at -= 1
         lines.insert(insert_at, line)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    rendered = ("\n".join(lines) + "\n").encode("utf-8")
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="manifest-rendering")
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(
+            attestation, path, rendered, "manifest-rendering"
+        )
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        "manifest-rendering: explicit parent root is required",
+    )
 
 
 def build_manifest(
