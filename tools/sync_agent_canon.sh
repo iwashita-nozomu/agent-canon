@@ -803,9 +803,9 @@ regular_path() {
   cp -a "$abs_source" "$abs_path"
 }
 
-path_is_tracked() {
+path_is_tracked_in_head() {
   local path="$1"
-  git -C "$ROOT_DIR" ls-files --error-unmatch -- "$path" >/dev/null 2>&1
+  git -C "$ROOT_DIR" cat-file -e "HEAD:$path" >/dev/null 2>&1
 }
 
 is_agentcanon_root_view_target() {
@@ -1135,12 +1135,14 @@ stage_sync_paths() {
   )
   while IFS= read -r spec; do
     [ -n "$spec" ] || continue
-    if [ -e "$ROOT_DIR/$spec" ] || [ -L "$ROOT_DIR/$spec" ] || path_is_tracked "$spec"; then
+    if [ -e "$ROOT_DIR/$spec" ] || [ -L "$ROOT_DIR/$spec" ] \
+      || path_is_tracked_in_head "$spec"; then
       git -C "$ROOT_DIR" add -A -- "$spec"
     fi
   done < <(build_root_absent_paths)
   for spec in "${ROOT_COPY_TRANSITION_REMOVED_PATHS[@]}"; do
-    if [ ! -e "$ROOT_DIR/$spec" ] && [ ! -L "$ROOT_DIR/$spec" ]; then
+    if [ ! -e "$ROOT_DIR/$spec" ] && [ ! -L "$ROOT_DIR/$spec" ] \
+      && path_is_tracked_in_head "$spec"; then
       git -C "$ROOT_DIR" add -A -- "$spec"
     fi
   done
@@ -1165,12 +1167,14 @@ commit_sync_paths_if_needed() {
   )
   while IFS= read -r spec; do
     [ -n "$spec" ] || continue
-    if [ -e "$ROOT_DIR/$spec" ] || [ -L "$ROOT_DIR/$spec" ] || path_is_tracked "$spec"; then
+    if [ -e "$ROOT_DIR/$spec" ] || [ -L "$ROOT_DIR/$spec" ] \
+      || path_is_tracked_in_head "$spec"; then
       owned_paths+=("$spec")
     fi
   done < <(build_root_absent_paths)
   for spec in "${ROOT_COPY_TRANSITION_REMOVED_PATHS[@]}"; do
-    if [ ! -e "$ROOT_DIR/$spec" ] && [ ! -L "$ROOT_DIR/$spec" ]; then
+    if [ ! -e "$ROOT_DIR/$spec" ] && [ ! -L "$ROOT_DIR/$spec" ] \
+      && path_is_tracked_in_head "$spec"; then
       owned_paths+=("$spec")
     fi
   done

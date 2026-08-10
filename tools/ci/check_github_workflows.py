@@ -13,7 +13,9 @@
 # upstream design ../../.github/workflows/agent-runtime-dashboard.yml standalone AgentCanon runtime dashboard workflow
 # upstream design ../../.github/workflows/issue-mirror.yml standalone local/GitHub issue mirror workflow
 # upstream design ../../.github/workflows/agent-canon-static-gates.yml PR candidate gate workflow
-# upstream implementation ./checkout_agent_canon_submodule.sh private submodule helper
+# upstream design ../../documents/agent-canon/agent-canon-github-remote.md checkout auth policy
+# upstream design ../../documents/contracts/template-github-remote.md credential boundary
+# upstream implementation ./checkout_agent_canon_submodule.sh public/private submodule helper
 # upstream implementation ../agent_tools/check_skill_frontmatter.py validates runtime skill frontmatter in static gates
 # downstream implementation ../../tests/tools/test_check_github_workflows.py tests
 # @dependency-end
@@ -360,11 +362,6 @@ def credential_env_names(source: dict[str, object]) -> set[str]:
     return {name for name in AGENT_CANON_CREDENTIALS if name in env}
 
 
-def has_credential_env(context: StepContext) -> bool:
-    """Return whether a helper step receives step-local AgentCanon credentials."""
-    return bool(credential_env_names(context.step))
-
-
 def non_step_credential_env_names(workflow: dict[str, object]) -> set[str]:
     """Return AgentCanon credentials exposed beyond their helper step."""
     names = credential_env_names(workflow)
@@ -422,14 +419,6 @@ def agent_canon_checkout_policy_findings(
     requires_agent_canon_checkout = path.name not in AGENT_CANON_INDEPENDENT_WORKFLOWS
     if requires_agent_canon_checkout and checkouts and not helpers:
         findings.append(Finding("error", path, "missing_agent_canon_checkout_helper"))
-    if (
-        requires_agent_canon_checkout
-        and checkouts
-        and not any(name in workflow_text for name in AGENT_CANON_CREDENTIALS)
-    ):
-        findings.append(
-            Finding("error", path, "missing_agent_canon_repo_credential_env")
-        )
     if not requires_agent_canon_checkout:
         if helpers:
             findings.append(
@@ -455,15 +444,6 @@ def agent_canon_checkout_policy_findings(
                 + ",".join(sorted(non_step_credentials)),
             )
         )
-    for helper_index, context in enumerate(helpers, start=1):
-        if not has_credential_env(context):
-            findings.append(
-                Finding(
-                    "error",
-                    path,
-                    f"checkout_helper_{helper_index}_missing_agent_canon_repo_credential_env",
-                )
-            )
     return findings
 
 
