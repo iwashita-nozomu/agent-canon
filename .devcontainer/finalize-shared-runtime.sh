@@ -40,7 +40,8 @@ fail() {
 
 container_uid="$(id -u)"
 container_gid="$(id -g)"
-[ "$container_uid" -ne 0 ] || fail "UID 0 is not a valid managed runtime identity"
+[[ "$container_uid" =~ ^[1-9][0-9]*$ ]] || fail "container UID must be a nonzero decimal"
+[[ "$container_gid" =~ ^[0-9]+$ ]] || fail "container GID must be a nonnegative decimal"
 container_groups="$(id -G | tr ' ' '\n' | sort -n | uniq | tr '\n' ' ' | sed 's/[[:space:]]*$//')"
 [ "$container_groups" = "$container_gid" ] || fail "container session has unexpected supplementary groups"
 
@@ -59,6 +60,7 @@ import json
 import os
 import stat
 import sys
+import tempfile
 
 (
     source_root,
@@ -97,8 +99,6 @@ def canonical_bytes(value: object) -> bytes:
 provision = read_shared_runtime_provision(provision_path)
 if provision.runtime_route != runtime_route:
     raise OSError("provision receipt route differs")
-if provision.host_uid != container_uid or provision.host_gid != container_gid:
-    raise OSError("Compose user identity differs from host provision identity")
 if provision.host_supplementary_gids != (provision.host_gid,):
     raise OSError("provision receipt contains non-primary group identity")
 if container_groups != (container_gid,):
@@ -133,6 +133,50 @@ namespace_inode = os.stat("/proc/self/ns/mnt", follow_symlinks=False).st_ino
 if namespace_inode <= 0 or mount_id <= 0 or mount_parent_id <= 0:
     raise OSError("shared runtime namespace or mount identity is invalid")
 
+usability_fd, usability_probe_path = tempfile.mkstemp(
+    prefix=".container-usability-",
+    dir=runtime_root,
+)
+try:
+    os.fchmod(usability_fd, 0o660)
+    usability_payload = b"agent-canon-shared-runtime-usability/v1\n"
+    offset = 0
+    while offset < len(usability_payload):
+        written = os.write(usability_fd, usability_payload[offset:])
+        if written <= 0:
+            raise OSError("shared runtime usability probe write made no progress")
+        offset += written
+    os.fsync(usability_fd)
+    os.lseek(usability_fd, 0, os.SEEK_SET)
+    observed = os.read(usability_fd, len(usability_payload))
+    if observed != usability_payload:
+        raise OSError("shared runtime usability probe readback differs")
+    usability_stat = os.fstat(usability_fd)
+    usability_path_stat = os.stat(usability_probe_path, follow_symlinks=False)
+    for label, candidate in (("fd", usability_stat), ("path", usability_path_stat)):
+        if not stat.S_ISREG(candidate.st_mode):
+            raise OSError(f"shared runtime usability probe {label} is not regular")
+        if candidate.st_dev != root_stat.st_dev:
+            raise OSError(f"shared runtime usability probe {label} is on a different device")
+        if candidate.st_ino <= 0:
+            raise OSError(f"shared runtime usability probe {label} has no valid inode")
+        if stat.S_IMODE(candidate.st_mode) != 0o660:
+            raise OSError(f"shared runtime usability probe {label} mode is not 0660")
+    if (usability_stat.st_dev, usability_stat.st_ino) != (
+        usability_path_stat.st_dev,
+        usability_path_stat.st_ino,
+    ):
+        raise OSError("shared runtime usability probe path identity differs from fd")
+    os.unlink(usability_probe_path)
+    usability_probe_path = ""
+finally:
+    os.close(usability_fd)
+    if usability_probe_path:
+        try:
+            os.unlink(usability_probe_path)
+        except FileNotFoundError:
+            pass
+
 probe_fd = os.open(probe_path, os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW)
 try:
     probe_descriptor = os.fstat(probe_fd)
@@ -146,10 +190,6 @@ try:
             raise OSError(f"probe {label} has no valid inode")
         if stat.S_IMODE(candidate.st_mode) != 0o660:
             raise OSError(f"probe {label} mode is not 0660")
-        if candidate.st_gid != container_gid:
-            raise OSError(f"probe {label} group differs")
-        if candidate.st_uid != container_uid:
-            raise OSError(f"probe {label} owner differs")
     if (probe_descriptor.st_dev, probe_descriptor.st_ino) != (
         probe_path_stat.st_dev,
         probe_path_stat.st_ino,
@@ -194,10 +234,8 @@ if not stat.S_ISREG(published.st_mode):
     raise OSError("published readback receipt is not a regular file")
 if published.st_dev != root_stat.st_dev or published.st_ino <= 0:
     raise OSError("published readback receipt identity is invalid")
-if stat.S_IMODE(published.st_mode) != 0o660 or published.st_gid != container_gid:
-    raise OSError("published readback receipt mode or primary group differs")
-if published.st_uid != container_uid:
-    raise OSError("published readback receipt owner differs")
+if stat.S_IMODE(published.st_mode) != 0o660:
+    raise OSError("published readback receipt mode differs")
 PY
 
 printf 'SHARED_RUNTIME_FINALIZE=pass route=%s target=%s readback=%s uid=%s gid=%s\n' \

@@ -20,14 +20,10 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
-
-from tests.tools.resource_plan_test_evidence import (
-    SnapshotResourceProbe,
-    discover_test_resources,
-)
 
 from tools.experiments.execution_resource_plan import (
     CALLER_ALLOCATION_PROVENANCE,
@@ -37,44 +33,254 @@ from tools.experiments.execution_resource_plan import (
     CompletionCoverageInput,
     ConcurrentRunEvidence,
     DescendantRetentionEvidence,
-    EvidenceFd,
     EvidenceAbsence,
+    EvidenceFd,
     GPUDevice,
     GpuProcessOccupancyProbe,
     GpuReservationTransaction,
     GpuRunRequest,
     LockPlacementEvidence,
     LockReadback,
-    MigEvidence,
-    RunGpuAdmissionReceipt,
     ManagedGpuOutcomeReducer,
-    PostToolUseProjectionReducer,
-    ReservationEvidence,
+    MigEvidence,
     NvidiaInventoryProbe,
-    managed_run_adapter_integration_contract,
     PlanState,
+    PostToolUseProjectionReducer,
+    ProcAncestryProbe,
     ProcessIdentity,
     ProcessOccupancyEvidence,
-    ProcAncestryProbe,
-    ResourceRequest,
+    ReservationEvidence,
     ResourceObservation,
+    ResourceRequest,
+    RunGpuAdmissionReceipt,
+    RuntimeIdentityReader,
     SourceFreezeOwner,
     TypedPreflightFailure,
     UUIDReservationStore,
     UuidVisibilityEvidence,
-    build_source_path_set,
     build_lock_bound_admission_receipt,
+    build_source_path_set,
     freeze_resource_plan,
+    managed_run_adapter_integration_contract,
     materialize_environment,
     parse_nvidia_driver_version,
     parse_nvidia_smi_list,
     parse_nvidia_smi_xml,
     plan_gpu_allocation,
+    read_shared_runtime_provision,
+    read_shared_runtime_readback,
+    write_runtime_receipt_atomic,
 )
+
+from tests.tools.resource_plan_test_evidence import (
+    SnapshotResourceProbe,
+    discover_test_resources,
+)
+
+
+def _receipt_fingerprint(payload: dict[str, object], field_name: str) -> str:
+    """Mirror the receipt owner's canonical fingerprint preimage for fixtures."""
+    body = {key: value for key, value in payload.items() if key != field_name}
+    return hashlib.sha256(
+        json.dumps(
+            body,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=True,
+            allow_nan=False,
+        ).encode("utf-8")
+    ).hexdigest()
+
+
+@contextmanager
+def _runtime_umask():
+    """Match the receipt owner’s exact 0007 publication umask in fixtures."""
+    previous = os.umask(0o0007)
+    try:
+        yield
+    finally:
+        os.umask(previous)
 
 
 class ExecutionResourcePlanContractTest(unittest.TestCase):
     """Describe public resource-plan invariants without private-detail coupling."""
+
+    def test_runtime_receipts_accept_user_namespace_mapping_and_use_readback_identity(
+        self,
+    ) -> None:
+        """Host provenance and container readback may use distinct numeric mappings."""
+        with _runtime_umask(), tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "locks").mkdir()
+            provision_path = root / "provision.json"
+            readback_path = root / "readback.json"
+            provision_payload: dict[str, object] = {
+                "schema_version": "shared-runtime-provision/v1",
+                "runtime_route": "MANAGED_CONTAINER",
+                "host_uid": 4242,
+                "host_gid": 4243,
+                "host_supplementary_gids": [4243],
+                "host_umask": 0o0007,
+                "bind_source_path": "/host/runtime",
+                "bind_source_dev": 123,
+                "bind_source_ino": 456,
+                "provision_fingerprint": "",
+            }
+            provision_payload["provision_fingerprint"] = _receipt_fingerprint(
+                provision_payload, "provision_fingerprint"
+            )
+            readback_payload: dict[str, object] = {
+                "schema_version": "shared-runtime-readback/v1",
+                "runtime_route": "MANAGED_CONTAINER",
+                "container_uid": 5252,
+                "container_gid": 5253,
+                "container_supplementary_gids": [5253],
+                "container_umask": 0o0007,
+                "bind_target_path": "/container/runtime",
+                "bind_target_dev": 123,
+                "bind_target_ino": 456,
+                "namespace_inode": 789,
+                "mount_id": 12,
+                "mount_parent_id": 11,
+                "mount_root": "/",
+                "probe_fd_disposition": "closed",
+                "readback_fingerprint": "",
+            }
+            readback_payload["readback_fingerprint"] = _receipt_fingerprint(
+                readback_payload, "readback_fingerprint"
+            )
+            write_runtime_receipt_atomic(str(provision_path), provision_payload)
+            write_runtime_receipt_atomic(str(readback_path), readback_payload)
+
+            provision = read_shared_runtime_provision(str(provision_path))
+            readback = read_shared_runtime_readback(str(readback_path))
+            receipt = RuntimeIdentityReader().read(provision, readback)
+
+            self.assertEqual(receipt.uid, 5252)
+            self.assertEqual(receipt.gid, 5253)
+            self.assertEqual(receipt.supplementary_gids, (5253,))
+            self.assertEqual(receipt.umask, 0o0007)
+            self.assertEqual(provision.host_uid, 4242)
+            self.assertEqual(readback.container_uid, 5252)
+
+            for label, invalid_provision, invalid_readback in (
+                ("provision-negative-gid", replace(provision, host_gid=-1), readback),
+                (
+                    "provision-primary-group-shape",
+                    replace(provision, host_supplementary_gids=(4243, 4244)),
+                    readback,
+                ),
+                ("readback-negative-gid", provision, replace(readback, container_gid=-1)),
+                (
+                    "readback-primary-group-shape",
+                    provision,
+                    replace(readback, container_supplementary_gids=(5253, 5254)),
+                ),
+            ):
+                with self.subTest(receipt=label):
+                    with self.assertRaises(TypedPreflightFailure) as raised:
+                        RuntimeIdentityReader().read(
+                            invalid_provision,
+                            invalid_readback,
+                        )
+                    self.assertEqual(raised.exception.code, "runtime_identity_invalid")
+
+            with self.subTest(receipt="provision-primary-group"):
+                malformed_provision = dict(provision_payload)
+                malformed_provision["host_supplementary_gids"] = [4243, 4244]
+                malformed_provision["provision_fingerprint"] = _receipt_fingerprint(
+                    malformed_provision, "provision_fingerprint"
+                )
+                write_runtime_receipt_atomic(str(provision_path), malformed_provision)
+                with self.assertRaises(TypedPreflightFailure) as provision_raised:
+                    read_shared_runtime_provision(str(provision_path))
+                self.assertEqual(
+                    provision_raised.exception.code, "runtime_identity_invalid"
+                )
+
+            with self.subTest(receipt="readback-primary-group"):
+                malformed_readback = dict(readback_payload)
+                malformed_readback["container_supplementary_gids"] = [5253, 5254]
+                malformed_readback["readback_fingerprint"] = _receipt_fingerprint(
+                    malformed_readback, "readback_fingerprint"
+                )
+                write_runtime_receipt_atomic(str(readback_path), malformed_readback)
+                with self.assertRaises(TypedPreflightFailure) as readback_raised:
+                    read_shared_runtime_readback(str(readback_path))
+                self.assertEqual(
+                    readback_raised.exception.code, "runtime_identity_invalid"
+                )
+
+    def test_runtime_receipt_tampering_route_device_inode_and_fingerprint_fails_closed(
+        self,
+    ) -> None:
+        """Mapping-neutral receipts retain route, bind identity, and hash oracles."""
+        with _runtime_umask(), tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "locks").mkdir()
+            provision_path = root / "provision.json"
+            readback_path = root / "readback.json"
+            provision_payload: dict[str, object] = {
+                "schema_version": "shared-runtime-provision/v1",
+                "runtime_route": "MANAGED_CONTAINER",
+                "host_uid": 4242,
+                "host_gid": 4243,
+                "host_supplementary_gids": [4243],
+                "host_umask": 0o0007,
+                "bind_source_path": "/host/runtime",
+                "bind_source_dev": 123,
+                "bind_source_ino": 456,
+                "provision_fingerprint": "",
+            }
+            provision_payload["provision_fingerprint"] = _receipt_fingerprint(
+                provision_payload, "provision_fingerprint"
+            )
+            base_readback: dict[str, object] = {
+                "schema_version": "shared-runtime-readback/v1",
+                "runtime_route": "MANAGED_CONTAINER",
+                "container_uid": 5252,
+                "container_gid": 5253,
+                "container_supplementary_gids": [5253],
+                "container_umask": 0o0007,
+                "bind_target_path": "/container/runtime",
+                "bind_target_dev": 123,
+                "bind_target_ino": 456,
+                "namespace_inode": 789,
+                "mount_id": 12,
+                "mount_parent_id": 11,
+                "mount_root": "/",
+                "probe_fd_disposition": "closed",
+                "readback_fingerprint": "",
+            }
+            write_runtime_receipt_atomic(str(provision_path), provision_payload)
+
+            for field, value, expected_code in (
+                ("runtime_route", "HOST_DIRECT", "runtime_identity_mismatch"),
+                ("bind_target_dev", 999, "runtime_identity_mismatch"),
+                ("bind_target_ino", 999, "runtime_identity_mismatch"),
+            ):
+                with self.subTest(field=field):
+                    payload = dict(base_readback)
+                    payload[field] = value
+                    payload["readback_fingerprint"] = _receipt_fingerprint(
+                        payload, "readback_fingerprint"
+                    )
+                    write_runtime_receipt_atomic(str(readback_path), payload)
+                    provision = read_shared_runtime_provision(str(provision_path))
+                    readback = read_shared_runtime_readback(str(readback_path))
+                    with self.assertRaises(TypedPreflightFailure) as raised:
+                        RuntimeIdentityReader().read(provision, readback)
+                    self.assertEqual(raised.exception.code, expected_code)
+
+            tampered = dict(base_readback)
+            tampered["readback_fingerprint"] = "0" * 64
+            write_runtime_receipt_atomic(str(readback_path), tampered)
+            with self.assertRaises(TypedPreflightFailure) as raised:
+                read_shared_runtime_readback(str(readback_path))
+            self.assertEqual(
+                raised.exception.code,
+                "runtime_receipt_fingerprint_mismatch",
+            )
 
     def test_r5_terminal_coverage_projection_is_exact_and_hook_validated(self) -> None:
         """Terminal outcome, exactly-once coverage, and Hook bytes share one receipt."""

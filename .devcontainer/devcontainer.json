@@ -1,6 +1,6 @@
 {
   "name": "${localWorkspaceFolderBasename}-devcontainer",
-  "initializeCommand": "AGENT_CANON_RUNTIME_IDENTITY_MODE=auto AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
+  "initializeCommand": "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
   "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
   "service": "workspace",
   "updateRemoteUserUID": false,

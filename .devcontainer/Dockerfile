@@ -15,8 +15,12 @@ ARG PROJECT_GID=1000
 ENV PYTHONDONTWRITEBYTECODE=1
 
 RUN set -eux; \
-    test "${PROJECT_UID}" -gt 0; \
-    test "${PROJECT_GID}" -gt 0; \
+    case "${PROJECT_UID}" in \
+      ''|0|0*|*[!0-9]*) echo "PROJECT_UID must be a nonzero decimal" >&2; exit 1 ;; \
+    esac; \
+    case "${PROJECT_GID}" in \
+      ''|*[!0-9]*) echo "PROJECT_GID must be a nonnegative decimal" >&2; exit 1 ;; \
+    esac; \
     apt-get update; \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
       ca-certificates \
@@ -32,8 +36,22 @@ RUN set -eux; \
       build-essential \
       ninja-build; \
     rm -rf /var/lib/apt/lists/*; \
-    groupadd --gid "${PROJECT_GID}" project; \
-    useradd --uid "${PROJECT_UID}" --gid project --create-home --shell /bin/bash project; \
+    if getent passwd project >/dev/null; then \
+      echo "project user-name collision" >&2; exit 1; \
+    fi; \
+    if getent passwd "${PROJECT_UID}" >/dev/null; then \
+      echo "PROJECT_UID is already owned by another user" >&2; exit 1; \
+    fi; \
+    existing_group_record="$(getent group "${PROJECT_GID}" || true)"; \
+    if [ -n "${existing_group_record}" ]; then \
+      :; \
+    else \
+      if getent group project >/dev/null; then \
+        echo "project group-name collision at another GID" >&2; exit 1; \
+      fi; \
+      groupadd --gid "${PROJECT_GID}" project; \
+    fi; \
+    useradd --uid "${PROJECT_UID}" --gid "${PROJECT_GID}" --create-home --shell /bin/bash project; \
     printf '%s\n' 'project ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/project; \
     chmod 0440 /etc/sudoers.d/project
 
@@ -55,7 +73,7 @@ RUN python3 /opt/agent-canon/tools/agent_tools/devcontainer_dependencies.py \
       image-install --workspace /opt/agent-canon --vendor-root /opt/agent-canon --format text \
     && rm -rf /opt/agent-canon
 
-RUN install -d -o project -g project -m 0755 \
+RUN install -d -o project -g "${PROJECT_GID}" -m 0755 \
       /home/project/.tools/bin \
       /var/lib/agent-canon/runtime \
       /var/lib/agent-canon/runtime/runs \
