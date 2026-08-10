@@ -452,6 +452,34 @@ class SurfaceMigrationTest(unittest.TestCase):
         check = self.run_sync(root, "check")
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
 
+    def test_removed_legacy_devcontainer_symlink_is_removed(self) -> None:
+        """A stale top-level .devcontainer symlink is removed without projection."""
+        root = self.clone_parent_fixture()
+        devcontainer = root / ".devcontainer"
+        devcontainer.symlink_to("vendor/agent-canon/.devcontainer")
+
+        result = self.run_sync(root, "link-root")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertFalse(os.path.lexists(devcontainer))
+
+    def test_regular_parent_devcontainer_directory_and_json_are_preserved(self) -> None:
+        """Parent-owned devcontainer directories keep non-canonical file identities."""
+        root = self.clone_parent_fixture()
+        devcontainer = root / ".devcontainer"
+        devcontainer.mkdir()
+        marker = devcontainer / "parent-owned-marker.txt"
+        marker.write_text("keep this directory\n", encoding="utf-8")
+        dev_json = devcontainer / "devcontainer.json"
+        dev_json.write_text("{\"parent\": true}\n", encoding="utf-8")
+
+        result = self.run_sync(root, "link-root")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(devcontainer.is_dir() and not devcontainer.is_symlink())
+        self.assertEqual(marker.read_text(encoding="utf-8"), "keep this directory\n")
+        self.assertEqual(dev_json.read_text(encoding="utf-8"), '{"parent": true}\n')
+
     def test_retired_direct_unrelated_symlinks_are_preserved(self) -> None:
         """Retired names preserve unrelated absolute and relative symlinks."""
         root = self.clone_parent_fixture()

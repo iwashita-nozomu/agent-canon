@@ -23,8 +23,12 @@ AgentCanon source is authoritative under `vendor/agent-canon/`. The root
 projection contains only the instruction view `AGENTS.md`, the runtime config
 view `.codex/config.toml`, and the shared CLI/tool namespace
 `tools/agent-canon`. The update lifecycle may create optional transaction state
-under `.agent-canon/`. Tests, notes, memory, evidence, editor, devcontainer,
-and GitHub paths are not mirrored shared surfaces.
+under `.agent-canon/`. Tests, notes, memory, evidence, editor, and GitHub paths
+are not mirrored shared surfaces. Parent `.devcontainer/` content is likewise
+never projected: `devcontainer.json`, `rootless/`, and `gpu-admission/` are
+retired/non-projecting paths. A parent may own regular files at those paths;
+only a stale symlink that still resolves into AgentCanon is eligible for removal
+during migration.
 Standalone AgentCanon may retain and validate its own regular `.vscode` source
 files; that standalone source ownership is separate from any parent `.vscode`
 directory, which remains parent-owned regular content.
@@ -80,6 +84,10 @@ The active projection is deliberately limited to:
 | `.codex/config.toml` | symlink | `.codex/config.toml` |
 | `tools/agent-canon` | symlink | `tools` |
 | `.agent-canon` | optional transaction state | update lifecycle |
+
+The standalone source may keep its own `rootless/` and `gpu-admission/`
+selectors. Those source files are not parent projections and are validated only
+when AgentCanon is checked as a standalone source root.
 
 Root `tools/` is a parent-owned regular container; only its `agent-canon` child
 is shared. The standalone source owns `vendor/agent-canon/tools/`, and the
