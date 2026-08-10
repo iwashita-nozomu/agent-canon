@@ -60,11 +60,18 @@ def run_container_cli(*args: str) -> subprocess.CompletedProcess[str]:
     )
 
 
-def write_pack(tmp_path: Path, *, gpus: str | None) -> Path:
+def write_pack(
+    tmp_path: Path,
+    *,
+    gpus: str | None,
+    workspace_mount: str = "/workspace",
+    workdir: str | None = "/workspace",
+) -> Path:
     """Write one image-owned runtime pack fixture."""
     pack_name = "gpu" if gpus else "default"
     pack = tmp_path / f"{pack_name}.toml"
     gpu_line = f'gpus = "{gpus}"' if gpus is not None else ""
+    workdir_line = f'workdir = "{workdir}"' if workdir is not None else ""
     pack.write_text(
         "\n".join(
             [
@@ -80,8 +87,8 @@ def write_pack(tmp_path: Path, *, gpus: str | None) -> Path:
                 "",
                 "[runtime]",
                 'shell = "/bin/bash"',
-                'workdir = "/workspace"',
-                'workspace_mount = "/workspace"',
+                workdir_line,
+                f'workspace_mount = "{workspace_mount}"',
                 gpu_line,
                 "",
             ]
@@ -89,6 +96,38 @@ def write_pack(tmp_path: Path, *, gpus: str | None) -> Path:
         encoding="utf-8",
     )
     return pack
+
+
+def test_print_only_python_file_uses_default_workspace_mount_and_workdir() -> None:
+    """The default pack mount remains the program path and workdir default."""
+    result = run_cli("--print-only", GENERIC_PYTHON_FIXTURE)
+
+    assert result.returncode == 0, result.stderr
+    assert f"python3 /workspace/{GENERIC_PYTHON_FIXTURE}" in result.stdout
+    assert "-w /workspace cuda_cpp_dev:default-runtime-pack" in result.stdout
+
+
+def test_print_only_python_file_uses_custom_workspace_mount_as_workdir(
+    tmp_path: Path,
+) -> None:
+    """A pack mount relocates both the workspace program and default workdir."""
+    pack = write_pack(
+        tmp_path,
+        gpus=None,
+        workspace_mount="/workspace/cpp_dev",
+        workdir=None,
+    )
+    result = run_cli(
+        "--pack",
+        str(pack),
+        "--print-only",
+        "--skip-env-check",
+        GENERIC_PYTHON_FIXTURE,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert f"python3 /workspace/cpp_dev/{GENERIC_PYTHON_FIXTURE}" in result.stdout
+    assert "-w /workspace/cpp_dev fixture:default" in result.stdout
 
 
 def test_print_only_python_file_uses_python_runner_and_env_check() -> None:

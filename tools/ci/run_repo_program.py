@@ -26,7 +26,7 @@ from container_runtime import (
     resolve_builder,
     workspace_path,
 )
-from run_python_in_dockerfile import load_rules, resolve_rule
+from run_python_in_dockerfile import PythonExecutionRule, load_rules, resolve_rule
 
 
 @dataclass(frozen=True)
@@ -126,6 +126,14 @@ def workspace_relative(program_path: Path) -> str:
     return program_path.relative_to(workspace_path(".")).as_posix()
 
 
+def workspace_container_path(workspace_mount: str, relative_program: str) -> str:
+    """Return a workspace-relative program path at the selected mount."""
+    normalized_mount = workspace_mount.rstrip("/") or "/"
+    if normalized_mount == "/":
+        return f"/{relative_program}"
+    return f"{normalized_mount}/{relative_program}"
+
+
 def resolve_program(
     *,
     dockerfile: str,
@@ -140,11 +148,9 @@ def resolve_program(
     workspace_root = workspace_path(".")
     program_candidate = workspace_root / program
     normalized_args = normalize_program_args(program_args)
+    resolved_rule: PythonExecutionRule | None = None
 
     if program_candidate.exists() and program_candidate.is_file():
-        relative_program = workspace_relative(program_candidate)
-        container_program = f"/workspace/{relative_program}"
-
         if program_candidate.suffix == ".py":
             _, rules = load_rules(rules_path)
             resolved_rule = resolve_rule(
@@ -152,16 +158,28 @@ def resolve_program(
                 python_file=program_candidate,
                 rules=rules,
             )
-            pack_path = pack_override or (
-                resolved_rule.pack
-                if resolved_rule is not None
-                else "docker/packs/default.toml"
-            )
+        pack_path = pack_override or (
+            resolved_rule.pack
+            if resolved_rule is not None
+            else "docker/packs/default.toml"
+        )
+    else:
+        pack_path = pack_override or "docker/packs/default.toml"
+
+    pack = load_or_default_pack(pack_path)
+    workspace_mount = pack.runtime.workspace_mount
+    default_workdir = workspace_mount.rstrip("/") or "/"
+    workdir = workdir_override or (
+        resolved_rule.workdir if resolved_rule is not None else default_workdir
+    )
+
+    if program_candidate.exists() and program_candidate.is_file():
+        relative_program = workspace_relative(program_candidate)
+        container_program = workspace_container_path(workspace_mount, relative_program)
+
+        if program_candidate.suffix == ".py":
             python_bin = (
                 resolved_rule.python_bin if resolved_rule is not None else "python3"
-            )
-            workdir = workdir_override or (
-                resolved_rule.workdir if resolved_rule is not None else None
             )
             return ProgramResolution(
                 pack_path=pack_path,
@@ -171,21 +189,21 @@ def resolve_program(
 
         if program_candidate.suffix in {".sh", ".bash"}:
             return ProgramResolution(
-                pack_path=pack_override or "docker/packs/default.toml",
+                pack_path=pack_path,
                 command=[shell or "/bin/bash", container_program, *normalized_args],
-                workdir=workdir_override,
+                workdir=workdir,
             )
 
         return ProgramResolution(
-            pack_path=pack_override or "docker/packs/default.toml",
+            pack_path=pack_path,
             command=[container_program, *normalized_args],
-            workdir=workdir_override,
+            workdir=workdir,
         )
 
     return ProgramResolution(
-        pack_path=pack_override or "docker/packs/default.toml",
+        pack_path=pack_path,
         command=[program, *normalized_args],
-        workdir=workdir_override,
+        workdir=workdir,
     )
 
 
