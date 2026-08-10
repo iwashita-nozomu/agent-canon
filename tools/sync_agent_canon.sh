@@ -1135,8 +1135,8 @@ stage_sync_paths() {
   )
   while IFS= read -r spec; do
     [ -n "$spec" ] || continue
-    if [ -e "$ROOT_DIR/$spec" ] || [ -L "$ROOT_DIR/$spec" ] \
-      || path_is_tracked_in_head "$spec"; then
+    if [ ! -e "$ROOT_DIR/$spec" ] && [ ! -L "$ROOT_DIR/$spec" ] \
+      && path_is_tracked_in_head "$spec"; then
       git -C "$ROOT_DIR" add -A -- "$spec"
     fi
   done < <(build_root_absent_paths)
@@ -1167,8 +1167,8 @@ commit_sync_paths_if_needed() {
   )
   while IFS= read -r spec; do
     [ -n "$spec" ] || continue
-    if [ -e "$ROOT_DIR/$spec" ] || [ -L "$ROOT_DIR/$spec" ] \
-      || path_is_tracked_in_head "$spec"; then
+    if [ ! -e "$ROOT_DIR/$spec" ] && [ ! -L "$ROOT_DIR/$spec" ] \
+      && path_is_tracked_in_head "$spec"; then
       owned_paths+=("$spec")
     fi
   done < <(build_root_absent_paths)
