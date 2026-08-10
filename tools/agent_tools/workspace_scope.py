@@ -18,6 +18,25 @@ import subprocess
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+        ensure_parent_owned_directory,
+        resolve_parent_owned_path,
+    )
+except ImportError:  # direct script/module execution
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+        ensure_parent_owned_directory,
+        resolve_parent_owned_path,
+    )
 from typing import TYPE_CHECKING
 
 if __package__:
@@ -64,12 +83,22 @@ def resolve_report_root(
     base_root = (
         workspace_root.resolve() if workspace_root is not None else Path.cwd().resolve()
     )
-    if report_root is None:
-        return (base_root / DEFAULT_REPORT_ROOT).resolve()
-    candidate = Path(report_root)
-    if candidate.is_absolute():
-        return candidate.resolve()
-    return (base_root / candidate).resolve()
+    try:
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=base_root, explicit_root=None, purpose="report-root"
+            )
+        )
+        candidate = DEFAULT_REPORT_ROOT if report_root is None else Path(report_root)
+        if not candidate.is_absolute():
+            candidate = base_root / candidate
+        return resolve_parent_owned_path(
+            attestation, candidate, "report-root", create=False
+        ).physical_path
+    except ParentRootSideEffectError as exc:
+        raise ReportBundleArtifactPathError(
+            str(report_root or DEFAULT_REPORT_ROOT), exc.reject.value
+        ) from exc
 
 
 class ReportBundleArtifactPathError(RuntimeError):
@@ -98,6 +127,19 @@ def resolve_report_bundle_artifact_path(
     if not parts:
         raise ReportBundleArtifactPathError(declared_path, "not_relative")
     report_root = report_dir.resolve()
+    try:
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=report_root, explicit_root=None, purpose="report-artifact"
+            )
+        )
+        # This is a non-creating capability check; the lexical checks below
+        # continue to provide the stable report-specific error taxonomy.
+        resolve_parent_owned_path(
+            attestation, report_root / Path(declared_path), "report-artifact"
+        )
+    except ParentRootSideEffectError as exc:
+        raise ReportBundleArtifactPathError(declared_path, exc.reject.value) from exc
     lexical_path = report_root
     for index, component in enumerate(parts):
         if component == "..":
@@ -394,11 +436,17 @@ def load_directory_snapshot(path: Path) -> dict[str, str]:
 
 def write_directory_snapshot(root: Path, output_path: Path) -> None:
     """Write the current directory snapshot to json."""
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(capture_directory_snapshot(root), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
-    )
+    try:
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=root.resolve(), explicit_root=None, purpose="directory-snapshot")
+        )
+        ensure_parent_owned_directory(attestation, output_path.parent, "directory-snapshot-parent")
+        receipt = resolve_parent_owned_path(attestation, output_path, "directory-snapshot")
+        ParentRootSideEffectBoundary().atomic_publish(
+            receipt, (json.dumps(capture_directory_snapshot(root), indent=2, sort_keys=True) + "\n").encode("utf-8")
+        )
+    except ParentRootSideEffectError as exc:
+        raise ReportBundleArtifactPathError(str(output_path), exc.reject.value) from exc
 
 
 def capture_workspace_change_snapshot(
@@ -428,20 +476,24 @@ def write_workspace_change_snapshot(
     ignored_paths: tuple[Path, ...] = (),
 ) -> None:
     """Write the current git-visible workspace change snapshot to json."""
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(
-            capture_workspace_change_snapshot(
-                workspace_root,
-                ignored_roots=ignored_roots,
-                ignored_paths=ignored_paths,
-            ),
-            indent=2,
-            sort_keys=True,
+    try:
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=workspace_root.resolve(), explicit_root=None, purpose="workspace-snapshot")
         )
-        + "\n",
-        encoding="utf-8",
-    )
+        ensure_parent_owned_directory(attestation, output_path.parent, "workspace-snapshot-parent")
+        receipt = resolve_parent_owned_path(attestation, output_path, "workspace-snapshot")
+        ParentRootSideEffectBoundary().atomic_publish(
+            receipt,
+            (json.dumps(
+                capture_workspace_change_snapshot(
+                    workspace_root,
+                    ignored_roots=ignored_roots,
+                    ignored_paths=ignored_paths,
+                ), indent=2, sort_keys=True
+            ) + "\n").encode("utf-8"),
+        )
+    except ParentRootSideEffectError as exc:
+        raise ReportBundleArtifactPathError(str(output_path), exc.reject.value) from exc
 
 
 def collect_directory_changes(

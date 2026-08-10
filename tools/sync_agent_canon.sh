@@ -23,6 +23,54 @@ if [ -n "$SUPERPROJECT_DIR" ]; then
 else
   ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 fi
+python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+  attest --root "$ROOT_DIR" --purpose agent-canon-sync >/dev/null
+CANON_PARENT_TMP_CANDIDATE="${AGENT_CANON_PARENT_TMPDIR:-$ROOT_DIR/.agent-canon/tmp/sync}"
+CANON_PARENT_TMPDIR="$(python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+  ensure-dir --root "$ROOT_DIR" --candidate "$CANON_PARENT_TMP_CANDIDATE" --purpose agent-canon-sync)"
+export TMPDIR="$CANON_PARENT_TMPDIR"
+parent_ensure_dir() {
+  python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+    ensure-dir --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-sync}"
+}
+parent_temp_dir() {
+  python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+    temp-dir --root "$ROOT_DIR" --candidate "$1" --prefix "$2" --purpose "${3:-agent-canon-sync}"
+}
+parent_write_file() {
+  local candidate="$1" content="${2-}"
+  printf '%s' "$content" | python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+    write --root "$ROOT_DIR" --candidate "$candidate" --purpose "${3:-agent-canon-sync}" >/dev/null
+}
+parent_remove_file() {
+  python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+    remove-file --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-sync}" >/dev/null
+}
+parent_remove_tree() {
+  python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+    remove-tree --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-sync}" >/dev/null
+}
+parent_remove_empty_dir() {
+  python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+    remove-empty-dir --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-sync}" >/dev/null
+}
+parent_checkout_index() {
+  python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+    checkout-index --root "$ROOT_DIR" --repository "$ROOT_DIR" --index-path "$1" \
+    --candidate "$2" --purpose "${3:-agent-canon-sync}" >/dev/null
+}
+parent_copy_file() {
+  python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+    copy --root "$ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-sync}" >/dev/null
+}
+parent_move_path() {
+  python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+    move --root "$ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-sync}" >/dev/null
+}
+parent_symlink() {
+  python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+    symlink --root "$ROOT_DIR" --target "$1" --candidate "$2" --purpose "${3:-agent-canon-sync}" >/dev/null
+}
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 if [ "$PREFIX" = "." ]; then
   PUBLIC_SYNC_COMMAND="bash tools/sync_agent_canon.sh"
@@ -304,16 +352,20 @@ materialize_submodule_remote_branch() {
     return 0
   fi
 
-  merge_log="$(mktemp)"
-  if git -C "$ROOT_DIR/$PREFIX" merge --no-autostash --no-edit "origin/$remote_branch" >"$merge_log" 2>&1; then
+  merge_log_dir="$(parent_temp_dir "$CANON_PARENT_TMPDIR" merge-log)"
+  merge_log="$merge_log_dir/output"
+  local merge_output=""
+  if merge_output="$(git -C "$ROOT_DIR/$PREFIX" merge --no-autostash --no-edit "origin/$remote_branch" 2>&1)"; then
+    parent_write_file "$merge_log" "$merge_output"
     cat "$merge_log"
-    rm -f "$merge_log"
+    parent_remove_file "$merge_log"
     echo "agent_canon_materialization_result=merged_remote"
     return 0
   fi
 
+  parent_write_file "$merge_log" "$merge_output"
   cat "$merge_log" >&2
-  rm -f "$merge_log"
+  parent_remove_file "$merge_log"
   if submodule_unresolved_merge_conflict; then
     echo "agent_canon_materialization_unresolved_merge_conflict=yes"
     echo "agent_canon_materialization_result=blocked_unresolved_merge_conflict"
@@ -482,13 +534,15 @@ ensure_repo_local_goal() {
     target="$(readlink "$path")"
     case "$target" in
       "$PREFIX"/*|./"$PREFIX"/*|../"$PREFIX"/*|*"$PREFIX"/goal.md)
-        rm -f "$path"
-        repo_local_goal_template >"$path"
+        parent_remove_file "$path"
+        repo_local_goal_template | python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+          write --root "$ROOT_DIR" --candidate "$path" --purpose agent-canon-sync >/dev/null
         echo "goal_md=converted_from_shared_symlink"
         ;;
     esac
   elif [ ! -e "$path" ]; then
-    repo_local_goal_template >"$path"
+    repo_local_goal_template | python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+      write --root "$ROOT_DIR" --candidate "$path" --purpose agent-canon-sync >/dev/null
     echo "goal_md=created_repo_local_placeholder"
   fi
   return 0
@@ -643,33 +697,33 @@ migrate_root_copy_transition() {
       || die "update transition candidate changed after preflight: $path"
   done
 
-  mkdir -p "$transition_state_dir"
-  quarantine="$(mktemp -d "$transition_state_dir/root-surface-transition.XXXXXX")"
+  parent_ensure_dir "$transition_state_dir"
+  quarantine="$(parent_temp_dir "$transition_state_dir" root-surface-transition)"
   case "$quarantine" in
     "$transition_state_dir"/root-surface-transition.*) ;;
     *) die "invalid root-surface transition quarantine path" ;;
   esac
 
   for path in "${ROOT_COPY_TRANSITION_CANDIDATES[@]}"; do
-    mkdir -p "$quarantine/$(dirname "$path")"
-    if ! mv "$ROOT_DIR/$path" "$quarantine/$path"; then
+    parent_ensure_dir "$quarantine/$(dirname "$path")"
+    if ! parent_move_path "$ROOT_DIR/$path" "$quarantine/$path"; then
       for ((index = ${#moved_paths[@]} - 1; index >= 0; index--)); do
         moved_path="${moved_paths[$index]}"
-        mkdir -p "$ROOT_DIR/$(dirname "$moved_path")"
-        mv "$quarantine/$moved_path" "$ROOT_DIR/$moved_path" \
+        parent_ensure_dir "$ROOT_DIR/$(dirname "$moved_path")"
+        parent_move_path "$quarantine/$moved_path" "$ROOT_DIR/$moved_path" \
           || die "update transition rollback failed for $moved_path"
       done
-      rm -rf "$quarantine"
+      parent_remove_tree "$quarantine"
       die "update transition move failed for $path; all earlier moves were restored"
     fi
     moved_paths+=("$path")
   done
 
-  rm -rf "$quarantine"
+  parent_remove_tree "$quarantine"
   for path in "${ROOT_COPY_TRANSITION_CANDIDATES[@]}"; do
     ROOT_COPY_TRANSITION_REMOVED_PATHS+=("$path")
     echo "update_transition[$ACTIVE_ROOT_COPY_TRANSITION_ID][$path]=removed_known_legacy_identity"
-    rmdir "$ROOT_DIR/$(dirname "$path")" 2>/dev/null || true
+    parent_remove_empty_dir "$ROOT_DIR/$(dirname "$path")" || true
   done
 }
 
@@ -677,9 +731,13 @@ link_path() {
   local path="$1"
   local target="$2"
   local abs_path="$ROOT_DIR/$path"
-  rm -rf "$abs_path"
-  mkdir -p "$(dirname "$abs_path")"
-  ln -s "$target" "$abs_path"
+  if [ -d "$abs_path" ] && [ ! -L "$abs_path" ]; then
+    parent_remove_tree "$abs_path"
+  elif [ -e "$abs_path" ] || [ -L "$abs_path" ]; then
+    parent_remove_file "$abs_path"
+  fi
+  parent_ensure_dir "$(dirname "$abs_path")"
+  parent_symlink "$target" "$abs_path"
 }
 
 copy_path() {
@@ -691,9 +749,14 @@ copy_path() {
   local abs_source="$ROOT_DIR/$source"
   [ "$(realpath -m "$abs_path")" != "$ROOT_DIR" ] || die "copy target must not be repository root"
   [ -e "$abs_source" ] || die "copy source '$source' does not exist"
-  rm -rf "$abs_path"
-  mkdir -p "$(dirname "$abs_path")"
-  project_copy_source "$abs_source" "$abs_path" > "$abs_path"
+  if [ -d "$abs_path" ] && [ ! -L "$abs_path" ]; then
+    parent_remove_tree "$abs_path"
+  elif [ -e "$abs_path" ] || [ -L "$abs_path" ]; then
+    parent_remove_file "$abs_path"
+  fi
+  parent_ensure_dir "$(dirname "$abs_path")"
+  project_copy_source "$abs_source" "$abs_path" | python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
+    write --root "$ROOT_DIR" --candidate "$abs_path" --purpose agent-canon-sync >/dev/null
   chmod --reference="$abs_source" "$abs_path"
 }
 
@@ -791,16 +854,16 @@ regular_path() {
     if [ -L "$abs_path" ]; then
       # Remove legacy whole-directory views before child links materialize.
       # Do not create an empty parent; the child surface creates it safely.
-      rm -f "$abs_path"
+      parent_remove_file "$abs_path"
     fi
     return
   fi
   [ -n "$source" ] || die "regular path '$path' is missing or is a symlink and has no seed source"
   abs_source="$ROOT_DIR/$source"
   [ -e "$abs_source" ] || die "regular seed source '$source' does not exist"
-  rm -rf "$abs_path"
-  mkdir -p "$(dirname "$abs_path")"
-  cp -a "$abs_source" "$abs_path"
+  parent_remove_tree "$abs_path"
+  parent_ensure_dir "$(dirname "$abs_path")"
+  parent_copy_file "$abs_source" "$abs_path"
 }
 
 path_is_tracked() {
@@ -992,7 +1055,7 @@ cmd_link_root() {
       target="$(readlink "$abs_path")"
     fi
     if [ -L "$abs_path" ] && is_agentcanon_root_view_target "$abs_path" "$target"; then
-      rm -f "$ROOT_DIR/$path"
+      parent_remove_file "$ROOT_DIR/$path"
     fi
   done < <(build_root_absent_paths)
 
@@ -1236,10 +1299,10 @@ materialize_cached_snapshot_diff() {
   while IFS= read -r -d '' status && IFS= read -r -d '' path; do
     case "$status" in
       D)
-        rm -f "$ROOT_DIR/$PREFIX/$path"
+        parent_remove_file "$ROOT_DIR/$PREFIX/$path"
         ;;
       *)
-        git -C "$ROOT_DIR" checkout-index -f -u -- "$PREFIX/$path"
+        parent_checkout_index "$PREFIX/$path" "$ROOT_DIR/$PREFIX/$path"
         ;;
     esac
   done < <(git -C "$ROOT_DIR" diff --name-status --no-renames -z "$base_sha" "$remote_sha" --)
@@ -1684,24 +1747,28 @@ pull_or_import_snapshot() {
     return
   fi
 
-  pull_log="$(mktemp)"
+  pull_log_dir="$(parent_temp_dir "$CANON_PARENT_TMPDIR" pull-log)"
+  pull_log="$pull_log_dir/output"
   commit_message="$(automation_commit_message "$remote_sha" "subtree_pull")"
-  if GIT_AUTHOR_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
+  local pull_output=""
+  if pull_output="$(GIT_AUTHOR_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
     GIT_AUTHOR_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
     GIT_COMMITTER_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
     GIT_COMMITTER_EMAIL="$COMMIT_AUTOMATION_AUTHOR_EMAIL" \
     git -C "$ROOT_DIR" subtree pull --prefix="$PREFIX" "$REMOTE_NAME" "$remote_sha" \
-    --squash --message="$commit_message" >"$pull_log" 2>&1; then
+    --squash --message="$commit_message" 2>&1)"; then
+    parent_write_file "$pull_log" "$pull_output"
     cat "$pull_log"
-    rm -f "$pull_log"
+    parent_remove_file "$pull_log"
     echo "agent_canon_update_method=subtree_pull"
     cmd_link_root 1
     commit_sync_paths_if_needed "$remote_sha" "subtree_pull"
     return
   fi
 
+  parent_write_file "$pull_log" "$pull_output"
   cat "$pull_log" >&2
-  rm -f "$pull_log"
+  parent_remove_file "$pull_log"
   echo "agent_canon_subtree_pull=failed"
   import_snapshot_preferring_tree_match "$local_split" "$local_tree" "$remote_sha" "snapshot_import_after_subtree_pull_failure"
 }

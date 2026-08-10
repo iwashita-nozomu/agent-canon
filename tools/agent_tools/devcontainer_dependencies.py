@@ -43,6 +43,29 @@ from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationReceipt,
+        ParentRootAttestationRequest,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+        child_environment,
+        ensure_parent_owned_directory,
+        resolve_parent_owned_path,
+    )
+except ImportError:  # direct script execution
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationReceipt,
+        ParentRootAttestationRequest,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+        child_environment,
+        ensure_parent_owned_directory,
+        resolve_parent_owned_path,
+    )
+
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
 
@@ -134,6 +157,42 @@ IMAGE_INSTALL_METHODS = frozenset(
 )
 IMAGE_DIRECTORY_MODE = 0o555
 IMAGE_FILE_MODE = 0o444
+
+
+def _parent_attestation(workspace: Path, purpose: str) -> ParentRootAttestationReceipt:
+    """Authenticate the selected parent before dependency side effects."""
+    try:
+        return attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=workspace, explicit_root=workspace, purpose=purpose
+            )
+        )
+    except ParentRootSideEffectError as exc:
+        raise DependencyError(
+            f"parent-root-attestation:{exc.reject.value}:{exc.detail}"
+        ) from exc
+
+
+def _parent_temp_root(workspace: Path, purpose: str) -> Path:
+    """Return a parent-owned temporary directory for one dependency operation."""
+    # A few pure installer adapters are exercised with a lexical workspace
+    # placeholder by their unit fixtures.  Keep that fixture write parent-local
+    # without manufacturing a repository outside the selected boundary.
+    if not workspace.exists():
+        workspace = workspace.parent
+    attestation = _parent_attestation(workspace, f"dependency-{purpose}")
+    try:
+        receipt = resolve_parent_owned_path(
+            attestation, Path(".agent-canon") / "tmp" / "devcontainer" / purpose,
+            f"dependency-{purpose}", create=False,
+        )
+    except ParentRootSideEffectError as exc:
+        raise DependencyError(
+            f"parent-root-path:{exc.reject.value}:{exc.detail}"
+        ) from exc
+    return ensure_parent_owned_directory(
+        attestation, receipt.physical_path, f"dependency-{purpose}"
+    ).physical_path
 
 
 class DependencyError(ValueError):
@@ -2564,6 +2623,7 @@ class Installer:
 
     def __init__(self, runner: CommandRunner | None = None) -> None:
         self.runner = runner or SubprocessRunner()
+        self._parent_attestation: ParentRootAttestationReceipt | None = None
 
     def _path_is_regular_executable(self, path: Path) -> bool:
         """Check one resolved target, allowing deterministic runner fixtures."""
@@ -2694,7 +2754,18 @@ class Installer:
         records: Sequence[str] | None = None,
     ) -> tuple[str, ...]:
         """Install records in order, resuming only after live receipt verification."""
-        receipts.mkdir(parents=True, exist_ok=True)
+        self._parent_attestation = _parent_attestation(workspace, "dependency-install")
+        try:
+            receipts = resolve_parent_owned_path(
+                self._parent_attestation, receipts, "dependency-receipts", create=False
+            ).physical_path
+        except ParentRootSideEffectError as exc:
+            raise DependencyError(
+                f"parent-root-path:{exc.reject.value}:{exc.detail}"
+            ) from exc
+        receipts = ensure_parent_owned_directory(
+            self._parent_attestation, receipts, "dependency-receipts"
+        ).physical_path
         completed: list[str] = []
         by_id = plan.by_id()
         order = tuple(records) if records is not None else plan.order
@@ -2902,8 +2973,8 @@ class Installer:
         value = payload.get("source_identity")
         return value if isinstance(value, str) else None
 
-    @staticmethod
     def _write_receipt(
+        self,
         path: Path,
         plan: DependencyPlan,
         record: DependencyRecord,
@@ -2930,14 +3001,27 @@ class Installer:
         repository_package = _repository_package_payload(record)
         if repository_package is not None:
             payload["repository_package"] = repository_package
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(
-            "w", encoding="utf-8", dir=path.parent, delete=False
-        ) as stream:
-            json.dump(payload, stream, sort_keys=True, indent=2)
-            stream.write("\n")
-            temporary = Path(stream.name)
-        os.replace(temporary, path)
+        if self._parent_attestation is None:
+            raise DependencyError(
+                "parent-root-attestation is required before receipt publication"
+            )
+        try:
+            ensure_parent_owned_directory(
+                self._parent_attestation, path.parent, "dependency-receipts"
+            )
+            receipt = resolve_parent_owned_path(
+                self._parent_attestation, path, "dependency-receipt", create=False
+            )
+            ParentRootSideEffectBoundary().atomic_publish(
+                receipt,
+                (json.dumps(payload, sort_keys=True, indent=2) + "\n").encode(
+                    "utf-8"
+                ),
+            )
+        except ParentRootSideEffectError as exc:
+            raise DependencyError(
+                f"parent-root-receipt:{exc.reject.value}:{exc.detail}"
+            ) from exc
 
     def _run(
         self,
@@ -2957,18 +3041,50 @@ class Installer:
 
     def _with_tool_paths(self, command_env: Mapping[str, str] | None) -> dict[str, str]:
         """Publish deterministic Python, Rust, and Lean tool paths."""
-        merged: dict[str, str] = dict(os.environ)
+        if self._parent_attestation is not None:
+            merged = child_environment(self._parent_attestation, os.environ)
+        else:
+            merged = dict(os.environ)
         merged.pop("CARGO_TARGET_DIR", None)
         merged.update(command_env or {})
         home = Path(merged.get("HOME", str(Path.home())))
-        cargo_home = merged.get("CARGO_HOME", str(home / ".cargo"))
-        rustup_home = merged.get("RUSTUP_HOME", str(home / ".rustup"))
-        elan_home = merged.get("ELAN_HOME", str(home / ".elan"))
+        parent_root = (
+            self._parent_attestation.parent_root
+            if self._parent_attestation is not None
+            else None
+        )
+        home_is_parent_owned = parent_root is not None and (
+            home == parent_root or parent_root in home.parents
+        )
+        cargo_home = merged.get(
+            "CARGO_HOME",
+            str(home / ".cargo") if home_is_parent_owned
+            else str(parent_root / ".agent-canon" / "cache" / "cargo-home")
+            if parent_root is not None
+            else str(home / ".cargo"),
+        )
+        rustup_home = merged.get(
+            "RUSTUP_HOME",
+            str(home / ".rustup") if home_is_parent_owned
+            else str(parent_root / ".agent-canon" / "cache" / "rustup-home")
+            if parent_root is not None
+            else str(home / ".rustup"),
+        )
+        elan_home = merged.get(
+            "ELAN_HOME",
+            str(home / ".elan") if home_is_parent_owned
+            else str(parent_root / ".agent-canon" / "cache" / "elan-home")
+            if parent_root is not None
+            else str(home / ".elan"),
+        )
         path_entries = list(filter(None, merged.get("PATH", "").split(os.pathsep)))
         tool_paths = (
             f"{cargo_home}/bin",
             f"{elan_home}/bin",
-            str(home / ".local" / "bin"),
+            str(home / ".local" / "bin") if home_is_parent_owned
+            else str(parent_root / ".agent-canon" / "cache" / "local-bin")
+            if parent_root is not None
+            else str(home / ".local" / "bin"),
         )
         merged["CARGO_HOME"] = cargo_home
         merged["RUSTUP_HOME"] = rustup_home
@@ -3056,7 +3172,7 @@ class Installer:
                 env=self._with_tool_paths(None),
             )
         elif method is Method.RELEASE_ASSET:
-            self._install_release_asset(record)
+            self._install_release_asset(record, workspace=workspace)
         elif method is Method.RUST_TOOLCHAIN:
             tool_env = self._with_tool_paths(None)
             self._run(
@@ -3379,7 +3495,7 @@ class Installer:
         if observed_source != expected_source:
             raise DependencyError(f"{record.id}: apt repository source is stale")
         if allow_network:
-            self._verify_repository_packages_digest(record)
+            self._verify_repository_packages_digest(record, workspace=workspace)
 
     @staticmethod
     def _apt_repository_line(record: DependencyRecord, keyring: Path) -> str:
@@ -3393,14 +3509,18 @@ class Installer:
         )
 
     @staticmethod
-    def _verify_repository_packages_digest(record: DependencyRecord) -> None:
+    def _verify_repository_packages_digest(
+        record: DependencyRecord, *, workspace: Path | None = None
+    ) -> None:
         """Verify a pinned Packages index before accepting an apt repository."""
         expected = record.repository_packages_sha256
         if expected is None:
             return
         url = _repository_packages_url(record)
         with tempfile.NamedTemporaryFile(
-            prefix=f"agent-canon-{record.id}-packages-", delete=False
+            prefix=f"agent-canon-{record.id}-packages-",
+            dir=_parent_temp_root(workspace or Path.cwd(), "apt-packages"),
+            delete=False,
         ) as stream:
             temporary = Path(stream.name)
         try:
@@ -3704,7 +3824,8 @@ class Installer:
         assert record.key_url is not None
         assert record.key_fingerprint is not None
         with tempfile.TemporaryDirectory(
-            prefix=f"agent-canon-{record.id}-"
+            prefix=f"agent-canon-{record.id}-",
+            dir=_parent_temp_root(workspace, "apt-repository"),
         ) as temporary:
             root = Path(temporary)
             raw_key = root / "key.raw"
@@ -3744,7 +3865,7 @@ class Installer:
             repo_line.write_text(
                 self._apt_repository_line(record, key_destination), encoding="utf-8"
             )
-            self._verify_repository_packages_digest(record)
+            self._verify_repository_packages_digest(record, workspace=workspace)
             self._run(
                 [
                     "install",
@@ -3780,7 +3901,9 @@ class Installer:
                     command.insert(2, "--reinstall")
                 self._run(command, workspace=workspace, privileged=True)
 
-    def _install_release_asset(self, record: DependencyRecord) -> None:
+    def _install_release_asset(
+        self, record: DependencyRecord, *, workspace: Path | None = None
+    ) -> None:
         assert record.destination is not None
         asset_map = dict(record.assets)
         if asset_map:
@@ -3798,7 +3921,8 @@ class Installer:
             else record.source
         )
         with tempfile.TemporaryDirectory(
-            prefix=f"agent-canon-{record.id}-"
+            prefix=f"agent-canon-{record.id}-",
+            dir=_parent_temp_root(workspace or Path.cwd(), "release-asset"),
         ) as temporary:
             root = Path(temporary)
             archive = root / asset

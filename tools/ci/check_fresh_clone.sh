@@ -16,7 +16,54 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 source "${SCRIPT_DIR}/../lib/repo_paths.sh"
 ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")"
-TMP_DIR="$(mktemp -d -t template-fresh-clone-XXXXXX)"
+python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+  attest --root "${ROOT_DIR}" --purpose fresh-clone >/dev/null
+PARENT_TMP_CANDIDATE="${AGENT_CANON_PARENT_TMP_ROOT:-${ROOT_DIR}/.agent-canon/tmp/fresh-clone}"
+PARENT_TMP_ROOT="$(python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+  ensure-dir --root "${ROOT_DIR}" --candidate "${PARENT_TMP_CANDIDATE}" --purpose fresh-clone)"
+parent_ensure_dir() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    ensure-dir --root "${ROOT_DIR}" --candidate "$1" --purpose "${2:-fresh-clone}"
+}
+parent_temp_dir() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    temp-dir --root "${ROOT_DIR}" --candidate "$1" --prefix "$2" --purpose "${3:-fresh-clone}"
+}
+parent_write_file() {
+  local candidate="$1" content="${2-}"
+  printf '%s' "$content" | python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    write --root "${ROOT_DIR}" --candidate "$candidate" --purpose "${3:-fresh-clone}" >/dev/null
+}
+parent_capture_subprocess() {
+  local candidate="$1"
+  shift
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    capture-subprocess --root "${ROOT_DIR}" --candidate "${candidate}" \
+    --purpose fresh-clone -- "$@"
+}
+parent_git_config_add() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    git-config-add --root "${ROOT_DIR}" --candidate "$1" --key "$2" --value "$3" \
+    --purpose "${4:-fresh-clone}" >/dev/null
+}
+parent_remove_file() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    remove-file --root "${ROOT_DIR}" --candidate "$1" --purpose "${2:-fresh-clone}" >/dev/null
+}
+parent_remove_tree() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    remove-tree --root "${ROOT_DIR}" --candidate "$1" --purpose "${2:-fresh-clone}" >/dev/null
+}
+parent_copy_file() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    copy --root "${ROOT_DIR}" --source "$1" --candidate "$2" --purpose "${3:-fresh-clone}" >/dev/null
+}
+parent_copy_tree() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    copy-tree --root "${ROOT_DIR}" --source "$1" --candidate "$2" \
+    --exclude .git --exclude .state --purpose "${3:-fresh-clone}" >/dev/null
+}
+TMP_DIR="$(parent_temp_dir "${PARENT_TMP_ROOT}" template-fresh-clone)"
 TOPIC_ROOT="${TMP_DIR}/workspace/fresh-clone"
 CLONE_DIR="${TOPIC_ROOT}/agent-canon"
 CLONE_TOOLS_ROOT=""
@@ -26,7 +73,7 @@ FRESH_CLONE_CLEANUP_DONE=0
 
 add_safe_directory_to_config() {
   local repo_dir="$1"
-  git config --file "${GIT_TEMP_CONFIG}" --add safe.directory "${repo_dir}" >/dev/null
+  parent_git_config_add "${GIT_TEMP_CONFIG}" safe.directory "${repo_dir}"
 }
 
 cleanup() {
@@ -39,7 +86,7 @@ cleanup() {
   else
     unset GIT_CONFIG_GLOBAL
   fi
-  rm -rf "${TMP_DIR}"
+  parent_remove_tree "${TMP_DIR}"
 }
 
 cleanup_on_signal() {
@@ -59,23 +106,17 @@ trap 'cleanup_on_signal INT 130' INT
 trap 'cleanup_on_signal TERM 143' TERM
 trap 'cleanup_on_signal HUP 129' HUP
 
-touch "${GIT_TEMP_CONFIG}"
+parent_write_file "${GIT_TEMP_CONFIG}" ""
 export GIT_CONFIG_GLOBAL="${GIT_TEMP_CONFIG}"
 add_safe_directory_to_config "${CLONE_DIR}"
 
-mkdir -p "${TOPIC_ROOT}"
+TOPIC_ROOT="$(parent_ensure_dir "${TMP_DIR}/workspace/fresh-clone")"
 
 echo "fresh-clone source: ${ROOT_DIR}"
 echo "fresh-clone target: ${CLONE_DIR}"
 
 overlay_current_tree() {
-  if ! command -v rsync >/dev/null 2>&1; then
-    echo "fresh_clone_overlay=fail"
-    echo "fresh_clone_overlay_error=rsync_required"
-    echo "fresh_clone_overlay_next_action=install rsync via docker/Dockerfile or host requirements"
-    exit 1
-  fi
-  rsync -a --delete --exclude .git --exclude .state "${ROOT_DIR}/" "${CLONE_DIR}/" >/dev/null
+  parent_copy_tree "${ROOT_DIR}" "${CLONE_DIR}"
 }
 
 attach_submodule_main_to_staged_pin() {
@@ -166,7 +207,7 @@ git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
 overlay_current_tree
 cd "${CLONE_DIR}"
 if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1; then
-  rm -rf vendor/agent-canon
+  parent_remove_tree vendor/agent-canon
   if ! submodule_init_output="$(git -c protocol.file.allow=always submodule update --init --recursive vendor/agent-canon 2>&1)"; then
     echo "fresh_clone_submodule_init=failed"
     echo "fresh_clone_submodule_init_reason=submodule_update_failed"
@@ -312,7 +353,7 @@ materialize_current_lifecycle_projection() {
 
   PYTHONPATH="${AGENT_CANON_TEST_WORK}/tools/agent_tools:${AGENT_CANON_TEST_WORK}/tools/ci" \
     python3 - "${packet_path}" "${candidate_sha}" "${candidate_tree_sha}" \
-      "${publication_sha}" "${publication_tree_sha}" <<'PY'
+      "${publication_sha}" "${publication_tree_sha}" "${AGENT_CANON_TEST_WORK}" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -322,6 +363,10 @@ from check_agent_canon_pr import (
     materialize_generated_completeness_receipt,
 )
 from github_publish import materialize_pr_identity_gate
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
 from update_lifecycle_contract import (
     SourceProjectionGateOwnerApis,
     materialize_fresh_clone_source_projection_packet,
@@ -329,6 +374,7 @@ from update_lifecycle_contract import (
 )
 
 packet_path = Path(sys.argv[1])
+root_dir = Path(sys.argv[6])
 packet = materialize_fresh_clone_source_projection_packet(
     candidate_sha=sys.argv[2],
     candidate_tree_sha=sys.argv[3],
@@ -341,8 +387,16 @@ packet = materialize_fresh_clone_source_projection_packet(
     ),
 )
 validate_source_projection_packet(packet)
-packet_path.parent.mkdir(parents=True, exist_ok=True)
-packet_path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+boundary = ParentRootSideEffectBoundary()
+attestation = boundary.attest(
+    ParentRootAttestationRequest(cwd=root_dir, explicit_root=root_dir, purpose="fresh-clone-packet")
+)
+boundary.write_parent_owned_file(
+    attestation,
+    packet_path,
+    (json.dumps(packet, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+    "fresh-clone-packet",
+)
 print("AGENT_CANON_FRESH_CLONE_SOURCE_PACKET=valid")
 PY
 
@@ -360,8 +414,8 @@ for lifecycle_path in \
   projection-queue/frontier.accepted.json \
   evidence/g4.parent-projection-integrity.json; do
   test -f "${source_namespace}/${lifecycle_path}"
-  mkdir -p "${target_namespace}/$(dirname "${lifecycle_path}")"
-  cp "${source_namespace}/${lifecycle_path}" "${target_namespace}/${lifecycle_path}"
+  parent_ensure_dir "${target_namespace}/$(dirname "${lifecycle_path}")"
+  parent_copy_file "${source_namespace}/${lifecycle_path}" "${target_namespace}/${lifecycle_path}"
 done
 
 PYTHONPATH="${CLONE_TOOLS_ROOT}/agent_tools" \
@@ -412,7 +466,8 @@ PY
 git config user.name "Fresh Clone Check"
 git config user.email "fresh-clone-check@example.invalid"
 materialize_current_lifecycle_projection
-bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" plan | tee "${TMP_DIR}/agent-canon-plan.txt"
+parent_capture_subprocess "${TMP_DIR}/agent-canon-plan.txt" \
+  bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" plan
 assert_update_plan_acceptance \
   "${TMP_DIR}/agent-canon-plan.txt" \
   "already_current_submodule|deferred_branch_pr|subtree_pull|submodule_update"
@@ -428,8 +483,10 @@ test -f vendor/agent-canon/.fresh-clone-agent-canon-marker
   git -c user.name="Fresh Clone Check" -c user.email="fresh-clone-check@example.invalid" commit -m "test: advance agent canon without subtree" >/dev/null
   git push origin main >/dev/null
 )
-mkdir -p "${TMP_DIR}/missing-git-exec"
-GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" plan | tee "${TMP_DIR}/agent-canon-no-subtree-plan.txt"
+parent_ensure_dir "${TMP_DIR}/missing-git-exec"
+parent_capture_subprocess "${TMP_DIR}/agent-canon-no-subtree-plan.txt" \
+  env GIT_EXEC_PATH="${TMP_DIR}/missing-git-exec" \
+  bash "${CLONE_TOOLS_ROOT}/update_agent_canon.sh" plan
 assert_update_plan_acceptance \
   "${TMP_DIR}/agent-canon-no-subtree-plan.txt" \
   "deferred_branch_pr|snapshot_import_tree_match|snapshot_import_no_subtree|submodule_update"

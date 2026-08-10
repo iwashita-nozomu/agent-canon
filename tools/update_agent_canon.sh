@@ -23,6 +23,45 @@ source "${SCRIPT_DIR}/lib/update_materialization.sh"
 source "${SCRIPT_DIR}/lib/git_authority.sh"
 ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")"
+python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+  attest --root "$ROOT_DIR" --purpose agent-canon-update >/dev/null
+CANON_PARENT_TMP_CANDIDATE="${AGENT_CANON_PARENT_TMPDIR:-$ROOT_DIR/.agent-canon/tmp/update}"
+CANON_PARENT_TMPDIR="$(python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+  ensure-dir --root "$ROOT_DIR" --candidate "$CANON_PARENT_TMP_CANDIDATE" --purpose agent-canon-update)"
+export TMPDIR="$CANON_PARENT_TMPDIR"
+parent_ensure_dir() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    ensure-dir --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-update}"
+}
+parent_temp_dir() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    temp-dir --root "$ROOT_DIR" --candidate "$1" --prefix "$2" --purpose "${3:-agent-canon-update}"
+}
+parent_write_file() {
+  local candidate="$1" content="${2-}"
+  printf '%s' "$content" | python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    write --root "$ROOT_DIR" --candidate "$candidate" --purpose "${3:-agent-canon-update}" >/dev/null
+}
+parent_remove_file() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    remove-file --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-update}" >/dev/null
+}
+parent_remove_tree() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    remove-tree --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-update}" >/dev/null
+}
+parent_copy_file() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    copy --root "$ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
+}
+parent_move_path() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    move --root "$ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
+}
+parent_symlink() {
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    symlink --root "$ROOT_DIR" --target "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
+}
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 SUPERPROJECT_DIR=""
 if [ "$(git -C "$ROOT_DIR" config -f .gitmodules --get "submodule.${PREFIX}.path" 2>/dev/null || true)" = "$PREFIX" ] \
@@ -277,17 +316,21 @@ acknowledge_update_todos_if_available() {
     return 0
   fi
 
-  todo_log="$(mktemp)"
-  if ! python3 "$todo_tool" plan --write >"$todo_log" 2>&1; then
+  todo_log_dir="$(parent_temp_dir "$CANON_PARENT_TMPDIR" todo-log)"
+  todo_log="$todo_log_dir/output"
+  local todo_output=""
+  if ! todo_output="$(python3 "$todo_tool" plan --write 2>&1)"; then
+    parent_write_file "$todo_log" "$todo_output"
     cat "$todo_log"
-    rm -f "$todo_log"
+    parent_remove_file "$todo_log"
     echo "AGENT_CANON_LATEST_TODOS=failed"
     echo "NEXT_ACTION=repair_agent_canon_update_todo_state_then_rerun_latest"
     return 1
   fi
+  parent_write_file "$todo_log" "$todo_output"
   cat "$todo_log"
   pending_count="$(awk -F= '/^AGENT_CANON_UPDATE_TODO_PENDING_COUNT=/{print $2}' "$todo_log")"
-  rm -f "$todo_log"
+  parent_remove_file "$todo_log"
 
   if [ "${pending_count:-0}" != "0" ]; then
     echo "AGENT_CANON_LATEST_TODOS=pending"
@@ -338,18 +381,23 @@ emit_queue_receipt() {
   local frontier_output="${8:-$UPDATE_PROJECTION_DIR/frontier.pending.json}"
   local current_marker="$UPDATE_STATE_DIR/current-transaction"
 
-  mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
+  parent_ensure_dir "$UPDATE_STATE_DIR"
+  parent_ensure_dir "$UPDATE_EVIDENCE_DIR"
+  parent_ensure_dir "$UPDATE_PROJECTION_DIR"
   PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
     python3 - "$binding_file" "$rebind_receipt_file" \
       "$source_main_readback_evidence_ref" "$predecessor_388_evidence_ref" \
       "$predecessor_389_evidence_ref" "$source_projection_packet" \
       "$queue_output" "$frontier_output" \
-      "$AGENT_CANON_DIR" "$current_marker" <<'PY'
+      "$AGENT_CANON_DIR" "$current_marker" "$ROOT_DIR" <<'PY'
 import json
-import os
 import sys
-import tempfile
 from pathlib import Path
+
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
 
 from update_lifecycle_contract import (
     materialize_dependency_frontier,
@@ -370,7 +418,13 @@ from update_lifecycle_contract import (
     frontier_path,
     source_namespace,
     current_marker_path,
+    root_dir,
 ) = sys.argv[1:]
+root = Path(root_dir)
+boundary = ParentRootSideEffectBoundary()
+attestation = boundary.attest(
+    ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="update-lifecycle")
+)
 binding = json.loads(Path(binding_path).read_text(encoding="utf-8"))
 rebind = json.loads(Path(rebind_path).read_text(encoding="utf-8"))
 packet = json.loads(Path(packet_path).read_text(encoding="utf-8"))
@@ -405,24 +459,14 @@ frontier = materialize_dependency_frontier(
 
 def persist_once(path_text, record, validator, identity_field):
     path = Path(path_text)
-    path.parent.mkdir(parents=True, exist_ok=True)
     if path.is_file():
         existing = validator(json.loads(path.read_text(encoding="utf-8")))
         validate_immutable_replay(existing, record, field=str(path))
         replay = json.loads(json.dumps(existing))
         replay["binding"]["timing"]["replayed"] = True
         return replay
-    handle = tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=path.parent, delete=False
-    )
-    try:
-        json.dump(record, handle, indent=2, sort_keys=True)
-        handle.write("\n")
-        handle.close()
-        os.replace(handle.name, path)
-    finally:
-        if os.path.exists(handle.name):
-            os.unlink(handle.name)
+    rendered = (json.dumps(record, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    boundary.write_parent_owned_file(attestation, path, rendered, "update-lifecycle")
     return record
 
 queue_result = persist_once(
@@ -443,18 +487,12 @@ if marker_path.is_file():
     if existing_marker != marker:
         raise SystemExit(f"input_identity_mismatch:{marker_path}")
 else:
-    marker_path.parent.mkdir(parents=True, exist_ok=True)
-    handle = tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=marker_path.parent, delete=False
+    boundary.write_parent_owned_file(
+        attestation,
+        marker_path,
+        (json.dumps(marker, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        "update-lifecycle",
     )
-    try:
-        json.dump(marker, handle, indent=2, sort_keys=True)
-        handle.write("\n")
-        handle.close()
-        os.replace(handle.name, marker_path)
-    finally:
-        if os.path.exists(handle.name):
-            os.unlink(handle.name)
 print(f"AGENT_CANON_QUEUE_RECEIPT_ID={queue_result['queue_receipt_id']}")
 print(f"AGENT_CANON_QUEUE_REPLAYED={str(queue_result['binding']['timing']['replayed']).lower()}")
 print(f"AGENT_CANON_FRONTIER_ID={frontier_result['frontier_id']}")
@@ -476,7 +514,9 @@ accept_dependency_frontier() {
     || die "accepted frontier requires exact origin/main readback identity"
   [[ "$source_main_tree" =~ ^[0-9a-f]{40}$ ]] \
     || die "accepted frontier requires exact origin/main tree readback identity"
-  mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
+  parent_ensure_dir "$UPDATE_STATE_DIR"
+  parent_ensure_dir "$UPDATE_EVIDENCE_DIR"
+  parent_ensure_dir "$UPDATE_PROJECTION_DIR"
   PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
     python3 - "$pending_frontier_file" "$queue_receipt_file" \
       "$rebind_receipt_file" "$source_main_sha" "$source_main_tree" \
@@ -485,10 +525,13 @@ accept_dependency_frontier() {
       "$ROOT_DIR" <<'PY'
 import hashlib
 import json
-import os
 import sys
-import tempfile
 from pathlib import Path
+
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
 
 from artifact_identity import canonical_json_bytes
 from update_lifecycle_contract import (
@@ -513,6 +556,11 @@ from update_lifecycle_contract import (
     g4_path,
     root_dir,
 ) = sys.argv[1:]
+root = Path(root_dir)
+boundary = ParentRootSideEffectBoundary()
+attestation = boundary.attest(
+    ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="update-frontier")
+)
 pending = json.loads(Path(pending_path).read_text(encoding="utf-8"))
 queue = json.loads(Path(queue_path).read_text(encoding="utf-8"))
 rebind = json.loads(Path(rebind_path).read_text(encoding="utf-8"))
@@ -537,7 +585,6 @@ accepted = validate_dependency_frontier_transition(
     ],
 )
 path = Path(output_path)
-path.parent.mkdir(parents=True, exist_ok=True)
 if path.is_file():
     existing = validate_dependency_frontier(
         json.loads(path.read_text(encoding="utf-8"))
@@ -546,17 +593,12 @@ if path.is_file():
     result = json.loads(json.dumps(existing))
     result["binding"]["timing"]["replayed"] = True
 else:
-    handle = tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=path.parent, delete=False
+    boundary.write_parent_owned_file(
+        attestation,
+        path,
+        (json.dumps(accepted, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        "update-frontier",
     )
-    try:
-        json.dump(accepted, handle, indent=2, sort_keys=True)
-        handle.write("\n")
-        handle.close()
-        os.replace(handle.name, path)
-    finally:
-        if os.path.exists(handle.name):
-            os.unlink(handle.name)
     result = accepted
 packet = validate_source_projection_packet(
     json.loads(Path(packet_path).read_text(encoding="utf-8"))
@@ -591,7 +633,6 @@ g4 = materialize_gate_verdict(
     verdict="pass",
 )
 g4_output = Path(g4_path)
-g4_output.parent.mkdir(parents=True, exist_ok=True)
 if g4_output.is_file():
     existing_g4 = validate_gate_verdict(
         json.loads(g4_output.read_text(encoding="utf-8"))
@@ -600,17 +641,12 @@ if g4_output.is_file():
     g4_result = json.loads(json.dumps(existing_g4))
     g4_result["binding"]["timing"]["replayed"] = True
 else:
-    handle = tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=g4_output.parent, delete=False
+    boundary.write_parent_owned_file(
+        attestation,
+        g4_output,
+        (json.dumps(g4, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        "update-frontier",
     )
-    try:
-        json.dump(g4, handle, indent=2, sort_keys=True)
-        handle.write("\n")
-        handle.close()
-        os.replace(handle.name, g4_output)
-    finally:
-        if os.path.exists(handle.name):
-            os.unlink(handle.name)
     g4_result = g4
 print(f"AGENT_CANON_FRONTIER_ID={result['frontier_id']}")
 print(f"AGENT_CANON_FRONTIER_STATE={result['frontier_state']}")
@@ -632,16 +668,21 @@ advance_source_projection() {
   source_main_sha="$(resolve_remote_branch_sha origin main)"
   ensure_remote_commit_object "$AGENT_CANON_DIR" origin "$source_main_sha"
   source_main_tree="$(git -C "$AGENT_CANON_DIR" rev-parse "$source_main_sha^{tree}")"
-  mkdir -p "$UPDATE_STATE_DIR" "$UPDATE_EVIDENCE_DIR" "$UPDATE_PROJECTION_DIR"
+  parent_ensure_dir "$UPDATE_STATE_DIR"
+  parent_ensure_dir "$UPDATE_EVIDENCE_DIR"
+  parent_ensure_dir "$UPDATE_PROJECTION_DIR"
   mapfile -t projection_values < <(
     PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
       python3 - "$packet" "$binding_file" "$rebind_file" \
-        "$source_main_sha" "$source_main_tree" <<'PY'
+        "$source_main_sha" "$source_main_tree" "$ROOT_DIR" <<'PY'
 import json
-import os
 import sys
-import tempfile
 from pathlib import Path
+
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
 
 from update_lifecycle_contract import validate_source_projection_packet
 
@@ -651,7 +692,13 @@ from update_lifecycle_contract import validate_source_projection_packet
     rebind_path,
     observed_source_main,
     observed_source_tree,
+    root_dir,
 ) = sys.argv[1:]
+root = Path(root_dir)
+boundary = ParentRootSideEffectBoundary()
+attestation = boundary.attest(
+    ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="source-projection")
+)
 packet = validate_source_projection_packet(
     json.loads(Path(packet_path).read_text(encoding="utf-8"))
 )
@@ -665,22 +712,14 @@ if (
 
 def persist_projection(path_text, value):
     path = Path(path_text)
-    path.parent.mkdir(parents=True, exist_ok=True)
     rendered = json.dumps(value, indent=2, sort_keys=True) + "\n"
     if path.is_file():
         if path.read_text(encoding="utf-8") != rendered:
             raise SystemExit(f"input_identity_mismatch:{path}")
         return
-    handle = tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=path.parent, delete=False
+    boundary.write_parent_owned_file(
+        attestation, path, rendered.encode("utf-8"), "source-projection"
     )
-    try:
-        handle.write(rendered)
-        handle.close()
-        os.replace(handle.name, path)
-    finally:
-        if os.path.exists(handle.name):
-            os.unlink(handle.name)
 
 persist_projection(binding_path, binding)
 persist_projection(rebind_path, packet["source_main_rebind_receipt"])
@@ -820,8 +859,11 @@ cmd_latest() {
     return 2
   fi
 
-  latest_log="$(mktemp)"
-  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
+  latest_log_dir="$(parent_temp_dir "$CANON_PARENT_TMPDIR" latest-log)"
+  latest_log="$latest_log_dir/output"
+  local latest_output=""
+  latest_output="$(bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" ensure-latest "$branch" 2>&1)" || latest_rc=$?
+  parent_write_file "$latest_log" "$latest_output"
   if [ "$latest_rc" -ne 0 ]; then
     cat "$latest_log"
     if grep -q '^agent_canon_materialization_collision=yes$' "$latest_log"; then
@@ -831,22 +873,22 @@ cmd_latest() {
     else
       emit_agentcanon_conflict_workflow_route "ensure_latest_failed=$latest_rc;route=${route:-unknown}"
     fi
-    rm -f "$latest_log"
+    parent_remove_file "$latest_log"
     return "$latest_rc"
   fi
   cat "$latest_log"
   if [ "$prefix_mode" = "submodule" ] && ! grep -q '^agent_canon_latest_submodule_local_state_checked=yes$' "$latest_log"; then
-    rm -f "$latest_log"
+    parent_remove_file "$latest_log"
     emit_agentcanon_conflict_workflow_route "ensure_latest_missing_submodule_local_state_evidence=yes;route=${route:-unknown}"
     return 2
   fi
   if grep -q '^agent_canon_latest=deferred_branch_pr$' "$latest_log"; then
-    rm -f "$latest_log"
+    parent_remove_file "$latest_log"
     echo "AGENT_CANON_LATEST_TOOL_RESULT=deferred_branch_pr"
     echo "NEXT_ACTION=after_agentcanon_PR_merge_rerun_make_agent-canon-ensure-latest"
     return 0
   fi
-  rm -f "$latest_log"
+  parent_remove_file "$latest_log"
 
   bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" check
   rebuild_agent_tools_if_available
@@ -872,19 +914,22 @@ cmd_apply() {
   fi
   require_accepted_dependency_frontier
 
-  latest_log="$(mktemp)"
-  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" ensure-latest "$branch" >"$latest_log" 2>&1 || latest_rc=$?
+  latest_log_dir="$(parent_temp_dir "$CANON_PARENT_TMPDIR" latest-log)"
+  latest_log="$latest_log_dir/output"
+  local latest_output=""
+  latest_output="$(bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" ensure-latest "$branch" 2>&1)" || latest_rc=$?
+  parent_write_file "$latest_log" "$latest_output"
   cat "$latest_log"
   if [ "$latest_rc" -ne 0 ]; then
-    rm -f "$latest_log"
+    parent_remove_file "$latest_log"
     return "$latest_rc"
   fi
   if grep -q '^agent_canon_latest=deferred_branch_pr$' "$latest_log"; then
-    rm -f "$latest_log"
+    parent_remove_file "$latest_log"
     echo "AGENT_CANON_TOOL_REBUILD=skipped_deferred_branch_pr"
     return 0
   fi
-  rm -f "$latest_log"
+  parent_remove_file "$latest_log"
   rebuild_agent_tools_if_available
 }
 
@@ -1002,15 +1047,18 @@ cmd_merge_main_into_current() {
     return
   fi
 
-  merge_log="$(mktemp)"
-  if git -C "$AGENT_CANON_DIR" merge --no-autostash --no-edit "$remote_sha" >"$merge_log" 2>&1; then
+  merge_log_dir="$(parent_temp_dir "$CANON_PARENT_TMPDIR" merge-log)"
+  merge_log="$merge_log_dir/output"
+  local merge_output=""
+  if merge_output="$(git -C "$AGENT_CANON_DIR" merge --no-autostash --no-edit "$remote_sha" 2>&1)"; then
+    parent_write_file "$merge_log" "$merge_output"
     post_head="$(git -C "$AGENT_CANON_DIR" rev-parse HEAD)"
     if git -C "$AGENT_CANON_DIR" merge-base --is-ancestor "$pre_head" "$remote_sha"; then
       result="fast_forwarded"
     else
       result="merged"
     fi
-    rm -f "$merge_log"
+    parent_remove_file "$merge_log"
     echo "agent_canon_merge_post_head=$post_head"
     emit_remote_main_ancestor_evidence "$remote_sha" "$post_head"
     echo "agent_canon_merge_result=$result"
@@ -1020,8 +1068,9 @@ cmd_merge_main_into_current() {
     return
   fi
 
+  parent_write_file "$merge_log" "$merge_output"
   cat "$merge_log" >&2
-  rm -f "$merge_log"
+  parent_remove_file "$merge_log"
   conflict_files="$(git -C "$AGENT_CANON_DIR" diff --name-only --diff-filter=U | paste -sd, -)"
   echo "agent_canon_merge_unresolved_merge_conflict=$([ -n "$conflict_files" ] && echo yes || echo no)"
   echo "agent_canon_merge_result=$([ -n "$conflict_files" ] && echo blocked_unresolved_merge_conflict || echo failed_without_conflict)"

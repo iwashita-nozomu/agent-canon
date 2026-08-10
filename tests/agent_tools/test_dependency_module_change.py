@@ -18,12 +18,33 @@ import sys
 from pathlib import Path
 
 import pytest
+from tools.agent_tools.parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
 
 TOPIC = "dependency-module-change"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "dependency_module_change.py"
 GENERIC_TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "repository_topic_clone.py"
+
+
+def test_dependency_module_root_attestation_preserves_home_and_parent_scope(
+    tmp_path: Path,
+) -> None:
+    """Dependency adapters receive a parent capability without rewriting HOME."""
+    subprocess.run(["git", "init", "-q", "-b", "main", str(tmp_path)], check=True)
+    receipt = ParentRootSideEffectBoundary().attest(
+        ParentRootAttestationRequest(
+            cwd=tmp_path, explicit_root=tmp_path, purpose="dependency-module-change"
+        )
+    )
+    environment = ParentRootSideEffectBoundary().child_environment(
+        receipt, {"HOME": "/home/fixture"}
+    )
+    assert environment["HOME"] == "/home/fixture"
+    assert Path(environment["TMPDIR"]).is_relative_to(tmp_path)
 
 
 def run_git(path: Path, *args: str) -> str:
@@ -159,6 +180,7 @@ def install_public_cli_surface(root: Path, *, derived: bool) -> Path:
     agent_tools.mkdir(parents=True)
     shutil.copy2(TOOL, agent_tools / TOOL.name)
     shutil.copy2(GENERIC_TOOL, agent_tools / GENERIC_TOOL.name)
+    shutil.copy2(TOOL.parent / "parent_root_side_effects.py", agent_tools / "parent_root_side_effects.py")
     if derived:
         tools_root.mkdir(parents=True)
         (tools_root / "agent-canon").symlink_to(
@@ -177,6 +199,7 @@ def test_public_cli_help_and_status_from_fresh_source_surfaces(
     """Run public help and status without ambient package context."""
     root = tmp_path / ("derived" if derived else "standalone")
     root.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
     executable = install_public_cli_surface(root, derived=derived)
     (root / ".gitmodules").write_text(
         '[submodule "dependency-0"]\n'

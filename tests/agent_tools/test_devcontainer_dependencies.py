@@ -40,8 +40,8 @@ from tools.agent_tools.devcontainer_dependencies import (
     _parse_dpkg_owned_paths,
     _repository_package_filename,
     _repository_packages_url,
-    build_plan,
     build_parser,
+    build_plan,
     image_install_plan,
     image_verify_plan,
     install_plan,
@@ -55,6 +55,32 @@ from tools.agent_tools.devcontainer_dependencies import (
 
 ROOT = Path(__file__).resolve().parents[2]
 ENGINE = ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
+
+
+def init_authentic_git(root: Path, *, remote: str = "https://example.invalid/fixture.git") -> None:
+    """Create the minimal authenticated Git parent used by side-effect fixtures."""
+    root.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["git", "init", "--quiet", "-b", "main", str(root)], check=True
+    )
+    subprocess.run(
+        ["git", "-C", str(root), "config", "user.name", "Fixture Test"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(root), "config", "user.email", "fixture@example.invalid"],
+        check=True,
+    )
+    marker = root / ".fixture-root"
+    marker.write_text("authenticated fixture\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", ".fixture-root"], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "commit", "--quiet", "-m", "fixture root"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(root), "remote", "add", "origin", remote], check=True
+    )
 
 
 def default_verification(
@@ -560,6 +586,7 @@ class DependencyModelTests(unittest.TestCase):
         identity = RuntimeIdentity("ubuntu", "22.04", "linux/amd64")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             image_root = root / "image-dependencies"
             install_runner = FakeRunner()
             self.assertEqual(
@@ -710,6 +737,7 @@ class DependencyModelTests(unittest.TestCase):
         identity = RuntimeIdentity("ubuntu", "22.04", "linux/amd64")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             failed_root = root / "failed-image"
             with self.assertRaises(DependencyError):
                 image_install_plan(
@@ -724,10 +752,12 @@ class DependencyModelTests(unittest.TestCase):
             publish_failure_root = root / "publish-failure"
             original_replace = dependency_module.os.replace
 
-            def fail_target_publish(source: Path, destination: Path) -> None:
+            def fail_target_publish(
+                source: object, destination: object, **kwargs: object
+            ) -> None:
                 if destination == publish_failure_root:
                     raise OSError("publish")
-                original_replace(source, destination)
+                original_replace(source, destination, **kwargs)
 
             with mock.patch.object(
                 dependency_module.os, "replace", side_effect=fail_target_publish
@@ -863,6 +893,7 @@ class DependencyModelTests(unittest.TestCase):
         identity = RuntimeIdentity("ubuntu", "22.04", "linux/amd64")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             image_root = root / "image-dependencies"
             with (
                 mock.patch.object(Installer, "install_record"),
@@ -1656,32 +1687,35 @@ class DependencyModelTests(unittest.TestCase):
                 )
             return result
 
-        with (
-            mock.patch.object(runner, "run", side_effect=run_with_key_fingerprint),
-            mock.patch(
-                "tools.agent_tools.devcontainer_dependencies._download",
-                side_effect=write_download,
-            ),
-        ):
-            Installer(runner)._install_apt_repository(
-                parsed, Path("/tmp/workspace"), repair=False
-            )
-            successful_calls = tuple(runner.calls)
-            runner.calls.clear()
-            runner.environments.clear()
-            mismatched = replace(
-                parsed,
-                repository_package_sha256=hashlib.sha256(b"different deb").hexdigest(),
-            )
-            with self.assertRaisesRegex(
-                DependencyError, "immutable apt package SHA256 mismatch"
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            init_authentic_git(workspace)
+            with (
+                mock.patch.object(runner, "run", side_effect=run_with_key_fingerprint),
+                mock.patch(
+                    "tools.agent_tools.devcontainer_dependencies._download",
+                    side_effect=write_download,
+                ),
             ):
                 Installer(runner)._install_apt_repository(
-                    mismatched, Path("/tmp/workspace"), repair=False
+                    parsed, workspace, repair=False
                 )
-            self.assertFalse(
-                any(command[:2] == ("apt-get", "install") for command in runner.calls)
-            )
+                successful_calls = tuple(runner.calls)
+                runner.calls.clear()
+                runner.environments.clear()
+                mismatched = replace(
+                    parsed,
+                    repository_package_sha256=hashlib.sha256(b"different deb").hexdigest(),
+                )
+                with self.assertRaisesRegex(
+                    DependencyError, "immutable apt package SHA256 mismatch"
+                ):
+                    Installer(runner)._install_apt_repository(
+                        mismatched, workspace, repair=False
+                    )
+                self.assertFalse(
+                    any(command[:2] == ("apt-get", "install") for command in runner.calls)
+                )
 
         local_installs = [
             command
@@ -1715,15 +1749,21 @@ class DependencyModelTests(unittest.TestCase):
         )
         plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
         with tempfile.TemporaryDirectory() as temporary:
-            receipt = Path(temporary) / "repo.json"
-            Installer._write_receipt(receipt, plan, parsed)
+            root = Path(temporary)
+            init_authentic_git(root)
+            receipt = root / "repo.json"
+            installer = Installer()
+            installer._parent_attestation = dependency_module._parent_attestation(
+                root, "test-receipt"
+            )
+            installer._write_receipt(receipt, plan, parsed)
             payload = json.loads(receipt.read_text(encoding="utf-8"))
             self.assertEqual(payload["repository_packages"]["sha256"], rolling_sha)
             self.assertEqual(payload["repository_package"]["sha256"], immutable_sha)
-            self.assertTrue(Installer._receipt_matches(receipt, plan, parsed))
+            self.assertTrue(installer._receipt_matches(receipt, plan, parsed))
             payload["repository_package"]["sha256"] = rolling_sha
             receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
-            self.assertFalse(Installer._receipt_matches(receipt, plan, parsed))
+            self.assertFalse(installer._receipt_matches(receipt, plan, parsed))
 
     def test_apt_executable_ownership_resolves_symlink_with_same_package(self) -> None:
         parsed = parse_record(
@@ -1879,6 +1919,7 @@ class DependencyModelTests(unittest.TestCase):
         """Manifest executable resolution is receipt-bound and independent of PATH."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             prefix = root / "npm"
             bin_dir = prefix / "bin"
             bin_dir.mkdir(parents=True)
@@ -2002,6 +2043,7 @@ class DependencyModelTests(unittest.TestCase):
         """A secondary provider may reject generic help while remaining bound."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             prefix = root / "npm"
             bin_dir = prefix / "bin"
             bin_dir.mkdir(parents=True)
@@ -2034,6 +2076,9 @@ class DependencyModelTests(unittest.TestCase):
             plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
             with mock.patch.object(dependency_module, "NPM_GLOBAL_PREFIX", str(prefix)):
                 installer = Installer()
+                installer._parent_attestation = dependency_module._parent_attestation(
+                    root, "test-receipt"
+                )
                 bindings = installer._executable_bindings(parsed, workspace=root)
                 receipt = root / "receipts" / "pyright-language-server.json"
                 installer._write_receipt(receipt, plan, parsed, executable_bindings=bindings)
@@ -2196,6 +2241,7 @@ class DependencyModelTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             with (
                 mock.patch(
                     "tools.agent_tools.devcontainer_dependencies.architecture",
@@ -2741,6 +2787,7 @@ class DependencyModelTests(unittest.TestCase):
         plan = build_plan((loaded_manifest(Path("x.toml"), (parsed,)),))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             runner = FakeRunner()
             installer = Installer(runner)
             receipts = root / "receipts"
@@ -2968,6 +3015,7 @@ class DependencyModelTests(unittest.TestCase):
         active = self._active_source_record()
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             source = root / "rust" / "agent-canon"
             source.mkdir(parents=True)
             (source / "Cargo.toml").write_text(
@@ -3252,6 +3300,7 @@ class DependencyModelTests(unittest.TestCase):
         plan = build_plan((loaded_manifest(Path("x.toml"), (provider, dependent)),))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             runner = FakeRunner(fail_on="apt-get")
             with self.assertRaisesRegex(
                 DependencyError, "dependency unavailable: dependent depends on provider"
@@ -3277,6 +3326,7 @@ class DependencyModelTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             cache = root / "ms-playwright"
             executable = cache / "chromium-123" / "chrome-linux" / "chrome"
             executable.parent.mkdir(parents=True)
@@ -3346,6 +3396,7 @@ class DependencyModelTests(unittest.TestCase):
         plan = build_plan((loaded_manifest(Path("fixture.toml"), (rust, lean, cargo)),))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             (root / "rust" / "agent-canon").mkdir(parents=True)
             binary = root / "rust" / "agent-canon" / "target" / "release" / "agent-cli"
             binary.parent.mkdir(parents=True)
@@ -3412,6 +3463,7 @@ class DependencyModelTests(unittest.TestCase):
         plan = build_plan((loaded_manifest(Path("fixture.toml"), (lean,)),))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             receipts = root / "receipts"
             runner = LeanToolchainRetryRunner()
             with self.assertRaises(DependencyError):

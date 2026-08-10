@@ -23,6 +23,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOL_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "repository_topic_clone.py"
 sys.path.insert(0, str(TOOL_PATH.parent))
 
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+)
 from update_lifecycle_contract import (  # noqa: E402
     materialize_publication_readback_receipt,
     pull_request_branch_table,
@@ -36,6 +42,28 @@ def run_git(path: Path, *args: str) -> str:
         capture_output=True,
         text=True,
     ).stdout.strip()
+
+
+def test_computed_clone_path_uses_parent_boundary_for_escaping_symlinks(
+    tmp_path: Path,
+) -> None:
+    """Clone projection rejects a topic path whose symlink leaves the parent."""
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    subprocess.run(["git", "init", "-q", "-b", "main", str(tmp_path)], check=True)
+    outside = tmp_path.parent / f"{tmp_path.name}-outside"
+    outside.mkdir()
+    (workspace / "topic").symlink_to(outside, target_is_directory=True)
+    receipt = ParentRootSideEffectBoundary().attest(
+        ParentRootAttestationRequest(
+            cwd=tmp_path, explicit_root=tmp_path, purpose="repository-topic-clone"
+        )
+    )
+    with pytest.raises(ParentRootSideEffectError) as rejected:
+        ParentRootSideEffectBoundary().resolve_parent_owned_path(
+            receipt, "workspace/topic/agent-canon", "repository-topic-clone"
+        )
+    assert rejected.value.reject is ParentRootReject.SYMLINK_ESCAPE
 
 
 def init_remote(tmp_path: Path) -> tuple[Path, str]:
@@ -572,6 +600,74 @@ def test_cleanup_without_publication_packet_matches_remote_head(tmp_path: Path) 
     assert removed.removed
     assert removed.evidence == "remote-head"
     assert not request.clone.exists()
+
+
+def test_cleanup_holds_when_managed_module_binding_disappears(tmp_path: Path) -> None:
+    """A managed manifest cannot silently fall back to root-only cleanup."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    request = rtc.request(
+        remote_url,
+        "repo-managed-missing",
+        workspace,
+        "topic-managed-missing",
+        "feature/cleanup",
+        evidence,
+    )
+    run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
+    run_git(
+        request.clone,
+        "config",
+        "repository-topic-clone.binding-mode",
+        "managed",
+    )
+    (workspace / ".gitmodules").write_text(
+        '[submodule "vendor/agent-canon"]\n'
+        "\tpath = vendor/agent-canon\n"
+        "\turl = https://example.invalid/agent-canon.git\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError,
+        match="managed parent binding source/module is missing or corrupt",
+    ):
+        rtc.cleanup(request.request, apply=True)
+    assert request.clone.exists()
+
+
+def test_cleanup_holds_when_binding_directory_is_present_but_files_are_missing(
+    tmp_path: Path,
+) -> None:
+    """A partial historical binding is a hard hold even without a live module."""
+    remote, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    request = rtc.request(
+        remote_url,
+        "repo-managed-partial",
+        workspace,
+        "topic-managed-partial",
+        "feature/cleanup",
+        evidence,
+    )
+    run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
+    binding_dir = (
+        workspace
+        / ".agent-canon"
+        / "parent-bindings"
+        / rtc.topic_slug(request.request.topic)
+        / request.request.repository
+    )
+    binding_dir.mkdir(parents=True)
+    with pytest.raises(
+        rtc.RepositoryTopicCloneError,
+        match="managed parent binding source/module is missing or corrupt",
+    ):
+        rtc.cleanup(request.request, apply=True)
+    assert request.clone.exists()
 
 
 def test_cleanup_accepts_exact_legacy_module_markers_read_only(

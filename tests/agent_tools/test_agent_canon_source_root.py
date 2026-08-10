@@ -32,10 +32,30 @@ from agent_canon_source_root import (  # noqa: E402
     resolve_agent_canon_source_root,
     run,
 )
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
 
 
 class AgentCanonSourceRootCLITests(unittest.TestCase):
     """Validate CLI subcommand wiring without touching real owner roots."""
+
+    def test_source_root_dispatch_can_issue_a_parent_bounded_child_environment(self) -> None:
+        """The source-root owner uses the shared parent capability for children."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+            receipt = ParentRootSideEffectBoundary().attest(
+                ParentRootAttestationRequest(
+                    cwd=root, explicit_root=root, purpose="agent-canon-source-root"
+                )
+            )
+            environment = ParentRootSideEffectBoundary().child_environment(
+                receipt, {"HOME": "/unchanged/home"}
+            )
+            self.assertEqual(environment["HOME"], "/unchanged/home")
+            self.assertTrue(Path(environment["TMPDIR"]).is_relative_to(root))
 
     def _mock_resolution(self, command_root: Path) -> RootResolution:
         return RootResolution(
@@ -65,6 +85,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         shutil.copy2(
             resolver_source,
             source / "tools" / "agent_tools" / resolver_source.name,
+        )
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
+            source / "tools" / "agent_tools" / "parent_root_side_effects.py",
         )
         devcontainer = source / ".devcontainer"
         devcontainer.mkdir(parents=True)
@@ -98,11 +122,8 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         )
         (devcontainer / "post-attach.sh").chmod(0o755)
         if derived:
-            (parent / ".git").mkdir(parents=True)
-            (source / ".git").write_text(
-                "gitdir: ../../.git/modules/vendor/agent-canon\n",
-                encoding="utf-8",
-            )
+            subprocess.run(["git", "init", "-q", "-b", "main", str(parent)], check=True)
+            subprocess.run(["git", "init", "-q", "-b", "main", str(source)], check=True)
             parent_devcontainer = parent / ".devcontainer"
             parent_devcontainer.mkdir(parents=True)
             (parent_devcontainer / "post-create-parent.sh").write_text(
@@ -123,7 +144,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             )
             command_root = parent
         else:
-            (source / ".git").mkdir()
+            subprocess.run(["git", "init", "-q", "-b", "main", str(source)], check=True)
             (source / "tools" / "agent-canon").symlink_to(
                 ".", target_is_directory=True
             )
@@ -186,6 +207,8 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             copy_ignore = shutil.ignore_patterns(
                 ".git",
                 ".agent-canon",
+                "reports",
+                "workspace",
                 "__pycache__",
                 ".pytest_cache",
                 ".ruff_cache",
@@ -236,6 +259,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         """Propagate a non-zero delegated command return code to the caller."""
         with tempfile.TemporaryDirectory() as workspace:
             root = Path(workspace)
+            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
             script = root / "tools" / "agent_tool.sh"
             script.parent.mkdir(parents=True, exist_ok=True)
             script.write_text(
@@ -370,12 +394,9 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             parent = Path(workspace) / "parent"
             source = parent / "vendor" / "agent-canon"
             catalog = source / "agents" / "skills" / "catalog.yaml"
-            (parent / ".git").mkdir(parents=True)
+            subprocess.run(["git", "init", "-q", "-b", "main", str(parent)], check=True)
             source.mkdir(parents=True)
-            (source / ".git").write_text(
-                "gitdir: ../../.git/modules/vendor/agent-canon\n",
-                encoding="utf-8",
-            )
+            subprocess.run(["git", "init", "-q", "-b", "main", str(source)], check=True)
             catalog.parent.mkdir(parents=True)
             catalog.write_text("skills: []\n", encoding="utf-8")
 
