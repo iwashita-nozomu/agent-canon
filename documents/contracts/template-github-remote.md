@@ -36,10 +36,11 @@ git config -f .gitmodules submodule.vendor/agent-canon.url \
 git submodule sync vendor/agent-canon
 ```
 
-## Private Submodule Workflow Secret
+## Submodule Checkout Authentication
 
-Because both the template repository and AgentCanon can be private, GitHub
-Actions needs an explicit cross-repo read credential for `vendor/agent-canon`.
+A public AgentCanon remote is read anonymously and needs no repository secret.
+When AgentCanon is private, GitHub Actions needs an explicit cross-repo read
+credential for `vendor/agent-canon`.
 
 Configure one of these repository secrets in `iwashita-nozomu/project_template`:
 
@@ -48,12 +49,12 @@ Configure one of these repository secrets in `iwashita-nozomu/project_template`:
 - `AGENT_CANON_REPO_SSH_KEY`: private half of a read-only deploy key whose
   public half is installed on `iwashita-nozomu/agent-canon`.
 
-Do not rely on automatic `actions/checkout` submodule fetch for the private
-AgentCanon submodule. Workflows should checkout the template root with
-`submodules: false`, then run
-`bash .github/scripts/checkout_agent_canon_submodule.sh` so missing credentials
-fail with a precise remediation message. Pass the token or deploy key only to
-that helper step. Later `make ci`, `make fresh-clone-check`, and
+Do not rely on automatic `actions/checkout` submodule fetch. Workflows should
+checkout the template root with `submodules: false`, then run
+`bash .github/scripts/checkout_agent_canon_submodule.sh`. The helper uses
+anonymous access for a public remote; for a private remote, missing credentials
+fail with a precise remediation message. Pass a configured token or deploy key
+only to that helper step. Later `make ci`, `make fresh-clone-check`, and
 `make agent-canon-pr-check` steps consume the initialized checkout without
 receiving the credential.
 

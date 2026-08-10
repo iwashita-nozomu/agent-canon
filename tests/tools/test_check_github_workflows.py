@@ -810,7 +810,6 @@ raise SystemExit(2)
             self.assertIn("checkout_1_missing_submodules_false", result.stdout)
             self.assertIn("checkout_1_missing_persist_credentials_false", result.stdout)
             self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
-            self.assertIn("missing_agent_canon_repo_credential_env", result.stdout)
 
     def test_docker_build_workflow_requires_agent_canon_checkout(self) -> None:
         """Docker build workflow consumes shared devcontainer files from AgentCanon."""
@@ -847,7 +846,6 @@ raise SystemExit(2)
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
-            self.assertIn("missing_agent_canon_repo_credential_env", result.stdout)
 
     def test_docker_build_workflow_with_agent_canon_checkout_passes(self) -> None:
         """Docker build workflow should be explicit about the AgentCanon checkout."""
@@ -1209,8 +1207,8 @@ raise SystemExit(2)
                 "missing_referenced_agent_canon_checkout_helper", result.stdout
             )
 
-    def test_helper_step_requires_credential_env(self) -> None:
-        """Checkout helper steps need token or SSH credential context."""
+    def test_helper_step_allows_anonymous_public_checkout(self) -> None:
+        """Checkout helper steps may omit credentials for a public remote."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_valid_workflow(root, helper_env=False)
@@ -1223,11 +1221,8 @@ raise SystemExit(2)
                 text=True,
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(
-                "checkout_helper_1_missing_agent_canon_repo_credential_env",
-                result.stdout,
-            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
 
     def test_workflow_level_credentials_fail(self) -> None:
         """Credentials for AgentCanon must stay on the checkout-helper step."""
