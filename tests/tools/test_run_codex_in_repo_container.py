@@ -23,7 +23,13 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_codex_in_repo_container.py"
 sys.path.insert(0, str(SCRIPT.parent))
 
-from run_codex_in_repo_container import build_nested_codex_script  # noqa: E402
+from run_codex_in_repo_container import (  # noqa: E402
+    DEFAULT_PROFILES_PATH,
+    build_nested_codex_script,
+    build_parser,
+    host_to_container_home,
+    load_profiles,
+)
 
 
 def run_cli(
@@ -38,6 +44,55 @@ def run_cli(
         text=True,
         env={**os.environ, **(env or {})},
     )
+
+
+def test_default_profiles_are_agent_canon_owned_packless_and_secret_safe(
+    tmp_path: Path,
+) -> None:
+    """AgentCanon defaults keep nested state ignored and credentials opt-in."""
+    args = build_parser().parse_args(["--list-profiles"])
+    defaults, profiles = load_profiles(args.profiles)
+
+    assert Path(args.profiles) == DEFAULT_PROFILES_PATH
+    assert DEFAULT_PROFILES_PATH == (
+        PROJECT_ROOT / "tools/ci/codex-container-profiles.toml"
+    )
+    assert [(profile.name, profile.pack) for profile in profiles] == [
+        ("default", None)
+    ]
+    assert defaults.container_home_root == "/workspace/workspace/.nested-codex"
+    assert defaults.mount_host_git_credentials is False
+    host_home, container_home = host_to_container_home(
+        defaults, profiles[0], tmp_path
+    )
+    assert host_home == tmp_path / "workspace/.nested-codex/default"
+    assert not host_home.exists()
+    assert container_home == "/workspace/workspace/.nested-codex/default"
+
+
+def test_omitted_profile_defaults_do_not_persist_host_git_credentials(
+    tmp_path: Path,
+) -> None:
+    """A partial explicit profile inherits the same secret-safe defaults."""
+    profiles_path = tmp_path / "profiles.toml"
+    profiles_path.write_text(
+        "\n".join(
+            (
+                "[defaults]",
+                "",
+                "[[profile]]",
+                'name = "default"',
+                'description = "fixture"',
+                "",
+            )
+        ),
+        encoding="utf-8",
+    )
+
+    defaults, _ = load_profiles(str(profiles_path))
+
+    assert defaults.container_home_root == "/workspace/workspace/.nested-codex"
+    assert defaults.mount_host_git_credentials is False
 
 
 def write_nested_profile_fixture(

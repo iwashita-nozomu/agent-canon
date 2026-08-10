@@ -83,7 +83,7 @@ tools/bin/agent-canon docs check <changed-file>.md
 bash tools/docker_dependency_validator.sh
 python3 tools/ci/container_config.py
 make docker-build-check
-python3 tools/ci/run_container_pack.py --pack docker/packs/default.toml --print-only
+python3 tools/ci/run_container_pack.py --print-only
 ```
 
 必要なら:

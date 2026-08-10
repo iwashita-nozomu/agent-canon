@@ -2006,7 +2006,7 @@ skill_families:
       - python3 tools/ci/container_config.py
       - make docker-build-check
       - make docker-build-check-host-docker
-      - python3 tools/ci/run_container_pack.py --pack docker/packs/default.toml --print-only
+      - python3 tools/ci/run_container_pack.py --print-only
       - make server-check
       - make ci-quick
       - make ci

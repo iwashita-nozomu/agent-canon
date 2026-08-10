@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import importlib.util
 import socket
+import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
@@ -22,6 +23,7 @@ from tools.ci import container_runtime as runtime_module
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RUNNER_SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_container_pack.py"
+REPO_PROGRAM_SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_repo_program.py"
 
 
 def load_runtime_module() -> Any:
@@ -123,6 +125,50 @@ def test_parent_pack_link_is_resolved_against_repo_root(tmp_path: Path) -> None:
     resolver: Callable[[Path], Path] = fake_resolver
     mounts = runtime.resolve_linked_data_mounts(pack, repo, resolve_path=resolver)
     assert mounts == ("/mnt/l/msm_data_root:/mnt/l/msm_data_root",)
+
+
+def test_workspace_discovery_uses_repo_markers_without_runtime_pack(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Workspace discovery is independent of optional project pack files."""
+    repo = tmp_path / "parent"
+    nested = repo / "scripts" / "nested"
+    (repo / ".git").mkdir(parents=True)
+    (repo / "README.md").write_text("fixture\n", encoding="utf-8")
+    nested.mkdir(parents=True)
+    monkeypatch.chdir(nested)
+
+    assert runtime_module.detect_workspace_root() == repo
+
+
+def test_repo_program_defaults_without_pack_or_python_rules(tmp_path: Path) -> None:
+    """Direct execution uses Dockerfile defaults when optional TOML is absent."""
+    repo = tmp_path / "parent"
+    (repo / ".git").mkdir(parents=True)
+    (repo / "docker").mkdir()
+    (repo / "README.md").write_text("fixture\n", encoding="utf-8")
+    (repo / "docker" / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
+    (repo / "sample.py").write_text("print('fixture')\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(REPO_PROGRAM_SCRIPT),
+            "--print-only",
+            "--skip-env-check",
+            "sample.py",
+        ],
+        cwd=repo,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "docker/python-execution-rules.toml" not in result.stderr
+    assert "docker/packs/default.toml" not in result.stderr
+    assert "python3 /workspace/sample.py" in result.stdout
+    assert "parent:agent-canon" in result.stdout
 
 
 def test_parent_pack_link_mount_reaches_run_command(tmp_path: Path) -> None:

@@ -40,10 +40,8 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - `documents/conventions/coding-conventions-project.md`
 - `documents/contracts/github-first-module-and-devcontainer-policy.md`
 - `documents/tools/README.md`
-- `docker/README.md`
-- `docker/packs/`
-- `docker/codex-container-profiles.toml`
-- `docker/python-execution-rules.toml`
+- project-owned `docker/`（packs / Python execution rules は optional）
+- AgentCanon-owned `tools/ci/codex-container-profiles.toml`
 - `documents/contracts/server-host-contract.md`
 - `templates/documents/server_runtime_layout.template.toml`
 - `docker/`
@@ -83,7 +81,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - Docker images own fixed Python/native capabilities, manifest tools, and parent-owned project dependencies; Node/npm is copied at image build from the exact digest-pinned official Node OCI provider image. A project-owned `VIRTUAL_ENV` may be selected by the project runtime contract, but the shared post-create lifecycle performs only image-verify and container runtime readback. It performs no editable install, pip setup, package mutation, network access, or workspace repair. Do not require a distro venv package, host-created virtual environments, or ad hoc `virtualenv`, `conda`, `uv`, `pipenv`, or `poetry` environments.
 - 1 回限りの手元補助なら、repo 正本に昇格させず代替案を先に検討します。
 - Docker、CI、README、workflow command が変わる場合は、同じ変更でそろえます。
-- Docker 変更では image fixed capabilities、digest-pinned official Node OCI provider image、`pyproject.toml` selected extras、runtime pack、typed Agent tool manifest、AgentCanon-owned devcontainer、関連 README の要否を同じ pass で判定します。
+- Docker 変更では image fixed capabilities、digest-pinned official Node OCI provider image、`pyproject.toml` selected extras、optional runtime pack/rules、typed Agent tool manifest、parent-owned devcontainer、AgentCanon-owned Codex profiles、関連 README の要否を同じ pass で判定します。
 - `host / docker image / CI / shared script` のどこが source of truth かを曖昧にしたまま実装へ進めません。
 - 依存追加の提案だけで終わらせず、validate と rollback まで記録します。
 - canonical container の `safe.directory` 方針は `CONTAINER_OPERATIONS.md` と repo-local Docker runbook に従います。
@@ -97,7 +95,7 @@ Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの
 - image-build project-dependency readback and image-verify plan/receipt/live-state readback
 - Agent tool manifest validation and explicit GPU host-orchestration checks
 - `make docker-build-check`
-- `python3 tools/ci/run_container_pack.py --pack docker/packs/default.toml --print-only`
+- `python3 tools/ci/run_container_pack.py --print-only`（project pack を使う場合だけ `--pack <path>`）
 - `make server-check`
 - `make ci-quick`
 - 必要なら `make ci`

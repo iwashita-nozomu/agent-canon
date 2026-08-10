@@ -86,11 +86,13 @@ The ownership boundary covers these primary surfaces.
 | `.devcontainer/`       | Template or derived repository | Parent-owned regular environment directory. Standalone AgentCanon owns only its own source checkout; parent regular files are preserved.                   |
 | `.vscode/`             | Template or derived repository | Parent-owned regular editor directory. Standalone AgentCanon may validate its four source files; no parent mirror is required.                              |
 | `Dockerfile`           | Template or derived repository | Project image contract. Do not add generic Codex, GitHub CLI, Rust toolchain, or agent convenience tooling here.                                               |
-| `docker/`              | Template or derived repository | Project-local container runbook, dependency packs, runtime package contract, and repository-specific image policy.                                             |
+| `docker/`              | Template or derived repository | Project-local image/runtime contract. `docker/Dockerfile` may stand alone; packs and Python execution rules are optional project overrides.                      |
+| `tools/ci/codex-container-profiles.toml` | AgentCanon | Default nested-Codex profile configuration, resolved from the AgentCanon source tree. A parent may select an explicit profile file without owning the default. |
 | GitHub Docker workflow | Template or derived repository | Parent-owned workflow. Its Docker behavior follows this rulebook; any AgentCanon source use is selected by the workflow rather than materialized as a root copy. |
 
-The separation is intentional. AgentCanon owns the shared automation boundary;
-the repository owns its runtime image and product dependencies.
+The separation is intentional. The project owns Docker runtime configuration,
+the parent devcontainer owns project analysis and implementation setup, and
+AgentCanon owns Codex-specific profiles and shared tools.
 
 ## Product Image And Mounted Tool Boundary
 
@@ -339,7 +341,12 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
   recorded and later certified by `EnvironmentCertificate`, not by a second
   environment policy surface.
 - Nested Codex uses container-local state under the selected workspace runtime
-  home for Codex session semantics, and the runner sets the profile-scoped
+  home for Codex session semantics. The default resolves to
+  `/workspace/workspace/.nested-codex/<profile>`, which maps to the parent-owned
+  ignored `workspace/` boundary required by
+  `documents/rule/repository-topic-clone.md`; it does not persist secrets in the
+  tracked tree. Host `.git-credentials` projection is disabled by default and
+  requires an explicit profile override. The runner sets the profile-scoped
   `XDG_STATE_HOME=/tmp/agent-canon-xdg-state/<profile>` outside the workspace.
   The runner
   rejects pack/profile/CLI forwarding of the owned `HOME`, `XDG_STATE_HOME`, and
@@ -425,9 +432,9 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
   Git remotes; otherwise keep the default read-only mode.
 - Resolver-invoked standalone-source post-create logic must tolerate a repository that has no local bare
   mirror and no host-specific optional mount.
-- Devcontainer-generated Compose must forward repo-local runtime environment
-  entries from `docker/packs/default.toml` so editor kernels, shells, and smoke
-  commands share the same import root.
+- When a project selects a runtime pack, Devcontainer-generated Compose forwards
+  its runtime environment. A parent with only `docker/Dockerfile` uses the
+  direct default and does not materialize an empty pack contract.
 
 ## Python Dependency Rules
 
@@ -447,8 +454,8 @@ python3 tools/ci/python_env_policy.py --create
 ```
 
 - Do not create `venv/`, `env/`, `.conda/`, or ad hoc environment directories.
-- Dependency packs under `docker/packs/` are repository-local contracts and must
-  not be treated as AgentCanon shared policy.
+- Dependency packs under `docker/packs/` and Python execution rules are optional
+  repository-local overrides and must not be treated as AgentCanon shared policy.
 
 ## GitHub Workflow Rules
 

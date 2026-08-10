@@ -962,13 +962,17 @@ For OOP readability, keep the mechanical report as the source of truth and use `
 ## Container Configuration Tools
 
 - `tools/ci/container_config.py` statically validates repo-local Dockerfile,
-  runtime pack, and AgentCanon-owned devcontainer configuration without
+  any present optional runtime packs, and the selected devcontainer boundary without
   requiring Docker or Podman to run. It returns `CONTAINER_CONFIG=skip` only
   when a checkout has neither `docker/` nor `.devcontainer/`.
 - `tools/docker_dependency_validator.sh` remains the shell-level dependency
   contract for canonical Docker image contents.
-- `tools/ci/run_container_pack.py --print-only` previews the build and smoke
-  commands resolved from `docker/packs/*.toml`.
+- `tools/ci/run_container_pack.py --print-only` previews direct
+  `docker/Dockerfile` defaults; `--pack <path>` selects an optional project pack.
+- `tools/ci/run_codex_in_repo_container.py` resolves its default profile from
+  AgentCanon-owned `tools/ci/codex-container-profiles.toml`; `--profiles <path>`
+  selects an optional parent override. Python runners use direct defaults unless
+  the caller supplies `--rules <path>`.
 
 ## 含めないもの
 
