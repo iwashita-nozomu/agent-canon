@@ -275,7 +275,7 @@ supplementary-GID environment は GPU profile にも生成しない。
 | clause | implementation route | reverse evidence / drift block |
 | --- | --- | --- |
 | DEV-DEFAULT-001 | `.devcontainer/devcontainer.json`: select generator-only default initialization | exact command readback; any host runtime provisioning invocation is a drift blocker |
-| DEV-DEFAULT-002 | `.devcontainer/generate-runtime-compose.sh` / linked config: resolve host UID/GID, pass `PROJECT_UID`/`PROJECT_GID` with fixed user name `project`, retain canonical `containerUser`/`remoteUser`, omit shared runtime group/bind/receipt env and custom HOME tmpfs; parent image creates `project` and runs as `USER project` | generated Compose/config/image inspection plus `project` ID, `USER`, workspace owner, and container path readback; any missing/mismatched build arg, public override, host runtime source, host bind, custom HOME tmpfs, or AgentCanon group is a drift blocker |
+| DEV-DEFAULT-002 | `.devcontainer/generate-runtime-compose.sh` / linked config: resolve host UID/GID, pass `PROJECT_UID`/`PROJECT_GID` with fixed build user name `project`, omit static default `containerUser`/`remoteUser`, set `updateRemoteUserUID: false`, and let generated Compose own resolved `service.user`; omit shared runtime group/bind/receipt env and custom HOME tmpfs; parent image creates `project` and runs as `USER project` | generated Compose/config/image inspection plus resolved `service.user`, `project` ID, `USER`, workspace owner, and container path readback; any missing/mismatched build arg, public identity override, host runtime source, host bind, custom HOME tmpfs, or AgentCanon group is a drift blocker |
 | DEV-DEFAULT-003 | generator GPU branch: default は host GPU/`nvidia-smi`/Docker NVIDIA runtime を probe せず、`DEVCONTAINER_GPU_MODE=disabled` を出力し、`DEVCONTAINER_GPU_REQUEST` を出力しない | command/env readback と no-GPU launch; probing、`DEVCONTAINER_GPU_REQUEST`、または `gpus: all` が default に現れれば drift blocker |
 | DEV-DEFAULT-004 | `.devcontainer/post-create.sh`: run only read-only image verification and container runtime readback after image build owns manifest installation | lifecycle tests and image metadata/tool readback; package/network mutation, project-install, sudo, or workspace repair is a drift blocker |
 | DEV-DEFAULT-005 | retain scripts and experiment owners; route managed runtime capability through the explicit `gpu-admission` selector/orchestrator | source existence, separate selector/output/project identity, and issue linkage; deletion of scheduler/managed experiment is out of scope and a review blocker |
@@ -314,8 +314,10 @@ guard の weakening を許可する fallback ではない。
 
 ### DEV-DEFAULT-002/004 validation-failure-response
 
-ユーザー指示で supersede した root runtime、標準 `vscode`、非canonicalな
-`remoteUser`、`updateRemoteUserUID`、または unresolved `user: ':'` を再導入しない。
+ユーザー指示で supersede した root runtime、標準 `vscode`、default の static
+`containerUser`/`remoteUser`、または unresolved `user: ':'` を再導入しない。default は
+`updateRemoteUserUID: false` を維持し、生成 Compose の解決済み `service.user` を
+Dev Container CLI の numeric identity source とする。
 digest-pinned plain Ubuntu 22.04 の `project` user、host UID/GID build args、
 `USER project`、container-local sudo を確認する。`dependency capability setup failed:
 root or sudo is required`、host password prompt、UID/GID mismatch、または workspace
