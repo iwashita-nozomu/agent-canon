@@ -59,9 +59,12 @@ parent_copy_file() {
     copy --root "${ROOT_DIR}" --source "$1" --candidate "$2" --purpose "${3:-fresh-clone}" >/dev/null
 }
 parent_copy_tree() {
+  local source="$1" candidate="$2"
+  shift 2
   python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
-    copy-tree --root "${ROOT_DIR}" --source "$1" --candidate "$2" \
-    --exclude .git --exclude .state --purpose "${3:-fresh-clone}" >/dev/null
+    copy-tree --root "${ROOT_DIR}" --source "${source}" --candidate "${candidate}" \
+    --exclude .git --exclude .state --exclude .agent-canon "$@" \
+    --purpose fresh-clone >/dev/null
 }
 TMP_DIR="$(parent_temp_dir "${PARENT_TMP_ROOT}" template-fresh-clone)"
 TOPIC_ROOT="${TMP_DIR}/workspace/fresh-clone"
@@ -116,7 +119,7 @@ echo "fresh-clone source: ${ROOT_DIR}"
 echo "fresh-clone target: ${CLONE_DIR}"
 
 overlay_current_tree() {
-  parent_copy_tree "${ROOT_DIR}" "${CLONE_DIR}"
+  parent_copy_tree "${ROOT_DIR}" "${CLONE_DIR}" --exclude reports
 }
 
 attach_submodule_main_to_staged_pin() {
@@ -207,7 +210,11 @@ git clone --no-local "${ROOT_DIR}" "${CLONE_DIR}" >/dev/null
 overlay_current_tree
 cd "${CLONE_DIR}"
 if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1; then
-  parent_remove_tree vendor/agent-canon
+  if [ -L "${CLONE_DIR}/vendor/agent-canon" ]; then
+    parent_remove_file "${CLONE_DIR}/vendor/agent-canon"
+  else
+    parent_remove_tree "${CLONE_DIR}/vendor/agent-canon"
+  fi
   if ! submodule_init_output="$(git -c protocol.file.allow=always submodule update --init --recursive vendor/agent-canon 2>&1)"; then
     echo "fresh_clone_submodule_init=failed"
     echo "fresh_clone_submodule_init_reason=submodule_update_failed"

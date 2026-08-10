@@ -103,6 +103,54 @@ has no clean-tree hard requirement, dirty-path count baseline, stash/reset
 transaction, or compatibility materialization route. Parent pin/root projection
 eligibility remains the separate clean-`main` contract after source publication.
 
+## Parent Stage-0 Detached-Pin Acceptance
+
+The parent index stage-0 mode-`160000` record for `vendor/agent-canon` is the
+pin authority for a parent update. `HEAD:vendor/agent-canon` is a diagnostic
+identity only; a staged parent pin may intentionally differ from the parent
+commit. A clean detached checkout is therefore accepted when its worktree
+`HEAD` equals that stage-0 object id.
+
+For the default `main` update, `plan` and `latest` use this state matrix:
+
+| State | Route | Operation |
+| --- | --- | --- |
+| detached, dirty or `HEAD !=` stage-0 pin | typed detached hold | preserve checkout; no attach |
+| detached exact pin, `main` absent/equal/strict ancestor | `submodule_detached_parent_pin` | create/switch `main`, or switch plus `merge --ff-only` |
+| detached exact pin, `main` descendant/divergent or checked out elsewhere | typed detached hold | preserve refs and worktrees |
+| remote URL, ls-remote, isolated probe object, or probe cleanup failure | typed remote/probe hold | print complete facts and return non-zero before frontier; retain failed-cleanup evidence |
+| local `origin/main` absent | attach prerequisite | retain plan readiness; attach fetches and readbacks it transactionally |
+| local `origin/main` unrelated to or ahead of selected remote | `submodule_origin_main_mismatch` | preserve refs and return non-zero before frontier |
+| attach rollback or transaction cleanup fails | typed rollback/cleanup hold plus transaction directory | no restored-state claim; preserve evidence for recovery |
+
+Remote `main` advancing by itself is not a blocker. During `plan`, the route
+resolves S1, fetches that SHA into a parent-owned disposable probe with a
+read-only alternates link to the source object database, then resolves S2. A
+descendant S2 is fetched and selected when coherent; a repeatedly changing
+remote keeps the first complete snapshot and records the race. The source
+refs, objects, `FETCH_HEAD`, and worktree are bytewise unchanged. Plan never
+fetches the source repository or writes its tracking refs.
+
+Before attachment the route repeats remote resolution and fetches `origin/main`
+immediately before branch mutation. Missing local tracking is a prerequisite;
+an unrelated or rewound tracking ref is a typed hold. Attachment is a narrow
+transaction: it captures HEAD, main/tracking refs and config, `FETCH_HEAD`,
+objects, status, and worktrees; injected upstream/readback or fetch failures
+restore those exact values with old-value guards and emit rollback evidence. A
+rollback or transaction-evidence cleanup failure is itself a typed hold: the
+transaction directory remains addressable and the route does not claim restored
+state or silently discard its evidence.
+Normal operation never uses reset, stash, force ref updates, clone fallback, or
+a second materialization heuristic. Afterward it proves clean named `main`,
+`HEAD ==` stage-0 pin, and upstream `origin/main`; only then does the existing
+materialization owner handle the update write set.
+
+Plan probe cleanup is also fail-closed. A successfully removed probe reports an
+empty probe path; a removal failure reports a typed cleanup hold and retains the
+parent-owned probe path for recovery. Complete plan output renders stage-0,
+remote, tracking, and materialization facts from their named state owners so an
+invalid gitlink record cannot shift fields into the remote section.
+
 ## Owner Namespace
 
 | Surface | Canonical location | Responsibility |
@@ -200,7 +248,7 @@ identity and ordering only; they do not rerun the owned check.
 
 | Entry | Responsibility |
 | --- | --- |
-| `tools/update_agent_canon.sh plan` | read-only route and local-state evidence, including the update materialization predicate and exact collision result |
+| `tools/update_agent_canon.sh plan` | read-only route and local-state evidence, including stage-0 detached-pin eligibility, remote/tracking readback facts, the update materialization predicate, and exact collision result |
 | `tools/update_agent_canon.sh latest` | standalone source-main rebind; in a parent, collision-safe named topic merge or accepted-frontier projection after publication |
 | `tools/update_agent_canon.sh apply` | apply the accepted projection while preserving non-colliding local paths in place |
 | `tools/update_agent_canon.sh merge-main-into-current` | merge remote main into the current named source branch under the update materialization predicate |

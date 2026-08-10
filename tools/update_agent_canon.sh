@@ -286,7 +286,7 @@ route_requires_agent_workflow() {
   local prefix_mode="$2"
 
   case "$route" in
-    submodule_detached|submodule_merge_conflict|submodule_materialization_collision|unresolved_submodule_merge_conflict)
+    submodule_detached|submodule_detached_dirty|submodule_detached_nonpin|submodule_detached_requires_main|submodule_detached_invalid_stage0_gitlink|submodule_detached_main_descendant|submodule_detached_main_divergent|submodule_detached_main_worktree_collision|submodule_remote_resolution_failed|submodule_remote_object_unavailable|submodule_origin_main_fetch_failed|submodule_origin_main_mismatch|submodule_merge_conflict|submodule_materialization_collision|unresolved_submodule_merge_conflict)
       return 0
       ;;
     deferred_branch_pr)
@@ -843,9 +843,15 @@ cmd_latest() {
     return
   fi
 
-  plan_output="$(cmd_plan "$branch")"
+  local plan_rc=0
+  plan_output="$(cmd_plan "$branch" 2>&1)" || plan_rc=$?
   printf '%s\n' "$plan_output"
   route="$(plan_value agent_canon_plan_route "$plan_output")"
+  if [ "$plan_rc" -ne 0 ]; then
+    echo "AGENT_CANON_LATEST_PLAN_RC=$plan_rc"
+    emit_agentcanon_conflict_workflow_route "plan_rc=$plan_rc;route=${route:-unknown}"
+    return "$plan_rc"
+  fi
   prefix_mode="$(plan_value agent_canon_plan_prefix_mode "$plan_output")"
   dirty_update_surface="$(plan_value agent_canon_plan_dirty_update_surface "$plan_output")"
   submodule_worktree_status="$(plan_value agent_canon_plan_submodule_worktree_status "$plan_output")"

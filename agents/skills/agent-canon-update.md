@@ -39,6 +39,20 @@ TODO state up to date.
   defined only by the [`AgentCanon parent state decision table`](../../documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table).
   The `cmd_latest` update-target branch is never a topic slug.
 
+  In a parent submodule, the stage-0 mode-`160000` gitlink is the pin authority.
+  A clean detached checkout whose `HEAD` equals that pin is an accepted
+  `main` attach candidate; local `main` absent/equal/ancestor states use only
+  create/switch or `merge --ff-only`. Dirty, non-pin, descendant/divergent,
+  topic, worktree-collision, and remote/tracking readback states remain typed
+  holds. Plan resolves remote S1/S2 through a parent-owned disposable probe
+  with source-object alternates; source refs, objects, and `FETCH_HEAD` remain
+  bytewise unchanged. Missing local `origin/main` is an attach prerequisite,
+  while unrelated or rewound tracking is a typed hold. `latest` prints the complete plan stream and returns its plan status
+  before dependency-frontier lookup, so a remote failure cannot be masked by
+  frontier handling. No reset, stash, force ref update, or clone fallback is
+  introduced by detached attachment. Attach fetch/upstream/readback failures
+  use an old-value-guarded transaction rollback with explicit rollback evidence.
+
 ## Use When
 
 - The user asks to update, latest, refresh, or sync AgentCanon.
@@ -239,6 +253,21 @@ python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh ch
   Parent state, requested topic identity, and dirty fallback next actions are
   defined only by the [`AgentCanon parent state decision table`](../../documents/rule/dependency-module-changes.md#agentcanon-parent-state-decision-table).
   `latest` の更新対象 branch 引数を topic slug に転用しません。
+  Parent submodule の stage-0 mode-`160000` gitlink が pin authority です。clean
+  detached `HEAD ==` pin は default `main` attach candidate として扱い、
+  absent/equal/ancestor の local main は create/switch または
+  `merge --ff-only` のみを許可します。dirty、non-pin、descendant/divergent、
+  topic、worktree collision、remote/tracking readback failure は typed hold
+  とし、`latest` は plan の全診断を出して同じ non-zero を frontier 前に返します。
+  plan の remote S1/S2 は parent-owned disposable probe と source object の
+  read-only alternates で取得し、source refs、objects、`FETCH_HEAD` を変更しません。
+  local `origin/main` の absent は attach prerequisite、unrelated/rewind は mismatch hold
+  です。attach の fetch/upstream/readback failure は old-value guard 付き rollback
+  と rollback evidence を伴います。rollback または transaction cleanup が失敗した
+  ときは typed hold とし、transaction directory を保持して復元済みと報告しません。
+  probe cleanup も removal 成功時だけ pass とし、失敗時は probe path/evidence を保持した
+  cleanup hold を返します。plan detail は stage-0、remote、tracking、materialization
+  の named facts を各 owner から直接出力します。
   Under that decision table, a vendor checkout owned by another topic is a
   refusal condition for this topic. Within the intended source branch, use the
   canonical update materialization predicate: dirty state remains evidence, not
