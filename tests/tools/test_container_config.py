@@ -30,7 +30,6 @@ POST_CREATE_ENTRYPOINT = PROJECT_ROOT / ".devcontainer" / "post-create-entrypoin
 GPU_ADMISSION_SELECTOR = (
     PROJECT_ROOT / ".devcontainer" / "gpu-admission" / "devcontainer.json"
 )
-ROOTLESS_SELECTOR = PROJECT_ROOT / ".devcontainer" / "rootless" / "devcontainer.json"
 GPU_ADMISSION_ORCHESTRATOR = PROJECT_ROOT / ".devcontainer" / "gpu-admission.sh"
 POST_CREATE_COMMAND = (
     "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
@@ -127,11 +126,10 @@ def write_devcontainer(root: Path) -> None:
         json.dumps(
             {
                 "name": "${localWorkspaceFolderBasename}-devcontainer",
-                "initializeCommand": "AGENT_CANON_RUNTIME_IDENTITY_MODE=project AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
+                "initializeCommand": "AGENT_CANON_RUNTIME_IDENTITY_MODE=auto AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
                 "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
                 "service": "workspace",
-                "containerUser": "project",
-                "remoteUser": "project",
+                "updateRemoteUserUID": False,
                 "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
                 "postCreateCommand": POST_CREATE_COMMAND,
                 "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
@@ -161,11 +159,6 @@ def write_devcontainer(root: Path) -> None:
         root,
         ".devcontainer/gpu-admission/devcontainer.json",
         GPU_ADMISSION_SELECTOR.read_text(encoding="utf-8"),
-    )
-    write_file(
-        root,
-        ".devcontainer/rootless/devcontainer.json",
-        ROOTLESS_SELECTOR.read_text(encoding="utf-8"),
     )
     write_file(
         root,
@@ -395,11 +388,10 @@ RUN image-install --workspace /opt/agent-canon --vendor-root /opt/agent-canon
 
 
 def test_post_create_uses_shared_lifecycle() -> None:
-    """Both selectors use the shared post-create lifecycle."""
+    """The default and explicit GPU selectors use the shared lifecycle."""
     for config_path in (
         PROJECT_ROOT / ".devcontainer" / "devcontainer.json",
         GPU_ADMISSION_SELECTOR,
-        ROOTLESS_SELECTOR,
     ):
         config = json.loads(config_path.read_text(encoding="utf-8"))
         command = config["postCreateCommand"]
@@ -506,8 +498,10 @@ def test_missing_generated_compose_is_a_required_scenario_finding(
     }
 
 
-def test_generator_scenarios_require_both_compose_outputs(tmp_path: Path) -> None:
-    """A generator that exits successfully without output fails both scenarios."""
+def test_generator_scenarios_require_default_and_gpu_compose_outputs(
+    tmp_path: Path,
+) -> None:
+    """A generator that exits successfully without output fails selected scenarios."""
     repo = write_topic_fixture(tmp_path)
     (repo / "docker/packs").mkdir(parents=True)
     generator = repo / ".devcontainer/generate-runtime-compose.sh"
@@ -559,8 +553,8 @@ def generate_gpu_admission_compose(tmp_path: Path) -> tuple[Path, Path]:
     return repo, output_path
 
 
-def test_noncanonical_remote_user_contract_is_rejected(tmp_path: Path) -> None:
-    """The devcontainer runtime identity is fixed to the canonical project user."""
+def test_default_auto_identity_rejects_static_remote_user_override(tmp_path: Path) -> None:
+    """Auto identity leaves container and remote user selection to Compose."""
     repo = write_topic_fixture(tmp_path)
     config_path = repo / ".devcontainer/devcontainer.json"
     config = json.loads(config_path.read_text(encoding="utf-8"))
@@ -570,7 +564,23 @@ def test_noncanonical_remote_user_contract_is_rejected(tmp_path: Path) -> None:
     result = run_validator(repo)
 
     assert result.returncode == 1, result.stdout + result.stderr
-    assert "remoteUser-expected:project" in result.stdout
+    assert "default-remoteUser-forbidden-auto-identity" in result.stdout
+
+
+def test_default_auto_identity_requires_update_remote_user_uid_false(
+    tmp_path: Path,
+) -> None:
+    """The CLI must not rewrite the Compose-owned numeric identity."""
+    repo = write_topic_fixture(tmp_path)
+    config_path = repo / ".devcontainer/devcontainer.json"
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config["updateRemoteUserUID"] = True
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+
+    result = run_validator(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "default-updateRemoteUserUID-expected:false" in result.stdout
 
 
 def test_legacy_topic_compose_root_is_rejected(tmp_path: Path) -> None:
@@ -624,8 +634,10 @@ def test_compose_missing_runtime_environment_is_rejected(tmp_path: Path) -> None
     assert "runtime-environment-required:AGENT_CANON_WORKSPACE_ROOT" in result.stdout
 
 
-def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
-    """The generator writes the host topic root only into generated Compose."""
+def test_auto_mode_projects_rootful_identity_and_one_topic_root_mount(
+    tmp_path: Path,
+) -> None:
+    """Auto rootful resolution writes project identity and one topic-root mount."""
     repo = tmp_path / "workspace" / "topic" / "agent-canon"
     write_devcontainer(repo)
     write_file(
@@ -653,6 +665,9 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     assert str(repo.parent.resolve()) in compose
     assert "/workspace/agent-canon" in compose
     assert 'AGENT_CANON_CODEX_SESSION_ROOT: "/home/project/.codex/sessions"' in compose
+    assert 'user: "0:0"' not in compose
+    assert 'AGENT_CANON_RUNTIME_IDENTITY_MODE: "project"' in compose
+    assert 'AGENT_CANON_CONTAINER_USER: "project"' in compose
     assert "/etc/project-template/parent-environment.sh" not in compose
     assert "/etc/project-template/zsh/.zshrc" not in compose
     assert "    tmpfs:" not in compose
@@ -676,7 +691,7 @@ def test_generator_materializes_one_topic_root_mount(tmp_path: Path) -> None:
     assert "\n      target:" not in compose
 
 
-def test_project_selector_rejects_rootless_docker_security_option(
+def test_explicit_project_mode_rejects_rootless_docker_security_option(
     tmp_path: Path,
 ) -> None:
     """The project selector fails closed when Docker reports name=rootless."""
@@ -699,20 +714,20 @@ def test_project_selector_rejects_rootless_docker_security_option(
     assert "ROOTLESS_DAEMON_REQUIRES_ROOTLESS_SELECTOR" in result.stderr
 
 
-def test_rootless_selector_projects_root_identity_without_default_mounts(
+def test_auto_mode_projects_rootless_identity_without_default_mounts(
     tmp_path: Path,
 ) -> None:
-    """The rootless selector uses uid 0 and keeps positive build ids."""
+    """Auto mode resolves a rootless daemon to uid 0 and keeps positive build ids."""
     repo = write_parent_generator_fixture(tmp_path)
     rootless_bin = write_fake_docker_probe(tmp_path / "rootless-docker", rootless=True)
-    output_path = repo / ".agent-canon/docker-compose.rootless.generated.yml"
+    output_path = repo / ".agent-canon/auto-rootless.generated.yml"
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,
         env={
             **os.environ,
             "PATH": f"{rootless_bin}:{os.environ['PATH']}",
-            "AGENT_CANON_RUNTIME_IDENTITY_MODE": "rootless-root",
+            "AGENT_CANON_RUNTIME_IDENTITY_MODE": "auto",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": str(output_path),
         },
         check=False,
@@ -746,10 +761,10 @@ def test_rootless_selector_projects_root_identity_without_default_mounts(
     )
 
 
-def test_rootless_selector_projects_selected_home_optional_mounts(
+def test_auto_mode_projects_selected_rootless_home_optional_mounts(
     tmp_path: Path,
 ) -> None:
-    """Rootless zsh and credentials profiles target /root and stay read-only."""
+    """Auto rootless resolution targets /root for selected read-only mounts."""
     repo = write_parent_generator_fixture(tmp_path)
     rootless_bin = write_fake_docker_probe(tmp_path / "rootless-docker", rootless=True)
     home = tmp_path / "credentials-home"
@@ -758,7 +773,7 @@ def test_rootless_selector_projects_selected_home_optional_mounts(
     (home / ".config" / "gh" / "hosts.yml").write_text("github.com:\n", encoding="utf-8")
     (home / ".ssh").mkdir()
     (home / ".ssh" / "known_hosts").write_text("", encoding="utf-8")
-    output_path = repo / ".agent-canon/docker-compose.rootless.generated.yml"
+    output_path = repo / ".agent-canon/auto-rootless.generated.yml"
     result = subprocess.run(
         ["bash", ".devcontainer/generate-runtime-compose.sh"],
         cwd=repo,
@@ -767,7 +782,7 @@ def test_rootless_selector_projects_selected_home_optional_mounts(
             "PATH": f"{rootless_bin}:{os.environ['PATH']}",
             "HOME": str(home),
             "AGENT_CANON_OPTIONAL_MOUNTS": "host-zshrc,host-credentials",
-            "AGENT_CANON_RUNTIME_IDENTITY_MODE": "rootless-root",
+            "AGENT_CANON_RUNTIME_IDENTITY_MODE": "auto",
             "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": str(output_path),
         },
         check=False,
@@ -798,21 +813,25 @@ def test_rootless_selector_projects_selected_home_optional_mounts(
     )
 
 
-def test_rootless_selector_validator_rejects_project_remote_user(tmp_path: Path) -> None:
-    """The static checker rejects a rootless selector that silently becomes project."""
-    repo = write_topic_fixture(tmp_path)
-    config_path = repo / ".devcontainer/rootless/devcontainer.json"
-    config = json.loads(config_path.read_text(encoding="utf-8"))
-    config["remoteUser"] = "project"
-    config_path.write_text(json.dumps(config), encoding="utf-8")
-
-    findings = load_container_config_module().validate_devcontainer(repo)
-
-    assert any(
-        finding.path == ".devcontainer/rootless/devcontainer.json"
-        and finding.detail == "remoteUser-expected:root"
-        for finding in findings
+def test_explicit_rootless_mode_rejects_rootful_docker_security_option(
+    tmp_path: Path,
+) -> None:
+    """The explicit rootless mode fails closed when Docker is rootful."""
+    repo = write_parent_generator_fixture(tmp_path)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "AGENT_CANON_RUNTIME_IDENTITY_MODE": "rootless-root",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
     )
+
+    assert result.returncode == 1
+    assert "ROOTLESS_SELECTOR_REQUIRES_ROOTLESS_DAEMON" in result.stderr
 
 
 def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(

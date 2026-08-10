@@ -29,12 +29,10 @@ Standalone AgentCanon may retain and validate its own regular `.vscode` source
 files; that standalone source ownership is separate from any parent `.vscode`
 directory, which remains parent-owned regular content.
 Standalone AgentCanon's `.devcontainer/` is likewise source-owned environment
-content and is not projected into a parent root. It contains an explicit rootful
-`project` selector and `.devcontainer/rootless/devcontainer.json` for a Docker
-daemon whose official `SecurityOptions` contains `name=rootless`. The rootless
-selector uses `.agent-canon/docker-compose.rootless.generated.yml`, runtime uid
-`0:0`, `HOME=/root`, and the rootless identity marker; optional host credentials
-and zsh mounts target selected runtime `HOME` only when explicitly selected.
+content and is not projected into a parent root. Its default selector asks the
+generator to inspect Docker's official `SecurityOptions` and auto-resolves
+rootful `project` or rootless `0:0` identity. Optional host credentials and zsh
+mounts target the resolved runtime `HOME` only when explicitly selected.
 
 ## Reader Map
 
