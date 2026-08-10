@@ -3,7 +3,6 @@
 # contract environment
 # responsibility Renders shared devcontainer compose from repo-local Docker pack and the host process identity.
 # upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md devcontainer boundary
-# upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract
 # upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell boundary
 # upstream implementation ../tools/agent_tools/dependency_module_change.py topic clone lifecycle tool
 # upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
@@ -447,12 +446,8 @@ if [[ "$runtime_shell" != /* || "$runtime_shell" == *[!A-Za-z0-9._/-]* ]]; then
   exit 1
 fi
 
-workspace_mount_source="$workspace_root"
-workspace_mount_target="/workspace"
-if [ "$workspace_layout" = "direct-repo" ]; then
-  workspace_mount_source="$repo_root"
-  workspace_mount_target="$container_repo_root"
-fi
+workspace_mount_source="$repo_root"
+workspace_mount_target="$container_repo_root"
 workspace_mount_source_yaml="$(python3 -c 'import json, sys; print(json.dumps(sys.argv[1]))' "$workspace_mount_source")"
 volume_lines=(
   "      - type: bind"

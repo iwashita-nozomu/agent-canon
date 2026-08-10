@@ -1288,60 +1288,31 @@ def validate_generated_compose(
             )
         )
 
-    workspace_mounts: list[tuple[str | None, str | None]] = []
+    repository_mounts = [
+        raw_volume for raw_volume in volumes if volume_fields(raw_volume)[1] == repo_target
+    ]
+    if len(repository_mounts) != 1:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                relative,
+                f"repository-mount-count:{len(repository_mounts)}",
+            )
+        )
+    elif source_path(volume_fields(repository_mounts[0])[0]) != root:
+        findings.append(
+            Finding("dependency_contract_violation", relative, "repository-mount-source")
+        )
     for raw_volume in volumes:
         source, target = volume_fields(raw_volume)
-        if target == "/workspace":
-            workspace_mounts.append((source, target))
-    if expected_workspace_layout == "managed-topic":
-        if len(workspace_mounts) != 1:
+        if source_path(source) == topic_root or target == "/workspace":
             findings.append(
                 Finding(
                     "dependency_contract_violation",
                     relative,
-                    f"workspace-mount-count:{len(workspace_mounts)}",
+                    "workspace-scope-leak",
                 )
             )
-        elif source_path(workspace_mounts[0][0]) != topic_root:
-            findings.append(
-                Finding("dependency_contract_violation", relative, "workspace-source")
-            )
-        for raw_volume in volumes:
-            source, target = volume_fields(raw_volume)
-            if source_path(source) == root or target == repo_target:
-                findings.append(
-                    Finding(
-                        "dependency_contract_violation", relative, "repository-double-mount"
-                    )
-                )
-    elif expected_workspace_layout == "direct-repo":
-        direct_mounts = [
-            raw_volume
-            for raw_volume in volumes
-            if volume_fields(raw_volume)[1] == repo_target
-        ]
-        if len(direct_mounts) != 1:
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    relative,
-                    f"direct-repo-mount-count:{len(direct_mounts)}",
-                )
-            )
-        elif source_path(volume_fields(direct_mounts[0])[0]) != root:
-            findings.append(
-                Finding("dependency_contract_violation", relative, "direct-repo-source")
-            )
-        for raw_volume in volumes:
-            source, target = volume_fields(raw_volume)
-            if source_path(source) == topic_root or target == "/workspace":
-                findings.append(
-                    Finding(
-                        "dependency_contract_violation",
-                        relative,
-                        "direct-repo-workspace-leak",
-                    )
-                )
     expected_shell = pack.shell if pack is not None else "/bin/bash"
     if service.get("command") != f'{expected_shell} -lc "sleep infinity"':
         findings.append(
@@ -1739,7 +1710,7 @@ def validate_generated_compose(
                         "docker-host-mount-must-be-read-write",
                     )
                 )
-    allowed_targets = {"/workspace", repo_target}
+    allowed_targets = {repo_target}
     if "host-zshrc" in optional_tokens:
         allowed_targets.add(f"{home_target}/.zshrc")
         allowed_targets.add(f"{home_target}/.zsh")
@@ -1781,12 +1752,8 @@ def validate_generated_compose(
         "AGENT_CANON_WORKSPACE_LAYOUT": expected_workspace_layout or "<invalid>",
         "AGENT_CANON_WORKSPACE_ROOT": "/workspace",
         "AGENT_CANON_REPOSITORY_ROOT": repo_target,
-        "DEPENDENCY_MODULE_CONTAINER_SOURCE": str(
-            root if expected_workspace_layout == "direct-repo" else topic_root
-        ),
-        "DEPENDENCY_MODULE_CONTAINER_TARGET": (
-            repo_target if expected_workspace_layout == "direct-repo" else "/workspace"
-        ),
+        "DEPENDENCY_MODULE_CONTAINER_SOURCE": str(root),
+        "DEPENDENCY_MODULE_CONTAINER_TARGET": repo_target,
         "AGENT_CANON_RUNTIME_ROUTE": (
             "MANAGED_CONTAINER" if profile == "gpu-admission" else "CONTAINER_LOCAL"
         ),

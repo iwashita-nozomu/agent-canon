@@ -2,12 +2,11 @@
 
 # @dependency-start
 # contract test
-# responsibility Verifies topic-root Compose mounts, selected repo paths, and retired VS Code projections.
-# upstream design ../../documents/rule/dependency-module-changes.md topic-root mount policy
+# responsibility Verifies exact-repository Compose mounts, selected repo paths, and retired VS Code projections.
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell contract
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission selector and scenario validation
 # upstream implementation ../../tools/ci/container_config.py semantic devcontainer checker
-# upstream implementation ../../.devcontainer/devcontainer.json selects the topic-root Compose generator
+# upstream implementation ../../.devcontainer/devcontainer.json selects the exact-repository Compose generator
 # @dependency-end
 
 from __future__ import annotations
@@ -181,8 +180,8 @@ def write_compose(
     volumes: list[dict[str, str]] = [
         {
             "type": "bind",
-            "source": str(root.resolve() if direct_repo else topic_root),
-            "target": repo_target if direct_repo else "/workspace",
+            "source": str(root.resolve()),
+            "target": repo_target,
         },
     ]
     if duplicate_repo_mount:
@@ -203,8 +202,8 @@ def write_compose(
             "      DEVCONTAINER_GPU_MODE: disabled",
             "      AGENT_CANON_WORKSPACE_ROOT: /workspace",
             f"      AGENT_CANON_REPOSITORY_ROOT: {repo_target}",
-            f"      DEPENDENCY_MODULE_CONTAINER_SOURCE: {json.dumps(str(root.resolve() if direct_repo else topic_root))}",
-            f"      DEPENDENCY_MODULE_CONTAINER_TARGET: {json.dumps(repo_target if direct_repo else '/workspace')}",
+            f"      DEPENDENCY_MODULE_CONTAINER_SOURCE: {json.dumps(str(root.resolve()))}",
+            f"      DEPENDENCY_MODULE_CONTAINER_TARGET: {json.dumps(repo_target)}",
         ]
         if include_runtime_environment
         else []
@@ -292,7 +291,7 @@ def load_container_config_module():
 
 
 def test_topic_compose_semantics_pass(tmp_path: Path) -> None:
-    """A topic-root mount exposes the selected repository one level below it."""
+    """A managed-topic checkout exposes only its selected repository."""
     repo = write_topic_fixture(tmp_path)
 
     result = run_validator(repo)
@@ -615,13 +614,31 @@ def test_noncanonical_checkout_compose_root_is_direct_repo(tmp_path: Path) -> No
 
 
 def test_compose_repo_double_mount_is_rejected(tmp_path: Path) -> None:
-    """The selected repository is not mounted a second time below /workspace."""
+    """The selected repository has exactly one mount below /workspace."""
     repo = write_topic_fixture(tmp_path, duplicate_repo_mount=True)
 
     result = run_validator(repo)
 
     assert result.returncode == 1, result.stdout + result.stderr
-    assert "repository-double-mount" in result.stdout
+    assert "repository-mount-count:2" in result.stdout
+
+
+def test_compose_topic_root_mount_is_rejected(tmp_path: Path) -> None:
+    """A managed topic never exposes its topic root or sibling repositories."""
+    repo = write_topic_fixture(tmp_path)
+    compose_path = repo / ".devcontainer/docker-compose.generated.yml"
+    compose = compose_path.read_text(encoding="utf-8")
+    compose = compose.replace(
+        json.dumps(str(repo.resolve())), json.dumps(str(repo.parent.resolve())), 1
+    ).replace(
+        json.dumps(f"/workspace/{repo.name}"), json.dumps("/workspace"), 1
+    )
+    compose_path.write_text(compose, encoding="utf-8")
+
+    result = run_validator(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "workspace-scope-leak" in result.stdout
 
 
 def test_compose_missing_runtime_environment_is_rejected(tmp_path: Path) -> None:
@@ -634,10 +651,10 @@ def test_compose_missing_runtime_environment_is_rejected(tmp_path: Path) -> None
     assert "runtime-environment-required:AGENT_CANON_WORKSPACE_ROOT" in result.stdout
 
 
-def test_auto_mode_projects_rootful_identity_and_one_topic_root_mount(
+def test_auto_mode_projects_rootful_identity_and_exact_repository_mount(
     tmp_path: Path,
 ) -> None:
-    """Auto rootful resolution writes project identity and one topic-root mount."""
+    """Auto rootful resolution writes project identity and one exact repo mount."""
     repo = tmp_path / "workspace" / "topic" / "agent-canon"
     write_devcontainer(repo)
     write_file(
@@ -661,9 +678,9 @@ def test_auto_mode_projects_rootful_identity_and_one_topic_root_mount(
     compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(
         encoding="utf-8"
     )
-    assert compose.count('target: "/workspace"') == 1
-    assert str(repo.parent.resolve()) in compose
-    assert "/workspace/agent-canon" in compose
+    assert compose.count('target: "/workspace/agent-canon"') == 1
+    assert f'source: "{repo.resolve()}"' in compose
+    assert f'source: "{repo.parent.resolve()}"' not in compose
     assert 'AGENT_CANON_CODEX_SESSION_ROOT: "/home/project/.codex/sessions"' in compose
     assert 'user: "0:0"' not in compose
     assert 'AGENT_CANON_RUNTIME_IDENTITY_MODE: "project"' in compose
@@ -680,7 +697,7 @@ def test_auto_mode_projects_rootful_identity_and_one_topic_root_mount(
     assert 'PROJECT_GID: "' in compose
     assert 'DEVCONTAINER_GPU_MODE: "disabled"' in compose
     assert 'DEPENDENCY_MODULE_CONTAINER_SOURCE:' in compose
-    assert 'DEPENDENCY_MODULE_CONTAINER_TARGET: "/workspace"' in compose
+    assert 'DEPENDENCY_MODULE_CONTAINER_TARGET: "/workspace/agent-canon"' in compose
     assert "DEVCONTAINER_GPU_REQUEST" not in compose
     assert "AGENT_CANON_RUNTIME_GID" not in compose
     assert "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS" not in compose
@@ -1289,9 +1306,9 @@ def test_generator_treats_workspace_topic_slug_as_managed(tmp_path: Path) -> Non
         encoding="utf-8"
     )
     assert 'AGENT_CANON_WORKSPACE_LAYOUT: "managed-topic"' in compose
-    assert f'source: "{repo.parent.resolve()}"' in compose
-    assert 'target: "/workspace"' in compose
-    assert 'target: "/workspace/agent-canon"' not in compose
+    assert f'source: "{repo.resolve()}"' in compose
+    assert f'source: "{repo.parent.resolve()}"' not in compose
+    assert 'target: "/workspace/agent-canon"' in compose
     assert load_container_config_module().validate_generated_compose(repo, None) == []
 
 
@@ -1337,14 +1354,9 @@ def test_generator_classifies_checkout_layouts(
         encoding="utf-8"
     )
     assert f'AGENT_CANON_WORKSPACE_LAYOUT: "{expected_layout}"' in compose
-    if expected_layout == "managed-topic":
-        assert f'source: "{repo.parent.resolve()}"' in compose
-        assert 'target: "/workspace"' in compose
-        assert f'source: "{repo.resolve()}"' not in compose
-    else:
-        assert f'source: "{repo.resolve()}"' in compose
-        assert f'target: "/workspace/{repo.name}"' in compose
-        assert f'source: "{repo.parent.resolve()}"' not in compose
+    assert f'source: "{repo.resolve()}"' in compose
+    assert f'target: "/workspace/{repo.name}"' in compose
+    assert f'source: "{repo.parent.resolve()}"' not in compose
     assert compose.count("type: bind") == 1
     assert load_container_config_module().validate_generated_compose(repo, None) == []
 
@@ -1417,9 +1429,9 @@ def test_generator_accepts_explicit_output_path(tmp_path: Path) -> None:
     default_output = repo / ".devcontainer/docker-compose.generated.yml"
     assert not default_output.exists()
     compose = output_path.read_text(encoding="utf-8")
-    assert compose.count('target: "/workspace"') == 1
-    assert str(repo.parent.resolve()) in compose
-    assert "/workspace/agent-canon" in compose
+    assert compose.count('target: "/workspace/agent-canon"') == 1
+    assert f'source: "{repo.resolve()}"' in compose
+    assert f'source: "{repo.parent.resolve()}"' not in compose
 
     relative_output = ".devcontainer/custom-compose-relative.generated.yml"
     result = subprocess.run(
@@ -1441,7 +1453,7 @@ def test_generator_accepts_explicit_output_path(tmp_path: Path) -> None:
         "relative compose output path must resolve from repo root"
     )
     relative_compose = relative_path.read_text(encoding="utf-8")
-    assert relative_compose.count('target: "/workspace"') == 1
+    assert relative_compose.count('target: "/workspace/agent-canon"') == 1
 
 
 def test_generator_rejects_legacy_topic_root_as_direct_repo(tmp_path: Path) -> None:

@@ -179,12 +179,13 @@ post-attach / Compose generator の有無と内容は親の environment contract
 └── <module-basename>/
 ```
 
-devcontainer は topic root を `/workspace` に一度だけ mount します。親レポと
-依存 clone を個別に mount したり、別 topic の clone を runtime に混ぜたり
-しません。作業完了後、再現に不要な clone は削除対象ですが、未統合 commit や
-ユーザー所有差分がある clone は保持してから判断します。
+topic root は clone の filesystem / lifecycle 境界です。devcontainer は選択した
+repository root 一つだけを `/workspace/<basename>` に mount し、topic root、親レポ、
+依存 clone、別 topic の clone を runtime に混ぜません。作業完了後、再現に不要な
+clone は削除対象ですが、未統合 commit やユーザー所有差分がある clone は保持してから
+判断します。
 
-### Direct-repo exception
+### Direct-repo layout
 
 依存 module の topic lifecycle 外にある既存 checkout（例:
 `~/workspace/data_download`）は `direct-repo` layout として起動できます。この場合、
@@ -193,12 +194,12 @@ devcontainer は exact repository root だけを `/workspace/<basename>` に bin
 では dependency-module topic marker/status guard を要求・実行しませんが、managed-topic
 の guard を弱める経路にはなりません。
 
-generator は `AGENT_CANON_WORKSPACE_LAYOUT=direct-repo` を出力し、post-attach は
-`DEPENDENCY_MODULE_CONTAINER_LAYOUT=direct-repo`、
+generator は source path に応じた `AGENT_CANON_WORKSPACE_LAYOUT` を出力し、
+post-attach は同じ `DEPENDENCY_MODULE_CONTAINER_LAYOUT`、
 `DEPENDENCY_MODULE_CONTAINER_SOURCE`、`DEPENDENCY_MODULE_CONTAINER_TARGET` を
-readback します。direct path の acceptance command は
-`devcontainer up --workspace-folder .` です。managed-topic は従来どおり topic root
-bind と marker/status guard を使います。
+readback します。両 layout の acceptance command は
+`devcontainer up --workspace-folder .` です。managed-topic も exact repository bind を
+使い、topic marker/status guard だけを追加で実行します。
 
 ## 構造確認
 

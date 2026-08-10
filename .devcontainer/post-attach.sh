@@ -3,7 +3,6 @@
 # contract environment
 # responsibility Reports default devcontainer attach status.
 # upstream design ../documents/contracts/github-first-module-and-devcontainer-policy.md devcontainer boundary
-# upstream design ../documents/rule/dependency-module-changes.md topic-root source visibility contract
 # upstream design ../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
 # upstream environment devcontainer.json postAttachCommand entrypoint
 # @dependency-end
@@ -117,10 +116,7 @@ check_dependency_module_runtime() {
     echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-target-readback-missing" >&2
     return 1
   }
-  expected_target="/workspace"
-  if [ "$workspace_layout" = "direct-repo" ]; then
-    expected_target="$repo_root"
-  fi
+  expected_target="$repo_root"
   [ "$workspace_target" = "$expected_target" ] || {
     echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-target-readback-mismatch:${workspace_target}:${expected_target}" >&2
     return 1

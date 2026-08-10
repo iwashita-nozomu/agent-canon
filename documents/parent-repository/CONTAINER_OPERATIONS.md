@@ -36,8 +36,9 @@ dependency receipt は親の実行状態であり、追跡対象にしません�
 
 ## host mount inventory と zsh startup
 
-default Composeのrequired host bindはworkspace repository topic-rootから`/workspace`
-への一つだけです。GPU device/driver runtime passthroughはhost GPUが利用可能な
+default Compose の required host bind は exact repository root から
+`/workspace/<basename>` への一つだけです。topic root、parent workspace、sibling
+repository は mount しません。GPU device/driver runtime passthroughはhost GPUが利用可能な
 場合のruntime capabilityで、imageへdriverを入れません。
 
 host `${HOME}/.zshrc` と `${HOME}/.zsh` は optional user-customizationです。

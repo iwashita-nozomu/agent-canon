@@ -19,7 +19,7 @@ downstream implementation ../../tools/agent_tools/repo_structure_contract.py str
 
 - [命名規約](naming.md): filename、identifier、artifact、運用名の決め方。
 - [ディレクトリ構成規約](directory-structure.md): 文書の配置、分割、正本境界の決め方。
-- [依存モジュール変更規約](dependency-module-changes.md): `.gitmodules`、独立 source clone、vendor pin projection、topic root mount、cleanup の共通契約。
+- [依存モジュール変更規約](dependency-module-changes.md): `.gitmodules`、独立 source clone、vendor pin projection、topic lifecycle、cleanup の共通契約。
 - [設計正本の入口](../design/README.md): target state と実装境界を固定する設計文書。
 
 ## 所有境界
