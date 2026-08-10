@@ -143,7 +143,7 @@ def load_profiles(path_like: str) -> tuple[ProfileDefaults, list[CodexProfile]]:
         container_home_root=parse_string(
             defaults_data,
             "container_home_root",
-            "/workspace/.state/nested-codex",
+            "/workspace/workspace/.nested-codex",
             source,
         ),
         use_host_user=parse_bool(defaults_data, "use_host_user", True, source),
@@ -152,7 +152,7 @@ def load_profiles(path_like: str) -> tuple[ProfileDefaults, list[CodexProfile]]:
             defaults_data, "mount_host_gitconfig", True, source
         ),
         mount_host_git_credentials=parse_bool(
-            defaults_data, "mount_host_git_credentials", True, source
+            defaults_data, "mount_host_git_credentials", False, source
         ),
         mount_host_ssh_dir=parse_bool(
             defaults_data, "mount_host_ssh_dir", False, source
@@ -279,7 +279,6 @@ def host_to_container_home(
         )
     relative_home = container_home.removeprefix(container_workspace).lstrip("/")
     host_home = (workspace_root / relative_home).resolve()
-    host_home.mkdir(parents=True, exist_ok=True)
     return host_home, container_home
 
 

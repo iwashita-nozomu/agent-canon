@@ -119,7 +119,9 @@ owning parent files. A template or derived parent keeps its own regular
 The project may expose only `docker/Dockerfile`; optional `docker/packs/*.toml`
 and Python execution rules remain project-owned overrides. AgentCanon-owned
 nested-Codex defaults resolve from `tools/ci/codex-container-profiles.toml`, while
-an explicit parent `--profiles` path remains an optional override.
+an explicit parent `--profiles` path remains an optional override. The default
+nested-Codex HOME maps to the required ignored parent `workspace/` boundary,
+and host `.git-credentials` is not projected unless an explicit profile enables it.
 
 When AgentCanon itself is opened as a standalone source checkout and no
 `docker/packs/default.toml` exists, the generator builds the source-owned

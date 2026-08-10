@@ -21,7 +21,9 @@ AgentCanon は mounted developer/agent tool と共有 runtime の source を所�
 - 親の `docker/Dockerfile` と workspace Python dependency は親の product image
   contract です。runtime pack と Python execution rules は親が必要な場合だけ所有する
   optional override であり、AgentCanon の nested-Codex 既定 profile は
-  `vendor/agent-canon/tools/ci/codex-container-profiles.toml` が所有します。
+  `vendor/agent-canon/tools/ci/codex-container-profiles.toml` が所有します。既定 HOME は
+  Git 管理外の `workspace/.nested-codex/<profile>` に置き、host `.git-credentials` は
+  明示 profile override がある場合だけ投影します。
 - `.devcontainer/parent-environment.sh` と
   `.devcontainer/parent-environment.toml` は legacy evidence として残っていても
   よいが、devcontainer create、shell startup、runtime/tool availabilityの入力に

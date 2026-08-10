@@ -341,7 +341,12 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
   recorded and later certified by `EnvironmentCertificate`, not by a second
   environment policy surface.
 - Nested Codex uses container-local state under the selected workspace runtime
-  home for Codex session semantics, and the runner sets the profile-scoped
+  home for Codex session semantics. The default resolves to
+  `/workspace/workspace/.nested-codex/<profile>`, which maps to the parent-owned
+  ignored `workspace/` boundary required by
+  `documents/rule/repository-topic-clone.md`; it does not persist secrets in the
+  tracked tree. Host `.git-credentials` projection is disabled by default and
+  requires an explicit profile override. The runner sets the profile-scoped
   `XDG_STATE_HOME=/tmp/agent-canon-xdg-state/<profile>` outside the workspace.
   The runner
   rejects pack/profile/CLI forwarding of the owned `HOME`, `XDG_STATE_HOME`, and

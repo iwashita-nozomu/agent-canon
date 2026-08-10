@@ -6,11 +6,11 @@
 # @dependency-end
 
 [defaults]
-container_home_root = "/workspace/.state/nested-codex"
+container_home_root = "/workspace/workspace/.nested-codex"
 use_host_user = true
 tty = true
 mount_host_gitconfig = true
-mount_host_git_credentials = true
+mount_host_git_credentials = false
 mount_host_ssh_dir = false
 forward_ssh_auth_sock = true
 forward_env = ["OPENAI_API_KEY", "OPENAI_BASE_URL", "GH_TOKEN", "GITHUB_TOKEN"]
