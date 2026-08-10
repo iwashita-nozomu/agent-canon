@@ -116,10 +116,10 @@ The standalone AgentCanon devcontainer source owns:
 The standalone source consumes repo-local Docker runtime contracts instead of
 owning parent files. A template or derived parent keeps its own regular
 `.devcontainer/` contract and may invoke source entrypoints through the resolver.
-The standalone source reads `docker/packs/default.toml`, builds the repo-local
-`docker/Dockerfile`, forwards the typed pack runtime environment into the generated
-Compose service, and installs only explicitly selected `pyproject.toml` extras
-after the workspace is mounted.
+The project may expose only `docker/Dockerfile`; optional `docker/packs/*.toml`
+and Python execution rules remain project-owned overrides. AgentCanon-owned
+nested-Codex defaults resolve from `tools/ci/codex-container-profiles.toml`, while
+an explicit parent `--profiles` path remains an optional override.
 
 When AgentCanon itself is opened as a standalone source checkout and no
 `docker/packs/default.toml` exists, the generator builds the source-owned

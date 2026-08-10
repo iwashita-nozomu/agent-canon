@@ -51,13 +51,17 @@ class CodexProfile:
     """One runtime profile for nested Codex."""
 
     name: str
-    pack: str
+    pack: str | None
     description: str
 
 
 NESTED_XDG_STATE_ROOT = "/tmp/agent-canon-xdg-state"
 NESTED_RUNTIME_OWNED_ENV = frozenset(
     {"HOME", "XDG_STATE_HOME", "AGENT_CANON_CONTAINER_USER"}
+)
+AGENT_CANON_SOURCE_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_PROFILES_PATH = (
+    AGENT_CANON_SOURCE_ROOT / "tools/ci/codex-container-profiles.toml"
 )
 
 
@@ -95,82 +99,92 @@ def validate_nested_owned_environment(
                 )
 
 
-def parse_bool(data: dict[str, object], key: str, default: bool) -> bool:
+def parse_bool(
+    data: dict[str, object], key: str, default: bool, source: Path
+) -> bool:
     """Extract a boolean option with a default."""
     value = data.get(key, default)
     if not isinstance(value, bool):
-        raise ValueError(
-            f"docker/codex-container-profiles.toml: {key} must be a boolean"
-        )
+        raise ValueError(f"{source}: {key} must be a boolean")
     return value
 
 
-def parse_string(data: dict[str, object], key: str, default: str) -> str:
+def parse_string(
+    data: dict[str, object], key: str, default: str, source: Path
+) -> str:
     """Extract a string option with a default."""
     value = data.get(key, default)
     if not isinstance(value, str):
-        raise ValueError(
-            f"docker/codex-container-profiles.toml: {key} must be a string"
-        )
+        raise ValueError(f"{source}: {key} must be a string")
     return value
 
 
-def parse_string_list(data: dict[str, object], key: str) -> tuple[str, ...]:
+def parse_string_list(
+    data: dict[str, object], key: str, source: Path
+) -> tuple[str, ...]:
     """Extract a list of strings."""
     value = data.get(key, [])
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
-        raise ValueError(
-            f"docker/codex-container-profiles.toml: {key} must be a list of strings"
-        )
+        raise ValueError(f"{source}: {key} must be a list of strings")
     return tuple(value)
 
 
 def load_profiles(path_like: str) -> tuple[ProfileDefaults, list[CodexProfile]]:
     """Load nested Codex profile definitions."""
+    source = workspace_path(path_like)
     data = load_toml(path_like)
     defaults_data = data.get("defaults", {})
     if not isinstance(defaults_data, dict):
         raise ValueError(
-            "docker/codex-container-profiles.toml: [defaults] must be a table"
+            f"{source}: [defaults] must be a table"
         )
 
     defaults = ProfileDefaults(
         container_home_root=parse_string(
-            defaults_data, "container_home_root", "/workspace/.state/nested-codex"
+            defaults_data,
+            "container_home_root",
+            "/workspace/.state/nested-codex",
+            source,
         ),
-        use_host_user=parse_bool(defaults_data, "use_host_user", True),
-        tty=parse_bool(defaults_data, "tty", True),
-        mount_host_gitconfig=parse_bool(defaults_data, "mount_host_gitconfig", True),
+        use_host_user=parse_bool(defaults_data, "use_host_user", True, source),
+        tty=parse_bool(defaults_data, "tty", True, source),
+        mount_host_gitconfig=parse_bool(
+            defaults_data, "mount_host_gitconfig", True, source
+        ),
         mount_host_git_credentials=parse_bool(
-            defaults_data, "mount_host_git_credentials", True
+            defaults_data, "mount_host_git_credentials", True, source
         ),
-        mount_host_ssh_dir=parse_bool(defaults_data, "mount_host_ssh_dir", False),
-        forward_ssh_auth_sock=parse_bool(defaults_data, "forward_ssh_auth_sock", True),
-        forward_env=parse_string_list(defaults_data, "forward_env"),
+        mount_host_ssh_dir=parse_bool(
+            defaults_data, "mount_host_ssh_dir", False, source
+        ),
+        forward_ssh_auth_sock=parse_bool(
+            defaults_data, "forward_ssh_auth_sock", True, source
+        ),
+        forward_env=parse_string_list(defaults_data, "forward_env", source),
     )
 
     raw_profiles = data.get("profile", [])
     if not isinstance(raw_profiles, list):
         raise ValueError(
-            "docker/codex-container-profiles.toml: [[profile]] must be a list"
+            f"{source}: [[profile]] must be a list"
         )
 
     profiles: list[CodexProfile] = []
     for raw_profile in raw_profiles:
         if not isinstance(raw_profile, dict):
             raise ValueError(
-                "docker/codex-container-profiles.toml: each profile must be a table"
+                f"{source}: each profile must be a table"
             )
         name = raw_profile.get("name")
         pack = raw_profile.get("pack")
         description = raw_profile.get("description", "")
         if (
             not isinstance(name, str)
-            or not isinstance(pack, str)
+            or (pack is not None and not isinstance(pack, str))
             or not isinstance(description, str)
         ):
             raise ValueError(
-                "docker/codex-container-profiles.toml: invalid profile entry"
+                f"{source}: invalid profile entry"
             )
         profiles.append(CodexProfile(name=name, pack=pack, description=description))
     return defaults, profiles
@@ -183,8 +197,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--profiles",
-        default="docker/codex-container-profiles.toml",
-        help="Profile TOML file. Default: docker/codex-container-profiles.toml",
+        default=str(DEFAULT_PROFILES_PATH),
+        help=f"Profile TOML file. Default: {DEFAULT_PROFILES_PATH}",
     )
     parser.add_argument(
         "--profile", default="default", help="Profile name. Default: default"

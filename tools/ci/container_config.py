@@ -2093,22 +2093,16 @@ def validate(root: Path) -> ValidationReport:
     findings: list[Finding] = []
     checked: list[str] = []
     packs: list[PackConfig] = []
+    parent_layout = (root / "vendor" / "agent-canon").is_dir()
     if docker_dir.exists():
-        checked.extend(
-            (
-                ".dockerignore",
-                "docker/Dockerfile",
-                "docker/packs",
-            )
-        )
+        checked.extend((".dockerignore", "docker/Dockerfile"))
         findings.extend(validate_dockerignore(root))
         findings.extend(validate_dockerfile(root))
         packs_dir = docker_dir / "packs"
-        if not packs_dir.is_dir():
-            findings.append(Finding("missing_file", "docker/packs", "missing"))
-        else:
+        if packs_dir.is_dir():
+            checked.append("docker/packs")
             pack_paths = sorted(packs_dir.glob("*.toml"))
-            if not pack_paths:
+            if not pack_paths and not parent_layout:
                 findings.append(
                     Finding("missing_file", "docker/packs", "no-pack-files")
                 )
@@ -2117,13 +2111,15 @@ def validate(root: Path) -> ValidationReport:
                 findings.extend(pack_findings)
                 if pack is not None:
                     packs.append(pack)
+        elif not parent_layout:
+            checked.append("docker/packs")
+            findings.append(Finding("missing_file", "docker/packs", "missing"))
 
     default_pack = next(
         (pack for pack in packs if pack.path == "docker/packs/default.toml"), None
     )
     if devcontainer_dir.exists():
         checked.append(".devcontainer")
-        parent_layout = (root / "vendor" / "agent-canon").is_dir()
         findings.extend(validate_devcontainer(root))
         if (
             is_standalone_source(root)

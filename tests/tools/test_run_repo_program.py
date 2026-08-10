@@ -99,12 +99,12 @@ def write_pack(
 
 
 def test_print_only_python_file_uses_default_workspace_mount_and_workdir() -> None:
-    """The default pack mount remains the program path and workdir default."""
+    """Direct Dockerfile defaults provide the program mount and workdir."""
     result = run_cli("--print-only", GENERIC_PYTHON_FIXTURE)
 
     assert result.returncode == 0, result.stderr
     assert f"python3 /workspace/{GENERIC_PYTHON_FIXTURE}" in result.stdout
-    assert "-w /workspace cuda_cpp_dev:default-runtime-pack" in result.stdout
+    assert "-w /workspace cpp_dev:agent-canon" in result.stdout
 
 
 def test_print_only_python_file_uses_custom_workspace_mount_as_workdir(

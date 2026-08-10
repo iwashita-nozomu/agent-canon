@@ -23,7 +23,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "run_codex_in_repo_container.py"
 sys.path.insert(0, str(SCRIPT.parent))
 
-from run_codex_in_repo_container import build_nested_codex_script  # noqa: E402
+from run_codex_in_repo_container import (  # noqa: E402
+    DEFAULT_PROFILES_PATH,
+    build_nested_codex_script,
+    build_parser,
+    load_profiles,
+)
 
 
 def run_cli(
@@ -38,6 +43,20 @@ def run_cli(
         text=True,
         env={**os.environ, **(env or {})},
     )
+
+
+def test_default_profiles_are_agent_canon_owned_and_packless() -> None:
+    """The default profile resolves from AgentCanon and needs no parent TOML."""
+    args = build_parser().parse_args(["--list-profiles"])
+    _, profiles = load_profiles(args.profiles)
+
+    assert Path(args.profiles) == DEFAULT_PROFILES_PATH
+    assert DEFAULT_PROFILES_PATH == (
+        PROJECT_ROOT / "tools/ci/codex-container-profiles.toml"
+    )
+    assert [(profile.name, profile.pack) for profile in profiles] == [
+        ("default", None)
+    ]
 
 
 def write_nested_profile_fixture(

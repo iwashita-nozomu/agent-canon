@@ -33,7 +33,7 @@ from run_python_in_dockerfile import PythonExecutionRule, load_rules, resolve_ru
 class ProgramResolution:
     """Describe how one program should run in the container."""
 
-    pack_path: str
+    pack_path: str | None
     command: list[str]
     workdir: str | None
 
@@ -53,8 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--rules",
-        default="docker/python-execution-rules.toml",
-        help="Python execution rule file. Default: docker/python-execution-rules.toml",
+        help="Optional project-owned Python execution rule file.",
     )
     parser.add_argument("--pack", help="Pack override. Skip rule resolution when set.")
     parser.add_argument(
@@ -137,7 +136,7 @@ def workspace_container_path(workspace_mount: str, relative_program: str) -> str
 def resolve_program(
     *,
     dockerfile: str,
-    rules_path: str,
+    rules_path: str | None,
     pack_override: str | None,
     program: str,
     program_args: list[str],
@@ -151,7 +150,7 @@ def resolve_program(
     resolved_rule: PythonExecutionRule | None = None
 
     if program_candidate.exists() and program_candidate.is_file():
-        if program_candidate.suffix == ".py":
+        if program_candidate.suffix == ".py" and rules_path is not None:
             _, rules = load_rules(rules_path)
             resolved_rule = resolve_rule(
                 dockerfile=dockerfile,
@@ -161,10 +160,10 @@ def resolve_program(
         pack_path = pack_override or (
             resolved_rule.pack
             if resolved_rule is not None
-            else "docker/packs/default.toml"
+            else None
         )
     else:
-        pack_path = pack_override or "docker/packs/default.toml"
+        pack_path = pack_override
 
     pack = load_or_default_pack(pack_path)
     workspace_mount = pack.runtime.workspace_mount
