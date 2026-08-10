@@ -20,6 +20,26 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ORCHESTRATOR = PROJECT_ROOT / ".devcontainer" / "gpu-admission.sh"
 
 
+def test_gpu_runtime_checks_are_mapping_neutral_and_probe_cleanup_is_explicit() -> None:
+    """GPU admission preserves within-side checks and uses a closed usability probe."""
+    orchestrator = ORCHESTRATOR.read_text(encoding="utf-8")
+    finalizer = (PROJECT_ROOT / ".devcontainer/finalize-shared-runtime.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert ".st_uid" not in orchestrator
+    assert ".st_gid" not in orchestrator
+    assert "owner differs" not in orchestrator
+    assert "group differs" not in orchestrator
+    assert 'prefix=".container-usability-"' in finalizer
+    assert "os.fsync(usability_fd)" in finalizer
+    assert "observed != usability_payload" in finalizer
+    assert "os.unlink(usability_probe_path)" in finalizer
+    assert "except FileNotFoundError" in finalizer
+    assert ".st_uid" not in finalizer
+    assert ".st_gid" not in finalizer
+
+
 def write_executable(path: Path, content: str) -> None:
     """Write one executable fixture command."""
     path.parent.mkdir(parents=True, exist_ok=True)

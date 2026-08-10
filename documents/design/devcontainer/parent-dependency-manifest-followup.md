@@ -115,7 +115,9 @@ image build
   immutable `/usr/local/share/agent-canon/image-dependencies/{plan.json,receipts}`
 post-create
   read-only image-verify (stored plan, receipts, live package/executable state)
-  container runtime readback; rootless workspace projection falls back to canonical runtime
+  container runtime readback; if the workspace projection is unusable or unwritable under
+  any daemon mapping mode, no host repair is attempted and the container-local canonical
+  runtime remains the fallback
 parent .devcontainer/post-create-parent.sh  # final, when present
 ```
 

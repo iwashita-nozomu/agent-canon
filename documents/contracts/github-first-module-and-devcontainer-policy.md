@@ -127,14 +127,18 @@ When AgentCanon itself is opened as a standalone source checkout and no
 does not fall back to an unpinned `ubuntu:22.04` image.
 
 The default parent image contract is the #524 canonical identity: a
-digest-pinned plain `ubuntu:22.04` base whose image creates the `project`
-user/group from `PROJECT_UID` / `PROJECT_GID` build args and runs as
-`USER project`. The generator resolves and validates those numeric args; it does
-not expose a public user-name override. The image exposes passwordless
-container-local `sudo -n` for mounted dependency installation. This does not
-invoke host `sudo`, prompt for a host password, mutate host groups, or add an
-AgentCanon-specific group. Workspace bind outputs are expected to carry the host
-mapped UID/GID owner.
+digest-pinned plain `ubuntu:22.04` base whose image creates user `project` at
+`PROJECT_UID` and uses numeric `PROJECT_GID` as its primary GID. An existing group
+at that GID (including GID `0`) is reused without rename; group `project` is
+created only when the requested GID is unused, and a group-name collision is
+fail-closed. The image runs as `USER project`. The generator resolves and
+validates those decimal args: UID is non-zero, while GID is non-negative and may
+be `0`; it does not expose a public user-name override or inspect Docker daemon mapping mode. The image exposes
+passwordless container-local `sudo -n` for mounted dependency installation. This
+does not invoke host `sudo`, prompt for a host password, mutate host groups, or
+add an AgentCanon-specific group. Workspace bind acceptance is established by
+container-side usability and writability, including an expected create/remove
+probe, rather than exact host-visible numeric owner equality.
 
 `devcontainer.json` must not use a fixed AgentCanon display name for every
 parent repository. The generated Compose file must also set a top-level project

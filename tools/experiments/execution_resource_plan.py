@@ -348,14 +348,12 @@ def _read_runtime_receipt(
             not stat.S_ISREG(before.st_mode)
             or before.st_dev != parent_stat.st_dev
             or stat.S_IMODE(before.st_mode) != 0o660
-            or before.st_uid != parent_stat.st_uid
-            or before.st_gid != parent_stat.st_gid
             or before.st_size <= 0
             or before.st_size > 65536
         ):
             raise TypedPreflightFailure(
                 "runtime_receipt_invalid",
-                "runtime receipt fd identity, mode, owner, group, or size is invalid",
+                "runtime receipt fd identity, mode, or size is invalid",
                 path=path,
             )
         chunks: list[bytes] = []
@@ -475,8 +473,6 @@ def write_runtime_receipt_atomic(
             not stat.S_ISREG(lock_stat.st_mode)
             or lock_stat.st_dev != parent_stat.st_dev
             or stat.S_IMODE(lock_stat.st_mode) != 0o660
-            or lock_stat.st_uid != parent_stat.st_uid
-            or lock_stat.st_gid != parent_stat.st_gid
         ):
             raise TypedPreflightFailure(
                 "runtime_receipt_lock_tampered",
@@ -501,8 +497,6 @@ def write_runtime_receipt_atomic(
                 not stat.S_ISREG(existing.st_mode)
                 or existing.st_dev != parent_stat.st_dev
                 or stat.S_IMODE(existing.st_mode) != 0o660
-                or existing.st_uid != parent_stat.st_uid
-                or existing.st_gid != parent_stat.st_gid
             ):
                 raise TypedPreflightFailure(
                     "runtime_receipt_target_tampered",
@@ -737,7 +731,7 @@ def _require_receipt_shape(
 def read_shared_runtime_provision(
     path: AbsolutePosixPath,
 ) -> SharedRuntimeProvisionReceipt:
-    payload, receipt_stat = _read_runtime_receipt(path)
+    payload, _receipt_stat = _read_runtime_receipt(path)
     _require_receipt_shape(
         payload,
         frozenset(
@@ -800,10 +794,16 @@ def read_shared_runtime_provision(
             "runtime provision receipt fingerprint does not match its payload",
             path=path,
         )
-    if receipt_stat.st_uid != typed_payload["host_uid"]:
+    if typed_payload["host_uid"] <= 0 or typed_payload["host_gid"] < 0:
         raise TypedPreflightFailure(
-            "runtime_receipt_identity_mismatch",
-            "runtime provision receipt fd owner differs from its host identity",
+            "runtime_identity_invalid",
+            "runtime provision receipt UID/GID must be nonzero/nonnegative",
+            path=path,
+        )
+    if typed_payload["host_supplementary_gids"] != (typed_payload["host_gid"],):
+        raise TypedPreflightFailure(
+            "runtime_identity_invalid",
+            "runtime provision receipt supplementary groups must equal its primary GID",
             path=path,
         )
     return SharedRuntimeProvisionReceipt(
@@ -835,7 +835,7 @@ def read_shared_runtime_provision(
 def read_shared_runtime_readback(
     path: AbsolutePosixPath,
 ) -> SharedRuntimeReadbackReceipt:
-    payload, receipt_stat = _read_runtime_receipt(path)
+    payload, _receipt_stat = _read_runtime_receipt(path)
     _require_receipt_shape(
         payload,
         frozenset(
@@ -921,10 +921,18 @@ def read_shared_runtime_readback(
             "runtime readback receipt fingerprint does not match its payload",
             path=path,
         )
-    if receipt_stat.st_uid != typed_payload["container_uid"]:
+    if typed_payload["container_uid"] <= 0 or typed_payload["container_gid"] < 0:
         raise TypedPreflightFailure(
-            "runtime_receipt_identity_mismatch",
-            "runtime readback receipt fd owner differs from its container identity",
+            "runtime_identity_invalid",
+            "runtime readback receipt UID/GID must be nonzero/nonnegative",
+            path=path,
+        )
+    if typed_payload["container_supplementary_gids"] != (
+        typed_payload["container_gid"],
+    ):
+        raise TypedPreflightFailure(
+            "runtime_identity_invalid",
+            "runtime readback receipt supplementary groups must equal its primary GID",
             path=path,
         )
     return SharedRuntimeReadbackReceipt(
@@ -975,11 +983,20 @@ class RuntimeIdentityReader:
                 "provision and readback routes differ",
             )
         if (
-            provision.host_uid != readback.container_uid
-            or provision.host_gid != readback.container_gid
-            or provision.host_supplementary_gids
-            != readback.container_supplementary_gids
-            or provision.host_umask != readback.container_umask
+            provision.host_uid <= 0
+            or provision.host_gid < 0
+            or provision.host_supplementary_gids != (provision.host_gid,)
+            or readback.container_uid <= 0
+            or readback.container_gid < 0
+            or readback.container_supplementary_gids != (readback.container_gid,)
+        ):
+            raise TypedPreflightFailure(
+                "runtime_identity_invalid",
+                "runtime provision/readback numeric identity is invalid under the mapping-neutral identity contract",
+            )
+        if (
+            provision.host_umask != 0o0007
+            or readback.container_umask != 0o0007
             or provision.bind_source_dev != readback.bind_target_dev
             or provision.bind_source_ino != readback.bind_target_ino
             or readback.probe_fd_disposition != "closed"
@@ -989,21 +1006,16 @@ class RuntimeIdentityReader:
         ):
             raise TypedPreflightFailure(
                 "runtime_identity_mismatch",
-                "runtime provision/readback identity is not exact",
-            )
-        if provision.host_uid == 0:
-            raise TypedPreflightFailure(
-                "runtime_identity_invalid",
-                "UID 0 is not a valid managed runtime identity",
+                "runtime provision/readback evidence is invalid under the mapping-neutral identity contract",
             )
         receipt_payload = {
             "schema_version": RUNTIME_IDENTITY_SCHEMA_VERSION,
             "runtime_route": provision.runtime_route,
             "namespace_inode": readback.namespace_inode,
-            "uid": provision.host_uid,
-            "gid": provision.host_gid,
-            "supplementary_gids": provision.host_supplementary_gids,
-            "umask": provision.host_umask,
+            "uid": readback.container_uid,
+            "gid": readback.container_gid,
+            "supplementary_gids": readback.container_supplementary_gids,
+            "umask": readback.container_umask,
             "bind_source_dev": provision.bind_source_dev,
             "bind_source_ino": provision.bind_source_ino,
             "bind_target_dev": readback.bind_target_dev,

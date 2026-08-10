@@ -35,16 +35,6 @@ else
 fi
 repo_basename="$(basename "$repo_root")"
 container_repo_root="/workspace/${repo_basename}"
-requested_identity_mode="${AGENT_CANON_RUNTIME_IDENTITY_MODE:-auto}"
-case "$requested_identity_mode" in
-  auto|project|rootless-root) ;;
-  *)
-    printf 'DEVCONTAINER_IDENTITY_ERROR=RUNTIME_IDENTITY_MODE_UNSUPPORTED:received=%s\n' \
-      "$requested_identity_mode" >&2
-    exit 1
-    ;;
-esac
-runtime_identity_mode="$requested_identity_mode"
 if [[ "${PROJECT_USER+x}" = "x" ]]; then
   printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_USER_OVERRIDE_FORBIDDEN:canonical=project:received=%s\n' "$PROJECT_USER" >&2
   exit 1
@@ -57,57 +47,17 @@ project_user="project"
 runtime_user_name="$project_user"
 project_uid="$(id -u)"
 project_gid="$(id -g)"
-if [[ ! "$project_uid" =~ ^[1-9][0-9]*$ || ! "$project_gid" =~ ^[1-9][0-9]*$ ]]; then
-  printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_MUST_BE_POSITIVE_DECIMAL:uid=%s:gid=%s\n' "$project_uid" "$project_gid" >&2
+if [[ ! "$project_uid" =~ ^[1-9][0-9]*$ ]]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_UID_MUST_BE_NONZERO_DECIMAL:uid=%s\n' "$project_uid" >&2
   exit 1
 fi
-command -v docker >/dev/null 2>&1 || {
-  printf 'DEVCONTAINER_IDENTITY_ERROR=DOCKER_SECURITY_OPTIONS_UNAVAILABLE:docker-command-missing\n' >&2
-  exit 1
-}
-docker_security_options_raw="$(docker info --format '{{json .SecurityOptions}}' 2>/dev/null)" || {
-  printf 'DEVCONTAINER_IDENTITY_ERROR=DOCKER_SECURITY_OPTIONS_UNAVAILABLE:docker-info-failed\n' >&2
-  exit 1
-}
-docker_rootless="$({
-  python3 - "$docker_security_options_raw" <<'PY'
-import json
-import sys
-
-try:
-    options = json.loads(sys.argv[1])
-except json.JSONDecodeError as exc:
-    raise SystemExit(f"invalid Docker SecurityOptions JSON: {exc}") from exc
-if not isinstance(options, list) or not all(isinstance(item, str) for item in options):
-    raise SystemExit("Docker SecurityOptions must be a JSON string array")
-print("true" if any(item == "name=rootless" for item in options) else "false")
-PY
-})"
-if [ "$requested_identity_mode" = "auto" ]; then
-  if [ "$docker_rootless" = true ]; then
-    runtime_identity_mode="rootless-root"
-  else
-    runtime_identity_mode="project"
-  fi
-fi
-if [ "$runtime_identity_mode" = "project" ] && [ "$docker_rootless" = true ]; then
-  printf 'DEVCONTAINER_IDENTITY_ERROR=ROOTLESS_DAEMON_REQUIRES_ROOTLESS_SELECTOR:mode=project\n' >&2
-  exit 1
-fi
-if [ "$runtime_identity_mode" = "rootless-root" ] && [ "$docker_rootless" != true ]; then
-  printf 'DEVCONTAINER_IDENTITY_ERROR=ROOTLESS_SELECTOR_REQUIRES_ROOTLESS_DAEMON:mode=rootless-root\n' >&2
+if [[ ! "$project_gid" =~ ^[0-9]+$ ]]; then
+  printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_GID_MUST_BE_NONNEGATIVE_DECIMAL:gid=%s\n' "$project_gid" >&2
   exit 1
 fi
 runtime_user_uid="$project_uid"
 runtime_user_gid="$project_gid"
-if [ "$runtime_identity_mode" = "rootless-root" ]; then
-  runtime_user_name="root"
-  runtime_user_uid=0
-  runtime_user_gid=0
-  project_home="/root"
-else
-  project_home="/home/${project_user}"
-fi
+project_home="/home/${project_user}"
 gpu_profile="${AGENT_CANON_GPU_ADMISSION_PROFILE:-default}"
 case "$gpu_profile" in
   default|gpu-admission) ;;
@@ -677,7 +627,6 @@ environment_lines=(
   "      PYTHONPATH: \"${container_repo_root}/python\""
   "      AGENT_CANON_WORKSPACE_LAYOUT: \"${workspace_layout}\""
   "      AGENT_CANON_CODEX_SESSION_ROOT: \"${project_home}/.codex/sessions\""
-  "      AGENT_CANON_RUNTIME_IDENTITY_MODE: \"${runtime_identity_mode}\""
   "      HOME: \"${project_home}\""
   "      SHELL: \"${runtime_shell}\""
   "      AGENT_CANON_CONTAINER_USER: \"${runtime_user_name}\""

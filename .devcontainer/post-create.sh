@@ -32,38 +32,22 @@ case "$home" in
     ;;
 esac
 
-runtime_identity_mode="${AGENT_CANON_RUNTIME_IDENTITY_MODE:-}"
-case "$runtime_identity_mode" in
-  project)
-    expected_runtime_user="project"
-    expected_runtime_uid="non-root"
-    expected_runtime_home="/home/project"
-    ;;
-  rootless-root)
-    expected_runtime_user="root"
-    expected_runtime_uid="root"
-    expected_runtime_home="/root"
-    ;;
-  *)
-    echo "post-create runtime identity marker is unsupported: ${runtime_identity_mode:-<unset>}" >&2
-    exit 1
-    ;;
-esac
+expected_runtime_user="project"
+expected_runtime_home="/home/project"
 [ "${AGENT_CANON_CONTAINER_USER:-}" = "$expected_runtime_user" ] || {
   echo "post-create runtime user marker mismatch: expected $expected_runtime_user" >&2
   exit 1
 }
-if [ "$expected_runtime_uid" = "non-root" ]; then
-  [ "$(id -u)" -ne 0 ] || {
-    echo "post-create project identity must be non-root" >&2
-    exit 1
-  }
-else
-  [ "$(id -u)" -eq 0 ] || {
-    echo "post-create rootless-root identity must be uid 0" >&2
-    exit 1
-  }
-fi
+runtime_uid="$(id -u)"
+runtime_gid="$(id -g)"
+[[ "$runtime_uid" =~ ^[1-9][0-9]*$ ]] || {
+  echo "post-create project identity UID must be a nonzero decimal: $runtime_uid" >&2
+  exit 1
+}
+[[ "$runtime_gid" =~ ^[0-9]+$ ]] || {
+  echo "post-create project primary GID must be a nonnegative decimal: $runtime_gid" >&2
+  exit 1
+}
 [ "$(id -un)" = "$expected_runtime_user" ] || {
   echo "post-create user mismatch: expected ${expected_runtime_user}, got $(id -un)" >&2
   exit 1
@@ -72,10 +56,8 @@ fi
   echo "post-create HOME mismatch: expected ${expected_runtime_home}, got ${HOME:-<unset>}" >&2
   exit 1
 }
-workspace_write_dir="$workspace/.agent-canon"
-mkdir -p "$workspace_write_dir"
-workspace_write_probe="$(mktemp "$workspace_write_dir/identity-write.XXXXXX")"
-rm -f "$workspace_write_probe"
+workspace_write_probe=""
+trap 'if [ -n "${workspace_write_probe:-}" ]; then rm -f -- "$workspace_write_probe"; fi' EXIT
 
 python3 "$agent_canon_root/tools/agent_tools/devcontainer_dependencies.py" \
   image-verify --workspace "$workspace" --vendor-root "$agent_canon_root" --format text
@@ -91,8 +73,21 @@ image_root="${AGENT_CANON_IMAGE_DEPENDENCIES_ROOT:-/usr/local/share/agent-canon/
   exit 1
 }
 
+workspace_write_probe="$(mktemp "$workspace/identity-write.XXXXXX")"
+printf '%s\n' "project" >"$workspace_write_probe"
+[ "$(cat "$workspace_write_probe")" = "project" ] || {
+  echo "post-create workspace readback failed: $workspace_write_probe" >&2
+  exit 1
+}
+rm -f -- "$workspace_write_probe"
+workspace_write_probe=""
+
 echo "DEVCONTAINER_IMAGE_DEPENDENCIES_ROOT=$image_root"
 echo "AGENT_CANON_RUNTIME_ROOT=$runtime_root"
+echo "AGENT_CANON_CONTAINER_USER=$expected_runtime_user"
+echo "AGENT_CANON_RUNTIME_UID=$runtime_uid"
+echo "AGENT_CANON_RUNTIME_GID=$runtime_gid"
+echo "AGENT_CANON_RUNTIME_HOME=$HOME"
 for tool in node npm npx corepack codex gh jq tree clang-format clangd-18 pyright pyright-langserver bash-language-server; do
   if command -v "$tool" >/dev/null 2>&1; then
     echo "DEVCONTAINER_TOOL_READBACK=$tool:available"

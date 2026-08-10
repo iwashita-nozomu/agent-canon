@@ -305,18 +305,27 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
   Default Compose creates this path inside the container; it is not a host bind or
   shared-runtime path.
 - The default repository Docker pack uses the #524 canonical digest-pinned plain
-  `ubuntu:22.04` base. The generator resolves and validates `PROJECT_UID` /
-  `PROJECT_GID` build args; the parent image creates the canonical `project`
-  user/group with those IDs and runs as `USER project`. Linked `devcontainer.json`
-  sets `containerUser` and `remoteUser` to `project`; the generator omits custom
-  HOME tmpfs and AgentCanon-specific groups. `/home/project` remains the
-  image-owned HOME. Container-local passwordless `sudo -n` is available for
-  mounted dependency operations.
+  `ubuntu:22.04` base. The generator resolves and validates numeric `PROJECT_UID` /
+  `PROJECT_GID` build args; UID must be decimal non-zero and GID may be any decimal
+  non-negative value, including `0`. The parent image creates user `project` at
+  `PROJECT_UID`, uses the group at numeric `PROJECT_GID` (including
+  GID `0`) as its primary group, reusing an existing group
+  without renaming it, and creates group `project` only when that GID is
+  unused; a group-name collision fails closed; it then runs as `USER project`. Linked
+  `devcontainer.json` leaves `containerUser` and `remoteUser` unset, keeps
+  `updateRemoteUserUID: false`, and lets generated Compose own the resolved
+  `service.user`. The generator does not probe or project Docker daemon mapping
+  mode, and omits custom HOME tmpfs and AgentCanon-specific groups. `/home/project`
+  remains the image-owned HOME. Container-local passwordless `sudo -n` is
+  available for mounted dependency operations.
 - This project runtime is container-local and never invokes host `sudo`, prompts for
-  host passwords, or mutates host groups. A missing/mismatched project UID/GID,
+  host passwords, or mutates host groups. A missing/invalid project UID/GID,
   non-Ubuntu base, missing digest pin, or missing container-local sudo is a parent image
-  contract failure; do not repair it by restoring host provisioning. Workspace bind
-  outputs are expected to carry the host mapped UID/GID owner.
+  contract failure; do not repair it by restoring host provisioning. The primary
+  group name may differ from `project` when its numeric GID is already owned;
+  workspace bind
+  acceptance is based on container-side usability and writability (including the
+  expected create/remove probe), not exact host-visible numeric owner equality.
 - Devcontainers support two explicit source layouts. Both bind only the exact
   repository root to `/workspace/<basename>` and do not mount the topic root,
   parent `~/workspace`, sibling repositories, or guessed paths. `managed-topic`
@@ -349,7 +358,7 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
   resolver 経由で選択する。standalone AgentCanon では同じ resolver を
   `tools/agent_tools/agent_canon_source_root.py` から実行する。profile は
   `nvidia-smi -L`、`devcontainer` CLI、active repository を fail-closed に確認した後、
-  `${repository_root}/.agent-canon/runtime` を primary UID/GID 所有で作成し、
+  `${repository_root}/.agent-canon/runtime` を primary UID/GID の provenance として記録し、
   provision receipt を発行する。GPU 不在、provision receipt 不一致、Compose/up/finalize
   failure は default profile へ降格しない。host `sudo`、system group 作成、session
   refresh はこの lifecycle の前提ではない。
@@ -364,12 +373,15 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
   `-gpu-admission` suffix とし、起動済み default container を再利用しない。
 - `devcontainer up` の成功後、同じ orchestrator が同じ profile `--config` の
   `devcontainer exec` と source-root resolver で `finalize-shared-runtime.sh` を一度だけ
-  実行する。finalize は provision receipt、
-  bind device/inode、mount namespace、probe、repository-local source、primary UID/GID、
-  umask を検証し、
+  実行する。finalize は container-side target の create/write/read/remove を確認し、
+  provision receipt、route/path、repository-local source、bind device/inode、symlink/type/mode、
+  open-fd/path race、mount namespace、probe、UID non-zero/GID numeric、umask を検証し、
   `shared-runtime-readback.json` を `tools/experiments/execution_resource_plan.py` の
   `read_shared_runtime_provision` / `write_runtime_receipt_atomic` owner 経由で発行する。
-  profile script は receipt parser/writer や identity repair を複製しない。
+  host/container UID/GID と inode owner の exact equality は acceptance gate にせず、numeric
+  receipt fields は provenance/observation として read back する。profile script は receipt
+  parser/writer や identity repair を複製しない。canonical receipt policy は
+  `documents/design/devcontainer/parent-devcontainer-policy.md` が所有する。
 - up/finalize failure は生成 Compose の検証済み `-gpu-admission` project name と
   profile-specific Compose file を指定して `docker compose down --remove-orphans` を
   実行する。cleanup failure は typed evidence として別に報告し、entrypoint は元の
@@ -425,7 +437,7 @@ state.
 - Runtime packs do not select project extras. Image build or a parent-owned
   product image prepares workspace Python packages before startup.
 - Shared post-create does not create dependency receipts or repair a workspace
-  bind. If a workspace projection/cache is rootless and unwritable, the
+  bind. If a workspace projection/cache is unusable or unwritable, the
   container-local canonical runtime remains the only fallback.
 - Host runtime does not create a repository-local virtual environment.
 - Container runtime may create `.venv` only through the canonical policy tool:
