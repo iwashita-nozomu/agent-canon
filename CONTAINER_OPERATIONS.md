@@ -15,7 +15,7 @@ downstream implementation .devcontainer/devcontainer.json standalone AgentCanon 
 downstream implementation .devcontainer/post-create.sh standalone AgentCanon image verification and runtime readback.
 downstream implementation .vscode/settings.json standalone AgentCanon source editor defaults.
 downstream implementation tools/ci/container_config.py container and devcontainer configuration validator.
-downstream implementation tools/ci/check_github_workflows.py GitHub workflow checkout and Docker-build validator.
+downstream implementation tools/ci/check_github_workflows.py GitHub workflow checkout and AgentCanon-surface validator.
 @dependency-end
 -->
 
@@ -459,8 +459,17 @@ python3 tools/ci/python_env_policy.py --create
 
 ## GitHub Workflow Rules
 
-Any GitHub workflow that runs shared AgentCanon devcontainer checks must checkout
-the AgentCanon submodule before calling shared AgentCanon paths.
+Any template or derived-repository GitHub workflow that consumes an AgentCanon-owned
+path under `vendor/agent-canon/` or `tools/agent-canon/` must prepare a coherent
+repository checkout and AgentCanon submodule checkout before that consumer runs.
+Each consuming job owns this sequence locally: an earlier safe `actions/checkout`
+step, then the checkout helper, then the first AgentCanon consumer. A checkout or
+helper in another job does not satisfy the consuming job, and step order is part
+of the contract.
+Workflow-, job-, and step-level environment values and inherited
+`defaults.run.working-directory` values are part of the consumer's effective
+execution context. A project-only workflow with no AgentCanon-owned path does not
+acquire this submodule dependency.
 
 Required pattern:
 
@@ -470,10 +479,7 @@ Required pattern:
    needed:
    - `AGENT_CANON_REPO_TOKEN`
    - `AGENT_CANON_REPO_SSH_KEY`
-1. Run Docker or devcontainer smoke after `vendor/agent-canon/` exists.
-
-Old wording that describes Docker Build as "submodule-free" is stale. Replace it
-with the submodule-aware pattern above.
+1. Run the selected shared check or tool after `vendor/agent-canon/` exists.
 
 ## Reformatting Checklist
 
@@ -585,7 +591,6 @@ a template-derived repository that may still contain stale wording.
 When a repository is being reformatted against current AgentCanon rules, sweep for
 these stale assumptions:
 
-- "Docker Build is submodule-free."
 - "AgentCanon is vendored as a subtree or committed snapshot" as the normal path.
 - "Local Git mirror is required" for default module work.
 - "Root `documents/` is entirely project-local" when shared policy symlinks are present.
