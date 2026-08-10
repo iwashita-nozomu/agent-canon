@@ -1045,8 +1045,14 @@ raise SystemExit(2)
         )
 
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("missing_agent_canon_repository_checkout", result.stdout)
-        self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
+        self.assertIn(
+            "agent_canon_consumer_missing_prior_repository_checkout:job=test",
+            result.stdout,
+        )
+        self.assertIn(
+            "agent_canon_consumer_missing_prior_checkout_helper:job=test",
+            result.stdout,
+        )
 
     def test_agent_canon_helper_without_repository_checkout_fails(self) -> None:
         """The submodule helper cannot run before actions/checkout prepares the repo."""
@@ -1067,8 +1073,134 @@ raise SystemExit(2)
         )
 
         self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn("missing_agent_canon_repository_checkout", result.stdout)
-        self.assertNotIn("missing_agent_canon_checkout_helper", result.stdout)
+        self.assertIn(
+            "agent_canon_checkout_helper_missing_prior_repository_checkout:job=test",
+            result.stdout,
+        )
+
+    def test_agent_canon_consumer_before_helper_fails(self) -> None:
+        """The helper must run before the first consumer in its job."""
+        result = self.run_custom_workflow(
+            """
+            name: CI
+            on: [push]
+            permissions:
+              contents: read
+            concurrency:
+              group: ci-${{ github.ref }}
+            jobs:
+              test:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: actions/checkout@v4
+                    with:
+                      submodules: false
+                      persist-credentials: false
+                  - run: python3 tools/agent-canon/ci/container_config.py
+                  - run: bash .github/scripts/checkout_agent_canon_submodule.sh
+            """
+        )
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "agent_canon_consumer_missing_prior_checkout_helper:job=test",
+            result.stdout,
+        )
+
+    def test_agent_canon_helper_before_repository_checkout_fails(self) -> None:
+        """The repository checkout must precede the helper in the same job."""
+        result = self.run_custom_workflow(
+            """
+            name: CI
+            on: [push]
+            permissions:
+              contents: read
+            concurrency:
+              group: ci-${{ github.ref }}
+            jobs:
+              test:
+                runs-on: ubuntu-latest
+                steps:
+                  - run: bash .github/scripts/checkout_agent_canon_submodule.sh
+                  - uses: actions/checkout@v4
+                    with:
+                      submodules: false
+                      persist-credentials: false
+                  - run: python3 tools/agent-canon/ci/container_config.py
+            """
+        )
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "agent_canon_checkout_helper_missing_prior_repository_checkout:job=test",
+            result.stdout,
+        )
+        self.assertIn(
+            "agent_canon_consumer_missing_prior_checkout_helper:job=test",
+            result.stdout,
+        )
+
+    def test_agent_canon_helper_in_another_job_does_not_satisfy_consumer(self) -> None:
+        """Checkout/helper preparation is local to each consuming job."""
+        result = self.run_custom_workflow(
+            """
+            name: CI
+            on: [push]
+            permissions:
+              contents: read
+            concurrency:
+              group: ci-${{ github.ref }}
+            jobs:
+              prepare:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: actions/checkout@v4
+                    with:
+                      submodules: false
+                      persist-credentials: false
+                  - run: bash .github/scripts/checkout_agent_canon_submodule.sh
+              consume:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: actions/checkout@v4
+                    with:
+                      submodules: false
+                      persist-credentials: false
+                  - run: python3 tools/agent-canon/ci/container_config.py
+            """
+        )
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(
+            "agent_canon_consumer_missing_prior_checkout_helper:job=consume",
+            result.stdout,
+        )
+
+    def test_ordered_same_job_agent_canon_checkout_sequence_passes(self) -> None:
+        """Repository checkout, helper, and consumer form the canonical sequence."""
+        result = self.run_custom_workflow(
+            """
+            name: CI
+            on: [push]
+            permissions:
+              contents: read
+            concurrency:
+              group: ci-${{ github.ref }}
+            jobs:
+              test:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: actions/checkout@v4
+                    with:
+                      submodules: false
+                      persist-credentials: false
+                  - run: bash .github/scripts/checkout_agent_canon_submodule.sh
+                  - run: python3 tools/agent-canon/ci/container_config.py
+            """
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
 
     def test_docker_build_workflow_with_agent_canon_checkout_passes(self) -> None:
         """Docker build workflow should be explicit about the AgentCanon checkout."""

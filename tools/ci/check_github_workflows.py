@@ -553,17 +553,77 @@ def agent_canon_checkout_policy_findings(
     findings: list[Finding] = []
     checkouts = checkout_steps(workflow)
     helpers = agent_canon_checkout_command_steps(workflow)
+    helper_indexes = {context.index for context in helpers}
+    checkout_indexes = {context.index for context in checkouts}
+    consumers = [
+        context
+        for context in agent_canon_surface_steps(workflow)
+        if context.index not in helper_indexes
+        and context.index not in checkout_indexes
+    ]
     agent_canon_independent = path.name in AGENT_CANON_INDEPENDENT_WORKFLOWS
-    requires_agent_canon_checkout_pair = (
-        not agent_canon_independent
-        and bool(agent_canon_surface_steps(workflow) or helpers)
-    )
-    if requires_agent_canon_checkout_pair and not checkouts:
-        findings.append(
-            Finding("error", path, "missing_agent_canon_repository_checkout")
-        )
-    if requires_agent_canon_checkout_pair and not helpers:
-        findings.append(Finding("error", path, "missing_agent_canon_checkout_helper"))
+    if not agent_canon_independent:
+        if consumers and not helpers:
+            findings.append(
+                Finding("error", path, "missing_agent_canon_checkout_helper")
+            )
+        for helper in helpers:
+            prior_checkouts = [
+                checkout
+                for checkout in checkouts
+                if checkout.job_name == helper.job_name
+                and checkout.index < helper.index
+            ]
+            if not prior_checkouts:
+                findings.append(
+                    Finding(
+                        "error",
+                        path,
+                        "agent_canon_checkout_helper_missing_prior_repository_checkout:"
+                        f"job={helper.job_name}",
+                    )
+                )
+        for job_name in sorted({context.job_name for context in consumers}):
+            first_consumer = min(
+                context.index
+                for context in consumers
+                if context.job_name == job_name
+            )
+            prior_checkouts = [
+                checkout
+                for checkout in checkouts
+                if checkout.job_name == job_name
+                and checkout.index < first_consumer
+            ]
+            if not prior_checkouts:
+                findings.append(
+                    Finding(
+                        "error",
+                        path,
+                        "agent_canon_consumer_missing_prior_repository_checkout:"
+                        f"job={job_name}",
+                    )
+                )
+            ordered_helpers = [
+                helper
+                for helper in helpers
+                if helper.job_name == job_name
+                and helper.index < first_consumer
+                and any(
+                    checkout.job_name == job_name
+                    and checkout.index < helper.index
+                    for checkout in checkouts
+                )
+            ]
+            if not ordered_helpers:
+                findings.append(
+                    Finding(
+                        "error",
+                        path,
+                        "agent_canon_consumer_missing_prior_checkout_helper:"
+                        f"job={job_name}",
+                    )
+                )
     if agent_canon_independent:
         if helpers:
             findings.append(

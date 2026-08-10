@@ -462,6 +462,10 @@ python3 tools/ci/python_env_policy.py --create
 Any template or derived-repository GitHub workflow that consumes an AgentCanon-owned
 path under `vendor/agent-canon/` or `tools/agent-canon/` must prepare a coherent
 repository checkout and AgentCanon submodule checkout before that consumer runs.
+Each consuming job owns this sequence locally: an earlier safe `actions/checkout`
+step, then the checkout helper, then the first AgentCanon consumer. A checkout or
+helper in another job does not satisfy the consuming job, and step order is part
+of the contract.
 Workflow-, job-, and step-level environment values and inherited
 `defaults.run.working-directory` values are part of the consumer's effective
 execution context. A project-only workflow with no AgentCanon-owned path does not
