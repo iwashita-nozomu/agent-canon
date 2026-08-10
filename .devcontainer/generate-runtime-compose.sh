@@ -35,15 +35,16 @@ else
 fi
 repo_basename="$(basename "$repo_root")"
 container_repo_root="/workspace/${repo_basename}"
-runtime_identity_mode="${AGENT_CANON_RUNTIME_IDENTITY_MODE:-project}"
-case "$runtime_identity_mode" in
-  project|rootless-root) ;;
+requested_identity_mode="${AGENT_CANON_RUNTIME_IDENTITY_MODE:-auto}"
+case "$requested_identity_mode" in
+  auto|project|rootless-root) ;;
   *)
     printf 'DEVCONTAINER_IDENTITY_ERROR=RUNTIME_IDENTITY_MODE_UNSUPPORTED:received=%s\n' \
-      "$runtime_identity_mode" >&2
+      "$requested_identity_mode" >&2
     exit 1
     ;;
 esac
+runtime_identity_mode="$requested_identity_mode"
 if [[ "${PROJECT_USER+x}" = "x" ]]; then
   printf 'DEVCONTAINER_IDENTITY_ERROR=PROJECT_USER_OVERRIDE_FORBIDDEN:canonical=project:received=%s\n' "$PROJECT_USER" >&2
   exit 1
@@ -82,6 +83,13 @@ if not isinstance(options, list) or not all(isinstance(item, str) for item in op
 print("true" if any(item == "name=rootless" for item in options) else "false")
 PY
 })"
+if [ "$requested_identity_mode" = "auto" ]; then
+  if [ "$docker_rootless" = true ]; then
+    runtime_identity_mode="rootless-root"
+  else
+    runtime_identity_mode="project"
+  fi
+fi
 if [ "$runtime_identity_mode" = "project" ] && [ "$docker_rootless" = true ]; then
   printf 'DEVCONTAINER_IDENTITY_ERROR=ROOTLESS_DAEMON_REQUIRES_ROOTLESS_SELECTOR:mode=project\n' >&2
   exit 1

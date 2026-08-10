@@ -14,7 +14,6 @@ downstream implementation ../../../.devcontainer/devcontainer.json selects the d
 downstream implementation ../../../.devcontainer/generate-runtime-compose.sh renders the workspace-only default and typed optional mount profiles
 downstream implementation ../../../.devcontainer/gpu-admission/devcontainer.json selects the explicit GPU-admission profile
 downstream implementation ../../../.devcontainer/gpu-admission.sh owns GPU-admission host preflight/up/finalize sequencing
-downstream implementation ../../../.devcontainer/rootless/devcontainer.json selects the rootless-root identity profile
 downstream design parent-dependency-manifest-followup.md declares the parent manifest, pin, and ordering follow-up
 @dependency-end
 -->
@@ -129,8 +128,6 @@ host `~/.zshrc`/`~/.zsh` optional projectionを使えます。profile未選択�
 pack-derived command だけを生成します。
 
 Compose の生成先は親レポの `.agent-canon/docker-compose.generated.yml` とする。
-rootless selector の生成先はトップレベルの
-`.agent-canon/docker-compose.rootless.generated.yml` とする。
 `.agent-canon/` は親レポの実行状態用であり、生成 Compose を追跡対象にしない。
 
 ## 既定起動プロファイルの境界
@@ -147,33 +144,30 @@ rootless selector の生成先はトップレベルの
 
 ### ユーザー指示による superseding decision
 
-canonical identity は `project` user/group と `PROJECT_UID` / `PROJECT_GID` で固定する。
+canonical build identity は `project` user/group と `PROJECT_UID` / `PROJECT_GID` で固定する。
 親の default Dockerfile は digest-pinned plain
 `ubuntu:22.04` base（または同等の標準 Ubuntu 22.04 image）を使い、generator が
 解決した host UID/GID を build args として渡す。公開 caller がこれらの値や user 名を
-override する経路は設けない。linked `devcontainer.json` は #524 canonical contract
-として `containerUser: project` と `remoteUser: project` を設定し、image の
-`USER project` と一致させる。generator は custom HOME tmpfs、AgentCanon-specific
+override する経路は設けない。generator は custom HOME tmpfs、AgentCanon-specific
 group、host group mutation を生成しない。
 
 ### Docker daemon と runtime identity の選択
 
-default の `.devcontainer/devcontainer.json` と GPU-admission selector は
-`AGENT_CANON_RUNTIME_IDENTITY_MODE=project` を明示する rootful Docker selector です。
-generator は `docker info --format '{{json .SecurityOptions}}'` の公式
-`SecurityOptions` に exact `name=rootless` がある場合、project selector を fail-closed
-で拒否します。rootless Docker は standalone source の
-`.devcontainer/rootless/devcontainer.json` を選択し、トップレベルの
-`.agent-canon/docker-compose.rootless.generated.yml` を使います。
+default の `.devcontainer/devcontainer.json` は
+`AGENT_CANON_RUNTIME_IDENTITY_MODE=auto` を指定します。generator は
+`docker info --format '{{json .SecurityOptions}}'` の公式 `SecurityOptions` を読み、
+exact `name=rootless` がある場合は `rootless-root`、それ以外は `project` に解決します。
+rootful Docker を要求する GPU-admission selector は `project` を明示し、rootless daemon
+では fail-closed します。
 
-rootless selector は `containerUser: root`、`remoteUser: root`、Compose `user: "0:0"`、
-`HOME=/root`、`AGENT_CANON_CONTAINER_USER=root`、
+rootless の auto 解決は Compose `user: "0:0"`、`HOME=/root`、
+`AGENT_CANON_CONTAINER_USER=root`、
 `AGENT_CANON_RUNTIME_IDENTITY_MODE=rootless-root` を同時に投影します。build 用の
 `PROJECT_UID` / `PROJECT_GID` は host process の正の値を保持し、runtime user とは
 分離します。post-create と post-attach は marker、process uid/name、HOME、workspace
 writability を read back します。
 
-rootless default は workspace bind 以外の credential、SSH、Docker socket、shared
+rootless の auto 解決は workspace bind 以外の credential、SSH、Docker socket、shared
 runtime host mount を生成しません。host zshrc/credentials は明示 optional profile 時だけ
 selected runtime `HOME` 配下へ read-only projection します。host chmod/chown、固定 subuid、
 `userns=host`、tmpfs、特定 workspace path の例外は追加しません。
@@ -207,7 +201,7 @@ absent を正本とする。
 | clause | operation | resulting state | completion evidence |
 | --- | --- | --- | --- |
 | DEV-DEFAULT-001 | `initializeCommand` から host runtime provisioning を外し、Compose generator を実行する | 既定起動が `sudo`、system group、host runtime path に依存しない | `devcontainer.json` の command readback と `devcontainer up` が sudo prompt なしで完了する |
-| DEV-DEFAULT-002 | 既定 Compose の shared-runtime `group_add`、bind、provision/readback receipt environment、custom HOME tmpfs、AgentCanon-specific group を生成せず、host UID/GID を canonical build args として親 image に渡す | generator は host の `id -u`/`id -g` を `PROJECT_UID`/`PROJECT_GID` として渡し、user 名 `project` を固定する。公開 caller に override 経路はない。digest-pinned plain `ubuntu:22.04` の親 image は同じ numeric ID の canonical `project` user/group を作り、image の `USER project`、`containerUser: project`、`remoteUser: project` で起動する。container は container-local `/var/lib/agent-canon/runtime` だけを使用し、host の同名 path とは bind/shared しない。host group mutation と host sudo/password prompt は行わない | 生成 Compose/config/image inspection で `PROJECT_UID`/`PROJECT_GID`、`project` passwd/group、`USER project`、`containerUser`/`remoteUser` が canonical values を持ち、`group_add`、host runtime bind、shared receipt env、custom HOME tmpfs、AgentCanon group が absent。bind workspace の成果物 owner が host mapped UID/GID と一致し、container 内 runtime path が作成される |
+| DEV-DEFAULT-002 | 既定 Compose の shared-runtime `group_add`、bind、provision/readback receipt environment、custom HOME tmpfs、AgentCanon-specific group を生成せず、host UID/GID を canonical build args として親 image に渡す | generator は host の `id -u`/`id -g` を `PROJECT_UID`/`PROJECT_GID` として渡し、build identity の user 名 `project` を固定する。公開 caller に override 経路はない。default の `devcontainer.json` は `containerUser`/`remoteUser` を持たず、`updateRemoteUserUID: false` で Compose の解決済み `service.user` を所有する。digest-pinned plain `ubuntu:22.04` の親 image は同じ numeric ID の canonical `project` user/group を作り、image の `USER project` で起動する。container は container-local `/var/lib/agent-canon/runtime` だけを使用し、host の同名 path とは bind/shared しない。host group mutation と host sudo/password prompt は行わない | 生成 Compose/config/image inspection で `PROJECT_UID`/`PROJECT_GID`、`project` passwd/group、`USER project`、解決済み `service.user`、`updateRemoteUserUID: false` が canonical values を持ち、`containerUser`/`remoteUser` の default override、`group_add`、host runtime bind、shared receipt env、custom HOME tmpfs、AgentCanon group が absent。bind workspace の成果物 owner が host mapped UID/GID と一致し、container 内 runtime path が作成される |
 | DEV-DEFAULT-003 | 既定 generator は host GPU、`nvidia-smi`、Docker NVIDIA runtime の probing を一切行わず、生成 environment に `DEVCONTAINER_GPU_MODE=disabled` を設定し、`DEVCONTAINER_GPU_REQUEST` は absent とする | GPU の有無に関わらず default container creation は GPU admission から独立し、Compose に GPU request を持たない | generator の command/readback に probing が無く、生成 env が `DEVCONTAINER_GPU_MODE=disabled`、`DEVCONTAINER_GPU_REQUEST` absent、`gpus: all` absent である static inspection と no-GPU launch |
 | DEV-DEFAULT-004 | source-root resolver 経由で呼ぶ post-create は image-owned immutable dependency tree の read-only verify と container runtime readback を実行する | package install、network、sudo、workspace bind repair は startup path に存在せず、stored plan/receipts と live package/executable verification が pass する。workspace projection/cache が rootless bind で書けない場合も container-local canonical runtime を使用し、parent hook は verify 後に一度だけ実行される | post-create static inspection、image-verify readback、tool availability、container-local runtime readback、parent-hook order test |
 | DEV-DEFAULT-005 | `finalize-shared-runtime.sh`、scheduler、managed experiment、receipt parser/writer は source に保持し、既定 profile から非選択にする | 実験機能の wholesale deletion は行わず、`gpu-admission/devcontainer.json` と `gpu-admission.sh` の明示 selector/entrypoint だけが runtime capability を選択する | default selector/config の readback が opt-in fields を持たず、profile selector が別 Compose path/project suffix を使い、Issue #521 の opt-in owner に接続する |
@@ -273,7 +267,7 @@ supplementary-GID environment は GPU profile にも生成しない。
 | security/runtime impact | 既定経路の host privilege escalation、固定 GID/セッション結合、host runtime 永続化を除去する。container-local logs/state と明示 opt-in 実験 capability は保持する |
 | owner / surfaces | Standalone AgentCanon は自身の `.devcontainer/` source を所有する。Template/derived parent は `.devcontainer/` regular environment、image、`docker/`、selector、parent hook を所有し、必要な AgentCanon entrypoint は source-root resolver 経由で呼ぶ。Issue #521 の opt-in owner は parent GPU-admission selector/orchestrator とし、既定境界の authority は本設計と実装の clause に置く |
 | dependency/install order | standalone AgentCanon image build は `python3`、`python3-pip`、`pipx`、`python3-packaging`、Node/npm と manifest の全 image-safe record を直接準備し、plan と receipts を canonical immutable image root に freeze する。post-create は shared entrypoint から read-only `image-verify` と container runtime readback だけを実行する |
-| validation | default/opt-in generated Compose scenario を `container_config.py` で別 profile として検証し、dependency manifest の validate/dry-run、image-install/image-verify、Docker dependency validator、対象 devcontainer/lifecycle tests、host password prompt なしの親 root default `devcontainer up` を実行する。GPU profile は `nvidia-smi -L`、selector、profile-specific Compose/project、repository-local primary UID/GID、provision、finalize readback を確認する。固定 capability は Dockerfile の `gpg`/`cc`/`gcc`/`pipx`、Node provider digest、apt package、immutable image metadata を確認してから operation を行い、親 image は base digest、`PROJECT_UID/GID/USER=project`、`USER project`、`containerUser`/`remoteUser`、bind workspace owner の host UID/GID 一致を確認する。公開 override が無いこと、managed-topic と direct-repo の layout/mount/readback を検証する。Python/wgrib2 の container smoke は親側 ownership とする |
+| validation | default/opt-in generated Compose scenario を `container_config.py` で別 profile として検証し、dependency manifest の validate/dry-run、image-install/image-verify、Docker dependency validator、対象 devcontainer/lifecycle tests、host password prompt なしの親 root default `devcontainer up` を実行する。GPU profile は `nvidia-smi -L`、selector、profile-specific Compose/project、repository-local primary UID/GID、provision、finalize readback を確認する。固定 capability は Dockerfile の `gpg`/`cc`/`gcc`/`pipx`、Node provider digest、apt package、immutable image metadata を確認してから operation を行い、親 image は base digest、`PROJECT_UID/GID/USER=project`、`USER project`、default Compose の解決済み service user、bind workspace owner の host UID/GID 一致を確認する。公開 override が無いこと、managed-topic と direct-repo の layout/mount/readback を検証する。Python/wgrib2 の container smoke は親側 ownership とする |
 | rollback | GPU profile の up/finalize 失敗は default profile へ降格せず、検証済み profile Compose/project identity を指定してその container/project だけを停止する。cleanup failure は別の typed evidence とし、entrypoint は元の rc を保持する。default profile へ host runtime provisioning を戻さない。rollback evidence は profile selector、host capability contract、別 Compose/project identity、cleanup command/result、元の rc、receipt readback を含む |
 
 ## Design-To-Implementation Trace
@@ -281,7 +275,7 @@ supplementary-GID environment は GPU profile にも生成しない。
 | clause | implementation route | reverse evidence / drift block |
 | --- | --- | --- |
 | DEV-DEFAULT-001 | `.devcontainer/devcontainer.json`: select generator-only default initialization | exact command readback; any host runtime provisioning invocation is a drift blocker |
-| DEV-DEFAULT-002 | `.devcontainer/generate-runtime-compose.sh` / linked config: resolve host UID/GID, pass `PROJECT_UID`/`PROJECT_GID` with fixed user name `project`, retain canonical `containerUser`/`remoteUser`, omit shared runtime group/bind/receipt env and custom HOME tmpfs; parent image creates `project` and runs as `USER project` | generated Compose/config/image inspection plus `project` ID, `USER`, workspace owner, and container path readback; any missing/mismatched build arg, public override, host runtime source, host bind, custom HOME tmpfs, or AgentCanon group is a drift blocker |
+| DEV-DEFAULT-002 | `.devcontainer/generate-runtime-compose.sh` / linked config: resolve host UID/GID, pass `PROJECT_UID`/`PROJECT_GID` with fixed build user name `project`, omit static default `containerUser`/`remoteUser`, set `updateRemoteUserUID: false`, and let generated Compose own resolved `service.user`; omit shared runtime group/bind/receipt env and custom HOME tmpfs; parent image creates `project` and runs as `USER project` | generated Compose/config/image inspection plus resolved `service.user`, `project` ID, `USER`, workspace owner, and container path readback; any missing/mismatched build arg, public identity override, host runtime source, host bind, custom HOME tmpfs, or AgentCanon group is a drift blocker |
 | DEV-DEFAULT-003 | generator GPU branch: default は host GPU/`nvidia-smi`/Docker NVIDIA runtime を probe せず、`DEVCONTAINER_GPU_MODE=disabled` を出力し、`DEVCONTAINER_GPU_REQUEST` を出力しない | command/env readback と no-GPU launch; probing、`DEVCONTAINER_GPU_REQUEST`、または `gpus: all` が default に現れれば drift blocker |
 | DEV-DEFAULT-004 | `.devcontainer/post-create.sh`: run only read-only image verification and container runtime readback after image build owns manifest installation | lifecycle tests and image metadata/tool readback; package/network mutation, project-install, sudo, or workspace repair is a drift blocker |
 | DEV-DEFAULT-005 | retain scripts and experiment owners; route managed runtime capability through the explicit `gpu-admission` selector/orchestrator | source existence, separate selector/output/project identity, and issue linkage; deletion of scheduler/managed experiment is out of scope and a review blocker |
@@ -321,8 +315,10 @@ weakening を許可する fallback ではない。
 
 ### DEV-DEFAULT-002/004 validation-failure-response
 
-ユーザー指示で supersede した root runtime、標準 `vscode`、非canonicalな
-`remoteUser`、`updateRemoteUserUID`、または unresolved `user: ':'` を再導入しない。
+ユーザー指示で supersede した root runtime、標準 `vscode`、default の static
+`containerUser`/`remoteUser`、または unresolved `user: ':'` を再導入しない。default は
+`updateRemoteUserUID: false` を維持し、生成 Compose の解決済み `service.user` を
+Dev Container CLI の numeric identity source とする。
 digest-pinned plain Ubuntu 22.04 の `project` user、host UID/GID build args、
 `USER project`、container-local sudo を確認する。`dependency capability setup failed:
 root or sudo is required`、host password prompt、UID/GID mismatch、または workspace
