@@ -15,9 +15,9 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
-import tempfile
 import unicodedata
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -34,6 +34,23 @@ from skill_shim_materializer import (  # pyright: ignore[reportMissingTypeStubs]
     build_record,
     render_shim,
 )
+
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
 
 SCHEMA_ROUTE = "agent_canon.route_golden_case.v1"
 SCHEMA_PACKETS = "agent_canon.skill_runtime_shim.fresh_packets"
@@ -54,6 +71,25 @@ SCENARIO_CATEGORIES = (
     "failure-argparse-normalization",
 )
 HOST_OBSERVATION_SCHEMA = "agent_canon.skill_runtime_shim.host_observation"
+
+
+def _parent_capability(purpose: str):
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = Path(configured)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
+    return ParentRootSideEffectBoundary(), attestation
+
+
+def _parent_write(path: Path, data: bytes, purpose: str) -> None:
+    boundary, attestation = _parent_capability(purpose)
+    boundary.write_parent_owned_file(attestation, path, data, purpose)
 
 
 class WorkflowSelectionCase(Protocol):
@@ -228,11 +264,19 @@ def route_golden(
     if len(manifest_data.cases) != 525:
         raise ProducerError("route_case_count_mismatch")
     rows: list[dict[str, object]] = []
-    with tempfile.TemporaryDirectory(prefix="skill-shim-route-") as prompt_dir:
-        prompt_root = Path(prompt_dir)
+    boundary, attestation = _parent_capability("skill-shim-route")
+    temp_parent = root / ".agent-canon" / "tmp" / "skill-shim-evaluation"
+    prompt_receipt = boundary.create_parent_owned_temp_directory(
+        attestation, temp_parent, "skill-shim-route", "skill-shim-route"
+    )
+    primary_error: BaseException | None = None
+    try:
+        prompt_root = prompt_receipt.physical_path
         for case in manifest_data.cases:
             prompt_path = prompt_root / f"{case.case_id}.txt"
-            prompt_path.write_text(case.prompt, encoding="utf-8")
+            boundary.write_parent_owned_file(
+                attestation, prompt_path, case.prompt.encode("utf-8"), "skill-shim-route"
+            )
             completed = subprocess.run(
                 [
                     sys.executable,
@@ -267,14 +311,29 @@ def route_golden(
                     "failure": failure,
                 }
             )
+    except BaseException as exc:
+        primary_error = exc
+        raise
+    finally:
+        try:
+            boundary.remove_parent_owned_tree(
+                attestation, prompt_receipt, "skill-shim-route-cleanup"
+            )
+        except ParentRootSideEffectError as cleanup_error:
+            if primary_error is not None:
+                raise cleanup_error from primary_error
+            raise
     payload = {
         "schema": "agent_canon.route_golden",
         "version": 1,
         "case_count": len(rows),
         "cases": rows,
     }
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    _parent_write(
+        output,
+        (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
+        "skill-shim-route-golden",
+    )
     return cast(Mapping[str, object], payload)
 
 
@@ -395,8 +454,11 @@ def packet_receipt(root: Path, manifest: Path, model: str, profile: str, output_
         "packet_count": len(rows),
         "packets": rows,
     }
-    output_dir.mkdir(parents=True, exist_ok=True)
-    (output_dir / "packet-receipt.json").write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    _parent_write(
+        output_dir / "packet-receipt.json",
+        (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
+        "skill-shim-packet-receipt",
+    )
     return cast(Mapping[str, object], payload)
 
 
@@ -804,8 +866,11 @@ def measurement(
         "scenario_rows": scenario_rows,
         "summary": summary,
     }
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    _parent_write(
+        output,
+        (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8"),
+        "skill-shim-measurement",
+    )
     return cast(Mapping[str, object], payload)
 
 

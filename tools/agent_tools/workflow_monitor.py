@@ -14,15 +14,15 @@
 from __future__ import annotations
 
 import argparse
-import fcntl
 import json
+import os
 import re
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TextIO, cast
+from typing import cast
 
 if __package__:
     from .workspace_scope import resolve_report_root, schedule_wave_row
@@ -40,8 +40,27 @@ from mid_task_user_input_policy import (
     has_reuse_marker,
     is_empty_policy_value,
 )
-from work_log import MONITOR_PASSTHROUGH_FIELDS, append_ledger_event
 from update_lifecycle_contract import TRANSACTION_STATES
+from work_log import MONITOR_PASSTHROUGH_FIELDS, append_ledger_event
+
+try:
+    from .parent_root_side_effects import (
+        ParentOwnedFileHandle,
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentOwnedFileHandle,
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
 
 DECISION_KEYS = (
     "skill_improvement_decision",
@@ -50,6 +69,26 @@ DECISION_KEYS = (
     "memory_learning_decision",
 )
 DECISION_VALUES = {"applied", "recorded", "not_applicable", "pending"}
+
+
+def _parent_path(path: Path, purpose: str, *, create: bool) -> Path:
+    """Authenticate a monitoring path before any lock or file mutation."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = Path(configured)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
+    boundary = ParentRootSideEffectBoundary()
+    if create:
+        boundary.ensure_parent_owned_directory(attestation, path.parent, purpose)
+    return boundary.resolve_parent_owned_path(
+        attestation, path, purpose, create=False
+    ).physical_path
 TOOL_WARNING_REQUIRED_KEYS = (
     "warning_id",
     "source_tool",
@@ -280,32 +319,49 @@ MONITORING_LEGACY_KEYS = {
 
 
 @contextmanager
-def locked_monitoring_artifact(path: Path) -> Iterator[TextIO]:
+def locked_monitoring_artifact(path: Path) -> Iterator[ParentOwnedFileHandle]:
     """Hold an exclusive lock while updating the monitoring artifact."""
-    path.touch(exist_ok=True)
-    with path.open("a+", encoding="utf-8") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        try:
-            handle.seek(0)
-            yield handle
-        finally:
-            handle.flush()
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "workflow-monitoring: explicit parent root is required",
+        )
+    parent = Path(configured)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(
+            cwd=parent, explicit_root=parent, purpose="workflow-monitoring"
+        )
+    )
+    boundary = ParentRootSideEffectBoundary()
+    with boundary.open_parent_owned_file(
+        attestation, path, "workflow-monitoring", create=True, mode="a+"
+    ) as handle:
+        handle.seek(0)
+        yield handle
 
 
 @contextmanager
-def locked_existing_artifact(path: Path) -> Iterator[TextIO]:
+def locked_existing_artifact(path: Path) -> Iterator[ParentOwnedFileHandle]:
     """Hold an exclusive lock while updating an existing artifact."""
-    if not path.is_file():
-        raise ValueError(f"missing required artifact: {path}")
-    with path.open("r+", encoding="utf-8") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-        try:
-            handle.seek(0)
-            yield handle
-        finally:
-            handle.flush()
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "workflow-monitoring: explicit parent root is required",
+        )
+    parent = Path(configured)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(
+            cwd=parent, explicit_root=parent, purpose="workflow-monitoring"
+        )
+    )
+    boundary = ParentRootSideEffectBoundary()
+    with boundary.open_parent_owned_file(
+        attestation, path, "workflow-monitoring", create=False, mode="r+"
+    ) as handle:
+        handle.seek(0)
+        yield handle
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -513,9 +569,8 @@ def resolve_report_dir(args: argparse.Namespace) -> Path:
     workspace_root = Path(str(args.workspace_root)).resolve()
     if args.report_dir:
         return Path(str(args.report_dir)).resolve()
-    return (
-        resolve_report_root(args.report_root, workspace_root) / str(args.run_id)
-    ).resolve()
+    # The configured parent is a write boundary, not a report-root override.
+    return (resolve_report_root(args.report_root, workspace_root) / str(args.run_id)).resolve()
 
 
 def timestamp_prefix(timestamp: str) -> str:
@@ -555,8 +610,8 @@ def normalize_semantic_event(entry: str) -> str:
             "semantic_kind must be one of: "
             + ",".join(sorted(COMPLETION_SEMANTIC_KINDS))
         )
-    for field in MONITOR_PASSTHROUGH_FIELDS:
-        _structured_semantic_field(fields, field)
+    for field_name in MONITOR_PASSTHROUGH_FIELDS:
+        _structured_semantic_field(fields, field_name)
     return f"ledger_event=projected {entry.strip()}"
 
 
@@ -594,10 +649,10 @@ def semantic_event_record(entry: str, report_dir: Path) -> dict[str, object]:
             event[optional] = fields[optional]
     if fields.get("member_clause_ids"):
         event["member_clause_ids"] = refs("member_clause_ids")
-    for field in MONITOR_PASSTHROUGH_FIELDS:
-        value = _structured_semantic_field(fields, field)
+    for field_name in MONITOR_PASSTHROUGH_FIELDS:
+        value = _structured_semantic_field(fields, field_name)
         if value is not None:
-            event[field] = value
+            event[field_name] = value
     return event
 
 
@@ -1416,7 +1471,7 @@ def append_monitoring(
 ) -> Path:
     """Append monitoring evidence and return the artifact path."""
     active_entries = entries_from_legacy(legacy_entries) if legacy_entries else entries
-    report_dir.mkdir(parents=True, exist_ok=True)
+    _parent_path(report_dir / "workflow_monitoring.md", "workflow-monitoring", create=True)
     for semantic_event in active_entries.semantic_events:
         append_ledger_event(
             report_dir,

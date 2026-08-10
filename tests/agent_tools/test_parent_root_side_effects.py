@@ -7,6 +7,7 @@ import json
 import os
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 
@@ -378,6 +379,90 @@ def test_path_capability_accepts_in_root_symlink_and_rejects_escape(tmp_path: Pa
     outside.unlink()
 
 
+def test_remove_parent_owned_file_unlinks_directory_symlink_and_preserves_target(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    target = tmp_path / "target-directory"
+    target.mkdir()
+    link = tmp_path / "tools-agent-canon"
+    link.symlink_to(target, target_is_directory=True)
+    capability = boundary.resolve_parent_owned_path(receipt, link, "lexical-link")
+
+    boundary.remove_parent_owned_file(capability)
+
+    assert not os.path.lexists(link)
+    assert target.is_dir()
+
+
+def test_remove_parent_owned_file_unlinks_direct_root_regular_file(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    regular = tmp_path / "direct-root-file"
+    regular.write_text("remove me\n", encoding="utf-8")
+    capability = boundary.resolve_parent_owned_path(receipt, regular, "regular-file")
+
+    boundary.remove_parent_owned_file(capability)
+
+    assert not regular.exists()
+
+
+def test_remove_parent_owned_file_unlinks_broken_in_root_symlink(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    link = tmp_path / "broken-link"
+    link.symlink_to("missing-target")
+    capability = boundary.resolve_parent_owned_path(receipt, link, "broken-link")
+    assert capability.target_dev is None
+    assert capability.lexical_link_target == "missing-target"
+
+    boundary.remove_parent_owned_file(capability)
+
+    assert not os.path.lexists(link)
+
+
+def test_external_missing_target_symlink_is_rejected_and_preserved(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    outside = tmp_path.parent / "missing-outside-target"
+    link = tmp_path / "external-broken-link"
+    link.symlink_to(outside)
+    with pytest.raises(ParentRootSideEffectError) as rejected:
+        boundary.resolve_parent_owned_path(receipt, link, "external-broken-link")
+    assert rejected.value.reject is ParentRootReject.SYMLINK_ESCAPE
+    assert os.path.lexists(link)
+
+
+def test_lexical_symlink_replacement_is_rejected_without_removing_replacement(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    first_target = tmp_path / "first-target"
+    second_target = tmp_path / "second-target"
+    first_target.mkdir()
+    second_target.mkdir()
+    link = tmp_path / "replaced-link"
+    link.symlink_to(first_target, target_is_directory=True)
+    capability = boundary.resolve_parent_owned_path(receipt, link, "replacement-link")
+    link.unlink()
+    link.symlink_to(second_target, target_is_directory=True)
+
+    with pytest.raises(ParentRootSideEffectError) as rejected:
+        boundary.remove_parent_owned_file(capability)
+
+    assert rejected.value.reject is ParentRootReject.ROOT_RACE_DETECTED
+    assert link.is_symlink()
+    assert link.resolve() == second_target
+
+
 def test_atomic_publish_and_child_environment_keep_home_unchanged(tmp_path: Path) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
@@ -435,6 +520,33 @@ def test_temp_directory_capability_is_exclusive_and_parent_bound(tmp_path: Path)
     assert not base.physical_path.exists()
 
 
+def test_temp_directory_replacement_is_typed_race(tmp_path: Path) -> None:
+    """A replaced temporary-directory inode is rejected by its receipt."""
+    boundary = ParentRootSideEffectBoundary()
+    attestation = attest(tmp_path)
+    temporary = boundary.create_parent_owned_temp_directory(
+        attestation, tmp_path / "replacement", "replacement", "replacement"
+    )
+    original = temporary.physical_path
+    moved = original.with_name(original.name + "-moved")
+    os.rename(original, moved)
+    os.mkdir(original)
+    with pytest.raises(ParentRootSideEffectError) as rejected:
+        boundary.remove_parent_owned_tree(attestation, temporary, "replacement")
+    assert rejected.value.reject is ParentRootReject.ROOT_RACE_DETECTED
+
+    replacement_receipt = boundary.resolve_parent_owned_path(
+        attestation, original, "replacement-cleanup", create=False
+    )
+    boundary.remove_parent_owned_tree(
+        attestation, replacement_receipt, "replacement-cleanup"
+    )
+    moved_receipt = boundary.resolve_parent_owned_path(
+        attestation, moved, "replacement-moved-cleanup", create=False
+    )
+    boundary.remove_parent_owned_tree(attestation, moved_receipt, "replacement-moved-cleanup")
+
+
 def test_symlink_replacement_after_capability_is_typed_race(tmp_path: Path) -> None:
     boundary = ParentRootSideEffectBoundary()
     receipt = attest(tmp_path)
@@ -460,6 +572,129 @@ def test_create_capability_uses_openat_and_rejects_final_symlink(tmp_path: Path)
     with pytest.raises(ParentRootSideEffectError) as rejected:
         boundary.resolve_parent_owned_path(receipt, escaped, "create", create=True)
     assert rejected.value.reject in {ParentRootReject.ROOT_RACE_DETECTED, ParentRootReject.SYMLINK_ESCAPE}
+
+
+def test_open_parent_owned_file_a_plus_creates_and_locks(tmp_path: Path) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    target = tmp_path / "monitor" / "workflow_monitoring.md"
+    with boundary.open_parent_owned_file(
+        receipt, target, "workflow-monitoring", create=True, mode="a+"
+    ) as handle:
+        handle.write("created\n")
+        handle.seek(0)
+        assert handle.read() == "created\n"
+    assert target.read_text(encoding="utf-8") == "created\n"
+
+
+def test_open_parent_owned_file_r_plus_requires_existing_file_and_does_not_truncate(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    target = tmp_path / "monitor" / "workflow_monitoring.md"
+    target.parent.mkdir()
+    target.write_text("existing\n", encoding="utf-8")
+    with boundary.open_parent_owned_file(
+        receipt, target, "workflow-monitoring", create=False, mode="r+"
+    ) as handle:
+        handle.seek(0)
+        assert handle.read() == "existing\n"
+    assert target.read_text(encoding="utf-8") == "existing\n"
+    with pytest.raises(ParentRootSideEffectError) as missing:
+        boundary.open_parent_owned_file(
+            receipt,
+            tmp_path / "monitor" / "missing.md",
+            "workflow-monitoring",
+            create=False,
+            mode="r+",
+        )
+    assert missing.value.reject is ParentRootReject.ROOT_MISSING
+
+
+def test_open_parent_owned_file_rejects_replaced_component(tmp_path: Path) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    outside = tmp_path.parent / "outside-monitor"
+    outside.mkdir()
+    replaced = tmp_path / "monitor"
+    replaced.symlink_to(outside, target_is_directory=True)
+    with pytest.raises(ParentRootSideEffectError) as rejected:
+        boundary.open_parent_owned_file(
+            receipt,
+            replaced / "workflow_monitoring.md",
+            "workflow-monitoring",
+            create=True,
+            mode="a+",
+        )
+    assert rejected.value.reject is ParentRootReject.SYMLINK_ESCAPE
+    assert not (outside / "workflow_monitoring.md").exists()
+
+
+def test_open_parent_owned_file_lock_blocks_until_release(tmp_path: Path) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    target = tmp_path / "monitor" / "workflow_monitoring.md"
+    first = boundary.open_parent_owned_file(
+        receipt, target, "workflow-monitoring", create=True, mode="a+"
+    )
+    started = threading.Event()
+    acquired = threading.Event()
+    failures: list[BaseException] = []
+
+    def acquire_second_handle() -> None:
+        try:
+            started.set()
+            with boundary.open_parent_owned_file(
+                receipt, target, "workflow-monitoring", create=False, mode="r+"
+            ):
+                acquired.set()
+        except BaseException as exc:  # pragma: no cover - assertion below reports it
+            failures.append(exc)
+
+    worker = threading.Thread(target=acquire_second_handle)
+    worker.start()
+    assert started.wait(2)
+    assert not acquired.wait(0.1)
+    first.close()
+    worker.join(timeout=2)
+    assert not worker.is_alive()
+    assert not failures
+    assert acquired.is_set()
+
+
+def test_open_parent_owned_file_rolls_back_new_file_after_open_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    target = tmp_path / "monitor" / "workflow_monitoring.md"
+
+    def fail_fdopen(*args: object, **kwargs: object) -> object:
+        raise OSError("injected text-wrapper failure")
+
+    monkeypatch.setattr(side_effects.os, "fdopen", fail_fdopen)
+    with pytest.raises(ParentRootSideEffectError):
+        boundary.open_parent_owned_file(
+            receipt, target, "workflow-monitoring", create=True, mode="a+"
+        )
+    assert not target.exists()
+
+
+def test_remove_parent_owned_tree_handles_deep_tree_without_recursion(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    temporary = boundary.create_parent_owned_temp_directory(
+        receipt, tmp_path / "deep", "deep-tree", "deep-tree"
+    )
+    current = temporary.physical_path
+    for _ in range(sys.getrecursionlimit() + 25):
+        current = current / "x"
+        os.mkdir(current)
+    boundary.remove_parent_owned_tree(receipt, temporary, "deep-tree-cleanup")
+    assert not temporary.physical_path.exists()
 
 
 def test_handoff_is_single_use_and_rejects_mutation_or_expiry(tmp_path: Path) -> None:

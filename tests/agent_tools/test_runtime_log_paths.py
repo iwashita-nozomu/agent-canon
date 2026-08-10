@@ -22,15 +22,22 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from tools.agent_tools.parent_root_side_effects import (
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+)
 from tools.agent_tools.runtime_log_paths import (
     agent_report_archive_dir,
     codex_runtime_index_path,
     codex_runtime_summary_path,
+    hook_event_spool_root,
     hook_log_file_name,
     hook_result_search_dirs,
     log_branch_key,
     mounted_log_archive_root,
     repo_log_key,
+    runtime_event_publication_outcome_spool_root,
 )
 
 
@@ -211,6 +218,132 @@ class RuntimeLogPathsTest(unittest.TestCase):
             runtime_root / "chats" / "thread-1" / f"summary-{commit_key}.jsonl",
         )
         self.assertEqual(hook_name, f"skill_usage-{commit_key}.jsonl")
+
+    def test_parent_capability_preserves_caller_archive_root(self) -> None:
+        """A shared parent must not collapse caller archive namespaces."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            parent = Path(temp_dir) / "parent"
+            caller_a = parent / "caller-a"
+            caller_b = parent / "caller-b"
+            parent.mkdir()
+            caller_a.mkdir()
+            caller_b.mkdir()
+            self.make_git_commit(parent)
+
+            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent)}):
+                archive_a = mounted_log_archive_root(caller_a)
+                archive_b = mounted_log_archive_root(caller_b)
+
+        self.assertEqual(archive_a, caller_a / ".agent-canon" / "log-archive")
+        self.assertEqual(archive_b, caller_b / ".agent-canon" / "log-archive")
+        self.assertNotEqual(archive_a, archive_b)
+
+    def test_parent_capability_preserves_caller_hook_spool_root(self) -> None:
+        """Hook events remain in the active caller's runtime spool."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            parent = Path(temp_dir) / "parent"
+            caller_a = parent / "caller-a"
+            caller_b = parent / "caller-b"
+            parent.mkdir()
+            caller_a.mkdir()
+            caller_b.mkdir()
+            self.make_git_commit(parent)
+
+            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent)}):
+                spool_a = hook_event_spool_root(caller_a)
+                spool_b = hook_event_spool_root(caller_b)
+
+        self.assertEqual(
+            spool_a,
+            caller_a / ".agent-canon" / "runtime-event-spool" / "hook-events" / repo_log_key(caller_a),
+        )
+        self.assertEqual(
+            spool_b,
+            caller_b / ".agent-canon" / "runtime-event-spool" / "hook-events" / repo_log_key(caller_b),
+        )
+        self.assertNotEqual(spool_a, spool_b)
+
+    def test_parent_capability_preserves_caller_publication_outcome_root(self) -> None:
+        """Publication outcomes remain in the active caller's runtime spool."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            parent = Path(temp_dir) / "parent"
+            caller_a = parent / "caller-a"
+            caller_b = parent / "caller-b"
+            parent.mkdir()
+            caller_a.mkdir()
+            caller_b.mkdir()
+            self.make_git_commit(parent)
+
+            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent)}):
+                spool_a = runtime_event_publication_outcome_spool_root(caller_a)
+                spool_b = runtime_event_publication_outcome_spool_root(caller_b)
+
+        self.assertEqual(
+            spool_a,
+            caller_a / ".agent-canon" / "runtime-event-spool" / "publication-outcome",
+        )
+        self.assertEqual(
+            spool_b,
+            caller_b / ".agent-canon" / "runtime-event-spool" / "publication-outcome",
+        )
+        self.assertNotEqual(spool_a, spool_b)
+
+    def test_parent_capability_rejects_external_runtime_candidate(self) -> None:
+        """An external runtime spool override fails before any write."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            parent = root / "parent"
+            caller = parent / "caller"
+            external = root / "external"
+            parent.mkdir()
+            caller.mkdir()
+            external.mkdir()
+            self.make_git_commit(parent)
+
+            with patch.dict(
+                os.environ,
+                {
+                    "AGENT_CANON_PARENT_ROOT": str(parent),
+                    "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(external),
+                },
+            ):
+                with self.assertRaises(ParentRootSideEffectError) as raised:
+                    hook_event_spool_root(caller)
+
+        self.assertIs(raised.exception.reject, ParentRootReject.SYMLINK_ESCAPE)
+        self.assertFalse((external / repo_log_key(caller)).exists())
+
+    def test_parent_capability_checks_unresolved_logical_candidate(self) -> None:
+        """Boundary validation observes the caller path before physical resolution."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            parent = Path(temp_dir) / "parent"
+            caller = parent / "caller"
+            override = caller / "override"
+            parent.mkdir()
+            caller.mkdir()
+            self.make_git_commit(parent)
+            observed: list[tuple[Path, str]] = []
+
+            def capture(self, attestation, candidate, purpose, *, create=False):
+                observed.append((candidate, purpose))
+                return object()
+
+            with patch.dict(
+                os.environ,
+                {
+                    "AGENT_CANON_PARENT_ROOT": str(parent),
+                    "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(override),
+                },
+            ), patch.object(
+                ParentRootSideEffectBoundary,
+                "resolve_parent_owned_path",
+                capture,
+            ):
+                result = hook_event_spool_root(caller)
+
+        expected = override / repo_log_key(caller)
+        self.assertEqual(observed, [(expected, "runtime-event-spool")])
+        self.assertEqual(result, expected)
 
 
 if __name__ == "__main__":

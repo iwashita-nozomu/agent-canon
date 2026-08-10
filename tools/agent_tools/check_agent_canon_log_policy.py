@@ -13,12 +13,36 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
+import secrets
 import subprocess
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
+
+try:
+    from .parent_root_side_effects import (
+        ParentOwnedPathReceipt,
+        ParentOwnedTargetHandle,
+        ParentRootAttestationReceipt,
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentOwnedPathReceipt,
+        ParentOwnedTargetHandle,
+        ParentRootAttestationReceipt,
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
 
 DEFAULT_REMOTE = "https://github.com/iwashita-nozomu/agent-canon-log.git"
 DEFAULT_COMMIT = "9f10130184539beaebe8991bbcfb5665d476fbe5"
@@ -31,6 +55,24 @@ EXPECTED_BLOCKERS = (
     "Migration must be a dry-run manifest, explicit authority, and exact remote readback.",
     "This inventory performs no branch deletion, merge, rewrite, or data migration.",
 )
+
+
+def _parent_capability() -> tuple[
+    ParentRootSideEffectBoundary, ParentRootAttestationReceipt
+]:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "policy inventory: explicit parent root is required",
+        )
+    parent = Path(configured)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(
+            cwd=parent, explicit_root=parent, purpose="policy-inventory"
+        )
+    )
+    return ParentRootSideEffectBoundary(), attestation
 
 
 class PolicyInventoryError(ValueError):
@@ -89,9 +131,11 @@ def validate_inventory_bytes(
         raise PolicyInventoryError("policy_inventory_remote_mismatch")
 
     branches_value = payload.get("legacy_branches")
-    if not isinstance(branches_value, list) or len(branches_value) != 42:
+    if not isinstance(branches_value, list):
         raise PolicyInventoryError("policy_inventory_legacy_branch_rows")
     branches = cast(list[object], branches_value)
+    if len(branches) != 42:
+        raise PolicyInventoryError("policy_inventory_legacy_branch_rows")
     branch_names: set[str] = set()
     for row_value in branches:
         row = _object(row_value, "policy_inventory_branch_row_invalid")
@@ -163,34 +207,103 @@ def validate_inventory_bytes(
 
 def retrieve_inventory_blob(remote: str, commit: str = DEFAULT_COMMIT) -> bytes:
     """Fetch one policy commit into a temporary Git object store, then read its blob."""
-    with tempfile.TemporaryDirectory(prefix="agent-canon-log-policy-") as temp_dir:
-        root = Path(temp_dir)
-        init = subprocess.run(["git", "init", "-q", str(root)], check=False, capture_output=True)
+    boundary, attestation = _parent_capability()
+    temp_parent = (
+        attestation.parent_root / ".agent-canon" / "tmp" / "policy-inventory"
+    )
+    candidate = temp_parent / f"agent-canon-log-policy-{secrets.token_hex(16)}"
+    target_handle: ParentOwnedTargetHandle | None = None
+    target_receipt: ParentOwnedPathReceipt | None = None
+    primary_error: BaseException | None = None
+    try:
+        target_handle = boundary.open_parent_owned_target(
+            attestation, candidate, "policy-inventory"
+        )
+        child_handle = target_handle
+        child_cwd = child_handle.proc_path
+
+        def run_git(
+            arguments: list[str], *, text: bool = False
+        ) -> subprocess.CompletedProcess[bytes | str]:
+            return subprocess.run(
+                ["git", *arguments],
+                cwd=child_cwd,
+                check=False,
+                capture_output=True,
+                text=text,
+                pass_fds=(child_handle.target_fd,),
+            )
+
+        init = run_git(["init", "-q"])
         if init.returncode != 0:
             raise PolicyInventoryError("policy_inventory_fetch_init_failed")
-        added = subprocess.run(
-            ["git", "-C", str(root), "remote", "add", "origin", remote],
-            check=False,
-            capture_output=True,
-        )
+        added = run_git(["remote", "add", "origin", remote])
         if added.returncode != 0:
             raise PolicyInventoryError("policy_inventory_remote_invalid")
-        fetched = subprocess.run(
-            ["git", "-C", str(root), "fetch", "--no-tags", "--quiet", "origin", commit],
-            check=False,
-            capture_output=True,
-            text=True,
+        fetched = run_git(
+            ["fetch", "--no-tags", "--quiet", "origin", commit], text=True
         )
         if fetched.returncode != 0:
             raise PolicyInventoryError("policy_inventory_fetch_failed")
-        shown = subprocess.run(
-            ["git", "-C", str(root), "show", f"{commit}:{INVENTORY_PATH}"],
-            check=False,
-            capture_output=True,
-        )
+        shown = run_git(["show", f"{commit}:{INVENTORY_PATH}"])
         if shown.returncode != 0:
             raise PolicyInventoryError("policy_inventory_blob_missing")
-        return shown.stdout
+        target_receipt = boundary.resolve_parent_owned_path(
+            attestation, target_handle.physical_path, "policy-inventory-readback"
+        )
+        if (target_receipt.target_dev, target_receipt.target_ino) != (
+            target_handle.target_dev,
+            target_handle.target_ino,
+        ):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "policy inventory target identity changed during Git retrieval",
+            )
+        return cast(bytes, shown.stdout)
+    except BaseException as exc:
+        primary_error = exc
+        raise
+    finally:
+        cleanup_errors: list[BaseException] = []
+        if target_handle is not None:
+            if target_receipt is None:
+                try:
+                    resolved_cleanup = boundary.resolve_parent_owned_path(
+                        attestation,
+                        target_handle.physical_path,
+                        "policy-inventory-cleanup",
+                    )
+                    if (resolved_cleanup.target_dev, resolved_cleanup.target_ino) != (
+                        target_handle.target_dev,
+                        target_handle.target_ino,
+                    ):
+                        raise ParentRootSideEffectError(
+                            ParentRootReject.ROOT_RACE_DETECTED,
+                            "policy inventory target identity changed during cleanup",
+                        )
+                    target_receipt = resolved_cleanup
+                except BaseException as exc:
+                    cleanup_errors.append(exc)
+            try:
+                target_handle.close()
+            except OSError as exc:
+                cleanup_errors.append(exc)
+        if target_receipt is not None:
+            try:
+                boundary.remove_parent_owned_tree(
+                    attestation, target_receipt, "policy-inventory-cleanup"
+                )
+            except BaseException as exc:
+                cleanup_errors.append(exc)
+        if cleanup_errors:
+            detail = "; ".join(str(error) for error in cleanup_errors)
+            cleanup_error = ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"policy inventory cleanup failed: {detail}",
+            )
+            if primary_error is not None:
+                raise cleanup_error from primary_error
+            raise cleanup_error
 
 
 def build_parser() -> argparse.ArgumentParser:

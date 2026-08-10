@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 from dataclasses import dataclass
@@ -84,11 +85,29 @@ def resolve_report_root(
         workspace_root.resolve() if workspace_root is not None else Path.cwd().resolve()
     )
     try:
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(
-                cwd=base_root, explicit_root=None, purpose="report-root"
+        # A caller may run from a nested checkout while its report bundle is
+        # intentionally owned by the already-authenticated outer repository.
+        # Authenticate that explicit parent through Git before accepting the
+        # capability; the environment variable is only a path selector and is
+        # never trusted as identity evidence on its own.  Attesting with the
+        # parent as cwd avoids replacing the selected outer boundary with the
+        # nested checkout's Git toplevel.
+        configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+        if configured_parent:
+            parent_root = Path(configured_parent).resolve(strict=True)
+            attestation = attest_parent_root(
+                ParentRootAttestationRequest(
+                    cwd=parent_root,
+                    explicit_root=parent_root,
+                    purpose="report-root",
+                )
             )
-        )
+        else:
+            attestation = attest_parent_root(
+                ParentRootAttestationRequest(
+                    cwd=base_root, explicit_root=None, purpose="report-root"
+                )
+            )
         candidate = DEFAULT_REPORT_ROOT if report_root is None else Path(report_root)
         if not candidate.is_absolute():
             candidate = base_root / candidate

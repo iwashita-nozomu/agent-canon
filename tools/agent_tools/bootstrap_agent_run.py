@@ -10,11 +10,45 @@
 from __future__ import annotations
 
 import argparse
+import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
 UTC = timezone.utc
 from pathlib import Path
+
+if __package__:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+else:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+
+
+def _write_parent(path: Path, data: bytes, purpose: str) -> None:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
+    ParentRootSideEffectBoundary().write_parent_owned_file(
+        attestation, path, data, purpose
+    )
 
 from agent_canon_preflight import AgentCanonPreflightResult, run_agent_canon_preflight
 
@@ -346,6 +380,8 @@ def resolve_bootstrap_context(
     """Resolve workflow family, specialists, and report paths for one run."""
     created_at = datetime.now(UTC).replace(microsecond=0)
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
+    # The parent capability authorizes the eventual write; it does not replace
+    # the caller's logical workspace/report-root selection.
     report_root = resolve_report_root(args.report_root, workspace_root)
     run_id = args.run_id or make_run_id(args.task, created_at)
     report_dir = report_root / run_id
@@ -706,8 +742,10 @@ def main() -> int:
     active_design_packet = run_active_design_packet(run_spec)
     created_files = create_run_bundle(run_spec)
     active_pointer = context.report_root / ".active_run"
-    active_pointer.write_text(
-        str(context.report_dir.resolve()) + "\n", encoding="utf-8"
+    _write_parent(
+        active_pointer,
+        (str(context.report_dir.resolve()) + "\n").encode("utf-8"),
+        "bootstrap-active-run",
     )
     write_task_authority_baselines(context.report_dir, context.report_root)
     runtime = BootstrapRuntime(

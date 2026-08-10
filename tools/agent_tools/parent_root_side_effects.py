@@ -27,7 +27,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from pathlib import Path
-from typing import cast
+from types import TracebackType
+from typing import TextIO, cast
 
 SCHEMA_REQUEST = "agent-canon.parent-root-attestation-request.v1"
 SCHEMA_RECEIPT = "agent-canon.parent-root-attestation-receipt.v1"
@@ -135,6 +136,16 @@ class ParentOwnedPathReceipt:
     target_dev: int | None = None
     target_ino: int | None = None
     parent_components: tuple[tuple[str, int, int], ...] = ()
+    lexical_parent_path: Path | None = None
+    lexical_parent_dev: int | None = None
+    lexical_parent_ino: int | None = None
+    lexical_name: str = ""
+    lexical_entry_dev: int | None = None
+    lexical_entry_ino: int | None = None
+    lexical_entry_type: int | None = None
+    lexical_entry_exists: bool = False
+    lexical_link_target: str | None = None
+    lexical_parent_components: tuple[tuple[str, int, int], ...] = ()
 
 
 @dataclass
@@ -162,6 +173,149 @@ class ParentOwnedTargetHandle:
             os.close(target_fd)
         if parent_fd >= 0:
             os.close(parent_fd)
+
+
+@dataclass
+class ParentOwnedFileHandle:
+    """A locked text file opened beneath an authenticated parent receipt."""
+
+    stream: TextIO
+    physical_path: Path
+    purpose: str
+    target_dev: int
+    target_ino: int
+    _closed: bool = False
+
+    @property
+    def fd(self) -> int:
+        """Return the owned file descriptor while the handle is open."""
+        return self.stream.fileno()
+
+    def fileno(self) -> int:
+        """Return the owned file descriptor for fd-based consumers."""
+        return self.fd
+
+    @property
+    def closed(self) -> bool:
+        """Return whether the receipt-bound stream is closed."""
+        return self.stream.closed
+
+    def read(self, size: int = -1) -> str:
+        """Read text from the locked receipt-bound stream."""
+        return self.stream.read(size)
+
+    def readline(self, size: int = -1) -> str:
+        """Read one line from the locked receipt-bound stream."""
+        return self.stream.readline(size)
+
+    def readlines(self, hint: int = -1) -> list[str]:
+        """Read lines from the locked receipt-bound stream."""
+        return self.stream.readlines(hint)
+
+    def write(self, text: str) -> int:
+        """Write text to the locked receipt-bound stream."""
+        return self.stream.write(text)
+
+    def writelines(self, lines: Sequence[str]) -> None:
+        """Write lines to the locked receipt-bound stream."""
+        self.stream.writelines(lines)
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        """Seek within the locked receipt-bound stream."""
+        return self.stream.seek(offset, whence)
+
+    def tell(self) -> int:
+        """Return the locked receipt-bound stream position."""
+        return self.stream.tell()
+
+    def truncate(self, size: int | None = None) -> int:
+        """Truncate the locked receipt-bound stream when explicitly requested."""
+        return self.stream.truncate(size)
+
+    def flush(self) -> None:
+        """Flush the locked receipt-bound stream."""
+        self.stream.flush()
+
+    def readable(self) -> bool:
+        """Return whether the locked receipt-bound stream is readable."""
+        return self.stream.readable()
+
+    def writable(self) -> bool:
+        """Return whether the locked receipt-bound stream is writable."""
+        return self.stream.writable()
+
+    def seekable(self) -> bool:
+        """Return whether the locked receipt-bound stream is seekable."""
+        return self.stream.seekable()
+
+    def __enter__(self) -> "ParentOwnedFileHandle":
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> bool:
+        try:
+            self.close()
+        except ParentRootSideEffectError as cleanup_error:
+            if exc_value is not None:
+                raise cleanup_error from exc_value
+            raise
+        return False
+
+    def close(self) -> None:
+        """Flush, unlock, and close the owned descriptor exactly once."""
+        if self._closed:
+            return
+        self._closed = True
+        cleanup_error: ParentRootSideEffectError | None = None
+        try:
+            descriptor = self.stream.fileno()
+            self.stream.flush()
+            os.fsync(descriptor)
+        except (OSError, ValueError) as exc:
+            cleanup_error = ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"parent-owned file flush failed ({self.purpose}): {exc}",
+            )
+        finally:
+            try:
+                descriptor = self.stream.fileno()
+            except ValueError:
+                descriptor = -1
+            if descriptor >= 0:
+                try:
+                    fcntl.flock(descriptor, fcntl.LOCK_UN)
+                except OSError as exc:
+                    if cleanup_error is None:
+                        cleanup_error = ParentRootSideEffectError(
+                            ParentRootReject.ROOT_RACE_DETECTED,
+                            f"parent-owned file unlock failed ({self.purpose}): {exc}",
+                        )
+            try:
+                self.stream.close()
+            except OSError as exc:
+                if cleanup_error is None:
+                    cleanup_error = ParentRootSideEffectError(
+                        ParentRootReject.ROOT_RACE_DETECTED,
+                        f"parent-owned file close failed ({self.purpose}): {exc}",
+                    )
+        if cleanup_error is not None:
+            raise cleanup_error
+
+
+@dataclass
+class _TreeRemovalFrame:
+    """One opened directory in the iterative post-order removal stack."""
+
+    directory_fd: int
+    parent_fd: int | None = None
+    entry_name: str | None = None
+    expected_dev: int | None = None
+    expected_ino: int | None = None
+    entries: list[str] | None = None
 
 
 @dataclass(frozen=True)
@@ -390,7 +544,10 @@ def _open_components(root: Path, parts: Sequence[str], *, create: bool) -> tuple
                     raise ParentRootSideEffectError(ParentRootReject.ROOT_MISSING,
                                                     f"missing directory component: {component}")
                 try:
-                    os.mkdir(component, 0o700, dir_fd=fd)
+                    try:
+                        os.mkdir(component, 0o700, dir_fd=fd)
+                    except FileExistsError:
+                        pass
                     child = os.open(component, os.O_RDONLY | os.O_DIRECTORY |
                                     os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=fd)
                 except OSError as exc:
@@ -436,7 +593,10 @@ def _component_identities(
                         f"missing directory component: {component}",
                     )
                 try:
-                    os.mkdir(component, 0o700, dir_fd=fd)
+                    try:
+                        os.mkdir(component, 0o700, dir_fd=fd)
+                    except FileExistsError:
+                        pass
                     child = os.open(
                         component,
                         os.O_RDONLY
@@ -489,6 +649,171 @@ def _verify_parent_components(receipt: ParentOwnedPathReceipt) -> None:
                 ParentRootReject.ROOT_RACE_DETECTED,
                 f"parent directory identity changed: {expected_entry[0]}",
             )
+
+
+def _lexical_snapshot(root: Path, lexical: Path) -> dict[str, object]:
+    """Capture the no-follow lexical parent and entry identity for a receipt."""
+    # The authenticated root itself is a valid directory capability used by
+    # ensure-dir callers for top-level paths (whose lexical parent is ``.``).
+    # It has no removable lexical entry; retain the attested receipt fields
+    # rather than attempting to inspect the parent outside the boundary.
+    if lexical == root:
+        return {}
+    try:
+        parent_parts = tuple(lexical.parent.relative_to(root).parts)
+    except ValueError as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.SYMLINK_ESCAPE,
+            f"lexical parent escapes parent root: {lexical}",
+        ) from exc
+    parent_fd, _ = _open_components(root, parent_parts, create=False)
+    try:
+        parent_info = os.fstat(parent_fd)
+        entry_name = lexical.name
+        entry_dev: int | None = None
+        entry_ino: int | None = None
+        entry_type: int | None = None
+        entry_exists = False
+        link_target: str | None = None
+        try:
+            entry_info = os.stat(
+                entry_name, dir_fd=parent_fd, follow_symlinks=False
+            )
+        except FileNotFoundError:
+            pass
+        else:
+            entry_exists = True
+            entry_dev = entry_info.st_dev
+            entry_ino = entry_info.st_ino
+            entry_type = stat.S_IFMT(entry_info.st_mode)
+            if stat.S_ISLNK(entry_info.st_mode):
+                link_target = os.readlink(entry_name, dir_fd=parent_fd)
+        return {
+            "lexical_parent_path": lexical.parent,
+            "lexical_parent_dev": parent_info.st_dev,
+            "lexical_parent_ino": parent_info.st_ino,
+            "lexical_name": entry_name,
+            "lexical_entry_dev": entry_dev,
+            "lexical_entry_ino": entry_ino,
+            "lexical_entry_type": entry_type,
+            "lexical_entry_exists": entry_exists,
+            "lexical_link_target": link_target,
+            "lexical_parent_components": _component_identities(
+                root, parent_parts, create=False
+            ),
+        }
+    finally:
+        os.close(parent_fd)
+
+
+def _open_lexical_entry(receipt: ParentOwnedPathReceipt) -> tuple[int, str]:
+    """Open and re-attest a receipt's lexical entry without following it."""
+    root = receipt.parent_root
+    lexical_parent = receipt.lexical_parent_path
+    if (
+        lexical_parent is None
+        or not receipt.lexical_name
+        or not receipt.lexical_entry_exists
+        or receipt.lexical_entry_dev is None
+        or receipt.lexical_entry_ino is None
+        or receipt.lexical_entry_type is None
+        or receipt.lexical_parent_dev is None
+        or receipt.lexical_parent_ino is None
+    ):
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_RACE_DETECTED,
+            "path receipt has no complete lexical-entry identity",
+        )
+    try:
+        parent_parts = tuple(lexical_parent.relative_to(root).parts)
+    except ValueError as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.SYMLINK_ESCAPE,
+            f"lexical parent escapes parent root: {lexical_parent}",
+        ) from exc
+    parent_fd, _ = _open_components(root, parent_parts, create=False)
+    try:
+        parent_info = os.fstat(parent_fd)
+        if (parent_info.st_dev, parent_info.st_ino) != (
+            receipt.lexical_parent_dev,
+            receipt.lexical_parent_ino,
+        ):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "lexical parent identity changed before removal",
+            )
+        actual_components = _component_identities(
+            root, parent_parts, create=False
+        )
+        if actual_components != receipt.lexical_parent_components:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "lexical parent component identity changed before removal",
+            )
+        observed = os.stat(
+            receipt.lexical_name, dir_fd=parent_fd, follow_symlinks=False
+        )
+        if (
+            (observed.st_dev, observed.st_ino)
+            != (receipt.lexical_entry_dev, receipt.lexical_entry_ino)
+            or stat.S_IFMT(observed.st_mode) != receipt.lexical_entry_type
+        ):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "lexical entry identity changed before removal",
+            )
+        if stat.S_ISLNK(observed.st_mode):
+            link_target = os.readlink(
+                receipt.lexical_name, dir_fd=parent_fd
+            )
+            if link_target != receipt.lexical_link_target:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "lexical symlink target changed before removal",
+                )
+            current_physical, _ = _physical_in_root(
+                root, receipt.lexical_path, allow_missing=True
+            )
+            if current_physical != receipt.physical_path:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "resolved symlink target changed before removal",
+                )
+            try:
+                target_info = current_physical.stat()
+            except FileNotFoundError:
+                if receipt.target_dev is not None or receipt.target_ino is not None:
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_RACE_DETECTED,
+                        "symlink target disappeared before removal",
+                    )
+            else:
+                if receipt.target_dev is None or receipt.target_ino is None:
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_RACE_DETECTED,
+                        "broken symlink target appeared before removal",
+                    )
+                if (target_info.st_dev, target_info.st_ino) != (
+                    receipt.target_dev,
+                    receipt.target_ino,
+                ):
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_RACE_DETECTED,
+                        "symlink target identity changed before removal",
+                    )
+        else:
+            current_physical, _ = _physical_in_root(
+                root, receipt.lexical_path, allow_missing=False
+            )
+            if current_physical != receipt.physical_path:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "resolved lexical entry changed before removal",
+                )
+        return parent_fd, receipt.lexical_name
+    except Exception:
+        os.close(parent_fd)
+        raise
 
 
 def _parent_directory(root: Path, physical: Path, *, create: bool) -> tuple[int, str, Path]:
@@ -989,7 +1314,7 @@ class ParentRootSideEffectBoundary:
             target = (info.st_dev, info.st_ino)
         except FileNotFoundError:
             pass
-        return ParentOwnedPathReceipt(
+        receipt = ParentOwnedPathReceipt(
             lexical,
             physical,
             purpose,
@@ -1000,6 +1325,12 @@ class ParentRootSideEffectBoundary:
             *(target or (None, None)),
             parent_components,
         )
+        try:
+            return replace(receipt, **_lexical_snapshot(root, lexical))
+        except ParentRootSideEffectError as exc:
+            if exc.reject is not ParentRootReject.ROOT_MISSING:
+                raise
+            return receipt
 
     def ensure_parent_owned_directory(self, attestation: ParentRootAttestationReceipt,
                                       candidate: Path | str, purpose: str) -> ParentOwnedPathReceipt:
@@ -1017,10 +1348,173 @@ class ParentRootSideEffectBoundary:
         parent_components = _component_identities(
             attestation.parent_root, parts[:-1], create=False
         )
-        return ParentOwnedPathReceipt(_lexical_candidate(attestation.parent_root, candidate), physical,
-                                      purpose, attestation.parent_dev, attestation.parent_ino,
-                                      attestation.token_digest, attestation.parent_root,
-                                      info.st_dev, info.st_ino, parent_components)
+        lexical = _lexical_candidate(attestation.parent_root, candidate)
+        receipt = ParentOwnedPathReceipt(
+            lexical,
+            physical,
+            purpose,
+            attestation.parent_dev,
+            attestation.parent_ino,
+            attestation.token_digest,
+            attestation.parent_root,
+            info.st_dev,
+            info.st_ino,
+            parent_components,
+        )
+        return replace(receipt, **_lexical_snapshot(attestation.parent_root, lexical))
+
+    def open_parent_owned_file(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        candidate: Path | str,
+        purpose: str,
+        *,
+        create: bool,
+        mode: str,
+    ) -> ParentOwnedFileHandle:
+        """Open and lock a receipt-bound ``a+`` or ``r+`` file without a path race."""
+        if sys.platform != "linux":
+            raise ParentRootSideEffectError(ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform)
+        if mode not in {"a+", "r+"}:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH,
+                f"unsupported parent-owned file mode: {mode}",
+            )
+        if mode == "r+" and create:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH,
+                "r+ parent-owned files cannot create a missing target",
+            )
+        if mode == "a+" and not create:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH,
+                "a+ parent-owned files require create=True",
+            )
+        root = attestation.parent_root
+        physical, _ = _physical_in_root(root, candidate, allow_missing=create)
+        parent_fd, name, _ = _parent_directory(root, physical, create=create)
+        target_fd = -1
+        handle: ParentOwnedFileHandle | None = None
+        created = False
+        created_info: os.stat_result | None = None
+        before = (attestation.parent_dev, attestation.parent_ino)
+        try:
+            if _identity(root) != before:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "parent identity changed before file open",
+                )
+            try:
+                existing = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                existing = None
+            flags = os.O_RDWR | os.O_CLOEXEC | os.O_NOFOLLOW
+            if mode == "a+":
+                flags |= os.O_APPEND | os.O_CREAT
+            try:
+                target_fd = os.open(name, flags, 0o600, dir_fd=parent_fd)
+            except FileNotFoundError as exc:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISSING,
+                    f"parent-owned file does not exist: {physical}",
+                ) from exc
+            except OSError as exc:
+                reject = (
+                    ParentRootReject.SYMLINK_ESCAPE
+                    if exc.errno in {errno.ELOOP, errno.ENOTDIR}
+                    else ParentRootReject.ROOT_RACE_DETECTED
+                )
+                raise ParentRootSideEffectError(
+                    reject, f"cannot open parent-owned file: {exc}"
+                ) from exc
+            created = existing is None and mode == "a+"
+            info = os.fstat(target_fd)
+            created_info = info if created else None
+            if not stat.S_ISREG(info.st_mode):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISMATCH,
+                    f"parent-owned target is not a regular file: {physical}",
+                )
+            if existing is not None and (info.st_dev, info.st_ino) != (
+                existing.st_dev,
+                existing.st_ino,
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "parent-owned file identity changed during open",
+                )
+            if _identity(root) != before:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "parent identity changed after file open",
+                )
+            while True:
+                try:
+                    fcntl.flock(target_fd, fcntl.LOCK_EX)
+                    break
+                except InterruptedError:
+                    continue
+                except OSError as exc:
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_RACE_DETECTED,
+                        f"cannot lock parent-owned file: {exc}",
+                    ) from exc
+            stream = cast(
+                TextIO,
+                os.fdopen(target_fd, mode, encoding="utf-8", newline=""),
+            )
+            target_fd = -1
+            handle = ParentOwnedFileHandle(
+                stream=stream,
+                physical_path=physical,
+                purpose=purpose,
+                target_dev=info.st_dev,
+                target_ino=info.st_ino,
+            )
+            os.close(parent_fd)
+            parent_fd = -1
+            return handle
+        except Exception as exc:
+            cleanup_errors: list[OSError] = []
+            if handle is not None:
+                try:
+                    handle.close()
+                except ParentRootSideEffectError as cleanup_error:
+                    cleanup_errors.append(OSError(str(cleanup_error)))
+            if target_fd >= 0:
+                try:
+                    fcntl.flock(target_fd, fcntl.LOCK_UN)
+                except OSError as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
+                try:
+                    os.close(target_fd)
+                except OSError as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
+            if created and created_info is not None:
+                try:
+                    current = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+                    if current.st_dev == created_info.st_dev and current.st_ino == created_info.st_ino:
+                        os.unlink(name, dir_fd=parent_fd)
+                        os.fsync(parent_fd)
+                except OSError as cleanup_error:
+                    cleanup_errors.append(cleanup_error)
+            try:
+                if parent_fd >= 0:
+                    os.close(parent_fd)
+            except OSError as cleanup_error:
+                cleanup_errors.append(cleanup_error)
+            if cleanup_errors:
+                detail = "; ".join(str(error) for error in cleanup_errors)
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"{exc}; parent-owned file rollback failed: {detail}",
+                ) from exc
+            if isinstance(exc, ParentRootSideEffectError):
+                raise
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"cannot open parent-owned file: {exc}",
+            ) from exc
 
     def create_parent_owned_temp_directory(
         self,
@@ -1068,13 +1562,19 @@ class ParentRootSideEffectBoundary:
                     tuple(physical.relative_to(attestation.parent_root).parts)[:-1],
                     create=False,
                 )
-                return replace(
+                receipt = replace(
                     base,
                     lexical_path=base.lexical_path / name,
                     physical_path=physical,
                     target_dev=info.st_dev,
                     target_ino=info.st_ino,
                     parent_components=parent_components,
+                )
+                return replace(
+                    receipt,
+                    **_lexical_snapshot(
+                        attestation.parent_root, receipt.lexical_path
+                    ),
                 )
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_RACE_DETECTED,
@@ -1220,12 +1720,13 @@ class ParentRootSideEffectBoundary:
             observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
             if (observed.st_dev, observed.st_ino) == (0, 0):
                 raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED, "published identity is invalid")
-            return replace(
+            published = replace(
                 receipt,
                 physical_path=physical,
                 target_dev=observed.st_dev,
                 target_ino=observed.st_ino,
             )
+            return replace(published, **_lexical_snapshot(root, published.lexical_path))
         except ParentRootSideEffectError as exc:
             primary_error = exc
             raise
@@ -1273,6 +1774,123 @@ class ParentRootSideEffectBoundary:
         """Atomically publish bytes beneath an already authenticated root."""
         receipt = self.resolve_parent_owned_path(attestation, candidate, purpose)
         return self.atomic_publish(receipt, data)
+
+    def publish_parent_owned_file_noreplace(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        candidate: Path | str,
+        data: bytes,
+        purpose: str,
+    ) -> tuple[str, str]:
+        """Publish one file without replacing an existing parent-owned target."""
+        if sys.platform != "linux":
+            raise ParentRootSideEffectError(
+                ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform
+            )
+        receipt = self.resolve_parent_owned_path(attestation, candidate, purpose)
+        root = receipt.parent_root
+        before = _identity(root)
+        if before != (receipt.parent_dev, receipt.parent_ino):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "parent identity changed before no-replace publication",
+            )
+        physical, _ = _physical_in_root(root, receipt.physical_path, allow_missing=True)
+        parent_fd, name, _ = _parent_directory(root, physical, create=True)
+        if not receipt.parent_components:
+            receipt = replace(
+                receipt,
+                parent_components=_component_identities(
+                    root,
+                    tuple(physical.relative_to(root).parts)[:-1],
+                    create=False,
+                ),
+            )
+        temporary = f".{name}.{secrets.token_hex(12)}.tmp"
+        temp_fd = -1
+        primary_error: BaseException | None = None
+        try:
+            temp_fd = os.open(
+                temporary,
+                os.O_WRONLY
+                | os.O_CREAT
+                | os.O_EXCL
+                | os.O_NOFOLLOW
+                | os.O_CLOEXEC,
+                0o600,
+                dir_fd=parent_fd,
+            )
+            _write_all(temp_fd, data)
+            os.fsync(temp_fd)
+            os.close(temp_fd)
+            temp_fd = -1
+            _verify_parent_components(receipt)
+            if _identity(root) != before:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "parent identity changed before no-replace link",
+                )
+            try:
+                os.link(
+                    temporary,
+                    name,
+                    src_dir_fd=parent_fd,
+                    dst_dir_fd=parent_fd,
+                    follow_symlinks=False,
+                )
+            except FileExistsError:
+                existing = self.resolve_parent_owned_path(attestation, physical, purpose)
+                if existing.target_dev is None:
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_RACE_DETECTED,
+                        "no-replace target disappeared during collision readback",
+                    )
+                if self.read_parent_owned_file(existing) == data:
+                    return "duplicate", ""
+                return "failed", "spool_conflict"
+            os.fsync(parent_fd)
+            committed = self.resolve_parent_owned_path(attestation, physical, purpose)
+            if committed.target_dev is None or self.read_parent_owned_file(committed) != data:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "no-replace publication readback differs",
+                )
+            return "spooled", ""
+        except ParentRootSideEffectError as exc:
+            primary_error = exc
+            raise
+        except OSError as exc:
+            primary_error = ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"no-replace publication failed: {exc}",
+            )
+            raise primary_error from exc
+        finally:
+            cleanup_errors: list[OSError] = []
+            if temp_fd >= 0:
+                try:
+                    os.close(temp_fd)
+                except OSError as exc:
+                    cleanup_errors.append(exc)
+            try:
+                os.unlink(temporary, dir_fd=parent_fd)
+            except FileNotFoundError:
+                pass
+            except OSError as exc:
+                cleanup_errors.append(exc)
+            try:
+                os.close(parent_fd)
+            except OSError as exc:
+                cleanup_errors.append(exc)
+            if cleanup_errors:
+                detail = "; ".join(str(error) for error in cleanup_errors)
+                cleanup_error = ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"no-replace publication cleanup failed: {detail}",
+                )
+                if primary_error is not None:
+                    raise cleanup_error from primary_error
+                raise cleanup_error
 
     def capture_subprocess(
         self,
@@ -1886,24 +2504,25 @@ class ParentRootSideEffectBoundary:
         return empty
 
     def remove_parent_owned_file(self, receipt: ParentOwnedPathReceipt) -> None:
-        """Unlink a capability target through its parent directory fd."""
+        """Unlink a lexical receipt entry through its no-follow parent fd."""
         root = receipt.parent_root
-        _verify_parent_components(receipt)
-        physical, _ = _physical_in_root(root, receipt.physical_path, allow_missing=False)
-        parent_fd, name, _ = _parent_directory(root, physical, create=False)
+        is_symlink = receipt.lexical_entry_type == stat.S_IFLNK
+        if not is_symlink:
+            _verify_parent_components(receipt)
+        parent_fd, name = _open_lexical_entry(receipt)
         before = _identity(root)
         try:
-            observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
-            if (observed.st_dev, observed.st_ino) != (
-                receipt.target_dev,
-                receipt.target_ino,
-            ):
-                raise ParentRootSideEffectError(
-                    ParentRootReject.ROOT_RACE_DETECTED,
-                    "file identity changed before removal",
-                )
             os.unlink(name, dir_fd=parent_fd)
             os.fsync(parent_fd)
+            try:
+                os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                pass
+            else:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "lexical entry remained after removal",
+                )
             if _identity(root) != before:
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
@@ -1919,19 +2538,116 @@ class ParentRootSideEffectBoundary:
 
     @staticmethod
     def _remove_open_tree(directory_fd: int) -> None:
-        for name in os.listdir(directory_fd):
-            info = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-            if stat.S_ISDIR(info.st_mode):
-                child_fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
-                                    dir_fd=directory_fd)
+        """Remove a directory tree with descriptor-bound iterative post-order."""
+        stack = [_TreeRemovalFrame(directory_fd=directory_fd)]
+        errors: list[Exception] = []
+        while stack:
+            frame = stack[-1]
+            if frame.entries is None:
                 try:
-                    ParentRootSideEffectBoundary._remove_open_tree(child_fd)
-                finally:
-                    os.close(child_fd)
-                os.rmdir(name, dir_fd=directory_fd)
-            else:
-                os.unlink(name, dir_fd=directory_fd)
-        os.fsync(directory_fd)
+                    frame.entries = list(os.listdir(frame.directory_fd))
+                except OSError as exc:
+                    errors.append(exc)
+                    frame.entries = []
+            if frame.entries:
+                name = frame.entries.pop()
+                try:
+                    observed = os.stat(
+                        name, dir_fd=frame.directory_fd, follow_symlinks=False
+                    )
+                except FileNotFoundError:
+                    continue
+                except OSError as exc:
+                    errors.append(exc)
+                    continue
+                if stat.S_ISDIR(observed.st_mode):
+                    child_fd = -1
+                    try:
+                        child_fd = os.open(
+                            name,
+                            os.O_RDONLY
+                            | os.O_DIRECTORY
+                            | os.O_NOFOLLOW
+                            | os.O_CLOEXEC,
+                            dir_fd=frame.directory_fd,
+                        )
+                        child_observed = os.fstat(child_fd)
+                        if (child_observed.st_dev, child_observed.st_ino) != (
+                            observed.st_dev,
+                            observed.st_ino,
+                        ):
+                            raise ParentRootSideEffectError(
+                                ParentRootReject.ROOT_RACE_DETECTED,
+                                f"directory identity changed before cleanup: {name}",
+                            )
+                    except (OSError, ParentRootSideEffectError) as exc:
+                        errors.append(exc)
+                        if child_fd >= 0:
+                            os.close(child_fd)
+                        continue
+                    stack.append(
+                        _TreeRemovalFrame(
+                            directory_fd=child_fd,
+                            parent_fd=frame.directory_fd,
+                            entry_name=name,
+                            expected_dev=observed.st_dev,
+                            expected_ino=observed.st_ino,
+                        )
+                    )
+                    continue
+                try:
+                    current = os.stat(
+                        name, dir_fd=frame.directory_fd, follow_symlinks=False
+                    )
+                    if (current.st_dev, current.st_ino) != (
+                        observed.st_dev,
+                        observed.st_ino,
+                    ):
+                        raise ParentRootSideEffectError(
+                            ParentRootReject.ROOT_RACE_DETECTED,
+                            f"file identity changed before cleanup: {name}",
+                        )
+                    os.unlink(name, dir_fd=frame.directory_fd)
+                except FileNotFoundError:
+                    continue
+                except (OSError, ParentRootSideEffectError) as exc:
+                    errors.append(exc)
+                continue
+            try:
+                os.fsync(frame.directory_fd)
+            except OSError as exc:
+                errors.append(exc)
+            if frame.parent_fd is not None and frame.entry_name is not None:
+                try:
+                    current = os.stat(
+                        frame.entry_name,
+                        dir_fd=frame.parent_fd,
+                        follow_symlinks=False,
+                    )
+                    if (current.st_dev, current.st_ino) != (
+                        frame.expected_dev,
+                        frame.expected_ino,
+                    ):
+                        raise ParentRootSideEffectError(
+                            ParentRootReject.ROOT_RACE_DETECTED,
+                            f"directory identity changed before removal: {frame.entry_name}",
+                        )
+                    os.rmdir(frame.entry_name, dir_fd=frame.parent_fd)
+                    os.fsync(frame.parent_fd)
+                except (OSError, ParentRootSideEffectError) as exc:
+                    errors.append(exc)
+            if frame.parent_fd is not None:
+                try:
+                    os.close(frame.directory_fd)
+                except OSError as exc:
+                    errors.append(exc)
+            stack.pop()
+        if errors:
+            detail = "; ".join(str(error) for error in errors)
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"parent-owned tree cleanup failed: {detail}",
+            ) from errors[0]
 
     def child_environment(self, attestation: ParentRootAttestationReceipt,
                           base_env: Mapping[str, str] | None = None) -> dict[str, str]:

@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -28,6 +29,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import capacity_handshake
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
+
+
+def _parent_validate(path: Path, purpose: str) -> None:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
+    ParentRootSideEffectBoundary().resolve_parent_owned_path(attestation, path, purpose, create=False)
 
 if __package__:
     from .tool_calls import (
@@ -85,6 +102,9 @@ AGENT_CANON_PREFIX = "vendor/agent-canon"
 
 def _resolve_report_root(report_root: str | None, workspace_root: Path) -> Path:
     """Load the team CLI helper only for the CLI/report path."""
+    # Keep report-root resolution tied to the requested workspace.  The
+    # parent capability below validates the resulting path and must not
+    # silently relocate lifecycle artifacts to the configured parent root.
     return resolve_report_root(report_root, workspace_root)
 
 
@@ -1286,6 +1306,7 @@ def main() -> int:
         report_dir = (
             _resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)
         ).resolve()
+    _parent_validate(report_dir, "task-close")
     workspace = Path.cwd().resolve()
     active_run = active_run_name(report_dir)
 

@@ -15,6 +15,7 @@ import hashlib
 import io
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -142,6 +143,18 @@ class HookEventLogHotPathTest(unittest.TestCase):
     def test_h02_concurrent_events_use_independent_no_replace_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+            )
+            subprocess.run(
+                ["git", "remote", "add", "origin", "https://example.invalid/hook-parent.git"],
+                cwd=root,
+                check=True,
+                capture_output=True,
+            )
             context = hook_event_log.HookLogContext(
                 root,
                 "PostToolUse",
@@ -149,7 +162,10 @@ class HookEventLogHotPathTest(unittest.TestCase):
             )
             with patch.dict(
                 os.environ,
-                {"AGENT_CANON_HOOK_RUN_NAMESPACE": "test-runtime"},
+                {
+                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-runtime",
+                    "AGENT_CANON_PARENT_ROOT": str(root),
+                },
                 clear=False,
             ):
                 with ThreadPoolExecutor(max_workers=2) as executor:

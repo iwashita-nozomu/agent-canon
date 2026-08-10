@@ -12,14 +12,22 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
 from typing import Protocol, cast
+from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootReject,
+    ParentRootSideEffectError,
+)
+
 MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
 RUNTIME_PROFILE_INVENTORY = (
@@ -1144,6 +1152,24 @@ class WorkflowMonitorTest(unittest.TestCase):
             self.assertIn("skills=$agent-orchestration", text)
             self.assertIn("stage owner routing active_roles=", text)
             self.assertIn("created run bundle", text)
+
+
+def test_monitor_atomic_open_rejects_parent_path_replacement() -> None:
+    """The monitor boundary rejects a replaced path component before opening it."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        root = Path(tmp_dir)
+        outside = root / "outside"
+        outside.mkdir()
+        replaced = root / "reports"
+        replaced.symlink_to(outside, target_is_directory=True)
+        module = load_monitor_module()
+        target = replaced / "workflow_monitoring.md"
+        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}):
+            with unittest.TestCase().assertRaises(ParentRootSideEffectError) as rejected:
+                with module.locked_monitoring_artifact(target):
+                    pass
+        assert rejected.exception.reject is ParentRootReject.SYMLINK_ESCAPE
+        assert not (outside / "workflow_monitoring.md").exists()
 
 
 if __name__ == "__main__":

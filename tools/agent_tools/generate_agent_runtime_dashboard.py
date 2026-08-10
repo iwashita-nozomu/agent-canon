@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -40,6 +41,13 @@ from generate_agent_improvement_guide import (  # noqa: E402
     counter_lines,
     known_skill_ids,
 )
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
 from report_artifact_checks import (  # noqa: E402
     actual_wave_event_fields,
     markdown_table_dict_rows,
@@ -47,6 +55,22 @@ from report_artifact_checks import (  # noqa: E402
 from runtime_log_paths import eval_result_search_dirs  # noqa: E402
 
 STATUS_RE = re.compile(r"\b[A-Z_]*STATUS=(pass|fail|skip)\b")
+
+
+def _parent_write(path: Path, data: bytes, purpose: str) -> None:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
+    ParentRootSideEffectBoundary().write_parent_owned_file(
+        attestation, path, data, purpose
+    )
 TOKEN_COMPARISON_RE = re.compile(
     r"baseline_total=(?P<baseline>\d+)\s+"
     r"candidate_total=(?P<candidate>\d+)\s+"
@@ -4220,14 +4244,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     dashboard = AgentRuntimeDashboard(args.root, recent_days=args.recent_days)
     summary = dashboard.collect()
     output = Path(args.out)
-    output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(render_dashboard(summary), encoding="utf-8")
+    _parent_write(output, render_dashboard(summary).encode("utf-8"), "runtime-dashboard")
     if args.compact_out is not None:
-        args.compact_out.parent.mkdir(parents=True, exist_ok=True)
-        args.compact_out.write_text(render_compact_dashboard(summary), encoding="utf-8")
+        _parent_write(
+            args.compact_out,
+            render_compact_dashboard(summary).encode("utf-8"),
+            "runtime-dashboard-compact",
+        )
     if args.api_out is not None:
-        args.api_out.parent.mkdir(parents=True, exist_ok=True)
-        args.api_out.write_text(render_dashboard_api(summary), encoding="utf-8")
+        _parent_write(
+            args.api_out,
+            render_dashboard_api(summary).encode("utf-8"),
+            "runtime-dashboard-api",
+        )
     print(f"AGENT_RUNTIME_DASHBOARD={output}")
     print("AGENT_RUNTIME_DASHBOARD_STATUS=pass")
     print(f"AGENT_RUNTIME_DASHBOARD_EVIDENCE_ROOT={summary.root.as_posix()}")

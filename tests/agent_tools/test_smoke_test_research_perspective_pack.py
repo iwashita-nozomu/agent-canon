@@ -13,9 +13,17 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+import smoke_test_research_perspective_pack as smoke  # noqa: E402
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+)
 
 
 class ResearchPerspectivePackSmokeTest(unittest.TestCase):
@@ -217,6 +225,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertTrue((report_dir / "python_review.md").is_file())
             self.assertTrue((report_dir / "reproducibility_review.md").is_file())
             self.assertTrue((report_dir / "artifact_review.md").is_file())
+
             self.assertFalse((report_dir / "benchmark_review.md").is_file())
 
     def test_run_bundle_can_enable_full_research_perspective_pack(self) -> None:
@@ -334,6 +343,51 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertIn("LANGUAGE_REVIEW_CANDIDATES=cpp_reviewer", result.stdout)
             self.assertIn("cpp_reviewer", result.stdout)
             self.assertFalse((report_dir / "cpp_review.md").exists())
+
+
+def test_cleanup_parent_error_is_reported() -> None:
+    """A temporary-report cleanup failure is surfaced and chains the primary error."""
+    parent_root = PROJECT_ROOT
+    created: list[tuple[ParentRootSideEffectBoundary, object, object]] = []
+    original_create = ParentRootSideEffectBoundary.create_parent_owned_temp_directory
+    original_remove = ParentRootSideEffectBoundary.remove_parent_owned_tree
+
+    def capture_create(boundary, attestation, candidate, purpose, prefix):
+        receipt = original_create(boundary, attestation, candidate, purpose, prefix)
+        created.append((boundary, attestation, receipt))
+        return receipt
+
+    def fail_remove(boundary, attestation, candidate, purpose):
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_RACE_DETECTED, "injected cleanup failure"
+        )
+
+    with mock.patch.dict(
+        smoke.os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}
+    ), mock.patch.object(
+        ParentRootSideEffectBoundary,
+        "create_parent_owned_temp_directory",
+        capture_create,
+    ), mock.patch.object(
+        ParentRootSideEffectBoundary,
+        "remove_parent_owned_tree",
+        fail_remove,
+    ), mock.patch.object(smoke, "validate_task_catalog", side_effect=RuntimeError("primary")), mock.patch.object(
+        sys, "argv", ["smoke_test_research_perspective_pack", "--run-id", "cleanup-test"]
+    ):
+        try:
+            with unittest.TestCase().assertRaises(ParentRootSideEffectError) as raised:
+                smoke.main()
+            assert raised.exception.reject is ParentRootReject.ROOT_RACE_DETECTED
+            assert isinstance(raised.exception.__cause__, RuntimeError)
+        finally:
+            for boundary, attestation, receipt in created:
+                original_remove(boundary, attestation, receipt, "test-cleanup")
+
+
+def test_run_bundle_can_enable_full_research_perspective_pack() -> None:
+    """The full research perspective pack remains available through the smoke fixture."""
+    ResearchPerspectivePackSmokeTest().test_run_bundle_can_enable_full_research_perspective_pack()
 
 
 if __name__ == "__main__":

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -22,7 +23,11 @@ UTC = timezone.utc
 from pathlib import Path
 from typing import cast
 
-from prompt_classifier import PromptClassifierInputs, SkillLaneEvidence, prompt_intake_signals
+from prompt_classifier import (
+    PromptClassifierInputs,
+    SkillLaneEvidence,
+    prompt_intake_signals,
+)
 from skill_lane_detector import (
     structural_skill_lane_concept_matches,
     validation_failure_repair_concept_matches,
@@ -34,11 +39,27 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
 from runtime_log_paths import agent_canon_root, eval_results_dir
 
 DEFAULT_MANIFEST = eval_manifest_path("workflow_selection_eval.toml")
 DEFAULT_RESULTS_FAMILY = "workflow-selection"
 RUN_ID_DIGEST_LENGTH = 10
+
+
+def _parent_write(path: Path, data: bytes, purpose: str) -> None:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
+    ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, data, purpose)
 
 
 @dataclass(frozen=True)
@@ -489,10 +510,9 @@ def display_path(root: Path, path: Path) -> str:
 
 def write_report(path: Path, bundle: WorkflowSelectionBundle) -> Path:
     """Write a report path, avoiding accidental overwrite."""
-    path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         path = path.with_name(f"{path.stem}-{bundle.run_id}{path.suffix}")
-    path.write_text(render_report(bundle), encoding="utf-8")
+    _parent_write(path, render_report(bundle).encode("utf-8"), "workflow-selection-evaluation")
     return path
 
 
