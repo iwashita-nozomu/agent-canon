@@ -31,8 +31,10 @@ AgentCanon は mounted developer/agent tool と共有 runtime の source を所�
 
 親の `.devcontainer/` は親が所有する regular directory のまま保持します。
 `devcontainer.json` を含む regular files は親の environment contract で管理し、
-AgentCanon source からの symlink・コピー・削除は行いません。生成 Compose と
-dependency receipt は親の実行状態であり、追跡対象にしません。
+AgentCanon source からの symlink・コピー・削除は行いません。AgentCanon 側の
+parent check は `devcontainer.json` の存在確認と JSON-object parse だけで、生成 Compose と
+identity/lifecycle/projection/validation（rootless・GPU を含む）は parent 側では実施しません。
+standalone AgentCanon 側で devcontainer/gpu-admission/rootless の厳密検証は維持します。
 
 ## host mount inventory と zsh startup
 
@@ -87,19 +89,8 @@ standalone AgentCanon source layout でも `host-zshrc` profile は同じ option
 shell projectionを使えます。profile未選択時は pack-derived command だけを生成し、
 host `~/.zshrc`、parent environment mount、`HOME`、tmpfs は要求しません。
 
-Compose がこの境界で直接所有する environment は runtime identity marker を含む次の値です。
-
-- `AGENT_CANON_RUNTIME_IDENTITY_MODE`: Docker の `SecurityOptions` から解決した
-  `project` または `rootless-root` と一致します。
-- `HOME`: `project` では `/home/project`、`rootless-root` では `/root` を指します。
-- `SHELL`: pack の `runtime.shell` と一致します。
-- `AGENT_CANON_CONTAINER_USER`: selector の `project` または `root` と一致し、post-create/attach が
-  process user、HOME、workspace writability を read backします。
-
-default selector は `docker info` の公式 `SecurityOptions` を自動判定します。
-rootless Docker では Compose `user: "0:0"`、`HOME=/root`、
-`AGENT_CANON_CONTAINER_USER=root` を投影し、rootful Docker では host UID/GID の
-`project` user を投影します。build 用 `PROJECT_UID/GID` は正の値を維持し、runtime user と混同しません。
+Compose runtime identity の明示的 projection と rootless 判定は standalone
+AgentCanon 側の厳密ルールに委譲し、parent 側では定義しません。
 
 parent environment pair の両方不在、または両方が file 実体へ解決できることは、値や
 container behavior の十分条件ではありません。最終的な親側検証は、validator、

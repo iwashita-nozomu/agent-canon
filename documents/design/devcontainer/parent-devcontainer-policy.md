@@ -23,7 +23,7 @@ downstream design parent-dependency-manifest-followup.md declares the parent man
 ## 最低限の構造
 
 親レポの `.devcontainer/` は親が所有する regular directory です。最低限、次だけを
-固定します。
+固定します。derived parent は `.devcontainer/devcontainer.json` を regular ファイルとして所有します。
 
 - `devcontainer.json`、selector、script、manifest は親の environment contract が
   必要に応じて所有します。AgentCanon source からの symlink、child projection、
@@ -65,11 +65,11 @@ startup、host premise の十分条件を証明したことにはなりません
 親の regular devcontainer files は、親レポの root contract と source-root resolver
 が選択する実体を直接呼び出します。
 
-- すべての public entry は source-root resolver 経由で呼ぶ。
-  `python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/<entry>`
-  は standalone source root と derived `vendor/agent-canon` root の両方を解決する。
-  親の `devcontainer.json` は必要な entrypoint を親-owned path として選択し、
-  AgentCanon fixed path の symlink contract を作らない。
+- AgentCanon 側の parent check は `parent` の `.devcontainer` に対して
+  `devcontainer.json` の存在確認と JSON-object parse のみを行う。
+  生成内容や packed 生成物の内容同一性、identity/lifecycle/Compose/rootless/GPU
+  の projection/validation はこの owner boundary で実施しない。
+  standalone 側の厳密ルールは standalone ルートで維持される。
 
 default generator は parent environment、host credentials、SSH、Docker socket、
 host runtime state を mount しない。host zshrc は `host-zshrc` optional profile が

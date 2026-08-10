@@ -184,15 +184,22 @@ if [[ -n "$(git status --short)" ]]; then
 fi
 
 python3 -m json.tool .devcontainer/devcontainer.json >/dev/null
-runtime_compose_generator="${CLONE_DIR}/.devcontainer/generate-runtime-compose.sh"
-if [ ! -f "${runtime_compose_generator}" ]; then
-  runtime_compose_generator="${CLONE_DIR}/vendor/agent-canon/.devcontainer/generate-runtime-compose.sh"
+
+parent_projection_mode=false
+if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1 \
+  && [ -d vendor/agent-canon ]; then
+  parent_projection_mode=true
 fi
-test -f "${runtime_compose_generator}"
-AGENT_CANON_DEVCONTAINER_REPO_ROOT=. \
-AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml \
-  bash "${runtime_compose_generator}" >/dev/null
-python3 - <<'PY'
+if [ "$parent_projection_mode" = false ]; then
+  runtime_compose_generator="${CLONE_DIR}/.devcontainer/generate-runtime-compose.sh"
+  if [ ! -f "${runtime_compose_generator}" ]; then
+    runtime_compose_generator="${CLONE_DIR}/vendor/agent-canon/.devcontainer/generate-runtime-compose.sh"
+  fi
+  test -f "${runtime_compose_generator}"
+  AGENT_CANON_DEVCONTAINER_REPO_ROOT=. \
+  AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml \
+    bash "${runtime_compose_generator}" >/dev/null
+  python3 - <<'PY'
 from __future__ import annotations
 
 from pathlib import Path
@@ -205,11 +212,6 @@ assert "services" in data and "workspace" in data["services"], "workspace servic
 expected_working_dir = f"/workspace/{Path.cwd().name}"
 assert data["services"]["workspace"]["working_dir"] == expected_working_dir
 PY
-
-parent_projection_mode=false
-if git config -f .gitmodules --get submodule.vendor/agent-canon.path >/dev/null 2>&1 \
-  && [ -d vendor/agent-canon ]; then
-  parent_projection_mode=true
 fi
 
 if [ "$parent_projection_mode" = true ]; then

@@ -2332,13 +2332,6 @@ class EnvironmentBoundaryModel:
         config = self._require(
             findings, checked, ".devcontainer/devcontainer.json", "parent"
         )
-        parent_hook = self._optional(
-            checked, ".devcontainer/post-create-parent.sh", executable=True
-        )
-        if parent_hook is not None and not os.access(parent_hook, os.X_OK):
-            findings.append(
-                BoundaryFinding("parent", str(parent_hook), "not-executable")
-            )
         if config is None:
             return
         try:
@@ -2353,42 +2346,6 @@ class EnvironmentBoundaryModel:
                 BoundaryFinding("parent", str(config), "json-root-must-be-object")
             )
             return
-        post_create = payload.get("postCreateCommand")
-        if not isinstance(post_create, (str, list, dict)):
-            findings.append(
-                BoundaryFinding("parent", str(config), "missing-post-create-command")
-            )
-        else:
-            command_text = json.dumps(post_create, sort_keys=True)
-            required = (
-                "tools/agent-canon/agent_tools/agent_canon_source_root.py exec "
-                ".devcontainer/post-create-entrypoint.sh"
-            )
-            if required not in command_text:
-                findings.append(
-                    BoundaryFinding("parent", str(config), f"missing-command:{required}")
-                )
-            entrypoint = self._require(
-                findings,
-                checked,
-                "vendor/agent-canon/.devcontainer/post-create-entrypoint.sh",
-                "parent",
-                executable=True,
-            )
-            if entrypoint is not None:
-                entrypoint_text = entrypoint.read_text(encoding="utf-8")
-                for required in (
-                    'parent_hook="$workspace/.devcontainer/post-create-parent.sh"',
-                    'bash "$parent_hook" "$workspace"',
-                ):
-                    if required not in entrypoint_text:
-                        findings.append(
-                            BoundaryFinding(
-                                "parent",
-                                str(entrypoint),
-                                f"missing-parent-hook-dispatch:{required}",
-                            )
-                        )
 
     def validate(self) -> EnvironmentBoundaryReport:
         """Validate typed ownership coverage without running project commands."""

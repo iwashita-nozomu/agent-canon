@@ -299,15 +299,16 @@ def test_topic_compose_semantics_pass(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_validator_rejects_missing_dependency_module_change_in_parent_mode(tmp_path: Path) -> None:
-    """Parent mode requires the canonical dependency module path when module checks are enabled."""
+def test_validator_does_not_require_dependency_module_change_in_parent_mode(tmp_path: Path) -> None:
+    """Parent layout skips dependency-module-change enforcement."""
     repo = write_topic_fixture(tmp_path)
+    (repo / "vendor" / "agent-canon").mkdir(parents=True)
     (repo / "tools" / "agent-canon" / "agent_tools" / "dependency_module_change.py").unlink()
 
     result = run_validator(repo)
 
-    assert result.returncode == 1, result.stdout + result.stderr
-    assert "required-for-devcontainer-dependency-check" in result.stdout
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "required-for-devcontainer-dependency-check" not in result.stdout
 
 
 def test_gpu_admission_selector_isolated_from_default_selector() -> None:
@@ -417,41 +418,26 @@ def test_lifecycle_scripts_validate_selected_identity_and_workspace_writability(
     assert "rootless-root-identity-not-uid-0" in post_attach
 
 
-def test_parent_layout_requires_language_runtime_before_shared_lifecycle(
-    tmp_path: Path,
-) -> None:
-    """Parent selectors require the shared post-create entrypoint."""
-    module = load_container_config_module()
-    default = json.loads(
-        (PROJECT_ROOT / ".devcontainer/devcontainer.json").read_text(
-            encoding="utf-8"
+def test_parent_layout_accepts_any_devcontainer_json_object(tmp_path: Path) -> None:
+    """Parent layout accepts valid JSON objects with no extra devcontainer contract checks."""
+    repo = write_topic_fixture(tmp_path, topic_root=tmp_path / "workspace" / "parent-canonical")
+    (repo / "vendor" / "agent-canon").mkdir(parents=True)
+
+    default = {"name": "mutation", "postCreateCommand": PARENT_POST_CREATE_COMMAND}
+    assert (
+        load_container_config_module().validate_devcontainer_json(
+            default, parent_layout=True
         )
+        == []
     )
-    default["postCreateCommand"] = PARENT_POST_CREATE_COMMAND
-    assert module.validate_devcontainer_json(default, parent_layout=True) == []
-    default["postCreateCommand"] = POST_CREATE_COMMAND
-    assert module.validate_devcontainer_json(default, parent_layout=True) == []
 
-    parent = tmp_path / "parent"
-    (parent / "vendor/agent-canon").mkdir(parents=True)
-    profile = json.loads(GPU_ADMISSION_SELECTOR.read_text(encoding="utf-8"))
-    profile["postCreateCommand"] = PARENT_POST_CREATE_COMMAND
-    write_file(
-        parent,
-        ".devcontainer/gpu-admission/devcontainer.json",
-        json.dumps(profile),
+    default.pop("name")
+    assert (
+        load_container_config_module().validate_devcontainer_json(
+            default, parent_layout=True
+        )
+        == []
     )
-    gpu_findings = module.validate_gpu_admission_selector(parent)
-    assert not any("postCreateCommand-expected" in item.detail for item in gpu_findings)
-
-    profile["postCreateCommand"] = POST_CREATE_COMMAND
-    write_file(
-        parent,
-        ".devcontainer/gpu-admission/devcontainer.json",
-        json.dumps(profile),
-    )
-    gpu_findings = module.validate_gpu_admission_selector(parent)
-    assert not any("postCreateCommand-expected" in item.detail for item in gpu_findings)
 
 
 def test_gpu_admission_selector_is_mandatory(tmp_path: Path) -> None:
