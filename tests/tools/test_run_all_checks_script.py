@@ -121,6 +121,25 @@ class RunAllChecksScriptTest(unittest.TestCase):
         )
         self.assertIn("AGENT_CANON_SOURCE_ROOT=\"${WORKSPACE_ROOT}/vendor/agent-canon\"", text)
 
+    def test_experiment_registry_gate_can_be_skipped(self) -> None:
+        """The optional experiment gate has explicit parser and guard wiring."""
+        text = SCRIPT.read_text(encoding="utf-8")
+
+        self.assertIn("SKIP_EXPERIMENTS=0", text)
+        self.assertIn("--skip-experiments)", text)
+        self.assertIn("SKIP_EXPERIMENTS=1", text)
+        self.assertIn('if [ "$SKIP_EXPERIMENTS" -eq 1 ]; then', text)
+        skip_marker = "EXPERIMENT_REGISTRY=skip reason=skip_experiments_option"
+        self.assertIn(skip_marker, text)
+        self.assertIn(
+            "experiment registry validation skipped by --skip-experiments",
+            text,
+        )
+        self.assertLess(
+            text.index('if [ "$SKIP_EXPERIMENTS" -eq 1 ]; then'),
+            text.index("check_experiment_registry.py"),
+        )
+
     def test_pr_gate_only_keeps_shared_surface_ownership(self) -> None:
         """The PR gate emits ownership evidence without running run_all_checks."""
         ci_text = SCRIPT.read_text(encoding="utf-8")
