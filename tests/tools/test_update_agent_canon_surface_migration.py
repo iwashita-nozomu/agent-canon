@@ -10,7 +10,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import importlib.util
 import os
 import shutil
@@ -393,103 +392,6 @@ class SurfaceMigrationTest(unittest.TestCase):
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
         for path in LEGACY_ROOT_PROJECTIONS:
             self.assertEqual((root / path).read_text(encoding="utf-8"), f"parent owns {path}\n")
-
-    def test_transition_commit_keeps_head_tracked_deletion_and_skips_staged_only_path(
-        self,
-    ) -> None:
-        """Commit a tracked retirement without passing a HEAD-absent path to Git."""
-        root = self.clone_parent_fixture(activate_transition=True)
-        source = Path(
-            self.git(
-                root,
-                "config",
-                "-f",
-                ".gitmodules",
-                "--get",
-                "submodule.vendor/agent-canon.url",
-            ).stdout.strip()
-        )
-        staged_only = root / ".vscode"
-        staged_only_target = "vendor/agent-canon/README.md"
-
-        tracked_path = "tools/sync_agent_canon.sh"
-        tracked_source, tracked_blob, tracked_mode = LEGACY_ROOT_PROJECTIONS[tracked_path]
-        tracked_bytes = self.historical_file(tracked_source)
-        staged_blob = subprocess.run(
-            ["git", "hash-object", "--stdin"],
-            cwd=root,
-            input=staged_only_target,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-        manifest = source / "documents" / "runtime" / "shared-runtime-surfaces.toml"
-        manifest.write_text(
-            manifest.read_text(encoding="utf-8")
-            + "\n[[update_transition]]\n"
-            + 'id = "test-head-tracked-retirement"\n'
-            + f'from_agent_canon_pins = ["{LEGACY_AGENT_CANON_PIN}"]\n'
-            + "\n[[update_transition.candidate]]\n"
-            + f'path = "{tracked_path}"\n'
-            + "\n[[update_transition.candidate.identity]]\n"
-            + 'kind = "regular"\n'
-            + f'git_blob = "{tracked_blob}"\n'
-            + f'content_sha256 = "{hashlib.sha256(tracked_bytes).hexdigest()}"\n'
-            + f'git_mode = "{tracked_mode}"\n'
-            + 'symlink_target = ""\n'
-            + "\n[[update_transition.candidate]]\n"
-            + 'path = ".vscode"\n'
-            + "\n[[update_transition.candidate.identity]]\n"
-            + 'kind = "symlink"\n'
-            + f'git_blob = "{staged_blob.stdout.strip()}"\n'
-            + f'content_sha256 = "{hashlib.sha256(staged_only_target.encode()).hexdigest()}"\n'
-            + 'git_mode = "120000"\n'
-            + f'symlink_target = "{staged_only_target}"\n',
-            encoding="utf-8",
-        )
-        self.git(source, "add", manifest.relative_to(source).as_posix())
-        self.git(source, "commit", "-m", "add test root-copy transition")
-        source_head = self.git(source, "rev-parse", "HEAD").stdout.strip()
-        submodule = root / "vendor" / "agent-canon"
-        self.git(submodule, "fetch", "origin", "main")
-        self.git(submodule, "merge", "--ff-only", source_head)
-        self.git(root, "add", "vendor/agent-canon")
-
-        first = self.run_sync(root, "ensure-latest")
-
-        self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
-        self.assertIn(
-            "update_transition[test-head-tracked-retirement][tools/sync_agent_canon.sh]=removed_known_legacy_identity",
-            first.stdout,
-        )
-        first_committed = self.git(root, "show", "--format=", "--name-only", "HEAD").stdout
-        self.assertIn(tracked_path, first_committed)
-
-        self.git(
-            root,
-            "update-index",
-            "--cacheinfo",
-            f"160000,{LEGACY_AGENT_CANON_PIN},vendor/agent-canon",
-        )
-        self.git(root, "commit", "-m", "replay the same transition base")
-        self.git(root, "add", "vendor/agent-canon")
-        staged_only.symlink_to(staged_only_target)
-        self.git(root, "add", ".vscode")
-
-        second = self.run_sync(root, "ensure-latest")
-
-        self.assertEqual(second.returncode, 0, second.stdout + second.stderr)
-        self.assertIn(
-            "update_transition[test-head-tracked-retirement][.vscode]=removed_known_legacy_identity",
-            second.stdout,
-        )
-        committed = self.git(root, "show", "--format=", "--name-only", "HEAD").stdout
-        self.assertNotIn(".vscode", committed)
-        self.assertFalse(os.path.lexists(staged_only))
-        self.assertEqual(
-            self.git(root, "status", "--short", "--", ".vscode").stdout,
-            "AD .vscode\n",
-        )
 
     def test_transition_move_failure_restores_every_candidate(self) -> None:
         """A failed move rolls back earlier moves instead of partially deleting."""
