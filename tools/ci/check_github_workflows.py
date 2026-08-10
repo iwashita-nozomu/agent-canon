@@ -1050,10 +1050,6 @@ def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]
     if is_template_or_derived_repo(root):
         specs: list[tuple[Path, Sequence[str]]] = [
             (
-                root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md",
-                projected_template_requirements(root, PR_TEMPLATE_REQUIRED_TEXT),
-            ),
-            (
                 root
                 / "vendor"
                 / "agent-canon"
@@ -1062,9 +1058,6 @@ def pr_template_requirement_specs(root: Path) -> list[tuple[Path, Sequence[str]]
                 PR_TEMPLATE_REQUIRED_TEXT,
             ),
         ]
-        root_template = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
-        if root_template.exists():
-            specs.append((root_template, PR_TEMPLATE_REQUIRED_TEXT))
         return specs
     return [
         (
@@ -1112,16 +1105,12 @@ def check_pr_templates(root: Path) -> list[Finding]:
         findings.extend(require_text(path, required))
     canon_root = agent_canon_root(root)
     semantic_templates = {
-        canon_root
-        / "templates"
-        / "documents"
-        / "github"
-        / "pull-request"
-        / "agent_canon.md",
-        root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md",
+        canon_root / "templates" / "documents" / "github" / "pull-request" / "agent_canon.md",
     }
-    optional_root_template = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
-    if optional_root_template.exists():
+    if not is_template_or_derived_repo(root):
+        semantic_templates.add(root / ".github" / "PULL_REQUEST_TEMPLATE" / "agent_canon.md")
+    if not is_template_or_derived_repo(root):
+        optional_root_template = root / ".github" / "PULL_REQUEST_TEMPLATE.md"
         semantic_templates.add(optional_root_template)
     for path in sorted(semantic_templates):
         findings.extend(check_template_agentcanon_pr_gate(path))
