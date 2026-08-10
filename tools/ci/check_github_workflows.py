@@ -43,6 +43,12 @@ AGENT_CANON_WORKFLOW_SURFACE_MARKERS = (
     "vendor/agent-canon",
     "tools/agent-canon",
 )
+LITERAL_ENV_REFERENCE_PATTERN = re.compile(
+    r"\$\{\{\s*env\.([A-Za-z_][A-Za-z0-9_]*)\s*\}\}"
+    r"|\$\{([A-Za-z_][A-Za-z0-9_]*)\}"
+    r"|\$([A-Za-z_][A-Za-z0-9_]*)"
+)
+SHELL_LINE_CONTINUATION_PATTERN = re.compile(r"\\\r?\n")
 AGENT_CANON_INDEPENDENT_WORKFLOWS: set[str] = {
     "agent-runtime-dashboard.yml",
     "issue-mirror.yml",
@@ -380,8 +386,14 @@ def agent_canon_checkout_command_steps(
     """Return steps that invoke the AgentCanon checkout helper."""
     steps: list[StepContext] = []
     for context in step_contexts(workflow):
-        run = context.step.get("run")
-        if isinstance(run, str) and any(path in run for path in HELPER_PATHS):
+        run_values = effective_step_execution_values(
+            workflow,
+            context,
+            fields=("run",),
+            include_env=False,
+            include_working_directory=False,
+        )
+        if any(path in value for value in run_values for path in HELPER_PATHS):
             steps.append(context)
     return steps
 
@@ -403,13 +415,101 @@ def nested_string_values(value: object) -> list[str]:
     return []
 
 
+def literal_env_values(source: dict[str, object]) -> dict[str, str]:
+    """Return literal environment values declared by one workflow scope."""
+    env = as_string_dict(source.get("env"))
+    if env is None:
+        return {}
+    return {name: value for name, value in env.items() if isinstance(value, str)}
+
+
+def resolve_literal_env_references(value: str, env: dict[str, str]) -> str:
+    """Resolve shell and GitHub env references whose values are literal."""
+
+    def replace(match: re.Match[str]) -> str:
+        name = next(group for group in match.groups() if group is not None)
+        return env.get(name, match.group(0))
+
+    resolved = value
+    for _index in range(len(env) + 1):
+        updated = LITERAL_ENV_REFERENCE_PATTERN.sub(replace, resolved)
+        if updated == resolved:
+            break
+        resolved = updated
+    return resolved
+
+
+def effective_step_env(
+    workflow: dict[str, object], context: StepContext
+) -> dict[str, str]:
+    """Return workflow, job, and step environment with child overrides."""
+    env = literal_env_values(workflow)
+    env.update(literal_env_values(context.job))
+    env.update(literal_env_values(context.step))
+    return {
+        name: resolve_literal_env_references(value, env)
+        for name, value in env.items()
+    }
+
+
+def default_run_working_directory(source: dict[str, object]) -> str | None:
+    """Return one scope's defaults.run.working-directory value."""
+    defaults = as_string_dict(source.get("defaults"))
+    if defaults is None:
+        return None
+    run_defaults = as_string_dict(defaults.get("run"))
+    if run_defaults is None:
+        return None
+    working_directory = run_defaults.get("working-directory")
+    return working_directory if isinstance(working_directory, str) else None
+
+
+def effective_step_working_directory(
+    workflow: dict[str, object], context: StepContext
+) -> str | None:
+    """Return the step's explicit or inherited run working directory."""
+    working_directory = default_run_working_directory(workflow)
+    job_working_directory = default_run_working_directory(context.job)
+    if job_working_directory is not None:
+        working_directory = job_working_directory
+    step_working_directory = context.step.get("working-directory")
+    if isinstance(step_working_directory, str):
+        working_directory = step_working_directory
+    return working_directory
+
+
+def effective_step_execution_values(
+    workflow: dict[str, object],
+    context: StepContext,
+    *,
+    fields: tuple[str, ...] = ("run", "uses", "with"),
+    include_env: bool = True,
+    include_working_directory: bool = True,
+) -> list[str]:
+    """Return normalized execution values after literal context resolution."""
+    env = effective_step_env(workflow, context)
+    values: list[str] = []
+    for field in fields:
+        values.extend(nested_string_values(context.step.get(field)))
+    if include_working_directory:
+        working_directory = effective_step_working_directory(workflow, context)
+        if working_directory is not None:
+            values.append(working_directory)
+    if include_env:
+        values.extend(env.values())
+    return [
+        SHELL_LINE_CONTINUATION_PATTERN.sub(
+            "", resolve_literal_env_references(value, env)
+        )
+        for value in values
+    ]
+
+
 def agent_canon_surface_steps(workflow: dict[str, object]) -> list[StepContext]:
     """Return execution steps that consume an AgentCanon-owned path."""
     steps: list[StepContext] = []
     for context in step_contexts(workflow):
-        execution_values: list[str] = []
-        for field in ("run", "uses", "working-directory", "env", "with"):
-            execution_values.extend(nested_string_values(context.step.get(field)))
+        execution_values = effective_step_execution_values(workflow, context)
         if any(
             marker in value
             for value in execution_values
@@ -454,10 +554,15 @@ def agent_canon_checkout_policy_findings(
     checkouts = checkout_steps(workflow)
     helpers = agent_canon_checkout_command_steps(workflow)
     agent_canon_independent = path.name in AGENT_CANON_INDEPENDENT_WORKFLOWS
-    requires_agent_canon_checkout = (
-        not agent_canon_independent and bool(agent_canon_surface_steps(workflow))
+    requires_agent_canon_checkout_pair = (
+        not agent_canon_independent
+        and bool(agent_canon_surface_steps(workflow) or helpers)
     )
-    if requires_agent_canon_checkout and checkouts and not helpers:
+    if requires_agent_canon_checkout_pair and not checkouts:
+        findings.append(
+            Finding("error", path, "missing_agent_canon_repository_checkout")
+        )
+    if requires_agent_canon_checkout_pair and not helpers:
         findings.append(Finding("error", path, "missing_agent_canon_checkout_helper"))
     if agent_canon_independent:
         if helpers:

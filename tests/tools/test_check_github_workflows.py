@@ -885,6 +885,191 @@ raise SystemExit(2)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
 
+    def test_workflow_env_agent_canon_path_requires_helper(self) -> None:
+        """Workflow env is part of every step's effective execution context."""
+        result = self.run_custom_workflow(
+            """
+            name: CI
+            on: [push]
+            permissions:
+              contents: read
+            concurrency:
+              group: ci-${{ github.ref }}
+            env:
+              CANON_TOOL: tools/agent-canon/ci/container_config.py
+            jobs:
+              test:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: actions/checkout@v4
+                    with:
+                      submodules: false
+                      persist-credentials: false
+                  - run: python3 "$CANON_TOOL"
+            """
+        )
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
+
+    def test_job_env_agent_canon_path_requires_helper(self) -> None:
+        """Job env is inherited by its execution steps."""
+        result = self.run_custom_workflow(
+            """
+            name: CI
+            on: [push]
+            permissions:
+              contents: read
+            concurrency:
+              group: ci-${{ github.ref }}
+            jobs:
+              test:
+                runs-on: ubuntu-latest
+                env:
+                  CANON_ROOT: tools/agent-canon
+                steps:
+                  - uses: actions/checkout@v4
+                    with:
+                      submodules: false
+                      persist-credentials: false
+                  - run: python3 "${CANON_ROOT}/ci/container_config.py"
+            """
+        )
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
+
+    def test_step_env_resolves_inherited_literal_agent_canon_path(self) -> None:
+        """Step env resolves literal references inherited from wider scopes."""
+        result = self.run_custom_workflow(
+            """
+            name: CI
+            on: [push]
+            permissions:
+              contents: read
+            concurrency:
+              group: ci-${{ github.ref }}
+            env:
+              CANON_ROOT: tools/agent-canon
+            jobs:
+              test:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: actions/checkout@v4
+                    with:
+                      submodules: false
+                      persist-credentials: false
+                  - env:
+                      CANON_TOOL: ${{ env.CANON_ROOT }}/ci/container_config.py
+                    run: python3 "$CANON_TOOL"
+            """
+        )
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
+
+    def test_job_default_working_directory_requires_helper(self) -> None:
+        """Job run defaults override workflow defaults in effective context."""
+        result = self.run_custom_workflow(
+            """
+            name: CI
+            on: [push]
+            permissions:
+              contents: read
+            concurrency:
+              group: ci-${{ github.ref }}
+            defaults:
+              run:
+                working-directory: docker
+            jobs:
+              test:
+                runs-on: ubuntu-latest
+                defaults:
+                  run:
+                    working-directory: tools/agent-canon
+                steps:
+                  - uses: actions/checkout@v4
+                    with:
+                      submodules: false
+                      persist-credentials: false
+                  - run: python3 ci/container_config.py
+            """
+        )
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
+
+    def test_shell_line_continuation_agent_canon_path_requires_helper(self) -> None:
+        """Shell continuation cannot hide an AgentCanon-owned path."""
+        result = self.run_custom_workflow(
+            """
+            name: CI
+            on: [push]
+            permissions:
+              contents: read
+            concurrency:
+              group: ci-${{ github.ref }}
+            jobs:
+              test:
+                runs-on: ubuntu-latest
+                steps:
+                  - uses: actions/checkout@v4
+                    with:
+                      submodules: false
+                      persist-credentials: false
+                  - run: |
+                      python3 tools/agent-\\
+                      canon/ci/container_config.py
+            """
+        )
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
+
+    def test_agent_canon_consumer_without_repository_checkout_fails(self) -> None:
+        """An AgentCanon consumer requires both repository and helper checkout."""
+        result = self.run_custom_workflow(
+            """
+            name: CI
+            on: [push]
+            permissions:
+              contents: read
+            concurrency:
+              group: ci-${{ github.ref }}
+            jobs:
+              test:
+                runs-on: ubuntu-latest
+                steps:
+                  - run: python3 tools/agent-canon/ci/container_config.py
+            """
+        )
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("missing_agent_canon_repository_checkout", result.stdout)
+        self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
+
+    def test_agent_canon_helper_without_repository_checkout_fails(self) -> None:
+        """The submodule helper cannot run before actions/checkout prepares the repo."""
+        result = self.run_custom_workflow(
+            """
+            name: CI
+            on: [push]
+            permissions:
+              contents: read
+            concurrency:
+              group: ci-${{ github.ref }}
+            jobs:
+              test:
+                runs-on: ubuntu-latest
+                steps:
+                  - run: bash .github/scripts/checkout_agent_canon_submodule.sh
+            """
+        )
+
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("missing_agent_canon_repository_checkout", result.stdout)
+        self.assertNotIn("missing_agent_canon_checkout_helper", result.stdout)
+
     def test_docker_build_workflow_with_agent_canon_checkout_passes(self) -> None:
         """Docker build workflow should be explicit about the AgentCanon checkout."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1477,6 +1662,21 @@ raise SystemExit(2)
             + "        run: make ci\n",
             encoding="utf-8",
         )
+
+    def run_custom_workflow(self, source: str) -> subprocess.CompletedProcess[str]:
+        """Run the checker against one custom workflow and canonical fixtures."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow = root / ".github" / "workflows" / "ci.yml"
+            workflow.parent.mkdir(parents=True)
+            workflow.write_text(textwrap.dedent(source).lstrip(), encoding="utf-8")
+            self.copy_required_surfaces(root)
+            return subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
 
     def copy_required_surfaces(self, root: Path) -> None:
         """Copy non-workflow surfaces required by the checker."""
