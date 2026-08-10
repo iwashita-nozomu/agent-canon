@@ -707,36 +707,22 @@ def validate_devcontainer_json(
     config: Mapping[str, object],
     *,
     parent_layout: bool = False,
-    identity_mode: str = "auto",
     config_path: str = ".devcontainer/devcontainer.json",
 ) -> list[Finding]:
     """Validate required devcontainer JSON fields."""
     findings: list[Finding] = []
-    if identity_mode not in {"auto", "project"}:
-        return [
-            Finding(
-                "dependency_contract_violation",
-                config_path,
-                f"runtime-identity-mode-unsupported:{identity_mode}",
-            )
-        ]
     compose_output = ".agent-canon/docker-compose.generated.yml"
-    initialize_prefix = f"AGENT_CANON_RUNTIME_IDENTITY_MODE={identity_mode}"
     expected_name = "${localWorkspaceFolderBasename}-devcontainer"
-    expected_user = "project"
     expected_json: dict[str, object] = {
         "name": expected_name,
-        "initializeCommand": f"{initialize_prefix} AGENT_CANON_DOCKER_COMPOSE_OUTPUT={compose_output} python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
+        "initializeCommand": f"AGENT_CANON_DOCKER_COMPOSE_OUTPUT={compose_output} python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
         "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
         "service": "workspace",
         "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
         "postCreateCommand": expected_post_create_command(parent_layout=parent_layout),
         "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
+        "updateRemoteUserUID": False,
     }
-    if identity_mode == "project":
-        expected_json.update({"containerUser": expected_user, "remoteUser": expected_user})
-    else:
-        expected_json["updateRemoteUserUID"] = False
     for key, expected in expected_json.items():
         if config.get(key) != expected:
             findings.append(
@@ -754,36 +740,20 @@ def validate_devcontainer_json(
                 "node-feature-forbidden-image-owned",
             )
         )
-    if identity_mode == "auto" and "containerUser" in config:
+    if "containerUser" in config:
         findings.append(
             Finding(
                 "dependency_contract_violation",
                 config_path,
-                "default-containerUser-forbidden-auto-identity",
+                "default-containerUser-forbidden-compose-owned-project-identity",
             )
         )
-    if identity_mode == "auto" and "remoteUser" in config:
+    if "remoteUser" in config:
         findings.append(
             Finding(
                 "dependency_contract_violation",
                 config_path,
-                "default-remoteUser-forbidden-auto-identity",
-            )
-        )
-    if identity_mode == "project" and "remoteUser" in config and config.get("remoteUser") != expected_user:
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                config_path,
-                f"remoteUser-expected:{expected_user}",
-            )
-        )
-    if identity_mode == "auto" and config.get("updateRemoteUserUID") is not False:
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                config_path,
-                "default-updateRemoteUserUID-expected:false",
+                "default-remoteUser-forbidden-compose-owned-project-identity",
             )
         )
     if "containerEnv" in config:
@@ -865,7 +835,7 @@ def validate_gpu_admission_selector(root: Path) -> list[Finding]:
         return findings
     expected = {
         "name": "${localWorkspaceFolderBasename}-gpu-admission-devcontainer",
-        "initializeCommand": "AGENT_CANON_RUNTIME_IDENTITY_MODE=project AGENT_CANON_GPU_ADMISSION_PROFILE=gpu-admission AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/gpu-admission-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
+        "initializeCommand": "AGENT_CANON_GPU_ADMISSION_PROFILE=gpu-admission AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/gpu-admission-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
         "dockerComposeFile": "../../.agent-canon/gpu-admission-compose.generated.yml",
         "service": "workspace",
         "containerUser": "project",
@@ -968,7 +938,6 @@ def validate_generated_compose(
     pack: PackConfig | None,
     *,
     profile: str = "default",
-    identity_mode: str = "project",
     compose_path: Path | None = None,
 ) -> list[Finding]:
     """Validate generated Compose meaning rather than generator implementation text."""
@@ -1016,37 +985,8 @@ def validate_generated_compose(
         ]
     parent_layout = (root / "vendor" / "agent-canon").is_dir()
     findings: list[Finding] = []
-    if identity_mode == "auto":
-        runtime_environment = as_mapping(service.get("environment"))
-        resolved_identity_mode = (
-            runtime_environment.get("AGENT_CANON_RUNTIME_IDENTITY_MODE")
-            if runtime_environment is not None
-            else None
-        )
-        if isinstance(resolved_identity_mode, str) and resolved_identity_mode in {
-            "project",
-            "rootless-root",
-        }:
-            identity_mode = resolved_identity_mode
-        else:
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    relative,
-                    "auto-runtime-identity-mode-resolved-marker-required",
-                )
-            )
-            identity_mode = "project"
-    if identity_mode not in {"project", "rootless-root"}:
-        findings.append(
-            Finding(
-                "dependency_contract_violation",
-                relative,
-                f"runtime-identity-mode-unsupported:{identity_mode}",
-            )
-        )
-    home_target = "/root" if identity_mode == "rootless-root" else "/home/project"
-    expected_runtime_user = "root" if identity_mode == "rootless-root" else "project"
+    home_target = "/home/project"
+    expected_runtime_user = "project"
     if profile not in {"default", "gpu-admission"}:
         findings.append(
             Finding(
@@ -1136,14 +1076,13 @@ def validate_generated_compose(
             else:
                 for name in ("PROJECT_UID", "PROJECT_GID"):
                     value = standalone_args.get(name)
-                    if not isinstance(value, str) or re.fullmatch(
-                        r"[1-9][0-9]*", value
-                    ) is None:
+                    pattern = r"[1-9][0-9]*" if name == "PROJECT_UID" else r"[0-9]+"
+                    if not isinstance(value, str) or re.fullmatch(pattern, value) is None:
                         findings.append(
                             Finding(
                                 "dependency_contract_violation",
                                 relative,
-                                f"standalone-build-arg-{name}-must-be-positive-integer",
+                                f"standalone-build-arg-{name}-must-be-{'nonzero' if name == 'PROJECT_UID' else 'nonnegative'}-decimal",
                             )
                         )
     volumes = as_sequence(service.get("volumes"))
@@ -1323,25 +1262,18 @@ def validate_generated_compose(
             )
         )
     service_user = service.get("user")
-    if identity_mode == "rootless-root":
-        if service_user != "0:0":
-            findings.append(
-                Finding(
-                    "dependency_contract_violation",
-                    relative,
-                    f"rootless-runtime-user-expected:0:0:{service_user}",
-                )
-            )
-    elif not isinstance(service_user, str) or re.fullmatch(
-        r"[1-9][0-9]*:[1-9][0-9]*", service_user
-    ) is None:
+    service_user_valid = isinstance(service_user, str) and re.fullmatch(
+        r"[1-9][0-9]*:[0-9]+", service_user
+    ) is not None
+    if not service_user_valid:
         findings.append(
             Finding(
                 "dependency_contract_violation",
                 relative,
-                "default-user-must-have-positive-uid-gid",
+                "project-user-must-have-nonzero-uid-nonnegative-gid",
             )
         )
+    build_args: Mapping[str, object] | None = None
     if build is None:
         findings.append(
             Finding(
@@ -1363,16 +1295,32 @@ def validate_generated_compose(
         else:
             for name in ("PROJECT_UID", "PROJECT_GID"):
                 value = build_args.get(name)
-                if not isinstance(value, str) or re.fullmatch(
-                    r"[1-9][0-9]*", value
-                ) is None:
+                pattern = r"[1-9][0-9]*" if name == "PROJECT_UID" else r"[0-9]+"
+                if not isinstance(value, str) or re.fullmatch(pattern, value) is None:
                     findings.append(
                         Finding(
                             "dependency_contract_violation",
                             relative,
-                            f"build-arg-{name}-must-be-positive-integer",
+                            f"build-arg-{name}-must-be-{'nonzero' if name == 'PROJECT_UID' else 'nonnegative'}-decimal",
                         )
                     )
+    if service_user_valid and build_args is not None:
+        project_uid = build_args.get("PROJECT_UID")
+        project_gid = build_args.get("PROJECT_GID")
+        if (
+            isinstance(project_uid, str)
+            and re.fullmatch(r"[1-9][0-9]*", project_uid) is not None
+            and isinstance(project_gid, str)
+            and re.fullmatch(r"[0-9]+", project_gid) is not None
+            and service_user != f"{project_uid}:{project_gid}"
+        ):
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "project-user-must-match-build-args",
+                )
+            )
     if not parent_layout and "tmpfs" in service:
         findings.append(
             Finding(
@@ -1569,17 +1517,16 @@ def validate_generated_compose(
                         "host-zsh-mount-read-only",
                     )
                 )
-        if identity_mode == "project":
-            for raw_volume in volumes:
-                source, target = volume_fields(raw_volume)
-                if (source and "/root/" in source) or (target and target.startswith("/root/")):
-                    findings.append(
-                        Finding(
-                            "dependency_contract_violation",
-                            relative,
-                            "root-home-mount-forbidden",
-                        )
+        for raw_volume in volumes:
+            source, target = volume_fields(raw_volume)
+            if (source and "/root/" in source) or (target and target.startswith("/root/")):
+                findings.append(
+                    Finding(
+                        "dependency_contract_violation",
+                        relative,
+                        "root-home-mount-forbidden",
                     )
+                )
     linked_targets: set[str] = set()
     if pack is not None:
         linked_targets = {linked_root.target for linked_root in pack.linked_data_roots}
@@ -1738,9 +1685,7 @@ def validate_generated_compose(
                     f"host-mount-target-forbidden-by-default:{target}",
                 )
             )
-        if identity_mode == "project" and (
-            (source and "/root/" in source) or (target and target.startswith("/root/"))
-        ):
+        if (source and "/root/" in source) or (target and target.startswith("/root/")):
             findings.append(
                 Finding(
                     "dependency_contract_violation",
@@ -1759,7 +1704,6 @@ def validate_generated_compose(
         ),
         "AGENT_CANON_CODEX_SESSION_ROOT": f"{home_target}/.codex/sessions",
         "AGENT_CANON_SECRET_MOUNT": "/mnt/agent-canon-secrets",
-        "AGENT_CANON_RUNTIME_IDENTITY_MODE": identity_mode,
         "HOME": home_target,
         "SHELL": expected_shell,
         "AGENT_CANON_CONTAINER_USER": expected_runtime_user,
@@ -1774,6 +1718,14 @@ def validate_generated_compose(
                 )
             )
     else:
+        if "AGENT_CANON_RUNTIME_IDENTITY_MODE" in environment:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "daemon-runtime-identity-mode-env-forbidden",
+                )
+            )
         expected_gpu_mode = "enabled" if profile == "gpu-admission" else "disabled"
         if environment.get("DEVCONTAINER_GPU_MODE") != expected_gpu_mode:
             findings.append(
@@ -1891,50 +1843,13 @@ def validate_generated_compose_scenarios(
                 "AGENT_CANON_DEVCONTAINER_REPO_ROOT": str(root.resolve()),
             }
         )
-        rootful_bin = temporary_root / "rootful-bin"
-        rootless_bin = temporary_root / "rootless-bin"
-        for bin_dir, security_options in (
-            (rootful_bin, '["name=seccomp"]'),
-            (rootless_bin, '["name=rootless"]'),
-        ):
-            bin_dir.mkdir()
-            docker = bin_dir / "docker"
-            docker.write_text(
-                "#!/usr/bin/env bash\n"
-                "if [ \"${1:-}\" = info ]; then\n"
-                f"  printf '%s\\n' '{security_options}'\n"
-                "  exit 0\n"
-                "fi\n"
-                "exit 1\n",
-                encoding="utf-8",
-            )
-            docker.chmod(0o755)
-        scenarios: list[tuple[str, dict[str, str], str]] = [
-            (
-                "default",
-                {
-                    "PATH": f"{rootful_bin}:{base_environment['PATH']}",
-                    "AGENT_CANON_RUNTIME_IDENTITY_MODE": "auto",
-                },
-                "project",
-            ),
-            (
-                "default",
-                {
-                    "PATH": f"{rootless_bin}:{base_environment['PATH']}",
-                    "AGENT_CANON_RUNTIME_IDENTITY_MODE": "auto",
-                },
-                "rootless-root",
-            ),
-        ]
+        scenarios: list[tuple[str, dict[str, str]]] = [("default", {})]
         packs_dir = root / "docker" / "packs"
         if packs_dir.is_dir():
             scenarios.append(
                 (
                     "gpu-admission",
                     {
-                        "PATH": f"{rootful_bin}:{base_environment['PATH']}",
-                        "AGENT_CANON_RUNTIME_IDENTITY_MODE": "project",
                         "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
                         "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(root / ".agent-canon/runtime"),
                         "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(root / ".agent-canon/runtime"),
@@ -1942,13 +1857,11 @@ def validate_generated_compose_scenarios(
                         "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(root / ".agent-canon/runtime/shared-runtime-provision.json"),
                         "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(root / ".agent-canon/runtime/shared-runtime-readback.json"),
                     },
-                    "project",
                 )
             )
             (root / ".agent-canon/runtime").mkdir(parents=True, exist_ok=True)
-        for profile, additions, identity_mode in scenarios:
-            compose_suffix = "" if identity_mode == "project" else "-rootless"
-            compose_path = temporary_root / f"{profile}{compose_suffix}.yml"
+        for profile, additions in scenarios:
+            compose_path = temporary_root / f"{profile}.yml"
             scenario_pack = pack
             if profile == "gpu-admission":
                 gpu_pack_path = packs_dir / "gpu-admission.toml"
@@ -1986,7 +1899,6 @@ def validate_generated_compose_scenarios(
                     root,
                     scenario_pack,
                     profile=profile,
-                    identity_mode=identity_mode,
                     compose_path=compose_path,
                 )
             )
@@ -2011,7 +1923,6 @@ def validate_devcontainer(root: Path) -> list[Finding]:
         validate_devcontainer_json(
             config,
             parent_layout=(root / "vendor" / "agent-canon").is_dir(),
-            identity_mode="auto",
             config_path=".devcontainer/devcontainer.json",
         )
     )
@@ -2067,7 +1978,7 @@ def validate_devcontainer_pack_alignment(
     if persisted_compose.exists():
         findings.extend(
             validate_generated_compose(
-                root, pack, identity_mode="auto", compose_path=persisted_compose
+                root, pack, compose_path=persisted_compose
             )
         )
     profile_compose = root / ".agent-canon" / "gpu-admission-compose.generated.yml"

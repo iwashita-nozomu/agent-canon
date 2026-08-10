@@ -38,8 +38,8 @@ host runtime provisioning は
 Issue [#521](https://github.com/iwashita-nozomu/agent-canon/issues/521) の opt-in owner は
 `.devcontainer/gpu-admission.sh` です。entrypoint は `devcontainer` CLI と
 `nvidia-smi -L` を先に確認し、`${repository_root}/.agent-canon/runtime` を primary
-UID/GID 所有で作成して provision receipt を発行し、profile selector の generator に
-渡します。profile Compose は host source を container の
+UID/GID の provenance を記録する source として作成して provision receipt を発行し、
+profile selector の generator に渡します。profile Compose は host source を container の
 `/var/lib/agent-canon/runtime` target に bind し、primary `PROJECT_UID:PROJECT_GID` を
 維持して `gpus: all`、`DEVCONTAINER_GPU_MODE=enabled`、
 `DEVCONTAINER_GPU_REQUEST=all`、`AGENT_CANON_RUNTIME_ROUTE=MANAGED_CONTAINER` を出力
@@ -53,7 +53,22 @@ identity は `-gpu-admission` suffix とし、default container/project を prof
 のいずれかが失敗した場合は default へ降格せず non-zero で停止します。provision/Compose generation/up/finalize
 failure は検証済み profile Compose/project だけを cleanup し、cleanup 結果と独立に元の
 rc を保持します。finalize の provision/readback parse と atomic publication は
-`tools/experiments/execution_resource_plan.py` が唯一の owner です。
+`tools/experiments/execution_resource_plan.py` が唯一の owner です。RDC-003 の bind
+acceptance は `finalize-shared-runtime.sh` が container-side target で
+create/write/read/remove を証明できることとし、host-visible owner、host-vs-container
+UID/GID、inode owner の exact equality を oracle にしません。`host_uid`/`host_gid`/
+`host_supplementary_gids` と `container_uid`/`container_gid`/
+`container_supplementary_gids` は typed provenance/observation fields として receipt に
+残します。
+
+この mapping-neutral 緩和は route/path、repository-local source と canonical target、
+symlink/type/mode、source/target device/inode、open-fd/path race、mount namespace と
+mount id/root、closed probe、schema/fingerprint、receipt lock、atomic publication、
+within-side group shape、UID non-zero/GID numeric の gate を弱めません。特に
+`tools/experiments/execution_resource_plan.py` の `read_shared_runtime_provision`、
+`read_shared_runtime_readback`、`RuntimeIdentityReader.read` は receipt-file-owner と
+host/container numeric identity の mapping-sensitive equality だけを acceptance gate から
+外し、他の typed and fingerprinted evidence を保持します。
 
 default 境界の authority は linked design/implementation であり、default 経路からの
 非選択は実験機能の wholesale deletion や R5 の runner/lifecycle semantics の変更を

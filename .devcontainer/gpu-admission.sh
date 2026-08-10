@@ -57,8 +57,6 @@ ensure_directory() {
   [ -d "$path" ] || fail "runtime path is not a directory: $path"
   chmod 2770 "$path"
   [ "$(stat -c '%a' "$path")" = "2770" ] || fail "runtime directory mode is not 02770: $path"
-  [ "$(stat -c '%u' "$path")" = "$host_uid" ] || fail "runtime directory owner differs: $path"
-  [ "$(stat -c '%g' "$path")" = "$host_gid" ] || fail "runtime directory group differs: $path"
 }
 
 ensure_directory "$runtime_source"
@@ -71,7 +69,7 @@ case "$filesystem_type" in
   *) fail "runtime filesystem is not btrfs, ext4, or xfs: $filesystem_type" ;;
 esac
 
-python3 - "$probe_path" "$runtime_source" "$host_gid" "$host_uid" <<'PY'
+python3 - "$probe_path" "$runtime_source" <<'PY'
 from __future__ import annotations
 
 import fcntl
@@ -79,9 +77,7 @@ import os
 import stat
 import sys
 
-probe_path, runtime_root, raw_gid, raw_uid = sys.argv[1:]
-runtime_gid = int(raw_gid)
-host_uid = int(raw_uid)
+probe_path, runtime_root = sys.argv[1:]
 probe_flags = os.O_RDWR | os.O_CREAT | os.O_CLOEXEC | os.O_NOFOLLOW
 fd = os.open(probe_path, probe_flags, 0o660)
 try:
@@ -97,10 +93,6 @@ try:
             raise OSError(f"bootstrap probe {label} has no valid inode")
         if stat.S_IMODE(candidate.st_mode) != 0o660:
             raise OSError(f"bootstrap probe {label} mode is not 0660")
-        if candidate.st_gid != runtime_gid:
-            raise OSError(f"bootstrap probe {label} group differs")
-        if candidate.st_uid != host_uid:
-            raise OSError(f"bootstrap probe {label} owner differs")
     if (fd_stat.st_dev, fd_stat.st_ino) != (path_stat.st_dev, path_stat.st_ino):
         raise OSError("bootstrap probe path identity differs from opened fd")
     probe_data = b"agent-canon-shared-runtime-probe/v5\\n"

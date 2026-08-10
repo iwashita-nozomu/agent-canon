@@ -154,38 +154,22 @@ check_dependency_module_runtime() {
 
 check_dependency_module_runtime
 
-runtime_identity_mode="${AGENT_CANON_RUNTIME_IDENTITY_MODE:-}"
-case "$runtime_identity_mode" in
-  project)
-    expected_runtime_user="project"
-    expected_runtime_uid="non-root"
-    expected_runtime_home="/home/project"
-    ;;
-  rootless-root)
-    expected_runtime_user="root"
-    expected_runtime_uid="root"
-    expected_runtime_home="/root"
-    ;;
-  *)
-    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-identity-mode-unsupported:${runtime_identity_mode:-<unset>}" >&2
-    exit 1
-    ;;
-esac
+expected_runtime_user="project"
+expected_runtime_home="/home/project"
 [ "${AGENT_CANON_CONTAINER_USER:-}" = "$expected_runtime_user" ] || {
   echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-user-marker-mismatch:${expected_runtime_user}" >&2
   exit 1
 }
-if [ "$expected_runtime_uid" = "non-root" ]; then
-  [ "$(id -u)" -ne 0 ] || {
-    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=project-identity-is-root" >&2
-    exit 1
-  }
-else
-  [ "$(id -u)" -eq 0 ] || {
-    echo "DEPENDENCY_MODULE_CONTAINER_ERROR=rootless-root-identity-not-uid-0" >&2
-    exit 1
-  }
-fi
+runtime_uid="$(id -u)"
+runtime_gid="$(id -g)"
+[[ "$runtime_uid" =~ ^[1-9][0-9]*$ ]] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=project-uid-must-be-nonzero-decimal:${runtime_uid}" >&2
+  exit 1
+}
+[[ "$runtime_gid" =~ ^[0-9]+$ ]] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=project-gid-must-be-nonnegative-decimal:${runtime_gid}" >&2
+  exit 1
+}
 [ "$(id -un)" = "$expected_runtime_user" ] || {
   echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-user-name-mismatch:${expected_runtime_user}:$(id -un)" >&2
   exit 1
@@ -194,16 +178,26 @@ fi
   echo "DEPENDENCY_MODULE_CONTAINER_ERROR=runtime-home-mismatch:${HOME:-}:${expected_runtime_home}" >&2
   exit 1
 }
-workspace_write_dir="$repo_root/.agent-canon"
-mkdir -p "$workspace_write_dir"
-workspace_write_probe="$(mktemp "$workspace_write_dir/identity-write.XXXXXX")"
-rm -f "$workspace_write_probe"
+workspace_write_probe=""
+trap 'if [ -n "${workspace_write_probe:-}" ]; then rm -f -- "$workspace_write_probe"; fi' EXIT
+workspace_write_probe="$(mktemp "$repo_root/identity-write.XXXXXX")"
+printf '%s\n' "project" >"$workspace_write_probe"
+[ "$(cat "$workspace_write_probe")" = "project" ] || {
+  echo "DEPENDENCY_MODULE_CONTAINER_ERROR=workspace-readback-failed:${workspace_write_probe}" >&2
+  exit 1
+}
+rm -f -- "$workspace_write_probe"
+workspace_write_probe=""
 
 echo
 echo "----------------------------------------"
 echo "AgentCanon devcontainer"
 echo "----------------------------------------"
 echo "repository: ${repo_root}"
+echo "runtime-user: ${expected_runtime_user}"
+echo "runtime-uid: ${runtime_uid}"
+echo "runtime-gid: ${runtime_gid}"
+echo "runtime-home: ${HOME}"
 echo "gpu: ${gpu_status}"
 echo "gpu-notice: ${DEVCONTAINER_GPU_NOTICE:-<unset>}"
 echo "/mnt/git: ${mnt_git_status}"

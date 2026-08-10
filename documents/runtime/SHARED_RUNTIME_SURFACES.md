@@ -29,10 +29,16 @@ Standalone AgentCanon may retain and validate its own regular `.vscode` source
 files; that standalone source ownership is separate from any parent `.vscode`
 directory, which remains parent-owned regular content.
 Standalone AgentCanon's `.devcontainer/` is likewise source-owned environment
-content and is not projected into a parent root. Its default selector asks the
-generator to inspect Docker's official `SecurityOptions` and auto-resolves
-rootful `project` or rootless `0:0` identity. Optional host credentials and zsh
-mounts target the resolved runtime `HOME` only when explicitly selected.
+content and is not projected into a parent root. Its default and opt-in selectors
+use only user `project` with decimal non-zero `PROJECT_UID` and decimal
+non-negative `PROJECT_GID` (including `0`). An existing group at the requested
+numeric GID is reused without rename; group `project` is created only for an
+unused GID. Docker rootful, rootless, and user-namespace mapping modes are
+outside this contract: no daemon probe, identity-mode selector, or mode
+environment is projected. Optional host credentials and zsh mounts target
+`HOME=/home/project` only when explicitly selected.
+Workspace bind acceptance is container-side create/read/write/remove usability;
+host-visible numeric owner equality is not a requirement.
 
 ## Reader Map
 

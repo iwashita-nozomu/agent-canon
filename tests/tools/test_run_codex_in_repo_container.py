@@ -498,7 +498,10 @@ def test_standalone_dockerfile_uses_canonical_project_identity() -> None:
     assert "ARG PROJECT_UID" in dockerfile
     assert "ARG PROJECT_GID" in dockerfile
     assert "groupadd --gid \"${PROJECT_GID}\" project" in dockerfile
-    assert "useradd --uid \"${PROJECT_UID}\" --gid project" in dockerfile
+    assert (
+        'useradd --uid "${PROJECT_UID}" --gid project' in dockerfile
+        or 'useradd --uid "${PROJECT_UID}" --gid "${PROJECT_GID}"' in dockerfile
+    )
     assert "project ALL=(ALL) NOPASSWD:ALL" in dockerfile
     assert "USER project" in dockerfile
 
@@ -602,12 +605,27 @@ def test_runtime_identity(tmp_path: Path) -> None:
     assert '"$devcontainer_dir/finalize-shared-runtime.sh"' not in post_create
     assert "project-install --workspace" not in post_create
     assert "image-verify --workspace" in post_create
+    assert "workspace_write_dir" not in post_create
+    assert "workspace/.agent-canon" not in post_create
+    assert 'workspace_write_probe="$(mktemp "$workspace/identity-write.XXXXXX")"' in post_create
+    assert post_create.index("image-verify") < post_create.index(
+        'workspace_write_probe="$(mktemp "$workspace/identity-write.XXXXXX")"'
+    )
+    assert "trap 'if [ -n \"${workspace_write_probe:-}\" ]; then rm -f -- \"$workspace_write_probe\"; fi' EXIT" in post_create
+    assert 'cat "$workspace_write_probe"' in post_create
+    assert 'rm -f -- "$workspace_write_probe"' in post_create
     assert "dependency_receipts" not in post_create
     assert ".agent-canon/dependency-receipts" not in post_create
     assert 'echo "codex-state: ${codex_state_status}"' in post_attach
     assert 'workspace_layout="${AGENT_CANON_WORKSPACE_LAYOUT:-managed-topic}"' in post_attach
     assert 'workspace_source="${DEPENDENCY_MODULE_CONTAINER_SOURCE:-}"' in post_attach
     assert 'workspace_target="${DEPENDENCY_MODULE_CONTAINER_TARGET:-}"' in post_attach
+    assert "workspace_write_dir" not in post_attach
+    assert "workspace/.agent-canon" not in post_attach
+    assert 'workspace_write_probe="$(mktemp "$repo_root/identity-write.XXXXXX")"' in post_attach
+    assert "trap 'if [ -n \"${workspace_write_probe:-}\" ]; then rm -f -- \"$workspace_write_probe\"; fi' EXIT" in post_attach
+    assert 'cat "$workspace_write_probe"' in post_attach
+    assert 'rm -f -- "$workspace_write_probe"' in post_attach
     assert 'DEPENDENCY_MODULE_CONTAINER_LAYOUT=${workspace_layout}' in post_attach
     assert 'DEPENDENCY_MODULE_CONTAINER_SOURCE=${workspace_source}' in post_attach
     assert 'DEPENDENCY_MODULE_CONTAINER_TARGET=${workspace_target}' in post_attach
@@ -628,6 +646,15 @@ def test_runtime_identity(tmp_path: Path) -> None:
     assert 'runtime_target="/var/lib/agent-canon/runtime"' in gpu_admission
     assert 'write_runtime_receipt_atomic' in gpu_admission
     assert "read_shared_runtime_provision" in finalize
+    assert "container-usability-" in finalize
+    assert ".st_uid" not in finalize
+    assert ".st_gid" not in finalize
+    assert "owner differs" not in finalize
+    assert "group differs" not in finalize
+    assert ".st_uid" not in gpu_admission
+    assert ".st_gid" not in gpu_admission
+    assert "owner differs" not in gpu_admission
+    assert "group differs" not in gpu_admission
     assert "write_runtime_receipt_atomic" in gpu_admission
     assert "write_runtime_receipt_atomic" in finalize
     assert (PROJECT_ROOT / ".devcontainer" / "finalize-shared-runtime.sh").is_file()

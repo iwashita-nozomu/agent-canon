@@ -142,10 +142,14 @@ post-attach / Compose generator の有無と内容は親の environment contract
   成功した後に呼ぶ親固有 source とする。
 - Compose の生成物は親の `.agent-canon/docker-compose.generated.yml` に置く。
 - 親 image は #524 canonical contract の digest-pinned plain `ubuntu:22.04` を基礎とし、
-  host UID/GID build args `PROJECT_UID` / `PROJECT_GID` から canonical `project`
-  user/group を作り、`USER project` で起動する。container-local passwordless sudo は
-  mounted dependency の導入にだけ使い、host sudo、host password prompt、host group
-  mutation は要求しない。
+  decimal `PROJECT_UID` / `PROJECT_GID` build args から UID non-zero の user `project`
+  と numeric primary GID を materialize し、`USER project` で起動する。要求 GID が既存
+  group に割り当て済みなら、その group（GID `0` の `root` を含む）を name変更なしで
+  再利用し、未使用 GID の場合だけ group `project` を作成する。group-name collision は
+  fail-closed とし、host-visible owner equality を要求しない。Docker daemon の rootful /
+  rootless / user-namespace mode は probe・selector・environment projection の対象外で
+  ある。container-local passwordless sudo は mounted dependency の導入にだけ使い、host
+  sudo、host password prompt、host group mutation は要求しない。
 - 親の default pack が zsh を選ぶ場合、generator は pack の `runtime.shell` を
   process boundary とし、`host-zshrc` profile が明示された場合だけ、resolved regular
   fileであるhost `${HOME}/.zshrc` と resolved regular directoryである `${HOME}/.zsh`

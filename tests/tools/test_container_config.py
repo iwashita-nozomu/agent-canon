@@ -38,31 +38,6 @@ POST_CREATE_COMMAND = (
 PARENT_POST_CREATE_COMMAND = POST_CREATE_COMMAND
 
 
-def write_fake_docker_probe(bin_dir: Path, *, rootless: bool) -> Path:
-    """Create a test-only Docker CLI returning official SecurityOptions."""
-    bin_dir.mkdir(parents=True, exist_ok=True)
-    docker = bin_dir / "docker"
-    security_options = '["name=rootless"]' if rootless else '["name=seccomp"]'
-    docker.write_text(
-        "#!/usr/bin/env bash\n"
-        'if [ "${1:-}" = info ]; then\n'
-        f"  printf '%s\\n' '{security_options}'\n"
-        "  exit 0\n"
-        "fi\n"
-        "exit 1\n",
-        encoding="utf-8",
-    )
-    docker.chmod(0o755)
-    return bin_dir
-
-
-@pytest.fixture(autouse=True)
-def rootful_docker_probe(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Keep project generator fixtures deterministic on a rootless host."""
-    probe_bin = write_fake_docker_probe(tmp_path / "rootful-docker", rootless=False)
-    monkeypatch.setenv("PATH", f"{probe_bin}:{os.environ['PATH']}")
-
-
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
     """Run the semantic container configuration checker."""
     return subprocess.run(
@@ -125,7 +100,7 @@ def write_devcontainer(root: Path) -> None:
         json.dumps(
             {
                 "name": "${localWorkspaceFolderBasename}-devcontainer",
-                "initializeCommand": "AGENT_CANON_RUNTIME_IDENTITY_MODE=auto AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
+                "initializeCommand": "AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
                 "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
                 "service": "workspace",
                 "updateRemoteUserUID": False,
@@ -193,7 +168,6 @@ def write_compose(
             "    environment:",
             "      AGENT_CANON_RUNTIME_ROUTE: CONTAINER_LOCAL",
             "      AGENT_CANON_CODEX_SESSION_ROOT: /home/project/.codex/sessions",
-            "      AGENT_CANON_RUNTIME_IDENTITY_MODE: project",
             "      HOME: /home/project",
             "      SHELL: /bin/bash",
             "      AGENT_CANON_CONTAINER_USER: project",
@@ -325,6 +299,8 @@ def test_gpu_admission_selector_isolated_from_default_selector() -> None:
     assert profile["dockerComposeFile"] != default["dockerComposeFile"]
     assert "features" not in default
     assert "features" not in profile
+    assert "AGENT_CANON_RUNTIME_IDENTITY_MODE" not in default["initializeCommand"]
+    assert "AGENT_CANON_RUNTIME_IDENTITY_MODE" not in profile["initializeCommand"]
     assert load_container_config_module().validate_gpu_admission_selector(PROJECT_ROOT) == []
 
 
@@ -339,6 +315,21 @@ def test_standalone_image_context_is_explicit_and_source_owned() -> None:
     assert "--workspace /opt/agent-canon --vendor-root /opt/agent-canon" in " ".join(
         dockerfile.split()
     )
+
+
+def test_dockerfile_materializes_project_with_existing_gid_reuse() -> None:
+    """The image creates project once and reuses an existing numeric primary group."""
+    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
+
+    assert 'case "${PROJECT_UID}"' in dockerfile
+    assert "0*|*[!0-9]*" in dockerfile
+    assert 'case "${PROJECT_GID}"' in dockerfile
+    assert 'getent group "${PROJECT_GID}"' in dockerfile
+    assert 'groupadd --gid "${PROJECT_GID}" project' in dockerfile
+    assert 'useradd --uid "${PROJECT_UID}" --gid "${PROJECT_GID}"' in dockerfile
+    assert "project group-name collision at another GID" in dockerfile
+    assert "groupmod" not in dockerfile
+    assert 'getent passwd "${PROJECT_UID}"' in dockerfile
 
 
 def test_standalone_image_context_rejects_broad_copy_and_leak_allowlist(
@@ -400,7 +391,7 @@ def test_post_create_uses_shared_lifecycle() -> None:
 
 
 def test_lifecycle_scripts_validate_selected_identity_and_workspace_writability() -> None:
-    """Lifecycle scripts own the exact identity marker and write probe contract."""
+    """Lifecycle scripts own the project identity and write probe contract."""
     post_create = (PROJECT_ROOT / ".devcontainer/post-create.sh").read_text(
         encoding="utf-8"
     )
@@ -408,13 +399,25 @@ def test_lifecycle_scripts_validate_selected_identity_and_workspace_writability(
         encoding="utf-8"
     )
     for script in (post_create, post_attach):
-        assert 'runtime_identity_mode="${AGENT_CANON_RUNTIME_IDENTITY_MODE:-}"' in script
-        assert "rootless-root" in script
-        assert 'expected_runtime_home="/root"' in script
+        assert 'expected_runtime_user="project"' in script
+        assert 'expected_runtime_home="/home/project"' in script
+        assert "AGENT_CANON_RUNTIME_IDENTITY_MODE" not in script
+        assert "rootless-root" not in script
         assert "workspace_write_probe" in script
         assert "mktemp" in script
-    assert "post-create rootless-root identity must be uid 0" in post_create
-    assert "rootless-root-identity-not-uid-0" in post_attach
+        assert "workspace_write_dir" not in script
+        assert "trap 'if [ -n \"${workspace_write_probe:-}\" ]; then rm -f -- \"$workspace_write_probe\"; fi' EXIT" in script
+        assert 'printf \'%s\\n\' "project" >"$' in script
+        assert 'cat "$workspace_write_probe"' in script
+        assert 'rm -f -- "$workspace_write_probe"' in script
+        assert ".agent-canon/identity-write" not in script
+    assert 'workspace_write_probe="$(mktemp "$workspace/identity-write.XXXXXX")"' in post_create
+    assert 'workspace_write_probe="$(mktemp "$repo_root/identity-write.XXXXXX")"' in post_attach
+    assert post_create.index("image-verify") < post_create.index(
+        'workspace_write_probe="$(mktemp "$workspace/identity-write.XXXXXX")"'
+    )
+    assert "project identity UID must be a nonzero decimal" in post_create
+    assert "project-gid-must-be-nonnegative-decimal" in post_attach
 
 
 def test_parent_layout_requires_language_runtime_before_shared_lifecycle(
@@ -552,8 +555,8 @@ def generate_gpu_admission_compose(tmp_path: Path) -> tuple[Path, Path]:
     return repo, output_path
 
 
-def test_default_auto_identity_rejects_static_remote_user_override(tmp_path: Path) -> None:
-    """Auto identity leaves container and remote user selection to Compose."""
+def test_default_project_identity_rejects_static_remote_user_override(tmp_path: Path) -> None:
+    """Project identity leaves container and remote user selection to Compose."""
     repo = write_topic_fixture(tmp_path)
     config_path = repo / ".devcontainer/devcontainer.json"
     config = json.loads(config_path.read_text(encoding="utf-8"))
@@ -563,10 +566,10 @@ def test_default_auto_identity_rejects_static_remote_user_override(tmp_path: Pat
     result = run_validator(repo)
 
     assert result.returncode == 1, result.stdout + result.stderr
-    assert "default-remoteUser-forbidden-auto-identity" in result.stdout
+    assert "default-remoteUser-forbidden-compose-owned-project-identity" in result.stdout
 
 
-def test_default_auto_identity_requires_update_remote_user_uid_false(
+def test_default_project_identity_requires_update_remote_user_uid_false(
     tmp_path: Path,
 ) -> None:
     """The CLI must not rewrite the Compose-owned numeric identity."""
@@ -579,7 +582,7 @@ def test_default_auto_identity_requires_update_remote_user_uid_false(
     result = run_validator(repo)
 
     assert result.returncode == 1, result.stdout + result.stderr
-    assert "default-updateRemoteUserUID-expected:false" in result.stdout
+    assert "updateRemoteUserUID-expected:False" in result.stdout
 
 
 def test_legacy_topic_compose_root_is_rejected(tmp_path: Path) -> None:
@@ -651,10 +654,79 @@ def test_compose_missing_runtime_environment_is_rejected(tmp_path: Path) -> None
     assert "runtime-environment-required:AGENT_CANON_WORKSPACE_ROOT" in result.stdout
 
 
-def test_auto_mode_projects_rootful_identity_and_exact_repository_mount(
+def test_generated_compose_rejects_legacy_runtime_identity_mode_environment(
     tmp_path: Path,
 ) -> None:
-    """Auto rootful resolution writes project identity and one exact repo mount."""
+    """Generated Compose cannot reintroduce the retired daemon identity selector."""
+    repo = write_topic_fixture(tmp_path)
+    compose_path = repo / ".devcontainer/docker-compose.generated.yml"
+    compose = compose_path.read_text(encoding="utf-8")
+    compose = compose.replace(
+        "      AGENT_CANON_CONTAINER_USER: project\n",
+        "      AGENT_CANON_CONTAINER_USER: project\n"
+        "      AGENT_CANON_RUNTIME_IDENTITY_MODE: legacy\n",
+        1,
+    )
+    compose_path.write_text(compose, encoding="utf-8")
+
+    result = run_validator(repo)
+
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "daemon-runtime-identity-mode-env-forbidden" in result.stdout
+
+
+@pytest.mark.parametrize("build_args_shape", ("missing", "non-mapping"))
+def test_generated_compose_rejects_malformed_build_args_without_crashing(
+    tmp_path: Path, build_args_shape: str
+) -> None:
+    """Malformed build args yield a finding instead of an equality-check exception."""
+    repo = write_topic_fixture(tmp_path)
+    compose_path = repo / ".devcontainer/docker-compose.generated.yml"
+    compose = compose_path.read_text(encoding="utf-8")
+    build_args = (
+        "      args:\n"
+        f'        PROJECT_UID: "{os.getuid()}"\n'
+        f'        PROJECT_GID: "{os.getgid()}"\n'
+    )
+    replacement = "" if build_args_shape == "missing" else "      args: []\n"
+    compose_path.write_text(compose.replace(build_args, replacement, 1), encoding="utf-8")
+
+    module = load_container_config_module()
+    findings = module.validate_generated_compose(repo, None)
+
+    assert "build-args-required:PROJECT_UID,PROJECT_GID" in {
+        finding.detail for finding in findings
+    }
+
+
+def test_standalone_compose_rejects_valid_but_mismatched_project_user_build_args(
+    tmp_path: Path,
+) -> None:
+    """Standalone Compose enforces the same service-user/build-arg identity pair."""
+    repo = write_topic_fixture(tmp_path)
+    compose_path = repo / ".devcontainer/docker-compose.generated.yml"
+    compose = compose_path.read_text(encoding="utf-8")
+    compose_path.write_text(
+        compose.replace(
+            f'user: "{os.getuid()}:{os.getgid()}"',
+            f'user: "{os.getuid() + 1}:{os.getgid() + 1}"',
+            1,
+        ),
+        encoding="utf-8",
+    )
+
+    module = load_container_config_module()
+    details = {
+        finding.detail for finding in module.validate_generated_compose(repo, None)
+    }
+
+    assert "project-user-must-match-build-args" in details
+
+
+def test_generator_projects_project_identity_and_exact_repository_mount(
+    tmp_path: Path,
+) -> None:
+    """The generator writes project identity and one exact repo mount."""
     repo = tmp_path / "workspace" / "topic" / "agent-canon"
     write_devcontainer(repo)
     write_file(
@@ -683,7 +755,7 @@ def test_auto_mode_projects_rootful_identity_and_exact_repository_mount(
     assert f'source: "{repo.parent.resolve()}"' not in compose
     assert 'AGENT_CANON_CODEX_SESSION_ROOT: "/home/project/.codex/sessions"' in compose
     assert 'user: "0:0"' not in compose
-    assert 'AGENT_CANON_RUNTIME_IDENTITY_MODE: "project"' in compose
+    assert "AGENT_CANON_RUNTIME_IDENTITY_MODE" not in compose
     assert 'AGENT_CANON_CONTAINER_USER: "project"' in compose
     assert "/etc/project-template/parent-environment.sh" not in compose
     assert "/etc/project-template/zsh/.zshrc" not in compose
@@ -706,149 +778,6 @@ def test_auto_mode_projects_rootful_identity_and_exact_repository_mount(
     assert "group_add:" not in compose
     assert "/var/lib/agent-canon/runtime" not in compose
     assert "\n      target:" not in compose
-
-
-def test_explicit_project_mode_rejects_rootless_docker_security_option(
-    tmp_path: Path,
-) -> None:
-    """The project selector fails closed when Docker reports name=rootless."""
-    repo = write_parent_generator_fixture(tmp_path)
-    rootless_bin = write_fake_docker_probe(tmp_path / "rootless-docker", rootless=True)
-    result = subprocess.run(
-        ["bash", ".devcontainer/generate-runtime-compose.sh"],
-        cwd=repo,
-        env={
-            **os.environ,
-            "PATH": f"{rootless_bin}:{os.environ['PATH']}",
-            "AGENT_CANON_RUNTIME_IDENTITY_MODE": "project",
-        },
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-
-    assert result.returncode == 1
-    assert "ROOTLESS_DAEMON_REQUIRES_ROOTLESS_SELECTOR" in result.stderr
-
-
-def test_auto_mode_projects_rootless_identity_without_default_mounts(
-    tmp_path: Path,
-) -> None:
-    """Auto mode resolves a rootless daemon to uid 0 and keeps positive build ids."""
-    repo = write_parent_generator_fixture(tmp_path)
-    rootless_bin = write_fake_docker_probe(tmp_path / "rootless-docker", rootless=True)
-    output_path = repo / ".agent-canon/auto-rootless.generated.yml"
-    result = subprocess.run(
-        ["bash", ".devcontainer/generate-runtime-compose.sh"],
-        cwd=repo,
-        env={
-            **os.environ,
-            "PATH": f"{rootless_bin}:{os.environ['PATH']}",
-            "AGENT_CANON_RUNTIME_IDENTITY_MODE": "auto",
-            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": str(output_path),
-        },
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-
-    assert result.returncode == 0, result.stdout + result.stderr
-    compose = output_path.read_text(encoding="utf-8")
-    assert 'user: "0:0"' in compose
-    assert 'HOME: "/root"' in compose
-    assert 'AGENT_CANON_CONTAINER_USER: "root"' in compose
-    assert 'AGENT_CANON_RUNTIME_IDENTITY_MODE: "rootless-root"' in compose
-    assert 'PROJECT_UID: "0"' not in compose
-    assert 'PROJECT_GID: "0"' not in compose
-    assert 'AGENT_CANON_OPTIONAL_MOUNTS: ""' in compose
-    assert "/var/run/docker.sock" not in compose
-    assert "/root/.ssh" not in compose
-    module = load_container_config_module()
-    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
-    assert pack_findings == []
-    assert pack is not None
-    assert (
-        module.validate_generated_compose(
-            repo,
-            pack,
-            identity_mode="rootless-root",
-            compose_path=output_path,
-        )
-        == []
-    )
-
-
-def test_auto_mode_projects_selected_rootless_home_optional_mounts(
-    tmp_path: Path,
-) -> None:
-    """Auto rootless resolution targets /root for selected read-only mounts."""
-    repo = write_parent_generator_fixture(tmp_path)
-    rootless_bin = write_fake_docker_probe(tmp_path / "rootless-docker", rootless=True)
-    home = tmp_path / "credentials-home"
-    write_host_zshrc(home)
-    (home / ".config" / "gh").mkdir(parents=True)
-    (home / ".config" / "gh" / "hosts.yml").write_text("github.com:\n", encoding="utf-8")
-    (home / ".ssh").mkdir()
-    (home / ".ssh" / "known_hosts").write_text("", encoding="utf-8")
-    output_path = repo / ".agent-canon/auto-rootless.generated.yml"
-    result = subprocess.run(
-        ["bash", ".devcontainer/generate-runtime-compose.sh"],
-        cwd=repo,
-        env={
-            **os.environ,
-            "PATH": f"{rootless_bin}:{os.environ['PATH']}",
-            "HOME": str(home),
-            "AGENT_CANON_OPTIONAL_MOUNTS": "host-zshrc,host-credentials",
-            "AGENT_CANON_RUNTIME_IDENTITY_MODE": "auto",
-            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": str(output_path),
-        },
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-
-    assert result.returncode == 0, result.stdout + result.stderr
-    compose = output_path.read_text(encoding="utf-8")
-    assert 'target: "/root/.zshrc"' in compose
-    assert ":/root/.config/gh:ro" in compose
-    assert ":/root/.ssh:ro" in compose
-    assert 'target: "/home/project/.zshrc"' not in compose
-    assert ":/home/project/.config/gh:ro" not in compose
-    assert ":/home/project/.ssh:ro" not in compose
-    module = load_container_config_module()
-    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
-    assert pack_findings == []
-    assert pack is not None
-    assert (
-        module.validate_generated_compose(
-            repo,
-            pack,
-            identity_mode="rootless-root",
-            compose_path=output_path,
-        )
-        == []
-    )
-
-
-def test_explicit_rootless_mode_rejects_rootful_docker_security_option(
-    tmp_path: Path,
-) -> None:
-    """The explicit rootless mode fails closed when Docker is rootful."""
-    repo = write_parent_generator_fixture(tmp_path)
-    result = subprocess.run(
-        ["bash", ".devcontainer/generate-runtime-compose.sh"],
-        cwd=repo,
-        env={
-            **os.environ,
-            "AGENT_CANON_RUNTIME_IDENTITY_MODE": "rootless-root",
-        },
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-
-    assert result.returncode == 1
-    assert "ROOTLESS_SELECTOR_REQUIRES_ROOTLESS_DAEMON" in result.stderr
 
 
 def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
@@ -1219,7 +1148,11 @@ def test_optional_mount_rejects_removed_shared_runtime_selector(
 
 @pytest.mark.parametrize(
     "reserved_name",
-    ("AGENT_CANON_RUNTIME_GID", "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS"),
+    (
+        "AGENT_CANON_RUNTIME_GID",
+        "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS",
+        "AGENT_CANON_RUNTIME_IDENTITY_MODE",
+    ),
 )
 def test_default_generator_rejects_reserved_runtime_identity_env(
     tmp_path: Path, reserved_name: str
@@ -1248,7 +1181,11 @@ def test_default_generator_rejects_reserved_runtime_identity_env(
 
 @pytest.mark.parametrize(
     "reserved_name",
-    ("AGENT_CANON_RUNTIME_GID", "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS"),
+    (
+        "AGENT_CANON_RUNTIME_GID",
+        "AGENT_CANON_HOST_SUPPLEMENTARY_GIDS",
+        "AGENT_CANON_RUNTIME_IDENTITY_MODE",
+    ),
 )
 def test_gpu_generator_rejects_reserved_runtime_identity_env(
     tmp_path: Path, reserved_name: str
@@ -2144,8 +2081,102 @@ def test_parent_environment_broken_symlink_does_not_block_default_generation(
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_parent_compose_rejects_root_user_and_missing_build_args(tmp_path: Path) -> None:
-    """Parent Compose requires a non-root runtime identity and reproducible build args."""
+def test_generator_projects_zero_primary_gid_without_daemon_probe(tmp_path: Path) -> None:
+    """The generator accepts numeric GID 0 while keeping the project account."""
+    repo = write_parent_generator_fixture(tmp_path)
+    identity_bin = tmp_path / "identity-bin"
+    identity_bin.mkdir()
+    identity_tool = identity_bin / "id"
+    identity_tool.write_text(
+        "#!/usr/bin/env bash\n"
+        'case "${1:-}" in\n'
+        '  -u) printf "1001\\n" ;;\n'
+        '  -g) printf "0\\n" ;;\n'
+        '  *) exit 1 ;;\n'
+        "esac\n",
+        encoding="utf-8",
+    )
+    identity_tool.chmod(0o755)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "PATH": f"{identity_bin}:{os.environ['PATH']}",
+            "HOME": str(tmp_path / "missing-home"),
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".agent-canon/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert 'user: "1001:0"' in compose
+    assert 'PROJECT_UID: "1001"' in compose
+    assert 'PROJECT_GID: "0"' in compose
+    assert 'HOME: "/home/project"' in compose
+    assert 'AGENT_CANON_CONTAINER_USER: "project"' in compose
+    assert "AGENT_CANON_RUNTIME_IDENTITY_MODE" not in compose
+
+
+@pytest.mark.parametrize("gpu_profile", (False, True))
+def test_generator_never_invokes_docker_daemon_probe(
+    tmp_path: Path, gpu_profile: bool
+) -> None:
+    """Compose generation is independent of any Docker daemon probe."""
+    repo = write_parent_generator_fixture(tmp_path)
+    environment = {
+        **os.environ,
+        "PATH": f"{tmp_path / 'sentinel-bin'}:{os.environ['PATH']}",
+        "HOME": str(tmp_path / "missing-home"),
+    }
+    sentinel_bin = tmp_path / "sentinel-bin"
+    sentinel_bin.mkdir()
+    marker = tmp_path / "docker-called"
+    docker = sentinel_bin / "docker"
+    docker.write_text(
+        "#!/usr/bin/env bash\n"
+        f"printf '%s\\n' called > {marker}\n"
+        "exit 97\n",
+        encoding="utf-8",
+    )
+    docker.chmod(0o755)
+    if gpu_profile:
+        write_gpu_admission_pack(repo)
+        environment.update(
+            {
+                "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
+                "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(repo / ".agent-canon/runtime"),
+                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(repo / ".agent-canon/runtime"),
+                "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
+                "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(
+                    repo / ".agent-canon/runtime/shared-runtime-provision.json"
+                ),
+                "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(
+                    repo / ".agent-canon/runtime/shared-runtime-readback.json"
+                ),
+                "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/gpu-admission-compose.generated.yml",
+            }
+        )
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert not marker.exists(), result.stdout + result.stderr
+
+
+def test_parent_compose_rejects_zero_uid_and_missing_build_args(tmp_path: Path) -> None:
+    """Parent Compose requires a nonzero UID and reproducible build args."""
     repo = write_parent_generator_fixture(tmp_path)
     (repo / ".agent-canon").mkdir()
     home = tmp_path / "home"
@@ -2166,8 +2197,11 @@ def test_parent_compose_rejects_root_user_and_missing_build_args(tmp_path: Path)
     compose_path = repo / ".agent-canon/docker-compose.generated.yml"
     malformed = (
         compose_path.read_text(encoding="utf-8")
-        .replace('user: "1000:1000"', 'user: "0:0"')
-        .replace('        PROJECT_GID: "1000"\n', "")
+        .replace(
+            f'user: "{os.getuid()}:{os.getgid()}"',
+            f'user: "0:{os.getgid()}"',
+        )
+        .replace(f'        PROJECT_GID: "{os.getgid()}"\n', "")
     )
     compose_path.write_text(malformed, encoding="utf-8")
     module = load_container_config_module()
@@ -2177,8 +2211,45 @@ def test_parent_compose_rejects_root_user_and_missing_build_args(tmp_path: Path)
     details = {
         finding.detail for finding in module.validate_generated_compose(repo, pack)
     }
-    assert "default-user-must-have-positive-uid-gid" in details
-    assert "build-arg-PROJECT_GID-must-be-positive-integer" in details
+    assert "project-user-must-have-nonzero-uid-nonnegative-gid" in details
+    assert "build-arg-PROJECT_GID-must-be-nonnegative-decimal" in details
+
+
+def test_parent_compose_rejects_valid_but_mismatched_project_user_build_args(
+    tmp_path: Path,
+) -> None:
+    """A numeric service user must be the exact build-arg identity pair."""
+    repo = write_parent_generator_fixture(tmp_path)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(tmp_path / "missing-home"),
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose_path = repo / ".agent-canon/docker-compose.generated.yml"
+    compose = compose_path.read_text(encoding="utf-8")
+    compose = compose.replace(
+        f'user: "{os.getuid()}:{os.getgid()}"',
+        f'user: "{os.getuid() + 1}:{os.getgid() + 1}"',
+        1,
+    )
+    compose_path.write_text(compose, encoding="utf-8")
+
+    module = load_container_config_module()
+    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack_findings == []
+    assert pack is not None
+    details = {
+        finding.detail for finding in module.validate_generated_compose(repo, pack)
+    }
+    assert "project-user-must-match-build-args" in details
 
 
 def test_generator_rejects_public_project_user_override(tmp_path: Path) -> None:
@@ -2220,8 +2291,8 @@ def test_generator_rejects_project_uid_or_gid_override(tmp_path: Path) -> None:
         assert "DEVCONTAINER_IDENTITY_ERROR=PROJECT_IDS_OVERRIDE_FORBIDDEN" in result.stderr
 
 
-def test_parent_validator_rejects_zero_uid_or_gid(tmp_path: Path) -> None:
-    """Generated Compose readback rejects zero project IDs."""
+def test_parent_validator_rejects_zero_uid(tmp_path: Path) -> None:
+    """Generated Compose readback rejects a zero project UID."""
     repo = write_parent_generator_fixture(tmp_path)
     (repo / ".agent-canon").mkdir()
     home = tmp_path / "home"
@@ -2246,32 +2317,94 @@ def test_parent_validator_rejects_zero_uid_or_gid(tmp_path: Path) -> None:
     assert pack_findings == []
     assert pack is not None
 
-    malformed_cases = (
-        (
-            valid.replace(
-                f'user: "{os.getuid()}:{os.getgid()}"',
-                f'user: "0:{os.getgid()}"',
-            ).replace(
-                f'PROJECT_UID: "{os.getuid()}"', 'PROJECT_UID: "0"'
-            ),
-            {"default-user-must-have-positive-uid-gid", "build-arg-PROJECT_UID-must-be-positive-integer"},
-        ),
-        (
-            valid.replace(
-                f'user: "{os.getuid()}:{os.getgid()}"',
-                f'user: "{os.getuid()}:0"',
-            ).replace(
-                f'PROJECT_GID: "{os.getgid()}"', 'PROJECT_GID: "0"'
-            ),
-            {"default-user-must-have-positive-uid-gid", "build-arg-PROJECT_GID-must-be-positive-integer"},
-        ),
+    malformed = valid.replace(
+        f'user: "{os.getuid()}:{os.getgid()}"',
+        f'user: "0:{os.getgid()}"',
+    ).replace(
+        f'PROJECT_UID: "{os.getuid()}"', 'PROJECT_UID: "0"'
     )
-    for malformed, expected in malformed_cases:
-        compose_path.write_text(malformed, encoding="utf-8")
-        details = {
-            finding.detail for finding in module.validate_generated_compose(repo, pack)
-        }
-        assert expected.issubset(details)
+    compose_path.write_text(malformed, encoding="utf-8")
+    details = {
+        finding.detail for finding in module.validate_generated_compose(repo, pack)
+    }
+    assert {
+        "project-user-must-have-nonzero-uid-nonnegative-gid",
+        "build-arg-PROJECT_UID-must-be-nonzero-decimal",
+    }.issubset(details)
+
+
+def test_parent_validator_accepts_zero_gid(tmp_path: Path) -> None:
+    """Generated Compose readback accepts the root primary group as project GID 0."""
+    repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".agent-canon").mkdir()
+    home = tmp_path / "home"
+    write_host_zshrc(home)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose_path = repo / ".agent-canon/docker-compose.generated.yml"
+    compose = compose_path.read_text(encoding="utf-8").replace(
+        f'user: "{os.getuid()}:{os.getgid()}"',
+        f'user: "{os.getuid()}:0"',
+    ).replace(
+        f'PROJECT_GID: "{os.getgid()}"', 'PROJECT_GID: "0"'
+    )
+    compose_path.write_text(compose, encoding="utf-8")
+    module = load_container_config_module()
+    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack_findings == []
+    assert pack is not None
+    assert module.validate_generated_compose(repo, pack) == []
+
+
+def test_parent_validator_rejects_malformed_gid(tmp_path: Path) -> None:
+    """Generated Compose readback rejects a negative project GID."""
+    repo = write_parent_generator_fixture(tmp_path)
+    (repo / ".agent-canon").mkdir()
+    home = tmp_path / "home"
+    write_host_zshrc(home)
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(home),
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": ".agent-canon/docker-compose.generated.yml",
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose_path = repo / ".agent-canon/docker-compose.generated.yml"
+    compose = compose_path.read_text(encoding="utf-8").replace(
+        f'user: "{os.getuid()}:{os.getgid()}"',
+        f'user: "{os.getuid()}:-1"',
+    ).replace(
+        f'PROJECT_GID: "{os.getgid()}"', 'PROJECT_GID: "-1"'
+    )
+    compose_path.write_text(compose, encoding="utf-8")
+    module = load_container_config_module()
+    pack, pack_findings = module.load_pack(repo, repo / "docker/packs/default.toml")
+    assert pack_findings == []
+    assert pack is not None
+    details = {
+        finding.detail for finding in module.validate_generated_compose(repo, pack)
+    }
+    assert {
+        "project-user-must-have-nonzero-uid-nonnegative-gid",
+        "build-arg-PROJECT_GID-must-be-nonnegative-decimal",
+    }.issubset(details)
 
 
 def test_generator_rejects_runtime_shell_arguments(tmp_path: Path) -> None:

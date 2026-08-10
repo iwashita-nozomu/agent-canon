@@ -45,7 +45,7 @@ host `${HOME}/.zshrc` と `${HOME}/.zsh` は optional user-customizationです�
 `host-zshrc` profileが明示された場合、regular fileまたはregular fileへ解決するsymlink
 は `realpath -e` のcanonical absolute sourceから selected runtime `HOME/.zshrc` へread-only
 projectionし、regular directoryへ解決する `${HOME}/.zsh` も selected runtime `HOME/.zsh` へ
-read-only projectionします（`project` は `/home/project`、`rootless-root` は `/root`）。欠落・broken symlink・型違いの場合はmountを省略し、
+read-only projectionします（`project` は `/home/project`）。欠落・broken symlink・型違いの場合はmountを省略し、
 image-owned empty/default startupで同一機能を成立させます。host `~/.codex`、
 parent-environment、個別credential/config、SSH agent、previous container state、
 `/mnt/git`、Docker socketはdefault create/tool availabilityの入力ではありません。
@@ -54,9 +54,17 @@ parent-environment、個別credential/config、SSH agent、previous container st
 `host-credentials`、`ssh-agent`、`docker-host`、`linked-data-roots` を有効化できます。
 GPU runtime は optional mount ではなく、明示的な `gpu-admission` selector と
 `.devcontainer/gpu-admission.sh` の lifecycle で選択します。この lifecycle は
-user-owned `${repository_root}/.agent-canon/runtime` を primary UID/GID で provision し、
-`/var/lib/agent-canon/runtime` へ bind/readback します。`agent-canon-runtime` group、
-`group_add`、supplementary GID env、sudo、追加 bootstrap は使用しません。
+user-owned `${repository_root}/.agent-canon/runtime` を primary UID/GID の provenance として
+receipt に記録し、`/var/lib/agent-canon/runtime` への bind を
+`.devcontainer/finalize-shared-runtime.sh` が container-side create/write/read/remove で
+readback します。host-visible owner、host-vs-container UID/GID、inode owner の一致は
+acceptance gate にせず、route/path、symlink/type/mode、device/inode、race、namespace/mount、
+fingerprint、atomic publication、closed probe、UID non-zero/GID numeric の mapping-neutral
+checks を維持します。receipt parse/read/write の sole owner は
+`tools/experiments/execution_resource_plan.py` です。`agent-canon-runtime` group、`group_add`、
+supplementary GID env、sudo、追加 bootstrap は使用しません。詳細な clause は
+[`../design/devcontainer/parent-devcontainer-policy.md`](../design/devcontainer/parent-devcontainer-policy.md)
+を参照します。
 Docker-in-Docker/host daemonは`docker-host` profileに限定します。zsh startupは
 `.zshenv`、`ZDOTDIR`、parent-environment sourceに依存せず、Docker `ENV`、
 devcontainer `containerEnv`、明示bootstrapからruntime値を受け取ります。
@@ -87,19 +95,22 @@ standalone AgentCanon source layout でも `host-zshrc` profile は同じ option
 shell projectionを使えます。profile未選択時は pack-derived command だけを生成し、
 host `~/.zshrc`、parent environment mount、`HOME`、tmpfs は要求しません。
 
-Compose がこの境界で直接所有する environment は runtime identity marker を含む次の値です。
+Compose がこの境界で直接所有する environment は `project` runtime marker を含む次の値です。
 
-- `AGENT_CANON_RUNTIME_IDENTITY_MODE`: Docker の `SecurityOptions` から解決した
-  `project` または `rootless-root` と一致します。
-- `HOME`: `project` では `/home/project`、`rootless-root` では `/root` を指します。
+- `HOME`: `/home/project` を指します。
 - `SHELL`: pack の `runtime.shell` と一致します。
-- `AGENT_CANON_CONTAINER_USER`: selector の `project` または `root` と一致し、post-create/attach が
-  process user、HOME、workspace writability を read backします。
+- `AGENT_CANON_CONTAINER_USER`: `project` と一致し、post-create/attach が process
+  UID/GID、HOME、workspace usability/writability を read backします。process UID は
+  decimal non-zero、primary GID は decimal non-negative（`0` を含む）です。要求 GID
+  に既存 group があれば name を変更せず再利用し、未使用 GID の場合だけ group
+  `project` を作成します。group-name collision は fail-closed です。
 
-default selector は `docker info` の公式 `SecurityOptions` を自動判定します。
-rootless Docker では Compose `user: "0:0"`、`HOME=/root`、
-`AGENT_CANON_CONTAINER_USER=root` を投影し、rootful Docker では host UID/GID の
-`project` user を投影します。build 用 `PROJECT_UID/GID` は正の値を維持し、runtime user と混同しません。
+default runtime は Docker の daemon mapping mode を probe せず、rootful、rootless、
+user-namespace のいずれでも同じ `project` runtime を投影します。build 用
+`PROJECT_UID/GID` はそれぞれ decimal UID non-zero、decimal GID non-negative（`0` を含む）であり、
+runtime user と mode selector を混同しません。bind acceptance は host-visible owner
+equality ではなく、container 内で expected workspace path の create、read、write、remove
+が成功することにより判定します。
 
 parent environment pair の両方不在、または両方が file 実体へ解決できることは、値や
 container behavior の十分条件ではありません。最終的な親側検証は、validator、
