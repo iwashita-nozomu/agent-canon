@@ -776,8 +776,8 @@ raise SystemExit(2)
             self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("missing_text_any_of:", result.stdout)
 
-    def test_legacy_auto_submodule_checkout_fails(self) -> None:
-        """Checkout steps must use the explicit AgentCanon helper."""
+    def test_legacy_auto_submodule_checkout_fails_safety_settings(self) -> None:
+        """Unsafe checkout settings fail without inventing an AgentCanon dependency."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             workflow_dir = root / ".github" / "workflows"
@@ -809,10 +809,12 @@ raise SystemExit(2)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("checkout_1_missing_submodules_false", result.stdout)
             self.assertIn("checkout_1_missing_persist_credentials_false", result.stdout)
-            self.assertIn("missing_agent_canon_checkout_helper", result.stdout)
+            self.assertNotIn("missing_agent_canon_checkout_helper", result.stdout)
 
-    def test_docker_build_workflow_requires_agent_canon_checkout(self) -> None:
-        """Docker build workflow consumes shared devcontainer files from AgentCanon."""
+    def test_project_only_docker_build_does_not_require_agent_canon_checkout(
+        self,
+    ) -> None:
+        """A direct project Docker build has no AgentCanon checkout dependency."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             workflow_dir = root / ".github" / "workflows"
@@ -833,6 +835,42 @@ raise SystemExit(2)
                 "          submodules: false\n"
                 "          persist-credentials: false\n"
                 "      - run: bash docker/check_build.sh --pack docker/packs/default.toml\n",
+                encoding="utf-8",
+            )
+            self.copy_required_surfaces(root)
+
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root)],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("missing_agent_canon_checkout_helper", result.stdout)
+
+    def test_agent_canon_tool_workflow_requires_agent_canon_checkout(self) -> None:
+        """A workflow invoking the shared tool view must prepare the submodule."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            workflow_dir = root / ".github" / "workflows"
+            workflow_dir.mkdir(parents=True)
+            (workflow_dir / "docker-build.yml").write_text(
+                "name: Docker Build\n"
+                "on: [push]\n"
+                "permissions:\n"
+                "  contents: read\n"
+                "concurrency:\n"
+                "  group: docker-${{ github.ref }}\n"
+                "jobs:\n"
+                "  docker-build:\n"
+                "    runs-on: ubuntu-latest\n"
+                "    steps:\n"
+                "      - uses: actions/checkout@v4\n"
+                "        with:\n"
+                "          submodules: false\n"
+                "          persist-credentials: false\n"
+                "      - run: python3 tools/agent-canon/ci/container_config.py\n",
                 encoding="utf-8",
             )
             self.copy_required_surfaces(root)

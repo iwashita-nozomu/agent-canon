@@ -39,6 +39,10 @@ HELPER_PATHS = (
     "tools/ci/checkout_agent_canon_submodule.sh",
     "tools/agent-canon/ci/checkout_agent_canon_submodule.sh",
 )
+AGENT_CANON_WORKFLOW_SURFACE_MARKERS = (
+    "vendor/agent-canon",
+    "tools/agent-canon",
+)
 AGENT_CANON_INDEPENDENT_WORKFLOWS: set[str] = {
     "agent-runtime-dashboard.yml",
     "issue-mirror.yml",
@@ -382,6 +386,39 @@ def agent_canon_checkout_command_steps(
     return steps
 
 
+def nested_string_values(value: object) -> list[str]:
+    """Return string leaves from one workflow execution field."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        values: list[str] = []
+        for nested in cast(dict[object, object], value).values():
+            values.extend(nested_string_values(nested))
+        return values
+    if isinstance(value, list):
+        values = []
+        for nested in cast(list[object], value):
+            values.extend(nested_string_values(nested))
+        return values
+    return []
+
+
+def agent_canon_surface_steps(workflow: dict[str, object]) -> list[StepContext]:
+    """Return execution steps that consume an AgentCanon-owned path."""
+    steps: list[StepContext] = []
+    for context in step_contexts(workflow):
+        execution_values: list[str] = []
+        for field in ("run", "uses", "working-directory", "env", "with"):
+            execution_values.extend(nested_string_values(context.step.get(field)))
+        if any(
+            marker in value
+            for value in execution_values
+            for marker in AGENT_CANON_WORKFLOW_SURFACE_MARKERS
+        ):
+            steps.append(context)
+    return steps
+
+
 def referenced_agent_canon_checkout_script_available(
     root: Path, workflow_text: str
 ) -> bool:
@@ -416,10 +453,13 @@ def agent_canon_checkout_policy_findings(
     findings: list[Finding] = []
     checkouts = checkout_steps(workflow)
     helpers = agent_canon_checkout_command_steps(workflow)
-    requires_agent_canon_checkout = path.name not in AGENT_CANON_INDEPENDENT_WORKFLOWS
+    agent_canon_independent = path.name in AGENT_CANON_INDEPENDENT_WORKFLOWS
+    requires_agent_canon_checkout = (
+        not agent_canon_independent and bool(agent_canon_surface_steps(workflow))
+    )
     if requires_agent_canon_checkout and checkouts and not helpers:
         findings.append(Finding("error", path, "missing_agent_canon_checkout_helper"))
-    if not requires_agent_canon_checkout:
+    if agent_canon_independent:
         if helpers:
             findings.append(
                 Finding("error", path, "agent_canon_checkout_helper_not_allowed")
