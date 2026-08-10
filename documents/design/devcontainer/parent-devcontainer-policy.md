@@ -212,8 +212,8 @@ absent を正本とする。
 | DEV-DEFAULT-004 | source-root resolver 経由で呼ぶ post-create は image-owned immutable dependency tree の read-only verify と container runtime readback を実行する | package install、network、sudo、workspace bind repair は startup path に存在せず、stored plan/receipts と live package/executable verification が pass する。workspace projection/cache が rootless bind で書けない場合も container-local canonical runtime を使用し、parent hook は verify 後に一度だけ実行される | post-create static inspection、image-verify readback、tool availability、container-local runtime readback、parent-hook order test |
 | DEV-DEFAULT-005 | `finalize-shared-runtime.sh`、scheduler、managed experiment、receipt parser/writer は source に保持し、既定 profile から非選択にする | 実験機能の wholesale deletion は行わず、`gpu-admission/devcontainer.json` と `gpu-admission.sh` の明示 selector/entrypoint だけが runtime capability を選択する | default selector/config の readback が opt-in fields を持たず、profile selector が別 Compose path/project suffix を使い、Issue #521 の opt-in owner に接続する |
 | DEV-DEFAULT-006 | profile boundary、dependency packet、rollback と検証コマンドを owner docs に固定する | 実装者が host runtime provisioning を復活させずに default/opt-in の責務を判定できる | 本節の DIC trace、dependency-design packet、`container_config.py`/dependency validator/launch smoke の結果を readback する |
-| DEV-DEFAULT-007 | repository path を `managed-topic` または `direct-repo` layout として判定し、layout に対応する mount/status guard を選択する | managed-topic は従来の workspace root bind と topic marker/status guard を保持し、direct-repo は topic marker/status を要求しない | generated env `AGENT_CANON_WORKSPACE_LAYOUT` が layout 名を示し、post-attach が同じ layout を readback する |
-| DEV-DEFAULT-008 | direct-repo では repository root だけを `/workspace/<basename>` に bind し、`devcontainer up --workspace-folder .` を受理する | sibling repository、親 `~/workspace` 全体、topic marker/status を direct default の前提にしない | generated Compose の bind source が exact repo root 一つで、target/env/readback が direct-repo、topic status guard が未実行で起動が完了する |
+| DEV-DEFAULT-007 | repository path を `managed-topic` または `direct-repo` layout として判定し、layout に対応する status guard を選択する | 両 layout は exact repository bind を共有し、managed-topic だけが topic marker/status guard を実行する。direct-repo は topic marker/status を要求しない | generated env `AGENT_CANON_WORKSPACE_LAYOUT` が layout 名を示し、post-attach が同じ layout と guard 結果を readback する |
+| DEV-DEFAULT-008 | 両 layout で repository root 一つだけを `/workspace/<basename>` に bind し、`devcontainer up --workspace-folder .` を受理する | sibling repository、topic root、親 `~/workspace` 全体を default container に公開せず、layout 判定と mount 範囲を分離する | generated Compose の bind source が exact repo root 一つ、target が `/workspace/<basename>` であり、topic root source と `/workspace` target が absent のまま起動が完了する |
 | DEV-DEFAULT-009 | pack/env の既知 optional profile を pack 順、環境-only 順で canonical union し、raw `runtime.mounts` を拒否する。`docker-host` は明示選択時だけ existing Unix socket を read-write bind する | plain pack と空の環境は host mount なしで空の selected profile を持ち、直接 runner と generator が同じ順序・拒否規則を共有する。docker socket 欠落時の直接 runner は fail-closed とする | `container_config.py`、`container_runtime.py`、generator、runtime 回帰テストで profile order、raw mount rejection、socket bind/missing、validator の pack readback を確認する |
 | DEV-DEFAULT-010 | `linked-data-roots` 選択時に non-empty inline table array、normalized repo-relative symlink、`realpath -e` の既存 directory、declared target exact match を要求する | generator と直接 runner は source==target の structured read-write bind だけを生成し、missing/file/mismatch、重複、CLI destination collision を fail-closed にする | generator missing/file/mismatch tests、parent-shaped load/run/print-only tests、read-write validator finding で確認する |
 | DEV-DEFAULT-011 | standalone default の未選択 profile と devcontainer-only host zsh projection の境界を保ち、host zshrc/.zsh と linked data を明示選択時だけ評価する | standalone plain default は host-independent で空の optional profileを持ち、host zshrc/.zsh は generator scope、linked data は pack-defined direct-runner scope に限定する | standalone generator/config tests と parent/runtime profile readback が profile未選択時の空 mount および selected scope を示す |
@@ -287,7 +287,7 @@ supplementary-GID environment は GPU profile にも生成しない。
 | DEV-DEFAULT-005 | retain scripts and experiment owners; route managed runtime capability through the explicit `gpu-admission` selector/orchestrator | source existence, separate selector/output/project identity, and issue linkage; deletion of scheduler/managed experiment is out of scope and a review blocker |
 | DEV-DEFAULT-006 | update validators/tests and run the packet-selected validation route | command receipts and parent launch readback; missing evidence blocks closeout |
 | DEV-DEFAULT-007 | layout detector and post-attach readback: select managed-topic or direct-repo without changing topic guard semantics | layout env/readback matches source path; a direct repo must not be rejected for missing topic marker, and a managed topic must not bypass its marker/status guard |
-| DEV-DEFAULT-008 | direct-repo mount projection: bind exact repository root to `/workspace/<basename>` and exclude parent workspace/siblings | Compose source/target inspection plus `devcontainer up --workspace-folder .`; any sibling or `~/workspace` bind is a drift blocker |
+| DEV-DEFAULT-008 | common mount projection: bind exact repository root to `/workspace/<basename>` for both layouts and exclude topic root/parent workspace/siblings | Compose source/target inspection plus `devcontainer up --workspace-folder .`; any topic root, sibling, parent workspace, or `/workspace` bind target is a drift blocker |
 | DEV-GPU-001 | Parent-owned `.devcontainer/gpu-admission/devcontainer.json` and `.devcontainer/gpu-admission.sh`: select a distinct config/output/project and bind up/exec to that config | derived parents keep the selector as regular project content and neither the default selector/output/container nor another profile container can be reused | regular selector, selector JSON, exact up/exec commands, output path, project suffix, lifecycle order |
 | DEV-DEFAULT-009 | `.devcontainer/generate-runtime-compose.sh`, `tools/ci/container_runtime.py`, and `tools/ci/container_config.py`: parse canonical optional profiles, reject raw runtime mounts, and resolve explicit `docker-host` socket bind | generator/runtime/config tests show pack-first union, empty plain default, raw-mount rejection, and socket missing/collision failure; a profile order, socket, or bypass mismatch is a drift blocker |
 | DEV-DEFAULT-010 | linked root parser/resolver and direct runner: validate typed list, repo-root symlink ownership, `realpath -e` directory/target equality, and collision-free RW binds | missing/file/mismatch, parent-shape, print-only, and CLI collision tests plus generated Compose readback; any host probe bypass, target mismatch, duplicate, or read-only linked bind is a drift blocker |
@@ -301,9 +301,9 @@ supplementary-GID environment は GPU profile にも生成しない。
 
 devcontainer の source path は次の二つだけを持つ。
 
-- `managed-topic`: `workspace/<topic-slug>` lifecycle にある source clone。従来どおり
-  workspace root を `/workspace` に bind し、dependency-module topic marker と status
-  guard を実行する。marker が欠落した managed topic は fail-closed とする。
+- `managed-topic`: `workspace/<topic-slug>` lifecycle にある source clone。repository
+  root だけを `/workspace/<basename>` に bind し、dependency-module topic marker と
+  status guard を実行する。marker が欠落した managed topic は fail-closed とする。
 - `direct-repo`: `~/workspace/data_download` のように topic lifecycle の外側にある
   repository root。repository root だけを `/workspace/<basename>` に bind し、親の
   `~/workspace` 全体、sibling repository、推測した別 root を mount しない。topic
@@ -315,8 +315,9 @@ environment に出力する。post-attach は同じ layout を
 `DEPENDENCY_MODULE_CONTAINER_SOURCE` と `DEPENDENCY_MODULE_CONTAINER_TARGET` を
 source/target fields として出力する。direct-repo の readback は topic guard を skip
 した理由と exact repository root/source target を含み、managed-topic の readback は
-marker/status receipt を含む。これらは layout の可視化であり、sibling mount や topic
-guard の weakening を許可する fallback ではない。
+同じ exact source/target と marker/status receipt を含む。これらは guard layout の
+可視化であり、topic root、sibling、parent workspace の mount や topic guard の
+weakening を許可する fallback ではない。
 
 ### DEV-DEFAULT-002/004 validation-failure-response
 

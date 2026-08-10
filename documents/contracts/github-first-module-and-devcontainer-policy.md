@@ -162,28 +162,29 @@ command の carve-out を継承しません。作業完了後の clone/topic roo
 PR lifecycle、必要な publication readback、owner evidence、expected identity を検証する
 canonical cleanup と `CleanupProof` receipt に限定します。
 
-ここでいう topic workspace は filesystem / lifecycle と devcontainer mount の
-用語です。VS Code workspace を意味しません。devcontainer は topic workspace
-root を一度だけ `/workspace` に bind mountし、`AGENT_CANON_WORKSPACE_ROOT=/workspace`
-を固定します。`<parent-repo-root>/workspace/<topic-slug>/<parent-repo>` と
-同列の `<module-basename>` clone が host layout です。個別 clone や親 repository
-の二重 mount、host absolute path の tracked config への書き込みは行いません。
-`/workspace` mount または dependency tool の欠落は startup design error として
-post-attach と `tools/ci/container_config.py` が報告します。
+ここでいう topic workspace は filesystem / lifecycle の用語であり、VS Code workspace
+や devcontainer の公開範囲を意味しません。devcontainer は選択した repository root
+一つだけを `/workspace/<basename>` に bind mountし、container 内の共通親 path として
+`AGENT_CANON_WORKSPACE_ROOT=/workspace` を固定します。
+`<parent-repo-root>/workspace/<topic-slug>/<parent-repo>` と同列の
+`<module-basename>` clone は host lifecycle layout ですが、選択 repository 以外の
+topic root、sibling clone、親 repository を container に公開しません。host absolute
+path を tracked config へ書き込みません。exact repository mount または dependency
+tool の欠落は startup design error として post-attach と
+`tools/ci/container_config.py` が報告します。
 
-Topic workspace の外側にある既存 repository checkout は `direct-repo` layout の
-canonical exception として扱います。direct-repo は exact repository root だけを
-`/workspace/<basename>` に bind し、親 `~/workspace` 全体、sibling clone、推測した
-別 path を mount しません。dependency-module topic marker/status guard は
-direct-repo では要求・実行せず、managed-topic では従来どおり必須です。
+Topic workspace の外側にある既存 repository checkout は `direct-repo` layout として
+扱います。exact repository root bind は `managed-topic` と `direct-repo` に共通です。
+dependency-module topic marker/status guard は direct-repo では要求・実行せず、
+managed-topic でだけ必須です。
 
 generator は `AGENT_CANON_WORKSPACE_LAYOUT=managed-topic|direct-repo` を Compose
 environment に出力し、post-attach は `DEPENDENCY_MODULE_CONTAINER_LAYOUT`、
 `DEPENDENCY_MODULE_CONTAINER_SOURCE`、`DEPENDENCY_MODULE_CONTAINER_TARGET` と
-exact source/target を readback します。direct-repo の acceptance command は
+exact source/target を readback します。両 layout の acceptance command は
 `devcontainer up --workspace-folder .` であり、layout env/readback が一致しない、
-source が repository root 以外、または sibling/parent workspace が bind された場合は
-startup design failure です。
+source が repository root 以外、target が `/workspace/<basename>` 以外、または
+topic root/sibling/parent workspace が bind された場合は startup design failure です。
 
 ## VS Code surface の責務境界
 

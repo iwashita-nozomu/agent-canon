@@ -317,12 +317,11 @@ Use the parent-owned `.devcontainer/` surface for project and agent runtime setu
   non-Ubuntu base, missing digest pin, or missing container-local sudo is a parent image
   contract failure; do not repair it by restoring host provisioning. Workspace bind
   outputs are expected to carry the host mapped UID/GID owner.
-- Devcontainers support two explicit source layouts. `managed-topic` keeps the
-  `workspace/<topic-slug>` workspace-root bind and dependency-module topic
-  marker/status guard. `direct-repo` binds only the exact repository root to
-  `/workspace/<basename>`; it does not mount the parent `~/workspace`, sibling
-  repositories, or guessed paths, and it does not require or run the topic
-  marker/status guard. The generator emits `AGENT_CANON_WORKSPACE_LAYOUT`, and
+- Devcontainers support two explicit source layouts. Both bind only the exact
+  repository root to `/workspace/<basename>` and do not mount the topic root,
+  parent `~/workspace`, sibling repositories, or guessed paths. `managed-topic`
+  keeps the dependency-module topic marker/status guard; `direct-repo` does not
+  require or run it. The generator emits `AGENT_CANON_WORKSPACE_LAYOUT`, and
   post-attach reads back `DEPENDENCY_MODULE_CONTAINER_LAYOUT` with the same value plus
   `DEPENDENCY_MODULE_CONTAINER_SOURCE` and `DEPENDENCY_MODULE_CONTAINER_TARGET` exact
   source/target fields. The direct path is validated by
