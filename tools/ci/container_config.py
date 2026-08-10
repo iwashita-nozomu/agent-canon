@@ -707,12 +707,12 @@ def validate_devcontainer_json(
     config: Mapping[str, object],
     *,
     parent_layout: bool = False,
-    identity_mode: str = "project",
+    identity_mode: str = "auto",
     config_path: str = ".devcontainer/devcontainer.json",
 ) -> list[Finding]:
     """Validate required devcontainer JSON fields."""
     findings: list[Finding] = []
-    if identity_mode not in {"project", "rootless-root"}:
+    if identity_mode not in {"auto", "project"}:
         return [
             Finding(
                 "dependency_contract_violation",
@@ -720,37 +720,23 @@ def validate_devcontainer_json(
                 f"runtime-identity-mode-unsupported:{identity_mode}",
             )
         ]
-    compose_output = (
-        ".agent-canon/docker-compose.generated.yml"
-        if identity_mode == "project"
-        else ".agent-canon/docker-compose.rootless.generated.yml"
-    )
-    initialize_prefix = (
-        "AGENT_CANON_RUNTIME_IDENTITY_MODE=project"
-        if identity_mode == "project"
-        else "AGENT_CANON_RUNTIME_IDENTITY_MODE=rootless-root"
-    )
-    expected_name = (
-        "${localWorkspaceFolderBasename}-devcontainer"
-        if identity_mode == "project"
-        else "${localWorkspaceFolderBasename}-rootless-devcontainer"
-    )
-    expected_user = "project" if identity_mode == "project" else "root"
-    expected_json = {
+    compose_output = ".agent-canon/docker-compose.generated.yml"
+    initialize_prefix = f"AGENT_CANON_RUNTIME_IDENTITY_MODE={identity_mode}"
+    expected_name = "${localWorkspaceFolderBasename}-devcontainer"
+    expected_user = "project"
+    expected_json: dict[str, object] = {
         "name": expected_name,
         "initializeCommand": f"{initialize_prefix} AGENT_CANON_DOCKER_COMPOSE_OUTPUT={compose_output} python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
-        "dockerComposeFile": (
-            "../.agent-canon/docker-compose.generated.yml"
-            if identity_mode == "project"
-            else "../../.agent-canon/docker-compose.rootless.generated.yml"
-        ),
+        "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
         "service": "workspace",
-        "containerUser": expected_user,
-        "remoteUser": expected_user,
         "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
         "postCreateCommand": expected_post_create_command(parent_layout=parent_layout),
         "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
     }
+    if identity_mode == "project":
+        expected_json.update({"containerUser": expected_user, "remoteUser": expected_user})
+    else:
+        expected_json["updateRemoteUserUID"] = False
     for key, expected in expected_json.items():
         if config.get(key) != expected:
             findings.append(
@@ -768,7 +754,23 @@ def validate_devcontainer_json(
                 "node-feature-forbidden-image-owned",
             )
         )
-    if "remoteUser" in config and config.get("remoteUser") != expected_user:
+    if identity_mode == "auto" and "containerUser" in config:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                config_path,
+                "default-containerUser-forbidden-auto-identity",
+            )
+        )
+    if identity_mode == "auto" and "remoteUser" in config:
+        findings.append(
+            Finding(
+                "dependency_contract_violation",
+                config_path,
+                "default-remoteUser-forbidden-auto-identity",
+            )
+        )
+    if identity_mode == "project" and "remoteUser" in config and config.get("remoteUser") != expected_user:
         findings.append(
             Finding(
                 "dependency_contract_violation",
@@ -776,12 +778,12 @@ def validate_devcontainer_json(
                 f"remoteUser-expected:{expected_user}",
             )
         )
-    if "updateRemoteUserUID" in config:
+    if identity_mode == "auto" and config.get("updateRemoteUserUID") is not False:
         findings.append(
             Finding(
                 "dependency_contract_violation",
                 config_path,
-                "default-devcontainer-field-forbidden:updateRemoteUserUID",
+                "default-updateRemoteUserUID-expected:false",
             )
         )
     if "containerEnv" in config:
@@ -1014,6 +1016,27 @@ def validate_generated_compose(
         ]
     parent_layout = (root / "vendor" / "agent-canon").is_dir()
     findings: list[Finding] = []
+    if identity_mode == "auto":
+        runtime_environment = as_mapping(service.get("environment"))
+        resolved_identity_mode = (
+            runtime_environment.get("AGENT_CANON_RUNTIME_IDENTITY_MODE")
+            if runtime_environment is not None
+            else None
+        )
+        if isinstance(resolved_identity_mode, str) and resolved_identity_mode in {
+            "project",
+            "rootless-root",
+        }:
+            identity_mode = resolved_identity_mode
+        else:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    relative,
+                    "auto-runtime-identity-mode-resolved-marker-required",
+                )
+            )
+            identity_mode = "project"
     if identity_mode not in {"project", "rootless-root"}:
         findings.append(
             Finding(
@@ -1920,12 +1943,19 @@ def validate_generated_compose_scenarios(
             )
             docker.chmod(0o755)
         scenarios: list[tuple[str, dict[str, str], str]] = [
-            ("default", {"PATH": f"{rootful_bin}:{base_environment['PATH']}"}, "project"),
+            (
+                "default",
+                {
+                    "PATH": f"{rootful_bin}:{base_environment['PATH']}",
+                    "AGENT_CANON_RUNTIME_IDENTITY_MODE": "auto",
+                },
+                "project",
+            ),
             (
                 "default",
                 {
                     "PATH": f"{rootless_bin}:{base_environment['PATH']}",
-                    "AGENT_CANON_RUNTIME_IDENTITY_MODE": "rootless-root",
+                    "AGENT_CANON_RUNTIME_IDENTITY_MODE": "auto",
                 },
                 "rootless-root",
             ),
@@ -2014,34 +2044,10 @@ def validate_devcontainer(root: Path) -> list[Finding]:
         validate_devcontainer_json(
             config,
             parent_layout=(root / "vendor" / "agent-canon").is_dir(),
-            identity_mode="project",
+            identity_mode="auto",
             config_path=".devcontainer/devcontainer.json",
         )
     )
-    rootless_path = devcontainer_dir / "rootless" / "devcontainer.json"
-    if not rootless_path.is_file() and not (root / "vendor" / "agent-canon").is_dir():
-        findings.append(
-            Finding(
-                "missing_file",
-                ".devcontainer/rootless/devcontainer.json",
-                "rootless-runtime-selector-required",
-            )
-        )
-    elif rootless_path.is_file():
-        rootless_config, rootless_findings = load_devcontainer_json(
-            rootless_path,
-            relative=".devcontainer/rootless/devcontainer.json",
-        )
-        findings.extend(rootless_findings)
-        if rootless_config is not None:
-            findings.extend(
-                validate_devcontainer_json(
-                    rootless_config,
-                    parent_layout=(root / "vendor" / "agent-canon").is_dir(),
-                    identity_mode="rootless-root",
-                    config_path=".devcontainer/rootless/devcontainer.json",
-                )
-            )
     findings.extend(validate_generate_runtime_compose_script(root))
     findings.extend(validate_post_create(root))
     findings.extend(validate_default_lifecycle_scripts(root))
@@ -2093,16 +2099,8 @@ def validate_devcontainer_pack_alignment(
     )
     if persisted_compose.exists():
         findings.extend(
-            validate_generated_compose(root, pack, compose_path=persisted_compose)
-        )
-    rootless_compose = root / ".agent-canon" / "docker-compose.rootless.generated.yml"
-    if rootless_compose.exists():
-        findings.extend(
             validate_generated_compose(
-                root,
-                pack,
-                identity_mode="rootless-root",
-                compose_path=rootless_compose,
+                root, pack, identity_mode="auto", compose_path=persisted_compose
             )
         )
     profile_compose = root / ".agent-canon" / "gpu-admission-compose.generated.yml"

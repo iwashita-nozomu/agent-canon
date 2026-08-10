@@ -88,17 +88,17 @@ host `~/.zshrc`、parent environment mount、`HOME`、tmpfs は要求しませ�
 
 Compose がこの境界で直接所有する environment は runtime identity marker を含む次の値です。
 
-- `AGENT_CANON_RUNTIME_IDENTITY_MODE`: rootful の `project` または rootless selector の
-  `rootless-root` と一致します。
+- `AGENT_CANON_RUNTIME_IDENTITY_MODE`: Docker の `SecurityOptions` から解決した
+  `project` または `rootless-root` と一致します。
 - `HOME`: `project` では `/home/project`、`rootless-root` では `/root` を指します。
 - `SHELL`: pack の `runtime.shell` と一致します。
 - `AGENT_CANON_CONTAINER_USER`: selector の `project` または `root` と一致し、post-create/attach が
   process user、HOME、workspace writability を read backします。
 
-default selector は rootful Docker 専用です。rootless Docker は
-`.devcontainer/rootless/devcontainer.json` と
-`.agent-canon/docker-compose.rootless.generated.yml` を選択し、Compose `user: "0:0"`
-で起動します。build 用 `PROJECT_UID/GID` は正の値を維持し、runtime user と混同しません。
+default selector は `docker info` の公式 `SecurityOptions` を自動判定します。
+rootless Docker では Compose `user: "0:0"`、`HOME=/root`、
+`AGENT_CANON_CONTAINER_USER=root` を投影し、rootful Docker では host UID/GID の
+`project` user を投影します。build 用 `PROJECT_UID/GID` は正の値を維持し、runtime user と混同しません。
 
 parent environment pair の両方不在、または両方が file 実体へ解決できることは、値や
 container behavior の十分条件ではありません。最終的な親側検証は、validator、

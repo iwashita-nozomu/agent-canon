@@ -1,10 +1,9 @@
 {
   "name": "${localWorkspaceFolderBasename}-devcontainer",
-  "initializeCommand": "AGENT_CANON_RUNTIME_IDENTITY_MODE=project AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
+  "initializeCommand": "AGENT_CANON_RUNTIME_IDENTITY_MODE=auto AGENT_CANON_DOCKER_COMPOSE_OUTPUT=.agent-canon/docker-compose.generated.yml python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/generate-runtime-compose.sh",
   "dockerComposeFile": "../.agent-canon/docker-compose.generated.yml",
   "service": "workspace",
-  "containerUser": "project",
-  "remoteUser": "project",
+  "updateRemoteUserUID": false,
   "workspaceFolder": "/workspace/${localWorkspaceFolderBasename}",
   "postCreateCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-create-entrypoint.sh /workspace/${localWorkspaceFolderBasename}",
   "postAttachCommand": "python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec .devcontainer/post-attach.sh",
