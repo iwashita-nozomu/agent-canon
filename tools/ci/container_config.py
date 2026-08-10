@@ -711,6 +711,8 @@ def validate_devcontainer_json(
 ) -> list[Finding]:
     """Validate required devcontainer JSON fields."""
     findings: list[Finding] = []
+    if parent_layout:
+        return findings
     compose_output = ".agent-canon/docker-compose.generated.yml"
     expected_name = "${localWorkspaceFolderBasename}-devcontainer"
     expected_json: dict[str, object] = {
@@ -1926,21 +1928,24 @@ def validate_devcontainer(root: Path) -> list[Finding]:
             config_path=".devcontainer/devcontainer.json",
         )
     )
-    findings.extend(validate_generate_runtime_compose_script(root))
-    findings.extend(validate_post_create(root))
-    findings.extend(validate_default_lifecycle_scripts(root))
-    findings.extend(validate_gpu_admission_selector(root))
-    dependency_module_change = (
-        shared_agent_tools_dir(root) / "dependency_module_change.py"
-    )
-    if (root / ".gitmodules").is_file() and not dependency_module_change.is_file():
-        findings.append(
-            Finding(
-                "missing_file",
-                dependency_module_change.relative_to(root).as_posix(),
-                "required-for-devcontainer-dependency-check",
-            )
+    parent_layout = (root / "vendor" / "agent-canon").is_dir()
+    if not parent_layout:
+        findings.extend(validate_generate_runtime_compose_script(root))
+        findings.extend(validate_post_create(root))
+        findings.extend(validate_default_lifecycle_scripts(root))
+        findings.extend(validate_gpu_admission_selector(root))
+    if not parent_layout:
+        dependency_module_change = (
+            shared_agent_tools_dir(root) / "dependency_module_change.py"
         )
+        if (root / ".gitmodules").is_file() and not dependency_module_change.is_file():
+            findings.append(
+                Finding(
+                    "missing_file",
+                    dependency_module_change.relative_to(root).as_posix(),
+                    "required-for-devcontainer-dependency-check",
+                )
+            )
     return findings
 
 
@@ -2118,6 +2123,7 @@ def validate(root: Path) -> ValidationReport:
     )
     if devcontainer_dir.exists():
         checked.append(".devcontainer")
+        parent_layout = (root / "vendor" / "agent-canon").is_dir()
         findings.extend(validate_devcontainer(root))
         if (
             is_standalone_source(root)
@@ -2125,7 +2131,8 @@ def validate(root: Path) -> ValidationReport:
         ):
             checked.append(".dockerignore")
             findings.extend(validate_standalone_docker_context(root))
-        findings.extend(validate_devcontainer_pack_alignment(root, default_pack))
+        if not parent_layout:
+            findings.extend(validate_devcontainer_pack_alignment(root, default_pack))
     if vscode_configured:
         checked.append(".vscode")
         findings.extend(validate_vscode(root))

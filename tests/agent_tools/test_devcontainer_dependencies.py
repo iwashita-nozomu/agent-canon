@@ -2405,8 +2405,8 @@ class DependencyModelTests(unittest.TestCase):
                 manifest_sources(root, root / "vendor" / "agent-canon"), ()
             )
 
-    def test_boundary_requires_entrypoint_parent_hook_dispatch(self) -> None:
-        """The resolver entrypoint, not JSON text, owns the derived parent hook."""
+    def test_boundary_requires_parent_devcontainer_json_object(self) -> None:
+        """Parent overlay validation is reduced to a JSON-object devcontainer check."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             model, _ = write_boundary_fixture(
@@ -2416,16 +2416,20 @@ class DependencyModelTests(unittest.TestCase):
             vendor_root = root / "vendor/agent-canon"
             vendor_root.unlink()
             vendor_root.mkdir(parents=True)
-            entrypoint = vendor_root / ".devcontainer/post-create-entrypoint.sh"
-            entrypoint.parent.mkdir(parents=True)
-            entrypoint.write_text("#!/bin/sh\n", encoding="utf-8")
+            (vendor_root / ".devcontainer").mkdir(parents=True, exist_ok=True)
+            (vendor_root / ".devcontainer/post-create-entrypoint.sh").write_text(
+                "#!/bin/sh\n", encoding="utf-8"
+            )
+            devcontainer = root / ".devcontainer/devcontainer.json"
+            devcontainer.write_text("[]", encoding="utf-8")
             findings: list[Any] = []
             checked: list[str] = []
             model._check_parent_devcontainer(findings, checked)
 
         self.assertTrue(
             any(
-                finding.detail.startswith("missing-parent-hook-dispatch:")
+                finding.path.endswith(".devcontainer/devcontainer.json")
+                and finding.detail == "json-root-must-be-object"
                 for finding in findings
             )
         )

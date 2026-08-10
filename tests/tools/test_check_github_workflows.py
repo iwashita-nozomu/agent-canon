@@ -1302,8 +1302,8 @@ raise SystemExit(2)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
 
-    def test_template_mode_requires_template_agent_canon_template(self) -> None:
-        """A real template root must keep the template-side AgentCanon PR template."""
+    def test_template_mode_allows_missing_parent_agent_canon_template(self) -> None:
+        """Derived templates may omit parent-owned root agentcanon templates."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_valid_workflow(root)
@@ -1324,14 +1324,11 @@ raise SystemExit(2)
                 text=True,
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(
-                "path=.github/PULL_REQUEST_TEMPLATE/agent_canon.md",
-                result.stdout,
-            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
 
-    def test_template_root_pr_template_evidence_fails_when_present(self) -> None:
-        """Optional template-root PR templates must keep the canonical route."""
+    def test_template_mode_ignores_arbitrary_parent_root_pr_template(self) -> None:
+        """Arbitrary parent-root PR templates are ignored by template-mode checks."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_valid_workflow(root)
@@ -1361,8 +1358,8 @@ raise SystemExit(2)
                 text=True,
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("missing_text:canonical route", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("GITHUB_WORKFLOWS=pass", result.stdout)
 
     def test_template_mode_does_not_require_standalone_root_docs(self) -> None:
         """Template roots should not require standalone-only root docs or PR templates."""

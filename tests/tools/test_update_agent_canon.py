@@ -382,6 +382,36 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
             script.index("materialize_current_lifecycle_projection"),
         )
 
+    def test_fresh_clone_routes_parent_mode_before_compose_assertions(self) -> None:
+        """Parent projection mode is decided before compose generation checks."""
+        script = (
+            AGENT_CANON_SOURCE_ROOT
+            / "tools"
+            / "ci"
+            / "check_fresh_clone.sh"
+        ).read_text(encoding="utf-8")
+        parse_position = script.index(
+            "python3 -m json.tool .devcontainer/devcontainer.json"
+        )
+        mode_position = script.index("parent_projection_mode=false")
+        standalone_branch_position = script.index(
+            'if [ "$parent_projection_mode" = false ]; then'
+        )
+        compose_call_position = script.index(
+            'bash "${runtime_compose_generator}"',
+            standalone_branch_position,
+        )
+        parent_branch_position = script.index(
+            'if [ "$parent_projection_mode" = true ]; then'
+        )
+        self.assertLess(parse_position, mode_position)
+        self.assertLess(mode_position, standalone_branch_position)
+        self.assertLess(standalone_branch_position, compose_call_position)
+        self.assertLess(standalone_branch_position, parent_branch_position)
+        self.assertLess(compose_call_position, parent_branch_position)
+        self.assertIn("bash \"${runtime_compose_generator}\"", script)
+        self.assertIn("AGENT_CANON_DOCKER_COMPOSE_OUTPUT", script)
+
     def test_merge_invocations_disable_configured_autostash(self) -> None:
         """Every AgentCanon update merge must refuse config-driven autostash."""
         for relative_path in ("tools/sync_agent_canon.sh", "tools/update_agent_canon.sh"):

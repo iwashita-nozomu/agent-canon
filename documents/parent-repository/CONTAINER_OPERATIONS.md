@@ -31,8 +31,10 @@ AgentCanon は mounted developer/agent tool と共有 runtime の source を所�
 
 親の `.devcontainer/` は親が所有する regular directory のまま保持します。
 `devcontainer.json` を含む regular files は親の environment contract で管理し、
-AgentCanon source からの symlink・コピー・削除は行いません。生成 Compose と
-dependency receipt は親の実行状態であり、追跡対象にしません。
+AgentCanon source からの symlink・コピー・削除は行いません。AgentCanon 側の
+parent check は `devcontainer.json` の存在確認と JSON-object parse だけで、生成 Compose と
+identity/lifecycle/projection/validation（rootless・GPU を含む）は parent 側では実施しません。
+standalone AgentCanon 側で devcontainer/gpu-admission/rootless の厳密検証は維持します。
 
 ## host mount inventory と zsh startup
 
@@ -111,6 +113,11 @@ user-namespace のいずれでも同じ `project` runtime を投影します。b
 runtime user と mode selector を混同しません。bind acceptance は host-visible owner
 equality ではなく、container 内で expected workspace path の create、read、write、remove
 が成功することにより判定します。
+Compose の runtime identity、daemon mapping mode、rootless 判定の strict projection は
+standalone AgentCanon 側の owner に委譲します。parent 側の check は、親が所有する
+`.devcontainer/devcontainer.json` の存在と JSON object 形状だけを確認し、生成 Compose、
+identity/lifecycle/projection/validation（rootless・GPU を含む）は parent 側で重複実施しません。
+standalone AgentCanon 側の strict validation は維持します。
 
 parent environment pair の両方不在、または両方が file 実体へ解決できることは、値や
 container behavior の十分条件ではありません。最終的な親側検証は、validator、
