@@ -39,7 +39,11 @@ def main() -> None:
             '''
             def test_test_paths_are_not_default_tool_references(self) -> None:
                 """Test paths are not mistaken for root tool references."""
-                namespace = runpy.run_path(str(CHECKER))
+                sys.path.insert(0, str(CHECKER.parent))
+                try:
+                    namespace = runpy.run_path(str(CHECKER))
+                finally:
+                    sys.path.pop(0)
                 pattern = namespace["TOOL_REFERENCE_RE"]
                 matches = set(
                     pattern.findall(
