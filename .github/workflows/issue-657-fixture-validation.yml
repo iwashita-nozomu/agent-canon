@@ -35,18 +35,23 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
+          def lines(*items: str) -> str:
+              return "\n".join(items) + "\n"
+
           workflow_test = Path("tests/tools/test_check_github_workflows.py")
           workflow_text = workflow_test.read_text(encoding="utf-8")
-          workflow_old = '''        with tempfile.TemporaryDirectory() as tmp_dir:
-              report_root = Path(tmp_dir)
-              bootstrap_environment = os.environ.copy()
-              bootstrap_environment["AGENT_CANON_PARENT_ROOT"] = str(REPO_ROOT)
-          '''
-          workflow_new = '''        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmp_dir:
-              report_root = Path(tmp_dir)
-              bootstrap_environment = os.environ.copy()
-              bootstrap_environment["AGENT_CANON_PARENT_ROOT"] = str(REPO_ROOT)
-          '''
+          workflow_old = lines(
+              "        with tempfile.TemporaryDirectory() as tmp_dir:",
+              "            report_root = Path(tmp_dir)",
+              "            bootstrap_environment = os.environ.copy()",
+              '            bootstrap_environment["AGENT_CANON_PARENT_ROOT"] = str(REPO_ROOT)',
+          )
+          workflow_new = lines(
+              "        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmp_dir:",
+              "            report_root = Path(tmp_dir)",
+              "            bootstrap_environment = os.environ.copy()",
+              '            bootstrap_environment["AGENT_CANON_PARENT_ROOT"] = str(REPO_ROOT)',
+          )
           if workflow_text.count(workflow_old) != 1:
               raise SystemExit("coordination fixture patch context changed")
           workflow_test.write_text(
@@ -62,60 +67,64 @@ jobs:
               raise SystemExit("container fixture import context changed")
           runtime_text = runtime_text.replace(import_old, import_new)
 
-          environment_old = '''    (repo / "sample.py").write_text("print('fixture')\\n", encoding="utf-8")
-
-              result = subprocess.run(
-          '''
-          environment_new = '''    (repo / "sample.py").write_text("print('fixture')\\n", encoding="utf-8")
-
-              environment = os.environ.copy()
-              for key in (
-                  "TMPDIR",
-                  "TEMP",
-                  "TMP",
-                  "XDG_CACHE_HOME",
-                  "PYTHONPYCACHEPREFIX",
-                  "AGENT_CANON_TOOLS_HOME",
-                  "CARGO_HOME",
-                  "CARGO_TARGET_DIR",
-                  "AGENT_CANON_CLI_TARGET_DIR",
-                  "AGENT_CANON_PARENT_ROOT",
-                  "AGENT_CANON_PARENT_ROOT_DEV",
-                  "AGENT_CANON_PARENT_ROOT_INO",
-                  "AGENT_CANON_CHILD_HANDOFF",
-                  "AGENT_CANON_CHILD_PURPOSE",
-                  "AGENT_CANON_HANDOFF_AUDIENCE",
-                  "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
-                  "AGENT_CANON_ROOT",
-                  "AGENT_CANON_SOURCE_ROOT",
-                  "AGENT_CANON_TASK_ID",
-                  "AGENT_CANON_REPOSITORY_ID",
-                  "AGENT_CANON_TASK_REPOSITORY",
-                  "AGENT_CANON_LIFECYCLE_ID",
-                  "AGENT_CANON_EXPECTED_IMAGE_TAG",
-                  "AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT",
-              ):
-                  environment.pop(key, None)
-              environment["AGENT_CANON_PARENT_ROOT"] = str(repo)
-              environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(repo)
-
-              result = subprocess.run(
-          '''
+          environment_old = lines(
+              '    (repo / "sample.py").write_text("print(\'fixture\')\\n", encoding="utf-8")',
+              "",
+              "    result = subprocess.run(",
+          )
+          environment_new = lines(
+              '    (repo / "sample.py").write_text("print(\'fixture\')\\n", encoding="utf-8")',
+              "",
+              "    environment = os.environ.copy()",
+              "    for key in (",
+              '        "TMPDIR",',
+              '        "TEMP",',
+              '        "TMP",',
+              '        "XDG_CACHE_HOME",',
+              '        "PYTHONPYCACHEPREFIX",',
+              '        "AGENT_CANON_TOOLS_HOME",',
+              '        "CARGO_HOME",',
+              '        "CARGO_TARGET_DIR",',
+              '        "AGENT_CANON_CLI_TARGET_DIR",',
+              '        "AGENT_CANON_PARENT_ROOT",',
+              '        "AGENT_CANON_PARENT_ROOT_DEV",',
+              '        "AGENT_CANON_PARENT_ROOT_INO",',
+              '        "AGENT_CANON_CHILD_HANDOFF",',
+              '        "AGENT_CANON_CHILD_PURPOSE",',
+              '        "AGENT_CANON_HANDOFF_AUDIENCE",',
+              '        "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",',
+              '        "AGENT_CANON_ROOT",',
+              '        "AGENT_CANON_SOURCE_ROOT",',
+              '        "AGENT_CANON_TASK_ID",',
+              '        "AGENT_CANON_REPOSITORY_ID",',
+              '        "AGENT_CANON_TASK_REPOSITORY",',
+              '        "AGENT_CANON_LIFECYCLE_ID",',
+              '        "AGENT_CANON_EXPECTED_IMAGE_TAG",',
+              '        "AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT",',
+              "    ):",
+              "        environment.pop(key, None)",
+              '    environment["AGENT_CANON_PARENT_ROOT"] = str(repo)',
+              '    environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(repo)',
+              "",
+              "    result = subprocess.run(",
+          )
           if runtime_text.count(environment_old) != 1:
               raise SystemExit("container fixture environment context changed")
           runtime_text = runtime_text.replace(environment_old, environment_new)
 
-          subprocess_old = '''            "sample.py",
-                  ],
-                  cwd=repo,
-                  check=False,
-          '''
-          subprocess_new = '''            "sample.py",
-                  ],
-                  cwd=repo,
-                  env=environment,
-                  check=False,
-          '''
+          subprocess_old = lines(
+              '            "sample.py",',
+              "        ],",
+              "        cwd=repo,",
+              "        check=False,",
+          )
+          subprocess_new = lines(
+              '            "sample.py",',
+              "        ],",
+              "        cwd=repo,",
+              "        env=environment,",
+              "        check=False,",
+          )
           if runtime_text.count(subprocess_old) != 1:
               raise SystemExit("container fixture subprocess context changed")
           runtime_test.write_text(
