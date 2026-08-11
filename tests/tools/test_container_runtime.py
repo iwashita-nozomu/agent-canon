@@ -90,6 +90,34 @@ def write_parent_pack(tmp_path: Path, *, linked: bool = True) -> tuple[Path, Pat
     return repo, pack_path, target
 
 
+def init_authentic_git(
+    root: Path, *, remote: str = "https://example.invalid/fixture.git"
+) -> None:
+    """Create the minimal authenticated Git parent used by side-effect fixtures."""
+    root.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["git", "init", "--quiet", "-b", "main", str(root)], check=True
+    )
+    subprocess.run(
+        ["git", "-C", str(root), "config", "user.name", "Fixture Test"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(root), "config", "user.email", "fixture@example.invalid"],
+        check=True,
+    )
+    marker = root / ".fixture-root"
+    marker.write_text("authenticated fixture\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", ".fixture-root"], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "commit", "--quiet", "-m", "fixture root"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(root), "remote", "add", "origin", remote], check=True
+    )
+
+
 class FakeResolvedPath:
     """Minimal resolved-path contract used for host-independent unit tests."""
 
@@ -135,7 +163,7 @@ def test_workspace_discovery_uses_repo_markers_without_runtime_pack(
     """Workspace discovery is independent of optional project pack files."""
     repo = tmp_path / "parent"
     nested = repo / "scripts" / "nested"
-    (repo / ".git").mkdir(parents=True)
+    init_authentic_git(repo)
     (repo / "README.md").write_text("fixture\n", encoding="utf-8")
     nested.mkdir(parents=True)
     monkeypatch.chdir(nested)
@@ -146,7 +174,7 @@ def test_workspace_discovery_uses_repo_markers_without_runtime_pack(
 def test_repo_program_defaults_without_pack_or_python_rules(tmp_path: Path) -> None:
     """Direct execution uses Dockerfile defaults when optional TOML is absent."""
     repo = tmp_path / "parent"
-    (repo / ".git").mkdir(parents=True)
+    init_authentic_git(repo)
     (repo / "docker").mkdir()
     (repo / "README.md").write_text("fixture\n", encoding="utf-8")
     (repo / "docker" / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
