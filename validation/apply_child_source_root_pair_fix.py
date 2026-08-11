@@ -35,6 +35,12 @@ def main() -> None:
     tests = Path("tests/agent_tools/test_parent_root_side_effects.py")
     replace_once(
         tests,
+        "import pytest\nimport tools.agent_tools.parent_root_side_effects as side_effects\n",
+        "import pytest\n\nimport tools.agent_tools.parent_root_side_effects as side_effects\n",
+        "parent-boundary test import spacing",
+    )
+    replace_once(
+        tests,
         '''    assert env["AGENT_CANON_PARENT_ROOT"] == str(tmp_path.resolve())
     assert env["AGENT_CANON_SOURCE_ROOT"] == str(tmp_path.resolve())
     for name in (
