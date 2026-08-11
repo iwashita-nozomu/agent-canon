@@ -40,8 +40,11 @@ jobs:
 
       - name: Apply focused patch
         run: |
-          python3 -m py_compile _validation/validation/apply_missing_report_bundle_fix.py
+          python3 -m py_compile \
+            _validation/validation/apply_missing_report_bundle_fix.py \
+            _validation/validation/apply_runtime_alignment_caller_env.py
           python3 _validation/validation/apply_missing_report_bundle_fix.py
+          python3 _validation/validation/apply_runtime_alignment_caller_env.py
           rm -rf _validation
 
       - name: Verify exact patch scope
@@ -52,6 +55,7 @@ jobs:
           expected = [
               "tests/agent_tools/test_check_agent_runtime_alignment.py",
               "tools/agent_tools/workspace_scope.py",
+              "tools/ci/check_agent_canon_pr.sh",
           ]
           tracked = sorted(
               line
@@ -71,6 +75,9 @@ jobs:
           git diff --check
 
       - name: Run report bundle and alignment regressions
+        env:
+          AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
+          AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
         run: |
           python3 -m pytest -q \
             tests/agent_tools/test_check_agent_runtime_alignment.py::AgentRuntimeAlignmentTest::test_missing_report_bundle_path_uses_existing_git_parent \
@@ -82,6 +89,7 @@ jobs:
           python3 -m py_compile \
             tests/agent_tools/test_check_agent_runtime_alignment.py \
             tools/agent_tools/workspace_scope.py
+          bash -n tools/ci/check_agent_canon_pr.sh
           git diff --check
 
       - name: Commit and push validated patch
@@ -92,6 +100,7 @@ jobs:
           expected = [
               "tests/agent_tools/test_check_agent_runtime_alignment.py",
               "tools/agent_tools/workspace_scope.py",
+              "tools/ci/check_agent_canon_pr.sh",
           ]
           tracked = sorted(
               line
@@ -112,7 +121,8 @@ jobs:
           git config user.email "agent-canon-validation@users.noreply.github.com"
           git add \
             tests/agent_tools/test_check_agent_runtime_alignment.py \
-            tools/agent_tools/workspace_scope.py
+            tools/agent_tools/workspace_scope.py \
+            tools/ci/check_agent_canon_pr.sh
           git commit -m "fix: attest future report bundles from existing parent"
           git push origin HEAD:canon/parent-bounded-side-effects-20260810
           test -z "$(git status --porcelain)"
