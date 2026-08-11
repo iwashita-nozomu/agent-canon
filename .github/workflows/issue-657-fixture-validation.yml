@@ -1,0 +1,54 @@
+name: Issue 657 Fixture Validation
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: issue-657-fixtures-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-validation:
+    runs-on: ubuntu-24.04
+    env:
+      AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
+      AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: false
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install focused validation dependencies
+        run: python3 -m pip install --upgrade pytest pyyaml tomli packaging ruff
+      - name: Run post-merge fixture suite
+        run: >-
+          python3 -m pytest -q
+          tests/tools/test_check_github_workflows.py
+          tests/tools/test_container_runtime.py
+      - name: Run graph integration suite
+        run: >-
+          python3 -m pytest -q
+          tests/tools/test_agent_canon_pr_graph_gate_integration.py
+      - name: Run parent-boundary nonce and cleanup suite
+        run: >-
+          python3 -m pytest -q
+          tests/agent_tools/test_parent_root_side_effects.py
+      - name: Run focused Ruff checks
+        run: >-
+          python3 -m ruff check --select E9,F,I
+          tests/tools/test_check_github_workflows.py
+          tests/tools/test_container_runtime.py
+      - name: Compile focused fixtures
+        run: >-
+          python3 -m py_compile
+          tests/tools/test_check_github_workflows.py
+          tests/tools/test_container_runtime.py
