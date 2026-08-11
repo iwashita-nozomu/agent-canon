@@ -25,6 +25,9 @@ jobs:
   issue-mirror-sync:
     if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
+    env:
+      AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
+      AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
     permissions:
       contents: read
       issues: write
@@ -44,17 +47,22 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          summary_file="${GITHUB_WORKSPACE}/.agent-canon/issue-mirror-${GITHUB_JOB}.md"
           python3 tools/agent_tools/issue_sync.py \
             --root . \
             --repo "${GITHUB_REPOSITORY}" \
             --github-check \
             --sync-github \
-            --summary-file "${GITHUB_STEP_SUMMARY}"
+            --summary-file "${summary_file}"
+          cat "${summary_file}" >> "${GITHUB_STEP_SUMMARY}"
 
   issue-mirror-check:
     needs: issue-mirror-sync
     if: always()
     runs-on: ubuntu-latest
+    env:
+      AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
+      AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
     permissions:
       contents: read
       issues: read
@@ -77,12 +85,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          summary_file="${GITHUB_WORKSPACE}/.agent-canon/issue-mirror-${GITHUB_JOB}.md"
           python3 tools/agent_tools/issue_sync.py \
             --root . \
             --repo "${GITHUB_REPOSITORY}" \
             --github-check \
             --allow-github-auth-unavailable \
-            --summary-file "${GITHUB_STEP_SUMMARY}"
+            --summary-file "${summary_file}"
+          cat "${summary_file}" >> "${GITHUB_STEP_SUMMARY}"
 
       - name: Record issue mirror unavailable
         if: failure() && steps.checkout.outcome != 'success'
