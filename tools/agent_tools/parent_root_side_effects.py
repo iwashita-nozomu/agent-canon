@@ -2905,6 +2905,7 @@ class ParentRootSideEffectBoundary:
         env["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(root)
         env["AGENT_CANON_PARENT_ROOT"] = str(root)
         env["AGENT_CANON_SOURCE_ROOT"] = str(attestation.source_root or root)
+        env["AGENT_CANON_ROOT"] = env["AGENT_CANON_SOURCE_ROOT"]
         env["AGENT_CANON_PARENT_ROOT_DEV"] = str(attestation.parent_dev)
         env["AGENT_CANON_PARENT_ROOT_INO"] = str(attestation.parent_ino)
         if issue_handoff:

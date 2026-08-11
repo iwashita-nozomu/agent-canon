@@ -18,6 +18,7 @@ import time
 from pathlib import Path
 
 import pytest
+
 import tools.agent_tools.parent_root_side_effects as side_effects
 from tools.agent_tools.parent_root_side_effects import (
     ParentRootAttestationRequest,
@@ -525,6 +526,7 @@ def test_atomic_publish_and_child_environment_keep_home_unchanged(tmp_path: Path
     assert env["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] == str(tmp_path.resolve())
     assert env["AGENT_CANON_PARENT_ROOT"] == str(tmp_path.resolve())
     assert env["AGENT_CANON_SOURCE_ROOT"] == str(tmp_path.resolve())
+    assert env["AGENT_CANON_ROOT"] == env["AGENT_CANON_SOURCE_ROOT"]
     for name in (
         "TMPDIR", "TEMP", "TMP", "XDG_CACHE_HOME", "PYTHONPYCACHEPREFIX",
         "AGENT_CANON_TOOLS_HOME", "CARGO_HOME", "CARGO_TARGET_DIR",
