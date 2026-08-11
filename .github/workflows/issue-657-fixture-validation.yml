@@ -156,12 +156,25 @@ jobs:
           python3 -m pytest -q
           tests/tools/test_check_github_workflows.py
           tests/tools/test_container_runtime.py
-      - name: Run graph integration suite
-        env:
-          AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}
-        run: >-
-          python3 -m pytest -q
-          tests/tools/test_agent_canon_pr_graph_gate_integration.py
+      - name: Run graph integration suite without ambient PR identity
+        run: |
+          python3 - <<'PY'
+          import os
+          import pytest
+
+          for key in tuple(os.environ):
+              if key.startswith("GITHUB_"):
+                  os.environ.pop(key, None)
+          os.environ.pop("AGENT_CANON_PR_READ_TOKEN", None)
+          raise SystemExit(
+              pytest.main(
+                  [
+                      "-q",
+                      "tests/tools/test_agent_canon_pr_graph_gate_integration.py",
+                  ]
+              )
+          )
+          PY
       - name: Run parent-boundary nonce and cleanup suite
         run: >-
           python3 -m pytest -q
