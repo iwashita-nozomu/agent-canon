@@ -4,6 +4,7 @@
 # responsibility Runs all checks CI automation.
 # upstream design ../../documents/design/dependency-manifest-design.md scoped parent graph receipt contract
 # upstream implementation ./check_agent_canon_pr.sh writes owner/root/PID/status-bound parent graph receipts
+# upstream implementation ../agent_tools/parent_root_side_effects.py owns parent-local child state and exact cleanup
 # upstream implementation ../agent_tools/check_dependency_headers.py validates changed-file dependency manifests
 # upstream implementation ../agent_tools/check_dependency_header_format.sh validates changed-file manifest syntax
 # upstream implementation ../agent_tools/check_static_any.py rejects explicit Python Any usage
@@ -79,16 +80,105 @@ else
   AGENT_CANON_SOURCE_ROOT="$WORKSPACE_ROOT"
 fi
 AGENT_CANON_CARGO_MANIFEST="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml"
-AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${HOME}/.tools/agent-canon/cargo-target}"
-AGENT_CANON_CI_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${AGENT_CANON_SOURCE_ROOT}/.agent-canon/log-archive}"
-mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"
-if [ -n "${AGENT_CANON_CI_EVAL_LOG_DIR:-}" ]; then
-  AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${AGENT_CANON_CI_EVAL_LOG_DIR}"
+AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${WORKSPACE_ROOT}/.agent-canon/cache/cargo-target}"
+AGENT_CANON_BOUNDARY_SCRIPT="${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py"
+if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "run-all-checks-script" ]]; then
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose run-all-checks-script \
+    --consume >/dev/null
 else
-  AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${WORKSPACE_ROOT}/.state/agent-eval-runs/run-all-checks"
-  rm -rf "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"
-  mkdir -p "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"
+  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose run-all-checks-script \
+    --issue-handoff \
+    -- bash "${BASH_SOURCE[0]}" "$@"
 fi
+unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
+
+AGENT_CANON_CI_EVAL_LOG_TEMP_CREATED=0
+AGENT_CANON_CI_HOOK_ARCHIVE_CREATED=0
+AGENT_CANON_CI_EXPLICIT_EVAL_CREATED=0
+AGENT_CANON_CI_SETUP_COMPLETE=0
+AGENT_CANON_CI_EVAL_LOG_DIR_VALUE=""
+AGENT_CANON_CI_HOOK_ARCHIVE_DIR="$(
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" resolve \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${AGENT_CANON_HOOK_ARCHIVE_DIR:-${AGENT_CANON_SOURCE_ROOT}/.agent-canon/log-archive}" \
+    --purpose run-all-checks-hook-archive
+)"
+if [[ ! -d "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" ]]; then
+  AGENT_CANON_CI_HOOK_ARCHIVE_CREATED=1
+fi
+if [ -n "${AGENT_CANON_CI_EVAL_LOG_DIR:-}" ]; then
+  AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="$(
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" resolve \
+      --root "${WORKSPACE_ROOT}" \
+      --candidate "${AGENT_CANON_CI_EVAL_LOG_DIR}" \
+      --purpose run-all-checks-explicit-eval-log
+  )"
+  if [[ ! -d "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}" ]]; then
+    AGENT_CANON_CI_EXPLICIT_EVAL_CREATED=1
+  fi
+fi
+
+cleanup_run_all_checks_temp() {
+  local status=$?
+  local cleanup_status=0
+  trap - EXIT
+  if [[ "${AGENT_CANON_CI_EVAL_LOG_TEMP_CREATED}" -eq 1 ]]; then
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" remove-tree \
+      --root "${WORKSPACE_ROOT}" \
+      --candidate "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}" \
+      --purpose run-all-checks-cleanup >/dev/null || cleanup_status=$?
+  fi
+  if [[ "${AGENT_CANON_CI_SETUP_COMPLETE}" -eq 0 ]]; then
+    if [[ "${AGENT_CANON_CI_EXPLICIT_EVAL_CREATED}" -eq 1 ]]; then
+      python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" remove-empty-dir \
+        --root "${WORKSPACE_ROOT}" \
+        --candidate "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}" \
+        --purpose run-all-checks-setup-rollback >/dev/null || cleanup_status=$?
+    fi
+    if [[ "${AGENT_CANON_CI_HOOK_ARCHIVE_CREATED}" -eq 1 ]]; then
+      python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" remove-empty-dir \
+        --root "${WORKSPACE_ROOT}" \
+        --candidate "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
+        --purpose run-all-checks-setup-rollback >/dev/null || cleanup_status=$?
+    fi
+  fi
+  if [[ "$status" -eq 0 && "$cleanup_status" -ne 0 ]]; then
+    status=$cleanup_status
+  fi
+  exit "$status"
+}
+trap cleanup_run_all_checks_temp EXIT
+
+AGENT_CANON_CI_HOOK_ARCHIVE_DIR="$(
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" ensure-dir \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}" \
+    --purpose run-all-checks-hook-archive
+)"
+if [ -n "${AGENT_CANON_CI_EVAL_LOG_DIR:-}" ]; then
+  AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="$(
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" ensure-dir \
+      --root "${WORKSPACE_ROOT}" \
+      --candidate "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}" \
+      --purpose run-all-checks-explicit-eval-log
+  )"
+else
+  AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="$(
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" temp-dir \
+      --root "${WORKSPACE_ROOT}" \
+      --candidate "${WORKSPACE_ROOT}/.agent-canon/tmp" \
+      --prefix run-all-eval \
+      --purpose run-all-checks-eval-log
+  )"
+  AGENT_CANON_CI_EVAL_LOG_TEMP_CREATED=1
+fi
+AGENT_CANON_CI_SETUP_COMPLETE=1
 
 PYTHON_BIN="${PYTHON_BIN:-}"
 if [ -z "$PYTHON_BIN" ]; then
@@ -227,18 +317,21 @@ resolve_agent_canon_cli() {
 }
 
 run_agent_canon() {
+  local command
   if [ "${AGENT_CANON_CLI_MODE:-}" = "binary" ] && [ -n "${AGENT_CANON_CLI_CMD:-}" ]; then
-    "$AGENT_CANON_CLI_CMD" "$@"
-    return $?
+    command=("${AGENT_CANON_CLI_CMD}" "$@")
+  elif [ "${AGENT_CANON_CLI_MODE:-}" = "cargo" ] && [ -n "${AGENT_CANON_CLI_CMD:-}" ]; then
+    command=("${AGENT_CANON_CLI_CMD}" run --manifest-path "${AGENT_CANON_CARGO_MANIFEST}" -- "$@")
+  else
+    echo "AGENT_CANON_CLI_BLOCKER=agent_canon_cli_unavailable" >&2
+    echo "AGENT_CANON_CLI_REASON=agent-canon CLI binary/shim missing and cargo route unavailable" >&2
+    return 127
   fi
-  if [ "${AGENT_CANON_CLI_MODE:-}" = "cargo" ] && [ -n "${AGENT_CANON_CLI_CMD:-}" ]; then
-    CARGO_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR}" \
-      cargo run --manifest-path "${AGENT_CANON_CARGO_MANIFEST}" -- "$@"
-    return $?
-  fi
-  echo "AGENT_CANON_CLI_BLOCKER=agent_canon_cli_unavailable" >&2
-  echo "AGENT_CANON_CLI_REASON=agent-canon CLI binary/shim missing and cargo route unavailable" >&2
-  return 127
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    -- "${command[@]}"
+  return $?
 }
 
 if ! resolve_agent_canon_cli; then
@@ -285,11 +378,6 @@ export GIT_AUTHOR_NAME="${GIT_AUTHOR_NAME:-AgentCanon CI}"
 export GIT_AUTHOR_EMAIL="${GIT_AUTHOR_EMAIL:-agent-canon-ci@example.invalid}"
 export GIT_COMMITTER_NAME="${GIT_COMMITTER_NAME:-AgentCanon CI}"
 export GIT_COMMITTER_EMAIL="${GIT_COMMITTER_EMAIL:-agent-canon-ci@example.invalid}"
-
-if ! command -v cargo >/dev/null 2>&1 && [ -f "${HOME}/.cargo/env" ]; then
-  # shellcheck disable=SC1091
-  . "${HOME}/.cargo/env"
-fi
 
 echo "════════════════════════════════════════════════════════════════"
 echo "📋 統合 CI セッション開始"

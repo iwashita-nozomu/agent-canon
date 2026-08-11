@@ -4,8 +4,10 @@
 # responsibility Rebuilds local compiled AgentCanon tools after AgentCanon source updates.
 # upstream design ../CONTAINER_OPERATIONS.md compiled tool cache and devcontainer boundary.
 # upstream design ../documents/design/rust-agent-tool-migration.md Rust CLI migration and rebuild policy.
+# upstream implementation ./agent_tools/parent_root_side_effects.py validates all rebuild output and cache paths.
 # downstream implementation ./update_agent_canon.sh calls this after safe AgentCanon updates.
 # downstream implementation ../tests/tools/test_update_agent_canon.py validates rebuild behavior.
+# downstream implementation ../tests/tools/test_rebuild_agent_tools.py verifies boundary-owned executable and link publication.
 # @dependency-end
 
 set -euo pipefail
@@ -19,20 +21,35 @@ else
 fi
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 TOOLS_HOME="${AGENT_CANON_TOOLS_HOME:-${ROOT_DIR}/.agent-canon/tools}"
-CARGO_HOME="${AGENT_CANON_CARGO_HOME:-${ROOT_DIR}/.agent-canon/cargo-home}"
+CARGO_HOME="${AGENT_CANON_CARGO_HOME:-${CARGO_HOME:-${ROOT_DIR}/.agent-canon/cache/cargo-home}}"
+BUILD_TARGET_DIR="${CARGO_TARGET_DIR:-${AGENT_CANON_CLI_TARGET_DIR:-${ROOT_DIR}/.agent-canon/cache/cargo-target}}"
 FORCE_REBUILD="${AGENT_CANON_FORCE_TOOL_REBUILD:-0}"
+BOUNDARY_SCRIPT="${ROOT_DIR}/tools/agent_tools/parent_root_side_effects.py"
+if [ ! -f "$BOUNDARY_SCRIPT" ] && [ -f "${ROOT_DIR}/${PREFIX}/tools/agent_tools/parent_root_side_effects.py" ]; then
+  BOUNDARY_SCRIPT="${ROOT_DIR}/${PREFIX}/tools/agent_tools/parent_root_side_effects.py"
+fi
+if [ ! -f "$BOUNDARY_SCRIPT" ]; then
+  echo "AGENT_CANON_TOOL_REBUILD=fail reason=missing-parent-boundary" >&2
+  exit 1
+fi
 
-assert_parent_path() {
-  local label="$1"
-  local path="$2"
-  case "$(realpath -m "$path")/" in
-    "$(realpath -m "$ROOT_DIR")/"*) ;;
-    *) echo "AGENT_CANON_TOOL_REBUILD=fail reason=${label}-outside-parent" >&2; exit 1 ;;
-  esac
+resolve_parent_path() {
+  python3 "$BOUNDARY_SCRIPT" resolve \
+    --root "$ROOT_DIR" \
+    --candidate "$1" \
+    --purpose "agent-canon-tool-rebuild-$2"
 }
 
-assert_parent_path tools-home "$TOOLS_HOME"
-assert_parent_path cargo-home "$CARGO_HOME"
+TOOLS_HOME="$(resolve_parent_path "$TOOLS_HOME" tools-home)"
+CARGO_HOME="$(resolve_parent_path "$CARGO_HOME" cargo-home)"
+BUILD_TARGET_DIR="$(resolve_parent_path "$BUILD_TARGET_DIR" cargo-target)"
+if [ -n "${CARGO_TARGET_DIR:-}" ] && [ -n "${AGENT_CANON_CLI_TARGET_DIR:-}" ]; then
+  CLI_TARGET_DIR="$(resolve_parent_path "$AGENT_CANON_CLI_TARGET_DIR" cli-target)"
+  if [ "$BUILD_TARGET_DIR" != "$CLI_TARGET_DIR" ]; then
+    echo "AGENT_CANON_TOOL_REBUILD=fail reason=target-alias-mismatch" >&2
+    exit 1
+  fi
+fi
 
 # shellcheck source=tools/lib/agent_canon_source_identity.sh
 source "$SCRIPT_DIR/lib/agent_canon_source_identity.sh"
@@ -90,14 +107,7 @@ rebuild_rust_cli() {
     echo "AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_rust_manifest"
     return
   fi
-  source_root="$(realpath -m "$source_root")"
-  case "$source_root/" in
-    "$(realpath -m "$ROOT_DIR")/"*) ;;
-    *)
-      echo "AGENT_CANON_TOOL_REBUILD=fail reason=source-outside-parent" >&2
-      return 1
-      ;;
-  esac
+  source_root="$(resolve_parent_path "$source_root" source-root)"
   if ! command -v cargo >/dev/null 2>&1; then
     echo "AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_cargo"
     echo "AGENT_CANON_TOOL_REBUILD_NEXT=rebuild_in_devcontainer_or_install_rust_toolchain"
@@ -116,16 +126,27 @@ rebuild_rust_cli() {
     return
   fi
 
-  mkdir -p "$CARGO_HOME"
+  CARGO_HOME="$(
+    python3 "$BOUNDARY_SCRIPT" ensure-dir \
+      --root "$ROOT_DIR" \
+      --candidate "$CARGO_HOME" \
+      --purpose agent-canon-tool-rebuild-cargo-home
+  )"
+  BUILD_TARGET_DIR="$(
+    python3 "$BOUNDARY_SCRIPT" ensure-dir \
+      --root "$ROOT_DIR" \
+      --candidate "$BUILD_TARGET_DIR" \
+      --purpose agent-canon-tool-rebuild-cargo-target
+  )"
   CARGO_HOME="$CARGO_HOME" \
-    CARGO_TARGET_DIR="$source_root/.agent-canon/cargo-target" \
+    CARGO_TARGET_DIR="$BUILD_TARGET_DIR" \
     cargo build --release --manifest-path "$manifest"
   source_sha_after="$(source_commit "$source_root")"
   if [ "$source_sha" != "$source_sha_after" ]; then
     echo "AgentCanon source identity changed during build: $source_sha!=$source_sha_after" >&2
     return 1
   fi
-  build_binary="$source_root/.agent-canon/cargo-target/release/agent-canon"
+  build_binary="$BUILD_TARGET_DIR/release/agent-canon"
   # Older/fake cargo providers may still honor the crate-local target path.
   # Both paths remain below the selected parent root; prefer the explicit
   # task-local target and accept the legacy path only as a compatibility read.
@@ -136,13 +157,38 @@ rebuild_rust_cli() {
     echo "AgentCanon cargo build produced no executable under the parent root" >&2
     return 1
   fi
-  install -d -m 755 "$state_dir/bin" "$TOOLS_HOME/bin"
-  install -m 755 "$build_binary" "$install_binary"
-  ln -sf "$install_binary" "$TOOLS_HOME/bin/agent-canon"
+  state_dir="$(
+    python3 "$BOUNDARY_SCRIPT" ensure-dir \
+      --root "$ROOT_DIR" \
+      --candidate "$state_dir" \
+      --purpose agent-canon-tool-rebuild-state
+  )"
+  python3 "$BOUNDARY_SCRIPT" ensure-dir \
+    --root "$ROOT_DIR" \
+    --candidate "$state_dir/bin" \
+    --purpose agent-canon-tool-rebuild-bin >/dev/null
+  python3 "$BOUNDARY_SCRIPT" ensure-dir \
+    --root "$ROOT_DIR" \
+    --candidate "$TOOLS_HOME/bin" \
+    --purpose agent-canon-tool-rebuild-tools-bin >/dev/null
+  python3 "$BOUNDARY_SCRIPT" copy \
+    --root "$ROOT_DIR" \
+    --source "$build_binary" \
+    --candidate "$install_binary" \
+    --preserve-mode \
+    --purpose agent-canon-tool-rebuild-install >/dev/null
+  python3 "$BOUNDARY_SCRIPT" replace-symlink \
+    --root "$ROOT_DIR" \
+    --target "$install_binary" \
+    --candidate "$TOOLS_HOME/bin/agent-canon" \
+    --purpose agent-canon-tool-rebuild-link >/dev/null
   {
     printf 'agent_canon_source_root=%s\n' "$source_root"
     printf 'agent_canon_source_commit=%s\n' "$source_sha"
-  } >"$state_file"
+  } | python3 "$BOUNDARY_SCRIPT" write \
+    --root "$ROOT_DIR" \
+    --candidate "$state_file" \
+    --purpose agent-canon-tool-rebuild-state >/dev/null
   maybe_link_usr_local "$TOOLS_HOME/bin/agent-canon"
   "$TOOLS_HOME/bin/agent-canon" --version >/dev/null
   echo "AGENT_CANON_TOOL_REBUILD_RUST=rebuilt"

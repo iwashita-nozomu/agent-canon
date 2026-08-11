@@ -4,6 +4,7 @@
 # responsibility Selects and evaluates parent PR graph gating from canonical owners, a validated diff base, and persisted graph reachability.
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.json canonical validation profile owner
 # upstream design ../../documents/design/dependency-manifest-design.md canonical dependency surface owner and parent gate contract
+# upstream implementation ../agent_tools/parent_root_side_effects.py owns selector publication, staging, and graph child execution
 # downstream implementation ./check_agent_canon_pr.sh consumes the typed selector verdict
 # downstream implementation ../../tests/tools/test_agent_canon_pr_graph_selector.py verifies required, skipped, and fail-closed selections
 # @dependency-end
@@ -20,6 +21,7 @@ import re
 import sqlite3
 import stat
 import subprocess
+import sys
 import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -27,22 +29,17 @@ from pathlib import Path
 from typing import TypedDict, cast
 from urllib.parse import quote
 
-try:
-    from tools.agent_tools.parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
-except ImportError:
-    from agent_tools.parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
-        ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
-    )
+AGENT_TOOLS_ROOT = Path(__file__).resolve().parents[1] / "agent_tools"
+if str(AGENT_TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(AGENT_TOOLS_ROOT))
+
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
 
 PROFILE_INVENTORY = Path("documents/runtime/runtime-profiles-and-check-matrix.json")
 DEPENDENCY_SURFACE_OWNER = Path("documents/design/dependency-manifest-design.md")
@@ -2380,6 +2377,36 @@ def graph_executable(source_root: Path | None) -> Path:
     return resolved
 
 
+def parent_bound_graph_command(
+    source_root: Path,
+    executable: Path,
+    arguments: Sequence[str],
+) -> list[str]:
+    """Route one graph child through the authenticated outer parent."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise SelectorFailure(
+            "trusted_base_graph_parent_unavailable",
+            "field=AGENT_CANON_PARENT_ROOT",
+        )
+    boundary = source_root / "tools" / "agent_tools" / "parent_root_side_effects.py"
+    return [
+        sys.executable,
+        str(boundary),
+        "exec-parent-bound",
+        "--root",
+        configured,
+        "--source-root",
+        str(source_root),
+        "--purpose",
+        "trusted-base-graph",
+        "--issue-handoff",
+        "--",
+        str(executable),
+        *arguments,
+    ]
+
+
 def surface_manifest_producer(source_root: Path | None) -> Path:
     """Resolve the current source producer injected into trusted-base builds."""
     root = authorized_source_root(source_root)
@@ -2592,27 +2619,30 @@ def build_trusted_base_graph(
         manifest = base_surface_manifest(base_root, base_sha)
 
         build = subprocess.run(
-            [
-                str(executable),
-                "graph",
-                "build",
-                "--root",
-                str(base_root),
-                "--profile",
-                GRAPH_PROFILE,
-                "--format",
-                "json",
-                "--surface-manifest-producer",
-                str(producer),
-                "--surface-manifest-producer-identity",
-                json.dumps(
-                    producer_identity.json(),
-                    sort_keys=True,
-                    separators=(",", ":"),
-                ),
-                "--surface-manifest",
-                manifest,
-            ],
+            parent_bound_graph_command(
+                authorized_root,
+                executable,
+                [
+                    "graph",
+                    "build",
+                    "--root",
+                    str(base_root),
+                    "--profile",
+                    GRAPH_PROFILE,
+                    "--format",
+                    "json",
+                    "--surface-manifest-producer",
+                    str(producer),
+                    "--surface-manifest-producer-identity",
+                    json.dumps(
+                        producer_identity.json(),
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                    "--surface-manifest",
+                    manifest,
+                ],
+            ),
             cwd=base_root,
             check=False,
             capture_output=True,
@@ -2649,27 +2679,30 @@ def build_trusted_base_graph(
             expected_producer_identity=producer_identity,
         )
         status = subprocess.run(
-            [
-                str(executable),
-                "graph",
-                "status",
-                "--root",
-                str(base_root),
-                "--profile",
-                GRAPH_PROFILE,
-                "--format",
-                "json",
-                "--surface-manifest-producer",
-                str(producer),
-                "--surface-manifest-producer-identity",
-                json.dumps(
-                    producer_identity.json(),
-                    sort_keys=True,
-                    separators=(",", ":"),
-                ),
-                "--surface-manifest",
-                manifest,
-            ],
+            parent_bound_graph_command(
+                authorized_root,
+                executable,
+                [
+                    "graph",
+                    "status",
+                    "--root",
+                    str(base_root),
+                    "--profile",
+                    GRAPH_PROFILE,
+                    "--format",
+                    "json",
+                    "--surface-manifest-producer",
+                    str(producer),
+                    "--surface-manifest-producer-identity",
+                    json.dumps(
+                        producer_identity.json(),
+                        sort_keys=True,
+                        separators=(",", ":"),
+                    ),
+                    "--surface-manifest",
+                    manifest,
+                ],
+            ),
             cwd=base_root,
             check=False,
             capture_output=True,

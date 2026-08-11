@@ -55,6 +55,26 @@ from tools.agent_tools.devcontainer_dependencies import (
 
 ROOT = Path(__file__).resolve().parents[2]
 ENGINE = ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
+_PARENT_BOUNDARY_PATH_KEYS = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+)
 
 
 def init_authentic_git(root: Path, *, remote: str = "https://example.invalid/fixture.git") -> None:
@@ -471,6 +491,22 @@ class LeanToolchainRetryRunner(FakeRunner):
 
 
 class DependencyModelTests(unittest.TestCase):
+    def setUp(self) -> None:
+        """Keep synthetic repository boundaries independent of the outer test runner."""
+        super().setUp()
+        saved = {key: os.environ.get(key) for key in _PARENT_BOUNDARY_PATH_KEYS}
+        for key in _PARENT_BOUNDARY_PATH_KEYS:
+            os.environ.pop(key, None)
+
+        def restore_environment() -> None:
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+        self.addCleanup(restore_environment)
+
     def test_base_capabilities_include_gnupg_for_repository_bootstrap(self) -> None:
         """A fixed image capability satisfies apt-repository gpg prerequisites."""
         self.assertIn("gnupg", BASE_CAPABILITIES)
@@ -3309,10 +3345,15 @@ class DependencyModelTests(unittest.TestCase):
             tools = parent / "tools"
             tools.mkdir()
             (tools / "lib").mkdir()
+            (tools / "agent_tools").mkdir()
             shutil.copy2(ROOT / "tools" / "rebuild_agent_tools.sh", tools)
             shutil.copy2(
                 ROOT / "tools" / "lib" / "agent_canon_source_identity.sh",
                 tools / "lib",
+            )
+            shutil.copy2(
+                ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
+                tools / "agent_tools",
             )
             fake_bin = root / "fake-bin"
             fake_bin.mkdir()
@@ -3339,6 +3380,13 @@ class DependencyModelTests(unittest.TestCase):
             environment = dict(os.environ)
             environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
             environment["AGENT_CANON_TOOLS_HOME"] = str(tools_home)
+            environment["CARGO_HOME"] = str(parent / ".agent-canon/cache/cargo-home")
+            environment["CARGO_TARGET_DIR"] = str(
+                parent / ".agent-canon/cache/cargo-target"
+            )
+            environment["AGENT_CANON_CLI_TARGET_DIR"] = environment[
+                "CARGO_TARGET_DIR"
+            ]
             host_home = parent / "host-home"
             environment["HOME"] = str(host_home)
             environment["AGENT_CANON_SKIP_USR_LOCAL_LINK"] = "1"
@@ -3353,7 +3401,7 @@ class DependencyModelTests(unittest.TestCase):
             )
             self.assertEqual(accepted.returncode, 0, accepted.stdout + accepted.stderr)
             self.assertIn(
-                f"AGENT_CANON_TOOL_REBUILD_CARGO_HOME={parent / '.agent-canon/cargo-home'}",
+                f"AGENT_CANON_TOOL_REBUILD_CARGO_HOME={parent / '.agent-canon/cache/cargo-home'}",
                 accepted.stdout,
             )
             self.assertFalse((host_home / ".cargo").exists())
@@ -3361,6 +3409,21 @@ class DependencyModelTests(unittest.TestCase):
                 encoding="utf-8"
             )
             self.assertIn(f"agent_canon_source_commit={source_commit}\n", state)
+
+            outside_environment = dict(environment)
+            outside_tools = root / "outside-tools"
+            outside_environment["AGENT_CANON_TOOLS_HOME"] = str(outside_tools)
+            outside = subprocess.run(
+                ["bash", str(tools / "rebuild_agent_tools.sh")],
+                cwd=parent,
+                env=outside_environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(outside.returncode, 0)
+            self.assertIn("PARENT_ROOT_SIDE_EFFECT_ERROR", outside.stderr)
+            self.assertFalse(outside_tools.exists())
 
             published_binary = tools_home / "agent-canon" / "bin" / "agent-canon"
             published_binary_before_mutation = published_binary.read_bytes()
@@ -3558,7 +3621,7 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIsNotNone(tool_environment)
         assert tool_environment is not None
         self.assertEqual(
-            tool_environment["CARGO_HOME"], f"{root}/.agent-canon/cargo-home"
+            tool_environment["CARGO_HOME"], f"{root}/.agent-canon/cache/cargo-home"
         )
         self.assertEqual(tool_environment["RUSTUP_HOME"], f"{root}/.rustup")
         self.assertEqual(tool_environment["ELAN_HOME"], f"{root}/.elan")

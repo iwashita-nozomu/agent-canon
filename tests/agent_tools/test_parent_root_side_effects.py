@@ -1,3 +1,9 @@
+# @dependency-start
+# contract test
+# responsibility Verifies authenticated parent capabilities, child state, publication, and exact cleanup.
+# upstream implementation ../../tools/agent_tools/parent_root_side_effects.py owns parent-local filesystem effects
+# @dependency-end
+
 """Focused tests for the parent-root side-effect boundary."""
 
 from __future__ import annotations
@@ -22,6 +28,36 @@ from tools.agent_tools.parent_root_side_effects import (
     resolve_parent_owned_path,
 )
 
+_PARENT_BOUNDARY_PATH_KEYS = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+)
+
+
+def _build_clean_env(overrides: dict[str, str] | None = None) -> dict[str, str]:
+    env = os.environ.copy()
+    for key in _PARENT_BOUNDARY_PATH_KEYS:
+        env.pop(key, None)
+    if overrides:
+        env.update(overrides)
+    return env
+
 
 def git_repo(path: Path, *, remote: str | None = None) -> None:
     path.mkdir(parents=True, exist_ok=True)
@@ -31,6 +67,15 @@ def git_repo(path: Path, *, remote: str | None = None) -> None:
     subprocess.run(["git", "-C", str(path), "-c", "user.name=Test", "-c",
                     "user.email=test@example.invalid", "commit", "--allow-empty",
                     "-m", "fixture"], check=True, capture_output=True)
+
+
+def pending_handoff_nonces(root: Path) -> dict[str, object]:
+    state = root / ".agent-canon" / "handoff" / "nonces.json"
+    if not state.exists():
+        return {}
+    value = json.loads(state.read_text(encoding="utf-8"))
+    assert isinstance(value, dict)
+    return value
 
 
 def attest(root: Path, **kwargs: object):
@@ -477,6 +522,9 @@ def test_atomic_publish_and_child_environment_keep_home_unchanged(tmp_path: Path
     original_home = os.environ.get("HOME")
     env = child_environment(receipt, {"HOME": original_home or ""})
     assert env["HOME"] == (original_home or "")
+    assert env["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] == str(tmp_path.resolve())
+    assert env["AGENT_CANON_PARENT_ROOT"] == str(tmp_path.resolve())
+    assert env["AGENT_CANON_SOURCE_ROOT"] == str(tmp_path.resolve())
     for name in (
         "TMPDIR", "TEMP", "TMP", "XDG_CACHE_HOME", "PYTHONPYCACHEPREFIX",
         "AGENT_CANON_TOOLS_HOME", "CARGO_HOME", "CARGO_TARGET_DIR",
@@ -888,7 +936,198 @@ def test_capture_subprocess_publishes_and_replays_stdout(tmp_path: Path) -> None
         check=False,
         capture_output=True,
         text=True,
+        env=_build_clean_env(),
     )
     assert result.returncode == 0, result.stderr
     assert result.stdout == "captured\n"
     assert target.read_text(encoding="utf-8") == "captured\n"
+    assert pending_handoff_nonces(tmp_path) == {}
+
+
+def test_exec_parent_bound_preserves_home_and_bindings(tmp_path: Path) -> None:
+    git_repo(tmp_path, remote="https://example.invalid/parent.git")
+    preserved_home = tmp_path / "outside-home"
+    preserved_home.mkdir()
+    env = _build_clean_env(
+        {"HOME": str(preserved_home), "PYTHONPATH": os.getcwd()}
+    )
+    code = (
+        "import json, os; "
+        "print(json.dumps({"
+        "\"home\": os.environ.get(\"HOME\"), "
+        "\"tmpdir\": os.environ.get(\"TMPDIR\"), "
+        "\"temp\": os.environ.get(\"TEMP\"), "
+        "\"tmp\": os.environ.get(\"TMP\"), "
+        "\"cache\": os.environ.get(\"XDG_CACHE_HOME\"), "
+        "\"tools\": os.environ.get(\"AGENT_CANON_TOOLS_HOME\"), "
+        "\"cargo_target\": os.environ.get(\"CARGO_TARGET_DIR\"), "
+        "\"cli_target\": os.environ.get(\"AGENT_CANON_CLI_TARGET_DIR\"), "
+        "\"handoff\": os.environ.get(\"AGENT_CANON_CHILD_HANDOFF\"), "
+        "\"purpose\": os.environ.get(\"AGENT_CANON_CHILD_PURPOSE\")"
+        "}))"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "tools/agent_tools/parent_root_side_effects.py",
+            "exec-parent-bound",
+            "--root",
+            str(tmp_path),
+            "--purpose",
+            "exec-test",
+            "--",
+            sys.executable,
+            "-c",
+            code,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env={
+            **env,
+            "AGENT_CANON_CHILD_HANDOFF": "untrusted-inherited-token",
+            "AGENT_CANON_HANDOFF_AUDIENCE": "untrusted-audience",
+            "AGENT_CANON_CHILD_PURPOSE": "untrusted-purpose",
+        },
+    )
+    assert result.returncode == 0, result.stderr
+    data = json.loads(result.stdout.strip())
+    assert data["home"] == str(preserved_home)
+    assert Path(data["tmpdir"]).resolve().is_relative_to(tmp_path.resolve())
+    assert Path(data["temp"]).resolve().is_relative_to(tmp_path.resolve())
+    assert Path(data["tmp"]).resolve().is_relative_to(tmp_path.resolve())
+    assert Path(data["cache"]).resolve().is_relative_to(tmp_path.resolve())
+    assert Path(data["tools"]).resolve().is_relative_to(tmp_path.resolve())
+    assert data["cargo_target"] == data["cli_target"]
+    assert data["handoff"] is None
+    assert data["purpose"] is None
+    assert pending_handoff_nonces(tmp_path) == {}
+
+
+def test_exec_parent_bound_failure_does_not_leave_pending_handoff(tmp_path: Path) -> None:
+    git_repo(tmp_path, remote="https://example.invalid/parent.git")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "tools/agent_tools/parent_root_side_effects.py",
+            "exec-parent-bound",
+            "--root",
+            str(tmp_path),
+            "--purpose",
+            "exec-failure-test",
+            "--",
+            sys.executable,
+            "-c",
+            "raise SystemExit(17)",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=_build_clean_env(),
+    )
+    assert result.returncode == 17
+    assert pending_handoff_nonces(tmp_path) == {}
+
+
+def test_exec_parent_bound_rejects_external_target_before_side_effects(tmp_path: Path) -> None:
+    git_repo(tmp_path, remote="https://example.invalid/parent.git")
+    external = tmp_path.parent / "external-target"
+    result = subprocess.run(
+        [
+            sys.executable,
+            "tools/agent_tools/parent_root_side_effects.py",
+            "exec-parent-bound",
+            "--root",
+            str(tmp_path),
+            "--purpose",
+            "exec-test",
+            "--",
+            "echo",
+            "should-not-run",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=_build_clean_env({"AGENT_CANON_CLI_TARGET_DIR": str(external)}),
+    )
+    assert result.returncode == 2
+    assert external.exists() is False
+    assert not (tmp_path / ".agent-canon" / "tmp").exists()
+
+
+def test_child_environment_rejection_preserves_preexisting_entries(tmp_path: Path) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    preexisting_tmp = tmp_path / ".agent-canon" / "tmp"
+    preexisting_cache = tmp_path / ".agent-canon" / "cache"
+    preexisting_tmp.mkdir(parents=True)
+    preexisting_cache.mkdir(parents=True)
+    pre_token = json.dumps({"marker": "preexisting"})
+    token_file = preexisting_tmp / "preexisting.txt"
+    token_file.write_text(pre_token, encoding="utf-8")
+
+    with pytest.raises(ParentRootSideEffectError):
+        boundary.child_environment(receipt, {"AGENT_CANON_CLI_TARGET_DIR": str(tmp_path.parent / "external-target")})
+
+    assert token_file.read_text(encoding="utf-8") == pre_token
+
+
+def test_copy_mode_external_read_and_symlink_replacement_are_boundary_owned(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    source = tmp_path / "build" / "agent-canon"
+    source.parent.mkdir()
+    source.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    source.chmod(0o755)
+    installed = tmp_path / ".agent-canon" / "tools" / "agent-canon" / "bin" / "agent-canon"
+
+    published = boundary.copy_parent_owned_file(
+        receipt,
+        source,
+        installed,
+        "executable-copy-test",
+        preserve_mode=True,
+    )
+    assert published.physical_path == installed
+    assert installed.stat().st_mode & 0o777 == 0o755
+
+    link = tmp_path / ".agent-canon" / "tools" / "bin" / "agent-canon"
+    link.parent.mkdir(parents=True)
+    link.symlink_to("obsolete")
+    assert boundary.replace_parent_owned_symlink(
+        receipt, str(installed), link, "symlink-replacement-test"
+    ) == link
+    assert link.is_symlink()
+    assert os.readlink(link) == str(installed)
+
+    external = tmp_path.parent / "read-only-input.txt"
+    external.write_text("external input\n", encoding="utf-8")
+    snapshot = tmp_path / ".agent-canon" / "tmp" / "snapshot.txt"
+    boundary.copy_read_only_file(
+        receipt, external, snapshot, "read-only-copy-test"
+    )
+    assert snapshot.read_text(encoding="utf-8") == "external input\n"
+    assert external.read_text(encoding="utf-8") == "external input\n"
+
+
+def test_verify_child_rejects_forged_purpose_without_handoff(tmp_path: Path) -> None:
+    git_repo(tmp_path, remote="https://example.invalid/parent.git")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "tools/agent_tools/parent_root_side_effects.py",
+            "verify-child",
+            "--root",
+            str(tmp_path),
+            "--purpose",
+            "forged-child",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=_build_clean_env({"AGENT_CANON_CHILD_PURPOSE": "forged-child"}),
+    )
+    assert result.returncode == 2
+    assert "handoff_invalid" in result.stderr

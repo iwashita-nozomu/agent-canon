@@ -1,4 +1,15 @@
 #!/usr/bin/env python3
+# @dependency-start
+# contract tool
+# responsibility Authenticates the selected parent repository and owns parent-local filesystem capabilities.
+# upstream design ../../agents/canonical/CODEX_WORKFLOW.md repository mutation and managed-clone authority
+# downstream implementation ../bin/agent-canon bounds CLI child state
+# downstream implementation ../ci/run_all_checks.sh bounds integrated CI child state and scratch
+# downstream implementation ../ci/check_agent_canon_pr.sh bounds PR gate child state and scratch
+# downstream implementation ../ci/agent_canon_pr_graph_selector.py bounds selector publication and graph children
+# downstream implementation ../../tests/agent_tools/test_parent_root_side_effects.py verifies capabilities and authenticated child environments
+# @dependency-end
+
 """Authenticate the parent repository and perform parent-owned effects.
 
 The boundary is intentionally the only place where these adapters may turn a
@@ -1043,7 +1054,8 @@ class ParentRootSideEffectBoundary:
 
     def _handoff(self, token: str | None, *, request: ParentRootAttestationRequest,
                  parent_root: Path, source_root: Path | None,
-                 clone_root: Path | None) -> ChildHandoffReceipt | None:
+                 clone_root: Path | None,
+                 consume_nonce: bool = True) -> ChildHandoffReceipt | None:
         if token is None:
             return None
         payload, raw_token = _decode_envelope(token)
@@ -1134,8 +1146,9 @@ class ParentRootSideEffectBoundary:
                 raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "unknown or replayed handoff nonce")
             if state[nonce] < now:
                 raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "handoff nonce expired")
-            del state[nonce]
-            _write_locked_state(fd, state)
+            if consume_nonce:
+                del state[nonce]
+                _write_locked_state(fd, state)
         finally:
             _close_state(fd)
         return ChildHandoffReceipt(str(payload["token_version"]), str(payload["audience"]), root,
@@ -1777,6 +1790,61 @@ class ParentRootSideEffectBoundary:
         receipt = self.resolve_parent_owned_path(attestation, candidate, purpose)
         return self.atomic_publish(receipt, data)
 
+    def set_parent_owned_mode(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        receipt: ParentOwnedPathReceipt,
+        mode: int,
+    ) -> ParentOwnedPathReceipt:
+        """Apply permission bits through the already authenticated file identity."""
+        if mode & ~0o777:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH,
+                f"unsupported file mode: {mode:o}",
+            )
+        _verify_parent_components(receipt)
+        parent_fd, name, _ = _parent_directory(
+            receipt.parent_root, receipt.physical_path, create=False
+        )
+        target_fd = -1
+        try:
+            target_fd = os.open(
+                name,
+                os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                dir_fd=parent_fd,
+            )
+            observed = os.fstat(target_fd)
+            if (observed.st_dev, observed.st_ino) != (
+                receipt.target_dev,
+                receipt.target_ino,
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "file identity changed before mode update",
+                )
+            os.fchmod(target_fd, mode)
+            os.fsync(target_fd)
+            readback = os.fstat(target_fd)
+            if stat.S_IMODE(readback.st_mode) != mode:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "file mode readback differs",
+                )
+        except ParentRootSideEffectError:
+            raise
+        except OSError as exc:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"cannot update parent-owned file mode: {exc}",
+            ) from exc
+        finally:
+            if target_fd >= 0:
+                os.close(target_fd)
+            os.close(parent_fd)
+        return self.resolve_parent_owned_path(
+            attestation, receipt.physical_path, receipt.purpose, create=False
+        )
+
     def publish_parent_owned_file_noreplace(
         self,
         attestation: ParentRootAttestationReceipt,
@@ -1908,7 +1976,12 @@ class ParentRootSideEffectBoundary:
                 "subprocess command is empty or contains NUL",
             )
         receipt = self.resolve_parent_owned_path(attestation, candidate, purpose)
-        result = subprocess.run(list(argv), stdout=subprocess.PIPE, check=False)
+        result = subprocess.run(
+            list(argv),
+            stdout=subprocess.PIPE,
+            check=False,
+            env=self.child_environment(attestation, issue_handoff=False),
+        )
         published = self.atomic_publish(receipt, result.stdout)
         if self.read_parent_owned_file(published) != result.stdout:
             raise ParentRootSideEffectError(
@@ -1995,11 +2068,75 @@ class ParentRootSideEffectBoundary:
         source: Path | str,
         candidate: Path | str,
         purpose: str,
+        *,
+        preserve_mode: bool = False,
     ) -> ParentOwnedPathReceipt:
         """Read a parent-owned source and atomically publish its bytes."""
         source_receipt = self.resolve_parent_owned_path(attestation, source, purpose)
         data = self.read_parent_owned_file(source_receipt)
-        return self.write_parent_owned_file(attestation, candidate, data, purpose)
+        published = self.write_parent_owned_file(attestation, candidate, data, purpose)
+        if preserve_mode:
+            source_mode = stat.S_IMODE(source_receipt.physical_path.stat().st_mode)
+            published = self.set_parent_owned_mode(
+                attestation, published, source_mode
+            )
+        return published
+
+    def copy_read_only_file(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        source: Path | str,
+        candidate: Path | str,
+        purpose: str,
+    ) -> ParentOwnedPathReceipt:
+        """Copy one external read-only regular file into the authenticated parent."""
+        source_path = _absolute(Path(source))
+        source_fd = -1
+        try:
+            before = os.stat(source_path, follow_symlinks=False)
+            if not stat.S_ISREG(before.st_mode):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISMATCH,
+                    f"read-only source is not a regular file: {source_path}",
+                )
+            source_fd = os.open(
+                source_path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC
+            )
+            opened = os.fstat(source_fd)
+            if (opened.st_dev, opened.st_ino) != (before.st_dev, before.st_ino):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "read-only source identity changed before copy",
+                )
+            data = bytearray()
+            while True:
+                chunk = os.read(source_fd, 1 << 20)
+                if not chunk:
+                    break
+                data.extend(chunk)
+            after = os.fstat(source_fd)
+            if (after.st_dev, after.st_ino, after.st_size) != (
+                opened.st_dev,
+                opened.st_ino,
+                opened.st_size,
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "read-only source identity changed during copy",
+                )
+        except ParentRootSideEffectError:
+            raise
+        except OSError as exc:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"cannot copy read-only source ({purpose}): {exc}",
+            ) from exc
+        finally:
+            if source_fd >= 0:
+                os.close(source_fd)
+        return self.write_parent_owned_file(
+            attestation, candidate, bytes(data), purpose
+        )
 
     def copy_parent_owned_tree(
         self,
@@ -2370,6 +2507,71 @@ class ParentRootSideEffectBoundary:
             os.close(parent_fd)
         return self.resolve_parent_owned_path(attestation, physical, purpose)
 
+    def replace_parent_owned_symlink(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        target: str,
+        candidate: Path | str,
+        purpose: str,
+    ) -> Path:
+        """Atomically replace one symlink below an authenticated parent root."""
+        if "\x00" in target:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH, "symlink target contains NUL"
+            )
+        root = attestation.parent_root
+        before = _identity(root)
+        lexical = _lexical_candidate(root, candidate)
+        if not _contains(root, lexical):
+            raise ParentRootSideEffectError(
+                ParentRootReject.SYMLINK_ESCAPE,
+                f"symlink candidate is outside parent root: {lexical}",
+            )
+        self.ensure_parent_owned_directory(
+            attestation, lexical.parent, f"{purpose}-parent"
+        )
+        parent_fd, name, _ = _parent_directory(root, lexical, create=True)
+        temporary = f".{name}.{secrets.token_hex(12)}.link"
+        try:
+            os.symlink(target, temporary, dir_fd=parent_fd)
+            if _identity(root) != before:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "parent identity changed before symlink replacement",
+                )
+            os.replace(temporary, name, src_dir_fd=parent_fd, dst_dir_fd=parent_fd)
+            os.fsync(parent_fd)
+            observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            if not stat.S_ISLNK(observed.st_mode):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "symlink replacement readback is not a symlink",
+                )
+            if os.readlink(name, dir_fd=parent_fd) != target:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "symlink replacement target changed",
+                )
+            if _identity(root) != before:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "parent identity changed after symlink replacement",
+                )
+        except ParentRootSideEffectError:
+            raise
+        except OSError as exc:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"cannot replace parent-owned symlink ({purpose}): {exc}",
+            ) from exc
+        finally:
+            try:
+                os.unlink(temporary, dir_fd=parent_fd)
+            except FileNotFoundError:
+                pass
+            os.close(parent_fd)
+        return lexical
+
     def remove_parent_owned_tree(self, attestation: ParentRootAttestationReceipt,
                                  candidate: Path | str | ParentOwnedPathReceipt, purpose: str) -> None:
         """Remove one parent-local directory tree through no-follow dirfds."""
@@ -2651,8 +2853,13 @@ class ParentRootSideEffectBoundary:
                 f"parent-owned tree cleanup failed: {detail}",
             ) from errors[0]
 
-    def child_environment(self, attestation: ParentRootAttestationReceipt,
-                          base_env: Mapping[str, str] | None = None) -> dict[str, str]:
+    def child_environment(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        base_env: Mapping[str, str] | None = None,
+        *,
+        issue_handoff: bool = True,
+    ) -> dict[str, str]:
         """Create fixed parent-local paths and transport a single-use handoff."""
         env = dict(os.environ if base_env is None else base_env)
         root = attestation.parent_root
@@ -2695,14 +2902,50 @@ class ParentRootSideEffectBoundary:
         for key, path in paths.items():
             capability = self.ensure_parent_owned_directory(attestation, path, f"child-{key}")
             env[key] = str(capability.physical_path)
+        env["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(root)
         env["AGENT_CANON_PARENT_ROOT"] = str(root)
+        env["AGENT_CANON_SOURCE_ROOT"] = str(attestation.source_root or root)
         env["AGENT_CANON_PARENT_ROOT_DEV"] = str(attestation.parent_dev)
         env["AGENT_CANON_PARENT_ROOT_INO"] = str(attestation.parent_ino)
-        handoff = self.issue_child_handoff(root, audience=attestation.purpose,
-                                           source_root=attestation.source_root, clone_root=attestation.clone_root)
-        env["AGENT_CANON_CHILD_HANDOFF"] = handoff
-        env["AGENT_CANON_HANDOFF_AUDIENCE"] = attestation.purpose
+        if issue_handoff:
+            handoff = self.issue_child_handoff(
+                root,
+                audience=attestation.purpose,
+                source_root=attestation.source_root,
+                clone_root=attestation.clone_root,
+            )
+            env["AGENT_CANON_CHILD_HANDOFF"] = handoff
+            env["AGENT_CANON_HANDOFF_AUDIENCE"] = attestation.purpose
+        else:
+            env.pop("AGENT_CANON_CHILD_HANDOFF", None)
+            env.pop("AGENT_CANON_HANDOFF_AUDIENCE", None)
+            env.pop("AGENT_CANON_CHILD_PURPOSE", None)
         return env
+
+    def exec_parent_bound(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        argv: Sequence[str],
+        purpose: str,
+        *,
+        issue_handoff: bool = False,
+    ) -> int:
+        """Create parent-owned child env and execute argv without a shell."""
+        if not argv:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH,
+                "exec command is empty",
+            )
+        if any("\x00" in argument for argument in argv):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH,
+                "exec command contains NUL",
+            )
+        env = self.child_environment(attestation, issue_handoff=issue_handoff)
+        if issue_handoff:
+            env["AGENT_CANON_CHILD_PURPOSE"] = purpose
+        os.execvpe(argv[0], list(argv), env)
+        raise RuntimeError("exec failed")
 
     def reattest_child(self, request: ParentRootAttestationRequest,
                        environment: Mapping[str, str]) -> ParentRootAttestationReceipt:
@@ -2710,6 +2953,34 @@ class ParentRootSideEffectBoundary:
         if not token:
             raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "child handoff token was dropped")
         return self.attest(replace(request, child_handoff_token=token))
+
+    def verify_child_environment(
+        self,
+        request: ParentRootAttestationRequest,
+        environment: Mapping[str, str],
+    ) -> ChildHandoffReceipt:
+        """Authenticate an inherited child environment without consuming its token."""
+        token = environment.get("AGENT_CANON_CHILD_HANDOFF", "")
+        if not token:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "child handoff token was dropped"
+            )
+        root = _physical(request.explicit_root or request.cwd, strict=True)
+        source = _physical(request.source_root, strict=True) if request.source_root else None
+        clone = _physical(request.clone_root, strict=True) if request.clone_root else None
+        handoff = self._handoff(
+            token,
+            request=request,
+            parent_root=root,
+            source_root=source,
+            clone_root=clone,
+            consume_nonce=False,
+        )
+        if handoff is None:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID, "child handoff verification failed"
+            )
+        return handoff
 
     def self_check(self, root: Path, *, sentinel_outside: Path | None = None) -> dict[str, object]:
         before_home = os.environ.get("HOME")
@@ -2782,8 +3053,15 @@ def git_config_add(attestation: ParentRootAttestationReceipt, candidate: Path | 
 
 
 def copy_parent_owned_file(attestation: ParentRootAttestationReceipt, source: Path | str,
-                           candidate: Path | str, purpose: str) -> ParentOwnedPathReceipt:
-    return _DEFAULT_BOUNDARY.copy_parent_owned_file(attestation, source, candidate, purpose)
+                           candidate: Path | str, purpose: str, *,
+                           preserve_mode: bool = False) -> ParentOwnedPathReceipt:
+    return _DEFAULT_BOUNDARY.copy_parent_owned_file(
+        attestation,
+        source,
+        candidate,
+        purpose,
+        preserve_mode=preserve_mode,
+    )
 
 
 def copy_parent_owned_tree(attestation: ParentRootAttestationReceipt, source: Path | str,
@@ -2837,9 +3115,17 @@ def remove_empty_parent_owned_directory_cli(
     )
 
 
-def child_environment(attestation: ParentRootAttestationReceipt,
-                      base_env: Mapping[str, str] | None = None) -> dict[str, str]:
-    return _DEFAULT_BOUNDARY.child_environment(attestation, base_env)
+def child_environment(
+    attestation: ParentRootAttestationReceipt,
+    base_env: Mapping[str, str] | None = None,
+    *,
+    issue_handoff: bool = True,
+) -> dict[str, str]:
+    return _DEFAULT_BOUNDARY.child_environment(
+        attestation,
+        base_env,
+        issue_handoff=issue_handoff,
+    )
 
 
 def _main(argv: Sequence[str] | None = None) -> int:
@@ -2873,6 +3159,18 @@ def _main(argv: Sequence[str] | None = None) -> int:
     capture.add_argument("--candidate", required=True, type=Path)
     capture.add_argument("--purpose", default="shell-side-effect")
     capture.add_argument("argv", nargs=argparse.REMAINDER)
+    exec_bound = sub.add_parser("exec-parent-bound")
+    exec_bound.add_argument("--root", required=True, type=Path)
+    exec_bound.add_argument("--source-root", type=Path)
+    exec_bound.add_argument("--consume-inherited-handoff", action="store_true")
+    exec_bound.add_argument("--issue-handoff", action="store_true")
+    exec_bound.add_argument("--purpose", default="shell-side-effect")
+    exec_bound.add_argument("argv", nargs=argparse.REMAINDER)
+    verify_child = sub.add_parser("verify-child")
+    verify_child.add_argument("--root", required=True, type=Path)
+    verify_child.add_argument("--source-root", type=Path)
+    verify_child.add_argument("--purpose", required=True)
+    verify_child.add_argument("--consume", action="store_true")
     git_config = sub.add_parser("git-config-add")
     git_config.add_argument("--root", required=True, type=Path)
     git_config.add_argument("--candidate", required=True, type=Path)
@@ -2883,7 +3181,13 @@ def _main(argv: Sequence[str] | None = None) -> int:
     copy.add_argument("--root", required=True, type=Path)
     copy.add_argument("--source", required=True, type=Path)
     copy.add_argument("--candidate", required=True, type=Path)
+    copy.add_argument("--preserve-mode", action="store_true")
     copy.add_argument("--purpose", default="shell-side-effect")
+    copy_read_only = sub.add_parser("copy-read-only")
+    copy_read_only.add_argument("--root", required=True, type=Path)
+    copy_read_only.add_argument("--source", required=True, type=Path)
+    copy_read_only.add_argument("--candidate", required=True, type=Path)
+    copy_read_only.add_argument("--purpose", default="shell-side-effect")
     copy_tree = sub.add_parser("copy-tree")
     copy_tree.add_argument("--root", required=True, type=Path)
     copy_tree.add_argument("--source", required=True, type=Path)
@@ -2906,6 +3210,11 @@ def _main(argv: Sequence[str] | None = None) -> int:
     symlink.add_argument("--target", required=True)
     symlink.add_argument("--candidate", required=True, type=Path)
     symlink.add_argument("--purpose", default="shell-side-effect")
+    replace_symlink = sub.add_parser("replace-symlink")
+    replace_symlink.add_argument("--root", required=True, type=Path)
+    replace_symlink.add_argument("--target", required=True)
+    replace_symlink.add_argument("--candidate", required=True, type=Path)
+    replace_symlink.add_argument("--purpose", default="shell-side-effect")
     remove_file = sub.add_parser("remove-file")
     remove_file.add_argument("--root", required=True, type=Path)
     remove_file.add_argument("--candidate", required=True, type=Path)
@@ -2933,8 +3242,45 @@ def _main(argv: Sequence[str] | None = None) -> int:
             receipt = _DEFAULT_BOUNDARY.attest(ParentRootAttestationRequest(cwd=args.root, explicit_root=args.root, purpose=args.purpose))
             directory = _DEFAULT_BOUNDARY.ensure_parent_owned_directory(receipt, args.candidate, args.purpose)
             print(str(directory.physical_path))
+        elif args.command == "verify-child":
+            request = ParentRootAttestationRequest(
+                cwd=args.root,
+                explicit_root=args.root,
+                source_root=args.source_root,
+                purpose=args.purpose,
+            )
+            if args.consume:
+                child = _DEFAULT_BOUNDARY.reattest_child(request, os.environ)
+                audience = child.handoff.audience if child.handoff else args.purpose
+                status = "consumed"
+            else:
+                handoff = _DEFAULT_BOUNDARY.verify_child_environment(
+                    request, os.environ
+                )
+                audience = handoff.audience
+                status = "verified"
+            print(json.dumps({"status": status, "audience": audience}))
         else:
-            receipt = _DEFAULT_BOUNDARY.attest(ParentRootAttestationRequest(cwd=args.root, explicit_root=args.root, purpose=args.purpose))
+            child_handoff_token = None
+            source_root = None
+            if args.command == "exec-parent-bound":
+                source_root = args.source_root
+                if args.consume_inherited_handoff:
+                    child_handoff_token = os.environ.get("AGENT_CANON_CHILD_HANDOFF")
+                    if not child_handoff_token:
+                        raise ParentRootSideEffectError(
+                            ParentRootReject.HANDOFF_INVALID,
+                            "inherited child handoff is missing",
+                        )
+            receipt = _DEFAULT_BOUNDARY.attest(
+                ParentRootAttestationRequest(
+                    cwd=args.root,
+                    explicit_root=args.root,
+                    source_root=source_root,
+                    child_handoff_token=child_handoff_token,
+                    purpose=args.purpose,
+                )
+            )
             if args.command == "temp-dir":
                 directory = _DEFAULT_BOUNDARY.create_parent_owned_temp_directory(
                     receipt, args.candidate, args.purpose, args.prefix
@@ -2952,6 +3298,16 @@ def _main(argv: Sequence[str] | None = None) -> int:
                 return _DEFAULT_BOUNDARY.capture_subprocess(
                     receipt, args.candidate, command, args.purpose
                 )
+            elif args.command == "exec-parent-bound":
+                command = list(args.argv)
+                if command and command[0] == "--":
+                    command = command[1:]
+                return _DEFAULT_BOUNDARY.exec_parent_bound(
+                    receipt,
+                    command,
+                    args.purpose,
+                    issue_handoff=args.issue_handoff,
+                )
             elif args.command == "git-config-add":
                 published = _DEFAULT_BOUNDARY.git_config_add(
                     receipt, args.candidate, args.key, args.value, args.purpose
@@ -2959,6 +3315,15 @@ def _main(argv: Sequence[str] | None = None) -> int:
                 print(str(published.physical_path))
             elif args.command == "copy":
                 published = _DEFAULT_BOUNDARY.copy_parent_owned_file(
+                    receipt,
+                    args.source,
+                    args.candidate,
+                    args.purpose,
+                    preserve_mode=args.preserve_mode,
+                )
+                print(str(published.physical_path))
+            elif args.command == "copy-read-only":
+                published = _DEFAULT_BOUNDARY.copy_read_only_file(
                     receipt, args.source, args.candidate, args.purpose
                 )
                 print(str(published.physical_path))
@@ -2984,6 +3349,11 @@ def _main(argv: Sequence[str] | None = None) -> int:
                     receipt, args.target, args.candidate, args.purpose
                 )
                 print(str(link.physical_path))
+            elif args.command == "replace-symlink":
+                link = _DEFAULT_BOUNDARY.replace_parent_owned_symlink(
+                    receipt, args.target, args.candidate, args.purpose
+                )
+                print(str(link))
             elif args.command == "remove-file":
                 target = _DEFAULT_BOUNDARY.resolve_parent_owned_path(
                     receipt, args.candidate, args.purpose, create=False

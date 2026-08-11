@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Materializes the canonical G2 receipt after AgentCanon generated-completeness checks pass.
 # upstream implementation ../agent_tools/update_lifecycle_contract.py owns gate identity and immutable replay.
+# upstream implementation ../agent_tools/parent_root_side_effects.py owns atomic G2 publication.
 # upstream implementation ./check_agent_canon_pr.sh owns the ordered generated-completeness check execution.
 # downstream implementation ../../tests/agent_tools/test_github_publish.py consumes owner-produced G2 fixtures.
 # downstream implementation ../../tests/tools/test_update_agent_canon.py consumes owner-produced G2 fixtures.
@@ -17,7 +18,6 @@ import json
 import os
 import subprocess
 import sys
-import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import cast
@@ -27,6 +27,11 @@ if str(AGENT_TOOLS_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_ROOT))
 
 from artifact_identity import canonical_json_bytes  # noqa: E402
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationReceipt,
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
 from update_lifecycle_contract import (  # noqa: E402
     materialize_gate_verdict,
     validate_gate_chain,
@@ -90,7 +95,7 @@ def materialize_generated_completeness_receipt(
 
 
 def _git_identity(source_root: Path) -> tuple[str, str]:
-    values = []
+    values: list[str] = []
     for revision in ("HEAD", "HEAD^{tree}"):
         values.append(
             subprocess.run(
@@ -103,23 +108,26 @@ def _git_identity(source_root: Path) -> tuple[str, str]:
     return values[0], values[1]
 
 
-def _persist(path: Path, receipt: Mapping[str, object]) -> dict[str, object]:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    if path.is_file():
-        existing = validate_gate_verdict(json.loads(path.read_text(encoding="utf-8")))
+def _persist(
+    path: Path,
+    receipt: Mapping[str, object],
+    *,
+    boundary: ParentRootSideEffectBoundary,
+    attestation: ParentRootAttestationReceipt,
+) -> dict[str, object]:
+    capability = boundary.resolve_parent_owned_path(
+        attestation, path, "agent-canon-g2-receipt"
+    )
+    if capability.target_dev is not None:
+        existing = validate_gate_verdict(
+            json.loads(boundary.read_parent_owned_file(capability).decode("utf-8"))
+        )
         validate_immutable_replay(existing, receipt, field=str(path))
         return existing
-    handle = tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=path.parent, delete=False
+    boundary.atomic_publish(
+        capability,
+        json.dumps(receipt, indent=2, sort_keys=True).encode("utf-8") + b"\n",
     )
-    try:
-        json.dump(receipt, handle, indent=2, sort_keys=True)
-        handle.write("\n")
-        handle.close()
-        os.replace(handle.name, path)
-    finally:
-        if os.path.exists(handle.name):
-            os.unlink(handle.name)
     return dict(receipt)
 
 
@@ -130,6 +138,18 @@ def main() -> int:
     parser.add_argument("--source-root", type=Path, required=True)
     args = parser.parse_args()
     source_root = args.source_root.resolve()
+    parent_root = Path(
+        os.environ.get("AGENT_CANON_PARENT_ROOT", str(source_root))
+    ).resolve()
+    boundary = ParentRootSideEffectBoundary()
+    attestation = boundary.attest(
+        ParentRootAttestationRequest(
+            cwd=parent_root,
+            explicit_root=parent_root,
+            source_root=source_root,
+            purpose="agent-canon-g2",
+        )
+    )
     output_root = (args.output or source_root).resolve()
     try:
         output_root.relative_to(source_root)
@@ -137,11 +157,23 @@ def main() -> int:
         raise SystemExit(
             "agent_canon_pr_gate:output must remain under source root"
         ) from exc
-    payload = json.loads(args.g1_bundle.read_text(encoding="utf-8"))
-    values = payload.get("gate_verdicts") if isinstance(payload, dict) else None
+    payload_object: object = json.loads(args.g1_bundle.read_text(encoding="utf-8"))
+    payload: Mapping[str, object]
+    if isinstance(payload_object, dict):
+        payload = cast(Mapping[str, object], payload_object)
+    else:
+        payload = {}
+    values = payload.get("gate_verdicts")
     if not isinstance(values, list):
         raise SystemExit("agent_canon_pr_gate_bundle:gate_verdicts_missing")
-    g1 = validate_gate_chain(values, expected_gate_ids=("G1",), require_pass=True)[0]
+    gate_values: list[Mapping[str, object]] = []
+    for value in cast(list[object], values):
+        if not isinstance(value, dict):
+            raise SystemExit("agent_canon_pr_gate_bundle:gate_verdict_invalid")
+        gate_values.append(cast(Mapping[str, object], value))
+    g1 = validate_gate_chain(
+        gate_values, expected_gate_ids=("G1",), require_pass=True
+    )[0]
     g1_binding = cast(Mapping[str, object], g1["binding"])
     transaction_id = cast(str, g1_binding["transaction_id"])
     output = args.output or (
@@ -162,7 +194,12 @@ def main() -> int:
             for check_id in GENERATED_COMPLETENESS_CHECK_IDS
         ],
     )
-    persisted = _persist(output, receipt)
+    persisted = _persist(
+        output,
+        receipt,
+        boundary=boundary,
+        attestation=attestation,
+    )
     persisted_binding = cast(Mapping[str, object], persisted["binding"])
     print("AGENT_CANON_G2_RECEIPT=materialized")
     print(f"AGENT_CANON_G2_OUTPUT={output}")

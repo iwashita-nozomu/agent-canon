@@ -19,6 +19,8 @@ CHECKER = PROJECT_ROOT / "tools" / "ci" / "check_experiment_template.py"
 
 def test_centralized_experiment_template_smoke_copies_and_runs() -> None:
     """生成した topic を smoke checker が作成、実行、削除することを検証します."""
+    temp_root = PROJECT_ROOT / ".agent-canon" / "tmp"
+    before: set[Path] = set(temp_root.iterdir()) if temp_root.is_dir() else set()
     result = subprocess.run(
         [sys.executable, str(CHECKER)],
         cwd=PROJECT_ROOT,
@@ -32,3 +34,5 @@ def test_centralized_experiment_template_smoke_copies_and_runs() -> None:
     assert "EXPERIMENT_TEMPLATE_TOPIC=experiments/template-smoke" in result.stdout
     assert "EXPERIMENT_TEMPLATE_EXECUTION=pass" in result.stdout
     assert not (PROJECT_ROOT / "experiments" / "template-smoke").exists()
+    after: set[Path] = set(temp_root.iterdir()) if temp_root.is_dir() else set()
+    assert after == before

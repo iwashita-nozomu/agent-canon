@@ -4,6 +4,7 @@
 # responsibility Provides stable shell entrypoint for the AgentCanon Rust CLI.
 # upstream design ../../documents/design/rust-agent-tool-migration.md Rust tool migration policy
 # upstream implementation ../../rust/agent-canon/src/main.rs Rust CLI entrypoint
+# upstream implementation ../agent_tools/parent_root_side_effects.py bounds child execution state to the selected parent
 # downstream implementation ../agent_tools/agent_canon_source_root.py resolves public source-root tool routes
 # downstream implementation ../agent_tools/pydocstyle_review.py owns explicit Docstring review
 # @dependency-end
@@ -15,23 +16,97 @@ if command -v readlink >/dev/null 2>&1; then
   script_path="$(readlink -f "$script_path")"
 fi
 canon_root="$(cd "$(dirname "$script_path")/../.." && pwd)"
+if [ -n "${AGENT_CANON_CHILD_HANDOFF:-}" ]; then
+  if [ -z "${AGENT_CANON_SOURCE_ROOT:-}" ]; then
+    echo "agent-canon child handoff is missing its source repository root" >&2
+    exit 2
+  fi
+  canon_root="$(cd "${AGENT_CANON_SOURCE_ROOT}" && pwd -P)"
+elif [ ! -f "${canon_root}/rust/agent-canon/Cargo.toml" ]; then
+  invocation_source="$(git -C "${PWD}" rev-parse --show-toplevel 2>/dev/null || true)"
+  if [ -n "${invocation_source}" ] \
+    && [ -f "${invocation_source}/rust/agent-canon/Cargo.toml" ]; then
+    canon_root="${invocation_source}"
+  fi
+fi
 manifest="${canon_root}/rust/agent-canon/Cargo.toml"
+boundary_script="${canon_root}/tools/agent_tools/parent_root_side_effects.py"
+
+git_toplevel() {
+  local root="$1"
+  if ! command -v git >/dev/null 2>&1; then
+    printf "%s\n" ""
+    return 0
+  fi
+  git -C "$root" rev-parse --show-toplevel 2>/dev/null || printf "%s\n" ""
+}
+
+resolve_parent_root() {
+  local active_root="${AGENT_CANON_ACTIVE_REPOSITORY_ROOT:-}"
+  local child_handoff="${AGENT_CANON_CHILD_HANDOFF:-}"
+  local invocation_root=""
+  if [ -n "${child_handoff}" ]; then
+    if [ -z "${active_root}" ]; then
+      echo "agent-canon child handoff is missing its active repository root" >&2
+      return 2
+    fi
+    printf "%s\n" "$active_root"
+    return 0
+  fi
+  invocation_root="$(git_toplevel "${PWD}")"
+  if [ -n "${invocation_root}" ]; then
+    if [ -n "${active_root}" ]; then
+      if [ ! -d "${active_root}" ] \
+        || [ "$(cd "${active_root}" && pwd -P)" != "${invocation_root}" ]; then
+        echo "agent-canon active repository root is not authoritative without a child handoff" >&2
+        return 2
+      fi
+    fi
+    printf "%s\n" "${invocation_root}"
+    return 0
+  fi
+  invocation_root="$(git_toplevel "${canon_root}")"
+  if [ -n "${invocation_root}" ]; then
+    printf "%s\n" "${invocation_root}"
+    return 0
+  fi
+  printf "%s\n" "${canon_root}"
+}
+
+run_parent_bound() {
+  local command=("$@")
+  local boundary_args=(
+    exec-parent-bound
+    --root "${parent_root}"
+    --source-root "${canon_root}"
+  )
+  if [ -n "${AGENT_CANON_CHILD_HANDOFF:-}" ]; then
+    if [ -z "${AGENT_CANON_HANDOFF_AUDIENCE:-}" ]; then
+      echo "agent-canon child handoff audience is missing" >&2
+      return 2
+    fi
+    boundary_args+=(
+      --consume-inherited-handoff
+      --purpose "${AGENT_CANON_HANDOFF_AUDIENCE}"
+    )
+  fi
+  python3 "${boundary_script}" "${boundary_args[@]}" -- "${command[@]}"
+}
+
+parent_root="$(resolve_parent_root)"
 
 if [ "${1:-}" = "pydocstyle-review" ]; then
   shift
-  exec python3 "${canon_root}/tools/agent_tools/agent_canon_source_root.py" \
-    exec tools/agent_tools/pydocstyle_review.py "$@"
+  AGENT_CANON_SOURCE_ROOT="${canon_root}" \
+    AGENT_CANON_ROOT="${canon_root}" \
+    run_parent_bound python3 \
+      "${canon_root}/tools/agent_tools/pydocstyle_review.py" "$@"
+  exit $?
 fi
 
-tools_home="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
+tools_home="${AGENT_CANON_TOOLS_HOME:-${parent_root}/.agent-canon/tools}"
 installed_binary="${tools_home}/agent-canon/bin/agent-canon"
 legacy_binary="/opt/agent-canon/bin/agent-canon"
-cargo_target_dir="${CARGO_TARGET_DIR:-${tools_home}/agent-canon/cargo-target}"
-
-if ! command -v cargo >/dev/null 2>&1 && [ -f "${HOME}/.cargo/env" ]; then
-  # shellcheck disable=SC1091
-  . "${HOME}/.cargo/env"
-fi
 
 if [ ! -x "$installed_binary" ] && [ -x "$legacy_binary" ]; then
   installed_binary="$legacy_binary"
@@ -48,16 +123,18 @@ if [ -x "$installed_binary" ]; then
     )"
   fi
   if [ -z "$source_newer" ]; then
-    exec "$installed_binary" "$@"
+    run_parent_bound "$installed_binary" "$@" && exit 0
+    exit $?
   fi
 fi
 
 if command -v cargo >/dev/null 2>&1; then
-  CARGO_TARGET_DIR="$cargo_target_dir" exec cargo run --manifest-path "$manifest" -- "$@"
+  run_parent_bound cargo run --manifest-path "$manifest" -- "$@" && exit 0
 fi
 
 if [ -x "$installed_binary" ]; then
-  exec "$installed_binary" "$@"
+  run_parent_bound "$installed_binary" "$@" && exit 0
+  exit $?
 fi
 
 echo "agent-canon runtime is unavailable" >&2
