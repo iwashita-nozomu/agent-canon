@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install focused validation dependencies
-        run: python3 -m pip install --upgrade pytest pyyaml tomli packaging ruff
+        run: python3 -m pip install --upgrade pytest pyyaml tomli packaging ruff pydocstyle
       - name: Complete the two remaining fixture integrations
         run: |
           python3 - <<'PY'
@@ -157,6 +157,8 @@ jobs:
           tests/tools/test_check_github_workflows.py
           tests/tools/test_container_runtime.py
       - name: Run graph integration suite
+        env:
+          AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}
         run: >-
           python3 -m pytest -q
           tests/tools/test_agent_canon_pr_graph_gate_integration.py
