@@ -1,0 +1,118 @@
+name: Issue 657 Report Bundle Validation
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: issue-657-report-bundle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-validation:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: canon/parent-bounded-side-effects-20260810
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: true
+
+      - name: Checkout validation driver
+        uses: actions/checkout@v4
+        with:
+          ref: validation/issue-657-fixtures
+          path: _validation
+          submodules: false
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install focused dependencies
+        run: python3 -m pip install --upgrade pytest pyyaml tomli packaging ruff
+
+      - name: Apply focused patch
+        run: |
+          python3 -m py_compile _validation/validation/apply_missing_report_bundle_fix.py
+          python3 _validation/validation/apply_missing_report_bundle_fix.py
+          rm -rf _validation
+
+      - name: Verify exact patch scope
+        run: |
+          python3 - <<'PY'
+          import subprocess
+
+          expected = [
+              "tests/agent_tools/test_check_agent_runtime_alignment.py",
+              "tools/agent_tools/workspace_scope.py",
+          ]
+          tracked = sorted(
+              line
+              for line in subprocess.check_output(
+                  ["git", "diff", "--name-only"], text=True
+              ).splitlines()
+              if line
+          )
+          untracked = subprocess.check_output(
+              ["git", "ls-files", "--others", "--exclude-standard"], text=True
+          ).splitlines()
+          if tracked != expected or untracked:
+              raise SystemExit(
+                  f"unexpected report bundle patch: tracked={tracked}, untracked={untracked}"
+              )
+          PY
+          git diff --check
+
+      - name: Run report bundle and alignment regressions
+        run: |
+          python3 -m pytest -q \
+            tests/agent_tools/test_check_agent_runtime_alignment.py::AgentRuntimeAlignmentTest::test_missing_report_bundle_path_uses_existing_git_parent \
+            tests/agent_tools/test_check_agent_runtime_alignment.py::AgentRuntimeAlignmentTest::test_alignment_script_passes
+          python3 tools/agent_tools/check_agent_runtime_alignment.py
+          python3 -m ruff check --select E9,F,I \
+            tests/agent_tools/test_check_agent_runtime_alignment.py \
+            tools/agent_tools/workspace_scope.py
+          python3 -m py_compile \
+            tests/agent_tools/test_check_agent_runtime_alignment.py \
+            tools/agent_tools/workspace_scope.py
+          git diff --check
+
+      - name: Commit and push validated patch
+        run: |
+          python3 - <<'PY'
+          import subprocess
+
+          expected = [
+              "tests/agent_tools/test_check_agent_runtime_alignment.py",
+              "tools/agent_tools/workspace_scope.py",
+          ]
+          tracked = sorted(
+              line
+              for line in subprocess.check_output(
+                  ["git", "diff", "--name-only"], text=True
+              ).splitlines()
+              if line
+          )
+          untracked = subprocess.check_output(
+              ["git", "ls-files", "--others", "--exclude-standard"], text=True
+          ).splitlines()
+          if tracked != expected or untracked:
+              raise SystemExit(
+                  f"refusing unexpected commit state: tracked={tracked}, untracked={untracked}"
+              )
+          PY
+          git config user.name "agent-canon-validation"
+          git config user.email "agent-canon-validation@users.noreply.github.com"
+          git add \
+            tests/agent_tools/test_check_agent_runtime_alignment.py \
+            tools/agent_tools/workspace_scope.py
+          git commit -m "fix: attest future report bundles from existing parent"
+          git push origin HEAD:canon/parent-bounded-side-effects-20260810
+          test -z "$(git status --porcelain)"
