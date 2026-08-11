@@ -147,11 +147,30 @@ def resolve_report_bundle_artifact_path(
         raise ReportBundleArtifactPathError(declared_path, "not_relative")
     report_root = report_dir.resolve()
     try:
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(
-                cwd=report_root, explicit_root=None, purpose="report-artifact"
+        configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+        if configured_parent:
+            attestation_root = Path(configured_parent).resolve()
+            attestation = attest_parent_root(
+                ParentRootAttestationRequest(
+                    cwd=attestation_root,
+                    explicit_root=attestation_root,
+                    purpose="report-artifact",
+                )
             )
-        )
+        else:
+            attestation_cwd = report_root
+            while not attestation_cwd.exists():
+                parent = attestation_cwd.parent
+                if parent == attestation_cwd:
+                    break
+                attestation_cwd = parent
+            attestation = attest_parent_root(
+                ParentRootAttestationRequest(
+                    cwd=attestation_cwd,
+                    explicit_root=None,
+                    purpose="report-artifact",
+                )
+            )
         # This is a non-creating capability check; the lexical checks below
         # continue to provide the stable report-specific error taxonomy.
         resolve_parent_owned_path(

@@ -53,6 +53,8 @@ if [ ! -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ] \
   AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
 fi
 cd "${WORKSPACE_ROOT}"
+export AGENT_CANON_PARENT_ROOT="${WORKSPACE_ROOT}"
+export AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${WORKSPACE_ROOT}"
 if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "agent-canon-pr-script" ]]; then
   python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
     --root "${WORKSPACE_ROOT}" \

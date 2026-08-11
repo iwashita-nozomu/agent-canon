@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -37,6 +38,7 @@ from packets import (  # noqa: E402
     resolve_role_document_packet,
 )
 from team_config import TaskCatalog, load_team_config, resolve_role  # noqa: E402
+from workspace_scope import resolve_report_bundle_artifact_path  # noqa: E402
 
 
 def task_catalog_from_raw(raw: dict[str, object]) -> TaskCatalog:
@@ -79,11 +81,28 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             encoding="utf-8",
         )
 
+    def test_missing_report_bundle_path_uses_existing_git_parent(self) -> None:
+        """A future report bundle is checked without being created."""
+        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as tmp_dir:
+            report_dir = Path(tmp_dir) / "reports" / "agents" / "future-run"
+
+            resolved = resolve_report_bundle_artifact_path(
+                report_dir,
+                "intent_brief.md",
+            )
+
+            self.assertEqual(resolved, report_dir / "intent_brief.md")
+            self.assertFalse(report_dir.exists())
+
     def test_alignment_script_passes(self) -> None:
         """The runtime alignment checker should succeed without findings."""
+        environment = os.environ.copy()
+        environment["AGENT_CANON_PARENT_ROOT"] = str(PROJECT_ROOT)
+        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(PROJECT_ROOT)
         result = subprocess.run(
             [sys.executable, str(SCRIPT_PATH)],
             cwd=PROJECT_ROOT,
+            env=environment,
             check=False,
             capture_output=True,
             text=True,
