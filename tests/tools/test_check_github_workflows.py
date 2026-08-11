@@ -30,6 +30,26 @@ SCRIPT = REPO_ROOT / "tools" / "ci" / "check_github_workflows.py"
 RUNTIME_DASHBOARD_WORKFLOW = (
     REPO_ROOT / ".github" / "workflows" / "agent-runtime-dashboard.yml"
 )
+_PARENT_BOUNDARY_PATH_KEYS = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+)
 
 
 class GitHubWorkflowCheckTest(unittest.TestCase):
@@ -80,6 +100,10 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         shutil.copy2(
             REPO_ROOT / "tools" / "agent_tools" / "agent_canon_source_root.py",
             module,
+        )
+        shutil.copy2(
+            REPO_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
+            module.parent / "parent_root_side_effects.py",
         )
         executable = root / "tools" / "bin" / "agent-canon"
         executable.parent.mkdir(parents=True)
@@ -197,6 +221,8 @@ raise SystemExit(2)
         """Execute the workflow-owned schedule command in a fresh root."""
         _condition, command = self.scheduled_graph_command()
         environment = os.environ.copy()
+        for key in _PARENT_BOUNDARY_PATH_KEYS:
+            environment.pop(key, None)
         environment.update(
             {
                 "GITHUB_WORKSPACE": str(root),
@@ -665,6 +691,8 @@ raise SystemExit(2)
         readback_script = textwrap.dedent(embedded)
         with tempfile.TemporaryDirectory() as tmp_dir:
             report_root = Path(tmp_dir)
+            bootstrap_environment = os.environ.copy()
+            bootstrap_environment["AGENT_CANON_PARENT_ROOT"] = str(REPO_ROOT)
             bootstrap = subprocess.run(
                 [
                     sys.executable,
@@ -684,6 +712,7 @@ raise SystemExit(2)
                     "scheduler",
                 ],
                 cwd=REPO_ROOT,
+                env=bootstrap_environment,
                 check=False,
                 capture_output=True,
                 text=True,
