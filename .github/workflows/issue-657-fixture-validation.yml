@@ -156,8 +156,19 @@ jobs:
           python3 -m pytest -q
           tests/tools/test_check_github_workflows.py
           tests/tools/test_container_runtime.py
-      - name: Run graph integration suite without ambient PR identity
+      - name: Run graph integration with an untracked Slice05 prerequisite
         run: |
+          cat > tools/agent-canon <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+          script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+          exec "${script_dir}/bin/agent-canon" "$@"
+          SH
+          chmod +x tools/agent-canon
+          cleanup() {
+            rm -f tools/agent-canon
+          }
+          trap cleanup EXIT
           python3 - <<'PY'
           import os
           import pytest
@@ -175,6 +186,26 @@ jobs:
               )
           )
           PY
+      - name: Verify temporary Slice05 prerequisite was removed
+        run: |
+          test ! -e tools/agent-canon
+          python3 - <<'PY'
+          import subprocess
+
+          expected = [
+              "tests/tools/test_check_github_workflows.py",
+              "tests/tools/test_container_runtime.py",
+          ]
+          actual = sorted(
+              line
+              for line in subprocess.check_output(
+                  ["git", "diff", "--name-only"], text=True
+              ).splitlines()
+              if line
+          )
+          if actual != expected:
+              raise SystemExit(f"unexpected post-graph paths: {actual}")
+          PY
       - name: Run parent-boundary nonce and cleanup suite
         run: >-
           python3 -m pytest -q
@@ -191,6 +222,24 @@ jobs:
           tests/tools/test_container_runtime.py
       - name: Commit and push validated follow-up
         run: |
+          test ! -e tools/agent-canon
+          python3 - <<'PY'
+          import subprocess
+
+          expected = [
+              "tests/tools/test_check_github_workflows.py",
+              "tests/tools/test_container_runtime.py",
+          ]
+          actual = sorted(
+              line
+              for line in subprocess.check_output(
+                  ["git", "diff", "--name-only"], text=True
+              ).splitlines()
+              if line
+          )
+          if actual != expected:
+              raise SystemExit(f"refusing unexpected commit paths: {actual}")
+          PY
           git config user.name "agent-canon-validation"
           git config user.email "agent-canon-validation@users.noreply.github.com"
           git add tests/tools/test_check_github_workflows.py tests/tools/test_container_runtime.py
