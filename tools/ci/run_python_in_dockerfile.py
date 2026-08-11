@@ -53,8 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("python_file", help="Python file to run inside the container.")
     parser.add_argument(
         "--rules",
-        default="docker/python-execution-rules.toml",
-        help="Rule file. Default: docker/python-execution-rules.toml",
+        help="Optional project-owned Python execution rule file.",
     )
     parser.add_argument("--pack", help="Pack override. Skip rule resolution when set.")
     parser.add_argument(
@@ -168,14 +167,14 @@ def main() -> int:
         if not python_file.is_file():
             raise SystemExit(f"Python file not found: {python_file}")
 
-        _, rules = load_rules(args.rules)
+        rules = load_rules(args.rules)[1] if args.rules is not None else []
         resolved_rule = resolve_rule(
             dockerfile=args.dockerfile, python_file=python_file, rules=rules
         )
         pack_path = args.pack or (
             resolved_rule.pack
             if resolved_rule is not None
-            else "docker/packs/default.toml"
+            else None
         )
         python_bin = (
             resolved_rule.python_bin if resolved_rule is not None else "python3"

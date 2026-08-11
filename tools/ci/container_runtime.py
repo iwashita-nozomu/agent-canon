@@ -34,7 +34,7 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 
 def detect_workspace_root() -> Path:
     """Return the repo root even when reached through a symlink view."""
-    markers = ("docker/packs/default.toml", "README.md")
+    markers = (".git", "README.md")
     search_roots = [Path.cwd().resolve(), Path(__file__).absolute().parent]
     for search_root in search_roots:
         for candidate in (search_root, *search_root.parents):
@@ -1768,9 +1768,20 @@ def workspace_path(path_like: str | Path) -> Path:
     return (WORKSPACE_ROOT / candidate).resolve()
 
 
-def default_pack_path() -> Path:
-    """Return the default runtime pack path."""
-    return workspace_path("docker/packs/default.toml")
+def default_container_pack() -> ContainerPack:
+    """Return direct Dockerfile defaults when no project pack is selected."""
+    repository_name = re.sub(r"[^a-z0-9._-]+", "-", WORKSPACE_ROOT.name.lower())
+    repository_name = repository_name.strip("-.") or "repository"
+    return ContainerPack(
+        name="default",
+        dockerfile="docker/Dockerfile",
+        context=".",
+        target=None,
+        image_tag=f"{repository_name}:agent-canon",
+        platform=None,
+        smoke=SmokeSpec(),
+        runtime=RuntimeSpec(),
+    )
 
 
 def resolve_builder(builder: str, print_only: bool) -> str:
@@ -2186,9 +2197,9 @@ def load_pack(path_like: str | Path) -> ContainerPack:
 
 
 def load_or_default_pack(path_like: str | None) -> ContainerPack:
-    """Load the requested pack or the default pack."""
+    """Load an explicit project pack or use direct Dockerfile defaults."""
     if path_like is None:
-        return load_pack(default_pack_path())
+        return default_container_pack()
     return load_pack(path_like)
 
 

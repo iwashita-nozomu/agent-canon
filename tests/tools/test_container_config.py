@@ -309,6 +309,20 @@ def test_validator_does_not_require_dependency_module_change_in_parent_mode(tmp_
     assert "required-for-devcontainer-dependency-check" not in result.stdout
 
 
+def test_parent_dockerfile_does_not_require_runtime_packs(tmp_path: Path) -> None:
+    """A derived parent may own a Dockerfile without defining pack TOML."""
+    repo = tmp_path / "parent"
+    write_file(repo, "vendor/agent-canon/README.md", "source marker\n")
+    write_file(repo, "docker/Dockerfile", "FROM scratch\n")
+    write_file(repo, ".dockerignore", ".git\n.state\nvendor/agent-canon\n")
+
+    report = load_container_config_module().validate(repo)
+
+    assert report.status == "pass"
+    assert "docker/packs" not in report.checked
+    assert report.packs == ()
+
+
 def test_gpu_admission_selector_isolated_from_default_selector() -> None:
     """The opt-in selector owns a distinct config and generated Compose identity."""
     default = json.loads(

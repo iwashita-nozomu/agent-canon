@@ -45,6 +45,8 @@ set -euo pipefail
 #   bash tools/ci/run_all_checks.sh --quick   # broad checks with ruff skipped
 #   bash tools/ci/run_all_checks.sh --quick --skip-docs --skip-github-workflows
 #                                               # PR gate reuse after those gates already ran
+#   bash tools/ci/run_all_checks.sh --skip-experiments
+#                                               # skip the optional experiment registry gate
 #
 # 前提条件:
 #   - Docker 環境、または requirements.txt のパッケージ導入済み
@@ -196,6 +198,7 @@ fi
 QUICK_MODE=0
 SKIP_DOCS=0
 SKIP_GITHUB_WORKFLOWS=0
+SKIP_EXPERIMENTS=0
 PR_GATE_RECEIPT=""
 PR_GATE_RECEIPT_VALID=0
 PR_GATE_DEPENDENCY_GRAPH_STATUS="not_applicable"
@@ -211,6 +214,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --skip-github-workflows)
       SKIP_GITHUB_WORKFLOWS=1
+      shift
+      ;;
+    --skip-experiments)
+      SKIP_EXPERIMENTS=1
       shift
       ;;
     --pr-gate-receipt)
@@ -608,7 +615,10 @@ echo ""
 
 # 2. experiment registry checks
 echo "2️⃣  experiment registry checks を実行中..."
-if [ ! -e experiments/registry.toml ]; then
+if [ "$SKIP_EXPERIMENTS" -eq 1 ]; then
+  echo "EXPERIMENT_REGISTRY=skip reason=skip_experiments_option"
+  echo "experiment registry validation skipped by --skip-experiments"
+elif [ ! -e experiments/registry.toml ]; then
   echo "EXPERIMENT_REGISTRY=skip"
   echo "experiment registry absent in this checkout; skipping registry validation"
 elif "$PYTHON_BIN" "${CANON_CI_ROOT}/check_experiment_registry.py" 2>&1; then

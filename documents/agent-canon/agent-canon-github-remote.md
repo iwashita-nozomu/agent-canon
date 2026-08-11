@@ -124,7 +124,9 @@ Template and derived repos should checkout the root repository with
 bash .github/scripts/checkout_agent_canon_submodule.sh
 ```
 
-The workflow must pass:
+Public AgentCanon repositories need no credential environment because the
+checkout helper probes anonymous read access first. For a private AgentCanon
+repository, the workflow passes one credential only to the helper step:
 
 ```yaml
 env:
@@ -132,8 +134,9 @@ env:
 ```
 
 `AGENT_CANON_REPO_TOKEN` should be a fine-grained PAT or equivalent GitHub App
-token with read-only Contents access to the AgentCanon repository. If the
-secret is missing, the helper fails with `AGENT_CANON_SUBMODULE_AUTH=missing`
+token with read-only Contents access to the AgentCanon repository. If a private
+remote is unreadable and the secret is missing, the helper fails with
+`AGENT_CANON_SUBMODULE_AUTH=missing`
 instead of letting `actions/checkout` fail during an opaque automatic submodule
 clone.
 
