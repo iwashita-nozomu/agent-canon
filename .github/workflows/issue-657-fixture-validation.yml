@@ -4,7 +4,7 @@ on:
   pull_request:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: issue-657-fixtures-${{ github.workflow }}-${{ github.ref }}
@@ -17,18 +17,131 @@ jobs:
       AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
       AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
     steps:
-      - name: Checkout repository
+      - name: Checkout feature branch
         uses: actions/checkout@v4
         with:
+          ref: canon/parent-bounded-side-effects-20260810
           fetch-depth: 0
           submodules: false
-          persist-credentials: false
+          persist-credentials: true
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
       - name: Install focused validation dependencies
         run: python3 -m pip install --upgrade pytest pyyaml tomli packaging ruff
+      - name: Complete the two remaining fixture integrations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          workflow_test = Path("tests/tools/test_check_github_workflows.py")
+          workflow_text = workflow_test.read_text(encoding="utf-8")
+          workflow_old = '''        with tempfile.TemporaryDirectory() as tmp_dir:
+              report_root = Path(tmp_dir)
+              bootstrap_environment = os.environ.copy()
+              bootstrap_environment["AGENT_CANON_PARENT_ROOT"] = str(REPO_ROOT)
+          '''
+          workflow_new = '''        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmp_dir:
+              report_root = Path(tmp_dir)
+              bootstrap_environment = os.environ.copy()
+              bootstrap_environment["AGENT_CANON_PARENT_ROOT"] = str(REPO_ROOT)
+          '''
+          if workflow_text.count(workflow_old) != 1:
+              raise SystemExit("coordination fixture patch context changed")
+          workflow_test.write_text(
+              workflow_text.replace(workflow_old, workflow_new),
+              encoding="utf-8",
+          )
+
+          runtime_test = Path("tests/tools/test_container_runtime.py")
+          runtime_text = runtime_test.read_text(encoding="utf-8")
+          import_old = "import importlib.util\nimport socket\n"
+          import_new = "import importlib.util\nimport os\nimport socket\n"
+          if runtime_text.count(import_old) != 1:
+              raise SystemExit("container fixture import context changed")
+          runtime_text = runtime_text.replace(import_old, import_new)
+
+          environment_old = '''    (repo / "sample.py").write_text("print('fixture')\\n", encoding="utf-8")
+
+              result = subprocess.run(
+          '''
+          environment_new = '''    (repo / "sample.py").write_text("print('fixture')\\n", encoding="utf-8")
+
+              environment = os.environ.copy()
+              for key in (
+                  "TMPDIR",
+                  "TEMP",
+                  "TMP",
+                  "XDG_CACHE_HOME",
+                  "PYTHONPYCACHEPREFIX",
+                  "AGENT_CANON_TOOLS_HOME",
+                  "CARGO_HOME",
+                  "CARGO_TARGET_DIR",
+                  "AGENT_CANON_CLI_TARGET_DIR",
+                  "AGENT_CANON_PARENT_ROOT",
+                  "AGENT_CANON_PARENT_ROOT_DEV",
+                  "AGENT_CANON_PARENT_ROOT_INO",
+                  "AGENT_CANON_CHILD_HANDOFF",
+                  "AGENT_CANON_CHILD_PURPOSE",
+                  "AGENT_CANON_HANDOFF_AUDIENCE",
+                  "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+                  "AGENT_CANON_ROOT",
+                  "AGENT_CANON_SOURCE_ROOT",
+                  "AGENT_CANON_TASK_ID",
+                  "AGENT_CANON_REPOSITORY_ID",
+                  "AGENT_CANON_TASK_REPOSITORY",
+                  "AGENT_CANON_LIFECYCLE_ID",
+                  "AGENT_CANON_EXPECTED_IMAGE_TAG",
+                  "AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT",
+              ):
+                  environment.pop(key, None)
+              environment["AGENT_CANON_PARENT_ROOT"] = str(repo)
+              environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(repo)
+
+              result = subprocess.run(
+          '''
+          if runtime_text.count(environment_old) != 1:
+              raise SystemExit("container fixture environment context changed")
+          runtime_text = runtime_text.replace(environment_old, environment_new)
+
+          subprocess_old = '''            "sample.py",
+                  ],
+                  cwd=repo,
+                  check=False,
+          '''
+          subprocess_new = '''            "sample.py",
+                  ],
+                  cwd=repo,
+                  env=environment,
+                  check=False,
+          '''
+          if runtime_text.count(subprocess_old) != 1:
+              raise SystemExit("container fixture subprocess context changed")
+          runtime_test.write_text(
+              runtime_text.replace(subprocess_old, subprocess_new),
+              encoding="utf-8",
+          )
+          PY
+      - name: Verify fixture-only diff
+        run: |
+          python3 - <<'PY'
+          import subprocess
+
+          expected = [
+              "tests/tools/test_check_github_workflows.py",
+              "tests/tools/test_container_runtime.py",
+          ]
+          actual = sorted(
+              line
+              for line in subprocess.check_output(
+                  ["git", "diff", "--name-only"], text=True
+              ).splitlines()
+              if line
+          )
+          if actual != expected:
+              raise SystemExit(f"unexpected fixture patch paths: {actual}")
+          PY
       - name: Run post-merge fixture suite
         run: >-
           python3 -m pytest -q
@@ -52,3 +165,10 @@ jobs:
           python3 -m py_compile
           tests/tools/test_check_github_workflows.py
           tests/tools/test_container_runtime.py
+      - name: Commit and push validated follow-up
+        run: |
+          git config user.name "agent-canon-validation"
+          git config user.email "agent-canon-validation@users.noreply.github.com"
+          git add tests/tools/test_check_github_workflows.py tests/tools/test_container_runtime.py
+          git commit -m "test: complete parent-boundary fixture isolation"
+          git push origin HEAD:canon/parent-bounded-side-effects-20260810
