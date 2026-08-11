@@ -1,0 +1,144 @@
+name: Issue 657 Child Source Root Validation
+
+on:
+  pull_request:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: issue-657-child-source-root-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  focused-validation:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v4
+        with:
+          ref: canon/parent-bounded-side-effects-20260810
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: true
+
+      - name: Checkout validation driver
+        uses: actions/checkout@v4
+        with:
+          ref: validation/issue-657-fixtures
+          path: _validation
+          submodules: false
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install focused dependencies
+        run: python3 -m pip install --upgrade pytest pyyaml tomli packaging ruff
+
+      - name: Apply focused patch
+        run: |
+          python3 -m py_compile _validation/validation/apply_child_source_root_pair_fix.py
+          python3 _validation/validation/apply_child_source_root_pair_fix.py
+          rm -rf _validation
+
+      - name: Verify exact patch scope
+        run: |
+          python3 - <<'PY'
+          import subprocess
+
+          expected = [
+              "tests/agent_tools/test_parent_root_side_effects.py",
+              "tools/agent_tools/parent_root_side_effects.py",
+          ]
+          tracked = sorted(
+              line
+              for line in subprocess.check_output(
+                  ["git", "diff", "--name-only"], text=True
+              ).splitlines()
+              if line
+          )
+          untracked = subprocess.check_output(
+              ["git", "ls-files", "--others", "--exclude-standard"], text=True
+          ).splitlines()
+          if tracked != expected or untracked:
+              raise SystemExit(
+                  f"unexpected child source-root patch: tracked={tracked}, untracked={untracked}"
+              )
+          PY
+          git diff --check
+
+      - name: Run parent-boundary regressions
+        run: |
+          python3 - <<'PY'
+          import os
+          import pytest
+
+          for key in tuple(os.environ):
+              if key.startswith("AGENT_CANON_") or key.startswith("GITHUB_"):
+                  os.environ.pop(key, None)
+          raise SystemExit(
+              pytest.main(
+                  [
+                      "-q",
+                      "tests/agent_tools/test_parent_root_side_effects.py",
+                  ]
+              )
+          )
+          PY
+          python3 -m pytest -q tests/agent_tools/test_agent_canon_source_root.py
+
+      - name: Reproduce parent-bound runtime alignment
+        run: |
+          python3 tools/agent_tools/parent_root_side_effects.py \
+            exec-parent-bound \
+            --root "${GITHUB_WORKSPACE}" \
+            --source-root "${GITHUB_WORKSPACE}" \
+            --purpose issue-657-child-root-validation \
+            -- \
+            python3 tools/agent_tools/check_agent_runtime_alignment.py
+
+      - name: Run focused static checks
+        run: |
+          python3 -m ruff check --select E9,F,I \
+            tests/agent_tools/test_parent_root_side_effects.py \
+            tools/agent_tools/parent_root_side_effects.py
+          python3 -m py_compile \
+            tests/agent_tools/test_parent_root_side_effects.py \
+            tools/agent_tools/parent_root_side_effects.py
+          git diff --check
+
+      - name: Commit and push validated patch
+        run: |
+          python3 - <<'PY'
+          import subprocess
+
+          expected = [
+              "tests/agent_tools/test_parent_root_side_effects.py",
+              "tools/agent_tools/parent_root_side_effects.py",
+          ]
+          tracked = sorted(
+              line
+              for line in subprocess.check_output(
+                  ["git", "diff", "--name-only"], text=True
+              ).splitlines()
+              if line
+          )
+          untracked = subprocess.check_output(
+              ["git", "ls-files", "--others", "--exclude-standard"], text=True
+          ).splitlines()
+          if tracked != expected or untracked:
+              raise SystemExit(
+                  f"refusing unexpected commit state: tracked={tracked}, untracked={untracked}"
+              )
+          PY
+          git config user.name "agent-canon-validation"
+          git config user.email "agent-canon-validation@users.noreply.github.com"
+          git add \
+            tests/agent_tools/test_parent_root_side_effects.py \
+            tools/agent_tools/parent_root_side_effects.py
+          git commit -m "fix: pair child source-root overrides"
+          git push origin HEAD:canon/parent-bounded-side-effects-20260810
+          test -z "$(git status --porcelain)"
