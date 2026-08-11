@@ -24,13 +24,16 @@ jobs:
           fetch-depth: 0
           submodules: false
           persist-credentials: true
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+
       - name: Install focused validation dependencies
         run: python3 -m pip install --upgrade pytest pyyaml tomli packaging ruff pydocstyle
-      - name: Complete the two remaining fixture integrations
+
+      - name: Complete the remaining fixture integration
         run: |
           python3 - <<'PY'
           from pathlib import Path
@@ -38,41 +41,44 @@ jobs:
           def lines(*items: str) -> str:
               return "\n".join(items) + "\n"
 
-          workflow_test = Path("tests/tools/test_check_github_workflows.py")
-          workflow_text = workflow_test.read_text(encoding="utf-8")
-          workflow_old = lines(
+          workflow_path = Path("tests/tools/test_check_github_workflows.py")
+          workflow_text = workflow_path.read_text(encoding="utf-8")
+          old = lines(
               "        with tempfile.TemporaryDirectory() as tmp_dir:",
               "            report_root = Path(tmp_dir)",
               "            bootstrap_environment = os.environ.copy()",
               '            bootstrap_environment["AGENT_CANON_PARENT_ROOT"] = str(REPO_ROOT)',
           )
-          workflow_new = lines(
+          new = lines(
               "        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmp_dir:",
               "            report_root = Path(tmp_dir)",
               "            bootstrap_environment = os.environ.copy()",
               '            bootstrap_environment["AGENT_CANON_PARENT_ROOT"] = str(REPO_ROOT)',
           )
-          if workflow_text.count(workflow_old) != 1:
-              raise SystemExit("coordination fixture patch context changed")
-          workflow_test.write_text(
-              workflow_text.replace(workflow_old, workflow_new),
-              encoding="utf-8",
-          )
+          if workflow_text.count(old) != 1:
+              raise SystemExit("coordination fixture context changed")
+          workflow_path.write_text(workflow_text.replace(old, new), encoding="utf-8")
 
-          runtime_test = Path("tests/tools/test_container_runtime.py")
-          runtime_text = runtime_test.read_text(encoding="utf-8")
-          import_old = "import importlib.util\nimport socket\n"
-          import_new = "import importlib.util\nimport os\nimport socket\n"
-          if runtime_text.count(import_old) != 1:
-              raise SystemExit("container fixture import context changed")
-          runtime_text = runtime_text.replace(import_old, import_new)
+          runtime_path = Path("tests/tools/test_container_runtime.py")
+          runtime_text = runtime_path.read_text(encoding="utf-8")
+          imports_old = "import importlib.util\nimport socket\n"
+          imports_new = "import importlib.util\nimport os\nimport socket\n"
+          if runtime_text.count(imports_old) != 1:
+              raise SystemExit("runtime import context changed")
+          runtime_text = runtime_text.replace(imports_old, imports_new)
 
-          environment_old = lines(
+          module_old = "import pytest\nfrom tools.ci import container_runtime as runtime_module\n"
+          module_new = "import pytest\n\nfrom tools.ci import container_runtime as runtime_module\n"
+          if runtime_text.count(module_old) != 1:
+              raise SystemExit("runtime module import context changed")
+          runtime_text = runtime_text.replace(module_old, module_new)
+
+          subprocess_anchor = lines(
               '    (repo / "sample.py").write_text("print(\'fixture\')\\n", encoding="utf-8")',
               "",
               "    result = subprocess.run(",
           )
-          environment_new = lines(
+          environment_block = lines(
               '    (repo / "sample.py").write_text("print(\'fixture\')\\n", encoding="utf-8")',
               "",
               "    environment = os.environ.copy()",
@@ -108,31 +114,29 @@ jobs:
               "",
               "    result = subprocess.run(",
           )
-          if runtime_text.count(environment_old) != 1:
-              raise SystemExit("container fixture environment context changed")
-          runtime_text = runtime_text.replace(environment_old, environment_new)
+          if runtime_text.count(subprocess_anchor) != 1:
+              raise SystemExit("runtime subprocess context changed")
+          runtime_text = runtime_text.replace(subprocess_anchor, environment_block)
 
-          subprocess_old = lines(
+          call_old = lines(
               '            "sample.py",',
               "        ],",
               "        cwd=repo,",
               "        check=False,",
           )
-          subprocess_new = lines(
+          call_new = lines(
               '            "sample.py",',
               "        ],",
               "        cwd=repo,",
               "        env=environment,",
               "        check=False,",
           )
-          if runtime_text.count(subprocess_old) != 1:
-              raise SystemExit("container fixture subprocess context changed")
-          runtime_test.write_text(
-              runtime_text.replace(subprocess_old, subprocess_new),
-              encoding="utf-8",
-          )
+          if runtime_text.count(call_old) != 1:
+              raise SystemExit("runtime subprocess call context changed")
+          runtime_path.write_text(runtime_text.replace(call_old, call_new), encoding="utf-8")
           PY
-      - name: Verify fixture-only diff
+
+      - name: Verify fixture-only working tree
         run: |
           python3 - <<'PY'
           import subprocess
@@ -141,7 +145,7 @@ jobs:
               "tests/tools/test_check_github_workflows.py",
               "tests/tools/test_container_runtime.py",
           ]
-          actual = sorted(
+          tracked = sorted(
               line
               for line in subprocess.check_output(
                   ["git", "diff", "--name-only"], text=True
@@ -151,16 +155,19 @@ jobs:
           untracked = subprocess.check_output(
               ["git", "ls-files", "--others", "--exclude-standard"], text=True
           ).splitlines()
-          if actual != expected or untracked:
+          if tracked != expected or untracked:
               raise SystemExit(
-                  f"unexpected fixture patch state: tracked={actual}, untracked={untracked}"
+                  f"unexpected fixture state: tracked={tracked}, untracked={untracked}"
               )
           PY
+          git diff --check
+
       - name: Run post-merge fixture suite
         run: >-
           python3 -m pytest -q
           tests/tools/test_check_github_workflows.py
           tests/tools/test_container_runtime.py
+
       - name: Run graph integration suite without ambient PR identity
         run: |
           python3 - <<'PY'
@@ -171,16 +178,13 @@ jobs:
               if key.startswith("GITHUB_"):
                   os.environ.pop(key, None)
           os.environ.pop("AGENT_CANON_PR_READ_TOKEN", None)
-          raise SystemExit(
-              pytest.main(
-                  [
-                      "-q",
-                      "tests/tools/test_agent_canon_pr_graph_gate_integration.py",
-                  ]
-              )
-          )
+          raise SystemExit(pytest.main([
+              "-q",
+              "tests/tools/test_agent_canon_pr_graph_gate_integration.py",
+          ]))
           PY
-      - name: Run parent-boundary nonce and cleanup suite in an isolated environment
+
+      - name: Run parent-boundary nonce and cleanup suite in isolation
         run: |
           python3 - <<'PY'
           import os
@@ -189,25 +193,22 @@ jobs:
           for key in tuple(os.environ):
               if key.startswith("AGENT_CANON_") or key.startswith("GITHUB_"):
                   os.environ.pop(key, None)
-          raise SystemExit(
-              pytest.main(
-                  [
-                      "-q",
-                      "tests/agent_tools/test_parent_root_side_effects.py",
-                  ]
-              )
-          )
+          raise SystemExit(pytest.main([
+              "-q",
+              "tests/agent_tools/test_parent_root_side_effects.py",
+          ]))
           PY
-      - name: Run focused Ruff checks
-        run: >-
-          python3 -m ruff check --select E9,F,I
-          tests/tools/test_check_github_workflows.py
-          tests/tools/test_container_runtime.py
-      - name: Compile focused fixtures
-        run: >-
-          python3 -m py_compile
-          tests/tools/test_check_github_workflows.py
-          tests/tools/test_container_runtime.py
+
+      - name: Run focused static validation
+        run: |
+          python3 -m ruff check --select E9,F,I \
+            tests/tools/test_check_github_workflows.py \
+            tests/tools/test_container_runtime.py
+          python3 -m py_compile \
+            tests/tools/test_check_github_workflows.py \
+            tests/tools/test_container_runtime.py
+          git diff --check
+
       - name: Commit and push validated follow-up
         run: |
           python3 - <<'PY'
@@ -217,7 +218,7 @@ jobs:
               "tests/tools/test_check_github_workflows.py",
               "tests/tools/test_container_runtime.py",
           ]
-          actual = sorted(
+          tracked = sorted(
               line
               for line in subprocess.check_output(
                   ["git", "diff", "--name-only"], text=True
@@ -227,9 +228,9 @@ jobs:
           untracked = subprocess.check_output(
               ["git", "ls-files", "--others", "--exclude-standard"], text=True
           ).splitlines()
-          if actual != expected or untracked:
+          if tracked != expected or untracked:
               raise SystemExit(
-                  f"refusing unexpected commit state: tracked={actual}, untracked={untracked}"
+                  f"refusing unexpected commit state: tracked={tracked}, untracked={untracked}"
               )
           PY
           git config user.name "agent-canon-validation"
@@ -237,3 +238,4 @@ jobs:
           git add tests/tools/test_check_github_workflows.py tests/tools/test_container_runtime.py
           git commit -m "test: complete parent-boundary fixture isolation"
           git push origin HEAD:canon/parent-bounded-side-effects-20260810
+          test -z "$(git status --porcelain)"
