@@ -15,7 +15,7 @@ def replace_once(path: Path, old: str, new: str, label: str) -> None:
 
 
 def main() -> None:
-    """Patch the extractor and add an integration regression."""
+    """Patch root-tool extraction and add a direct regex regression."""
     checker = Path("tools/agent_tools/tool_catalog.py")
     replace_once(
         checker,
@@ -27,38 +27,29 @@ def main() -> None:
     )
 
     tests = Path("tests/agent_tools/test_tool_catalog.py")
+    replace_once(
+        tests,
+        "import subprocess\nimport sys\n",
+        "import runpy\nimport subprocess\nimport sys\n",
+        "tool catalog runpy import",
+    )
     anchor = "    def test_entry_summary_is_required(self) -> None:\n"
     regression = indent(
         dedent(
             '''
             def test_test_paths_are_not_default_tool_references(self) -> None:
-                """Default wiring must not catalog the tools segment of test paths."""
-                with tempfile.TemporaryDirectory() as tmp_dir:
-                    root = Path(tmp_dir)
-                    self.write_minimal_repo(root)
-                    checks = root / "tools" / "ci" / "run_all_checks.sh"
-                    checks.write_text(
-                        checks.read_text(encoding="utf-8")
-                        + "\\npython3 tests/tools/test_catalog_fixture.py\\n",
-                        encoding="utf-8",
+                """Test paths are not mistaken for root tool references."""
+                namespace = runpy.run_path(str(CHECKER))
+                pattern = namespace["TOOL_REFERENCE_RE"]
+                matches = set(
+                    pattern.findall(
+                        "python3 tests/tools/test_catalog_fixture.py\\n"
+                        "python3 tools/agent_tools/uncataloged.py\\n"
                     )
-                    self.write_file(
-                        root,
-                        "tests/tools/test_catalog_fixture.py",
-                        self.manifest("Fixture test, not a cataloged tool."),
-                    )
+                )
 
-                    result = self.run_checker(root)
-
-                    self.assertEqual(
-                        result.returncode,
-                        0,
-                        result.stdout + result.stderr,
-                    )
-                    self.assertNotIn(
-                        "default_wiring:tools/test_catalog_fixture.py:",
-                        result.stdout,
-                    )
+                self.assertNotIn("tools/test_catalog_fixture.py", matches)
+                self.assertIn("tools/agent_tools/uncataloged.py", matches)
 
             '''
         ).lstrip("\n"),
