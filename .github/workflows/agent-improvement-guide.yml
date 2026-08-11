@@ -1,25 +1,20 @@
 # @dependency-start
 # contract configuration
-# responsibility Generates bounded AgentCanon improvement guidance for selected PR paths and manual dispatch.
+# responsibility Generates bounded AgentCanon improvement guidance for its generator surface and manual dispatch.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR evidence rules
 # upstream implementation ../../tools/agent_tools/generate_agent_improvement_guide.py builds the guide
 # upstream implementation ../../tools/ci/checkout_agent_canon_submodule.sh checks out AgentCanon when this workflow is copied into template repos
 # @dependency-end
 
-# Standalone AgentCanon improvement guidance workflow. Derived repositories do
-# not run this guide for every push or pull request.
+# Standalone AgentCanon improvement guidance workflow. Derived repositories run
+# it automatically only when the guide generator surface changes.
 name: Agent Improvement Guide
 
 on:
   pull_request:
     paths:
-      - ".agents/**"
-      - ".codex/**"
-      - ".github/**"
-      - "agents/**"
-      - "documents/**"
-      - "templates/**"
-      - "tools/**"
+      - "tools/agent_tools/generate_agent_improvement_guide.py"
+      - "tests/agent_tools/test_generate_agent_improvement_guide.py"
   workflow_dispatch:
 
 permissions:
