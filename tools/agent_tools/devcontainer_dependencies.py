@@ -95,6 +95,31 @@ HEX_RE = re.compile(r"^[0-9a-fA-F]+$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 ACTIVE_SOURCE_IDENTITY = "active-source"
+CANONICAL_SNAPSHOT_IDENTITY = "canonical-snapshot"
+RUSTUP_INIT_VERSION = "1.28.2"
+RUSTUP_INIT_URL = (
+    "https://static.rust-lang.org/rustup/archive/1.28.2/"
+    "x86_64-unknown-linux-gnu/rustup-init"
+)
+RUSTUP_INIT_SHA256 = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c"
+CANONICAL_RUST_SOURCE_FILES = (
+    "Cargo.lock", "Cargo.toml", "src/dependency_manifest.rs", "src/docs.rs",
+    "src/graph.rs", "src/jit_ir_to_lean.rs", "src/main.rs", "src/memory.rs",
+    "src/migration_audit.rs", "src/python_algorithm_contract.rs",
+    "src/python_module_groups.rs", "src/python_structure_hash.rs",
+    "src/python_structure_hash_impact.rs", "src/python_structure_hash_report.rs",
+    "src/python_structure_hash_scope_plan.rs", "src/rust_migration_plan.rs",
+    "src/semantic_index/args.rs", "src/semantic_index/cli.rs",
+    "src/semantic_index/embedding.rs", "src/semantic_index/eval.rs",
+    "src/semantic_index/mod.rs", "src/semantic_index/model.rs",
+    "src/semantic_index/pipeline.rs", "src/semantic_index/query.rs",
+    "src/semantic_index/relations.rs", "src/semantic_index/report.rs",
+    "src/semantic_index/source.rs", "src/semantic_index/storage.rs",
+    "src/semantic_index/tests.rs", "src/structured_analysis.rs",
+    "src/test_design.rs", "tests/python_algorithm_contract_cli.rs",
+)
+CANONICAL_RUST_SOURCE_SHA256 = "6084cc155d0166cb06e661a07cae7a0630c34df21ee7e9d4c6816d875ec5d15c"
+CANONICAL_CARGO_LOCK_SHA256 = "060b8825843b14b12bebb9da095503f4ec7f68a77934e595c082957cb1f72638"
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 APT_PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
 NPM_PACKAGE_RE = re.compile(r"^(?:@[a-z0-9._~-]+/[a-z0-9._~-]+|[a-z0-9._~-]+)$")
@@ -126,6 +151,7 @@ BASE_CAPABILITIES = frozenset(
         "tar",
         "tomli",
         "tomllib",
+        "rustup-init",
         "xz-utils",
     }
 )
@@ -153,7 +179,14 @@ IMAGE_DEPENDENCIES_ROOT = Path("/usr/local/share/agent-canon/image-dependencies"
 IMAGE_PLAN_SCHEMA = "agent-canon.devcontainer-image-dependencies"
 IMAGE_PLAN_SCHEMA_VERSION = 1
 IMAGE_INSTALL_METHODS = frozenset(
-    {"apt-package", "apt-repository", "npm-global", "release-asset"}
+    {
+        "apt-package",
+        "apt-repository",
+        "npm-global",
+        "release-asset",
+        "rust-toolchain",
+        "cargo-source-build",
+    }
 )
 IMAGE_DIRECTORY_MODE = 0o555
 IMAGE_FILE_MODE = 0o444
@@ -520,6 +553,8 @@ class DependencyRecord:
     repo: str | None = None
     commit: str | None = None
     source_identity: str | None = None
+    source_tree_sha256: str | None = None
+    cargo_lock_sha256: str | None = None
     locked: bool | None = None
     browser: str | None = None
     browser_cache_path: str | None = None
@@ -1029,6 +1064,8 @@ def _validate_method_fields(
             "commit",
             "source_identity",
             "locked",
+            "source_tree_sha256",
+            "cargo_lock_sha256",
         },
         Method.BROWSER_INSTALL: {"browser", "browser_cache_path"},
     }
@@ -1189,9 +1226,25 @@ def _validate_method_values(record: DependencyRecord) -> None:
             )
         assert record.repo is not None
         _validate_https_url(record.repo, f"{record.id}.repo")
-        if record.source_identity is not None and record.source_identity != ACTIVE_SOURCE_IDENTITY:
+        if record.source_identity is not None and record.source_identity not in {
+            ACTIVE_SOURCE_IDENTITY,
+            CANONICAL_SNAPSHOT_IDENTITY,
+        }:
             raise DependencyError(
-                f"{record.id}.source_identity must be {ACTIVE_SOURCE_IDENTITY!r}"
+                f"{record.id}.source_identity must be one of active-source or canonical-snapshot"
+            )
+        if record.source_identity == CANONICAL_SNAPSHOT_IDENTITY:
+            for field_name, value in (
+                ("source_tree_sha256", record.source_tree_sha256),
+                ("cargo_lock_sha256", record.cargo_lock_sha256),
+            ):
+                if value is None or SHA256_RE.fullmatch(value) is None:
+                    raise DependencyError(
+                        f"{record.id}.{field_name} is required for canonical-snapshot"
+                    )
+        elif record.source_tree_sha256 is not None or record.cargo_lock_sha256 is not None:
+            raise DependencyError(
+                f"{record.id}: source snapshot digests require canonical-snapshot"
             )
         if record.commit is not None and COMMIT_RE.fullmatch(record.commit) is None:
             raise DependencyError(f"{record.id}.commit must be a full 40-hex commit")
@@ -1256,6 +1309,8 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         "repo",
         "commit",
         "source_identity",
+        "source_tree_sha256",
+        "cargo_lock_sha256",
         "locked",
         "browser",
         "browser_cache_path",
@@ -1369,6 +1424,12 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         commit=_optional_string(raw.get("commit"), f"{record_id}.commit"),
         source_identity=_optional_string(
             raw.get("source_identity"), f"{record_id}.source_identity"
+        ),
+        source_tree_sha256=_optional_string(
+            raw.get("source_tree_sha256"), f"{record_id}.source_tree_sha256"
+        ),
+        cargo_lock_sha256=_optional_string(
+            raw.get("cargo_lock_sha256"), f"{record_id}.cargo_lock_sha256"
         ),
         locked=raw.get("locked") if "locked" in raw else None,
         browser=_optional_string(raw.get("browser"), f"{record_id}.browser"),
@@ -1586,6 +1647,9 @@ def merge_records(manifests: Sequence[LoadedManifest]) -> tuple[DependencyRecord
                 "repo",
                 "commit",
                 "locked",
+                "source_identity",
+                "source_tree_sha256",
+                "cargo_lock_sha256",
                 "browser",
                 "browser_cache_path",
             )
@@ -1818,6 +1882,22 @@ def _image_owner(production: bool) -> tuple[int, int]:
     return os.geteuid(), os.getegid()
 
 
+def _image_record_is_safe(record: DependencyRecord) -> bool:
+    """Return whether one validated record is immutable enough for an image."""
+    if record.method.value not in IMAGE_INSTALL_METHODS:
+        return False
+    if record.method is Method.CARGO_SOURCE_BUILD:
+        return (
+            record.locked is True
+            and record.source_identity == CANONICAL_SNAPSHOT_IDENTITY
+            and record.source_tree_sha256 is not None
+            and SHA256_RE.fullmatch(record.source_tree_sha256) is not None
+            and record.cargo_lock_sha256 is not None
+            and SHA256_RE.fullmatch(record.cargo_lock_sha256) is not None
+        )
+    return True
+
+
 def _lstat_image_path(path: Path, *, description: str) -> os.stat_result:
     """Read one image path without following symlinks."""
     try:
@@ -2004,10 +2084,17 @@ def image_install_plan(
     records: Sequence[str] | str | None = None,
     runner: CommandRunner | None = None,
     identity: RuntimeIdentity | None = None,
+    final_binary_dir: Path | None = None,
     _test_image_root: Path | None = None,
 ) -> tuple[str, ...]:
     """Build and publish an immutable image dependency plan and receipts."""
     target, production = _image_target(_test_image_root, require_root=True)
+    if (
+        production
+        and final_binary_dir is not None
+        and final_binary_dir.resolve() != Path("/usr/local/bin")
+    ):
+        raise DependencyError("image final binary directory is not /usr/local/bin")
     if os.path.lexists(target):
         raise DependencyError(
             f"image dependency root already exists; rebuild-required: {target}"
@@ -2017,7 +2104,7 @@ def image_install_plan(
     image_unsafe = [
         record_id
         for record_id in selected_ids
-        if by_id[record_id].method.value not in IMAGE_INSTALL_METHODS
+        if not _image_record_is_safe(by_id[record_id])
     ]
     if image_unsafe:
         raise DependencyError(
@@ -2048,11 +2135,20 @@ def image_install_plan(
     ) as temporary:
         staging = Path(temporary)
         receipts = staging / "receipts"
-        completed = Installer(runner).install(
+        completed = Installer(
+            runner,
+            image_owned=production,
+            image_owned_root=target.parent if production else None,
+        ).install(
             plan,
             workspace=workspace,
             receipts=receipts,
             records=selected_ids,
+            final_binary_dir=(
+                (final_binary_dir or Path("/usr/local/bin"))
+                if production
+                else None
+            ),
         )
         expected = set(selected_ids)
         if set(completed) != expected:
@@ -2157,13 +2253,16 @@ def image_verify_plan(
                 f"image-verify rebuild-required: stale receipt: {record_id}"
             )
         try:
-            installer.verify(
-                record,
-                workspace=workspace,
-                expected_source_identity=Installer._receipt_source_identity(receipt),
-                strict_executables=True,
-                allow_network=False,
-            )
+            if production and record.method is Method.CARGO_SOURCE_BUILD:
+                installer._verify_final_binary_receipt(receipt_payload, record)
+            else:
+                installer.verify(
+                    record,
+                    workspace=workspace,
+                    expected_source_identity=Installer._receipt_source_identity(receipt),
+                    strict_executables=True,
+                    allow_network=False,
+                )
             bindings = receipt_payload.get("executable_bindings")
             if bindings and (
                 installer._executable_bindings(record, workspace=workspace) != bindings
@@ -2621,9 +2720,18 @@ def _expected_executable_path(record: DependencyRecord, executable: str) -> Path
 class Installer:
     """Execute a validated plan with per-record receipt semantics."""
 
-    def __init__(self, runner: CommandRunner | None = None) -> None:
+    def __init__(
+        self,
+        runner: CommandRunner | None = None,
+        *,
+        image_owned: bool = False,
+        image_owned_root: Path | None = None,
+    ) -> None:
         self.runner = runner or SubprocessRunner()
         self._parent_attestation: ParentRootAttestationReceipt | None = None
+        self._image_owned = image_owned
+        self._image_owned_root = image_owned_root.resolve() if image_owned_root else None
+        self._install_workspace: Path | None = None
 
     def _path_is_regular_executable(self, path: Path) -> bool:
         """Check one resolved target, allowing deterministic runner fixtures."""
@@ -2723,6 +2831,92 @@ class Installer:
         path = _current_executable_path(record, executable)
         return path, path
 
+    def _cargo_binary_path(
+        self,
+        record: DependencyRecord,
+        *,
+        source: Path | None = None,
+        workspace: Path | None = None,
+    ) -> Path:
+        """Resolve a Cargo verification binary in the configured build target."""
+        spec = record.verification
+        if spec.path is None:
+            raise DependencyError(f"{record.id}: cargo verification path is missing")
+        relative = Path(spec.path)
+        if (
+            relative.is_absolute()
+            or len(relative.parts) < 2
+            or relative.parts[0] != "target"
+            or any(part in {"", ".", ".."} for part in relative.parts)
+        ):
+            raise DependencyError(f"{record.id}: cargo binary path is unsafe")
+        if source is None:
+            if workspace is None:
+                raise DependencyError(f"{record.id}: Cargo source workspace is missing")
+            source = self._cargo_source(record, workspace)
+        target_root = (
+            os.environ.get("AGENT_CANON_CARGO_TARGET_DIR")
+            if self._image_owned
+            else None
+        )
+        if target_root:
+            return (Path(target_root) / Path(*relative.parts[1:])).resolve()
+        return (source / relative).resolve()
+
+    def _publish_final_binary(
+        self,
+        record: DependencyRecord,
+        *,
+        workspace: Path,
+        final_binary_dir: Path,
+    ) -> Path:
+        """Install a verified Cargo binary into the immutable image PATH."""
+        if not self._image_owned or record.method is not Method.CARGO_SOURCE_BUILD:
+            raise DependencyError(
+                f"{record.id}: final binary publication is image Cargo-only"
+            )
+        final_dir = final_binary_dir.resolve()
+        if final_dir != Path("/usr/local/bin"):
+            raise DependencyError(
+                f"{record.id}: final binary directory is not the image PATH"
+            )
+        source = self._cargo_source(record, workspace)
+        binary = self._cargo_binary_path(record, source=source)
+        if not binary.is_file() or not os.access(binary, os.X_OK):
+            raise DependencyError(f"{record.id}: Cargo build binary is missing: {binary}")
+        name = Path(record.verification.path or "").name
+        if not name or name in {".", ".."}:
+            raise DependencyError(f"{record.id}: final binary name is unsafe")
+        final_binary = final_dir / name
+        self._run(
+            ["install", "-m", "0555", str(binary), str(final_binary)],
+            workspace=workspace,
+            privileged=True,
+        )
+        return final_binary
+
+    @staticmethod
+    def _verify_final_binary_receipt(
+        payload: Mapping[str, Any], record: DependencyRecord
+    ) -> None:
+        """Verify the image-owned final binary bound by a Cargo receipt."""
+        spec_path = record.verification.path
+        if spec_path is None:
+            raise DependencyError(f"{record.id}: Cargo verification path is missing")
+        expected = Path("/usr/local/bin") / Path(spec_path).name
+        final_value = payload.get("binary_path")
+        digest = payload.get("binary_sha256")
+        if final_value != str(expected) or not isinstance(digest, str) or not SHA256_RE.fullmatch(digest):
+            raise DependencyError(f"{record.id}: final binary receipt binding is malformed")
+        final_binary = Path(final_value)
+        if final_binary.is_symlink() or not final_binary.is_file() or not os.access(final_binary, os.X_OK):
+            raise DependencyError(f"{record.id}: final image binary is missing: {final_binary}")
+        observed = hashlib.sha256(final_binary.read_bytes()).hexdigest()
+        if observed != digest:
+            raise DependencyError(
+                f"{record.id}: final image binary digest mismatch {observed}!={digest}"
+            )
+
     def dry_run(self, plan: DependencyPlan) -> dict[str, Any]:
         """Return planned actions without network, package, or filesystem installs."""
         by_id = plan.by_id()
@@ -2752,20 +2946,36 @@ class Installer:
         workspace: Path,
         receipts: Path,
         records: Sequence[str] | None = None,
+        final_binary_dir: Path | None = None,
     ) -> tuple[str, ...]:
         """Install records in order, resuming only after live receipt verification."""
-        self._parent_attestation = _parent_attestation(workspace, "dependency-install")
-        try:
-            receipts = resolve_parent_owned_path(
-                self._parent_attestation, receipts, "dependency-receipts", create=False
+        self._install_workspace = workspace.resolve()
+        if self._image_owned:
+            if self._image_owned_root is None:
+                raise DependencyError("image-owned install requires an image root")
+            image_root = self._image_owned_root
+            try:
+                receipts = receipts.resolve()
+                receipts.relative_to(image_root)
+            except (OSError, ValueError) as exc:
+                raise DependencyError(
+                    "image-owned receipts must remain under the image root"
+                ) from exc
+            receipts.mkdir(parents=True, exist_ok=True)
+            self._parent_attestation = None
+        else:
+            self._parent_attestation = _parent_attestation(workspace, "dependency-install")
+            try:
+                receipts = resolve_parent_owned_path(
+                    self._parent_attestation, receipts, "dependency-receipts", create=False
+                ).physical_path
+            except ParentRootSideEffectError as exc:
+                raise DependencyError(
+                    f"parent-root-path:{exc.reject.value}:{exc.detail}"
+                ) from exc
+            receipts = ensure_parent_owned_directory(
+                self._parent_attestation, receipts, "dependency-receipts"
             ).physical_path
-        except ParentRootSideEffectError as exc:
-            raise DependencyError(
-                f"parent-root-path:{exc.reject.value}:{exc.detail}"
-            ) from exc
-        receipts = ensure_parent_owned_directory(
-            self._parent_attestation, receipts, "dependency-receipts"
-        ).physical_path
         completed: list[str] = []
         by_id = plan.by_id()
         order = tuple(records) if records is not None else plan.order
@@ -2774,6 +2984,12 @@ class Installer:
             raise DependencyError(
                 "selected dependency records are not in the plan: "
                 + ", ".join(unknown)
+            )
+        if self._image_owned and final_binary_dir is None and any(
+            by_id[record_id].method is Method.CARGO_SOURCE_BUILD for record_id in order
+        ):
+            raise DependencyError(
+                "image-owned Cargo install requires a final binary directory"
             )
         unavailable: set[str] = set()
         for record_id in order:
@@ -2845,8 +3061,23 @@ class Installer:
                     executable_bindings = self._executable_bindings(
                         record, workspace=workspace
                     )
+                    final_binary_path = None
+                    if (
+                        final_binary_dir is not None
+                        and record.method is Method.CARGO_SOURCE_BUILD
+                    ):
+                        final_binary_path = self._publish_final_binary(
+                            record,
+                            workspace=workspace,
+                            final_binary_dir=final_binary_dir,
+                        )
                     self._write_receipt(
-                        receipt, plan, record, source_identity, executable_bindings
+                        receipt,
+                        plan,
+                        record,
+                        source_identity,
+                        executable_bindings,
+                        final_binary_path=final_binary_path,
                     )
             except Exception as exc:
                 receipt.unlink(missing_ok=True)
@@ -2904,6 +3135,8 @@ class Installer:
             == _repository_packages_payload(record)
             and payload.get("repository_package")
             == _repository_package_payload(record)
+            and payload.get("source_tree_sha256") == record.source_tree_sha256
+            and payload.get("cargo_lock_sha256") == record.cargo_lock_sha256
             and (
                 record.method is not Method.CARGO_SOURCE_BUILD
                 or isinstance(payload.get("source_identity"), str)
@@ -2980,7 +3213,15 @@ class Installer:
         record: DependencyRecord,
         source_identity: str | None = None,
         executable_bindings: Mapping[str, Mapping[str, str]] | None = None,
+        *,
+        final_binary_path: Path | None = None,
     ) -> None:
+        if (
+            source_identity is None
+            and record.method is Method.CARGO_SOURCE_BUILD
+            and record.source_identity == CANONICAL_SNAPSHOT_IDENTITY
+        ):
+            source_identity = record.source_identity
         payload = {
             "schema": "agent-canon.devcontainer-dependency-receipt",
             "status": "pass",
@@ -3001,6 +3242,58 @@ class Installer:
         repository_package = _repository_package_payload(record)
         if repository_package is not None:
             payload["repository_package"] = repository_package
+        if record.method is Method.CARGO_SOURCE_BUILD and record.source_identity == CANONICAL_SNAPSHOT_IDENTITY:
+            source = self._cargo_source(
+                record,
+                self._install_workspace
+                or (
+                    self._parent_attestation.parent_root
+                    if self._parent_attestation
+                    else Path.cwd()
+                ),
+            )
+            source_digest, lock_digest = self._cargo_snapshot(source)
+            assert record.verification.path is not None
+            binary = self._cargo_binary_path(record, source=source)
+            binary_path = final_binary_path or binary
+            payload.update(
+                {
+                    "source_tree_sha256": source_digest,
+                    "cargo_lock_sha256": lock_digest,
+                    "binary_path": str(binary_path),
+                    "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+                    "rustup_init_version": RUSTUP_INIT_VERSION,
+                    "rustup_init_sha256": RUSTUP_INIT_SHA256,
+                }
+            )
+            if final_binary_path is not None:
+                payload["build_binary_path"] = str(binary)
+        content = (json.dumps(payload, sort_keys=True, indent=2) + "\n").encode(
+            "utf-8"
+        )
+        if self._image_owned:
+            if self._image_owned_root is None:
+                raise DependencyError("image-owned receipt publication lacks an image root")
+            try:
+                path = path.resolve()
+                path.relative_to(self._image_owned_root)
+            except (OSError, ValueError) as exc:
+                raise DependencyError(
+                    "image-owned receipt escaped the image root"
+                ) from exc
+            path.parent.mkdir(parents=True, exist_ok=True)
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{path.name}.", dir=path.parent
+            )
+            os.close(descriptor)
+            temporary = Path(temporary_name)
+            try:
+                temporary.write_bytes(content)
+                temporary.chmod(0o600)
+                os.replace(temporary, path)
+            finally:
+                temporary.unlink(missing_ok=True)
+            return
         if self._parent_attestation is None:
             raise DependencyError(
                 "parent-root-attestation is required before receipt publication"
@@ -3014,9 +3307,7 @@ class Installer:
             )
             ParentRootSideEffectBoundary().atomic_publish(
                 receipt,
-                (json.dumps(payload, sort_keys=True, indent=2) + "\n").encode(
-                    "utf-8"
-                ),
+                content,
             )
         except ParentRootSideEffectError as exc:
             raise DependencyError(
@@ -3058,31 +3349,30 @@ class Installer:
         )
         cargo_home = merged.get(
             "CARGO_HOME",
-            str(home / ".cargo") if home_is_parent_owned
-            else str(parent_root / ".agent-canon" / "cache" / "cargo-home")
+            str(parent_root / ".agent-canon" / "cargo-home")
             if parent_root is not None
             else str(home / ".cargo"),
         )
         rustup_home = merged.get(
             "RUSTUP_HOME",
             str(home / ".rustup") if home_is_parent_owned
-            else str(parent_root / ".agent-canon" / "cache" / "rustup-home")
+            else str(parent_root / ".agent-canon" / "rustup-home")
             if parent_root is not None
             else str(home / ".rustup"),
         )
         elan_home = merged.get(
             "ELAN_HOME",
             str(home / ".elan") if home_is_parent_owned
-            else str(parent_root / ".agent-canon" / "cache" / "elan-home")
+            else str(parent_root / ".agent-canon" / "elan-home")
             if parent_root is not None
             else str(home / ".elan"),
         )
         path_entries = list(filter(None, merged.get("PATH", "").split(os.pathsep)))
         tool_paths = (
-            f"{cargo_home}/bin",
+            str(home / ".cargo" / "bin") if home_is_parent_owned else f"{cargo_home}/bin",
             f"{elan_home}/bin",
             str(home / ".local" / "bin") if home_is_parent_owned
-            else str(parent_root / ".agent-canon" / "cache" / "local-bin")
+            else str(parent_root / ".agent-canon" / "local-bin")
             if parent_root is not None
             else str(home / ".local" / "bin"),
         )
@@ -3280,6 +3570,8 @@ class Installer:
             )
         elif method is Method.CARGO_SOURCE_BUILD:
             source = self._cargo_source(record, workspace)
+            if record.source_identity == CANONICAL_SNAPSHOT_IDENTITY:
+                self._verify_canonical_snapshot(record, workspace)
             source_identity_before = None
             if record.commit is not None:
                 source_identity_before = self._cargo_source_identity(
@@ -3295,7 +3587,16 @@ class Installer:
                     str(source / "Cargo.toml"),
                 ],
                 workspace=workspace,
-                env=self._with_tool_paths({"CARGO_TARGET_DIR": str(source / "target")}),
+                env=self._with_tool_paths(
+                    {
+                        "CARGO_TARGET_DIR": (
+                            os.environ.get("AGENT_CANON_CARGO_TARGET_DIR")
+                            if self._image_owned
+                            else None
+                        )
+                        or str(source / "target")
+                    }
+                ),
             )
             if source_identity_before is not None:
                 source_identity_after = self._cargo_source_identity(
@@ -3306,6 +3607,8 @@ class Installer:
                         f"{record.id}: source identity changed during build "
                         f"{source_identity_before}!={source_identity_after}"
                     )
+            if record.source_identity == CANONICAL_SNAPSHOT_IDENTITY:
+                self._verify_canonical_snapshot(record, workspace)
         elif method is Method.BROWSER_INSTALL:
             assert record.browser is not None
             assert record.browser_cache_path is not None
@@ -3678,10 +3981,12 @@ class Installer:
             ),
         )
         for tool in tools:
-            self._capture(
+            result = self._capture(
                 ["rustup", "run", record.version, tool, "--version"],
                 workspace=workspace,
             )
+            if tool == "rust-analyzer":
+                self._require_output(result, f"rust-analyzer {record.version}", record.id)
 
     @staticmethod
     def _rust_toolchain_matches(line: str, version: str) -> bool:
@@ -3713,17 +4018,71 @@ class Installer:
         # A vendored AgentCanon checkout is the canonical source in a derived
         # parent. Resolve it before considering the standalone layout so a
         # stale parent-root copy cannot win merely because it exists.
-        if vendor_root.is_dir():
+        source_projection = workspace_root.parent / "agent-canon-source" / record.source
+        if source_projection.is_dir():
+            source = source_projection.resolve()
+        elif vendor_root.is_dir():
             source = (vendor_root / record.source).resolve()
         else:
             source = standalone_source.resolve()
-        if os.path.commonpath((str(workspace_root), str(source))) != str(
-            workspace_root
+        allowed_roots = [workspace_root]
+        if source_projection.is_dir():
+            allowed_roots.append(source_projection.parent.parent.resolve())
+        if not any(
+            os.path.commonpath((str(root), str(source))) == str(root)
+            for root in allowed_roots
         ):
             raise DependencyError(f"{record.id}: cargo source escapes workspace")
         if not source.is_dir():
             raise DependencyError(f"{record.id}: cargo source is missing: {source}")
         return source
+
+    @staticmethod
+    def _cargo_snapshot(source: Path) -> tuple[str, str]:
+        """Verify the closed canonical source inventory and return its digests."""
+        expected: set[str] = set(CANONICAL_RUST_SOURCE_FILES)
+        for relative in CANONICAL_RUST_SOURCE_FILES:
+            path = source / relative
+            if path.is_symlink() or not path.is_file():
+                raise DependencyError(f"cargo source snapshot file is missing: {relative}")
+        actual = {
+            path.relative_to(source).as_posix()
+            for path in source.rglob("*")
+            if path.is_file() and not path.is_symlink()
+            and "target" not in path.relative_to(source).parts
+            and ".git" not in path.relative_to(source).parts
+        }
+        if actual != expected:
+            missing = sorted(expected - actual)
+            extra = sorted(actual - expected)
+            raise DependencyError(
+                f"cargo source snapshot inventory mismatch: missing={missing} extra={extra}"
+            )
+        digest = hashlib.sha256()
+        for relative in sorted(CANONICAL_RUST_SOURCE_FILES):
+            blob = hashlib.sha256((source / relative).read_bytes()).hexdigest()
+            digest.update(relative.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(blob.encode("ascii"))
+            digest.update(b"\0")
+        cargo_lock = hashlib.sha256((source / "Cargo.lock").read_bytes()).hexdigest()
+        return digest.hexdigest(), cargo_lock
+
+    def _verify_canonical_snapshot(
+        self, record: DependencyRecord, workspace: Path
+    ) -> tuple[str, str]:
+        source = self._cargo_source(record, workspace)
+        source_digest, lock_digest = self._cargo_snapshot(source)
+        if (
+            source_digest != record.source_tree_sha256
+            or lock_digest != record.cargo_lock_sha256
+        ):
+            raise DependencyError(
+                f"{record.id}: immutable source snapshot mismatch "
+                f"{source_digest}!={record.source_tree_sha256} or "
+                f"{lock_digest}!={record.cargo_lock_sha256}"
+            )
+        return source_digest, lock_digest
 
     def _cargo_source_identity(
         self,
@@ -3776,11 +4135,19 @@ class Installer:
         spec = record.verification
         assert spec.path is not None and spec.output_contains is not None
         source = self._cargo_source(record, workspace)
+        if record.source_identity == CANONICAL_SNAPSHOT_IDENTITY:
+            self._verify_canonical_snapshot(record, workspace)
         if record.commit is not None:
             self._cargo_source_identity(record, workspace, source=source)
-        binary = (source / spec.path).resolve()
-        if os.path.commonpath((str(source), str(binary))) != str(source):
-            raise DependencyError(f"{record.id}: cargo binary escapes source")
+        binary = self._cargo_binary_path(record, source=source)
+        configured_target = (
+            os.environ.get("AGENT_CANON_CARGO_TARGET_DIR")
+            if self._image_owned
+            else None
+        )
+        allowed_root = Path(configured_target or source / "target").resolve()
+        if os.path.commonpath((str(allowed_root), str(binary))) != str(allowed_root):
+            raise DependencyError(f"{record.id}: cargo binary escapes its target")
         if not binary.is_file() or not os.access(binary, os.X_OK):
             raise DependencyError(f"{record.id}: cargo binary is missing: {binary}")
         result = self._capture([str(binary), *spec.args], workspace=workspace)
@@ -4101,7 +4468,12 @@ def resolve_verified_executable(
     ):
         raise DependencyError(f"{record_id}: executable receipt binding is stale")
     installer = Installer()
-    installer.verify(record, workspace=workspace, strict_executables=True)
+    installer.verify(
+        record,
+        workspace=workspace,
+        strict_executables=True,
+        allow_network=False,
+    )
     live_bindings = installer._executable_bindings(record, workspace=workspace)
     live = live_bindings.get(executable)
     if live is None:
@@ -4160,6 +4532,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--workspace", default=".")
     parser.add_argument("--vendor-root")
     parser.add_argument("--receipts")
+    parser.add_argument(
+        "--final-binary-dir",
+        help="image-owned destination directory for built Cargo binaries",
+    )
     parser.add_argument("--extras", default="")
     parser.add_argument(
         "--records",
@@ -4217,6 +4593,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                         plan,
                         workspace=workspace,
                         records=selected_records,
+                        final_binary_dir=(
+                            Path(args.final_binary_dir).resolve()
+                            if args.final_binary_dir
+                            else None
+                        ),
                     )
                     payload = {
                         "status": "pass",

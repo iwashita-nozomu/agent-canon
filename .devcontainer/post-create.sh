@@ -64,8 +64,13 @@ python3 "$agent_canon_root/tools/agent_tools/devcontainer_dependencies.py" \
 
 runtime_root="${AGENT_CANON_RUNTIME_ROOT:-/var/lib/agent-canon/runtime}"
 image_root="${AGENT_CANON_IMAGE_DEPENDENCIES_ROOT:-/usr/local/share/agent-canon/image-dependencies}"
+image_receipt_root="${AGENT_CANON_IMAGE_DEPENDENCIES_RECEIPT_ROOT:-$image_root/receipts}"
 [ -d "$runtime_root" ] && [ -r "$runtime_root" ] || {
   echo "post-create runtime readback failed: runtime root is unavailable: $runtime_root" >&2
+  exit 1
+}
+[ -d "$image_receipt_root" ] && [ -r "$image_receipt_root" ] || {
+  echo "post-create image receipt readback failed: receipt root is unavailable: $image_receipt_root" >&2
   exit 1
 }
 [ -d "$image_root" ] && [ -r "$image_root" ] || {
@@ -83,12 +88,13 @@ rm -f -- "$workspace_write_probe"
 workspace_write_probe=""
 
 echo "DEVCONTAINER_IMAGE_DEPENDENCIES_ROOT=$image_root"
+echo "DEVCONTAINER_IMAGE_DEPENDENCIES_RECEIPT_ROOT=$image_receipt_root"
 echo "AGENT_CANON_RUNTIME_ROOT=$runtime_root"
 echo "AGENT_CANON_CONTAINER_USER=$expected_runtime_user"
 echo "AGENT_CANON_RUNTIME_UID=$runtime_uid"
 echo "AGENT_CANON_RUNTIME_GID=$runtime_gid"
 echo "AGENT_CANON_RUNTIME_HOME=$HOME"
-for tool in node npm npx corepack codex gh jq tree clang-format clangd-18 pyright pyright-langserver bash-language-server; do
+for tool in node npm npx corepack codex gh jq tree clang-format clangd-18 pyright pyright-langserver bash-language-server rust-analyzer agent-canon; do
   if command -v "$tool" >/dev/null 2>&1; then
     echo "DEVCONTAINER_TOOL_READBACK=$tool:available"
   else

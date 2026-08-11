@@ -53,19 +53,27 @@ while [[ $# -gt 0 ]]; do
 done
 
 ROOT_DIR="$(realpath -m "$ROOT_DIR")"
+TEMP_ROOT="${AGENT_CANON_PARENT_TMPDIR:-$ROOT_DIR/.agent-canon/tmp}/dependency-graph"
+ROOT_REAL="$(realpath -m "$ROOT_DIR")"
+TEMP_REAL="$(realpath -m "$TEMP_ROOT")"
+case "$TEMP_REAL/" in
+  "$ROOT_REAL/"*) ;;
+  *) echo "DEPENDENCY_GRAPH=fail reason=temp-root-outside-parent" >&2; exit 1 ;;
+esac
+mkdir -p "$TEMP_ROOT"
 if [[ -x "$ROOT_DIR/vendor/agent-canon/tools/bin/agent-canon" ]]; then
   GRAPH_CLI="$ROOT_DIR/vendor/agent-canon/tools/bin/agent-canon"
 else
   GRAPH_CLI="$ROOT_DIR/tools/bin/agent-canon"
 fi
 
-status_file="$(mktemp)"
-query_file="$(mktemp)"
-all_edges="$(mktemp)"
-edges_file="$(mktemp)"
-manifest_files="$(mktemp)"
-selected_file="$(mktemp)"
-scope_file="$(mktemp)"
+status_file="$(mktemp "$TEMP_ROOT/status.XXXXXX")"
+query_file="$(mktemp "$TEMP_ROOT/query.XXXXXX")"
+all_edges="$(mktemp "$TEMP_ROOT/all-edges.XXXXXX")"
+edges_file="$(mktemp "$TEMP_ROOT/edges.XXXXXX")"
+manifest_files="$(mktemp "$TEMP_ROOT/manifest.XXXXXX")"
+selected_file="$(mktemp "$TEMP_ROOT/selected.XXXXXX")"
+scope_file="$(mktemp "$TEMP_ROOT/scope.XXXXXX")"
 trap 'rm -f "$status_file" "$query_file" "$all_edges" "$edges_file" "$manifest_files" "$selected_file" "$scope_file"' EXIT
 
 set +e
@@ -147,6 +155,11 @@ if [[ "$PRINT_EDGES" -eq 1 ]]; then
   cat "$edges_file"
 fi
 if [[ -n "$GRAPH_TSV_OUTPUT" ]]; then
+  graph_output_real="$(realpath -m "$GRAPH_TSV_OUTPUT")"
+  case "$graph_output_real/" in
+    "$ROOT_REAL/"*) ;;
+    *) echo "DEPENDENCY_GRAPH=fail reason=graph-output-outside-parent" >&2; exit 1 ;;
+  esac
   mkdir -p "$(dirname "$GRAPH_TSV_OUTPUT")"
   {
     printf 'direction\tkind\tsource\ttarget\n'

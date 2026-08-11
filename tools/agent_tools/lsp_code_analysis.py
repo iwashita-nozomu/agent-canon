@@ -45,6 +45,9 @@ DEFAULT_TIMEOUT_SECONDS = 15.0
 DEFAULT_MAX_FRAME_BYTES = 16 * 1024 * 1024
 DEFAULT_STDERR_BYTES = 64 * 1024
 DEFAULT_MAX_HEADER_BYTES = 64 * 1024
+IMAGE_RECEIPT_ROOT = Path(
+    "/usr/local/share/agent-canon/image-dependencies/receipts"
+)
 
 
 class LspAnalysisError(RuntimeError):
@@ -221,7 +224,12 @@ class LspServerSpec:
             raise ServerUnavailable("manifest dependency resolver is unavailable") from exc
         workspace = root.resolve()
         vendor = vendor_root or (workspace / "vendor" / "agent-canon")
-        receipt_root = receipts or (workspace / ".agent-canon" / "dependency-receipts")
+        if receipts is not None:
+            receipt_root = receipts
+        elif IMAGE_RECEIPT_ROOT.is_dir():
+            receipt_root = IMAGE_RECEIPT_ROOT
+        else:
+            receipt_root = workspace / ".agent-canon" / "dependency-receipts"
         try:
             verified = resolve_verified_executable(
                 workspace,
@@ -1315,6 +1323,14 @@ def _legacy_lines(report: CodeAnalysisReport, root: Path, *, print_unresolved: b
 
 def _write_report_atomic(report: CodeAnalysisReport, root: Path, destination: Path) -> None:
     """Persist either complete or failed report before emitting legacy status."""
+    destination = destination if destination.is_absolute() else root / destination
+    destination = destination.resolve(strict=False)
+    try:
+        destination.relative_to(root.resolve())
+    except ValueError as exc:
+        raise PathEscape(
+            f"analysis report destination escapes selected root: {destination}"
+        ) from exc
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_name(destination.name + ".tmp")
     temporary.write_text(

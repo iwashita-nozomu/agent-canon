@@ -140,6 +140,12 @@ def test_nested_runner_xdg_state_allows_container_local_receipts(
     """Nested generated env lets post-create write receipts outside workspace HOME."""
     workspace = tmp_path / "workspace"
     workspace.mkdir()
+    subprocess.run(
+        ["git", "init", "--quiet", str(workspace)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
     pack = tmp_path / "pack.toml"
     pack.write_text(
         "\n".join(
@@ -201,8 +207,8 @@ def test_nested_runner_xdg_state_allows_container_local_receipts(
         str(workspace),
     )
     assert result.returncode == 0, result.stderr
-    xdg_state = Path(f"/tmp/agent-canon-xdg-state/{profile_name}")
-    assert f"-e XDG_STATE_HOME={xdg_state}" in result.stdout
+    xdg_state = workspace.parent / ".agent-canon-nested-xdg-state" / profile_name
+    assert "-e XDG_STATE_HOME=/workspace/.agent-canon/nested-xdg-state/" in result.stdout
     assert f"-e HOME=/workspace/.state/nested-codex/{profile_name}" in result.stdout
 
     post_create = workspace / "vendor/agent-canon/.devcontainer/post-create.sh"
@@ -308,7 +314,7 @@ def test_host_uid_setup_chowns_workspace_artifacts_before_setpriv() -> None:
     post_create = output.index(
         "bash /workspace/vendor/agent-canon/.devcontainer/post-create.sh /workspace"
     )
-    workspace_marker = output.index('workspace_marker="$(mktemp)"')
+    workspace_marker = output.index('workspace_marker="$(mktemp ')
     workspace_ownership = output.index(
         f"find -P /workspace -xdev -mindepth 1 -uid 0 -newer \"$workspace_marker\" "
         f"-exec chown -h {os.getuid()}:{os.getgid()} {{}} +",

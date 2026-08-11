@@ -727,6 +727,114 @@ class DependencyModelTests(unittest.TestCase):
                 )
             self.assertFalse(image_root.exists())
 
+    def test_image_safe_gate_accepts_only_immutable_rust_and_cargo_records(self) -> None:
+        """Image installs admit pinned Rust and canonical Cargo snapshots only."""
+        rust = parse_record(
+            record(
+                "rust-toolchain",
+                method="rust-toolchain",
+                version="1.89.0",
+                source="https://static.rust-lang.org/dist",
+                components=["rust-analyzer"],
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        cargo = parse_record(
+            record(
+                "agent-canon-cli",
+                method="cargo-source-build",
+                source="rust/agent-canon",
+                repo="https://github.com/example/agent-canon.git",
+                source_identity="canonical-snapshot",
+                source_tree_sha256="a" * 64,
+                cargo_lock_sha256="b" * 64,
+                locked=True,
+            ),
+            path=Path("fixture.toml"),
+            index=1,
+        )
+        active = parse_record(
+            record(
+                "active-cli",
+                method="cargo-source-build",
+                source="rust/agent-canon",
+                repo="https://github.com/example/agent-canon.git",
+                source_identity="active-source",
+                locked=True,
+            ),
+            path=Path("fixture.toml"),
+            index=2,
+        )
+
+        self.assertTrue(dependency_module._image_record_is_safe(rust))
+        self.assertTrue(dependency_module._image_record_is_safe(cargo))
+        self.assertFalse(dependency_module._image_record_is_safe(active))
+
+    def test_image_owned_full_plan_publishes_final_binary_only_for_cargo(self) -> None:
+        """Image final-binary publication does not run for apt or Rust records."""
+        apt = parse_record(
+            record("apt-tool", method="apt-package"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        rust = parse_record(
+            record(
+                "rust-toolchain",
+                method="rust-toolchain",
+                version="1.89.0",
+                source="https://static.rust-lang.org/dist",
+            ),
+            path=Path("fixture.toml"),
+            index=1,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (apt, rust)),))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            image_root = root / "image-layer"
+            installer = Installer(
+                FakeRunner(), image_owned=True, image_owned_root=image_root
+            )
+            with mock.patch.object(installer, "_publish_final_binary") as publish:
+                self.assertEqual(
+                    installer.install(
+                        plan,
+                        workspace=root,
+                        receipts=image_root / "receipts",
+                        final_binary_dir=Path("/usr/local/bin"),
+                    ),
+                    ("apt-tool", "rust-toolchain"),
+                )
+            publish.assert_not_called()
+
+            cargo = parse_record(
+                record(
+                    "agent-canon-cli",
+                    method="cargo-source-build",
+                    source="rust/agent-canon",
+                    repo="https://github.com/example/agent-canon.git",
+                    source_identity="canonical-snapshot",
+                    source_tree_sha256="a" * 64,
+                    cargo_lock_sha256="b" * 64,
+                    locked=True,
+                ),
+                path=Path("fixture.toml"),
+                index=2,
+            )
+            cargo_plan = build_plan(
+                (loaded_manifest(Path("fixture.toml"), (cargo,)),)
+            )
+            with self.assertRaisesRegex(
+                DependencyError, "requires a final binary directory"
+            ):
+                Installer(
+                    FakeRunner(), image_owned=True, image_owned_root=image_root
+                ).install(
+                    cargo_plan,
+                    workspace=root,
+                    receipts=image_root / "missing-receipts",
+                )
+
     def test_image_install_failure_does_not_publish_target_and_freezes_tree(self) -> None:
         parsed = parse_record(
             record("image-tool", method="apt-package"),
@@ -2518,6 +2626,8 @@ class DependencyModelTests(unittest.TestCase):
                 "tree",
                 "clang-format",
                 "clangd-language-server",
+                "rust-toolchain",
+                "agent-canon-cli",
             },
         )
         for removed in (
@@ -2529,9 +2639,7 @@ class DependencyModelTests(unittest.TestCase):
             "detect-secrets",
             "elan",
             "rustup-init",
-            "rust-toolchain",
             "lean-toolchain",
-            "agent-canon-cli",
             "pyyaml",
         ):
             self.assertNotIn(removed, ids)
@@ -3227,10 +3335,12 @@ class DependencyModelTests(unittest.TestCase):
                 encoding="utf-8",
             )
             cargo.chmod(0o755)
-            tools_home = root / "tools-home"
+            tools_home = parent / ".agent-canon" / "tools-home"
             environment = dict(os.environ)
             environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
             environment["AGENT_CANON_TOOLS_HOME"] = str(tools_home)
+            host_home = parent / "host-home"
+            environment["HOME"] = str(host_home)
             environment["AGENT_CANON_SKIP_USR_LOCAL_LINK"] = "1"
 
             accepted = subprocess.run(
@@ -3242,6 +3352,11 @@ class DependencyModelTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(accepted.returncode, 0, accepted.stdout + accepted.stderr)
+            self.assertIn(
+                f"AGENT_CANON_TOOL_REBUILD_CARGO_HOME={parent / '.agent-canon/cargo-home'}",
+                accepted.stdout,
+            )
+            self.assertFalse((host_home / ".cargo").exists())
             state = (tools_home / "agent-canon" / ".build-state").read_text(
                 encoding="utf-8"
             )
@@ -3442,7 +3557,9 @@ class DependencyModelTests(unittest.TestCase):
         tool_environment = runner.environments[cargo_build_index]
         self.assertIsNotNone(tool_environment)
         assert tool_environment is not None
-        self.assertEqual(tool_environment["CARGO_HOME"], f"{root}/.cargo")
+        self.assertEqual(
+            tool_environment["CARGO_HOME"], f"{root}/.agent-canon/cargo-home"
+        )
         self.assertEqual(tool_environment["RUSTUP_HOME"], f"{root}/.rustup")
         self.assertEqual(tool_environment["ELAN_HOME"], f"{root}/.elan")
         self.assertEqual(
@@ -3535,6 +3652,7 @@ class DependencyModelTests(unittest.TestCase):
         dockerfile = (ROOT / ".devcontainer" / "Dockerfile").read_text(
             encoding="utf-8"
         )
+        dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
         post_create = (ROOT / ".devcontainer" / "post-create.sh").read_text(
             encoding="utf-8"
         )
@@ -3544,7 +3662,21 @@ class DependencyModelTests(unittest.TestCase):
             dockerfile,
         )
         self.assertIn("COPY --from=node-provider /usr/local/lib/node_modules", dockerfile)
+        self.assertIn(
+            "COPY tools/agent_tools/parent_root_side_effects.py "
+            "/opt/agent-canon/tools/agent_tools/parent_root_side_effects.py",
+            dockerfile,
+        )
+        self.assertIn("!tools/agent_tools/parent_root_side_effects.py", dockerignore)
         self.assertIn("image-install --workspace /opt/agent-canon", dockerfile)
+        self.assertIn(
+            "CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo", dockerfile
+        )
+        self.assertIn(
+            "PATH=/usr/local/share/agent-canon/toolchains/cargo/bin:$PATH", dockerfile
+        )
+        self.assertIn("--final-binary-dir /usr/local/bin", dockerfile)
+        self.assertIn("rm -rf /opt/agent-canon /opt/agent-canon-source", dockerfile)
         self.assertIn("/usr/local/share/agent-canon/image-dependencies", dockerfile)
         self.assertIn("/etc/profile.d/agent-canon-tools.sh", dockerfile)
         self.assertIn("python3-pip", dockerfile)

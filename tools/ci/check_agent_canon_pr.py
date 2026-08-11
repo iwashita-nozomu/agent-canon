@@ -129,6 +129,14 @@ def main() -> int:
     parser.add_argument("--output", type=Path)
     parser.add_argument("--source-root", type=Path, required=True)
     args = parser.parse_args()
+    source_root = args.source_root.resolve()
+    output_root = (args.output or source_root).resolve()
+    try:
+        output_root.relative_to(source_root)
+    except ValueError as exc:
+        raise SystemExit(
+            "agent_canon_pr_gate:output must remain under source root"
+        ) from exc
     payload = json.loads(args.g1_bundle.read_text(encoding="utf-8"))
     values = payload.get("gate_verdicts") if isinstance(payload, dict) else None
     if not isinstance(values, list):
@@ -137,14 +145,14 @@ def main() -> int:
     g1_binding = cast(Mapping[str, object], g1["binding"])
     transaction_id = cast(str, g1_binding["transaction_id"])
     output = args.output or (
-        args.source_root.resolve()
+        source_root
         / ".agent-canon"
         / "update-lifecycle"
         / "evidence"
         / transaction_id.removeprefix("tx:")
         / "g2.generated-completeness.json"
     )
-    candidate_sha, tree_sha = _git_identity(args.source_root.resolve())
+    candidate_sha, tree_sha = _git_identity(source_root)
     receipt = materialize_generated_completeness_receipt(
         g1_gate=g1,
         candidate_sha=candidate_sha,

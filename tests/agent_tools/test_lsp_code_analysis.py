@@ -17,6 +17,7 @@ import tempfile
 import textwrap
 import unittest
 from pathlib import Path
+from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "lsp_code_analysis.py"
@@ -295,6 +296,49 @@ class LspCodeAnalysisTest(unittest.TestCase):
         """C-family languages share the exact clangd manifest record."""
         self.assertEqual(lsp.LANGUAGE_RECORDS["cpp"], "clangd-language-server")
         self.assertEqual(lsp.LANGUAGE_RECORDS["rust"], "rust-toolchain")
+
+    def test_manifest_receipt_resolution_prefers_override_then_image_then_workspace(self) -> None:
+        """LSP resolution uses the immutable image receipt before workspace state."""
+        from tools.agent_tools import devcontainer_dependencies as dependencies
+
+        verified = dependencies.VerifiedExecutable(
+            record_id="rust-toolchain",
+            manifest_version="1.89.0",
+            executable="/usr/local/bin/rust-analyzer",
+            absolute_path="/usr/local/bin/rust-analyzer",
+            record_fingerprint="a" * 64,
+            plan_fingerprint="b" * 64,
+            verification_output="rust-analyzer 1.89.0",
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image_receipts = root / "image-receipts"
+            image_receipts.mkdir()
+            override = root / "override-receipts"
+            override.mkdir()
+            workspace_receipts = root / ".agent-canon" / "dependency-receipts"
+            workspace_receipts.mkdir(parents=True)
+            with (
+                mock.patch.object(lsp, "IMAGE_RECEIPT_ROOT", image_receipts),
+                mock.patch.object(
+                    dependencies,
+                    "resolve_verified_executable",
+                    return_value=verified,
+                ) as resolver,
+            ):
+                lsp.LspServerSpec.for_language(
+                    "rust", root=root, receipts=override
+                )
+                self.assertEqual(resolver.call_args.args[2], override)
+
+                resolver.reset_mock()
+                lsp.LspServerSpec.for_language("rust", root=root)
+                self.assertEqual(resolver.call_args.args[2], image_receipts)
+
+                image_receipts.rmdir()
+                resolver.reset_mock()
+                lsp.LspServerSpec.for_language("rust", root=root)
+                self.assertEqual(resolver.call_args.args[2], workspace_receipts)
 
     def test_fake_server_emits_schema_symbols_and_provenance(self) -> None:
         """A fake server produces stable symbols and server provenance."""

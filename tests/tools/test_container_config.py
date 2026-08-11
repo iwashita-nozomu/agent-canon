@@ -56,6 +56,24 @@ def write_file(root: Path, relative: str, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def write_generator_boundary(root: Path) -> None:
+    """Provide the authenticated publication capability to generator fixtures."""
+    boundary = root / "tools/agent_tools/parent_root_side_effects.py"
+    boundary.parent.mkdir(parents=True, exist_ok=True)
+    boundary.write_text(
+        (PROJECT_ROOT / "tools/agent_tools/parent_root_side_effects.py").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
+    subprocess.run(
+        ["git", "init", "--quiet", str(root)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
 def write_host_zshrc(home: Path, content: str = "# fixture zshrc\n") -> None:
     """Write the explicit host zshrc premise used by generator tests."""
     home.mkdir(parents=True, exist_ok=True)
@@ -94,6 +112,7 @@ def write_linked_data_root_symlink(repo: Path, tmp_path: Path) -> tuple[str, Pat
 
 def write_devcontainer(root: Path) -> None:
     """Write only the observable devcontainer entrypoint surface."""
+    write_generator_boundary(root)
     write_file(
         root,
         ".devcontainer/devcontainer.json",
@@ -232,6 +251,11 @@ def write_topic_fixture(
     write_file(
         repo,
         "tools/agent-canon/agent_tools/dependency_module_change.py",
+        "#!/usr/bin/env python3\n",
+    )
+    write_file(
+        repo,
+        "tools/agent_tools/dependency_module_change.py",
         "#!/usr/bin/env python3\n",
     )
     return repo
@@ -539,6 +563,39 @@ def generate_gpu_admission_compose(tmp_path: Path) -> tuple[Path, Path]:
     )
     assert result.returncode == 0, result.stdout + result.stderr
     return repo, output_path
+
+
+@pytest.mark.parametrize(
+    "variable",
+    (
+        "AGENT_CANON_TASK_ID",
+        "AGENT_CANON_REPOSITORY_ID",
+        "AGENT_CANON_LIFECYCLE_ID",
+        "AGENT_CANON_EXPECTED_IMAGE_TAG",
+        "DEVCONTAINER_PROJECT_NAME",
+    ),
+)
+def test_generator_rejects_untrusted_yaml_scalar_inputs(
+    tmp_path: Path, variable: str
+) -> None:
+    """Task identity and image labels cannot inject quoted YAML scalars."""
+    repo = write_topic_fixture(tmp_path)
+    output = repo / ".agent-canon/generated.yml"
+    result = subprocess.run(
+        ["bash", ".devcontainer/generate-runtime-compose.sh"],
+        cwd=repo,
+        env={
+            **os.environ,
+            variable: 'unsafe"scalar',
+            "AGENT_CANON_DOCKER_COMPOSE_OUTPUT": str(output),
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "YAML scalar is unsafe" in result.stderr
+    assert not output.exists()
 
 
 def test_default_project_identity_rejects_static_remote_user_override(tmp_path: Path) -> None:
@@ -1253,6 +1310,7 @@ def test_generator_classifies_checkout_layouts(
 ) -> None:
     """Shell and Python classifiers agree on managed and direct repository paths."""
     repo = tmp_path / relative_repo
+    write_generator_boundary(repo)
     write_file(
         repo,
         ".devcontainer/generate-runtime-compose.sh",
@@ -1289,6 +1347,7 @@ def test_generator_standalone_projects_host_zshrc_only_when_profile_selected(
 ) -> None:
     """Standalone layout shares the opt-in host zshrc profile contract."""
     repo = tmp_path / "workspace" / "data_download"
+    write_generator_boundary(repo)
     write_file(
         repo,
         ".devcontainer/generate-runtime-compose.sh",
@@ -1431,6 +1490,7 @@ def write_parent_generator_fixture(
 ) -> Path:
     """Create a parent-shaped generator fixture with the zsh contract inputs."""
     repo = tmp_path / "workspace" / "topic" / "parent"
+    write_generator_boundary(repo)
     write_file(
         repo,
         ".devcontainer/generate-runtime-compose.sh",

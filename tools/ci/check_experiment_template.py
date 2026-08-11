@@ -275,7 +275,11 @@ def main() -> int:
     if not source_root.is_dir() or not create_tool.is_file() or not registry_checker.is_file():
         raise SystemExit("AgentCanon source root or canonical experiment tools are missing")
 
-    with tempfile.TemporaryDirectory(prefix="agent-canon-template-smoke-") as temporary:
+    temp_root = source_root / ".agent-canon" / "tmp"
+    temp_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(
+        prefix="template-smoke-", dir=temp_root
+    ) as temporary:
         parent_root = Path(temporary)
         materialize_parent_fixture(source_root, parent_root)
         registry_path = write_parent_registry(parent_root)

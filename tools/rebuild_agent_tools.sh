@@ -18,8 +18,21 @@ else
   ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 fi
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
-TOOLS_HOME="${AGENT_CANON_TOOLS_HOME:-${HOME}/.tools}"
+TOOLS_HOME="${AGENT_CANON_TOOLS_HOME:-${ROOT_DIR}/.agent-canon/tools}"
+CARGO_HOME="${AGENT_CANON_CARGO_HOME:-${ROOT_DIR}/.agent-canon/cargo-home}"
 FORCE_REBUILD="${AGENT_CANON_FORCE_TOOL_REBUILD:-0}"
+
+assert_parent_path() {
+  local label="$1"
+  local path="$2"
+  case "$(realpath -m "$path")/" in
+    "$(realpath -m "$ROOT_DIR")/"*) ;;
+    *) echo "AGENT_CANON_TOOL_REBUILD=fail reason=${label}-outside-parent" >&2; exit 1 ;;
+  esac
+}
+
+assert_parent_path tools-home "$TOOLS_HOME"
+assert_parent_path cargo-home "$CARGO_HOME"
 
 # shellcheck source=tools/lib/agent_canon_source_identity.sh
 source "$SCRIPT_DIR/lib/agent_canon_source_identity.sh"
@@ -57,22 +70,7 @@ rust_sources_newer_than_binary() {
 }
 
 maybe_link_usr_local() {
-  local binary="$1"
-  if [ "${AGENT_CANON_SKIP_USR_LOCAL_LINK:-0}" = "1" ]; then
-    echo "AGENT_CANON_TOOL_REBUILD_USR_LOCAL=skipped_by_env"
-    return
-  fi
-  if [ "$(id -u)" -eq 0 ]; then
-    ln -sf "$binary" /usr/local/bin/agent-canon
-    echo "AGENT_CANON_TOOL_REBUILD_USR_LOCAL=linked"
-    return
-  fi
-  if command -v sudo >/dev/null 2>&1 && sudo -n true 2>/dev/null; then
-    sudo ln -sf "$binary" /usr/local/bin/agent-canon
-    echo "AGENT_CANON_TOOL_REBUILD_USR_LOCAL=linked"
-    return
-  fi
-  echo "AGENT_CANON_TOOL_REBUILD_USR_LOCAL=skipped_no_privilege"
+  echo "AGENT_CANON_TOOL_REBUILD_USR_LOCAL=skipped_parent_bounded"
 }
 
 rebuild_rust_cli() {
@@ -92,6 +90,14 @@ rebuild_rust_cli() {
     echo "AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_rust_manifest"
     return
   fi
+  source_root="$(realpath -m "$source_root")"
+  case "$source_root/" in
+    "$(realpath -m "$ROOT_DIR")/"*) ;;
+    *)
+      echo "AGENT_CANON_TOOL_REBUILD=fail reason=source-outside-parent" >&2
+      return 1
+      ;;
+  esac
   if ! command -v cargo >/dev/null 2>&1; then
     echo "AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_cargo"
     echo "AGENT_CANON_TOOL_REBUILD_NEXT=rebuild_in_devcontainer_or_install_rust_toolchain"
@@ -110,13 +116,26 @@ rebuild_rust_cli() {
     return
   fi
 
-  cargo build --release --manifest-path "$manifest"
+  mkdir -p "$CARGO_HOME"
+  CARGO_HOME="$CARGO_HOME" \
+    CARGO_TARGET_DIR="$source_root/.agent-canon/cargo-target" \
+    cargo build --release --manifest-path "$manifest"
   source_sha_after="$(source_commit "$source_root")"
   if [ "$source_sha" != "$source_sha_after" ]; then
     echo "AgentCanon source identity changed during build: $source_sha!=$source_sha_after" >&2
     return 1
   fi
-  build_binary="$source_root/rust/agent-canon/target/release/agent-canon"
+  build_binary="$source_root/.agent-canon/cargo-target/release/agent-canon"
+  # Older/fake cargo providers may still honor the crate-local target path.
+  # Both paths remain below the selected parent root; prefer the explicit
+  # task-local target and accept the legacy path only as a compatibility read.
+  if [ ! -x "$build_binary" ] && [ -x "$source_root/rust/agent-canon/target/release/agent-canon" ]; then
+    build_binary="$source_root/rust/agent-canon/target/release/agent-canon"
+  fi
+  if [ ! -x "$build_binary" ]; then
+    echo "AgentCanon cargo build produced no executable under the parent root" >&2
+    return 1
+  fi
   install -d -m 755 "$state_dir/bin" "$TOOLS_HOME/bin"
   install -m 755 "$build_binary" "$install_binary"
   ln -sf "$install_binary" "$TOOLS_HOME/bin/agent-canon"
@@ -132,6 +151,7 @@ rebuild_rust_cli() {
 main() {
   echo "AGENT_CANON_TOOL_REBUILD_ROOT=$ROOT_DIR"
   echo "AGENT_CANON_TOOL_REBUILD_TOOLS_HOME=$TOOLS_HOME"
+  echo "AGENT_CANON_TOOL_REBUILD_CARGO_HOME=$CARGO_HOME"
   rebuild_rust_cli
   echo "AGENT_CANON_TOOL_REBUILD=pass"
 }

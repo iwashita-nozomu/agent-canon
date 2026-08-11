@@ -11,6 +11,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${WORKSPACE_ROOT}"
+TEMP_ROOT="${WORKSPACE_ROOT}/.agent-canon/tmp/pre-review"
+mkdir -p "${TEMP_ROOT}"
 
 REPORT_DIR="${AGENT_REPORT_DIR:-}"
 REPORT_FILE=""
@@ -21,10 +23,22 @@ AGENT_ROLE_NAME="${AGENT_ROLE:-}"
 ENFORCE_WRITE_SCOPE="${AGENT_ENFORCE_WRITE_SCOPE:-0}"
 
 if [ -n "${REPORT_DIR}" ]; then
+  report_real="$(realpath -m "${REPORT_DIR}")"
+  workspace_real="$(realpath -m "${WORKSPACE_ROOT}")"
+  case "${report_real}/" in
+    "${workspace_real}/"*) ;;
+    *)
+      echo "pre_review report directory must remain under the selected workspace" >&2
+      exit 2
+      ;;
+  esac
+fi
+
+if [ -n "${REPORT_DIR}" ]; then
   mkdir -p "${REPORT_DIR}"
   if [ -n "${AGENT_ROLE_NAME}" ] && [ "${ENFORCE_WRITE_SCOPE}" = "1" ]; then
-    REPORT_SNAPSHOT_FILE="$(mktemp)"
-    WORKSPACE_SNAPSHOT_FILE="$(mktemp)"
+    REPORT_SNAPSHOT_FILE="$(mktemp "${TEMP_ROOT}/report.XXXXXX")"
+    WORKSPACE_SNAPSHOT_FILE="$(mktemp "${TEMP_ROOT}/workspace.XXXXXX")"
     python3 tools/agent_tools/validate_role_write_scope.py \
       --report-dir "${REPORT_DIR}" \
       --workspace-root "${WORKSPACE_ROOT}" \

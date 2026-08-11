@@ -74,6 +74,44 @@ STANDALONE_DOCKER_CONTEXT_ALLOWLIST = (
     "tools/",
     "tools/agent_tools/",
     "tools/agent_tools/devcontainer_dependencies.py",
+    "tools/agent_tools/parent_root_side_effects.py",
+    "rust/",
+    "rust/agent-canon/",
+    "rust/agent-canon/src/",
+    "rust/agent-canon/src/semantic_index/",
+    "rust/agent-canon/tests/",
+    "rust/agent-canon/Cargo.lock",
+    "rust/agent-canon/Cargo.toml",
+    "rust/agent-canon/src/dependency_manifest.rs",
+    "rust/agent-canon/src/docs.rs",
+    "rust/agent-canon/src/graph.rs",
+    "rust/agent-canon/src/jit_ir_to_lean.rs",
+    "rust/agent-canon/src/main.rs",
+    "rust/agent-canon/src/memory.rs",
+    "rust/agent-canon/src/migration_audit.rs",
+    "rust/agent-canon/src/python_algorithm_contract.rs",
+    "rust/agent-canon/src/python_module_groups.rs",
+    "rust/agent-canon/src/python_structure_hash.rs",
+    "rust/agent-canon/src/python_structure_hash_impact.rs",
+    "rust/agent-canon/src/python_structure_hash_report.rs",
+    "rust/agent-canon/src/python_structure_hash_scope_plan.rs",
+    "rust/agent-canon/src/rust_migration_plan.rs",
+    "rust/agent-canon/src/semantic_index/args.rs",
+    "rust/agent-canon/src/semantic_index/cli.rs",
+    "rust/agent-canon/src/semantic_index/embedding.rs",
+    "rust/agent-canon/src/semantic_index/eval.rs",
+    "rust/agent-canon/src/semantic_index/mod.rs",
+    "rust/agent-canon/src/semantic_index/model.rs",
+    "rust/agent-canon/src/semantic_index/pipeline.rs",
+    "rust/agent-canon/src/semantic_index/query.rs",
+    "rust/agent-canon/src/semantic_index/relations.rs",
+    "rust/agent-canon/src/semantic_index/report.rs",
+    "rust/agent-canon/src/semantic_index/source.rs",
+    "rust/agent-canon/src/semantic_index/storage.rs",
+    "rust/agent-canon/src/semantic_index/tests.rs",
+    "rust/agent-canon/src/structured_analysis.rs",
+    "rust/agent-canon/src/test_design.rs",
+    "rust/agent-canon/tests/python_algorithm_contract_cli.rs",
 )
 
 
@@ -610,6 +648,7 @@ def validate_standalone_docker_context(root: Path) -> list[Finding]:
         required_copies = (
             "COPY .devcontainer/dependencies.toml /opt/agent-canon/.devcontainer/dependencies.toml",
             "COPY tools/agent_tools/devcontainer_dependencies.py /opt/agent-canon/tools/agent_tools/devcontainer_dependencies.py",
+            "COPY tools/agent_tools/parent_root_side_effects.py /opt/agent-canon/tools/agent_tools/parent_root_side_effects.py",
         )
         for required_copy in required_copies:
             if required_copy not in dockerfile_text:
@@ -1830,7 +1869,11 @@ def validate_generated_compose_scenarios(
     if not script_path.is_file() or script_path.stat().st_mode & 0o111 == 0:
         return []
     findings: list[Finding] = []
-    with tempfile.TemporaryDirectory(prefix="agent-canon-container-config-") as tmp_dir:
+    temporary_parent = root / ".agent-canon" / "tmp"
+    temporary_parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(
+        prefix="container-config-", dir=temporary_parent
+    ) as tmp_dir:
         temporary_root = Path(tmp_dir)
         base_environment = {
             name: value

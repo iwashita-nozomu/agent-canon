@@ -20,11 +20,16 @@ from container_runtime import (
     build_build_command,
     build_run_command,
     build_shell_invocation,
+    emit_not_created_lifecycle_receipt,
     join_shell_lines,
+    lifecycle_context,
     load_or_default_pack,
     print_label_and_command,
     resolve_builder,
+    scope_pack_image_tag,
+    start_container_lifecycle,
     workspace_path,
+    write_lifecycle_receipt,
 )
 from run_python_in_dockerfile import load_rules, resolve_rule
 
@@ -67,9 +72,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-build", action="store_true", help="Skip the build step."
     )
     parser.add_argument(
-        "--keep-image", action="store_true", help="Keep the built image."
-    )
-    parser.add_argument(
         "--print-only", action="store_true", help="Print commands without executing."
     )
     parser.add_argument(
@@ -104,13 +106,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Arguments passed to the target program. Use -- to separate them.",
     )
     return parser
-
-
-def cleanup_image(builder: str, image_tag: str) -> None:
-    """Remove one image quietly."""
-    subprocess.run(
-        [builder, "image", "rm", "-f", image_tag], check=False, capture_output=True
-    )
 
 
 def normalize_program_args(program_args: list[str]) -> list[str]:
@@ -223,7 +218,12 @@ def main() -> int:
             dockerfile=args.dockerfile,
         )
         builder = resolve_builder(args.builder, print_only=args.print_only)
-        build_command = build_build_command(builder, pack)
+        workspace_root = workspace_path(".")
+        lifecycle = lifecycle_context(workspace_root, builder, "repo-program")
+        if not args.skip_build:
+            pack = scope_pack_image_tag(pack, lifecycle)
+        lifecycle = lifecycle.bind_image_tag(pack.image_tag)
+        build_command = build_build_command(builder, pack, labels=lifecycle.labels())
         print_label_and_command("build", build_command)
 
         env_check_command: list[str] | None = None
@@ -231,44 +231,59 @@ def main() -> int:
             env_check_command = build_run_command(
                 builder,
                 pack,
-                workspace_root=workspace_path("."),
+                workspace_root=workspace_root,
                 command=build_env_check_command(),
                 env=tuple(args.env),
                 mounts=tuple(args.mount),
+                labels=lifecycle.labels(),
             )
             print_label_and_command("env-check", env_check_command)
 
         run_command = build_run_command(
             builder,
             pack,
-            workspace_root=workspace_path("."),
+            workspace_root=workspace_root,
             command=resolution.command,
             env=tuple(args.env),
             mounts=tuple(args.mount),
             workdir=resolution.workdir,
+            labels=lifecycle.labels(),
         )
         print_label_and_command("run", run_command)
 
         if args.print_only:
+            emit_not_created_lifecycle_receipt(workspace_root, lifecycle)
             return 0
 
-        image_built_here = False
-        if not args.skip_build:
-            build_result = subprocess.run(build_command, check=False)
-            if build_result.returncode != 0:
-                return build_result.returncode
-            image_built_here = True
+        lifecycle_run = start_container_lifecycle(
+            workspace_root, builder, "repo-program", context=lifecycle
+        )
+        if lifecycle_run.receipt.state != "snapshot":
+            write_lifecycle_receipt(workspace_root, lifecycle_run.receipt)
+            print(
+                f"container lifecycle unavailable: {lifecycle_run.receipt.failure or lifecycle_run.receipt.before.query_status}",
+                file=sys.stderr,
+            )
+            return 2
 
+        command_exit = 0
         try:
-            if env_check_command is not None:
-                env_check_result = subprocess.run(env_check_command, check=False)
-                if env_check_result.returncode != 0:
-                    return env_check_result.returncode
-            run_result = subprocess.run(run_command, check=False)
-            return run_result.returncode
+            if not args.skip_build:
+                command_exit = subprocess.run(build_command, check=False).returncode
+            if command_exit == 0 and env_check_command is not None:
+                command_exit = subprocess.run(env_check_command, check=False).returncode
+            if command_exit == 0:
+                command_exit = subprocess.run(run_command, check=False).returncode
         finally:
-            if image_built_here and not args.keep_image:
-                cleanup_image(builder, pack.image_tag)
+            cleanup_result = lifecycle_run.finish(cleanup=True)
+        if cleanup_result.state not in {"cleaned", "not-created"}:
+            print(
+                f"container lifecycle cleanup state={cleanup_result.state}: {cleanup_result.failure}",
+                file=sys.stderr,
+            )
+            if command_exit == 0:
+                command_exit = 2
+        return command_exit
     except (RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 2

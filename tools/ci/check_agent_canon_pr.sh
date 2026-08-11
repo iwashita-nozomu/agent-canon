@@ -42,19 +42,36 @@ if [ ! -f "${CANON_SYNC_TOOL}" ]; then
   echo "AGENT_CANON_PR_SOURCE_TOOLS_REASON=agent_canon_source_tools_root_resolve_failed"
   exit 1
 fi
-AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${HOME}/.tools/agent-canon/cargo-target}"
+AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${WORKSPACE_ROOT}/.agent-canon/cargo-target}"
 AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}"
 if [ ! -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ] \
   && [ -f "${WORKSPACE_ROOT}/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]; then
   AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
 fi
 cd "${WORKSPACE_ROOT}"
+mkdir -p "${WORKSPACE_ROOT}/.agent-canon/tmp"
+
+workspace_real="$(realpath -m "${WORKSPACE_ROOT}")"
+assert_parent_path() {
+  local candidate="$1"
+  local resolved
+  resolved="$(realpath -m "${candidate}")"
+  case "${resolved}/" in
+    "${workspace_real}/"*) ;;
+    *)
+      echo "AGENT_CANON_PR=fail reason=path-outside-parent path=${candidate}" >&2
+      exit 2
+      ;;
+  esac
+}
+assert_parent_path "${AGENT_CANON_CLI_TARGET_DIR}"
 
 AGENT_CANON_PR_TEMP_ROOT_CREATED=0
 if [[ -z "${AGENT_CANON_PR_TEMP_ROOT:-}" ]]; then
-  AGENT_CANON_PR_TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"
+  AGENT_CANON_PR_TEMP_ROOT="$(mktemp -d "${WORKSPACE_ROOT}/.agent-canon/tmp/pr-check.XXXXXX")"
   AGENT_CANON_PR_TEMP_ROOT_CREATED=1
 fi
+assert_parent_path "${AGENT_CANON_PR_TEMP_ROOT}"
 PR_GATE_RECEIPT="${AGENT_CANON_PR_TEMP_ROOT}/pr-gate-prepared.receipt"
 cleanup_agent_canon_pr_temp_root() {
   if [[ -n "${PR_GATE_RECEIPT:-}" ]]; then
@@ -74,6 +91,7 @@ else
   PR_AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}"
 fi
 PR_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${PR_AGENT_CANON_SOURCE_ROOT}/.agent-canon/log-archive}"
+assert_parent_path "${PR_HOOK_ARCHIVE_DIR}"
 mkdir -p "${PR_HOOK_ARCHIVE_DIR}"
 
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
