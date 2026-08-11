@@ -1,5 +1,13 @@
 """Focused tests for parent-owned policy inventory retrieval."""
 
+# @dependency-start
+# contract test
+# responsibility Verifies parent-owned temporary retrieval and race-safe cleanup for the fixed AgentCanon-log policy inventory.
+# upstream design ../../documents/design/runtime-log-repository-lifecycle.md RL-009..RL-012 policy evidence
+# upstream implementation ../../tools/agent_tools/check_agent_canon_log_policy.py owns read-only inventory retrieval
+# upstream implementation ../../tools/agent_tools/parent_root_side_effects.py owns temporary target capabilities and cleanup
+# @dependency-end
+
 from __future__ import annotations
 
 import os
