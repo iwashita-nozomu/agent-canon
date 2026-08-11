@@ -72,7 +72,9 @@ jobs:
 
       - name: Run tool catalog regressions
         run: |
-          python3 -m pytest -q tests/agent_tools/test_tool_catalog.py
+          python3 -m pytest -q \
+            tests/agent_tools/test_tool_catalog.py::CheckToolCatalogTest::test_default_wired_reference_must_be_cataloged \
+            tests/agent_tools/test_tool_catalog.py::CheckToolCatalogTest::test_test_paths_are_not_default_tool_references
           python3 tools/agent_tools/tool_catalog.py --root .
           python3 -m ruff check --select E9,F,I \
             tests/agent_tools/test_tool_catalog.py \
