@@ -855,6 +855,8 @@ def _read_bound_file(root: Path, path: Path | None, reject: ParentRootReject) ->
     if physical.name == ".gitmodules":
         try:
             raw = physical.read_bytes()
+        except FileExistsError as exc:
+            raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED, "publication target collision") from exc
         except OSError as exc:
             raise ParentRootSideEffectError(reject, f"cannot read {physical}: {exc}") from exc
         if not raw:
@@ -2654,17 +2656,44 @@ class ParentRootSideEffectBoundary:
         """Create fixed parent-local paths and transport a single-use handoff."""
         env = dict(os.environ if base_env is None else base_env)
         root = attestation.parent_root
-        paths = {"TMPDIR": root / ".agent-canon" / "tmp", "TEMP": root / ".agent-canon" / "tmp",
-                 "TMP": root / ".agent-canon" / "tmp", "XDG_CACHE_HOME": root / ".agent-canon" / "cache",
-                 "PYTHONPYCACHEPREFIX": root / ".agent-canon" / "cache" / "pycache",
-                 "CARGO_TARGET_DIR": root / ".agent-canon" / "cache" / "cargo-target"}
+        default_tmp = root / ".agent-canon" / "tmp"
+        default_cache = root / ".agent-canon" / "cache"
+        default_target = default_cache / "cargo-target"
+
+        def parent_local_value(name: str, default: Path) -> Path:
+            """Validate one environment path without creating anything."""
+            value = env.get(name)
+            candidate = Path(value) if value else default
+            physical, _ = _physical_in_root(root, candidate, allow_missing=True)
+            return physical
+
+        # Validate every override before creating any of the parent-local
+        # directories.  In particular, a late invalid value must not leave
+        # earlier defaults behind as an observable partial side effect.
+        paths = {
+            "TMPDIR": parent_local_value("TMPDIR", default_tmp),
+            "TEMP": parent_local_value("TEMP", default_tmp),
+            "TMP": parent_local_value("TMP", default_tmp),
+            "XDG_CACHE_HOME": parent_local_value("XDG_CACHE_HOME", default_cache),
+            "PYTHONPYCACHEPREFIX": parent_local_value(
+                "PYTHONPYCACHEPREFIX", default_cache / "pycache"
+            ),
+            "AGENT_CANON_TOOLS_HOME": parent_local_value(
+                "AGENT_CANON_TOOLS_HOME", root / ".agent-canon" / "tools"
+            ),
+            "CARGO_HOME": parent_local_value("CARGO_HOME", default_cache / "cargo-home"),
+        }
+        target_a = parent_local_value("CARGO_TARGET_DIR", default_target)
+        target_b = parent_local_value("AGENT_CANON_CLI_TARGET_DIR", default_target)
+        if env.get("CARGO_TARGET_DIR") and env.get("AGENT_CANON_CLI_TARGET_DIR") and target_a != target_b:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH, "target_alias_mismatch"
+            )
+        target = target_a if env.get("CARGO_TARGET_DIR") else target_b
+        paths["CARGO_TARGET_DIR"] = target
+        paths["AGENT_CANON_CLI_TARGET_DIR"] = target
         for key, path in paths.items():
-            capability = self.resolve_parent_owned_path(attestation, path, f"child-{key}", create=False)
-            if not capability.physical_path.exists():
-                _, parts = _physical_in_root(root, path, allow_missing=True)
-                directory_fd, _ = _open_components(root, parts, create=True)
-                os.close(directory_fd)
-                capability = self.resolve_parent_owned_path(attestation, path, f"child-{key}", create=False)
+            capability = self.ensure_parent_owned_directory(attestation, path, f"child-{key}")
             env[key] = str(capability.physical_path)
         env["AGENT_CANON_PARENT_ROOT"] = str(root)
         env["AGENT_CANON_PARENT_ROOT_DEV"] = str(attestation.parent_dev)

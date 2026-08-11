@@ -477,8 +477,52 @@ def test_atomic_publish_and_child_environment_keep_home_unchanged(tmp_path: Path
     original_home = os.environ.get("HOME")
     env = child_environment(receipt, {"HOME": original_home or ""})
     assert env["HOME"] == (original_home or "")
-    for name in ("TMPDIR", "TEMP", "TMP", "XDG_CACHE_HOME", "PYTHONPYCACHEPREFIX", "CARGO_TARGET_DIR"):
+    for name in (
+        "TMPDIR", "TEMP", "TMP", "XDG_CACHE_HOME", "PYTHONPYCACHEPREFIX",
+        "AGENT_CANON_TOOLS_HOME", "CARGO_HOME", "CARGO_TARGET_DIR",
+        "AGENT_CANON_CLI_TARGET_DIR",
+    ):
         assert Path(env[name]).resolve().is_relative_to(tmp_path.resolve())
+    assert env["CARGO_TARGET_DIR"] == env["AGENT_CANON_CLI_TARGET_DIR"]
+
+
+def test_child_environment_rejects_external_override_before_creating_directories(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    external = tmp_path.parent / "external-child-cache"
+
+    with pytest.raises(ParentRootSideEffectError) as rejected:
+        boundary.child_environment(
+            receipt,
+            {"HOME": "/unchanged/home", "AGENT_CANON_CLI_TARGET_DIR": str(external)},
+        )
+
+    assert rejected.value.reject is ParentRootReject.SYMLINK_ESCAPE
+    assert not (tmp_path / ".agent-canon" / "tmp").exists()
+    assert not (tmp_path / ".agent-canon" / "cache").exists()
+    assert not external.exists()
+
+
+def test_child_environment_rejects_target_alias_mismatch_before_creating_directories(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    with pytest.raises(ParentRootSideEffectError) as rejected:
+        boundary.child_environment(
+            receipt,
+            {
+                "CARGO_TARGET_DIR": str(tmp_path / "target-a"),
+                "AGENT_CANON_CLI_TARGET_DIR": str(tmp_path / "target-b"),
+            },
+        )
+
+    assert rejected.value.reject is ParentRootReject.ROOT_MISMATCH
+    assert rejected.value.detail == "target_alias_mismatch"
+    assert not (tmp_path / ".agent-canon" / "tmp").exists()
+    assert not (tmp_path / ".agent-canon" / "cache").exists()
 
 
 def test_file_read_and_remove_reject_replaced_capability(tmp_path: Path) -> None:
