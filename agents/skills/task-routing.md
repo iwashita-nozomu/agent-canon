@@ -7,6 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/design/tool-skill-routing-refactor.md short tool and skill naming policy
 upstream design ./agent-orchestration.md owns Decision Sufficiency policy and verdict validation
 downstream implementation ../../tools/agent_tools/route.py selects short routing areas
+downstream implementation ../../tests/agent_tools/test_task_routing_fast_path.py validates packet-free ordinary routing
 upstream design ./skill-dependencies.yaml owns typed skill prerequisites, successors, order, and parallel relations
 downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives the invocation order from that dictionary
 downstream implementation ../../tools/agent_tools/skill_dependency_map.py statically validates and generates the dependency graph
@@ -26,10 +27,13 @@ downstream implementation ../../tools/agent_tools/agent_team.py materializes rou
 - Boundary: this skill selects routes; the selected skills still own execution
   rules and validation.
 
-`agent-orchestration` owns request mode, decision sufficiency, bounded-owner
-execution, coordination activation, and write safety. This skill only resolves
-the compact route name and command packet; it does not add a second execution
-workflow or owner-bounded public layer.
+`agent-orchestration` owns request mode, later implementation decisions,
+coordination activation, and write safety. This skill only resolves the compact
+route name and selected command from the prompt, changed paths, or an explicit
+area/name; it does not require an implementation packet or add a second
+execution workflow. Decision Sufficiency remains an `agent-orchestration`
+check for a selected high-risk or genuinely ambiguous implementation owner,
+not an input to this skill.
 
 ## Purpose
 
@@ -63,12 +67,13 @@ runtime feedback では、prompt routing の結果を入口にし、観測 evide
 
 ## Standard Command
 
-Consume the semantic decision-sufficiency record before selecting a route. It
-must identify the owner, replaceable unit, implementation mechanism, validation
-route, and any unresolved branch that could change them. A handoff message or
-tool result is sufficient; `run.decision_sufficiency.packet_ref` is used only
-when coordination or resumption needs durable state. This skill forwards the
-record and does not create a second sufficiency form or threshold policy.
+Select the short route directly from the prompt, changed paths, or an explicit
+area/name. Ordinary routing does not require a Decision Sufficiency packet,
+owner, replaceable unit, implementation mechanism, validation route,
+unresolved branch, handoff record, or `packet_ref`. If the selected route later
+enters high-risk or genuinely ambiguous implementation work, that
+implementation owner may use `agent-orchestration` Decision Sufficiency before
+editing. `route.py` does not create or forward a substitute pre-routing record.
 
 Executable routing is supplied directly in
 `run.repo_tool_routing_policy.*.tool_call_token` when a route operation is
@@ -97,9 +102,6 @@ python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format t
 - `NEXT_ACTION`
 - `COMMANDS`
 - `EVIDENCE`
-- `DECISION_SUFFICIENCY_PACKET_REF`
-- owner-produced semantic sufficiency fields: `owner`, `replaceable_unit`,
-  `implementation_mechanism`, `validation_route`, and `unresolved_branch`
 - machine-readable `TOOL_CALL_TOKEN`
 - prompt routing の場合は `MODE`, `SKILLS`, `ACTIVE_SKILLS`,
   `DEFERRED_SKILLS`, `MATCHED_SKILLS`, `RELATED_SKILL_CANDIDATES`,
@@ -119,8 +121,9 @@ route is genuinely reusable.
 
 Runtime route tokens are materialized by `agent_team.py` under
 `run.repo_tool_routing_policy`. Related skill candidates remain dynamic
-triggers; activation materializes a new token and retains the same owner DSV
-verdict unless changed input creates a successor decision.
+triggers; activation materializes a new token. Any later Decision Sufficiency
+verdict belongs to the selected implementation route and is not a task-routing
+output.
 
 ### Canonical Skill Dependency Order
 
