@@ -1,5 +1,13 @@
 """Focused tests for the repository-container lifecycle wrapper."""
 
+# @dependency-start
+# contract test
+# responsibility Verifies repository-container parsing preserves parent workspace ownership and rejects retained task images.
+# upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent-owned container lifecycle boundary
+# upstream implementation ../../tools/ci/run_in_repo_container.py owns repository-container orchestration
+# upstream implementation ../../tools/ci/container_runtime.py owns lifecycle receipts, scoped images, and cleanup
+# @dependency-end
+
 from __future__ import annotations
 
 import importlib.util
