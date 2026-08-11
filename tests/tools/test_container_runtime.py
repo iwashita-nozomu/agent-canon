@@ -13,6 +13,7 @@ from __future__ import annotations
 import copy
 import hashlib
 import importlib.util
+import os
 import socket
 import subprocess
 import sys
@@ -21,6 +22,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+
 from tools.ci import container_runtime as runtime_module
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -180,6 +182,37 @@ def test_repo_program_defaults_without_pack_or_python_rules(tmp_path: Path) -> N
     (repo / "docker" / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
     (repo / "sample.py").write_text("print('fixture')\n", encoding="utf-8")
 
+    environment = os.environ.copy()
+    for key in (
+        "TMPDIR",
+        "TEMP",
+        "TMP",
+        "XDG_CACHE_HOME",
+        "PYTHONPYCACHEPREFIX",
+        "AGENT_CANON_TOOLS_HOME",
+        "CARGO_HOME",
+        "CARGO_TARGET_DIR",
+        "AGENT_CANON_CLI_TARGET_DIR",
+        "AGENT_CANON_PARENT_ROOT",
+        "AGENT_CANON_PARENT_ROOT_DEV",
+        "AGENT_CANON_PARENT_ROOT_INO",
+        "AGENT_CANON_CHILD_HANDOFF",
+        "AGENT_CANON_CHILD_PURPOSE",
+        "AGENT_CANON_HANDOFF_AUDIENCE",
+        "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+        "AGENT_CANON_ROOT",
+        "AGENT_CANON_SOURCE_ROOT",
+        "AGENT_CANON_TASK_ID",
+        "AGENT_CANON_REPOSITORY_ID",
+        "AGENT_CANON_TASK_REPOSITORY",
+        "AGENT_CANON_LIFECYCLE_ID",
+        "AGENT_CANON_EXPECTED_IMAGE_TAG",
+        "AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT",
+    ):
+        environment.pop(key, None)
+    environment["AGENT_CANON_PARENT_ROOT"] = str(repo)
+    environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(repo)
+
     result = subprocess.run(
         [
             sys.executable,
@@ -189,6 +222,7 @@ def test_repo_program_defaults_without_pack_or_python_rules(tmp_path: Path) -> N
             "sample.py",
         ],
         cwd=repo,
+        env=environment,
         check=False,
         capture_output=True,
         text=True,

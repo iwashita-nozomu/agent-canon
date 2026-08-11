@@ -689,7 +689,7 @@ raise SystemExit(2)
         self.assertIn(start, source)
         embedded = source.split(start, 1)[1].split(end, 1)[0]
         readback_script = textwrap.dedent(embedded)
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmp_dir:
             report_root = Path(tmp_dir)
             bootstrap_environment = os.environ.copy()
             bootstrap_environment["AGENT_CANON_PARENT_ROOT"] = str(REPO_ROOT)
