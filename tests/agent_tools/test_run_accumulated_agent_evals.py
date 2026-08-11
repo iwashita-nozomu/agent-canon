@@ -10,12 +10,14 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from collections.abc import Sequence
 from pathlib import Path
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
@@ -25,6 +27,76 @@ from run_accumulated_agent_evals import (  # noqa: E402
     render_results,
     run_producers,
 )
+
+_PARENT_BOUNDARY_PATH_KEYS = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+    "AGENT_CANON_TASK_ID",
+    "AGENT_CANON_REPOSITORY_ID",
+    "AGENT_CANON_TASK_REPOSITORY",
+    "AGENT_CANON_LIFECYCLE_ID",
+    "AGENT_CANON_EXPECTED_IMAGE_TAG",
+    "AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT",
+)
+def parent_bound_environment(root: Path) -> dict[str, str]:
+    """Return a clean environment for one real eval fixture repository."""
+    subprocess.run(
+        ["git", "init", "-q", "-b", "main", str(root)],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "remote",
+            "add",
+            "origin",
+            "https://example.invalid/parent.git",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "fixture",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    environment = os.environ.copy()
+    for key in _PARENT_BOUNDARY_PATH_KEYS:
+        environment.pop(key, None)
+    fixture_root = str(root.resolve())
+    environment["AGENT_CANON_PARENT_ROOT"] = fixture_root
+    environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = fixture_root
+    return environment
 
 
 class RunAccumulatedAgentEvalsTest(unittest.TestCase):
@@ -70,6 +142,7 @@ class RunAccumulatedAgentEvalsTest(unittest.TestCase):
         """Producer stdout/stderr should be stored in files, with compact status on stdout."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
+            environment = parent_bound_environment(root)
             log_dir = root / "reports" / "agent-eval-runs" / "run"
             producers = (
                 EvalProducer("ok-family", ("ok",)),
@@ -88,12 +161,13 @@ class RunAccumulatedAgentEvalsTest(unittest.TestCase):
                     stderr=f"stderr for {command[0]}\n",
                 )
 
-            results = run_producers(
-                root=root,
-                producers=producers,
-                log_dir=log_dir,
-                runner=fake_runner,
-            )
+            with patch.dict(os.environ, environment, clear=True):
+                results = run_producers(
+                    root=root,
+                    producers=producers,
+                    log_dir=log_dir,
+                    runner=fake_runner,
+                )
             rendered = render_results(root, results)
 
             self.assertEqual(len(results), 2)

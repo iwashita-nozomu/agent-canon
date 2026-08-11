@@ -903,9 +903,11 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             fake_bin / "cargo",
             """
             #!/usr/bin/env bash
-            mkdir -p rust/agent-canon/target/debug
-            cp tools/bin/agent-canon rust/agent-canon/target/debug/agent-canon
-            chmod +x rust/agent-canon/target/debug/agent-canon
+            set -euo pipefail
+            target_dir="${CARGO_TARGET_DIR:?}"
+            mkdir -p "${target_dir}/debug"
+            cp tools/bin/agent-canon "${target_dir}/debug/agent-canon"
+            chmod +x "${target_dir}/debug/agent-canon"
             exit 0
             """,
         )

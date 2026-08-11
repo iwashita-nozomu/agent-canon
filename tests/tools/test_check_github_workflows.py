@@ -1392,6 +1392,36 @@ raise SystemExit(2)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_text:edit_scope:", result.stdout)
 
+    def test_parent_bounded_workflow_writers_use_repo_owned_outputs(self) -> None:
+        """Workflow writers authenticate the repo before publishing evidence."""
+        expected = {
+            "AGENT_CANON_PARENT_ROOT": "${{ github.workspace }}",
+            "AGENT_CANON_ACTIVE_REPOSITORY_ROOT": "${{ github.workspace }}",
+        }
+        dashboard_path = (
+            REPO_ROOT / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+        )
+        dashboard = yaml.safe_load(dashboard_path.read_text(encoding="utf-8"))
+        self.assertEqual(dashboard["jobs"]["dashboard"]["env"], expected)
+
+        issue_path = REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml"
+        issue = yaml.safe_load(issue_path.read_text(encoding="utf-8"))
+        for job_name in ("issue-mirror-sync", "issue-mirror-check"):
+            self.assertEqual(issue["jobs"][job_name]["env"], expected)
+        source = issue_path.read_text(encoding="utf-8")
+        self.assertEqual(
+            source.count(
+                'summary_file="${GITHUB_WORKSPACE}/.agent-canon/'
+                'issue-mirror-${GITHUB_JOB}.md"'
+            ),
+            2,
+        )
+        self.assertEqual(
+            source.count('cat "${summary_file}" >> "${GITHUB_STEP_SUMMARY}"'),
+            2,
+        )
+        self.assertNotIn('--summary-file "${GITHUB_STEP_SUMMARY}"', source)
+
     def test_issue_mirror_workflow_with_checkout_failure_summary_passes(self) -> None:
         """Standalone issue mirror can only fail checkout by writing failure summary."""
         with tempfile.TemporaryDirectory() as tmp_dir:

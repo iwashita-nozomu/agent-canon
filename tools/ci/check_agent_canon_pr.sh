@@ -428,10 +428,10 @@ emit_generated_completeness_receipt() {
 
 run_standalone_static_gate_ci() {
   cargo build --manifest-path rust/agent-canon/Cargo.toml
-  local memory_cli="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon"
+  local memory_cli="${AGENT_CANON_CLI_TARGET_DIR}/debug/agent-canon"
   if [[ ! -x "${memory_cli}" ]]; then
     echo "AGENT_CANON_MEMORY_CLI_BUILD=fail"
-    echo "AGENT_CANON_MEMORY_CLI_REASON=rust build did not produce target/debug/agent-canon" >&2
+    echo "AGENT_CANON_MEMORY_CLI_REASON=rust build did not produce ${memory_cli}" >&2
     return 1
   fi
   echo "AGENT_CANON_MEMORY_CLI_BUILD=${memory_cli}"

@@ -820,14 +820,14 @@ def append_summary(path: Path, report: IssueSyncReport) -> None:
             ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="issue-sync-summary")
         )
         boundary = ParentRootSideEffectBoundary()
-        receipt = boundary.resolve_parent_owned_path(attestation, path, "issue-sync-summary", create=False)
-        try:
-            previous = boundary.read_parent_owned_file(receipt)
-        except (FileNotFoundError, OSError):
-            previous = b""
-        boundary.write_parent_owned_file(
-            attestation, path, previous + rendered.encode("utf-8"), "issue-sync-summary"
-        )
+        with boundary.open_parent_owned_file(
+            attestation,
+            path,
+            "issue-sync-summary",
+            create=True,
+            mode="a+",
+        ) as handle:
+            handle.write(rendered)
         return
     raise ParentRootSideEffectError(
         ParentRootReject.HANDOFF_INVALID,

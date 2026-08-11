@@ -28,3 +28,23 @@ def test_explicit_pr_temp_is_a_preserved_base_for_one_unique_child() -> None:
     assert "--prefix pr-check." in source
     assert '--candidate "${AGENT_CANON_PR_TEMP_ROOT}"' in source
     assert "--purpose agent-canon-pr-receipt" in source
+
+
+def test_memory_cli_readback_uses_bounded_cargo_target() -> None:
+    """The PR gate reads the executable from its parent-owned target."""
+    source = SCRIPT.read_text(encoding="utf-8")
+
+    assert (
+        'local memory_cli="${AGENT_CANON_CLI_TARGET_DIR}/debug/agent-canon"'
+        in source
+    )
+    assert (
+        'local memory_cli="${AGENT_CANON_SOURCE_ROOT}/rust/'
+        'agent-canon/target/debug/agent-canon"'
+        not in source
+    )
+    assert (
+        "AGENT_CANON_MEMORY_CLI_REASON=rust build did not produce "
+        "${memory_cli}"
+        in source
+    )
