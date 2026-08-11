@@ -36,7 +36,9 @@ CATALOG_PATH = "tools/catalog.yaml"
 TOOL_DOCS_PATH = "documents/tools/tool-docs.toml"
 PUBLIC_SURFACE_PRODUCER_VERSION = "public-surface.v1"
 ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-TOOL_REFERENCE_RE = re.compile(r"\btools/[A-Za-z0-9_./-]+\.(?:py|sh)\b")
+TOOL_REFERENCE_RE = re.compile(
+    r"(?<!tests/)\btools/[A-Za-z0-9_./-]+\.(?:py|sh)\b"
+)
 DEFAULT_COMMAND_SOURCES = (
     "tools/ci/run_all_checks.sh",
     "tools/ci/check_agent_canon_pr.sh",
