@@ -33,6 +33,9 @@ concurrency:
 jobs:
   dashboard:
     runs-on: ubuntu-latest
+    env:
+      AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
+      AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
