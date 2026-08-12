@@ -10,6 +10,7 @@
 name: Issue Mirror
 
 on:
+  pull_request:
   push:
     branches:
       - main
@@ -21,6 +22,7 @@ concurrency:
 
 jobs:
   issue-mirror-sync:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -47,3 +49,22 @@ jobs:
             --github-check \
             --sync-github \
             --summary-file "${GITHUB_STEP_SUMMARY}"
+
+  issue-mirror-check:
+    if: always()
+    needs: issue-mirror-sync
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: PR required-check compatibility
+        if: github.event_name == 'pull_request'
+        run: echo "Remote issue reconciliation is intentionally skipped for pull requests."
+
+      - name: Confirm publication sync
+        if: github.event_name != 'pull_request'
+        run: |
+          if [ "${{ needs.issue-mirror-sync.result }}" != "success" ]; then
+            echo "Issue mirror publication sync did not succeed." >&2
+            exit 1
+          fi
