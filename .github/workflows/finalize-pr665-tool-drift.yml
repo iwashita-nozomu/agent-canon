@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python3 -m pip install --upgrade pytest pyyaml tomli
+      - run: python3 -m pip install --upgrade pytest pyyaml tomli packaging ruff pyright
       - name: Remove retired coordination workflow from PR-flow convention
         shell: bash
         run: |
@@ -35,15 +35,23 @@ jobs:
               raise SystemExit('stale coordination text-check anchor missing')
           p.write_text(s.replace(block, '', 1))
           PY
-          rm .github/workflows/finalize-pr665-tool-drift.yml
+          rm -f .github/workflows/finalize-pr665-tool-drift.yml .ci-kick-pr665-tool-drift
           touch .ci-trigger-pr665-tool-drift
       - name: Focused validation
         shell: bash
         run: |
           set -euo pipefail
           python3 -m pytest -q tests/agent_tools/test_tool_drift.py
-          python3 tools/agent_tools/tool_drift.py --root .
           git diff --check
+      - name: Canonical integration validation
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}
+          AGENT_CANON_PR_NUMBER: '665'
+          AGENT_CANON_PR_BASE_REF: main
+          AGENT_CANON_PR_HEAD_REF: canon/simplify-diagnostic-workflows-624-628
+        run: bash tools/ci/check_agent_canon_pr.sh
       - name: Commit completion
         shell: bash
         run: |
