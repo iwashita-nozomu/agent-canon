@@ -1,12 +1,13 @@
 # @dependency-start
 # contract configuration
-# responsibility Runs standalone AgentCanon validation in semantic execution units while preserving one aggregate required check.
+# responsibility Selects and runs standalone AgentCanon validation in semantic execution units while preserving one aggregate required check.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
+# upstream implementation ../../tools/agent_tools/classify_path_risk.py canonical changed-path selector and unit mapping
 # upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh executes one selected static-gate unit
 # upstream implementation ../../tools/ci/check_agent_canon_pr.sh preserves the manual full-confidence route
 # downstream implementation ../../tools/ci/check_github_workflows.py validates workflow and PR template conventions
-# downstream test ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries
+# downstream test ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries and selection
 # @dependency-end
 
 name: AgentCanon Static Gates
@@ -23,8 +24,36 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  rust-static:
+  select-static-units:
     if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      units: ${{ steps.select.outputs.units }}
+      rust: ${{ steps.select.outputs.rust }}
+      contracts: ${{ steps.select.outputs.contracts }}
+      eval: ${{ steps.select.outputs.eval }}
+      workflow_container: ${{ steps.select.outputs.workflow_container }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: false
+      - name: Select validation units from trusted PR diff
+        id: select
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          git diff --name-only "${BASE_SHA}" "${HEAD_SHA}" > "${RUNNER_TEMP}/agent-canon-changed-paths.txt"
+          python3 tools/agent_tools/classify_path_risk.py \
+            --paths-file "${RUNNER_TEMP}/agent-canon-changed-paths.txt" \
+            --format github-output | tee -a "${GITHUB_OUTPUT}"
+
+  rust-static:
+    needs: select-static-units
+    if: needs.select-static-units.outputs.rust == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -39,7 +68,8 @@ jobs:
         run: bash tools/ci/run_standalone_static_gate_unit.sh rust
 
   contracts-static:
-    if: github.event_name == 'pull_request'
+    needs: select-static-units
+    if: needs.select-static-units.outputs.contracts == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -58,7 +88,8 @@ jobs:
         run: bash tools/ci/run_standalone_static_gate_unit.sh contracts
 
   eval-static:
-    if: github.event_name == 'pull_request'
+    needs: select-static-units
+    if: needs.select-static-units.outputs.eval == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -77,7 +108,8 @@ jobs:
         run: bash tools/ci/run_standalone_static_gate_unit.sh eval
 
   workflow-container-static:
-    if: github.event_name == 'pull_request'
+    needs: select-static-units
+    if: needs.select-static-units.outputs.workflow_container == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -98,26 +130,44 @@ jobs:
   static-gates:
     if: always()
     needs:
+      - select-static-units
       - rust-static
       - contracts-static
       - eval-static
       - workflow-container-static
     runs-on: ubuntu-latest
     steps:
-      - name: Read back PR execution units
+      - name: Read back selected PR execution units
         if: github.event_name == 'pull_request'
         env:
+          SELECTOR_RESULT: ${{ needs.select-static-units.result }}
+          SELECTED_UNITS: ${{ needs.select-static-units.outputs.units }}
+          RUST_SELECTED: ${{ needs.select-static-units.outputs.rust }}
+          CONTRACTS_SELECTED: ${{ needs.select-static-units.outputs.contracts }}
+          EVAL_SELECTED: ${{ needs.select-static-units.outputs.eval }}
+          WORKFLOW_CONTAINER_SELECTED: ${{ needs.select-static-units.outputs.workflow_container }}
           RUST_RESULT: ${{ needs.rust-static.result }}
           CONTRACTS_RESULT: ${{ needs.contracts-static.result }}
           EVAL_RESULT: ${{ needs.eval-static.result }}
           WORKFLOW_CONTAINER_RESULT: ${{ needs.workflow-container-static.result }}
         run: |
-          printf 'rust=%s\ncontracts=%s\neval=%s\nworkflow_container=%s\n' \
-            "${RUST_RESULT}" "${CONTRACTS_RESULT}" "${EVAL_RESULT}" "${WORKFLOW_CONTAINER_RESULT}"
-          test "${RUST_RESULT}" = success
-          test "${CONTRACTS_RESULT}" = success
-          test "${EVAL_RESULT}" = success
-          test "${WORKFLOW_CONTAINER_RESULT}" = success
+          test "${SELECTOR_RESULT}" = success
+          printf 'selected_units=%s\n' "${SELECTED_UNITS}"
+          check_unit() {
+            selected="$1"
+            result="$2"
+            name="$3"
+            printf '%s selected=%s result=%s\n' "${name}" "${selected}" "${result}"
+            if [ "${selected}" = true ]; then
+              test "${result}" = success
+            else
+              test "${result}" = skipped
+            fi
+          }
+          check_unit "${RUST_SELECTED}" "${RUST_RESULT}" rust
+          check_unit "${CONTRACTS_SELECTED}" "${CONTRACTS_RESULT}" contracts
+          check_unit "${EVAL_SELECTED}" "${EVAL_RESULT}" eval
+          check_unit "${WORKFLOW_CONTAINER_SELECTED}" "${WORKFLOW_CONTAINER_RESULT}" workflow-container
 
       - name: Checkout repository for manual full gate
         if: github.event_name == 'workflow_dispatch'
