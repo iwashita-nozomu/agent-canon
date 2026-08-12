@@ -4,7 +4,6 @@
 # responsibility Classifies changed paths into runtime risk profiles and targeted validation checks.
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md defines profile-based validation routing.
 # upstream design ../../agents/TASK_WORKFLOWS.md defines risk-scaled workflow families.
-# downstream implementation ../../.github/workflows/path-risk-check-matrix-smoke.yml runs manual path/risk smoke.
 # downstream design ../../documents/tools/classify_path_risk.md documents path-risk classification.
 # downstream implementation ../../tests/agent_tools/test_classify_path_risk.py tests representative profiles.
 # @dependency-end
