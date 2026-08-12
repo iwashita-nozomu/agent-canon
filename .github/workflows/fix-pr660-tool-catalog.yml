@@ -31,16 +31,23 @@ jobs:
 
           t = Path('tests/agent_tools/test_tool_catalog.py')
           s = t.read_text()
-          old_case = '"python3 tests/tools/test_catalog_fixture.py\\n"\n                    "python3 tools/agent_tools/uncataloged.py\\n"'
-          new_case = '"python3 tests/tools/test_catalog_fixture.py\\n"\n                    "python3 tests/tools/tools/run_symlink_lint.py\\n"\n                    "python3 tools/agent_tools/uncataloged.py\\n"'
-          if s.count(old_case) != 1:
-              raise SystemExit('tool regex test anchor mismatch')
-          s = s.replace(old_case, new_case, 1)
-          old_assert = 'self.assertNotIn("tools/test_catalog_fixture.py", matches)\n                self.assertIn("tools/agent_tools/uncataloged.py", matches)'
-          new_assert = 'self.assertNotIn("tools/test_catalog_fixture.py", matches)\n                self.assertNotIn("tools/tools/run_symlink_lint.py", matches)\n                self.assertIn("tools/agent_tools/uncataloged.py", matches)'
-          if s.count(old_assert) != 1:
-              raise SystemExit('tool regex assertion anchor mismatch')
-          t.write_text(s.replace(old_assert, new_assert, 1))
+          needle = '                "python3 tools/agent_tools/uncataloged.py\\n"'
+          if s.count(needle) < 1:
+              raise SystemExit('uncataloged fixture anchor missing')
+          s = s.replace(
+              needle,
+              '                "python3 tests/tools/tools/run_symlink_lint.py\\n"\n' + needle,
+              1,
+          )
+          assertion = '        self.assertIn("tools/agent_tools/uncataloged.py", matches)'
+          if s.count(assertion) < 1:
+              raise SystemExit('catalog assertion anchor missing')
+          s = s.replace(
+              assertion,
+              '        self.assertNotIn("tools/tools/run_symlink_lint.py", matches)\n' + assertion,
+              1,
+          )
+          t.write_text(s)
           PY
       - name: Validate focused catalog behavior
         run: |
