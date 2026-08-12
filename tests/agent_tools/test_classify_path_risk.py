@@ -5,7 +5,6 @@
 # responsibility Tests path-risk classifier smoke routing.
 # upstream implementation ../../tools/agent_tools/classify_path_risk.py classifies changed paths.
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md defines risk/check routing.
-# downstream implementation ../../.github/workflows/path-risk-check-matrix-smoke.yml consumes classifier output.
 # @dependency-end
 
 from __future__ import annotations

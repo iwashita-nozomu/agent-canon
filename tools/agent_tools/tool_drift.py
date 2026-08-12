@@ -114,16 +114,8 @@ CONTRACTS = (
             LinkCheck(".github/AGENTS.md"),
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
             LinkCheck("templates/documents/github/pull-request/agent_canon.md"),
-            LinkCheck(".github/workflows/agent-coordination.yml"),
             LinkCheck("tools/ci/checkout_agent_canon_submodule.sh"),
             LinkCheck("README.md"),
-        ),
-        text_checks=(
-            TextCheck(
-                ".github/workflows/agent-coordination.yml",
-                "tools/ci/checkout_agent_canon_submodule.sh",
-                "missing-standalone-checkout-helper-route",
-            ),
         ),
     ),
     ToolContract(

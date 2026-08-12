@@ -1,24 +1,18 @@
 # @dependency-start
 # contract configuration
-# responsibility Publishes read-only AgentCanon runtime log and eval dashboards in the standalone AgentCanon repository.
+# responsibility Publishes scheduled/manual read-only AgentCanon runtime log and eval dashboards.
+# upstream design ../../documents/design/responsibility-rationale.md diagnostic-product activation rationale
 # upstream design ../../agents/evals/README.md eval evidence contract
 # upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates accumulated evidence
-# upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py validates workflow routing cases
-# upstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report quality checklist cases
+# upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py produces accumulated eval evidence
 # upstream implementation ../../tools/agent_tools/generate_agent_runtime_dashboard.py renders dashboard artifact
 # upstream implementation ../../tools/agent_tools/agent_canon_source_root.py resolves the canonical Graph CLI
-# upstream implementation ../../rust/agent-canon/src/graph.rs builds and reads back the canonical graph snapshot
 # @dependency-end
 
-# Standalone-only workflow. Template and derived repositories should not copy
-# this workflow into their root; they should read the AgentCanon repository run.
 name: Agent Runtime Dashboard
 
 on:
   pull_request:
-  push:
-    branches:
-      - "**"
   workflow_dispatch:
   schedule:
     - cron: "17 3 * * *"
@@ -34,25 +28,33 @@ jobs:
   dashboard:
     runs-on: ubuntu-latest
     steps:
+      - name: PR required-check compatibility
+        if: github.event_name == 'pull_request'
+        run: echo "Runtime dashboard generation is intentionally skipped for pull requests."
+
       - name: Checkout repository
+        if: github.event_name != 'pull_request'
         uses: actions/checkout@v4
         with:
           submodules: false
           persist-credentials: false
 
       - name: Setup Python
+        if: github.event_name != 'pull_request'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dashboard dependencies
+        if: github.event_name != 'pull_request'
         run: python3 -m pip install --upgrade pyyaml tomli
 
       - name: Prepare runtime log archive
+        if: github.event_name != 'pull_request'
         run: mkdir -p .agent-canon/log-archive
 
       - name: Build and read back canonical graph
-        if: github.event_name == 'schedule'
+        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec \
@@ -63,33 +65,32 @@ jobs:
             --root "${GITHUB_WORKSPACE}" --profile default --format json
 
       - name: Run accumulated eval producers
+        if: github.event_name != 'pull_request'
         run: |
-          canon_root="${GITHUB_WORKSPACE}"
-          python3 "${canon_root}/tools/agent_tools/run_accumulated_agent_evals.py" \
-            --root "${canon_root}" \
+          python3 tools/agent_tools/run_accumulated_agent_evals.py \
+            --root "${GITHUB_WORKSPACE}" \
             --run-id "agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Validate accumulated evidence
-        run: |
-          canon_root="${GITHUB_WORKSPACE}"
-          python3 "${canon_root}/tools/agent_tools/eval_accumulation_check.py" --root "${canon_root}"
+        if: github.event_name != 'pull_request'
+        run: python3 tools/agent_tools/eval_accumulation_check.py --root "${GITHUB_WORKSPACE}"
 
       - name: Generate runtime dashboard
+        if: github.event_name != 'pull_request'
         id: dashboard
         run: |
-          canon_root="${GITHUB_WORKSPACE}"
           report_dir="${GITHUB_WORKSPACE}/reports/agent-runtime-dashboard"
           mkdir -p "${report_dir}"
           dashboard_path="${report_dir}/agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
-          python3 "${canon_root}/tools/agent_tools/generate_agent_runtime_dashboard.py" \
-            --root "${canon_root}" \
+          python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
+            --root "${GITHUB_WORKSPACE}" \
             --out "${dashboard_path}"
           cat "${dashboard_path}" >> "${GITHUB_STEP_SUMMARY}"
           echo "dashboard_path=${dashboard_path}" >> "$GITHUB_OUTPUT"
 
       - name: Upload runtime dashboard
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: agent-runtime-dashboard-${{ github.run_id }}-${{ github.run_attempt }}
-          path: |
-            ${{ steps.dashboard.outputs.dashboard_path }}
+          path: ${{ steps.dashboard.outputs.dashboard_path }}

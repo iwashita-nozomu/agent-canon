@@ -4,7 +4,6 @@ contract reference
 responsibility Documents path-risk classifier usage.
 upstream implementation ../../tools/agent_tools/classify_path_risk.py classifies changed paths into runtime profiles.
 upstream design ../runtime/runtime-profiles-and-check-matrix.md defines profile-based validation routing.
-downstream implementation ../../.github/workflows/path-risk-check-matrix-smoke.yml runs manual smoke classification.
 downstream implementation ../../tests/agent_tools/test_classify_path_risk.py tests representative profiles.
 @dependency-end
 -->
@@ -21,7 +20,5 @@ python3 tools/agent_tools/classify_path_risk.py \
   --format text
 ```
 
-The GitHub workflow
-`.github/workflows/path-risk-check-matrix-smoke.yml` exposes the same classifier
-through `workflow_dispatch`. It is intentionally a smoke evidence generator,
-not a required full CI replacement.
+The classifier is a direct CLI/test-owned surface. It does not require a
+separate manual workflow wrapper.
