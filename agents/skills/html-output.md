@@ -2,211 +2,44 @@
 <!--
 @dependency-start
 contract skill
-responsibility Documents browser-readable HTML output, preview, and publication workflow.
+responsibility Produces and validates browser-readable HTML artifacts; serving/publication is explicit and separate.
 upstream design README.md shared skill canon index
-upstream design catalog.yaml public skill family catalog
-upstream design structure-planning.md reusable structure contract skill
-upstream design report-writing.md reader-facing report quality skill and Markdown default
-downstream design html-experiment-report.md experiment-specific HTML report workflow
-downstream implementation ../../.agents/skills/html-output/SKILL.md exposes this workflow as a runtime skill
+upstream design ../../documents/design/responsibility-rationale.md HTML artifact/serving and closeout rationale
+upstream design structure-planning.md optional structural-decision owner
+upstream design report-writing.md reader-facing report content owner
 upstream design code-visualization.md sole public visualization owner and typed projection contract
+downstream design html-experiment-report.md compatibility route for experiment-specific HTML rendering
+downstream implementation ../../.agents/skills/html-output/SKILL.md exposes this workflow as a runtime skill
 downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
 
-## Visualization Adapter Boundary
-
-HTML composition, accessibility, layout, and interactive controls are renderer
-concerns. Every embedded graph hands its complete selected native facts to
-`code-visualization` and consumes that owner's `VisualizationSourceUniverse`,
-canonical `ToolCall`, `ProjectionCoverageManifest`, post-format readback, and
-final coverage status. Filtering changes display state only; the complete data
-and identities remain present and discoverable. This skill does not own or
-repeat the universal omission/granularity policy.
-
-## Reader Map
-
-- Purpose: produce browser-readable HTML artifacts with layout, asset,
-  preview-server, and publication evidence.
-- Section path: Purpose and Use When decide whether HTML is in scope; Required
-  Order defines the build sequence; Browser Server Commands, Layout Quality
-  Gate, and Closeout Tokens define preview and validation.
-- Use when: the user explicitly asks for HTML, a browser view, dashboard,
-  external URL, local preview server, or polished HTML report artifact.
-- Boundary: reports default to Markdown unless HTML is explicit; claims, raw
-  evidence, experiment execution, and domain decisions stay with their owner
-  skills.
-
 ## Purpose
 
-`html-output` is the skill for producing polished browser-readable HTML
-artifacts and making them available to a local or external browser. It owns the
-rendered page contract, layout quality gate, optional ImageGen asset route, and
-preview server commands.
+`html-output` owns generation and validation of a requested browser-readable HTML artifact: markup, assets, links, layout/readability, accessibility-relevant structure, and any selected rendered visualization. It does not own report claims, experiment execution, raw evidence, or network publication.
 
-It does not own report claims, raw evidence, experiment execution, or domain
-decisions. Use `report-writing` for report content, `structure-planning` for
-nontrivial page structure, `html-experiment-report` for experiment or Eval
-HTML reports, and `result-artifact-writeout` for raw machine artifacts.
+## Activation
 
-The default report output is Markdown. Reports default to Markdown unless the
-user explicitly asks for HTML, a browser page, dashboard, web view, or external browser publication.
+Use this skill when HTML/browser output is explicitly requested. Reports otherwise default to their normal text/document format. Structure planning activates only if a genuine page-topology decision exists.
 
-## Use When
+## Artifact validation
 
-- A user explicitly asks for HTML output, an HTML report, browser view,
-  dashboard-like page, external browser URL, or local preview server.
-- A generated report needs a polished layout with figures, tables, cards, or a
-  first-viewport summary.
-- A report or review artifact needs optional generated raster visuals through
-  `$imagegen`.
-- An existing HTML artifact must be served to a browser without starting a
-  duplicate server.
+Validate the produced file and the properties needed by the request: referenced assets exist, internal links/IDs resolve where applicable, required data/content is present, and selected layout/render checks succeed. Use `code-visualization` for selected graph rendering/coverage.
 
-## Required Order
+A listen socket is not required to prove a static artifact correct.
 
-1. Confirm HTML is explicit. If the user asks for a report without naming HTML,
-   use Markdown through `report-writing` instead.
-1. Fix the source packet: title, audience, source artifacts, observed facts,
-   inferred claims, limitations, provenance, and output path.
-1. Use `structure-planning` before writing page code when the page has a
-   nontrivial first viewport, figure/table order, source-to-section map, or
-   invalid interpretation boundary.
-1. Survey existing assets, renderers, CSS, plots, screenshots, and previous
-   reports before adding a new renderer.
-1. Decide the visual asset route. Prefer existing repo or run artifacts. Use
-   `$imagegen` only when a generated bitmap materially improves comprehension
-   and no existing asset is suitable.
-1. Build a self-contained HTML/CSS artifact unless the surrounding app already
-   has a build system. Keep stable dimensions for figures, tables, cards, and
-   media so labels, hover states, and dynamic text do not resize the layout.
-1. Put the first-viewport answer first: title, short reader guide, primary
-   figure/table/card, key caveat, and source packet link or summary.
-1. Keep sections in reader order, not raw tool-output order. Separate observed
-   facts, interpretation, limitations, provenance, and next action.
-1. Validate the file exists, opens over HTTP, references only existing assets,
-   has no overlapping text at expected viewport sizes, and keeps generated
-   reports out of policy truth.
-1. Publish with the server commands below. Reuse an existing server on the
-   chosen port when it is already serving the requested file.
+## Preview and serving
 
-## Browser Server Commands
+Starting an HTTP server, choosing a port, binding `0.0.0.0`, discovering host addresses, or exposing an external URL are separate delivery operations. Perform them **only** when the user explicitly requests preview, serving, or publication. Use the environment/runtime owner for lifecycle and network rules rather than creating a second server wrapper here.
 
-Set these variables first:
+When serving is requested, start the minimum appropriate process, verify the requested URL/readback, report how to stop it, and do not imply external reachability without evidence.
 
-```bash
-HTML_ROOT=reports/agents/<run-id>
-HTML_FILE=semantic_provider_compare.html
-PORT=${PORT:-8765}
-```
+## Completion evidence
 
-Check whether a compatible server is already available:
+Always read back only:
 
-```bash
-if command -v rg >/dev/null 2>&1; then
-  ss -ltnp 2>/dev/null | rg ":${PORT}\\b" || true
-else
-  ss -ltnp 2>/dev/null | grep -E ":${PORT}([[:space:]]|$)" || true
-fi
-curl -fsS "http://127.0.0.1:${PORT}/${HTML_FILE}" >/dev/null \
-  && echo "HTML_SERVER=reuse"
-```
+- artifact identity/path;
+- source/provenance needed to interpret it;
+- validation actually selected and its result.
 
-Start a server only when the `curl` check fails:
-
-```bash
-LOG=/tmp/agentcanon-html-${PORT}.log
-setsid bash -lc "cd '$HTML_ROOT' && exec python3 -m http.server '$PORT' --bind 0.0.0.0" \
-  >"$LOG" 2>&1 < /dev/null &
-echo $! >/tmp/agentcanon-html-${PORT}.pid
-sleep 1
-curl -fsS "http://127.0.0.1:${PORT}/${HTML_FILE}" >/dev/null
-hostname -I | awk '{print $1}'
-```
-
-Report both URLs when the server check passes:
-
-```text
-local_url=http://127.0.0.1:<port>/<file>
-external_url=http://<hostname-I-first-ip>:<port>/<file>
-```
-
-If `ss`, `rg`, or `curl` is unavailable, record the missing tool and use the
-closest available equivalent such as `grep -E` for the port filter. Do not claim
-external-browser availability without an HTTP check against `127.0.0.1` and a
-concrete host IP from `hostname -I`.
-
-## Layout Quality Gate
-
-- The first viewport answers what the reader should inspect first.
-- Text fits within containers on desktop and mobile widths.
-- Figures, tables, cards, and media have stable responsive dimensions.
-- Primary visuals reveal the actual result, product, state, or comparison.
-- Generated images are cited as generated assets and do not replace evidence.
-- Observations, interpretations, limitations, and provenance are visually
-  distinct.
-- The page can be served from its artifact directory without a repo build step,
-  unless it intentionally belongs to an existing web app.
-
-## Closeout Tokens
-
-Record these in `workflow_monitoring.md`, a run bundle, or the HTML report:
-
-```text
-html_output=complete
-html_output_file=<path>
-html_source_packet=<path-or-inline>
-html_layout_check=<pass|fail>
-html_server_mode=<reuse|started|not_requested|blocked>
-html_server_local_url=<url|not_requested|blocked>
-html_server_external_url=<url|not_requested|blocked>
-html_imagegen=<used|not_required>
-html_policy_truth=<no>
-```
-
-## Runtime Contract Clauses
-
-The runtime discovery adapter delegates these required operating clauses to this canonical owner.
-
-1. Read `agents/skills/html-output.md`.
-1. Confirm HTML is explicit. If the user asks for a report without saying HTML,
-   browser view, dashboard, web page, or external browser publication, default to Markdown through `$report-writing` instead.
-1. Fix the source packet: title, audience, source artifacts, observed facts,
-   inferred claims, limitations, provenance, and output path.
-1. Use `$structure-planning` before writing page code when the first viewport,
-   figure/table order, source-to-section map, or invalid interpretation
-   boundary is nontrivial.
-1. Survey existing assets, renderers, CSS, plots, screenshots, and prior reports
-   before adding a new renderer.
-1. Prefer existing visuals. Use `$imagegen` only when a generated bitmap
-   materially improves comprehension and no existing asset is suitable; store
-   generated assets beside the HTML artifact and cite them as generated assets.
-1. Build a polished self-contained HTML/CSS artifact unless an existing app
-   build system owns the page. Use stable dimensions, responsive constraints,
-   readable tables/figures/cards, and no overlapping text.
-1. Put the first-viewport answer first: title, reader guide, primary visual or
-   table, key caveat, and source packet link or summary.
-1. Validate that the file exists, asset references resolve, generated reports do
-   not become policy truth, and layout quality passes at expected desktop and
-   mobile widths.
-1. Publish or reuse a preview server with these commands, replacing variables:
-   `HTML_ROOT=reports/agents/<run-id>`, `HTML_FILE=<file>.html`,
-   `PORT=${PORT:-8765}`.
-1. Check existing server first:
-   `if command -v rg >/dev/null 2>&1; then ss -ltnp 2>/dev/null | rg ":${PORT}\\b" || true; else ss -ltnp 2>/dev/null | grep -E ":${PORT}([[:space:]]|$)" || true; fi` and
-   `curl -fsS "http://127.0.0.1:${PORT}/${HTML_FILE}" >/dev/null && echo "HTML_SERVER=reuse"`.
-1. If the `curl` check fails, start the server:
-   `LOG=/tmp/agentcanon-html-${PORT}.log; setsid bash -lc "cd '$HTML_ROOT' && exec python3 -m http.server '$PORT' --bind 0.0.0.0" >"$LOG" 2>&1 < /dev/null & echo $! >/tmp/agentcanon-html-${PORT}.pid; sleep 1; curl -fsS "http://127.0.0.1:${PORT}/${HTML_FILE}" >/dev/null; hostname -I | awk '{print $1}'`.
-1. Report both `http://127.0.0.1:<port>/<file>` and
-   `http://<hostname-I-first-ip>:<port>/<file>` only after the HTTP check
-   passes.
-1. Record closeout tokens:
-   `html_output=complete`,
-   `html_output_file=<path>`,
-   `html_source_packet=<path-or-inline>`,
-   `html_layout_check=<pass|fail>`,
-   `html_server_mode=<reuse|started|not_requested|blocked>`,
-   `html_server_local_url=<url|not_requested|blocked>`,
-   `html_server_external_url=<url|not_requested|blocked>`,
-   `html_imagegen=<used|not_required>`, and
-   `html_policy_truth=no`.
+Optional operations such as server startup, URL publication, ImageGen, or special policy checks are recorded only when they actually ran. Do not emit `not_requested`, `blocked`, or placeholder fields for unused operations, and do not make fixed token count/field presence an eval oracle.
