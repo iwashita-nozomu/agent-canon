@@ -50,9 +50,14 @@ jobs:
           if s.count(old)!=1:
               raise SystemExit('static workflow requirement anchor mismatch')
           s=s.replace(old,new,1)
-          # carry forward publication-only checker correction from PR665.
           s=s.replace('''STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (\n    "Standalone-only workflow",\n    "Template and derived repositories should not copy",\n    "generate_agent_runtime_dashboard.py",\n)''','''STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (\n    "workflow_dispatch:",\n    "schedule:",\n    "generate_agent_runtime_dashboard.py",\n)''')
           s=s.replace('''STANDALONE_ISSUE_MIRROR_WORKFLOW_REQUIREMENTS = (\n    "Standalone-only workflow",\n    "Template and derived repositories should not copy",\n    "issue_sync.py",\n    "--github-check",\n    "--sync-github",\n    "GITHUB_STEP_SUMMARY",\n    "permissions:",\n    "issues: read",\n    "issues: write",\n)''','''STANDALONE_ISSUE_MIRROR_WORKFLOW_REQUIREMENTS = (\n    "push:",\n    "- main",\n    "workflow_dispatch:",\n    "issue_sync.py",\n    "--github-check",\n    "--sync-github",\n    "GITHUB_STEP_SUMMARY",\n    "permissions:",\n    "issues: write",\n)''')
+          p.write_text(s)
+
+          p=Path('tests/agent_tools/test_classify_path_risk.py')
+          s=p.read_text()
+          s=s.replace('# downstream implementation ../../.github/workflows/path-risk-check-matrix-smoke.yml consumes classifier output.\n','')
+          s=s.replace('''        self.assertIn("docs-only-or-docs-impact", profiles)\n        self.assertIn("python-tooling", profiles)\n        self.assertIn("github-automation", profiles)\n        self.assertIn("agentcanon-shared-surface", profiles)''','''        self.assertIn("docs", profiles)\n        self.assertIn("python", profiles)\n        self.assertIn("workflow", profiles)''')
           p.write_text(s)
           PY
           rm .github/workflows/fix-pr668-validation.yml
@@ -65,12 +70,12 @@ jobs:
           printf '%s\n' tools/agent_tools/tool_catalog.py > "$tmp"
           PYTHONPATH=tools python3 tools/ci/run_selected_agent_canon_pr_checks.py --paths-file "$tmp" --print-only | grep -F 'python3 -m pytest -q tests/agent_tools/test_tool_catalog.py'
           python3 tools/ci/check_github_workflows.py
-          python3 -m ruff check tools/agent_tools/classify_path_risk.py tools/ci/run_selected_agent_canon_pr_checks.py tools/ci/check_github_workflows.py
+          python3 -m ruff check tools/agent_tools/classify_path_risk.py tools/ci/run_selected_agent_canon_pr_checks.py tools/ci/check_github_workflows.py tests/agent_tools/test_classify_path_risk.py
           git diff --check
       - name: Commit and push
         run: |
           git config user.name agent-canon-validation
           git config user.email agent-canon-validation@users.noreply.github.com
-          git add tools/agent_tools/classify_path_risk.py tools/ci/run_selected_agent_canon_pr_checks.py tools/ci/check_github_workflows.py .github/workflows/fix-pr668-validation.yml
+          git add tools/agent_tools/classify_path_risk.py tools/ci/run_selected_agent_canon_pr_checks.py tools/ci/check_github_workflows.py tests/agent_tools/test_classify_path_risk.py .github/workflows/fix-pr668-validation.yml
           git commit -m 'fix: preserve behavioral tests in selected Python validation'
           git push origin HEAD:canon/selective-pr-gates-629-644
