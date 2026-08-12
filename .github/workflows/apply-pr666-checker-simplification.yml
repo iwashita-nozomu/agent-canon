@@ -1,0 +1,65 @@
+name: Apply PR666 checker simplification
+on:
+  pull_request:
+    types: [synchronize]
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.event.pull_request.number == 666
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: canon/simplify-core-skill-contracts-630-640
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Remove duplicate legacy marker ownership
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('tools/agent_tools/convention_compliance_contracts.toml')
+          s = p.read_text(encoding='utf-8')
+          blocks = [
+              '''[[contracts.surfaces]]\npath = "agents/skills/python-review.md"\nmarkers = ["SOLID 原則シグナル", "OOP 可読性レポート", "tools/oop/python/readability.py", "tools/agent_tools/check_solid_evidence.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "readability.py", "scanned_paths"]\n\n''',
+              '''[[contracts.surfaces]]\npath = "agents/skills/change-review.md"\nmarkers = ["python-review", "$oop-readability-check", "tools/agent_tools/check_solid_evidence.py", "SOLID principle signal", "OOP readability report", "class", "Protocol"]\n\n''',
+              '''[[contracts.surfaces]]\npath = "agents/skills/python-review.md"\nmarkers = ["定義順", "読者順序", "公開入口", "内部補助関数", "check_convention_compliance.py"]\n\n''',
+          ]
+          for block in blocks:
+              if block not in s:
+                  raise SystemExit(f'missing marker block: {block.splitlines()[1]}')
+              s = s.replace(block, '', 1)
+          p.write_text(s, encoding='utf-8')
+
+          p = Path('tools/agent_tools/check_convention_compliance.py')
+          s = p.read_text(encoding='utf-8')
+          blocks = [
+              '''    "agents/skills/structure-planning.md": (\n        "document_unit",\n        "document_split_decision",\n        "split_when",\n        "merge_when",\n        "invalid_split_boundaries",\n    ),\n''',
+              '''    "agents/skills/change-review.md": (\n        "issue_route",\n        "issues/open/",\n        "issue_sync.py",\n        "new_local_issue",\n        "github_mirror",\n    ),\n''',
+          ]
+          for block in blocks:
+              if block not in s:
+                  raise SystemExit('missing inline marker block')
+              s = s.replace(block, '', 1)
+          p.write_text(s, encoding='utf-8')
+          PY
+          rm -f .github/workflows/apply-pr666-checker-simplification.yml .pr666-checker-kick
+      - name: Validate focused convention ownership
+        run: |
+          python3 -m pip install --upgrade pyyaml tomli
+          python3 tools/agent_tools/check_convention_compliance.py --root . --format json
+          python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --root .
+          python3 tools/agent_tools/evaluate_report_quality.py --root .
+          git diff --check
+      - name: Commit and push
+        run: |
+          git config user.name 'agent-canon-integration'
+          git config user.email 'agent-canon-integration@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: align convention ownership with simplified skills'
+          git push origin HEAD:canon/simplify-core-skill-contracts-630-640
