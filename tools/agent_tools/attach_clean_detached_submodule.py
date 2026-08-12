@@ -43,7 +43,8 @@ def ref_sha(root: Path, ref: str) -> str | None:
 
 def attach(root: Path, prefix: str, branch: str) -> int:
     submodule = root / prefix
-    mode = run_git(root, "ls-tree", "HEAD", prefix).stdout.split(maxsplit=1)[0]
+    tree_entry = run_git(root, "ls-tree", "HEAD", prefix, check=False).stdout
+    mode = tree_entry.split(maxsplit=1)[0] if tree_entry else ""
     if mode != "160000":
         print(f"AGENT_CANON_DETACHED_ATTACH=not_submodule:{prefix}")
         return 0
