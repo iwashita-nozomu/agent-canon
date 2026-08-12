@@ -1,0 +1,86 @@
+name: Finalize PR666 convention ownership
+
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.event.pull_request.number == 666
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: canon/simplify-core-skill-contracts-630-640
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m pip install --upgrade pytest pyyaml tomli packaging ruff pyright
+      - run: rustup component add rustfmt clippy
+      - name: Remove duplicate skill-owned convention projections
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          p = Path('tools/agent_tools/convention_compliance_contracts.toml')
+          s = p.read_text()
+          blocks = [
+              '''[[contracts.surfaces]]\npath = "agents/skills/python-review.md"\nmarkers = ["SOLID 原則シグナル", "OOP 可読性レポート", "tools/oop/python/readability.py", "tools/agent_tools/check_solid_evidence.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "readability.py", "scanned_paths"]\n\n''',
+              '''[[contracts.surfaces]]\npath = "agents/skills/change-review.md"\nmarkers = ["python-review", "$oop-readability-check", "tools/agent_tools/check_solid_evidence.py", "SOLID principle signal", "OOP readability report", "class", "Protocol"]\n\n''',
+              '''[[contracts.surfaces]]\npath = "agents/skills/python-review.md"\nmarkers = ["定義順", "読者順序", "公開入口", "内部補助関数", "check_convention_compliance.py"]\n\n''',
+          ]
+          for block in blocks:
+              if block not in s:
+                  raise SystemExit(f'missing convention manifest anchor: {block.splitlines()[1]}')
+              s = s.replace(block, '', 1)
+          p.write_text(s)
+
+          p = Path('tools/agent_tools/check_convention_compliance.py')
+          s = p.read_text()
+          structure_block = '''    "agents/skills/structure-planning.md": (\n        "document_unit",\n        "document_split_decision",\n        "split_when",\n        "merge_when",\n        "invalid_split_boundaries",\n    ),\n'''
+          if structure_block not in s:
+              raise SystemExit('missing structure-planning split marker anchor')
+          s = s.replace(structure_block, '', 1)
+          issue_block = '''    "agents/skills/change-review.md": (\n        "issue_route",\n        "issues/open/",\n        "issue_sync.py",\n        "new_local_issue",\n        "github_mirror",\n    ),\n'''
+          if issue_block not in s:
+              raise SystemExit('missing change-review issue marker anchor')
+          s = s.replace(issue_block, '', 1)
+          p.write_text(s)
+          PY
+          rm -f .github/workflows/finalize-pr666-convention.yml .ci-kick-pr666-convention
+          touch .ci-trigger-pr666-convention
+      - name: Focused ownership validation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/agent_tools/check_convention_compliance.py --root . --format json
+          python3 -m pytest -q tests/agent_tools/test_check_convention_compliance.py
+          python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --root .
+          python3 tools/agent_tools/evaluate_report_quality.py --root .
+          git diff --check
+      - name: Canonical integration validation
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}
+          AGENT_CANON_PR_NUMBER: '666'
+          AGENT_CANON_PR_BASE_REF: main
+          AGENT_CANON_PR_HEAD_REF: canon/simplify-core-skill-contracts-630-640
+        run: bash tools/ci/check_agent_canon_pr.sh
+      - name: Commit completion
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'fix: deduplicate simplified skill convention ownership'
+          git push origin HEAD:canon/simplify-core-skill-contracts-630-640
