@@ -1,0 +1,25 @@
+name: Refresh PR665 on main
+on:
+  pull_request:
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-24.04
+    if: github.head_ref == 'canon/simplify-diagnostic-workflows-624-628'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: canon/simplify-diagnostic-workflows-624-628
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Merge current main
+        run: |
+          git fetch origin main
+          git config user.name agent-canon-validation
+          git config user.email agent-canon-validation@users.noreply.github.com
+          git merge --no-edit origin/main
+          rm .github/workflows/refresh-pr665-main.yml
+          git add -u .github/workflows/refresh-pr665-main.yml
+          git commit -m 'ci: remove PR665 refresh workflow'
+          git push origin HEAD:canon/simplify-diagnostic-workflows-624-628
