@@ -7,8 +7,7 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md raw/summary artifact boundary
 upstream design catalog.yaml upstream registry for this public skill
 upstream design report-writing.md interpretation and narrative projection
 upstream design html-output.md reader-facing rendering and viewport constraints
-upstream design html-experiment-report.md first-figure report plan
-upstream design structure-planning.md first-figure and section planning
+upstream design structure-planning.md figure and section planning when topology is genuinely unresolved
 upstream design result-artifact-writeout.md artifact placement and manifest discipline
 upstream design ../../documents/experiments/experiment-report-style.md reader-facing evidence quality
 downstream implementation ../../.agents/skills/result-visualize/SKILL.md exposes this workflow as a runtime skill
@@ -19,7 +18,7 @@ downstream implementation ../../.agents/skills/result-visualize/SKILL.md exposes
 
 - Scope: Reusable Figure Contracts for indexed result artifacts, independent of any specific domain.
 - Use When: Figure-level contracts are needed for plotting, status summaries, or visual comparison planning.
-- Boundary: Raw persistence belongs to `result-artifact-writeout`, interpretation belongs to `report-writing`, rendering belongs to `html-output`/`html-experiment-report`, execution belongs to `experiment-lifecycle`.
+- Boundary: Raw persistence belongs to `result-artifact-writeout`, interpretation belongs to `report-writing`, rendering belongs to `html-output`, execution belongs to `experiment-lifecycle`.
 - Section Path: Use `Purpose`, `Use When`, `Figure Contract`, `Coverage`, `Required Calculation Patterns`, `Workflow`, `Chart Families`, `Output Schema`.
 
 ## Purpose
@@ -55,8 +54,7 @@ Each figure must be defined as one contract block with all required fields:
 - `conditioning_population`: slice and conditioning population used for this figure
 - `scope_limit`: population or condition outside which the supported statement does not extend
 
-The first figure contract is the execution-status view. It appears exactly once
-and is not repeated as a preface or inside later result sections.
+The first figure contract is the execution-status view. It appears exactly once and is not repeated as a preface or inside later result sections.
 
 ## Workflow
 
@@ -66,9 +64,7 @@ and is not repeated as a preface or inside later result sections.
 4. Formula, grouping, weighting: write exact formulas, grouping fields, and weights for each figure.
 5. Geometry: choose chart geometry that matches question, scale type, and missingness policy.
 6. Coverage validation: validate complete-key handling via observed/missing/failed/not_applicable reporting.
-7. Choice resolution: replace every unresolved `or`, `optional`, and alternative
-   encoding with one concrete design; create separate figure blocks when both
-   alternatives are required.
+7. Choice resolution: replace every unresolved `or`, `optional`, and alternative encoding with one concrete design; create separate figure blocks when both alternatives are required.
 8. Figure inventory: emit one figure block for each required figure.
 
 ## Coverage
@@ -85,47 +81,24 @@ Define full-coverage behavior for distribution views (density, ECDF, quantiles, 
 ## Required Calculation Patterns
 
 1. Status counts
-   - For expected key set $K$ and status category $s$,
-     $N_s=\sum_{k\in K}\mathbf 1\{\operatorname{status}(k)=s\}$.
-   - $p_s=\frac{N_s}{|K|}$
+   - For expected key set $K$ and status category $s$, $N_s=\sum_{k\in K}\mathbf 1\{\operatorname{status}(k)=s\}$ and $p_s=N_s/|K|$.
 2. Histogram and ECDF
-   - For bin $b=[a_b,a_{b+1})$,
-     $H_b=\sum_{i=1}^{n}\mathbf 1\{a_b\leq x_i<a_{b+1}\}$.
-   - $h_b=\frac{H_b}{n}$
-   - $f_b=\frac{H_b}{n(a_{b+1}-a_b)}$
-   - $\widehat F(x)=\frac{1}{n}\sum_{i=1}^{n}\mathbf 1\{x_i\le x\}$
+   - For bin $b=[a_b,a_{b+1})$, $H_b=\sum_i\mathbf 1\{a_b\leq x_i<a_{b+1}\}$, $h_b=H_b/n$, and $\widehat F(x)=n^{-1}\sum_i\mathbf 1\{x_i\le x\}$.
 3. Hierarchical expectation distinctions
-   - $z_{e,r}=g(x_{e,r})$
-   - $\bar z_e=\frac{1}{|R_e|}\sum_{r\in R_e}z_{e,r}$
-   - Across-entity distribution:
-     $\frac{1}{|E|}\sum_{e\in E}\delta_{\bar z_e}$, with one weight per entity.
-   - Pooled distribution:
-     $\frac{1}{\sum_e|R_e|}\sum_{e\in E}\sum_{r\in R_e}\delta_{z_{e,r}}$,
-     with one weight per record.
-   - Metric of the within-entity mean:
-     $g(\bar x_e)=g\left(\frac{1}{|R_e|}\sum_{r\in R_e}x_{e,r}\right)$.
-   - State whether the estimand is $E[g(X)]$ or $g(E[X])$; these are not
-     interchangeable for nonlinear $g$.
+   - State whether the estimand is $E[g(X)]$ or $g(E[X])$; these are not interchangeable for nonlinear $g$.
+   - Across-entity and pooled distributions must state their weighting unit explicitly.
 4. Paired method comparison
-   - $K=K_A\cap K_B$
-   - $\Delta_k=y^A_k-y^B_k$
-   - Direction: positive $\Delta_k$ indicates method $A$ exceeds method $B$ on key $k$.
+   - $K=K_A\cap K_B$ and $\Delta_k=y^A_k-y^B_k$; state the sign convention.
 5. Coordinate-value density
-   - For coordinate bins $[c_u,c_{u+1})$ and value bins $[a_v,a_{v+1})$,
-     $D_{u,v}=\sum_{i=1}^{n}\mathbf 1\{c_u\leq c_i<c_{u+1},
-     \ a_v\leq x_i<a_{v+1}\}$.
-   - State whether color encodes $D_{u,v}$, relative frequency
-     $D_{u,v}/n$, or area-normalized density.
+   - State whether color represents counts, relative frequency, or area-normalized density.
 6. Entity-by-quantile
-   - Entity quantile: $Q_e(\tau)=\inf\{x:F_e(x)\ge \tau\}$ for eligible records in each entity slice.
+   - $Q_e(\tau)=\inf\{x:F_e(x)\ge \tau\}$ over eligible records.
 7. Event proportion
-   - For eligible index set $J$,
-     $r=\frac{1}{|J|}\sum_{j\in J}\mathbf 1\{\operatorname{event}_j=1\}$.
+   - $r=|J|^{-1}\sum_{j\in J}\mathbf 1\{\operatorname{event}_j=1\}$ for an explicit eligible set $J$.
 8. Relative metric
-   - $m_j=\frac{n_j}{d_j}$, where $d_j>0$ is explicit per figure and same denominator convention is used across comparands.
+   - $m_j=n_j/d_j$ with explicit $d_j>0$ and a consistent denominator convention.
 9. Recompute consistency residual
-   - Signed residual: $\mathrm{resid}=y_{\mathrm{recomputed}}-y_{\mathrm{reported}}$
-   - Absolute residual: $|\mathrm{resid}|$
+   - $\mathrm{resid}=y_{\mathrm{recomputed}}-y_{\mathrm{reported}}$; report signed or absolute residual intentionally.
 
 ## Chart Families
 
@@ -139,18 +112,16 @@ Use question-to-geometry defaults, then lock the geometry in each figure block.
 - Dense relation checks: hexbin or 2D density
 - Order/shape checks: quantile heatmap
 
-Other geometries are allowed when the figure contract explicitly states axis semantics, scale assumptions, and missingness handling.
-Write every formula with Markdown math delimiters. A final figure contract
-contains one resolved geometry, axis mapping, scale, grouping, and facet plan.
+Other geometries are allowed when the figure contract explicitly states axis semantics, scale assumptions, and missingness handling. A final figure contract contains one resolved geometry, axis mapping, scale, grouping, and facet plan.
 
 ## Relationship To Other Skills
 
-- `report-writing`: convert figure contracts into reader-facing narrative, limitations, and interpretation.
-- `html-output`: render optional static or browser-ready outputs from the same source artifacts.
-- `html-experiment-report`: map the first figure and report structure when HTML outputs are requested.
+- `report-writing`: convert figure contracts into reader-facing narrative, limitations, and interpretation when requested.
+- `html-output`: render existing artifacts or report content when HTML/browser output is explicitly requested; no intermediate experiment-report wrapper is required.
 - `experiment-review`: evaluate experiment-specific adequacy, fairness, or comparison validity.
-- `experiment-lifecycle`: govern experiment execution, run metadata, and status reporting assumptions.
-- `result-artifact-writeout`: persist raw results, summaries, and manifests.
+- `experiment-lifecycle`: govern run identity, execution, provenance, terminal status, rerun, and explicit publication decisions.
+- `result-artifact-writeout`: persist only the concrete generated artifacts with role/checksum/readback.
+- `structure-planning`: add only when owner/source/reader topology is genuinely being chosen rather than for a bounded existing-artifact render.
 
 ## Output Schema
 
@@ -160,6 +131,4 @@ If a figure renderer consumes machine-readable input, include only the required 
 
 ## Closeout
 
-Record:
-
-`result_visualize=complete`, `result_visualize_inventory=<path>`, `result_visualize_status_summary=<path>`
+Record the selected inventory/status outputs that were actually produced; do not create negative receipts for renderers or publication operations that did not run.
