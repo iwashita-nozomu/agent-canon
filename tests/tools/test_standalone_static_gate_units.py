@@ -50,7 +50,7 @@ def test_full_wrapper_is_shell_syntax_valid() -> None:
 def test_rust_commands_are_confined_to_rust_unit() -> None:
     text = RUNNER.read_text(encoding="utf-8")
     rust_body = text.split("run_rust() {", 1)[1].split("\n}\n\nrun_contracts()", 1)[0]
-    remainder = text.replace(rust_body, "")
+    remainder = text.replace(rust_body, "", 1)
     for command in (
         "cargo build --manifest-path rust/agent-canon/Cargo.toml",
         "cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check",
@@ -59,6 +59,17 @@ def test_rust_commands_are_confined_to_rust_unit() -> None:
     ):
         assert command in rust_body
         assert command not in remainder
+
+
+def test_focused_regression_is_owned_by_workflow_container_unit() -> None:
+    text = RUNNER.read_text(encoding="utf-8")
+    workflow_body = text.split("run_workflow_container() {", 1)[1].split(
+        "\n}\n\ncase ", 1
+    )[0]
+    remainder = text.replace(workflow_body, "", 1)
+    command = "python3 -m pytest tests/tools/test_standalone_static_gate_units.py -q"
+    assert command in workflow_body
+    assert command not in remainder
 
 
 def test_full_wrapper_aggregates_each_unit_once_without_reowning_commands() -> None:
@@ -117,6 +128,11 @@ def test_toolchain_setup_is_bounded_to_owning_jobs() -> None:
         assert "actions/setup-python@v5" in text
         assert "pip install" in text
         assert "rustup component add" not in text
+
+    assert "pytest" not in str(jobs["contracts-static"])
+    assert "pytest" not in str(jobs["eval-static"])
+    assert "pytest" in str(jobs["workflow-container-static"])
+    assert "pytest" in str(jobs["static-gates"])
 
 
 def test_workflow_full_wrapper_is_manual_only() -> None:

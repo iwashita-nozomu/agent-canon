@@ -66,6 +66,7 @@ run_eval() {
 }
 
 run_workflow_container() {
+  python3 -m pytest tests/tools/test_standalone_static_gate_units.py -q
   python3 "${TOOLS_ROOT}/ci/check_github_workflows.py"
   python3 "${TOOLS_ROOT}/ci/container_config.py"
 }
