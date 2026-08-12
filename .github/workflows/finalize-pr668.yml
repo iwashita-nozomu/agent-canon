@@ -64,7 +64,7 @@ jobs:
           p.write_text(s)
           PY
           chmod +x tools/agent_tools/classify_path_risk.py tools/ci/run_selected_agent_canon_pr_checks.py
-          rm .github/workflows/finalize-pr668.yml
+          rm -f .github/workflows/fix-pr668-validation.yml .github/workflows/finalize-pr668.yml .ci-kick-pr668
           touch .ci-trigger-pr668
       - name: Focused validation
         shell: bash
