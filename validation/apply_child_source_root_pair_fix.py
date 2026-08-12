@@ -14,7 +14,7 @@ def replace_once(path: Path, old: str, new: str, label: str) -> None:
 
 
 def main() -> None:
-    """Patch the child environment and its focused regression."""
+    """Patch the child environment and its focused regressions."""
     boundary = Path("tools/agent_tools/parent_root_side_effects.py")
     replace_once(
         boundary,
@@ -118,6 +118,33 @@ def main() -> None:
     assert Path(data["cache"]).resolve().is_relative_to(tmp_path.resolve())
 ''',
         "exec-bound temporary environment regression",
+    )
+
+    source_root_tests = Path("tests/agent_tools/test_agent_canon_source_root.py")
+    replace_once(
+        source_root_tests,
+        '''            environment = ParentRootSideEffectBoundary().child_environment(
+                receipt, {"HOME": "/unchanged/home"}
+            )
+            self.assertEqual(environment["HOME"], "/unchanged/home")
+            self.assertTrue(Path(environment["TMPDIR"]).is_relative_to(root))
+''',
+        '''            os_temp = root.parent / "source-root-os-temp"
+            environment = ParentRootSideEffectBoundary().child_environment(
+                receipt,
+                {
+                    "HOME": "/unchanged/home",
+                    "TMPDIR": str(os_temp),
+                    "TEMP": str(os_temp),
+                    "TMP": str(os_temp),
+                },
+            )
+            self.assertEqual(environment["HOME"], "/unchanged/home")
+            self.assertEqual(environment["TMPDIR"], str(os_temp))
+            self.assertEqual(environment["TEMP"], str(os_temp))
+            self.assertEqual(environment["TMP"], str(os_temp))
+''',
+        "source-root temporary environment regression",
     )
 
 
