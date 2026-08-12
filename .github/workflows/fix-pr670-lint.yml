@@ -34,7 +34,7 @@ jobs:
         run: |
           python3 -m pytest -q tests/agent_tools/test_attach_clean_detached_submodule.py
           python3 -m ruff check tests/agent_tools/test_attach_clean_detached_submodule.py tools/agent_tools/attach_clean_detached_submodule.py
-          python3 -m pyright tools/agent_tools/attach_clean_detached_submodule.py tests/agent_tools/test_attach_clean_detached_submodule.py
+          PYTHONPATH=tools/agent_tools python3 -m pyright tools/agent_tools/attach_clean_detached_submodule.py tests/agent_tools/test_attach_clean_detached_submodule.py
           bash -n tools/update_agent_canon.sh
           git diff --check
       - name: Commit and push
