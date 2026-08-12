@@ -91,7 +91,7 @@ jobs:
         with:
           python-version: "3.11"
       - name: Install workflow gate dependencies
-        run: python3 -m pip install --upgrade pyyaml tomli packaging
+        run: python3 -m pip install --upgrade pyyaml tomli packaging pytest
       - name: Run workflow and container static unit
         run: bash tools/ci/run_standalone_static_gate_unit.sh workflow-container
 
@@ -139,7 +139,7 @@ jobs:
           python-version: "3.11"
       - name: Install manual full-gate dependencies
         if: github.event_name == 'workflow_dispatch'
-        run: python3 -m pip install --upgrade pyyaml tomli packaging
+        run: python3 -m pip install --upgrade pyyaml tomli packaging pytest
       - name: Install Rust components for manual full gate
         if: github.event_name == 'workflow_dispatch'
         run: rustup component add rustfmt clippy
