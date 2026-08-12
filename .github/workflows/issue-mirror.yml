@@ -61,10 +61,30 @@ jobs:
         if: github.event_name == 'pull_request'
         run: echo "Remote issue reconciliation is intentionally skipped for pull requests."
 
-      - name: Confirm publication sync
+      - name: Checkout repository
+        id: checkout
         if: github.event_name != 'pull_request'
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+          persist-credentials: false
+
+      - name: Confirm publication sync
+        if: github.event_name != 'pull_request' && steps.checkout.outcome == 'success'
         run: |
           if [ "${{ needs.issue-mirror-sync.result }}" != "success" ]; then
             echo "Issue mirror publication sync did not succeed." >&2
             exit 1
           fi
+
+      - name: Record issue mirror unavailable
+        if: failure() && steps.checkout.outcome != 'success'
+        run: |
+          {
+            echo "## Issue Mirror Check"
+            echo ""
+            echo "- status: \`fail\`"
+            echo "- reason: \`checkout-failed\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+          echo "ISSUE_SYNC=fail"
+          exit 1
