@@ -46,8 +46,7 @@ downstream design parent-dependency-manifest-followup.md declares the parent man
 
 ## Default runtime と optional mount
 
-既定 generator `.devcontainer/generate-runtime-compose.sh` は parent environment、credentials、SSH agent、Docker socket、
-host runtime state を暗黙 mount せず、plain pack は host-independent な Compose を生成します。
+既定 generator `.devcontainer/generate-runtime-compose.sh` は parent environment、credentials、SSH agent、Docker socket、host runtime state を暗黙 mount せず、plain pack は host-independent な Compose を生成します。
 optional mount は `runtime.optional_mount_profiles` と `AGENT_CANON_OPTIONAL_MOUNTS` の明示選択だけを
 `.devcontainer/generate-runtime-compose.sh` と `tools/ci/container_config.py` が受理します。
 
@@ -123,8 +122,7 @@ RDC-003 の provision は `.devcontainer/gpu-admission.sh`、container readback 
 receipt parser/writer は `tools/experiments/execution_resource_plan.py` が所有します。
 `host_uid` / `host_gid` と `container_uid` / `container_gid` は provenance/observation として保存し、
 `tools/experiments/execution_resource_plan.py` は cross-boundary numeric equality を acceptance gate にしません。
-route/path、source/target device/inode、symlink/type/mode、mount namespace、fingerprint、lock、atomic publication、closed probe は
-`.devcontainer/finalize-shared-runtime.sh` と `tools/experiments/execution_resource_plan.py` が fail-closed で維持します。
+route/path、source/target device/inode、symlink/type/mode、mount namespace、fingerprint、lock、atomic publication、closed probe は `.devcontainer/finalize-shared-runtime.sh` と `tools/experiments/execution_resource_plan.py` が fail-closed で維持します。
 
 ## Explicit GPU-admission profile
 
@@ -157,8 +155,7 @@ runtime shell / account / optional profile の入力は `.devcontainer/generate-
 
 AgentCanon 共有実装の変更は `tools/update_agent_canon.sh` の source PR route で `main` へ統合した後、
 親 repo の gitlink/root views を `tools/sync_agent_canon.sh` が更新します。
-container の起動・停止・image 操作はこの source-update route に吸収せず、
-`documents/parent-repository/CONTAINER_OPERATIONS.md` の parent operation owner に接続します。
+container の起動・停止・image 操作はこの source-update route に吸収せず、`documents/parent-repository/CONTAINER_OPERATIONS.md` の parent operation owner に接続します。
 
 ## 禁止する重複
 
@@ -166,3 +163,9 @@ container の起動・停止・image 操作はこの source-update route に吸�
 - AgentCanon 共有 script の parent copy/wrapper は `tools/sync_agent_canon.sh` の direct source-view boundary に反します。
 - generated Compose の複数追跡先は `.devcontainer/generate-runtime-compose.sh` の `.agent-canon/docker-compose.generated.yml` owner に反します。
 - parent environment value の別 shell/Compose copy は `tools/ci/container_config.py` の single audited source boundary に反します。
+## Evidence And Assumption Ledger
+
+- Evidence sources: `.devcontainer/generate-runtime-compose.sh`, `tools/ci/container_config.py`, `tools/ci/container_runtime.py`, `.devcontainer/gpu-admission.sh`, `.devcontainer/finalize-shared-runtime.sh`, and `tools/experiments/execution_resource_plan.py` own the runtime/readback clauses above.
+- Assumption boundary: daemon mode and host-visible numeric ownership are observations, not acceptance predicates; container-side usability remains the oracle owned by `.devcontainer/post-create.sh` and `.devcontainer/finalize-shared-runtime.sh`.
+- Parent alignment: source publication remains owned by `tools/update_agent_canon.sh` / `tools/sync_agent_canon.sh`; container lifecycle remains owned by `documents/parent-repository/CONTAINER_OPERATIONS.md`.
+- Refactor handoff: changes that alter an owner or accepted clause must update the named implementation/checker rather than adding a second policy surface here.
