@@ -1,12 +1,12 @@
 name: Diagnose PR666 evals
 on:
-  pull_request:
+  push:
+    branches: [canon/simplify-core-skill-contracts-630-640]
 permissions:
   contents: write
 jobs:
   evals:
     runs-on: ubuntu-24.04
-    if: github.head_ref == 'canon/simplify-core-skill-contracts-630-640'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -22,7 +22,6 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import re
-
           def replace_eval_blocks(path: Path, reject_prefixes: tuple[str, ...], append: str) -> None:
               text = path.read_text()
               head, *blocks = text.split('\n[[evals]]')
@@ -35,11 +34,7 @@ jobs:
                   kept.append(block)
               out = head.rstrip() + ''.join('\n[[evals]]' + block for block in kept)
               path.write_text(out.rstrip() + '\n\n' + append.strip() + '\n')
-
-          replace_eval_blocks(
-              Path('evidence/agent-evals/skill_workflow_prompt_eval.toml'),
-              ('report-writing-', 'structure-planning-', 'test-design-'),
-              r'''
+          replace_eval_blocks(Path('evidence/agent-evals/skill_workflow_prompt_eval.toml'),('report-writing-', 'structure-planning-', 'test-design-'),r'''
 [[evals]]
 id = "report-writing-semantic-contract"
 target = "agents/skills/report-writing.md"
@@ -52,7 +47,6 @@ required_regex = ["material factual or recommendation claim", "source support", 
 id = "REPORT-SEMANTIC-2"
 critical = true
 required_regex = ["No fixed heading count", "finding_count == 0", "advisory checker", "Markdown is the default", "explicitly requested"]
-
 [[evals]]
 id = "structure-planning-semantic-activation"
 target = "agents/skills/structure-planning.md"
@@ -65,7 +59,6 @@ required_regex = ["owner", "canonical source", "reader entry", "validation topol
 id = "STRUCTURE-SEMANTIC-2"
 critical = true
 required_regex = ["Mermaid", "optional diagnostics", "information gain"]
-
 [[evals]]
 id = "test-design-semantic-admission"
 target = "agents/skills/test-design.md"
@@ -78,13 +71,8 @@ required_regex = ["contract", "reachable", "counterexample", "oracle"]
 id = "TEST-SEMANTIC-2"
 critical = true
 required_regex = ["reproduction", "reachability evidence", "null-hypothesis"]
-''',
-          )
-
-          replace_eval_blocks(
-              Path('evidence/agent-evals/report_quality_eval.toml'),
-              ('report-writing-runtime-skill', 'report-writing-human-doc'),
-              r'''
+''')
+          replace_eval_blocks(Path('evidence/agent-evals/report_quality_eval.toml'),('report-writing-runtime-skill', 'report-writing-human-doc'),r'''
 [[evals]]
 id = "report-writing-semantic-quality"
 target = "agents/skills/report-writing.md"
@@ -97,8 +85,7 @@ required_regex = ["source support", "inference", "observations and interpretatio
 id = "REPORT-QUALITY-SEMANTIC-2"
 critical = true
 required_regex = ["No fixed heading count", "accepted blocking findings", "finding_count == 0", "second policy/source-of-truth"]
-''',
-          )
+''')
           PY
           rm -f .github/workflows/diag-pr666-evals.yml .github/workflows/fix-pr666-evals.yml
       - name: Validate semantic evals
