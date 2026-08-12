@@ -200,14 +200,6 @@ path = "agents/skills/codex-task-workflow.md"
 markers = ["$oop-readability-check", "SOLID principle signal", "OOP dimension", "finding kind", "tools/oop/shared/readability_core.py", "check_solid_evidence.py", "scanned_paths", "class", "Protocol"]
 
 [[contracts.surfaces]]
-path = "agents/skills/python-review.md"
-markers = ["SOLID 原則シグナル", "OOP 可読性レポート", "tools/oop/python/readability.py", "tools/agent_tools/check_solid_evidence.py", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "readability.py", "scanned_paths"]
-
-[[contracts.surfaces]]
-path = "agents/skills/change-review.md"
-markers = ["python-review", "$oop-readability-check", "tools/agent_tools/check_solid_evidence.py", "SOLID principle signal", "OOP readability report", "class", "Protocol"]
-
-[[contracts.surfaces]]
 path = ".codex/agents/python_reviewer.toml"
 markers = ["check_solid_evidence.py", "OOP readability report", "SOLID principle signal", "Single responsibility", "Open/closed", "Liskov substitution", "Interface segregation", "Dependency inversion", "path-covered"]
 
@@ -242,10 +234,6 @@ markers = ["読者順序", "依存順序", "公開契約", "公開入口", "内�
 [[contracts.surfaces]]
 path = "documents/conventions/coding-conventions-house-style.md"
 markers = ["読者順序", "公開契約", "公開入口", "内部補助関数", "単一公開入口"]
-
-[[contracts.surfaces]]
-path = "agents/skills/python-review.md"
-markers = ["定義順", "読者順序", "公開入口", "内部補助関数", "check_convention_compliance.py"]
 
 [[contracts.surfaces]]
 path = "agents/skills/catalog.yaml"
