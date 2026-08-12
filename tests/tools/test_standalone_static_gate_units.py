@@ -60,7 +60,10 @@ def test_canonical_selector_maps_representative_surfaces_to_units() -> None:
     assert selected_units("rust/agent-canon/src/main.rs") == ("rust",)
     assert selected_units("agents/evals/skill-workflow-prompt.yaml") == ("eval",)
     assert selected_units("agents/skills/catalog.yaml") == ("contracts",)
-    assert selected_units(".github/PULL_REQUEST_TEMPLATE.md") == ("workflow-container",)
+    assert selected_units(".github/PULL_REQUEST_TEMPLATE.md") == (
+        "contracts",
+        "workflow-container",
+    )
     assert selected_units("docker/Dockerfile") == ("workflow-container",)
     assert selected_units("memory/example.yaml") == ("contracts",)
 
