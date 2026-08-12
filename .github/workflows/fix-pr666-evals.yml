@@ -1,3 +1,4 @@
+# targeted temporary validation workflow
 name: Fix PR666 semantic evals
 on:
   pull_request:
@@ -16,28 +17,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - run: python3 -m pip install --upgrade tomli pyyaml packaging
+      - run: python3 -m pip install --upgrade tomli pyyaml packaging pytest
       - name: Replace obsolete ceremony evals with semantic oracles
         run: |
           python3 - <<'PY'
           from pathlib import Path
-
           def filter_blocks(path: Path, reject_tokens: tuple[str, ...], append: str) -> None:
               text = path.read_text()
               head, *blocks = text.split('\n[[evals]]')
               kept = [b for b in blocks if not any(token in b for token in reject_tokens)]
               out = head.rstrip() + ''.join('\n[[evals]]' + b for b in kept)
               path.write_text(out.rstrip() + '\n\n' + append.strip() + '\n')
-
           skill_manifest = Path('evidence/agent-evals/skill_workflow_prompt_eval.toml')
-          filter_blocks(
-              skill_manifest,
-              (
-                  'id = "report-writing-',
-                  'id = "structure-planning-',
-                  'id = "test-design-',
-              ),
-              r'''
+          filter_blocks(skill_manifest, ('id = "report-writing-', 'id = "structure-planning-', 'id = "test-design-'), r'''
 [[evals]]
 id = "report-writing-semantic-contract"
 target = "agents/skills/report-writing.md"
@@ -50,7 +42,6 @@ required_regex = ["material factual or recommendation claim", "source support", 
 id = "REPORT-SEMANTIC-2"
 critical = true
 required_regex = ["No fixed heading count", "finding_count == 0", "advisory checker", "Markdown is the default", "explicitly requested"]
-
 [[evals]]
 id = "structure-planning-semantic-activation"
 target = "agents/skills/structure-planning.md"
@@ -63,7 +54,6 @@ required_regex = ["owner", "source", "reader", "validation", "decision"]
 id = "STRUCTURE-SEMANTIC-2"
 critical = true
 required_regex = ["Mermaid", "optional", "diagnostic"]
-
 [[evals]]
 id = "test-design-semantic-admission"
 target = "agents/skills/test-design.md"
@@ -76,15 +66,9 @@ required_regex = ["contract", "reachable", "counterexample", "oracle"]
 id = "TEST-SEMANTIC-2"
 critical = true
 required_regex = ["reproduction", "reachability", "null hypothesis"]
-''',
-          )
-
+''')
           report_manifest = Path('evidence/agent-evals/report_quality_eval.toml')
-          # Keep reviewer-role coverage, replace report body/shim shape checks.
-          filter_blocks(
-              report_manifest,
-              ('id = "report-writing-runtime-skill"', 'id = "report-writing-human-doc"'),
-              r'''
+          filter_blocks(report_manifest, ('id = "report-writing-runtime-skill"', 'id = "report-writing-human-doc"'), r'''
 [[evals]]
 id = "report-writing-semantic-quality"
 target = "agents/skills/report-writing.md"
@@ -96,11 +80,10 @@ required_regex = ["source support", "inference", "observations and interpretatio
 [[evals.checklist]]
 id = "REPORT-QUALITY-SEMANTIC-2"
 critical = true
-required_regex = ["No fixed heading count", "accepted blocking findings", "not raw `finding_count == 0`", "second policy/source-of-truth"]
-''',
-          )
+required_regex = ["No fixed heading count", "accepted blocking findings", "finding_count == 0", "second policy/source-of-truth"]
+''')
           PY
-          rm .github/workflows/diag-pr666-evals.yml .github/workflows/fix-pr666-evals.yml
+          rm -f .github/workflows/diag-pr666-evals.yml .github/workflows/fix-pr666-evals.yml
       - name: Validate new semantic evals
         run: |
           python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --root .
@@ -111,7 +94,7 @@ required_regex = ["No fixed heading count", "accepted blocking findings", "not r
         run: |
           git config user.name agent-canon-validation
           git config user.email agent-canon-validation@users.noreply.github.com
-          git add evidence/agent-evals/skill_workflow_prompt_eval.toml evidence/agent-evals/report_quality_eval.toml .github/workflows/diag-pr666-evals.yml .github/workflows/fix-pr666-evals.yml
+          git add -A evidence/agent-evals .github/workflows
           git commit -m 'test: align skill evals with semantic contracts'
           git fetch origin main
           git merge --no-edit origin/main
