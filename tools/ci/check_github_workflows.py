@@ -137,19 +137,19 @@ ROOT_IMPROVEMENT_GUIDE_WORKFLOW_ALLOWED_TAGS = (
     "Template AgentCanon improvement guidance workflow",
 )
 STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
-    "Standalone-only workflow",
-    "Template and derived repositories should not copy",
+    "workflow_dispatch:",
+    "schedule:",
     "generate_agent_runtime_dashboard.py",
 )
 STANDALONE_ISSUE_MIRROR_WORKFLOW_REQUIREMENTS = (
-    "Standalone-only workflow",
-    "Template and derived repositories should not copy",
+    "push:",
+    "- main",
+    "workflow_dispatch:",
     "issue_sync.py",
     "--github-check",
     "--sync-github",
     "GITHUB_STEP_SUMMARY",
     "permissions:",
-    "issues: read",
     "issues: write",
 )
 VENDOR_COORDINATION_WORKFLOW_REQUIREMENTS = (
