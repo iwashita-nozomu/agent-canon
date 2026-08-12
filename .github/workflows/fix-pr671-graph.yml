@@ -44,7 +44,8 @@ jobs:
         run: |
           tools/bin/agent-canon graph build
           python3 tools/agent_tools/check_design_doc_claims.py --root . documents/design/devcontainer/parent-devcontainer-policy.md
-          python3 tools/agent_tools/prose_reasoning_graph.py check-document documents/design/devcontainer/parent-devcontainer-policy.md --profile all
+          out=$(mktemp -d)
+          python3 tools/agent_tools/prose_reasoning_graph.py check-document documents/design/devcontainer/parent-devcontainer-policy.md --profile all --out-dir "$out"
           tools/bin/agent-canon docs check documents/design/devcontainer/parent-devcontainer-policy.md
           git diff --check
       - name: Commit validated document and remove temporary validators
