@@ -1,0 +1,49 @@
+name: Finalize PR665
+on:
+  pull_request:
+permissions:
+  contents: write
+jobs:
+  finalize:
+    if: github.head_ref == 'canon/simplify-diagnostic-workflows-624-628'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: canon/simplify-diagnostic-workflows-624-628
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m pip install --upgrade pyyaml tomli packaging pytest
+      - name: Remove retired workflow edges
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          edits = {
+              Path('tools/ci/check_github_workflows.py'): '# upstream design ../../.github/workflows/agent-coordination.yml workflow source\n',
+              Path('tools/ci/pre_review.sh'): '# downstream implementation ../../.github/workflows/agent-coordination.yml verifier stage calls this entrypoint\n',
+          }
+          for path, line in edits.items():
+              text = path.read_text()
+              if line not in text:
+                  raise SystemExit(f'missing expected stale edge: {path}')
+              path.write_text(text.replace(line, '', 1))
+          PY
+      - name: Validate focused workflow and dependency contracts
+        run: |
+          python3 tools/ci/check_github_workflows.py
+          python3 -m pytest -q tests/agent_tools/test_classify_path_risk.py
+          bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
+          tools/bin/agent-canon graph build
+          bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing --cycle-report-only
+          git diff --check
+      - name: Commit and push
+        run: |
+          git config user.name agent-canon-validation
+          git config user.email agent-canon-validation@users.noreply.github.com
+          rm .github/workflows/finalize-pr665.yml
+          git add tools/ci/check_github_workflows.py tools/ci/pre_review.sh .github/workflows/finalize-pr665.yml
+          git commit -m 'fix: remove retired workflow dependency edges'
+          git push origin HEAD:canon/simplify-diagnostic-workflows-624-628
