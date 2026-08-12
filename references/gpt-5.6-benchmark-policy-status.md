@@ -3,7 +3,7 @@
 @dependency-start
 contract reference
 responsibility Separates dated GPT-5.6 benchmark observations from current AgentCanon orchestration and write-safety policy.
-upstream reference gpt-5.6-benchmark-report-ja.md dated benchmark synthesis being scoped
+upstream design gpt-5.6-benchmark-report-ja.md dated benchmark synthesis being scoped
 upstream design ../documents/design/responsibility-rationale.md canonical current multi-agent and write-control rationale
 @dependency-end
 -->
