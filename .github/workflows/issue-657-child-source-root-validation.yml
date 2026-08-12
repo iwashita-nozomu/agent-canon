@@ -50,6 +50,7 @@ jobs:
           import subprocess
 
           expected = [
+              "tests/agent_tools/test_agent_canon_source_root.py",
               "tests/agent_tools/test_parent_root_side_effects.py",
               "tools/agent_tools/parent_root_side_effects.py",
           ]
@@ -65,7 +66,7 @@ jobs:
           ).splitlines()
           if tracked != expected or untracked:
               raise SystemExit(
-                  f"unexpected child source-root patch: tracked={tracked}, untracked={untracked}"
+                  f"unexpected parent-boundary patch: tracked={tracked}, untracked={untracked}"
               )
           PY
           git diff --check
@@ -103,9 +104,11 @@ jobs:
       - name: Run focused static checks
         run: |
           python3 -m ruff check --select E9,F,I \
+            tests/agent_tools/test_agent_canon_source_root.py \
             tests/agent_tools/test_parent_root_side_effects.py \
             tools/agent_tools/parent_root_side_effects.py
           python3 -m py_compile \
+            tests/agent_tools/test_agent_canon_source_root.py \
             tests/agent_tools/test_parent_root_side_effects.py \
             tools/agent_tools/parent_root_side_effects.py
           git diff --check
@@ -116,6 +119,7 @@ jobs:
           import subprocess
 
           expected = [
+              "tests/agent_tools/test_agent_canon_source_root.py",
               "tests/agent_tools/test_parent_root_side_effects.py",
               "tools/agent_tools/parent_root_side_effects.py",
           ]
@@ -137,8 +141,9 @@ jobs:
           git config user.name "agent-canon-validation"
           git config user.email "agent-canon-validation@users.noreply.github.com"
           git add \
+            tests/agent_tools/test_agent_canon_source_root.py \
             tests/agent_tools/test_parent_root_side_effects.py \
             tools/agent_tools/parent_root_side_effects.py
-          git commit -m "fix: pair child source-root overrides"
+          git commit -m "fix: preserve ephemeral OS temp state"
           git push origin HEAD:canon/parent-bounded-side-effects-20260810
           test -z "$(git status --porcelain)"
