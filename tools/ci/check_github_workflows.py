@@ -8,7 +8,6 @@
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR checklist
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
 # upstream design ../../templates/documents/github/pull-request/agent_canon.md canonical template-side AgentCanon PR checklist
-# upstream design ../../.github/workflows/agent-coordination.yml workflow source
 # upstream design ../../.github/workflows/agent-improvement-guide.yml PR and push improvement guide workflow
 # upstream design ../../.github/workflows/agent-runtime-dashboard.yml standalone AgentCanon runtime dashboard workflow
 # upstream design ../../.github/workflows/issue-mirror.yml standalone local/GitHub issue mirror workflow
