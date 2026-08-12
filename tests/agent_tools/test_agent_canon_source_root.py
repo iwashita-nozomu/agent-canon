@@ -51,11 +51,20 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                     cwd=root, explicit_root=root, purpose="agent-canon-source-root"
                 )
             )
+            os_temp = root.parent / "source-root-os-temp"
             environment = ParentRootSideEffectBoundary().child_environment(
-                receipt, {"HOME": "/unchanged/home"}
+                receipt,
+                {
+                    "HOME": "/unchanged/home",
+                    "TMPDIR": str(os_temp),
+                    "TEMP": str(os_temp),
+                    "TMP": str(os_temp),
+                },
             )
             self.assertEqual(environment["HOME"], "/unchanged/home")
-            self.assertTrue(Path(environment["TMPDIR"]).is_relative_to(root))
+            self.assertEqual(environment["TMPDIR"], str(os_temp))
+            self.assertEqual(environment["TEMP"], str(os_temp))
+            self.assertEqual(environment["TMP"], str(os_temp))
 
     def _mock_resolution(self, command_root: Path) -> RootResolution:
         return RootResolution(

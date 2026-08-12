@@ -521,16 +521,28 @@ def test_atomic_publish_and_child_environment_keep_home_unchanged(tmp_path: Path
     assert published.target_ino is not None
     assert published.physical_path.read_text(encoding="utf-8") == "updated\n"
     original_home = os.environ.get("HOME")
-    env = child_environment(receipt, {"HOME": original_home or ""})
+    os_temp = tmp_path.parent / "os-temp"
+    env = child_environment(
+        receipt,
+        {
+            "HOME": original_home or "",
+            "TMPDIR": str(os_temp),
+            "TEMP": str(os_temp),
+            "TMP": str(os_temp),
+        },
+    )
     assert env["HOME"] == (original_home or "")
+    assert env["TMPDIR"] == str(os_temp)
+    assert env["TEMP"] == str(os_temp)
+    assert env["TMP"] == str(os_temp)
+    assert not os_temp.exists()
     assert env["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] == str(tmp_path.resolve())
     assert env["AGENT_CANON_PARENT_ROOT"] == str(tmp_path.resolve())
     assert env["AGENT_CANON_SOURCE_ROOT"] == str(tmp_path.resolve())
     assert env["AGENT_CANON_ROOT"] == env["AGENT_CANON_SOURCE_ROOT"]
     for name in (
-        "TMPDIR", "TEMP", "TMP", "XDG_CACHE_HOME", "PYTHONPYCACHEPREFIX",
-        "AGENT_CANON_TOOLS_HOME", "CARGO_HOME", "CARGO_TARGET_DIR",
-        "AGENT_CANON_CLI_TARGET_DIR",
+        "XDG_CACHE_HOME", "PYTHONPYCACHEPREFIX", "AGENT_CANON_TOOLS_HOME",
+        "CARGO_HOME", "CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR",
     ):
         assert Path(env[name]).resolve().is_relative_to(tmp_path.resolve())
     assert env["CARGO_TARGET_DIR"] == env["AGENT_CANON_CLI_TARGET_DIR"]
@@ -950,8 +962,15 @@ def test_exec_parent_bound_preserves_home_and_bindings(tmp_path: Path) -> None:
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
     preserved_home = tmp_path / "outside-home"
     preserved_home.mkdir()
+    os_temp = tmp_path.parent / "exec-os-temp"
     env = _build_clean_env(
-        {"HOME": str(preserved_home), "PYTHONPATH": os.getcwd()}
+        {
+            "HOME": str(preserved_home),
+            "PYTHONPATH": os.getcwd(),
+            "TMPDIR": str(os_temp),
+            "TEMP": str(os_temp),
+            "TMP": str(os_temp),
+        }
     )
     code = (
         "import json, os; "
@@ -995,9 +1014,9 @@ def test_exec_parent_bound_preserves_home_and_bindings(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     data = json.loads(result.stdout.strip())
     assert data["home"] == str(preserved_home)
-    assert Path(data["tmpdir"]).resolve().is_relative_to(tmp_path.resolve())
-    assert Path(data["temp"]).resolve().is_relative_to(tmp_path.resolve())
-    assert Path(data["tmp"]).resolve().is_relative_to(tmp_path.resolve())
+    assert data["tmpdir"] == str(os_temp)
+    assert data["temp"] == str(os_temp)
+    assert data["tmp"] == str(os_temp)
     assert Path(data["cache"]).resolve().is_relative_to(tmp_path.resolve())
     assert Path(data["tools"]).resolve().is_relative_to(tmp_path.resolve())
     assert data["cargo_target"] == data["cli_target"]
