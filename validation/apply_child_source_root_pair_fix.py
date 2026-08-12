@@ -86,6 +86,39 @@ def main() -> None:
 ''',
         "parent-local persistent environment regression",
     )
+    replace_once(
+        tests,
+        '''    env = _build_clean_env(
+        {"HOME": str(preserved_home), "PYTHONPATH": os.getcwd()}
+    )
+''',
+        '''    os_temp = tmp_path.parent / "exec-os-temp"
+    env = _build_clean_env(
+        {
+            "HOME": str(preserved_home),
+            "PYTHONPATH": os.getcwd(),
+            "TMPDIR": str(os_temp),
+            "TEMP": str(os_temp),
+            "TMP": str(os_temp),
+        }
+    )
+''',
+        "exec-bound temporary environment input",
+    )
+    replace_once(
+        tests,
+        '''    assert Path(data["tmpdir"]).resolve().is_relative_to(tmp_path.resolve())
+    assert Path(data["temp"]).resolve().is_relative_to(tmp_path.resolve())
+    assert Path(data["tmp"]).resolve().is_relative_to(tmp_path.resolve())
+    assert Path(data["cache"]).resolve().is_relative_to(tmp_path.resolve())
+''',
+        '''    assert data["tmpdir"] == str(os_temp)
+    assert data["temp"] == str(os_temp)
+    assert data["tmp"] == str(os_temp)
+    assert Path(data["cache"]).resolve().is_relative_to(tmp_path.resolve())
+''',
+        "exec-bound temporary environment regression",
+    )
 
 
 if __name__ == "__main__":
