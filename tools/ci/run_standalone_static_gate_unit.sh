@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Runs one standalone AgentCanon static-gate execution unit without selecting whether that unit is required.
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
-# upstream implementation ./check_agent_canon_pr.sh existing full standalone static-gate command set
+# downstream implementation ./check_agent_canon_pr.sh aggregates all units for the manual full-confidence route
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml remote execution boundary
 # downstream test ../../tests/tools/test_standalone_static_gate_units.py unit partition regression
 # @dependency-end
