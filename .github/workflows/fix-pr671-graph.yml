@@ -23,22 +23,13 @@ jobs:
           from pathlib import Path
           p=Path('documents/design/devcontainer/parent-devcontainer-policy.md')
           s=p.read_text()
-          s=s.replace(
-            '既定 generator `.devcontainer/generate-runtime-compose.sh` は parent environment、credentials、SSH agent、Docker socket、\nhost runtime state を暗黙 mount せず、plain pack は host-independent な Compose を生成します。',
-            '既定 generator `.devcontainer/generate-runtime-compose.sh` は parent environment、credentials、SSH agent、Docker socket、host runtime state を暗黙 mount せず、plain pack は host-independent な Compose を生成します。',
-          )
-          s=s.replace(
-            'route/path、source/target device/inode、symlink/type/mode、mount namespace、fingerprint、lock、atomic publication、closed probe は\n`.devcontainer/finalize-shared-runtime.sh` と `tools/experiments/execution_resource_plan.py` が fail-closed で維持します。',
-            'route/path、source/target device/inode、symlink/type/mode、mount namespace、fingerprint、lock、atomic publication、closed probe は `.devcontainer/finalize-shared-runtime.sh` と `tools/experiments/execution_resource_plan.py` が fail-closed で維持します。',
-          )
-          s=s.replace(
-            'container の起動・停止・image 操作はこの source-update route に吸収せず、\n`documents/parent-repository/CONTAINER_OPERATIONS.md` の parent operation owner に接続します。',
-            'container の起動・停止・image 操作はこの source-update route に吸収せず、`documents/parent-repository/CONTAINER_OPERATIONS.md` の parent operation owner に接続します。',
-          )
+          s=s.replace('既定 generator `.devcontainer/generate-runtime-compose.sh` は parent environment、credentials、SSH agent、Docker socket、\nhost runtime state を暗黙 mount せず、plain pack は host-independent な Compose を生成します。','既定 generator `.devcontainer/generate-runtime-compose.sh` は parent environment、credentials、SSH agent、Docker socket、host runtime state を暗黙 mount せず、plain pack は host-independent な Compose を生成します。')
+          s=s.replace('route/path、source/target device/inode、symlink/type/mode、mount namespace、fingerprint、lock、atomic publication、closed probe は\n`.devcontainer/finalize-shared-runtime.sh` と `tools/experiments/execution_resource_plan.py` が fail-closed で維持します。','route/path、source/target device/inode、symlink/type/mode、mount namespace、fingerprint、lock、atomic publication、closed probe は `.devcontainer/finalize-shared-runtime.sh` と `tools/experiments/execution_resource_plan.py` が fail-closed で維持します。')
+          s=s.replace('container の起動・停止・image 操作はこの source-update route に吸収せず、\n`documents/parent-repository/CONTAINER_OPERATIONS.md` の parent operation owner に接続します。','container の起動・停止・image 操作はこの source-update route に吸収せず、`documents/parent-repository/CONTAINER_OPERATIONS.md` の parent operation owner に接続します。')
           ledger='''\n## Evidence And Assumption Ledger\n\n- Evidence sources: `.devcontainer/generate-runtime-compose.sh`, `tools/ci/container_config.py`, `tools/ci/container_runtime.py`, `.devcontainer/gpu-admission.sh`, `.devcontainer/finalize-shared-runtime.sh`, and `tools/experiments/execution_resource_plan.py` own the runtime/readback clauses above.\n- Assumption boundary: daemon mode and host-visible numeric ownership are observations, not acceptance predicates; container-side usability remains the oracle owned by `.devcontainer/post-create.sh` and `.devcontainer/finalize-shared-runtime.sh`.\n- Parent alignment: source publication remains owned by `tools/update_agent_canon.sh` / `tools/sync_agent_canon.sh`; container lifecycle remains owned by `documents/parent-repository/CONTAINER_OPERATIONS.md`.\n- Refactor handoff: changes that alter an owner or accepted clause must update the named implementation/checker rather than adding a second policy surface here.\n'''
           if '## Evidence And Assumption Ledger' not in s:
-              s=s.rstrip()+ledger+'\n'
-          p.write_text(s)
+              s=s.rstrip()+ledger
+          p.write_text(s.rstrip()+'\n')
           PY
       - name: Rebuild canonical graph and validate document
         run: |
