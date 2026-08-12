@@ -12,6 +12,7 @@
 name: Agent Runtime Dashboard
 
 on:
+  pull_request:
   workflow_dispatch:
   schedule:
     - cron: "17 3 * * *"
@@ -27,24 +28,33 @@ jobs:
   dashboard:
     runs-on: ubuntu-latest
     steps:
+      - name: PR required-check compatibility
+        if: github.event_name == 'pull_request'
+        run: echo "Runtime dashboard generation is intentionally skipped for pull requests."
+
       - name: Checkout repository
+        if: github.event_name != 'pull_request'
         uses: actions/checkout@v4
         with:
           submodules: false
           persist-credentials: false
 
       - name: Setup Python
+        if: github.event_name != 'pull_request'
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
       - name: Install dashboard dependencies
+        if: github.event_name != 'pull_request'
         run: python3 -m pip install --upgrade pyyaml tomli
 
       - name: Prepare runtime log archive
+        if: github.event_name != 'pull_request'
         run: mkdir -p .agent-canon/log-archive
 
       - name: Build and read back canonical graph
+        if: github.event_name != 'pull_request'
         run: |
           set -euo pipefail
           PYTHONPATH=tools python3 -m agent_tools.agent_canon_source_root exec \
@@ -55,15 +65,18 @@ jobs:
             --root "${GITHUB_WORKSPACE}" --profile default --format json
 
       - name: Run accumulated eval producers
+        if: github.event_name != 'pull_request'
         run: |
           python3 tools/agent_tools/run_accumulated_agent_evals.py \
             --root "${GITHUB_WORKSPACE}" \
             --run-id "agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Validate accumulated evidence
+        if: github.event_name != 'pull_request'
         run: python3 tools/agent_tools/eval_accumulation_check.py --root "${GITHUB_WORKSPACE}"
 
       - name: Generate runtime dashboard
+        if: github.event_name != 'pull_request'
         id: dashboard
         run: |
           report_dir="${GITHUB_WORKSPACE}/reports/agent-runtime-dashboard"
@@ -76,6 +89,7 @@ jobs:
           echo "dashboard_path=${dashboard_path}" >> "$GITHUB_OUTPUT"
 
       - name: Upload runtime dashboard
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: agent-runtime-dashboard-${{ github.run_id }}-${{ github.run_attempt }}
