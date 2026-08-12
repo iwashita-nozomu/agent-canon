@@ -1,0 +1,24 @@
+name: Diagnose PR666 evals
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  evals:
+    runs-on: ubuntu-24.04
+    if: github.head_ref == 'canon/simplify-core-skill-contracts-630-640'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: canon/simplify-core-skill-contracts-630-640
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m pip install --upgrade tomli pyyaml
+      - name: Skill prompt eval
+        continue-on-error: true
+        run: python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --root .
+      - name: Report quality eval
+        continue-on-error: true
+        run: python3 tools/agent_tools/evaluate_report_quality.py --root .
