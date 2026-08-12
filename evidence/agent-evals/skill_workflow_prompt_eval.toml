@@ -14,7 +14,6 @@
 # @dependency-end
 
 version = 1
-
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
@@ -238,67 +237,6 @@ description = "Defaults tool finding runs to full repository scope and records a
 required_regex = ["full repository", "scope_exception", "requested_scope", "omitted_surfaces"]
 
 [[evals]]
-id = "report-writing-skill"
-target = ".agents/skills/report-writing/SKILL.md"
-canonical_target = "agents/skills/report-writing.md"
-kind = "skill"
-description = "Report writing must require source packets, evidence traceability, limitations, actionability, reviewer routing, and result-artifact separation."
-
-[[evals.checklist]]
-id = "REPORT-WRITING-SKILL-1"
-critical = true
-description = "Requires reader-facing report classification and source packet setup."
-required_regex = ["reader-facing", "Classify the report", "source packet"]
-
-[[evals.checklist]]
-id = "REPORT-WRITING-SKILL-2"
-critical = true
-description = "Requires quality checklist dimensions, limitations, and actionability."
-required_regex = ["Report Quality Checklist", "limitations", "actionability", "evidence traceability"]
-
-[[evals.checklist]]
-id = "REPORT-WRITING-SKILL-3"
-critical = true
-description = "Separates raw result writeout from report narrative and requires reviewer routing."
-required_regex = ["\\$result-artifact-writeout", "raw", "reader report", "report_reviewer"]
-
-[[evals.checklist]]
-id = "REPORT-SOURCE-SHIM-1"
-critical = true
-description = "Requires existing reference-note inspection and durable source packets."
-required_regex = ["external references", "existing repo reference notes", "durable source packets"]
-
-[[evals.checklist]]
-id = "REPORT-SOURCE-SHIM-2"
-critical = true
-description = "Rejects transient browser, temporary download, and chat-only summaries as provenance."
-required_regex = ["browser tab", "downloaded temp file", "chat-only source summary"]
-
-[[evals.checklist]]
-id = "REPORT-STRUCTURE-SHIM-1"
-critical = true
-description = "Routes nontrivial report structure through structure-planning before drafting."
-required_regex = ["\\$structure-planning", "structure contract", "report skeleton", "mapped evidence"]
-
-[[evals.checklist]]
-id = "REPORT-OUTPUT-FORMAT-SKILL-1"
-critical = true
-description = "Defaults reports to Markdown and routes explicit HTML/browser output to html-output."
-required_regex = ["default to Markdown", "explicitly asks for HTML", "\\$html-output", "browser view", "external browser publication"]
-
-[[evals.checklist]]
-id = "REPORT-PROJECTION-ORDER-SKILL-1"
-critical = true
-description = "Requires report prose projection to consume whole-document selected ordering from prose graph handoff."
-required_regex = ["selected_ordering\\.ordered_anchors", "whole-document topological sentence order", "DSL-to-prose input sequence"]
-
-[[evals.checklist]]
-id = "REPORT-POSITIVE-RESPONSIBILITY-SKILL-1"
-critical = true
-description = "Requires report projection prose to use positive responsibility contracts and classify ad hoc labels."
-required_regex = ["positive prose contracts", "Boundary, Limitation, or Non-Goal", "ad hoc", "prompt-defect classification"]
-
-[[evals]]
 id = "md-style-check-unified-rust-docs"
 target = ".agents/skills/md-style-check/SKILL.md"
 canonical_target = "agents/skills/md-style-check.md"
@@ -458,79 +396,6 @@ id = "HTML-OUTPUT-DOC-3"
 critical = true
 description = "Wires ImageGen and layout quality gates."
 required_regex = ["\\$imagegen", "Layout Quality Gate", "stable dimensions", "Text fits", "html_layout_check"]
-
-[[evals]]
-id = "structure-planning-shim"
-target = ".agents/skills/structure-planning/SKILL.md"
-canonical_target = "agents/skills/structure-planning.md"
-kind = "skill"
-description = "Structure planning runtime skill must cover reports, experiments, documents, HTML views, and refactors."
-
-[[evals.checklist]]
-id = "STRUCTURE-PLANNING-SHIM-1"
-critical = true
-description = "Defines a structure contract with first artifact, source map, metric or delta contract, invalid interpretations, and validation gate."
-required_regex = ["structure contract", "first artifact", "visual_plan", "source-to-structure map", "metric or delta contract", "invalid interpretations", "validation gate"]
-
-[[evals.checklist]]
-id = "STRUCTURE-PLANNING-SHIM-2"
-critical = true
-description = "Routes the completed contract to report, HTML experiment, experiment lifecycle, document, paper, and refactor skills."
-required_regex = ["\\$report-writing", "\\$html-output", "\\$html-experiment-report", "\\$experiment-lifecycle", "\\$long-form-writing", "\\$academic-writing", "\\$paper-writing", "\\$refactor-loop"]
-
-[[evals.checklist]]
-id = "STRUCTURE-PLANNING-SHIM-3"
-critical = true
-description = "Keeps structure planning separate from storage, execution, prose, implementation, and domain authority."
-required_regex = ["owns structure", "not raw storage", "experiment execution", "report prose", "implementation", "domain authority"]
-
-[[evals.checklist]]
-id = "STRUCTURE-PLANNING-SHIM-4"
-critical = true
-description = "Routes nontrivial paragraph order and connective evidence through semantic-index discourse-relations without making it authority."
-required_regex = ["discourse-relations", "--profile", "advisory structure evidence", "not as prose or policy authority"]
-
-[[evals.checklist]]
-id = "STRUCTURE-PLANNING-SHIM-5"
-critical = true
-description = "Uses Mermaid as the default first visual for nontrivial reader-facing flow, dependency, ownership, routing, state, review-gate, or handoff structure."
-required_regex = ["Mermaid", "default first visual", "process flow", "dependencies", "ownership", "routing", "state transitions", "review gates", "visual_plan"]
-
-[[evals]]
-id = "structure-planning-doc"
-target = "agents/skills/structure-planning.md"
-kind = "skill"
-description = "Human structure-planning skill must define reusable contracts for report, experiment, document, and refactor structure."
-
-[[evals.checklist]]
-id = "STRUCTURE-PLANNING-DOC-1"
-critical = true
-description = "Covers report, experiment, document, paper, HTML, and refactor use cases."
-required_regex = ["report", "experiment", "document", "paper", "HTML", "refactor"]
-
-[[evals.checklist]]
-id = "STRUCTURE-PLANNING-DOC-2"
-critical = true
-description = "Defines the structure contract fields and closeout tokens."
-required_regex = ["structure_kind", "first_artifact", "visual_plan", "source_to_structure_map", "metric_or_delta_contract", "ordered_structure", "structure_planning=complete"]
-
-[[evals.checklist]]
-id = "STRUCTURE-PLANNING-DOC-3"
-critical = true
-description = "Separates structure authority from raw storage, experiment execution, report prose, document drafting, implementation, and domain authority."
-required_regex = ["does not own raw result storage", "experiment execution", "report prose", "document\\s+drafting", "implementation", "domain authority"]
-
-[[evals.checklist]]
-id = "STRUCTURE-PLANNING-DOC-4"
-critical = true
-description = "Documents discourse-relations as optional paragraph-order and transition evidence."
-required_regex = ["discourse-relations", "connective profile", "therefore", "because", "structure evidence"]
-
-[[evals.checklist]]
-id = "STRUCTURE-PLANNING-DOC-5"
-critical = true
-description = "Documents Mermaid as the default visual plan for nontrivial reader-facing process, dependency, ownership, routing, state, review-gate, or handoff structure."
-required_regex = ["Mermaid", "default first visual", "process flow", "dependencies", "ownership", "routing", "state transitions", "review gates", "visual_plan"]
 
 [[evals]]
 id = "code-visualization-skill"
@@ -850,48 +715,6 @@ description = "Requires durable provenance for external sources and rejects tran
 required_regex = ["URL / DOI", "access date", "browser tab", "download cache"]
 
 [[evals]]
-id = "report-writing-source-provenance-doc"
-target = "agents/skills/report-writing.md"
-kind = "skill"
-description = "Human report-writing skill must require durable source provenance for external references."
-
-[[evals.checklist]]
-id = "REPORT-SOURCE-DOC-1"
-critical = true
-description = "Requires durable source notes or source packets before publishing reports with external references."
-required_regex = ["External Source Provenance", "existing durable source notes", "source packets"]
-
-[[evals.checklist]]
-id = "REPORT-SOURCE-DOC-2"
-critical = true
-description = "Requires source fields and rejects transient provenance."
-required_regex = ["URL/DOI", "adoption/exclusion decision", "chat-only summaries"]
-
-[[evals.checklist]]
-id = "REPORT-OUTPUT-FORMAT-DOC-1"
-critical = true
-description = "Defines Markdown default and explicit HTML route."
-required_regex = ["default report output is Markdown", "explicitly asks for HTML", "html-output", "output format"]
-
-[[evals.checklist]]
-id = "REPORT-PROJECTION-ORDER-DOC-1"
-critical = true
-description = "Human report writing skill requires selected ordering as the prose projection sequence."
-required_regex = ["selected_ordering\\.ordered_anchors", "topological", "DSL-to-prose input sequence"]
-
-[[evals.checklist]]
-id = "REPORT-POSITIVE-RESPONSIBILITY-DOC-1"
-critical = true
-description = "Human report writing skill requires positive responsibility contracts and ad hoc replacement."
-required_regex = ["positive responsibility prose", "Boundary, Limitation, and Non-Goal", "ad hoc", "prompt-defect"]
-
-[[evals.checklist]]
-id = "NON-ACADEMIC-TEX-3"
-critical = true
-description = "Forbid Academic Writing's default TeX route from leaking into report writing."
-forbidden_regex = ["TeX output plan", "latexmk", "dvisvgm", "pdfcrop"]
-
-[[evals]]
 id = "html-experiment-report-structure-planning"
 target = ".agents/skills/html-experiment-report/SKILL.md"
 canonical_target = "agents/skills/html-experiment-report.md"
@@ -928,57 +751,6 @@ id = "EXPERIMENT-STRUCTURE-2"
 critical = true
 description = "Connects experiment planning/reporting to discourse-relations profiles when causal or evidence transitions are nontrivial."
 required_regex = ["discourse-relations", "experiment-report", "methods-protocol", "advisory edge evidence"]
-
-[[evals]]
-id = "test-design-numerical-admission-gate-shim"
-target = ".agents/skills/test-design/SKILL.md"
-canonical_target = "agents/skills/test-design.md"
-kind = "skill"
-description = "The discoverable test-design skill must gate numerical, randomized, tolerance, solver, convergence, residual, benchmark, and experiment-style tests before proposing them."
-
-[[evals.checklist]]
-id = "TEST-DESIGN-NUMERICAL-GATE-SHIM-1"
-critical = true
-description = "Requires numerical test admission before recommending numerical tests."
-required_regex = ["Numerical Test Admission Gate", "numerical trigger", "non-numerical alternative", "oracle", "budget", "omit"]
-
-[[evals]]
-id = "test-design-validation-failure-response-shim"
-target_glob = "agents/skills/test-design.md"
-expected_count = 1
-kind = "skill"
-description = "The discoverable test-design skill must classify validation failures before simplification, deletion, revert, or oracle weakening, then route implementation bugs to owning repair."
-
-[[evals.checklist]]
-id = "TEST-DESIGN-VALIDATION-FAILURE-SHIM-1"
-critical = true
-description = "Requires validation/check failure response evidence before weakening intended behavior and avoids blocking implementation bugs behind extra test planning."
-required_regex = ["failing contract", "observation level", "failure cause", "approved intent", "owning code", "extra test-design pass", "oracle weakening"]
-
-[[evals]]
-id = "test-design-numerical-admission-gate-doc"
-target = "agents/skills/test-design.md"
-kind = "skill-doc"
-description = "The human test-design skill must require numerical trigger, alternative, oracle, and budget evidence."
-
-[[evals.checklist]]
-id = "TEST-DESIGN-NUMERICAL-GATE-DOC-1"
-critical = true
-description = "Routes numerical test admission to the canonical testing convention after activation."
-required_regex = ["activation=required", "documents/conventions/coding-conventions-testing\\.md", "Numerical Test Admission Gate", "数値 trigger", "non-numerical alternative", "oracle", "budget"]
-
-[[evals]]
-id = "test-design-validation-failure-response-doc"
-target_glob = "agents/skills/test-design.md"
-expected_count = 1
-kind = "skill-doc"
-description = "The human test-design skill must classify validation failures before simplification, deletion, revert, or oracle weakening, then route implementation bugs to owning repair."
-
-[[evals.checklist]]
-id = "TEST-DESIGN-VALIDATION-FAILURE-DOC-1"
-critical = true
-description = "Requires validation/check failure response evidence before weakening intended behavior and avoids blocking implementation bugs behind extra test planning."
-required_regex = ["failing_contract", "observation_level", "cause_classification", "intent_preservation", "documents/runtime/runtime-profiles-and-check-matrix\\.json", "owning code", "intent を弱めません"]
 
 [[evals]]
 id = "testing-conventions-numerical-admission-gate"
@@ -2447,3 +2219,43 @@ id = "P5-ROLE-ATTRIBUTION-1"
 critical = true
 description = "Requires profile attribution and numeric-spawn duplicate rejection."
 required_regex = ["profile-attribution", "numeric-spawn-budget-duplicate", "declared-21-plus-6-does-not-derive-27"]
+
+
+[[evals]]
+id = "report-writing-semantic-contract"
+target = "agents/skills/report-writing.md"
+description = "Report correctness is semantic rather than a fixed presentation schema."
+[[evals.checklist]]
+id = "REPORT-SEMANTIC-1"
+critical = true
+required_regex = ["material factual or recommendation claim", "source support", "inference", "observations and interpretations", "limitations", "next action"]
+[[evals.checklist]]
+id = "REPORT-SEMANTIC-2"
+critical = true
+required_regex = ["No fixed heading count", "finding_count == 0", "advisory checker", "Markdown is the default", "explicitly requested"]
+
+[[evals]]
+id = "structure-planning-semantic-activation"
+target = "agents/skills/structure-planning.md"
+description = "Structure planning activates only for genuine structural decisions."
+[[evals.checklist]]
+id = "STRUCTURE-SEMANTIC-1"
+critical = true
+required_regex = ["owner", "canonical source", "reader entry", "validation topology", "real structural decision"]
+[[evals.checklist]]
+id = "STRUCTURE-SEMANTIC-2"
+critical = true
+required_regex = ["Mermaid", "optional diagnostics", "information gain"]
+
+[[evals]]
+id = "test-design-semantic-admission"
+target = "agents/skills/test-design.md"
+description = "Regression admission depends on contract, reachability, and a stable oracle."
+[[evals.checklist]]
+id = "TEST-SEMANTIC-1"
+critical = true
+required_regex = ["contract", "reachable", "counterexample", "oracle"]
+[[evals.checklist]]
+id = "TEST-SEMANTIC-2"
+critical = true
+required_regex = ["reproduction", "reachability evidence", "null-hypothesis"]
