@@ -1,0 +1,46 @@
+name: Fix PR670 lint findings
+on:
+  pull_request:
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-24.04
+    if: github.head_ref == 'canon/clean-detached-parent-update-605'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: canon/clean-detached-parent-update-605
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m pip install --upgrade pytest ruff pyright
+      - name: Apply lint-only fixes
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          for name in ['tests/agent_tools/test_attach_clean_detached_submodule.py','tools/agent_tools/attach_clean_detached_submodule.py']:
+              p=Path(name); s=p.read_text()
+              s=s.replace('stdout=subprocess.PIPE,\n        stderr=subprocess.PIPE,','capture_output=True,')
+              p.write_text(s)
+          p=Path('tests/agent_tools/test_attach_clean_detached_submodule.py')
+          p.write_text(p.read_text().replace('from attach_clean_detached_submodule import attach  # noqa: E402','from attach_clean_detached_submodule import attach'))
+          PY
+          chmod +x tools/agent_tools/attach_clean_detached_submodule.py
+          rm -f .github/workflows/refresh-pr670-main.yml .github/workflows/fix-pr670-lint.yml
+      - name: Validate
+        run: |
+          python3 -m pytest -q tests/agent_tools/test_attach_clean_detached_submodule.py
+          python3 -m ruff check tests/agent_tools/test_attach_clean_detached_submodule.py tools/agent_tools/attach_clean_detached_submodule.py
+          python3 -m pyright tools/agent_tools/attach_clean_detached_submodule.py tests/agent_tools/test_attach_clean_detached_submodule.py
+          bash -n tools/update_agent_canon.sh
+          git diff --check
+      - name: Commit and push
+        run: |
+          git config user.name agent-canon-validation
+          git config user.email agent-canon-validation@users.noreply.github.com
+          git add tests/agent_tools/test_attach_clean_detached_submodule.py tools/agent_tools/attach_clean_detached_submodule.py .github/workflows/refresh-pr670-main.yml .github/workflows/fix-pr670-lint.yml
+          git commit -m 'fix: satisfy detached-update static checks'
+          git push origin HEAD:canon/clean-detached-parent-update-605
