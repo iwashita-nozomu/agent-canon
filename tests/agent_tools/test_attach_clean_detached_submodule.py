@@ -16,7 +16,7 @@ AGENT_TOOLS = ROOT / "tools" / "agent_tools"
 if str(AGENT_TOOLS) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS))
 
-from attach_clean_detached_submodule import attach  # noqa: E402
+from attach_clean_detached_submodule import attach
 
 
 def git(root: Path, *args: str) -> str:
@@ -24,8 +24,7 @@ def git(root: Path, *args: str) -> str:
         ["git", "-C", str(root), *args],
         check=True,
         text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
     )
     return completed.stdout.strip()
 
@@ -75,8 +74,7 @@ def make_parent(tmp_path: Path) -> tuple[Path, Path, str]:
         ],
         check=True,
         text=True,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
+        capture_output=True,
     )
     git(parent, "add", ".gitmodules", "vendor/agent-canon")
     git(
