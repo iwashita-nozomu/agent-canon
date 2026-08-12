@@ -31,6 +31,22 @@ def _changed_python(paths: tuple[str, ...]) -> list[str]:
     return [path for path in paths if Path(path).suffix in {".py", ".pyi"} and Path(path).exists()]
 
 
+def _targeted_python_tests(paths: tuple[str, ...]) -> list[str]:
+    tests: list[str] = []
+    for raw in paths:
+        path = Path(raw)
+        if path.suffix not in {".py", ".pyi"}:
+            continue
+        if raw.startswith("tests/") and path.exists():
+            tests.append(raw)
+            continue
+        if raw.startswith("tools/agent_tools/"):
+            candidate = Path("tests/agent_tools") / f"test_{path.stem}.py"
+            if candidate.exists():
+                tests.append(candidate.as_posix())
+    return list(dict.fromkeys(tests))
+
+
 def _run(command: list[str], *, print_only: bool) -> None:
     print("SELECTED_VALIDATION_COMMAND=" + " ".join(command), flush=True)
     if not print_only:
@@ -59,6 +75,9 @@ def execute(paths: tuple[str, ...], risks: tuple[PathRisk, ...], *, print_only: 
                 ["python3", "-m", "pyright", *changed_python],
                 print_only=print_only,
             )
+            targeted_tests = _targeted_python_tests(paths)
+            if targeted_tests:
+                _run(["python3", "-m", "pytest", "-q", *targeted_tests], print_only=print_only)
 
     if "container" in profiles:
         _run(["python3", "tools/ci/container_config.py", "--root", "."], print_only=print_only)

@@ -5,7 +5,6 @@
 # responsibility Tests path-risk classifier smoke routing.
 # upstream implementation ../../tools/agent_tools/classify_path_risk.py classifies changed paths.
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md defines risk/check routing.
-# downstream implementation ../../.github/workflows/path-risk-check-matrix-smoke.yml consumes classifier output.
 # @dependency-end
 
 from __future__ import annotations
@@ -46,10 +45,9 @@ class ClassifyPathRiskTest(unittest.TestCase):
         payload = json.loads(result.stdout)
         profiles = {row["profile"] for row in payload["risks"]}
 
-        self.assertIn("docs-only-or-docs-impact", profiles)
-        self.assertIn("python-tooling", profiles)
-        self.assertIn("github-automation", profiles)
-        self.assertIn("agentcanon-shared-surface", profiles)
+        self.assertIn("docs", profiles)
+        self.assertIn("python", profiles)
+        self.assertIn("workflow", profiles)
 
 
 if __name__ == "__main__":

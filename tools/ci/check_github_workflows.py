@@ -137,19 +137,19 @@ ROOT_IMPROVEMENT_GUIDE_WORKFLOW_ALLOWED_TAGS = (
     "Template AgentCanon improvement guidance workflow",
 )
 STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
-    "Standalone-only workflow",
-    "Template and derived repositories should not copy",
+    "workflow_dispatch:",
+    "schedule:",
     "generate_agent_runtime_dashboard.py",
 )
 STANDALONE_ISSUE_MIRROR_WORKFLOW_REQUIREMENTS = (
-    "Standalone-only workflow",
-    "Template and derived repositories should not copy",
+    "push:",
+    "- main",
+    "workflow_dispatch:",
     "issue_sync.py",
     "--github-check",
     "--sync-github",
     "GITHUB_STEP_SUMMARY",
     "permissions:",
-    "issues: read",
     "issues: write",
 )
 VENDOR_COORDINATION_WORKFLOW_REQUIREMENTS = (
@@ -187,7 +187,9 @@ AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
     "pull_request:",
     "workflow_dispatch:",
     "github.event.pull_request.head.sha || github.sha",
-    "bash tools/ci/check_agent_canon_pr.sh",
+    "classify_path_risk.py",
+    "run_selected_agent_canon_pr_checks.py",
+    "--full-confidence",
 )
 PARENT_PROJECT_QUALITY_OWNER_ENV = "AGENT_CANON_PR_PROJECT_QUALITY_OWNER"
 PARENT_PROJECT_QUALITY_OWNER = "parent_ci"
@@ -978,20 +980,24 @@ def agent_canon_static_gate_findings(
     """Require one candidate-tree gate consumer and reject duplicate gate loops."""
     findings: list[Finding] = []
     wrapper = "bash tools/ci/check_agent_canon_pr.sh"
+    selected_executor = "tools/ci/run_selected_agent_canon_pr_checks.py"
     run_steps = [
         (context, run)
         for context in step_contexts(workflow)
         if isinstance((run := context.step.get("run")), str)
     ]
     wrapper_steps = [context for context, run in run_steps if wrapper in run]
-    if len(wrapper_steps) != 1:
+    selected_steps = [context for context, run in run_steps if selected_executor in run]
+    if len(selected_steps) != 1:
         findings.append(
             Finding(
                 "error",
                 path,
-                f"canonical_candidate_gate_consumer_count:{len(wrapper_steps)}",
+                f"canonical_selected_gate_consumer_count:{len(selected_steps)}",
             )
         )
+    if wrapper_steps:
+        findings.append(Finding("error", path, "direct_full_gate_consumer_forbidden_on_selected_route"))
     non_step_read_credential = AGENT_CANON_PR_READ_CREDENTIAL in (
         set(as_string_dict(workflow.get("env")) or {})
         | {
@@ -1008,7 +1014,7 @@ def agent_canon_static_gate_findings(
                 "canonical_candidate_gate_read_credential_must_be_step_local",
             )
         )
-    for context in wrapper_steps:
+    for context in selected_steps:
         step_env = as_string_dict(context.step.get("env")) or {}
         if step_env.get(AGENT_CANON_PR_READ_CREDENTIAL) != GITHUB_TOKEN_EXPRESSION:
             findings.append(

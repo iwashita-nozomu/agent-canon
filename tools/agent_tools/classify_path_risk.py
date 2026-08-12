@@ -70,8 +70,7 @@ def normalize_paths(paths: list[str], paths_file: str | None) -> tuple[str, ...]
         path = raw_path.strip()
         if not path:
             continue
-        if path.startswith("./"):
-            path = path[2:]
+        path = path.removeprefix("./")
         normalized.append(path)
     return tuple(dict.fromkeys(normalized))
 
@@ -111,6 +110,7 @@ def classify(paths: tuple[str, ...], *, full_confidence: bool = False) -> tuple[
                 checks=(
                     "python3 -m ruff check <changed-python-paths>",
                     "PYTHONPATH=tools/agent_tools python3 -m pyright <changed-python-paths>",
+                    "python3 -m pytest -q <targeted-python-tests>",
                 ),
             )
         )
