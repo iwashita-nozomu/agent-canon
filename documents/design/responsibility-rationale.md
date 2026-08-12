@@ -26,6 +26,8 @@ The common rule is reachability: a responsibility is selected only when the chan
 
 Changed paths, operation mode, and repository profile select semantic validation responsibilities once. Focused PR validation exists to distinguish the changed contract from a regression; repository-wide/full-confidence validation exists for cross-surface integration, manual acceptance, and mainline confidence. Remote GitHub Actions exist to replay the selected responsibility in a clean environment, not to add an independent path classifier or to execute unrelated toolchains.
 
+Legacy marker/checker projections that encode a retired ceremony are not independent completion owners. When the canonical semantic owner is simplified, those projections must either follow the new responsibility boundary or be removed rather than forcing the retired ceremony back into user-facing skills.
+
 Diagnostic products such as runtime dashboards aggregate evidence that a single PR cannot observe. They therefore belong to schedule/manual diagnostics unless their own schema or generator is changed. Local deterministic classifiers belong to local/unit validation unless a remote environment adds an observable contract.
 
 ## Issue and mirror responsibility
