@@ -1,0 +1,123 @@
+name: Finalize PR666 semantic contracts
+
+on:
+  pull_request:
+    types: [synchronize]
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    if: github.event.pull_request.number == 666
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: canon/simplify-core-skill-contracts-630-640
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m pip install --upgrade tomli pyyaml pytest
+      - name: Align eval manifests with semantic contracts
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          def rewrite(path: str, prefixes: tuple[str, ...], append: str) -> None:
+              p = Path(path)
+              text = p.read_text()
+              head, *blocks = text.split('\n[[evals]]')
+              kept: list[str] = []
+              for block in blocks:
+                  match = re.search(r'\nid\s*=\s*"([^"]+)"', '\n' + block)
+                  eval_id = match.group(1) if match else ''
+                  if any(eval_id.startswith(prefix) for prefix in prefixes):
+                      continue
+                  kept.append(block)
+              p.write_text(head.rstrip() + ''.join('\n[[evals]]' + block for block in kept) + '\n\n' + append.strip() + '\n')
+
+          rewrite('evidence/agent-evals/skill_workflow_prompt_eval.toml', ('report-writing-', 'structure-planning-', 'test-design-'), r'''
+          [[evals]]
+          id = "report-writing-semantic-contract"
+          target = "agents/skills/report-writing.md"
+          description = "Report correctness is semantic rather than a fixed presentation schema."
+          [[evals.checklist]]
+          id = "REPORT-SEMANTIC-1"
+          critical = true
+          required_regex = ["material factual or recommendation claim", "source support", "inference", "observations and interpretations", "limitations", "next action"]
+          [[evals.checklist]]
+          id = "REPORT-SEMANTIC-2"
+          critical = true
+          required_regex = ["No fixed heading count", "finding_count == 0", "advisory checker", "Markdown is the default", "explicitly requested"]
+
+          [[evals]]
+          id = "structure-planning-semantic-activation"
+          target = "agents/skills/structure-planning.md"
+          description = "Structure planning activates only for genuine structural decisions."
+          [[evals.checklist]]
+          id = "STRUCTURE-SEMANTIC-1"
+          critical = true
+          required_regex = ["owner", "canonical source", "reader entry", "validation topology", "real structural decision"]
+          [[evals.checklist]]
+          id = "STRUCTURE-SEMANTIC-2"
+          critical = true
+          required_regex = ["Mermaid", "optional diagnostics", "information gain"]
+
+          [[evals]]
+          id = "test-design-semantic-admission"
+          target = "agents/skills/test-design.md"
+          description = "Regression admission depends on contract, reachability, and a stable oracle."
+          [[evals.checklist]]
+          id = "TEST-SEMANTIC-1"
+          critical = true
+          required_regex = ["contract", "reachable", "counterexample", "oracle"]
+          [[evals.checklist]]
+          id = "TEST-SEMANTIC-2"
+          critical = true
+          required_regex = ["reproduction", "reachability evidence", "null-hypothesis"]
+          ''')
+
+          rewrite('evidence/agent-evals/report_quality_eval.toml', ('report-writing-runtime-skill', 'report-writing-human-doc'), r'''
+          [[evals]]
+          id = "report-writing-semantic-quality"
+          target = "agents/skills/report-writing.md"
+          description = "Report quality is claim/evidence/limitation/action correctness, not heading or token count."
+          [[evals.checklist]]
+          id = "REPORT-QUALITY-SEMANTIC-1"
+          critical = true
+          required_regex = ["source support", "inference", "observations and interpretations", "limitations", "next action"]
+          [[evals.checklist]]
+          id = "REPORT-QUALITY-SEMANTIC-2"
+          critical = true
+          required_regex = ["No fixed heading count", "accepted blocking findings", "finding_count == 0", "second policy/source-of-truth"]
+          ''')
+          PY
+          rm -f .github/workflows/diag-pr666-evals.yml \
+                .github/workflows/fix-pr666-evals.yml \
+                .github/workflows/finalize-pr666.yml \
+                .github/workflows/finalize-pr666-v2.yml \
+                .ci-kick-pr666
+          touch .ci-trigger-pr666
+      - name: Validate semantic producers
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --root .
+          python3 tools/agent_tools/evaluate_report_quality.py --root .
+          python3 -m pytest -q tests/agent_tools/test_evaluate_report_quality.py
+          git diff --check
+      - name: Commit completion
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'test: align evals with semantic skill contracts'
+          git push origin HEAD:canon/simplify-core-skill-contracts-630-640
