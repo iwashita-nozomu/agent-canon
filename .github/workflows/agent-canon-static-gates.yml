@@ -1,25 +1,12 @@
 # @dependency-start
 # contract configuration
-# responsibility Runs the canonical AgentCanon source gate once for a PR candidate tree.
-# upstream design ../../agents/workflows/agent-canon-pr-workflow.md agent-canon PR workflow
-# upstream implementation ../../tools/agent_tools/tool_catalog.py validates tool catalog shape
-# upstream implementation ../../tools/agent_tools/tool_drift.py rejects retired legacy tool surfaces
-# upstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope/tool ownership
-# upstream implementation ../../tools/agent_tools/import_responsibility.py validates import ownership boundaries
-# upstream implementation ../../tools/agent_tools/issue_sync.py validates local issue files
-# upstream implementation ../../tools/agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
-# upstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval result accumulation
-# upstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates Codex runtime role config
-# upstream implementation ../../tools/agent_tools/evaluate_codex_agent_roles.py validates Codex agent role prompts
-# upstream implementation ../../tools/agent_tools/check_skill_frontmatter.py validates runtime skill YAML frontmatter
-# upstream implementation ../../tools/agent_tools/smoke_test_research_perspective_pack.py validates research review pack routing
-# upstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py validates skill/workflow prompt surfaces
-# upstream implementation ../../tools/agent_tools/check_convention_compliance.py validates convention gate wiring
-# upstream implementation ../../tools/agent_tools/evaluate_workflow_selection.py validates workflow routing eval prompts
-# upstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report quality checklist prompts
-# upstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh checks dependency headers and graph
-# upstream implementation ../../tools/ci/check_github_workflows.py validates workflow and PR template conventions
-# upstream implementation ../../tools/ci/check_agent_canon_pr.sh owns the one source-PR static gate invocation.
+# responsibility Replays the canonical selected validation responsibilities for an AgentCanon PR; manual dispatch retains full-confidence validation.
+# upstream design ../../documents/design/responsibility-rationale.md selected validation and remote replay rationale
+# upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md profile-based validation routing
+# upstream implementation ../../tools/agent_tools/classify_path_risk.py is the sole changed-path selector
+# upstream implementation ../../tools/ci/run_selected_agent_canon_pr_checks.py executes the selected responsibilities
+# upstream implementation ../../tools/ci/check_agent_canon_pr.sh remains the explicit full-confidence executor
+# downstream implementation ../../tools/ci/check_github_workflows.py validates workflow conventions
 # @dependency-end
 
 name: AgentCanon Static Gates
@@ -46,27 +33,60 @@ jobs:
           submodules: false
           persist-credentials: false
 
-      - name: Checkout AgentCanon submodule
-        env:
-          AGENT_CANON_REPO_TOKEN: ${{ secrets.AGENT_CANON_REPO_TOKEN }}
-          AGENT_CANON_REPO_SSH_KEY: ${{ secrets.AGENT_CANON_REPO_SSH_KEY }}
-        run: bash tools/ci/checkout_agent_canon_submodule.sh
+      - name: Select validation responsibilities
+        id: select
+        shell: bash
+        run: |
+          set -euo pipefail
+          paths_file="${RUNNER_TEMP}/changed-paths.txt"
+          : > "${paths_file}"
+          selector_args=()
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            git diff --name-only --diff-filter=ACMRT \
+              "${{ github.event.pull_request.base.sha }}...HEAD" > "${paths_file}"
+          else
+            selector_args+=(--full-confidence)
+          fi
+          python3 tools/agent_tools/classify_path_risk.py \
+            --paths-file "${paths_file}" "${selector_args[@]}" --format json \
+            > "${RUNNER_TEMP}/selected-validation.json"
+          cat "${RUNNER_TEMP}/selected-validation.json"
+          profiles="$(python3 - "${RUNNER_TEMP}/selected-validation.json" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          payload = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+          print(",".join(payload["profiles"]))
+          PY
+          )"
+          echo "profiles=${profiles}" >> "$GITHUB_OUTPUT"
+          echo "paths_file=${paths_file}" >> "$GITHUB_OUTPUT"
 
-      - name: Setup Python
+      - name: Setup Python validation runtime
+        if: contains(steps.select.outputs.profiles, 'python') || contains(steps.select.outputs.profiles, 'workflow') || contains(steps.select.outputs.profiles, 'container') || contains(steps.select.outputs.profiles, 'eval') || contains(steps.select.outputs.profiles, 'full-confidence')
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install static gate dependencies
-        run: python3 -m pip install --upgrade pyyaml tomli packaging
+      - name: Install selected Python gate dependencies
+        if: contains(steps.select.outputs.profiles, 'python') || contains(steps.select.outputs.profiles, 'workflow') || contains(steps.select.outputs.profiles, 'container') || contains(steps.select.outputs.profiles, 'eval') || contains(steps.select.outputs.profiles, 'full-confidence')
+        run: python3 -m pip install --upgrade pyyaml tomli packaging ruff pyright
 
-      - name: Prepare runtime log archive
-        run: mkdir -p .agent-canon/log-archive
-
-      - name: Install Rust gate components
+      - name: Install selected Rust gate components
+        if: contains(steps.select.outputs.profiles, 'rust') || contains(steps.select.outputs.profiles, 'full-confidence')
         run: rustup component add rustfmt clippy
 
-      - name: Run static gates
+      - name: Prepare selected eval/full runtime archive
+        if: contains(steps.select.outputs.profiles, 'eval') || contains(steps.select.outputs.profiles, 'full-confidence')
+        run: mkdir -p .agent-canon/log-archive
+
+      - name: Run selected validation
         env:
           AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}
-        run: bash tools/ci/check_agent_canon_pr.sh
+          PYTHONPATH: tools
+        run: |
+          args=(--paths-file "${{ steps.select.outputs.paths_file }}")
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            args+=(--full-confidence)
+          fi
+          python3 tools/ci/run_selected_agent_canon_pr_checks.py "${args[@]}"
