@@ -344,11 +344,13 @@ class CheckToolCatalogTest(unittest.TestCase):
         matches = set(
             pattern.findall(
                 "python3 tests/tools/test_catalog_fixture.py\n"
+                "python3 tests/tools/tools/run_symlink_lint.py\n"
                 "python3 tools/agent_tools/uncataloged.py\n"
             )
         )
 
         self.assertNotIn("tools/test_catalog_fixture.py", matches)
+        self.assertNotIn("tools/tools/run_symlink_lint.py", matches)
         self.assertIn("tools/agent_tools/uncataloged.py", matches)
 
     def test_entry_summary_is_required(self) -> None:
