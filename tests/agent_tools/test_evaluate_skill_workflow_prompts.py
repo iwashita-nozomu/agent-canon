@@ -699,6 +699,44 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
             self.assertIn("glob-sample:prompts/a.md", result.stdout)
             self.assertIn("glob-sample:prompts/b.md", result.stdout)
 
+    def test_target_glob_reads_one_canonical_owner_for_each_shim(self) -> None:
+        """Globbed thin shims can share one canonical owner in checklist text."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            prompt_dir = root / "prompts"
+            prompt_dir.mkdir()
+            (prompt_dir / "a.md").write_text("shim\n", encoding="utf-8")
+            (root / "canonical.md").write_text("canonical-marker\n", encoding="utf-8")
+            manifest = root / "eval.toml"
+            manifest.write_text(
+                textwrap.dedent(
+                    """
+                    version = 1
+
+                    [[evals]]
+                    id = "glob-canonical"
+                    target_glob = "prompts/*.md"
+                    expected_count = 1
+                    canonical_target = "canonical.md"
+                    kind = "skill"
+                    description = "sample"
+
+                    [[evals.checklist]]
+                    id = "GC1"
+                    critical = true
+                    description = "requires canonical owner"
+                    required_regex = ["canonical-marker"]
+                    """
+                ).strip()
+                + "\n",
+                encoding="utf-8",
+            )
+
+            result = run_eval("--root", str(root), "--manifest", "eval.toml")
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("EVAL_CHECKS_TOTAL=1", result.stdout)
+
     def test_target_glob_expected_count_mismatch_fails_closed(self) -> None:
         """A glob count mismatch forces the eval manifest to be updated."""
         with tempfile.TemporaryDirectory() as tmp_dir:

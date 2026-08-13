@@ -22,6 +22,11 @@ from pathlib import Path
 import yaml
 
 if __package__:
+    from .agent_canon_source_root import resolve_agent_canon_source_root
+else:
+    from agent_canon_source_root import resolve_agent_canon_source_root
+
+if __package__:
     from .packets import ActiveDesignPacketConfig
 else:
     from packets import ActiveDesignPacketConfig
@@ -47,9 +52,9 @@ else:
     from agent_team import create_run_bundle, run_active_design_packet
 
 if __package__:
-    from .workspace_scope import resolve_role_write_scope
+    from .workspace_scope import resolve_repository_roots, resolve_role_write_scope
 else:
-    from workspace_scope import resolve_role_write_scope
+    from workspace_scope import resolve_repository_roots, resolve_role_write_scope
 
 ROOT = Path(__file__).resolve().parents[2]
 from parent_root_side_effects import (  # noqa: E402
@@ -62,8 +67,6 @@ from parent_root_side_effects import (  # noqa: E402
     attest_parent_root,
 )
 
-CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
-TASK_CATALOG = ROOT / "agents" / "task_catalog.yaml"
 BASE_RESEARCH_ROLE_IDS = (
     "researcher",
     "research_reviewer",
@@ -169,18 +172,13 @@ def find_by_id(entries: object, entry_id: str) -> dict[str, object]:
     raise RuntimeError(f"missing entry with id={entry_id}")
 
 
-def prepare_workspace(workspace_root: Path) -> None:
+def prepare_workspace(workspace_root: Path, source_root: Path) -> None:
     """Create a minimal workspace that satisfies manifest scope resolution."""
-    for directory in (".codex", "agents", "python", "documents", "reports/runtime"):
+    for directory in (".codex", "python", "documents", "reports/runtime"):
         _ensure_parent(workspace_root / directory, "research-perspective-smoke")
     _write_parent(
         workspace_root / ".codex" / "config.toml",
-        (ROOT / ".codex" / "config.toml").read_bytes(),
-        "research-perspective-smoke",
-    )
-    _write_parent(
-        workspace_root / "agents" / "model_profiles.toml",
-        (ROOT / "agents" / "model_profiles.toml").read_bytes(),
+        (source_root / ".codex" / "config.toml").read_bytes(),
         "research-perspective-smoke",
     )
     _write_parent(
@@ -202,9 +200,11 @@ def prepare_workspace(workspace_root: Path) -> None:
     )
 
 
-def validate_task_catalog() -> None:
+def validate_task_catalog(source_root: Path) -> None:
     """Check that the task catalog exposes the review pack."""
-    data = yaml.safe_load(TASK_CATALOG.read_text(encoding="utf-8"))
+    data = yaml.safe_load(
+        (source_root / "agents" / "task_catalog.yaml").read_text(encoding="utf-8")
+    )
     ensure(isinstance(data, dict), "task catalog did not parse as a mapping")
 
     research_family = find_by_id(
@@ -268,9 +268,10 @@ def validate_runtime_surfaces(
     report_dir: Path,
     workspace_root: Path,
     active_design_packet: ActiveDesignPacketConfig,
+    source_root: Path,
 ) -> None:
     """Check that config, agent inventory, templates, and bundle outputs align."""
-    config = load_team_config()
+    config = load_team_config(source_root / "agents" / "agents_config.json")
     manifest_path = report_dir / config.artifacts["team_manifest"]
     manifest_text = manifest_path.read_text(encoding="utf-8")
 
@@ -279,7 +280,7 @@ def validate_runtime_surfaces(
         artifact_key = ROLE_TO_ARTIFACT_KEY[role_id]
         artifact_name = config.artifacts[artifact_key]
         artifact_path = report_dir / artifact_name
-        codex_agent_path = CODEX_AGENT_ROOT / f"{role_id}.toml"
+        codex_agent_path = source_root / ".codex" / "agents" / f"{role_id}.toml"
 
         if not codex_agent_path.is_file():
             raise RuntimeError(f"missing Codex agent definition: {codex_agent_path}")
@@ -322,6 +323,8 @@ def validate_runtime_surfaces(
 def main() -> int:
     """Run the smoke test."""
     args = build_parser().parse_args()
+    source_resolution = resolve_agent_canon_source_root(Path(__file__).resolve())
+    source_root = source_resolution.source_root
     temp_receipts: list[
         tuple[
             ParentRootSideEffectBoundary,
@@ -331,7 +334,7 @@ def main() -> int:
     ] = []
 
     if args.workspace_root is None:
-        workspace_root = ROOT
+        workspace_root = source_root
     else:
         workspace_root = Path(args.workspace_root).resolve()
         _ensure_parent(workspace_root, "research-perspective-smoke")
@@ -361,11 +364,11 @@ def main() -> int:
     primary_error: BaseException | None = None
     try:
         if args.workspace_root is not None:
-            prepare_workspace(workspace_root)
-        validate_task_catalog()
+            prepare_workspace(workspace_root, source_root)
+        validate_task_catalog(source_root)
 
-        config = load_team_config()
-        task_catalog = load_task_catalog(config)
+        config = load_team_config(source_root / "agents" / "agents_config.json")
+        task_catalog = load_task_catalog(config, root=source_root)
         specialist_roles = tuple(
             resolve_role(config, role_id)
             for role_id in BASE_RESEARCH_ROLE_IDS + PERSPECTIVE_ROLE_IDS
@@ -374,6 +377,12 @@ def main() -> int:
         created_at = datetime.now(UTC).replace(microsecond=0)
         created_at_iso = created_at.isoformat().replace("+00:00", "Z")
         report_dir = (report_root / args.run_id).resolve()
+        repository_roots = resolve_repository_roots(
+            workspace_root.resolve(),
+            report_root,
+            source_root=source_root,
+            canon_root=source_resolution.canon_root,
+        )
 
         run_spec = RunBundleSpec(
             config=config,
@@ -384,6 +393,9 @@ def main() -> int:
             created_at_iso=created_at_iso,
             roles=roles,
             workspace_root=workspace_root.resolve(),
+            agentcanon_source_root=repository_roots.agentcanon_source_root,
+            report_root=repository_roots.report_root,
+            repository_roots=repository_roots,
             task_catalog=task_catalog,
         )
         active_design_packet = run_active_design_packet(run_spec)
@@ -393,6 +405,7 @@ def main() -> int:
             report_dir,
             workspace_root.resolve(),
             active_design_packet,
+            repository_roots.agentcanon_source_root,
         )
 
         print(f"RUN_ID={args.run_id}")

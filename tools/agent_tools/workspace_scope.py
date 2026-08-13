@@ -41,9 +41,19 @@ except ImportError:  # direct script/module execution
 from typing import TYPE_CHECKING
 
 if __package__:
-    from .team_config import ROOT, Role, TeamConfig, resolve_role
+    from .agent_canon_source_root import (
+        RepositoryRoots,
+        RootResolution,
+        resolve_agent_canon_source_root,
+    )
+    from .team_config import Role, TeamConfig, resolve_role
 else:
-    from team_config import ROOT, Role, TeamConfig, resolve_role
+    from agent_canon_source_root import (  # type: ignore[no-redef]
+        RepositoryRoots,
+        RootResolution,
+        resolve_agent_canon_source_root,
+    )
+    from team_config import Role, TeamConfig, resolve_role
 
 if TYPE_CHECKING:
     if __package__:
@@ -62,18 +72,87 @@ SHA256_READ_CHUNK_BYTES = 65_536
 DEFAULT_REPORT_ROOT = Path("reports") / "agents"
 
 
-def resolve_workspace_document_path(workspace_root: Path, relative_path: str) -> Path:
-    """Resolve a document path through the root view or vendored AgentCanon source."""
-    root_path = (workspace_root / relative_path).resolve()
-    if root_path.exists():
-        return root_path
-    vendor_path = (workspace_root / "vendor" / "agent-canon" / relative_path).resolve()
-    if vendor_path.exists():
-        return vendor_path
-    canon_path = (ROOT / relative_path).resolve()
-    if canon_path.exists():
-        return canon_path
-    return root_path
+def _resolve_rooted_path(root: Path, relative_path: str, root_key: str) -> Path:
+    """Resolve a logical relative path below one typed runtime root."""
+    declared = str(relative_path)
+    candidate = Path(declared)
+    if (
+        not declared
+        or "\x00" in declared
+        or "\\" in declared
+        or "//" in declared
+        or candidate.is_absolute()
+        or any(part in {"", ".", ".."} for part in candidate.parts)
+    ):
+        raise RuntimeError(f"runtime_artifact_path_invalid:{root_key}:{declared}")
+    resolved_root = root.resolve()
+    resolved = (resolved_root / candidate).resolve()
+    try:
+        resolved.relative_to(resolved_root)
+    except ValueError as exc:
+        raise RuntimeError(f"runtime_artifact_path_invalid:{root_key}:{declared}") from exc
+    return resolved
+
+
+def resolve_workspace_document_path(
+    workspace_root: Path,
+    relative_path: str,
+    *,
+    root_key: str | None = None,
+    agentcanon_source_root: Path | None = None,
+    report_root: Path | None = None,
+) -> Path:
+    """Resolve a document only below the explicitly selected logical root."""
+    if root_key is None:
+        raise RuntimeError("runtime_roots_invalid:root_key_missing")
+    roots = {
+        "workspace": workspace_root,
+        "agentcanon": agentcanon_source_root,
+        "artifact": report_root,
+    }
+    selected = roots.get(root_key)
+    if selected is None:
+        raise RuntimeError(
+            f"runtime_roots_invalid:missing_{root_key}_root:{relative_path}"
+        )
+    return _resolve_rooted_path(selected, relative_path, root_key)
+
+
+def resolve_repository_roots(
+    workspace_root: Path,
+    report_root: str | Path | None = None,
+    *,
+    source_root: Path | None = None,
+    canon_root: Path | None = None,
+) -> RepositoryRoots:
+    """Assemble source/state/report roots before constructing a run spec."""
+    workspace = workspace_root.resolve()
+    resolution: RootResolution
+    same_standalone_identity = (
+        source_root is not None
+        and canon_root is not None
+        and workspace == source_root.resolve()
+        and workspace == canon_root.resolve()
+    )
+    if (source_root is None and canon_root is None) or same_standalone_identity:
+        resolution = resolve_agent_canon_source_root(workspace)
+    else:
+        resolution = resolve_agent_canon_source_root(
+            workspace,
+            source_root=source_root,
+            canon_root=canon_root,
+        )
+    selected_report = resolve_report_root(
+        None if report_root is None else str(report_root), workspace
+    )
+    public = resolution.public_tool_root
+    return RepositoryRoots(
+        workspace_root=workspace,
+        agentcanon_source_root=resolution.source_root,
+        report_root=selected_report,
+        layout=resolution.layout,
+        public_tool_root=public,
+    )
 
 
 def resolve_report_root(

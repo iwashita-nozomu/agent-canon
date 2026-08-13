@@ -29,6 +29,7 @@ from agent_canon_source_root import (  # noqa: E402
     LAYOUT_VENDORED,
     RootResolution,
     SourceRootFailure,
+    _default_pythonpath,
     build_parser,
     resolve_agent_canon_source_root,
     run,
@@ -59,6 +60,20 @@ _SYNTHETIC_ROOT_BOUNDARY_ENV_KEYS = (
 
 class AgentCanonSourceRootCLITests(unittest.TestCase):
     """Validate CLI subcommand wiring without touching real owner roots."""
+
+    def test_pythonpath_rejects_untyped_agent_tools_alias(self) -> None:
+        """Inherited repository tool roots cannot shadow the selected source."""
+        with tempfile.TemporaryDirectory() as workspace:
+            root = Path(workspace)
+            tools = root / "tools"
+            (tools / "agent_tools").mkdir(parents=True)
+            with patch.dict(os.environ, {"PYTHONPATH": str(tools / "agent_tools")}):
+                with self.assertRaises(SourceRootFailure) as raised:
+                    _default_pythonpath(root=root)
+            self.assertEqual(
+                raised.exception.code,
+                "agent_canon_source_root_pythonpath_conflict",
+            )
 
     def _mock_resolution(self, command_root: Path) -> RootResolution:
         return RootResolution(
@@ -277,6 +292,51 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("shared surface source manifest is valid", result.stdout)
+
+    def test_exec_command_supports_python_source_contract_readback(self) -> None:
+        """The source wrapper can run a Python checker with source-relative paths."""
+        with tempfile.TemporaryDirectory() as workspace:
+            clone = Path(workspace) / "agent-canon"
+
+            def ignore_clone_links(directory: str, names: list[str]) -> set[str]:
+                """Avoid copying the source self-view into the temporary clone."""
+                ignored = set(
+                    shutil.ignore_patterns(
+                        ".git", ".agent-canon", "reports", "workspace"
+                    )(directory, names)
+                )
+                if Path(directory).resolve() == (PROJECT_ROOT / "tools").resolve():
+                    ignored.add("agent-canon")
+                return ignored
+
+            shutil.copytree(
+                PROJECT_ROOT,
+                clone,
+                symlinks=True,
+                ignore=ignore_clone_links,
+            )
+            subprocess.run(["git", "init", "-q"], cwd=clone, check=True)
+            (clone / "tools" / "agent-canon").symlink_to(".", target_is_directory=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    PUBLIC_RESOLVER,
+                    "exec",
+                    "python3",
+                    "tools/agent_tools/repo_structure_contract.py",
+                    "--root",
+                    ".",
+                    "--contract",
+                    "documents/structure/repo-structure-contract.toml",
+                ],
+                cwd=clone,
+                env=self._synthetic_root_environment(clone),
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_exec_command_propagates_nonzero_exit(self) -> None:
         """Propagate a non-zero delegated command return code to the caller."""

@@ -87,6 +87,24 @@ class CheckToolCatalogTest(unittest.TestCase):
             1,
         )
 
+    def test_workflow_command_rows_use_existing_catalog_schema(self) -> None:
+        """Workflow monitor and waterfall gate are ordinary catalog entries."""
+        catalog = yaml.safe_load(
+            (PROJECT_ROOT / "tools" / "catalog.yaml").read_text(encoding="utf-8")
+        )
+        rows = {
+            entry["id"]: entry
+            for entry in catalog["entries"]
+            if entry["id"] in {"workflow-monitor", "waterfall-gate-check"}
+        }
+        self.assertEqual(set(rows), {"workflow-monitor", "waterfall-gate-check"})
+        self.assertEqual(rows["workflow-monitor"]["path"], "tools/agent_tools/workflow_monitor.py")
+        self.assertEqual(rows["waterfall-gate-check"]["path"], "tools/agent_tools/waterfall_gate_check.py")
+        self.assertTrue(rows["workflow-monitor"]["writes"])
+        self.assertFalse(rows["waterfall-gate-check"]["writes"])
+        result = self.run_checker(PROJECT_ROOT, "--format", "json")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_pr_eval_entry_is_wired_through_accumulation_wrapper(self) -> None:
         """The PR-wired role eval is owned by the accumulation wrapper."""
         catalog = yaml.safe_load(

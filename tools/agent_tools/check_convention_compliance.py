@@ -391,13 +391,6 @@ DOCUMENT_SPLIT_DECISION_MARKERS = {
         "check_convention_compliance.py",
         "task_close.py",
     ),
-    "agents/skills/structure-planning.md": (
-        "document_unit",
-        "document_split_decision",
-        "split_when",
-        "merge_when",
-        "invalid_split_boundaries",
-    ),
     "agents/skills/long-form-writing.md": (
         "document_split_decision",
         "owner",
@@ -611,13 +604,6 @@ REFACTOR_SEQUENCE_MARKERS = {
     ),
 }
 REVIEW_ISSUE_ROUTING_MARKERS = {
-    "agents/skills/change-review.md": (
-        "issue_route",
-        "issues/open/",
-        "issue_sync.py",
-        "new_local_issue",
-        "github_mirror",
-    ),
     "documents/conventions/REVIEW_PROCESS.md": (
         "Review Finding Issue Routing",
         "issue_route",

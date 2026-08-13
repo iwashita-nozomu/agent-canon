@@ -13,6 +13,7 @@
 # upstream implementation ./capacity_handshake.py owns typed capacity readback
 # upstream implementation ./packets.py owns active design packet normalization and materialization
 # upstream implementation ./team_config.py owns team and role configuration resolution
+# upstream implementation ./workspace_scope.py owns typed workspace/source/report roots
 # @dependency-end
 
 """Validate that agent runtime surfaces, task catalog, and bundle outputs align."""
@@ -22,7 +23,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import subprocess
 import tempfile
 
@@ -113,6 +113,24 @@ if __package__:
     from .agent_team import create_run_bundle
 else:
     from agent_team import create_run_bundle
+
+if __package__:
+    from .agent_canon_source_root import (
+        RepositoryRoots,
+        RootResolution,
+        resolve_agent_canon_source_root,
+    )
+else:
+    from agent_canon_source_root import (  # type: ignore[no-redef]
+        RepositoryRoots,
+        RootResolution,
+        resolve_agent_canon_source_root,
+    )
+
+if __package__:
+    from .workspace_scope import resolve_repository_roots
+else:
+    from workspace_scope import resolve_repository_roots
 
 if __package__:
     from .manifest_rendering import required_output_templates_missing
@@ -225,6 +243,7 @@ class AlignmentWorkspace:
 
     workspace_root: Path
     report_root: Path
+    repository_roots: RepositoryRoots
 
 
 def resolve_packet_probe_workspace() -> Path:
@@ -732,6 +751,7 @@ def validate_team_config_references() -> None:
             config.artifacts["team_manifest"],
             config.artifacts["verification"],
         ),
+        source_root=ROOT,
     )
     ensure(
         not missing_templates,
@@ -770,7 +790,10 @@ def validate_team_config_references() -> None:
 
     packet_probe_workspace = resolve_packet_probe_workspace()
     packet_probe_report_dir = ROOT / "reports" / "agents" / "_packet_probe"
-    for entry in resolve_cross_cutting_document_packet(packet_probe_workspace):
+    for entry in resolve_cross_cutting_document_packet(
+        packet_probe_workspace,
+        ROOT,
+    ):
         ensure(entry.path.exists(), f"cross-cutting document packet path missing: {entry.path}")
     for role in config.always_on_roles + config.specialist_roles:
         packet = resolve_role_document_packet(
@@ -779,6 +802,7 @@ def validate_team_config_references() -> None:
             report_dir=packet_probe_report_dir,
             workspace_root=packet_probe_workspace,
             active_design_packet=active_design_packet,
+            agentcanon_source_root=ROOT,
         )
         for entry in packet.read_before_work:
             ensure(
@@ -1529,11 +1553,23 @@ def validate_vendor_skill_adapters() -> None:
     )
 
 
-def alignment_workspace(tmp_root: Path) -> AlignmentWorkspace:
+def alignment_workspace(
+    tmp_root: Path,
+    source_resolution: RootResolution,
+) -> AlignmentWorkspace:
     """Return the temporary workspace layout for bundle smoke checks."""
+    workspace_root = tmp_root / "workspace"
+    report_root = tmp_root / "reports"
+    repository_roots = resolve_repository_roots(
+        workspace_root,
+        report_root,
+        source_root=source_resolution.source_root,
+        canon_root=source_resolution.canon_root,
+    )
     return AlignmentWorkspace(
-        workspace_root=tmp_root / "workspace",
-        report_root=tmp_root / "reports",
+        workspace_root=workspace_root,
+        report_root=report_root,
+        repository_roots=repository_roots,
     )
 
 
@@ -1545,21 +1581,9 @@ def initialize_alignment_workspace(workspace: AlignmentWorkspace) -> None:
     (workspace.workspace_root / "documents").mkdir()
     (workspace.workspace_root / "reports" / "runtime").mkdir(parents=True)
     (workspace.workspace_root / ".codex").mkdir()
-    (workspace.workspace_root / "agents").mkdir()
-    for relative_path in (
-        ".codex/config.toml",
-        "agents/agents_config.json",
-        "agents/task_catalog.yaml",
-        "agents/model_profiles.toml",
-        "agents/capacity_policy.toml",
-        "agents/canonical/CODEX_WORKFLOW.md",
-        "templates/agents/design_brief.md",
-        "agents/workflows/implementation-waterfall-workflow.md",
-        "documents/design/dependency-manifest-design.md",
-    ):
-        destination = workspace.workspace_root / relative_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.copy2(ROOT / relative_path, destination)
+    (workspace.workspace_root / ".codex" / "config.toml").write_bytes(
+        (workspace.repository_roots.agentcanon_source_root / ".codex" / "config.toml").read_bytes()
+    )
     (workspace.workspace_root / "WORKTREE_SCOPE.md").write_text(
         "\n".join(
             [
@@ -2107,6 +2131,7 @@ def validate_task_bundle_output(
     task = task_by_id(catalog, task_id)
     roles = roles_for_task(config, catalog, task_id)
     report_dir = workspace.report_root / task_id
+    repository_roots = workspace.repository_roots
     create_run_bundle(
         RunBundleSpec(
             config=config,
@@ -2117,6 +2142,9 @@ def validate_task_bundle_output(
             created_at_iso=created_at_iso,
             roles=roles,
             workspace_root=workspace.workspace_root,
+            agentcanon_source_root=repository_roots.agentcanon_source_root,
+            report_root=repository_roots.report_root,
+            repository_roots=repository_roots,
             workflow_family_id=str(task["family"]),
             task_catalog=catalog,
         )
@@ -2163,6 +2191,7 @@ def validate_full_team_bundle_output(
         workflow_family_id="comprehensive_development",
     )
     full_team_dir = workspace.report_root / "full-team"
+    repository_roots = workspace.repository_roots
     create_run_bundle(
         RunBundleSpec(
             config=config,
@@ -2173,6 +2202,9 @@ def validate_full_team_bundle_output(
             created_at_iso=created_at_iso,
             roles=full_team_roles,
             workspace_root=workspace.workspace_root,
+            agentcanon_source_root=repository_roots.agentcanon_source_root,
+            report_root=repository_roots.report_root,
+            repository_roots=repository_roots,
             workflow_family_id="comprehensive_development",
             task_catalog=catalog,
         )
@@ -2182,8 +2214,10 @@ def validate_full_team_bundle_output(
 
 def validate_bundle_outputs() -> None:
     """Create temporary bundles for every catalog task and full-team run."""
-    config = load_team_config()
-    catalog = load_task_catalog(config)
+    source_resolution = resolve_agent_canon_source_root(ROOT)
+    source_root = source_resolution.source_root
+    config = load_team_config(source_root / "agents" / "agents_config.json")
+    catalog = load_task_catalog(config, root=source_root)
     created_at_iso = current_utc_iso()
 
     temp_parent: str | None = None
@@ -2203,7 +2237,7 @@ def validate_bundle_outputs() -> None:
             "runtime-alignment-temp: explicit parent root is required",
         )
     with tempfile.TemporaryDirectory(prefix="agent-runtime-alignment-", dir=temp_parent) as tmp_dir:
-        workspace = alignment_workspace(Path(tmp_dir))
+        workspace = alignment_workspace(Path(tmp_dir), source_resolution)
         initialize_alignment_workspace(workspace)
 
         for task_id in task_ids(catalog):

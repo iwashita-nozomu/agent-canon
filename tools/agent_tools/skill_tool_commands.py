@@ -187,6 +187,157 @@ class CommandPlan:
 
 
 @dataclass(frozen=True)
+class PublicCommandProjection:
+    """Transient public-layout projection of one logical command.
+
+    ``CommandPlan`` remains the execution authority.  This value is deliberately
+    not persisted in skill packets: it only supplies the path spelling shown to
+    a caller in a standalone or derived checkout.
+    """
+
+    logical_command: str
+    layout: str
+    public_cwd: str
+    public_env: tuple[tuple[str, str], ...]
+    public_argv: tuple[str, ...]
+
+
+def _public_tool_prefix(root_resolution: RootResolution) -> str:
+    """Return the one public tool prefix for the selected checkout layout."""
+    return "tools" if root_resolution.layout == "standalone" else "tools/agent-canon"
+
+
+def _project_public_path(token: str, prefix: str) -> str:
+    """Map source-relative AgentCanon tool paths to one public prefix."""
+    if token.startswith("tools/agent-canon/tools/"):
+        raise SourceRootFailure(
+            "agent_canon_public_command_invalid",
+            f"Nested public tools path is not valid: {token}",
+        )
+    if token.startswith("vendor/agent-canon/vendor/agent-canon/"):
+        raise SourceRootFailure(
+            "agent_canon_public_command_invalid",
+            f"Repeated vendor source prefix is not valid: {token}",
+        )
+    if token.startswith("vendor/agent-canon/tools/"):
+        token = "tools/" + token.removeprefix("vendor/agent-canon/tools/")
+    if token.startswith("tools/"):
+        return f"{prefix}/{token.removeprefix('tools/')}"
+    return token
+
+
+def _project_contract_path(token: str, prefix: str) -> str:
+    """Project a source-document operand independently of the public tool path."""
+    if token.startswith("vendor/agent-canon/vendor/agent-canon/"):
+        raise SourceRootFailure(
+            "agent_canon_public_command_invalid",
+            f"Repeated vendor contract prefix is not valid: {token}",
+        )
+    if token.startswith("vendor/agent-canon/"):
+        relative = token.removeprefix("vendor/agent-canon/")
+        return relative if prefix == "tools" else token
+    if token.startswith(("documents/", "agents/", "templates/")):
+        return token if prefix == "tools" else f"vendor/agent-canon/{token}"
+    return token
+
+
+def project_public_command(
+    logical_command: str,
+    root_resolution: RootResolution,
+) -> PublicCommandProjection:
+    """Project a catalog/skill logical command without changing execution.
+
+    The parser is shared with ``build_command_plan``; only executable, source
+    tool, and PYTHONPATH tokens are rewritten.  Operands such as ``--root`` and
+    ``--contract`` remain independent logical paths.
+    """
+    raw = shlex.split(logical_command)
+    if not raw:
+        raise SourceRootFailure("agent_canon_public_command_invalid", "empty command")
+    prefix = _public_tool_prefix(root_resolution)
+    env: list[tuple[str, str]] = []
+    index = 0
+    while index < len(raw) and ASSIGNMENT_TOKEN_RE.fullmatch(raw[index]):
+        key, value = raw[index].split("=", maxsplit=1)
+        if key == "PYTHONPATH":
+            projected: list[str] = []
+            for entry in value.split(":"):
+                if not entry:
+                    continue
+                if entry in {"tools", "vendor/agent-canon/tools"}:
+                    entry = prefix
+                projected.append(entry)
+            value = ":".join(dict.fromkeys(projected))
+        env.append((key, value))
+        index += 1
+    tokens = raw[index:]
+    projected_tokens: list[str] = []
+    for token_index, token in enumerate(tokens):
+        if token_index == 1 and tokens[0] in SCRIPT_INTERPRETERS:
+            projected_tokens.append(_project_public_path(token, prefix))
+        elif token_index == 0 and token.startswith(("tools/", "vendor/agent-canon/tools/")):
+            projected_tokens.append(_project_public_path(token, prefix))
+        elif token_index > 0 and tokens[token_index - 1] == "--contract":
+            projected_tokens.append(_project_contract_path(token, prefix))
+        elif token.startswith("--contract="):
+            key, value = token.split("=", maxsplit=1)
+            projected_tokens.append(f"{key}={_project_contract_path(value, prefix)}")
+        else:
+            projected_tokens.append(token)
+    public_tokens = tuple(projected_tokens)
+    if root_resolution.layout != "standalone":
+        public_root = (
+            root_resolution.current_repository_root / "tools" / "agent-canon"
+        ).resolve()
+        for token in public_tokens[:2]:
+            if not token.startswith(f"{prefix}/"):
+                continue
+            candidate = (
+                root_resolution.current_repository_root / token
+            ).resolve()
+            try:
+                candidate.relative_to(public_root)
+            except ValueError as exc:
+                raise SourceRootFailure(
+                    "agent_canon_public_command_escape",
+                    f"Public command escapes the authenticated public view: {token}",
+                ) from exc
+            if candidate.suffix in {".py", ".sh"} and not candidate.is_file():
+                raise SourceRootFailure(
+                    "agent_canon_public_command_missing",
+                    f"Public executable does not exist: {token}",
+                )
+    return PublicCommandProjection(
+        logical_command=shlex.join(raw),
+        layout=root_resolution.layout,
+        public_cwd=".",
+        public_env=tuple(env),
+        public_argv=public_tokens,
+    )
+
+
+def project_public_command_for_layout(
+    logical_command: str,
+    *,
+    layout: str,
+) -> PublicCommandProjection:
+    """Project a logical command when only the resolved layout is available."""
+    if layout not in {"standalone", "vendored", "override"}:
+        raise SourceRootFailure("agent_canon_public_command_invalid", f"unknown layout: {layout}")
+    # The projection itself is independent of source identity.  A lightweight
+    # resolution object keeps this helper on the same owner seam without
+    # persisting another command schema.
+    resolution = RootResolution(
+        current_repository_root=Path("."),
+        source_root=Path("."),
+        layout=layout,
+        canon_root=Path("."),
+        public_tool_root=Path("tools/agent-canon"),
+    )
+    return project_public_command(logical_command, resolution)
+
+
+@dataclass(frozen=True)
 class Finding:
     """One skill-command-section finding."""
 
@@ -454,6 +605,42 @@ def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillComman
     )
 
 
+def validate_command_plan_executables(
+    root_resolution: RootResolution,
+    packet: SkillCommandPacket,
+) -> None:
+    """Validate every resolved script executable before report publication."""
+    command_groups = (
+        packet.resolved_required_commands,
+        packet.resolved_conditional_commands,
+        packet.resolved_maintenance_commands,
+    )
+    for group in command_groups:
+        for _logical, _source, _cwd, _env, argv in group:
+            if not argv:
+                raise SourceRootFailure(
+                    "agent_canon_command_preflight_invalid",
+                    f"empty command for skill {packet.skill}",
+                )
+            executable = argv[1] if argv[0] in SCRIPT_INTERPRETERS and len(argv) > 1 else argv[0]
+            if not executable.startswith("/"):
+                continue
+            declared = Path(executable)
+            candidate = declared.resolve()
+            if declared.is_symlink() or not candidate.is_file():
+                raise SourceRootFailure(
+                    "agent_canon_command_preflight_missing",
+                    f"command executable is missing: {executable}",
+                )
+            try:
+                candidate.relative_to(root_resolution.source_root.resolve())
+            except ValueError as exc:
+                raise SourceRootFailure(
+                    "agent_canon_command_preflight_escape",
+                    f"command executable escapes source root: {executable}",
+                ) from exc
+
+
 def related_skills_for(root: Path, skill: str) -> tuple[str, ...]:
     """Return related skills from the public catalog when that catalog exists."""
     catalog_path = root / HUMAN_SKILL_ROOT / "catalog.yaml"
@@ -558,6 +745,39 @@ def render_packet_text(packet: SkillCommandPacket) -> str:
     return "\n".join(lines)
 
 
+def render_public_projection_text(
+    packet: SkillCommandPacket,
+    root_resolution: RootResolution,
+) -> str:
+    """Render transient public argv projections without changing packet schema."""
+    lines = [
+        f"SKILL_TOOL_COMMANDS_PUBLIC_LAYOUT={root_resolution.layout}",
+        "SKILL_TOOL_COMMANDS_PUBLIC_REQUIRED:",
+    ]
+    for command in packet.required_commands:
+        projection = project_public_command(command, root_resolution)
+        lines.extend(
+            (
+                f"- logical={projection.logical_command}",
+                f"- public_cwd={projection.public_cwd}",
+                f"- public_env={json.dumps(list(projection.public_env))}",
+                f"- public_argv={json.dumps(list(projection.public_argv))}",
+            )
+        )
+    lines.append("SKILL_TOOL_COMMANDS_PUBLIC_CONDITIONAL:")
+    for command in packet.conditional_commands:
+        projection = project_public_command(command, root_resolution)
+        lines.extend(
+            (
+                f"- logical={projection.logical_command}",
+                f"- public_cwd={projection.public_cwd}",
+                f"- public_env={json.dumps(list(projection.public_env))}",
+                f"- public_argv={json.dumps(list(projection.public_argv))}",
+            )
+        )
+    return "\n".join(lines)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the selected subcommand."""
     parser = build_parser()
@@ -575,6 +795,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(json.dumps(asdict(packet), indent=2, sort_keys=True))
         else:
             print(render_packet_text(packet))
+            print(render_public_projection_text(packet, root_resolution))
         return 0
     findings = check(root)
     if args.format == "json":

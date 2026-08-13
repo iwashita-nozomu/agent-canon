@@ -204,8 +204,15 @@ def has_non_string_key(mapping: Mapping[str, object], key: str) -> bool:
     return key in mapping and not isinstance(mapping[key], str)
 
 
-def resolve_repo_path(root: Path, relative_path: str) -> Path:
-    """Resolve a path through the root view or vendored AgentCanon source."""
+def resolve_repo_path(
+    root: Path,
+    relative_path: str,
+    *,
+    source_root: Path | None = None,
+) -> Path:
+    """Resolve a catalog path below an explicit source root when supplied."""
+    if source_root is not None:
+        return source_root.resolve() / relative_path
     root_path = root / relative_path
     if root_path.exists():
         return root_path
@@ -993,6 +1000,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(render_json(report, public))
     elif args.format == "markdown":
         print(render_markdown(report))
+        # Markdown is the catalog crosswalk projection.  The public-surface
+        # extractor is intentionally reported by the JSON/text projections;
+        # minimal catalog fixtures need not materialize Rust/CLI inputs merely
+        # to render this catalog-owned view.
+        return 1 if report.findings else 0
     else:
         for finding in report.findings:
             print(finding.render())

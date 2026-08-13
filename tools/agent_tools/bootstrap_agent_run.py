@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import os
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -25,6 +26,7 @@ if __package__:
         ParentRootSideEffectError,
         attest_parent_root,
     )
+    from .agent_canon_source_root import resolve_agent_canon_source_root
 else:
     from parent_root_side_effects import (  # type: ignore[no-redef]
         ParentRootAttestationRequest,
@@ -33,6 +35,7 @@ else:
         ParentRootSideEffectError,
         attest_parent_root,
     )
+    from agent_canon_source_root import resolve_agent_canon_source_root
 
 
 def _write_parent(path: Path, data: bytes, purpose: str) -> None:
@@ -122,6 +125,7 @@ if __package__:
         language_review_candidates,
         pre_handoff_gate_status_output_lines,
         pre_handoff_scope_policy_output_lines,
+        public_command_for_layout,
         repo_tool_routing_policy_output_lines,
         same_role_subagent_policy_output_lines,
         standard_agent_wave_sequence_output_lines,
@@ -139,6 +143,7 @@ else:
         language_review_candidates,
         pre_handoff_gate_status_output_lines,
         pre_handoff_scope_policy_output_lines,
+        public_command_for_layout,
         repo_tool_routing_policy_output_lines,
         same_role_subagent_policy_output_lines,
         standard_agent_wave_sequence_output_lines,
@@ -175,15 +180,34 @@ else:
     )
 
 if __package__:
-    from .agent_team import create_run_bundle, run_active_design_packet
+    from .agent_team import (
+        PreparedRunBundle,
+        prepare_run_bundle,
+        run_active_design_packet,
+    )
 else:
-    from agent_team import create_run_bundle, run_active_design_packet
+    from agent_team import (  # type: ignore[no-redef]
+        PreparedRunBundle,
+        prepare_run_bundle,
+        run_active_design_packet,
+    )
 
 if __package__:
-    from .workspace_scope import make_run_id, resolve_report_root
+    from .workspace_scope import (
+        make_run_id,
+        resolve_report_root,
+        resolve_repository_roots,
+    )
 else:
-    from workspace_scope import make_run_id, resolve_report_root
-from task_authority import write_task_authority_baselines
+    from workspace_scope import (  # type: ignore[no-redef]
+        make_run_id,
+        resolve_report_root,
+        resolve_repository_roots,
+    )
+from task_authority import (
+    AUTHORITY_FILE_NAME,
+    hash_baseline_bytes,
+)
 from workflow_monitor import append_monitoring
 
 
@@ -204,6 +228,7 @@ class BootstrapRunContext:
     workflow_family_name: str | None
     workflow_active_spawn_budget: int | None
     workflow_max_write_subagents: int | None
+    repository_roots: object | None = None
 
 
 @dataclass(frozen=True)
@@ -221,9 +246,16 @@ def suggested_skills(
     task_id: str | None,
     workflow_family_id: str | None,
     task_text: str = "",
+    *,
+    source_root: Path | None = None,
 ) -> tuple[str, ...]:
     """Return the public skills that should be read before work starts."""
-    return suggested_public_skills(task_id, workflow_family_id, task_text)
+    return suggested_public_skills(
+        task_id,
+        workflow_family_id,
+        task_text,
+        source_root=source_root,
+    )
 
 
 def codex_agents_for_role(config: TeamConfig, role_id: str) -> tuple[str, ...]:
@@ -240,6 +272,7 @@ def document_packet_output(
     report_dir: Path,
     workspace_root: Path,
     active_design_packet: ActiveDesignPacketConfig | None = None,
+    agentcanon_source_root: Path | None = None,
 ) -> str:
     """Render one role's explicit document packet as a CSV-like path list."""
     role = next(
@@ -253,15 +286,22 @@ def document_packet_output(
         report_dir,
         workspace_root,
         active_design_packet,
+        agentcanon_source_root,
     )
     return ",".join(str(entry.path) for entry in packet.read_before_work)
 
 
-def cross_cutting_document_packet_output(workspace_root: Path) -> str:
+def cross_cutting_document_packet_output(
+    workspace_root: Path,
+    agentcanon_source_root: Path | None = None,
+) -> str:
     """Render the common cross-cutting document packet."""
     return ",".join(
         str(entry.path)
-        for entry in resolve_cross_cutting_document_packet(workspace_root)
+        for entry in resolve_cross_cutting_document_packet(
+            workspace_root,
+            agentcanon_source_root,
+        )
     )
 
 
@@ -376,13 +416,18 @@ def resolve_bootstrap_context(
     config: TeamConfig,
     catalog: TaskCatalog,
     workspace_root: Path,
+    repository_roots: object | None = None,
 ) -> BootstrapRunContext:
     """Resolve workflow family, specialists, and report paths for one run."""
     created_at = datetime.now(UTC).replace(microsecond=0)
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
     # The parent capability authorizes the eventual write; it does not replace
     # the caller's logical workspace/report-root selection.
-    report_root = resolve_report_root(args.report_root, workspace_root)
+    report_root = (
+        repository_roots.report_root
+        if repository_roots is not None
+        else resolve_report_root(args.report_root, workspace_root)
+    )
     run_id = args.run_id or make_run_id(args.task, created_at)
     report_dir = report_root / run_id
     manual_specialists = expand_enabled_specialists(config, catalog, tuple(args.enable))
@@ -437,6 +482,7 @@ def resolve_bootstrap_context(
         workflow_family_name=workflow_family_name,
         workflow_active_spawn_budget=workflow_active_spawn_budget,
         workflow_max_write_subagents=workflow_max_write_subagents,
+        repository_roots=repository_roots,
     )
 
 
@@ -466,14 +512,28 @@ def emit_bootstrap_output(
     runtime: BootstrapRuntime,
 ) -> None:
     """Print the machine-readable bootstrap summary."""
+    repository_roots = context.repository_roots
+    if repository_roots is None:
+        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
+    source_root = getattr(repository_roots, "agentcanon_source_root", None)
+    if source_root is None:
+        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
     selected_skills = suggested_skills(
         args.task_id,
         context.workflow_family_id,
         args.task,
+        source_root=source_root,
     )
-    active_skills = current_stage_skills(selected_skills, args.task)
-    deferred_skills = deferred_stage_skills(selected_skills, args.task)
+    active_skills = current_stage_skills(
+        selected_skills, args.task, source_root=source_root
+    )
+    deferred_skills = deferred_stage_skills(
+        selected_skills, args.task, source_root=source_root
+    )
     review_roles = selected_review_roles(runtime.roles)
+    public_layout = getattr(repository_roots, "layout", None)
+    if public_layout is None:
+        raise RuntimeError("runtime_roots_invalid:layout_missing")
     print("AGENT_CANON_PREFLIGHT_COMMAND=make agent-canon-update-plan")
     print(f"AGENT_CANON_PREFLIGHT_STATUS={preflight.status}")
     print(f"AGENT_CANON_PREFLIGHT_REASON={preflight.reason}")
@@ -488,8 +548,8 @@ def emit_bootstrap_output(
         print(line)
     print(f"REQUEST_CONTRACT={context.report_dir / 'user_request_contract.md'}")
     print("REQUEST_CONTRACT_REQUIRED=yes")
-    print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads()}")
-    print(f"RUNTIME_MAX_DEPTH={codex_runtime_max_depth()}")
+    print(f"RUNTIME_MAX_THREADS={codex_runtime_max_threads(workspace_root)}")
+    print(f"RUNTIME_MAX_DEPTH={codex_runtime_max_depth(workspace_root)}")
     print(f"SUGGESTED_SKILLS={','.join(selected_skills)}")
     print(f"ACTIVE_SKILLS={','.join(active_skills)}")
     print(f"DEFERRED_SKILLS={','.join(deferred_skills) or '-'}")
@@ -516,7 +576,7 @@ def emit_bootstrap_output(
             "DYNAMIC_SUBAGENT_EXPANSION_MONITOR=workflow_monitoring.md#Behavior Events"
         )
         print(
-            f"SUBAGENT_WAVE_RECORD_COMMAND={subagent_wave_record_command(context.report_dir)}"
+            f"SUBAGENT_WAVE_RECORD_COMMAND={subagent_wave_record_command(context.report_dir, layout=public_layout)}"
         )
         active_budget = context.workflow_active_spawn_budget or 0
         initial_wave = recommended_initial_subagent_wave(
@@ -524,6 +584,7 @@ def emit_bootstrap_output(
             active_budget,
             catalog,
             runtime.agent_type_selections,
+            source_root / ".codex" / "agents",
         )
         if initial_wave:
             print("PARENT_WAVE_EXECUTION_GATE=required_before_implementation")
@@ -541,6 +602,7 @@ def emit_bootstrap_output(
             initial_wave,
             catalog,
             runtime.agent_type_selections,
+            source_root / ".codex" / "agents",
         )
         expansion_wave_slots = recommended_dynamic_expansion_wave_slots(
             runtime.roles,
@@ -548,6 +610,7 @@ def emit_bootstrap_output(
             initial_wave,
             catalog,
             runtime.agent_type_selections,
+            source_root / ".codex" / "agents",
         )
         print(
             "SUBAGENT_AGENT_TYPE_SELECTIONS="
@@ -583,7 +646,10 @@ def emit_bootstrap_output(
         print(line)
     for line in contract_complete_implementation_policy_output_lines(args.task):
         print(line)
-    for line in repo_tool_routing_policy_output_lines(selected_skills):
+    for line in repo_tool_routing_policy_output_lines(
+        selected_skills,
+        source_root=source_root,
+    ):
         print(line)
     for line in default_quality_check_policy_output_lines(
         runtime.roles,
@@ -592,6 +658,7 @@ def emit_bootstrap_output(
         language_review_candidates=context.language_review_candidates,
         default_review_packs_enabled=False,
         default_review_pack_ids=context.default_review_pack_ids,
+        layout=public_layout,
     ):
         print(line)
     if not args.no_language_review_candidates:
@@ -609,39 +676,59 @@ def emit_bootstrap_output(
     print("IMPLEMENTATION_SURFACE_ROUTE_STATUS=pending")
     print(
         "IMPLEMENTATION_SURFACE_ROUTE_COMMAND="
-        "python3 tools/agent_tools/search.py "
-        "--query-file <request-or-design-question.txt> "
-        "--providers text,semantic,vector,tool,header-deps,code-deps "
-        "--format json"
+        +
+        public_command_for_layout(
+            "python3 tools/agent_tools/search.py "
+            "--query-file <request-or-design-question.txt> "
+            "--providers text,semantic,vector,tool,header-deps,code-deps "
+            "--format json",
+            public_layout,
+        )
     )
     print("TOOL_REUSE_LEDGER_STATUS=required_before_custom_implementation")
     print("PRE_EDIT_REJECTION_PREDICTION_STATUS=pending")
     print(
         "PRE_EDIT_REJECTION_COMMAND="
-        "python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>"
+        +
+        public_command_for_layout(
+            "python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>",
+            public_layout,
+        )
     )
     print("AGENT_REPORT_COLLECTION_STATUS=available")
     print(
-        "AGENT_REPORT_COLLECTION_STATUS_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py status"
+        "AGENT_REPORT_COLLECTION_STATUS_COMMAND="
+        + public_command_for_layout(
+            "python3 tools/agent_tools/runtime_log_archive_git.py status",
+            public_layout,
+        )
     )
     print(
         "AGENT_REPORT_ARCHIVE_RUN_COMMAND="
-        f"python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {context.report_dir}"
+        +
+        public_command_for_layout(
+            f"python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir {context.report_dir}",
+            public_layout,
+        )
     )
     print(
-        "AGENT_REPORT_COLLECTION_SYNC_COMMAND=python3 tools/agent_tools/runtime_log_archive_git.py sync"
+        "AGENT_REPORT_COLLECTION_SYNC_COMMAND="
+        + public_command_for_layout(
+            "python3 tools/agent_tools/runtime_log_archive_git.py sync",
+            public_layout,
+        )
     )
     print(
         "CROSS_CUTTING_DOCUMENT_PACKET="
-        f"{cross_cutting_document_packet_output(workspace_root)}"
+        f"{cross_cutting_document_packet_output(workspace_root, source_root)}"
     )
     print(
         "DESIGN_DOCUMENT_PACKET="
-        f"{document_packet_output(config, 'designer', context.report_dir, workspace_root, runtime.active_design_packet)}"
+        f"{document_packet_output(config, 'designer', context.report_dir, workspace_root, runtime.active_design_packet, source_root)}"
     )
     print(
         "IMPLEMENTATION_DOCUMENT_PACKET="
-        f"{document_packet_output(config, 'implementer', context.report_dir, workspace_root, runtime.active_design_packet)}"
+        f"{document_packet_output(config, 'implementer', context.report_dir, workspace_root, runtime.active_design_packet, source_root)}"
     )
     print(f"ACTIVE_ROLES={','.join(role.id for role in runtime.roles)}")
     print(f"CREATED_FILES={','.join(runtime.created_files)}")
@@ -655,14 +742,18 @@ def record_bootstrap_monitoring(
     review_roles: tuple[str, ...],
     task_text: str,
     preflight_status: str,
+    source_root: Path | None = None,
 ) -> None:
     """Record bootstrap monitoring evidence."""
+    if source_root is None:
+        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
+    selected_source_root = source_root
     append_monitoring(
         context.report_dir,
         signals=[
             (
                 f"workflow={context.workflow_family_name or 'Unspecified'}, "
-                f"skills={','.join(current_stage_skills(selected_skills, task_text)) or '-'}, "
+                f"skills={','.join(current_stage_skills(selected_skills, task_text, source_root=selected_source_root)) or '-'}, "
                 f"review={','.join(review_roles) or '-'}"
             ),
             f"stage owner routing active_roles={','.join(role.id for role in roles)}",
@@ -676,10 +767,192 @@ def record_bootstrap_monitoring(
     )
 
 
+def _read_optional_bytes(path: Path) -> bytes | None:
+    """Read one prior file exactly, preserving absent state as ``None``."""
+    return path.read_bytes() if path.is_file() else None
+
+
+def _restore_parent_file(
+    boundary: ParentRootSideEffectBoundary,
+    attestation: object,
+    path: Path,
+    prior: bytes | None,
+    purpose: str,
+) -> None:
+    """Restore one captured file through the authenticated parent boundary."""
+    if prior is not None:
+        boundary.write_parent_owned_file(attestation, path, prior, purpose)
+        return
+    if not path.exists():
+        return
+    receipt = boundary.resolve_parent_owned_path(attestation, path, purpose, create=False)
+    boundary.remove_parent_owned_file(receipt)
+
+
+def publish_prepared_run(
+    spec: RunBundleSpec,
+    prepared: PreparedRunBundle,
+    report_root: Path,
+    post_move: Callable[[], None] | None = None,
+) -> tuple[str, ...]:
+    """Stage one prepared byte map, move it once, publish sidecars, and rollback."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "bootstrap-publish: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(
+            cwd=parent,
+            explicit_root=parent,
+            purpose="bootstrap-publish",
+        )
+    )
+    boundary = ParentRootSideEffectBoundary()
+    report_root = report_root.resolve()
+    final_run = spec.report_dir.resolve()
+    expected_final_run = (report_root / spec.run_id).resolve()
+    if final_run != expected_final_run:
+        raise RuntimeError("runtime_roots_invalid:report_dir_mismatch")
+    if final_run.exists():
+        raise RuntimeError(f"bootstrap_run_id_collision:{spec.run_id}")
+    pointer = report_root / ".active_run"
+    pointer_baseline = report_root / ".active_run.sha256"
+    authority_baseline = final_run / f"{AUTHORITY_FILE_NAME}.sha256"
+    prior_files = {
+        pointer: _read_optional_bytes(pointer),
+        pointer_baseline: _read_optional_bytes(pointer_baseline),
+        authority_baseline: _read_optional_bytes(authority_baseline),
+    }
+    prior_children = {child.name for child in report_root.iterdir()} if report_root.is_dir() else set()
+    stage_receipt = None
+    moved = False
+    try:
+        stage_receipt = boundary.create_parent_owned_temp_directory(
+            attestation,
+            report_root,
+            "bootstrap-stage",
+            ".stage-run",
+        )
+        for relative, payload in prepared.files:
+            relative_path = Path(relative)
+            if (
+                relative_path.is_absolute()
+                or not relative
+                or any(part in {"", ".", ".."} for part in relative_path.parts)
+            ):
+                raise RuntimeError(f"runtime_artifact_path_invalid:stage:{relative}")
+            target = stage_receipt.physical_path / relative_path
+            boundary.write_parent_owned_file(
+                attestation,
+                target,
+                payload,
+                "bootstrap-stage-artifact",
+            )
+            if target.read_bytes() != payload:
+                raise RuntimeError(f"bootstrap_stage_readback_failed:{relative}")
+        boundary.move_parent_owned(
+            attestation,
+            stage_receipt.physical_path,
+            final_run,
+            "bootstrap-stage-move",
+        )
+        moved = True
+        pointer_bytes = (str(final_run.resolve()) + "\n").encode("utf-8")
+        boundary.write_parent_owned_file(
+            attestation,
+            pointer,
+            pointer_bytes,
+            "bootstrap-active-run",
+        )
+        boundary.write_parent_owned_file(
+            attestation,
+            pointer_baseline,
+            hash_baseline_bytes(pointer_bytes),
+            "bootstrap-active-run-baseline",
+        )
+        authority_path = final_run / AUTHORITY_FILE_NAME
+        if authority_path.is_file():
+            boundary.write_parent_owned_file(
+                attestation,
+                authority_baseline,
+                hash_baseline_bytes(authority_path.read_bytes()),
+                "bootstrap-authority-baseline",
+            )
+        if post_move is not None:
+            post_move()
+        for relative, payload in prepared.files:
+            if relative == "workflow_monitoring.md":
+                continue
+            if (final_run / relative).read_bytes() != payload:
+                raise RuntimeError(f"bootstrap_final_readback_failed:{relative}")
+        monitoring_path = final_run / "workflow_monitoring.md"
+        if not monitoring_path.is_file() or not monitoring_path.read_bytes().startswith(
+            dict(prepared.files).get("workflow_monitoring.md", b"")
+        ):
+            raise RuntimeError("bootstrap_monitoring_readback_failed")
+        if pointer.read_bytes() != pointer_bytes:
+            raise RuntimeError("bootstrap_pointer_readback_failed")
+        if pointer_baseline.read_bytes() != hash_baseline_bytes(pointer_bytes):
+            raise RuntimeError("bootstrap_pointer_baseline_readback_failed")
+        if authority_path.is_file() and authority_baseline.read_bytes() != hash_baseline_bytes(
+            authority_path.read_bytes()
+        ):
+            raise RuntimeError("bootstrap_authority_baseline_readback_failed")
+        return prepared.created_files
+    except Exception as primary_error:
+        rollback_errors: list[str] = []
+        try:
+            if stage_receipt is not None and not moved and stage_receipt.physical_path.exists():
+                boundary.remove_parent_owned_tree(
+                    attestation,
+                    stage_receipt,
+                    "bootstrap-stage-rollback",
+                )
+            if moved and final_run.exists():
+                boundary.remove_parent_owned_tree(
+                    attestation,
+                    final_run,
+                    "bootstrap-run-rollback",
+                )
+            for path, prior in prior_files.items():
+                _restore_parent_file(
+                    boundary,
+                    attestation,
+                    path,
+                    prior,
+                    "bootstrap-publish-rollback",
+                )
+            observed_children = {child.name for child in report_root.iterdir()} if report_root.is_dir() else set()
+            if observed_children != prior_children:
+                raise RuntimeError(
+                    f"child_delta:{sorted(observed_children ^ prior_children)}"
+                )
+            for path, prior in prior_files.items():
+                if _read_optional_bytes(path) != prior:
+                    raise RuntimeError(f"prior_bytes:{path}")
+        except Exception as rollback_error:
+            rollback_errors.append(str(rollback_error))
+        if rollback_errors:
+            raise RuntimeError(
+                "bootstrap_publish_rollback_failed:"
+                f"{primary_error}:{';'.join(rollback_errors)}"
+            ) from primary_error
+        raise
+
+
 def main() -> int:
     """Run the bootstrap command."""
-    config = load_team_config()
-    catalog = load_task_catalog(config)
+    try:
+        source_resolution = resolve_agent_canon_source_root(Path(__file__).resolve())
+        source_root = source_resolution.source_root
+        config = load_team_config(source_root / "agents" / "agents_config.json")
+        catalog = load_task_catalog(config, root=source_root)
+    except (RuntimeError, OSError) as exc:
+        print(str(exc), flush=True)
+        return 1
     args = build_parser(enable_choices(config, catalog), task_ids(catalog)).parse_args()
     try:
         explicit_active_design_packet = parse_active_design_packet_input(
@@ -690,6 +963,16 @@ def main() -> int:
         return 2
     workspace_root = Path(args.workspace_root).resolve()
     try:
+        repository_roots = resolve_repository_roots(
+            workspace_root,
+            args.report_root,
+            source_root=source_root,
+            canon_root=source_resolution.canon_root,
+        )
+    except (RuntimeError, OSError) as exc:
+        print(str(exc), flush=True)
+        return 1
+    try:
         preflight = run_agent_canon_preflight(
             workspace_root,
             skip=args.skip_agent_canon_preflight,
@@ -697,7 +980,13 @@ def main() -> int:
     except RuntimeError as exc:
         print(str(exc), flush=True)
         return 1
-    context = resolve_bootstrap_context(args, config, catalog, workspace_root)
+    context = resolve_bootstrap_context(
+        args,
+        config,
+        catalog,
+        workspace_root,
+        repository_roots,
+    )
     roles = select_roles(
         config,
         list(context.enabled_specialists),
@@ -718,6 +1007,7 @@ def main() -> int:
         args.task_id,
         context.workflow_family_id,
         args.task,
+        source_root=repository_roots.agentcanon_source_root,
     )
     run_spec = RunBundleSpec(
             config=config,
@@ -728,6 +1018,9 @@ def main() -> int:
             created_at_iso=context.created_at_iso,
             roles=roles,
             workspace_root=workspace_root,
+            agentcanon_source_root=repository_roots.agentcanon_source_root,
+            report_root=repository_roots.report_root,
+            repository_roots=repository_roots,
             active_design_packet=explicit_active_design_packet,
             workflow_family_id=context.workflow_family_id or "",
             manual_specialists=context.manual_specialists,
@@ -739,23 +1032,39 @@ def main() -> int:
             task_catalog=catalog,
             agent_type_selections=agent_type_selections,
         )
-    active_design_packet = run_active_design_packet(run_spec)
-    created_files = create_run_bundle(run_spec)
+    try:
+        prepared = prepare_run_bundle(run_spec)
+        active_design_packet = prepared.active_design_packet
+    except (RuntimeError, OSError) as exc:
+        print(str(exc), flush=True)
+        return 1
     active_pointer = context.report_root / ".active_run"
-    _write_parent(
-        active_pointer,
-        (str(context.report_dir.resolve()) + "\n").encode("utf-8"),
-        "bootstrap-active-run",
-    )
-    write_task_authority_baselines(context.report_dir, context.report_root)
+    review_roles = selected_review_roles(roles)
     runtime = BootstrapRuntime(
         roles=roles,
-        created_files=created_files,
+        created_files=prepared.created_files,
         active_pointer=active_pointer,
         agent_type_selections=agent_type_selections,
         active_design_packet=active_design_packet,
     )
-    review_roles = selected_review_roles(roles)
+    try:
+        publish_prepared_run(
+            run_spec,
+            prepared,
+            context.report_root,
+            post_move=lambda: record_bootstrap_monitoring(
+                context,
+                roles,
+                selected_skills,
+                review_roles,
+                args.task,
+                preflight.status,
+                repository_roots.agentcanon_source_root,
+            ),
+        )
+    except (RuntimeError, OSError, ParentRootSideEffectError) as exc:
+        print(str(exc), flush=True)
+        return 1
     emit_bootstrap_output(
         args=args,
         config=config,
@@ -764,14 +1073,6 @@ def main() -> int:
         workspace_root=workspace_root,
         preflight=preflight,
         runtime=runtime,
-    )
-    record_bootstrap_monitoring(
-        context,
-        roles,
-        selected_skills,
-        review_roles,
-        args.task,
-        preflight.status,
     )
     return 0
 
