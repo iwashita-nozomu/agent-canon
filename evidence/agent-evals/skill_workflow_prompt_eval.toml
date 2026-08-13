@@ -1645,6 +1645,42 @@ description = "Forbids unconditional receipt activation and fixed receipt schema
 required_regex = ["fixed schema", "fixed candidate count", "conditional|該当する場合だけ"]
 forbidden_regex = ["every required_action.*receipt", "all findings.*receipt", "unconditional.*receipt", "receipt.*required.*every"]
 
+[[evals.checklist]]
+id = "HV-WF-9"
+critical = true
+description = "Negative scenario: a smallest-patch or symptom-only proposal fails after cause selection."
+required_regex = [
+  "Gate H0\\.75|根本原因に対する修正スコープ",
+  "root-cause[\\s\\S]*closure|root mechanism[\\s\\S]*(closure|closed)|根本原因[\\s\\S]*(closure|閉じ)",
+  "minimum-diff|smallest-local-patch|smallest patch|最小差分|最小パッチ",
+  "explicitly[\\s\\S]*prohibited|明示的に禁止|禁止します",
+  "[Ss]ymptom[\\s\\S]*suppression|症状抑制|症状だけから",
+  "wrapper|compatibility shim|wrapper / compatibility shim|ラッパー",
+  "test-only relaxation|oracle weakening|test-only relaxation / oracle weakening|テストだけの緩和",
+  "nearby local[\\s\\S]*patch|近傍行だけ|近傍.*修正",
+  "root mechanism[\\s\\S]*(closure|closed)|root mechanism[\\s\\S]*閉じ|根本機構[\\s\\S]*閉じ",
+]
+
+[[evals.checklist]]
+id = "HV-WF-10"
+critical = true
+description = "Positive scenario: the selected complete owning unit closes mechanism, effects, and contract surfaces."
+required_regex = [
+  "complete[\\s\\S]*replaceable[\\s\\S]*owning[\\s\\S]*responsibility[\\s\\S]*unit|complete[\\s\\S]*owning[\\s\\S]*unit|完全な差し替え可能な責務単位",
+  "root mechanism[\\s\\S]*(closed|closure)|root mechanism|根本機構",
+  "reachable[\\s\\S]*(consumer|effect)|到達可能な.*(consumer|影響)",
+  "side[\\s\\S]*effect|副作用",
+  "failure[\\s\\S]*(handling|path)|失敗処理|failure",
+  "rollback|ロールバック",
+  "cleanup|クリーンアップ",
+  "contract|契約",
+  "docs|documentation|文書",
+  "tests?|テスト",
+  "validation|検証",
+  "evidence[\\s\\S]*bounded|evidence-bounded|証拠.*bounded|証拠.*限定",
+  "complete_owning_unit_selected[\\s\\S]*root_mechanism_closed[\\s\\S]*reachable_effects_closed[\\s\\S]*contract_docs_tests_validation_closed|complete[\\s\\S]*unit[\\s\\S]*closed",
+]
+
 [[evals]]
 id = "change-review-cause-investigation"
 target = ".agents/skills/change-review/SKILL.md"
@@ -1672,6 +1708,40 @@ description = "Forbids making every action-bearing, rejected, duplicate, or unre
 required_regex = ["conditional", "straightforward finding", "direct cause proof", "rejected", "duplicate", "already-covered", "unreachable", "no named receipt|receipt は不要|receipt を要求しません"]
 forbidden_regex = ["every required_action.*receipt", "all findings.*receipt", "unconditional.*receipt"]
 
+[[evals.checklist]]
+id = "CR-CAUSE-4"
+critical = true
+description = "Negative scenario: change review rejects a smallest-patch or symptom-only repair after cause selection."
+required_regex = [
+  "minimum-diff|smallest-local-patch|smallest patch|最小差分|最小パッチ",
+  "explicitly[\\s\\S]*prohibited|明示的に禁止|禁止します",
+  "[Ss]ymptom[\\s\\S]*suppression|症状抑制|症状だけから",
+  "wrapper|compatibility shim|wrapper / compatibility shim|ラッパー",
+  "test-only relaxation|oracle weakening|test-only relaxation / oracle weakening|テストだけの緩和",
+  "nearby local[\\s\\S]*patch|近傍行だけ|近傍.*修正",
+  "root mechanism[\\s\\S]*(closure|closed)|root mechanism[\\s\\S]*閉じ|根本機構[\\s\\S]*閉じ",
+]
+
+[[evals.checklist]]
+id = "CR-CAUSE-5"
+critical = true
+description = "Positive scenario: change review accepts only complete owning-unit closure across reachable effects and validation."
+required_regex = [
+  "complete[\\s\\S]*replaceable[\\s\\S]*owning[\\s\\S]*responsibility[\\s\\S]*unit|complete[\\s\\S]*owning[\\s\\S]*unit|完全な差し替え可能な責務単位",
+  "root mechanism[\\s\\S]*(closed|closure)|root mechanism|根本機構",
+  "reachable[\\s\\S]*(consumer|effect)|到達可能な.*(consumer|影響)",
+  "side[\\s\\S]*effect|副作用",
+  "failure[\\s\\S]*(handling|path)|失敗処理|failure",
+  "rollback|ロールバック",
+  "cleanup|クリーンアップ",
+  "contract|契約",
+  "docs|documentation|文書",
+  "tests?|テスト",
+  "validation|検証",
+  "evidence[\\s\\S]*bounded|evidence-bounded|証拠.*bounded|証拠.*限定",
+  "complete_owning_unit_selected[\\s\\S]*root_mechanism_closed[\\s\\S]*reachable_effects_closed[\\s\\S]*contract_docs_tests_validation_closed|complete[\\s\\S]*unit[\\s\\S]*closed",
+]
+
 [[evals]]
 id = "dependency-analysis-code-improvement-skill"
 target = ".agents/skills/dependency-analysis/SKILL.md"
@@ -1697,6 +1767,40 @@ critical = true
 description = "Requires conditional activation and direct proof for straightforward dependency findings."
 required_regex = ["causal ambiguity", "alternative", "owner", "fix surface", "validation route", "straightforward finding", "direct cause proof", "rejected", "duplicate", "already-covered", "unreachable", "no named receipt|receipt は不要|receipt を要求しません"]
 forbidden_regex = ["every required_action.*receipt", "all findings.*receipt", "unconditional.*receipt"]
+
+[[evals.checklist]]
+id = "DA-SKILL-CAUSE-3"
+critical = true
+description = "Negative scenario: dependency analysis rejects a smallest-patch or symptom-only repair after cause selection."
+required_regex = [
+  "minimum-diff|smallest-local-patch|smallest patch|最小差分|最小パッチ",
+  "explicitly[\\s\\S]*prohibited|明示的に禁止|禁止します",
+  "[Ss]ymptom[\\s\\S]*suppression|症状抑制|症状だけから",
+  "wrapper|compatibility shim|wrapper / compatibility shim|ラッパー",
+  "test-only relaxation|oracle weakening|test-only relaxation / oracle weakening|テストだけの緩和",
+  "nearby local[\\s\\S]*patch|近傍行だけ|近傍.*修正",
+  "root mechanism[\\s\\S]*(closure|closed)|root mechanism[\\s\\S]*閉じ|根本機構[\\s\\S]*閉じ",
+]
+
+[[evals.checklist]]
+id = "DA-SKILL-CAUSE-4"
+critical = true
+description = "Positive scenario: dependency analysis binds the complete owning unit and its downstream contract closure."
+required_regex = [
+  "complete[\\s\\S]*replaceable[\\s\\S]*owning[\\s\\S]*responsibility[\\s\\S]*unit|complete[\\s\\S]*owning[\\s\\S]*unit|完全な差し替え可能な責務単位",
+  "root mechanism[\\s\\S]*(closed|closure)|root mechanism|根本機構",
+  "reachable[\\s\\S]*(consumer|effect)|到達可能な.*(consumer|影響)",
+  "side[\\s\\S]*effect|副作用",
+  "failure[\\s\\S]*(handling|path)|失敗処理|failure",
+  "rollback|ロールバック",
+  "cleanup[\\s\\S]*(path)?|クリーンアップ",
+  "contract|契約",
+  "docs|documentation|文書",
+  "tests?|テスト",
+  "validation[\\s\\S]*(route)?|検証",
+  "evidence[\\s\\S]*bounded|evidence-bounded|証拠.*bounded|証拠.*限定",
+  "complete_owning_unit_selected[\\s\\S]*root_mechanism_closed[\\s\\S]*reachable_effects_closed[\\s\\S]*contract_docs_tests_validation_closed|complete[\\s\\S]*unit[\\s\\S]*closed",
+]
 
 [[evals]]
 id = "dependency-analysis-shim-code-improvement"
