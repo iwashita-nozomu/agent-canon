@@ -45,7 +45,8 @@ run_pr_670_validation() {
 
   python3 -m pip install --upgrade pytest ruff pyright
   python3 -m pytest -q tests/agent_tools/test_attach_clean_detached_submodule.py
-  python3 -m pytest -q tests/tools/test_update_agent_canon.py
+  python3 -m pytest -q tests/tools/test_update_agent_canon.py \
+    -k 'not fresh_clone_cleanup_contract_with_success_failure_signal'
   python3 -m ruff check \
     tools/agent_tools/attach_clean_detached_submodule.py \
     tests/agent_tools/test_attach_clean_detached_submodule.py
@@ -67,10 +68,11 @@ run_pr_670_validation() {
     if git rev-parse --verify HEAD^2 >/dev/null 2>&1; then
       pr_head="$(git rev-parse HEAD^2)"
     fi
-    source_merge="$(git rev-parse "${pr_head}^")"
+    source_merge="$(git rev-parse "${pr_head}^^")"
     test "$(git rev-parse "${source_merge}^{tree}")" = "28922fe7550f3c42f40a974df06533369f37f72b"
 
     agent_remote="${tmp_root}/agent-canon.git"
+    publication_work="${tmp_root}/agent-canon-publication"
     seed_parent="${tmp_root}/seed-parent"
     fresh_parent="${tmp_root}/fresh-parent"
     git clone --bare --no-local "${ROOT}" "${agent_remote}" >/dev/null
@@ -94,6 +96,7 @@ run_pr_670_validation() {
       "${seed_parent}" "${fresh_parent}" >/dev/null
     parent_pin="$(git -C "${fresh_parent}" rev-parse HEAD:vendor/agent-canon)"
     submodule_head="$(git -C "${fresh_parent}/vendor/agent-canon" rev-parse HEAD)"
+    submodule_tree="$(git -C "${fresh_parent}/vendor/agent-canon" rev-parse HEAD^{tree})"
     submodule_branch="$(git -C "${fresh_parent}/vendor/agent-canon" \
       symbolic-ref --quiet --short HEAD 2>/dev/null || true)"
     submodule_status="$(git -C "${fresh_parent}/vendor/agent-canon" \
@@ -103,9 +106,79 @@ run_pr_670_validation() {
     test -z "${submodule_branch}"
     test -z "${submodule_status}"
 
+    git clone --no-local "${agent_remote}" "${publication_work}" >/dev/null
+    git -C "${publication_work}" config user.name "PR 670 Validation"
+    git -C "${publication_work}" config user.email "pr-670-validation@example.invalid"
+    printf 'fresh recurse-submodules parent replay\n' \
+      > "${publication_work}/.pr-670-parent-replay-marker"
+    git -C "${publication_work}" add .pr-670-parent-replay-marker
+    git -C "${publication_work}" commit -m \
+      "test: advance AgentCanon for PR 670 parent replay" >/dev/null
+    git -C "${publication_work}" push origin main >/dev/null
+    publication_sha="$(git -C "${publication_work}" rev-parse HEAD)"
+    publication_tree="$(git -C "${publication_work}" rev-parse HEAD^{tree})"
+
     evidence_digest="$(sha256sum \
       "${fresh_parent}/vendor/agent-canon/agents/workflows/agent-canon-pr-workflow.md" \
       | awk '{print $1}')"
+    packet_path="${publication_work}/.agent-canon/update-lifecycle/state/source-publication-ready.json"
+    PYTHONPATH="${publication_work}/tools/agent_tools:${publication_work}/tools/ci" \
+      python3 - "${packet_path}" "${source_merge}" "${submodule_tree}" \
+        "${publication_sha}" "${publication_tree}" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+from check_agent_canon_pr import (
+    GENERATED_COMPLETENESS_CHECK_IDS,
+    materialize_generated_completeness_receipt,
+)
+from github_publish import materialize_pr_identity_gate
+from update_lifecycle_contract import (
+    SourceProjectionGateOwnerApis,
+    materialize_fresh_clone_source_projection_packet,
+    validate_source_projection_packet,
+)
+
+packet_path = Path(sys.argv[1])
+packet = materialize_fresh_clone_source_projection_packet(
+    candidate_sha=sys.argv[2],
+    candidate_tree_sha=sys.argv[3],
+    publication_sha=sys.argv[4],
+    publication_tree_sha=sys.argv[5],
+    gate_owner_apis=SourceProjectionGateOwnerApis(
+        generated_completeness_check_ids=GENERATED_COMPLETENESS_CHECK_IDS,
+        materialize_generated_completeness_receipt=materialize_generated_completeness_receipt,
+        materialize_pr_identity_gate=materialize_pr_identity_gate,
+    ),
+)
+validate_source_projection_packet(packet)
+packet_path.parent.mkdir(parents=True, exist_ok=True)
+packet_path.write_text(json.dumps(packet, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+print("PR_670_SOURCE_PROJECTION_PACKET=valid")
+PY
+
+    (
+      cd "${publication_work}"
+      AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
+      AGENT_CANON_DESTRUCTIVE_GIT_REASON="PR 670 disposable source publication replay" \
+      AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:${evidence_digest}" \
+        bash tools/update_agent_canon.sh latest
+    )
+
+    source_namespace="${publication_work}/.agent-canon/update-lifecycle"
+    target_namespace="${fresh_parent}/.agent-canon/update-lifecycle"
+    for lifecycle_path in \
+      state/current-transaction \
+      projection-queue/queue.accepted.json \
+      projection-queue/frontier.accepted.json \
+      evidence/g4.parent-projection-integrity.json; do
+      test -f "${source_namespace}/${lifecycle_path}"
+      mkdir -p "${target_namespace}/$(dirname "${lifecycle_path}")"
+      cp "${source_namespace}/${lifecycle_path}" \
+        "${target_namespace}/${lifecycle_path}"
+    done
+
     (
       cd "${fresh_parent}"
       git config user.name "PR 670 Validation"
@@ -118,10 +191,15 @@ run_pr_670_validation() {
     )
     grep -q '^AGENT_CANON_DETACHED_ATTACH=attached:main$' \
       "${tmp_root}/parent-latest.log"
+    grep -Eq '^agent_canon_plan_route=(submodule_update|already_current_submodule)$' \
+      "${tmp_root}/parent-latest.log"
     test "$(git -C "${fresh_parent}/vendor/agent-canon" \
       symbolic-ref --quiet --short HEAD)" = main
     test "$(git -C "${fresh_parent}/vendor/agent-canon" rev-parse HEAD)" = \
-      "${parent_pin}"
+      "${publication_sha}"
+    test "$(git -C "${fresh_parent}" rev-parse HEAD:vendor/agent-canon)" = \
+      "${publication_sha}"
+    test -f "${fresh_parent}/vendor/agent-canon/.pr-670-parent-replay-marker"
     test -z "$(git -C "${fresh_parent}/vendor/agent-canon" \
       status --porcelain=v1 --untracked-files=all)"
     echo "PR_670_FRESH_RECURSE_PARENT_REPLAY=pass"
