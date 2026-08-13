@@ -1,0 +1,62 @@
+name: PR671 independent validation
+
+on:
+  push:
+    branches:
+      - canon/close-devcontainer-design-diagnostics-614
+
+permissions:
+  contents: write
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: canon/close-devcontainer-design-diagnostics-614
+          fetch-depth: 0
+          persist-credentials: true
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install checker dependencies
+        run: python3 -m pip install --upgrade pyyaml tomli packaging
+      - name: Merge current main
+        run: |
+          git fetch origin main
+          git config user.name agent-canon-validation
+          git config user.email agent-canon-validation@users.noreply.github.com
+          git merge --no-edit origin/main
+          echo "main_head=$(git rev-parse origin/main)"
+          echo "validation_merge=$(git rev-parse HEAD)"
+      - name: Rebuild canonical graph
+        run: tools/bin/agent-canon graph build
+      - name: Check design claims
+        run: python3 tools/agent_tools/check_design_doc_claims.py --root . documents/design/devcontainer/parent-devcontainer-policy.md
+      - name: Check prose reasoning graph and print diagnostics
+        run: |
+          out=$(mktemp -d)
+          python3 tools/agent_tools/prose_reasoning_graph.py check-document documents/design/devcontainer/parent-devcontainer-policy.md --profile all --out-dir "$out"
+          echo "diagnostic_output=$out"
+          find "$out" -maxdepth 2 -type f -print -exec sed -n '1,260p' {} \;
+      - name: Check docs
+        run: tools/bin/agent-canon docs check documents/design/devcontainer/parent-devcontainer-policy.md
+      - name: Check dependency header and whitespace
+        run: |
+          bash tools/agent_tools/check_dependency_header_format.sh --changed --require-header
+          git diff --check
+      - name: Remove temporary validator and read back final scope
+        run: |
+          rm .github/workflows/pr671-independent-validation.yml
+          git add -u .github/workflows/pr671-independent-validation.yml
+          git commit -m 'ci: remove temporary PR671 validator'
+          changed=$(git diff --name-only origin/main...HEAD)
+          printf 'final_changed_files:\n%s\n' "$changed"
+          test "$changed" = 'documents/design/devcontainer/parent-devcontainer-policy.md'
+          test -z "$(git status --porcelain --untracked-files=no)"
+          git diff --check origin/main...HEAD
+          git show HEAD:documents/design/devcontainer/parent-devcontainer-policy.md >/tmp/pr671-readback.md
+          test -s /tmp/pr671-readback.md
+          sed -n '1,80p' /tmp/pr671-readback.md
+          git push origin HEAD:canon/close-devcontainer-design-diagnostics-614
