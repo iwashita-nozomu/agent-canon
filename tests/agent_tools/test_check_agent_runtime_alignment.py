@@ -156,6 +156,25 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
 
+    def test_alignment_script_standalone_parent_uses_external_fixture_parent(self) -> None:
+        """Standalone parent-bound checks keep derived reports outside source."""
+        environment = os.environ.copy()
+        environment["AGENT_CANON_PARENT_ROOT"] = str(PROJECT_ROOT)
+        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(PROJECT_ROOT)
+        before = set(PROJECT_ROOT.parent.glob(".agent-canon-runtime-parent-*"))
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT_PATH)],
+            cwd=PROJECT_ROOT,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        after = set(PROJECT_ROOT.parent.glob(".agent-canon-runtime-parent-*"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
+        self.assertEqual(after, before)
+
     def test_retired_command_accepts_catalog_backed_validation_owner(self) -> None:
         """A tombstone may route to a canonical validation tool in the catalog."""
         runtime_alignment.validate_retired_command_or_skill(

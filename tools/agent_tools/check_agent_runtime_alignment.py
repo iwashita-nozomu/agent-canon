@@ -25,6 +25,7 @@ import os
 import re
 import subprocess
 import tempfile
+from contextlib import contextmanager
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -244,6 +245,85 @@ class AlignmentWorkspace:
     workspace_root: Path
     report_root: Path
     repository_roots: RepositoryRoots
+
+
+@contextmanager
+def runtime_alignment_parent(source_resolution: RootResolution):
+    """Yield an authenticated parent that can host derived alignment state.
+
+    The standalone static-gate wrapper authenticates the source checkout itself
+    as the parent.  A derived workspace cannot place reports below that source
+    without violating the typed root boundary, so the self-check creates a
+    short-lived Git parent beside the source checkout for this fixture only.
+    Managed parent/derived executions retain their caller-provided parent.
+    """
+    configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured_parent:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "runtime-alignment-temp: explicit parent root is required",
+        )
+    parent = Path(configured_parent).resolve(strict=True)
+    source_root = source_resolution.source_root.resolve()
+    if parent != source_root:
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=parent,
+                explicit_root=parent,
+                purpose="runtime-alignment",
+            )
+        )
+        base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
+            attestation,
+            parent / ".agent-canon" / "tmp" / "runtime-alignment",
+            "runtime-alignment-temp",
+        )
+        yield base.physical_path
+        return
+
+    source_origin = subprocess.run(
+        ["git", "-C", str(source_root), "remote", "get-url", "origin"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    with tempfile.TemporaryDirectory(
+        prefix=".agent-canon-runtime-parent-",
+        dir=source_root.parent,
+    ) as fixture_parent_text:
+        fixture_parent = Path(fixture_parent_text)
+        subprocess.run(["git", "init", "-q", str(fixture_parent)], check=True)
+        subprocess.run(
+            ["git", "-C", str(fixture_parent), "remote", "add", "origin", source_origin],
+            check=True,
+        )
+        previous_parent = os.environ.get("AGENT_CANON_PARENT_ROOT")
+        previous_active = os.environ.get("AGENT_CANON_ACTIVE_REPOSITORY_ROOT")
+        os.environ["AGENT_CANON_PARENT_ROOT"] = str(fixture_parent)
+        os.environ["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(fixture_parent)
+        try:
+            attestation = attest_parent_root(
+                ParentRootAttestationRequest(
+                    cwd=fixture_parent,
+                    explicit_root=fixture_parent,
+                    purpose="runtime-alignment",
+                )
+            )
+            base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
+                attestation,
+                fixture_parent / ".agent-canon" / "tmp" / "runtime-alignment",
+                "runtime-alignment-temp",
+            )
+            yield base.physical_path
+        finally:
+            if previous_parent is None:
+                os.environ.pop("AGENT_CANON_PARENT_ROOT", None)
+            else:
+                os.environ["AGENT_CANON_PARENT_ROOT"] = previous_parent
+            if previous_active is None:
+                os.environ.pop("AGENT_CANON_ACTIVE_REPOSITORY_ROOT", None)
+            else:
+                os.environ["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = previous_active
 
 
 def resolve_packet_probe_workspace() -> Path:
@@ -2220,41 +2300,28 @@ def validate_bundle_outputs() -> None:
     catalog = load_task_catalog(config, root=source_root)
     created_at_iso = current_utc_iso()
 
-    temp_parent: str | None = None
-    configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if configured_parent:
-        parent = Path(configured_parent).resolve(strict=True)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="runtime-alignment")
-        )
-        base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-            attestation, parent / ".agent-canon" / "tmp" / "runtime-alignment", "runtime-alignment-temp"
-        )
-        temp_parent = str(base.physical_path)
-    else:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            "runtime-alignment-temp: explicit parent root is required",
-        )
-    with tempfile.TemporaryDirectory(prefix="agent-runtime-alignment-", dir=temp_parent) as tmp_dir:
-        workspace = alignment_workspace(Path(tmp_dir), source_resolution)
-        initialize_alignment_workspace(workspace)
+    with runtime_alignment_parent(source_resolution) as temp_parent:
+        with tempfile.TemporaryDirectory(
+            prefix="agent-runtime-alignment-", dir=str(temp_parent)
+        ) as tmp_dir:
+            workspace = alignment_workspace(Path(tmp_dir), source_resolution)
+            initialize_alignment_workspace(workspace)
 
-        for task_id in task_ids(catalog):
-            validate_task_bundle_output(
+            for task_id in task_ids(catalog):
+                validate_task_bundle_output(
+                    config=config,
+                    catalog=catalog,
+                    workspace=workspace,
+                    task_id=task_id,
+                    created_at_iso=created_at_iso,
+                )
+
+            validate_full_team_bundle_output(
                 config=config,
                 catalog=catalog,
                 workspace=workspace,
-                task_id=task_id,
                 created_at_iso=created_at_iso,
             )
-
-        validate_full_team_bundle_output(
-            config=config,
-            catalog=catalog,
-            workspace=workspace,
-            created_at_iso=created_at_iso,
-        )
 
 
 def main() -> int:
