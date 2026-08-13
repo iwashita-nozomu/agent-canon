@@ -14,7 +14,6 @@
 # @dependency-end
 
 version = 1
-
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
@@ -409,55 +408,6 @@ id = "MD-STYLE-DOC-STRUCTURE-GATE-1"
 critical = true
 description = "Separates format-only Markdown checks from substantive document structure changes."
 required_regex = ["prose-reasoning-graph", "structure-planning", "section order", "reader path", "format-only", "structure_contract=skipped"]
-
-[[evals]]
-id = "html-output-shim"
-target = ".agents/skills/html-output/SKILL.md"
-canonical_target = "agents/skills/html-output.md"
-kind = "skill"
-description = "HTML output runtime skill must handle explicit HTML routing, layout, ImageGen, and browser server publication."
-
-[[evals.checklist]]
-id = "HTML-OUTPUT-SHIM-1"
-critical = true
-description = "Only routes explicit HTML/browser requests and defaults unspecified reports to Markdown."
-required_regex = ["default to Markdown", "explicitly asks for HTML", "\\$report-writing", "browser view", "external browser publication"]
-
-[[evals.checklist]]
-id = "HTML-OUTPUT-SHIM-2"
-critical = true
-description = "Documents server reuse, start, validation, bind, and host-IP commands."
-required_regex = ["ss -ltnp", "curl -fsS", "HTML_SERVER=reuse", "python3 -m http\\.server", "--bind 0\\.0\\.0\\.0", "hostname -I"]
-
-[[evals.checklist]]
-id = "HTML-OUTPUT-SHIM-3"
-critical = true
-description = "Wires ImageGen and layout quality constraints."
-required_regex = ["\\$imagegen", "stable dimensions", "responsive", "no overlapping text", "first-viewport"]
-
-[[evals]]
-id = "html-output-doc"
-target = "agents/skills/html-output.md"
-kind = "skill"
-description = "Human HTML output skill must define Markdown default, server publication, ImageGen, and layout quality gates."
-
-[[evals.checklist]]
-id = "HTML-OUTPUT-DOC-1"
-critical = true
-description = "Defines Markdown default and explicit HTML trigger boundary."
-required_regex = ["default report output is Markdown", "explicitly asks for HTML", "browser page", "external browser publication"]
-
-[[evals.checklist]]
-id = "HTML-OUTPUT-DOC-2"
-critical = true
-description = "Documents server reuse, start, validation, bind, and external URL commands."
-required_regex = ["ss -ltnp", "curl -fsS", "HTML_SERVER=reuse", "python3 -m http\\.server", "--bind 0\\.0\\.0\\.0", "hostname -I", "external_url"]
-
-[[evals.checklist]]
-id = "HTML-OUTPUT-DOC-3"
-critical = true
-description = "Wires ImageGen and layout quality gates."
-required_regex = ["\\$imagegen", "Layout Quality Gate", "stable dimensions", "Text fits", "html_layout_check"]
 
 [[evals]]
 id = "structure-planning-shim"
@@ -2394,31 +2344,6 @@ description = "Queues source publication once and blocks parent projection until
 required_regex = ["QueueReceipt", "DependencyFrontier", "#388 -> #389 -> current transaction", "accepted-frontier evidence before", "parent pin/root projection", "no parent projection"]
 
 [[evals]]
-id = "pr-processing-diff-intake-runtime"
-target = ".agents/skills/pr-processing/SKILL.md"
-canonical_target = "agents/skills/pr-processing.md"
-kind = "skill"
-description = "The runtime PR processing skill must require diff intake and repair before ready, merge, or dependent pin sync."
-
-[[evals.checklist]]
-id = "PR-PROCESSING-DIFF-INTAKE-RUNTIME-1"
-critical = true
-description = "Requires PR diff intake against PR Essence before merge gates."
-required_regex = ["diff intake", "PR Essence", "missing, stale, unintended, or over-broad", "PR head branch", "parent pin"]
-
-[[evals]]
-id = "pr-processing-diff-intake-doc"
-target = "agents/skills/pr-processing.md"
-kind = "skill-doc"
-description = "The human PR processing skill must require fixing required diffs while incorporating PRs."
-
-[[evals.checklist]]
-id = "PR-PROCESSING-DIFF-INTAKE-DOC-1"
-critical = true
-description = "Requires PR diff intake and head-branch repair before incorporation."
-required_regex = ["PR diff intake", "PR Essence", "missing", "head branch", "parent pin", "root-view", "QueueReceipt", "DependencyFrontier"]
-
-[[evals]]
 id = "p5-generated-runtime-profile-projection"
 target = "tools/agent_tools/check_agent_runtime_alignment.py"
 kind = "workflow"
@@ -2447,3 +2372,52 @@ id = "P5-ROLE-ATTRIBUTION-1"
 critical = true
 description = "Requires profile attribution and numeric-spawn duplicate rejection."
 required_regex = ["profile-attribution", "numeric-spawn-budget-duplicate", "declared-21-plus-6-does-not-derive-27"]
+
+[[evals]]
+id = "pr-processing-dependency-activation"
+target = "agents/skills/pr-processing.md"
+kind = "skill"
+description = "Queue planning activates only for actual inter-candidate dependency or conflict evidence."
+
+[[evals.checklist]]
+id = "PR-OPS-SEMANTIC-1"
+critical = true
+required_regex = ["single-candidate fast path", "base/head/diff/check/authority", "dependency evidence"]
+
+[[evals]]
+id = "html-output-artifact-delivery-boundary"
+target = "agents/skills/html-output.md"
+kind = "skill"
+description = "HTML artifact correctness is distinct from optional serving and publication."
+
+[[evals.checklist]]
+id = "HTML-OPS-SEMANTIC-1"
+critical = true
+required_regex = ["generation and validation", "explicitly requested", "separate delivery operations", "only.*explicitly requests", "source/provenance"]
+
+[[evals]]
+id = "task-routing-canonical-state"
+target = "agents/skills/task-routing.md"
+kind = "skill"
+description = "Routing has one selected set plus evidence-backed deferred candidates."
+
+[[evals.checklist]]
+id = "ROUTE-OPS-SEMANTIC-1"
+critical = true
+required_regex = ["SELECTED_SKILLS", "DEFERRED_CANDIDATES", "one source of truth", "compatibility", "not independent state owners"]
+
+[[evals]]
+id = "structure-refactor-bounded-repair"
+target = "agents/skills/structure-refactor.md"
+kind = "skill"
+description = "Known drift uses direct reconciliation; review scope expands only on concrete evidence."
+
+[[evals.checklist]]
+id = "STRUCTURE-OPS-SEMANTIC-1"
+critical = true
+required_regex = ["detect the drift", "canonical repair", "read back", "resume"]
+
+[[evals.checklist]]
+id = "STRUCTURE-OPS-SEMANTIC-2"
+critical = true
+required_regex = ["changed subtree", "reverse edges", "owner boundary", "full-tree", "concrete evidence"]

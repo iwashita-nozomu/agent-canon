@@ -10,7 +10,6 @@
 # upstream design ../../agents/skills/codex-task-workflow.md implementation workflow skill
 # upstream design ../../agents/skills/subagent-bootstrap.md subagent handoff skill
 # upstream design ../../agents/skills/tool-finding-report.md tool warning closeout skill
-# upstream design ../../agents/skills/pr-processing.md PR body and run-bundle evidence skill
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR essence workflow
 # upstream design ../../agents/workflows/pr-queue-cleanup-workflow.md PR queue cleanup body update workflow
 # upstream design ../../agents/skills/md-style-check.md Markdown small-edit skill route
@@ -641,14 +640,6 @@ PR_ESSENCE_DOCUMENTATION_MARKERS = {
         "Canonical owner / responsibility unit:",
         "Behavior or contract delta:",
         "Evidence route:",
-    ),
-    "agents/skills/pr-processing.md": (
-        "PR Essence",
-        "problem / user request",
-        "design intent",
-        "canonical owner",
-        "behavior or contract delta",
-        "evidence route",
     ),
     "agents/workflows/agent-canon-pr-workflow.md": (
         "PR Essence",
@@ -1389,7 +1380,7 @@ def check_review_issue_routing(root: Path) -> list[Finding]:
 
 
 def check_pr_essence_documentation(root: Path) -> list[Finding]:
-    """Verify PR routes preserve change essence in body and run-bundle evidence."""
+    """Verify PR body and lifecycle workflow owners preserve change essence."""
     paths = tuple(PR_ESSENCE_DOCUMENTATION_MARKERS)
     findings = check_required_files(root, paths, "pr_essence_documentation")
     for path, markers in PR_ESSENCE_DOCUMENTATION_MARKERS.items():
