@@ -33,7 +33,8 @@ print(json.dumps(value, ensure_ascii=False))
 PY
 }
 
-repo_root="${AGENT_CANON_DEVCONTAINER_REPO_ROOT:-${AGENT_CANON_ACTIVE_REPOSITORY_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}}"
+agent_canon_source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+repo_root="${AGENT_CANON_DEVCONTAINER_REPO_ROOT:-${AGENT_CANON_ACTIVE_REPOSITORY_ROOT:-$agent_canon_source_root}}"
 repo_root="$(cd "$repo_root" && pwd -P)"
 workspace_root="$(cd "${repo_root}/.." && pwd -P)"
 [ -d "$workspace_root" ] || {
@@ -777,7 +778,7 @@ compose_payload="$(
     printf '      com.agent-canon.lifecycle-id: %s\n' "$lifecycle_id_yaml"
   }
 )"
-COMPOSE_PAYLOAD="$compose_payload" python3 - "$repo_root" "$compose_output_real" <<'PY'
+COMPOSE_PAYLOAD="$compose_payload" python3 - "$repo_root" "$compose_output_real" "$agent_canon_source_root" <<'PY'
 from __future__ import annotations
 
 import os
@@ -786,17 +787,20 @@ from pathlib import Path
 
 root = Path(sys.argv[1]).resolve()
 target = Path(sys.argv[2]).resolve(strict=False)
+agent_canon_source_root = Path(sys.argv[3]).resolve()
 try:
     relative = target.relative_to(root)
 except ValueError as exc:
     raise SystemExit("compose output escaped repository root") from exc
 payload = os.environ.get("COMPOSE_PAYLOAD", "").encode("utf-8") + b"\n"
-boundary_source = root / "tools" / "agent_tools" / "parent_root_side_effects.py"
+boundary_source = (
+    agent_canon_source_root / "tools" / "agent_tools" / "parent_root_side_effects.py"
+)
 if not boundary_source.is_file():
     raise SystemExit(
         "parent_root_side_effects capability is required for Compose publication"
     )
-sys.path.insert(0, str(root / "tools" / "agent_tools"))
+sys.path.insert(0, str(agent_canon_source_root / "tools" / "agent_tools"))
 from parent_root_side_effects import (  # noqa: E402
     ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
