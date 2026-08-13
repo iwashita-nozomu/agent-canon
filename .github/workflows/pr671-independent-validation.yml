@@ -107,16 +107,10 @@ jobs:
           find "$out" -maxdepth 2 -type f -print -exec sed -n '1,400p' {} \;
       - name: Check docs
         run: |
-          rm -rf "$RUNNER_TEMP/pr671-docs-parent"
-          git init -q -b main "$RUNNER_TEMP/pr671-docs-parent"
-          git -C "$RUNNER_TEMP/pr671-docs-parent" config user.name agent-canon-validation
-          git -C "$RUNNER_TEMP/pr671-docs-parent" config user.email agent-canon-validation@users.noreply.github.com
-          git -C "$RUNNER_TEMP/pr671-docs-parent" remote add origin https://example.invalid/pr671-docs-parent.git
-          git -C "$RUNNER_TEMP/pr671-docs-parent" commit --allow-empty -m 'initialize docs validation parent'
-          mkdir -p "$RUNNER_TEMP/pr671-docs-parent/tmp" "$RUNNER_TEMP/pr671-docs-parent/cargo-target"
-          AGENT_CANON_PARENT_ROOT="$RUNNER_TEMP/pr671-docs-parent" \
-          TMPDIR="$RUNNER_TEMP/pr671-docs-parent/tmp" \
-          CARGO_TARGET_DIR="$RUNNER_TEMP/pr671-docs-parent/cargo-target" \
+          rm -rf "$GITHUB_WORKSPACE/.agent-canon/pr671-docs-tmp" "$GITHUB_WORKSPACE/.agent-canon/pr671-docs-cargo-target"
+          mkdir -p "$GITHUB_WORKSPACE/.agent-canon/pr671-docs-tmp" "$GITHUB_WORKSPACE/.agent-canon/pr671-docs-cargo-target"
+          TMPDIR="$GITHUB_WORKSPACE/.agent-canon/pr671-docs-tmp" \
+          CARGO_TARGET_DIR="$GITHUB_WORKSPACE/.agent-canon/pr671-docs-cargo-target" \
             tools/bin/agent-canon docs check documents/design/devcontainer/parent-devcontainer-policy.md
       - name: Check dependency header and whitespace
         run: |
