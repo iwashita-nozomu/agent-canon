@@ -5,6 +5,7 @@
 # upstream design ../../documents/experiments/experiment-registry.md registry schema and path contract
 # upstream design ../../templates/README.md centralized template owner and copy boundary
 # upstream implementation ../experiments/create_experiment_topic.py canonical topic creation and copy route
+# upstream implementation ../agent_tools/parent_root_side_effects.py owns smoke-fixture allocation and exact cleanup
 # upstream implementation ./check_experiment_registry.py validates the temporary registry identity
 # downstream implementation ../../tests/tools/test_check_experiment_template.py tests this smoke checker
 # @dependency-end
@@ -19,10 +20,19 @@ import os
 import shutil
 import subprocess
 import sys
-import tempfile
 from pathlib import Path
+from typing import cast
 
 import yaml
+
+AGENT_TOOLS_ROOT = Path(__file__).resolve().parents[1] / "agent_tools"
+if str(AGENT_TOOLS_ROOT) not in sys.path:
+    sys.path.insert(0, str(AGENT_TOOLS_ROOT))
+
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
 
 TOPIC = "template-smoke"
 
@@ -98,9 +108,10 @@ def materialize_parent_fixture(source_root: Path, parent_root: Path) -> None:
 def complete_template_fixture(topic_dir: Path) -> None:
     """テスト専用に semantic completion field を個別 materialize します."""
     config_path = topic_dir / "config.yaml"
-    config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-    if not isinstance(config, dict):
+    config_object: object = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    if not isinstance(config_object, dict):
         raise RuntimeError("completion fixture requires a YAML mapping")
+    config = cast(dict[str, object], config_object)
     config.update(
         {
             "template_complete": True,
@@ -275,8 +286,42 @@ def main() -> int:
     if not source_root.is_dir() or not create_tool.is_file() or not registry_checker.is_file():
         raise SystemExit("AgentCanon source root or canonical experiment tools are missing")
 
-    with tempfile.TemporaryDirectory(prefix="agent-canon-template-smoke-") as temporary:
-        parent_root = Path(temporary)
+    selected_parent = Path(
+        os.environ.get("AGENT_CANON_PARENT_ROOT", str(source_root))
+    ).resolve()
+    boundary = ParentRootSideEffectBoundary()
+    attestation = boundary.attest(
+        ParentRootAttestationRequest(
+            cwd=selected_parent,
+            explicit_root=selected_parent,
+            source_root=source_root,
+            purpose="experiment-template-smoke",
+        )
+    )
+    temporary = boundary.create_parent_owned_temp_directory(
+        attestation,
+        selected_parent / ".agent-canon" / "tmp",
+        "experiment-template-smoke",
+        "template-smoke",
+    )
+    try:
+        parent_root = temporary.physical_path
+        runtime_tmp = parent_root / ".runtime" / "tmp"
+        runtime_cache = parent_root / ".runtime" / "cache"
+        runtime_pycache = runtime_cache / "pycache"
+        runtime_tmp.mkdir(parents=True)
+        runtime_pycache.mkdir(parents=True)
+        run_env = dict(os.environ)
+        run_env.update(
+            {
+                "AGENT_CANON_PARENT_ROOT": str(selected_parent),
+                "PYTHONPYCACHEPREFIX": str(runtime_pycache),
+                "TEMP": str(runtime_tmp),
+                "TMP": str(runtime_tmp),
+                "TMPDIR": str(runtime_tmp),
+                "XDG_CACHE_HOME": str(runtime_cache),
+            }
+        )
         materialize_parent_fixture(source_root, parent_root)
         registry_path = write_parent_registry(parent_root)
 
@@ -291,10 +336,10 @@ def main() -> int:
                 TOPIC,
             ],
             cwd=source_root,
+            env=run_env,
         )
         topic_dir = parent_root / "experiments" / TOPIC
         incomplete_run_dir = topic_dir / "result" / "template-smoke-incomplete"
-        run_env = dict(os.environ)
         run_env["EXPERIMENT_RUN_MANIFEST"] = str(parent_root / "manifest.json")
         run_env["EXPERIMENT_RUN_DIR"] = str(incomplete_run_dir)
         incomplete_result = subprocess.run(
@@ -324,6 +369,7 @@ def main() -> int:
                 str(registry_path),
             ],
             cwd=source_root,
+            env=run_env,
         )
         run_checked(
             [
@@ -334,6 +380,13 @@ def main() -> int:
                 str(parent_root / "experiments" / TOPIC / "cases.py"),
             ],
             cwd=source_root,
+            env=run_env,
+        )
+    finally:
+        boundary.remove_parent_owned_tree(
+            attestation,
+            temporary,
+            "experiment-template-smoke-cleanup",
         )
 
     print("EXPERIMENT_TEMPLATE_SMOKE=pass")

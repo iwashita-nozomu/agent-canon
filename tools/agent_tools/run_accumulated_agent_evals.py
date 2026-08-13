@@ -21,6 +21,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -32,9 +33,32 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
 
 DEFAULT_RUN_ID = "agent-canon-accumulated-eval"
 DEFAULT_PROMPT_EVAL_MANIFEST = Path(eval_manifest_path("skill_workflow_prompt_eval.toml"))
+
+
+def _parent_write(path: Path, data: bytes, purpose: str) -> None:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
+    ParentRootSideEffectBoundary().write_parent_owned_file(
+        attestation, path, data, purpose
+    )
 
 
 @dataclass(frozen=True)
@@ -195,8 +219,7 @@ def subprocess_runner(command: Sequence[str], cwd: Path) -> subprocess.Completed
 
 def write_text(path: Path, text: str) -> Path:
     """Write captured command output to one log file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    _parent_write(path, text.encode("utf-8"), "accumulated-eval-log")
     return path
 
 

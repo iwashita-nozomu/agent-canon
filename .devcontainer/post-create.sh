@@ -88,7 +88,7 @@ echo "AGENT_CANON_CONTAINER_USER=$expected_runtime_user"
 echo "AGENT_CANON_RUNTIME_UID=$runtime_uid"
 echo "AGENT_CANON_RUNTIME_GID=$runtime_gid"
 echo "AGENT_CANON_RUNTIME_HOME=$HOME"
-for tool in node npm npx corepack codex gh jq tree clang-format clangd-18 pyright pyright-langserver bash-language-server; do
+for tool in node npm npx corepack codex gh jq tree clang-format clangd-18 pyright pyright-langserver bash-language-server rust-analyzer agent-canon; do
   if command -v "$tool" >/dev/null 2>&1; then
     echo "DEVCONTAINER_TOOL_READBACK=$tool:available"
   else

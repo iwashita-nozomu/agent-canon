@@ -11,16 +11,20 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
 sys.path.insert(0, str(TOOLS_ROOT))
 
+import skill_shim_evaluation  # noqa: E402
 from skill_shim_evaluation import (  # noqa: E402
     ProducerError,
     _host_observation,
@@ -28,6 +32,7 @@ from skill_shim_evaluation import (  # noqa: E402
     _paired_reduction_summary,
     _validate_host_observations,
     normalize_route_result,
+    route_golden,
 )
 
 
@@ -95,6 +100,64 @@ class SkillShimEvaluationTest(unittest.TestCase):
                 {row["variant"] for row in payload["candidate_rows"]},
                 {"current", "generated"},
             )
+
+
+def test_route_golden_uses_parent_temp_receipt() -> None:
+    """Route prompts are staged under one parent-owned temporary receipt."""
+    parent_root = PROJECT_ROOT
+    cases = tuple(
+        SimpleNamespace(case_id=f"case-{index:03d}", prompt=f"prompt-{index}")
+        for index in range(525)
+    )
+    manifest = SimpleNamespace(
+        expected_case_count=525,
+        expected_generated_case_count=525,
+        cases=cases,
+    )
+    created: list[object] = []
+    original_create = skill_shim_evaluation.ParentRootSideEffectBoundary.create_parent_owned_temp_directory
+    original_run = subprocess.run
+
+    def capture_create(boundary, attestation, candidate, purpose, prefix):
+        receipt = original_create(boundary, attestation, candidate, purpose, prefix)
+        created.append(receipt)
+        return receipt
+
+    def fake_run(args, **kwargs):
+        command = list(args)
+        if "--prompt-file" in command:
+            return subprocess.CompletedProcess(
+                args,
+                0,
+                json.dumps({"schema": "agent_canon.route.skill_route.v1"}).encode(),
+                b"",
+            )
+        return original_run(args, **kwargs)
+
+    with mock.patch.dict(
+        os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}
+    ), mock.patch.object(
+        skill_shim_evaluation, "load_manifest", return_value=manifest
+    ), mock.patch.object(
+        skill_shim_evaluation.ParentRootSideEffectBoundary,
+        "create_parent_owned_temp_directory",
+        capture_create,
+    ), mock.patch.object(skill_shim_evaluation.subprocess, "run", side_effect=fake_run):
+        output = Path(
+            os.environ.get(
+                "TMPDIR", str(parent_root / ".agent-canon" / "validation")
+            )
+        ) / "route-golden.json"
+        payload = route_golden(parent_root, parent_root / "manifest.toml", parent_root / "route.py", output)
+
+    assert payload["case_count"] == 525
+    assert len(created) == 1
+    assert not created[0].physical_path.exists()
+    boundary, attestation = skill_shim_evaluation._parent_capability("test-route-cleanup")
+    output_receipt = boundary.resolve_parent_owned_path(
+        attestation, output, "test-route-cleanup", create=False
+    )
+    boundary.remove_parent_owned_file(output_receipt)
 
     def test_host_pairs_fail_closed_for_every_manifest_scenario(self) -> None:
         """Missing, duplicate, mismatched, and incomplete observations fail directly."""

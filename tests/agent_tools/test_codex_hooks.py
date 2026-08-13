@@ -22,12 +22,16 @@ import tempfile
 import unittest
 from pathlib import Path
 from typing import cast
+from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 HOOK_DISPATCHER = PROJECT_ROOT / ".codex" / "hooks" / "hook_dispatcher.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
+import hook_dispatcher  # noqa: E402
+import hook_event_log  # noqa: E402
 from prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
     prompt_intake_signals,
@@ -1041,6 +1045,36 @@ class CodexHooksTest(unittest.TestCase):
         for command in commands:
             with self.subTest(command=command):
                 self.assertIsNotNone(self._run_shared_checkout_guard(command))
+
+
+def test_hook_event_publish_rejects_unattested_parent_without_raw_fallback() -> None:
+    """Missing parent capability returns typed failure without touching the path."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        target = Path(tmp_dir) / "event.json"
+        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}):
+            result = hook_event_log.publish_hook_event_noreplace(target, b"event\n")
+        assert result == ("failed", "parent_unattested")
+        assert not target.exists()
+
+
+def test_hook_report_requires_parent_capability() -> None:
+    """Report projection stays disabled until the parent capability is present."""
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        target = Path(tmp_dir) / "report"
+        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}):
+            assert hook_dispatcher._parent_bound_report(target, "hook-report") is None
+
+
+def test_pointer_targets_reject_missing_and_containment_escapes() -> None:
+    """The focused module node delegates to the existing pointer contract."""
+    with mock.patch.dict(
+        os.environ,
+        {
+            "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": "",
+            "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": "",
+        },
+    ):
+        CodexHooksTest().test_pointer_targets_reject_missing_and_containment_escapes()
 
 
 if __name__ == "__main__":

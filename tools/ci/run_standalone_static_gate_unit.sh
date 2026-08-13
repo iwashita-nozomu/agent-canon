@@ -5,7 +5,7 @@
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
 # downstream implementation ./check_agent_canon_pr.sh aggregates all units for the manual full-confidence route
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml remote execution boundary
-# downstream test ../../tests/tools/test_standalone_static_gate_units.py unit partition regression
+# downstream implementation ../../tests/tools/test_standalone_static_gate_units.py unit partition regression
 # @dependency-end
 
 set -euo pipefail
@@ -22,9 +22,21 @@ ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 TOOLS_ROOT="$(agent_canon_source_tools_root "${ROOT}")"
 cd "${ROOT}"
 
+if [[ -z "${AGENT_CANON_CHILD_HANDOFF:-}" ]]; then
+  exec python3 "${TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    exec-parent-bound --root "${ROOT}" --source-root "${TOOLS_ROOT}/.." \
+    --issue-handoff --purpose "standalone-static-gate-unit" -- \
+    "${SCRIPT_DIR}/$(basename "${BASH_SOURCE[0]}")" "$UNIT"
+fi
+
+python3 "${TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" verify-child \
+  --root "${ROOT}" --source-root "${TOOLS_ROOT}/.." \
+  --purpose "standalone-static-gate-unit" --consume >/dev/null
+unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
+
 run_rust() {
   cargo build --manifest-path rust/agent-canon/Cargo.toml
-  local memory_cli="${ROOT}/rust/agent-canon/target/debug/agent-canon"
+  local memory_cli="${CARGO_TARGET_DIR:?}/debug/agent-canon"
   if [[ ! -x "${memory_cli}" ]]; then
     echo "AGENT_CANON_MEMORY_CLI_BUILD=fail" >&2
     return 1
@@ -50,20 +62,52 @@ run_contracts() {
   python3 "${TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check
 }
 
-run_eval() {
-  local temp_root
-  temp_root="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-static-eval.XXXXXX")"
-  trap 'rm -rf "${temp_root}"' RETURN
+run_eval() (
+  local temp_root primary_status=0 cleanup_status=0
+  temp_root="$(python3 "${TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" temp-dir \
+    --root "${ROOT}" --candidate "${ROOT}/.agent-canon/tmp" \
+    --prefix "agent-canon-static-eval" --purpose "standalone-static-eval")"
+  cleanup_eval() {
+    local trap_status=$?
+    trap - EXIT
+    set +e
+    python3 "${TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" remove-tree \
+      --root "${ROOT}" --candidate "${temp_root}" \
+      --purpose "standalone-static-eval-cleanup" >/dev/null
+    cleanup_status=$?
+    set -e
+    if [[ "${primary_status}" -ne 0 ]]; then
+      exit "${primary_status}"
+    fi
+    if [[ "${trap_status}" -ne 0 ]]; then
+      exit "${trap_status}"
+    fi
+    exit "${cleanup_status}"
+  }
+  trap cleanup_eval EXIT
   local hook_archive="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${ROOT}/.agent-canon/log-archive}"
   local eval_log_dir="${temp_root}/agent-eval-runs/agent-canon-pr-gate"
-  mkdir -p "${hook_archive}" "${eval_log_dir}"
+  hook_archive="$(python3 "${TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" ensure-dir \
+    --root "${ROOT}" --candidate "${hook_archive}" --purpose "standalone-static-eval-hook-archive")"
+  eval_log_dir="$(python3 "${TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" ensure-dir \
+    --root "${ROOT}" --candidate "${eval_log_dir}" --purpose "standalone-static-eval-log-dir")"
+  set +e
   AGENT_CANON_HOOK_ARCHIVE_DIR="${hook_archive}" \
     python3 "${TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" \
       --run-id agent-canon-pr-gate --log-dir "${eval_log_dir}"
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${hook_archive}" \
-    python3 "${TOOLS_ROOT}/agent_tools/eval_accumulation_check.py"
-  python3 "${TOOLS_ROOT}/agent_tools/smoke_test_research_perspective_pack.py"
-}
+  primary_status=$?
+  if [[ "${primary_status}" -eq 0 ]]; then
+    AGENT_CANON_HOOK_ARCHIVE_DIR="${hook_archive}" \
+      python3 "${TOOLS_ROOT}/agent_tools/eval_accumulation_check.py"
+    primary_status=$?
+  fi
+  if [[ "${primary_status}" -eq 0 ]]; then
+    python3 "${TOOLS_ROOT}/agent_tools/smoke_test_research_perspective_pack.py"
+    primary_status=$?
+  fi
+  set -e
+  return "${primary_status}"
+)
 
 run_workflow_container() {
   python3 -m pytest tests/tools/test_standalone_static_gate_units.py -q

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import re
 import sys
 from collections.abc import Sequence
@@ -28,11 +29,27 @@ else:
     import tomli as tomllib
 
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
 from runtime_log_paths import agent_canon_root, eval_results_dir
 
 DEFAULT_MANIFEST = eval_manifest_path("report_quality_eval.toml")
 DEFAULT_RESULTS_FAMILY = "report-quality"
 RUN_ID_DIGEST_LENGTH = 10
+
+
+def _parent_write(path: Path, data: bytes, purpose: str) -> None:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
+    ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, data, purpose)
 
 
 @dataclass(frozen=True)
@@ -349,10 +366,9 @@ def comma(values: Sequence[str]) -> str:
 
 def write_report(path: Path, bundle: ReportQualityBundle) -> Path:
     """Write a report path without overwriting an existing report."""
-    path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         path = path.with_name(f"{path.stem}-{bundle.run_id}{path.suffix}")
-    path.write_text(render_report(bundle), encoding="utf-8")
+    _parent_write(path, render_report(bundle).encode("utf-8"), "report-quality-evaluation")
     return path
 
 

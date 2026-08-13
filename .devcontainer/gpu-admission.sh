@@ -157,47 +157,111 @@ PY
 
 [ -f "$provision_receipt" ] || fail "runtime provision receipt was not published"
 
-devcontainer_dir="$(cd -P "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cleanup_required=0
 
-read_profile_project_name() {
-  local project_name=""
-  [ -f "$profile_compose" ] || return 1
-  project_name="$(awk '/^name: / {print $2; exit}' "$profile_compose")"
-  [[ "$project_name" =~ ^[a-z0-9][a-z0-9_-]*-gpu-admission$ ]] || return 1
-  printf '%s\n' "$project_name"
+lifecycle_id="${AGENT_CANON_LIFECYCLE_ID:-$(python3 - <<'PY'
+import secrets
+print(secrets.token_hex(16))
+PY
+)}"
+task_id="${AGENT_CANON_TASK_ID:-gpu-admission-${host_uid}-${BASHPID}-${lifecycle_id}}"
+default_project_base_name="$(python3 - "$repository_root" <<'PY'
+import hashlib
+import re
+import sys
+from pathlib import Path
+root = sys.argv[1]
+name = Path(root).name.casefold()
+slug = re.sub(r"[^a-z0-9_-]+", "-", name).strip("-_" ) or "workspace"
+digest = hashlib.sha1(root.encode("utf-8")).hexdigest()[:8]
+print(f"{slug}-{digest}-devcontainer")
+PY
+)"
+compose_project_base_name="${DEVCONTAINER_PROJECT_NAME:-$default_project_base_name}"
+compose_project_name="${compose_project_base_name}-${lifecycle_id}-gpu-admission"
+expected_image_tag="${AGENT_CANON_EXPECTED_IMAGE_TAG:-${compose_project_name}:task-${lifecycle_id}}"
+export AGENT_CANON_LIFECYCLE_ID="$lifecycle_id"
+export AGENT_CANON_TASK_ID="$task_id"
+export AGENT_CANON_EXPECTED_IMAGE_TAG="$expected_image_tag"
+export DEVCONTAINER_PROJECT_NAME="$compose_project_base_name"
+export AGENT_CANON_EXPECTED_COMPOSE_PROJECT="$compose_project_name"
+lifecycle_receipt="$repository_root/.agent-canon/container-lifecycle/gpu-admission-${lifecycle_id}.json"
+export AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT="$lifecycle_receipt"
+
+lifecycle_phase() {
+  local phase="$1"
+  python3 - "$agent_canon_root" "$repository_root" "$lifecycle_receipt" "$phase" <<'PY'
+from __future__ import annotations
+
+import json
+import sys
+from pathlib import Path
+
+agent_root, repository_root, receipt_path, phase = sys.argv[1:]
+sys.path.insert(0, str(Path(agent_root) / "tools" / "ci"))
+from container_runtime import (  # noqa: E402
+    CommandDaemonClient,
+    ContainerLifecycleBoundary,
+    lifecycle_context,
+    lifecycle_receipt_from_json,
+    start_container_lifecycle,
+    write_lifecycle_receipt,
+)
+
+root = Path(repository_root)
+target = Path(receipt_path)
+if phase == "capture":
+    run = start_container_lifecycle(root, "docker", "gpu-admission")
+    write_lifecycle_receipt(root, run.receipt)
+    if run.receipt.state != "snapshot":
+        print(f"GPU_ADMISSION_LIFECYCLE=blocked state={run.receipt.state}", file=sys.stderr)
+        raise SystemExit(2)
+    print(f"GPU_ADMISSION_LIFECYCLE=captured receipt={target}")
+    raise SystemExit(0)
+
+payload = json.loads(target.read_text(encoding="utf-8"))
+if not isinstance(payload, dict):
+    raise SystemExit("GPU admission lifecycle receipt is malformed")
+receipt = lifecycle_receipt_from_json(payload)
+boundary = ContainerLifecycleBoundary(
+    receipt.context, CommandDaemonClient(receipt.context.builder, cwd=root)
+)
+after = boundary.snapshot()
+receipt = boundary.record_create_or_pull(receipt, after, "gpu-admission")
+if phase == "finish":
+    if receipt.state not in {"created", "not-created"}:
+        write_lifecycle_receipt(root, receipt)
+        print(f"GPU_ADMISSION_LIFECYCLE=finish-blocked state={receipt.state} receipt={target}", file=sys.stderr)
+        raise SystemExit(2)
+    write_lifecycle_receipt(root, receipt)
+    print(f"GPU_ADMISSION_LIFECYCLE=ready state={receipt.state} receipt={target}")
+    raise SystemExit(0)
+result = boundary.cleanup(receipt)
+write_lifecycle_receipt(root, receipt)
+print(
+    f"GPU_ADMISSION_LIFECYCLE=cleanup state={result.state} receipt={target}",
+    file=sys.stderr,
+)
+raise SystemExit(0 if result.state in {"cleaned", "not-created"} else 2)
+PY
 }
 
 cleanup_profile() {
   local original_rc="$1"
-  local project_name=""
   local cleanup_rc=0
-  if [ ! -f "$profile_compose" ]; then
-    printf 'GPU_ADMISSION_CLEANUP=skipped original_rc=%s reason=compose-missing path=%s\n' \
-      "$original_rc" "$profile_compose" >&2
+  if [ ! -f "$lifecycle_receipt" ]; then
+    printf 'GPU_ADMISSION_CLEANUP=skipped original_rc=%s reason=receipt-missing path=%s\n' \
+      "$original_rc" "$lifecycle_receipt" >&2
     return 0
   fi
-  project_name="$(read_profile_project_name)" || {
-    printf 'GPU_ADMISSION_CLEANUP=failed original_rc=%s reason=project-name-invalid path=%s\n' \
-      "$original_rc" "$profile_compose" >&2
-    return 1
-  }
-  if ! command -v docker >/dev/null 2>&1; then
-    printf 'GPU_ADMISSION_CLEANUP=failed original_rc=%s reason=docker-cli-unavailable project=%s\n' \
-      "$original_rc" "$project_name" >&2
-    return 1
-  fi
-  docker compose \
-    --project-name "$project_name" \
-    --file "$profile_compose" \
-    down --remove-orphans || cleanup_rc=$?
+  lifecycle_phase cleanup || cleanup_rc=$?
   if [ "$cleanup_rc" -ne 0 ]; then
-    printf 'GPU_ADMISSION_CLEANUP=failed original_rc=%s cleanup_rc=%s project=%s compose=%s\n' \
-      "$original_rc" "$cleanup_rc" "$project_name" "$profile_compose" >&2
+    printf 'GPU_ADMISSION_CLEANUP=failed original_rc=%s cleanup_rc=%s receipt=%s\n' \
+      "$original_rc" "$cleanup_rc" "$lifecycle_receipt" >&2
     return "$cleanup_rc"
   fi
-  printf 'GPU_ADMISSION_CLEANUP=pass original_rc=%s project=%s compose=%s\n' \
-    "$original_rc" "$project_name" "$profile_compose" >&2
+  printf 'GPU_ADMISSION_CLEANUP=pass original_rc=%s receipt=%s\n' \
+    "$original_rc" "$lifecycle_receipt" >&2
 }
 
 on_exit() {
@@ -227,10 +291,16 @@ export AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT="${runtime_source}/shared-run
 printf 'GPU_ADMISSION_RUNTIME_PROVISION=pass source=%s target=%s provision=%s uid=%s gid=%s\n' \
   "$runtime_source" "$runtime_target" "$provision_receipt" "$host_uid" "$host_gid"
 
+lifecycle_phase capture
 cleanup_required=1
 devcontainer up \
   --workspace-folder "$repository_root" \
   --config "$profile_config"
+[ -f "$profile_compose" ] || fail "GPU-admission Compose output is missing: $profile_compose"
+grep -Fqx "name: $compose_project_name" "$profile_compose" \
+  || fail "GPU-admission Compose project identity does not match lifecycle"
+grep -Fqx "    image: \"$expected_image_tag\"" "$profile_compose" \
+  || fail "GPU-admission Compose image tag does not match lifecycle"
 
 container_repository_root="/workspace/$(basename "$repository_root")"
 devcontainer exec \
@@ -238,7 +308,20 @@ devcontainer exec \
   --config "$profile_config" \
   python3 "$container_repository_root/tools/agent-canon/agent_tools/agent_canon_source_root.py" \
   exec .devcontainer/finalize-shared-runtime.sh
-cleanup_required=0
+finish_rc=0
+lifecycle_phase finish || finish_rc=$?
+cleanup_rc=0
+cleanup_profile "$finish_rc" || cleanup_rc=$?
+if [ "$cleanup_rc" -eq 0 ]; then
+  cleanup_required=0
+fi
+if [ "$finish_rc" -ne 0 ]; then
+  exit "$finish_rc"
+fi
+if [ "$cleanup_rc" -ne 0 ]; then
+  printf 'GPU_ADMISSION_CLEANUP_RESULT=blocked original_rc=0 cleanup_rc=%s receipt=%s\n' \
+    "$cleanup_rc" "$lifecycle_receipt" >&2
+fi
 
 printf 'GPU_ADMISSION_PROFILE=pass selector=%s compose_project_suffix=-gpu-admission runtime=%s\n' \
   "$profile_config" "$runtime_target"

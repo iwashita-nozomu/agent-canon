@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -331,6 +332,26 @@ class CheckToolCatalogTest(unittest.TestCase):
                 "default_wiring:tools/agent_tools/uncataloged.py:uncataloged-tool-reference",
                 result.stdout,
             )
+
+    def test_test_paths_are_not_default_tool_references(self) -> None:
+        """Test paths are not mistaken for root tool references."""
+        sys.path.insert(0, str(CHECKER.parent))
+        try:
+            namespace = runpy.run_path(str(CHECKER))
+        finally:
+            sys.path.pop(0)
+        pattern = namespace["TOOL_REFERENCE_RE"]
+        matches = set(
+            pattern.findall(
+                "python3 tests/tools/test_catalog_fixture.py\n"
+                "python3 tests/tools/tools/run_symlink_lint.py\n"
+                "python3 tools/agent_tools/uncataloged.py\n"
+            )
+        )
+
+        self.assertNotIn("tools/test_catalog_fixture.py", matches)
+        self.assertNotIn("tools/tools/run_symlink_lint.py", matches)
+        self.assertIn("tools/agent_tools/uncataloged.py", matches)
 
     def test_entry_summary_is_required(self) -> None:
         """Catalog entries must include a reader-facing summary."""

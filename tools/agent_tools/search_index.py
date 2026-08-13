@@ -14,6 +14,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 from collections import Counter
@@ -26,6 +27,23 @@ from pathlib import Path
 from typing import cast
 
 import yaml
+
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
 
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -42,6 +60,22 @@ SUMMARY_CHARS = 220
 DEFAULT_HASH_LENGTH = 12
 ELLIPSIS_CHARS = 3
 TOKEN_RE = re.compile(r"[0-9A-Za-z_\u0080-\uFFFF]+")
+
+
+def _parent_write(path: Path, data: bytes, purpose: str) -> None:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
+    ParentRootSideEffectBoundary().write_parent_owned_file(
+        attestation, path, data, purpose
+    )
 
 
 @dataclass(frozen=True)
@@ -347,11 +381,11 @@ def build_cards(options: BuildOptions) -> tuple[SearchCard, ...]:
 
 def write_jsonl(path: Path, cards: Sequence[SearchCard]) -> None:
     """Write search cards as JSONL."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        for card in cards:
-            handle.write(json.dumps(card.as_json(), ensure_ascii=False, sort_keys=True))
-            handle.write("\n")
+    data = "".join(
+        json.dumps(card.as_json(), ensure_ascii=False, sort_keys=True) + "\n"
+        for card in cards
+    )
+    _parent_write(path, data.encode("utf-8"), "search-index-cards")
 
 
 def write_state(path: Path, report: BuildReport, root: Path) -> None:
@@ -363,7 +397,11 @@ def write_state(path: Path, report: BuildReport, root: Path) -> None:
         "cards": len(report.cards),
         "provider": "deterministic_semantic_index",
     }
-    path.write_text(json.dumps(state, ensure_ascii=False, indent=2), encoding="utf-8")
+    _parent_write(
+        path,
+        json.dumps(state, ensure_ascii=False, indent=2).encode("utf-8"),
+        "search-index-state",
+    )
 
 
 def build_index(args: argparse.Namespace) -> BuildReport:

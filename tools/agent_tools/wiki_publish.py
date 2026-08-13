@@ -19,15 +19,67 @@ import json
 import re
 import subprocess
 import tempfile
+import os
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+
 MAX_ERROR_CHARS = 4000
 REMOTE_UNINITIALIZED = "REMOTE_UNINITIALIZED"
 WIKI_SOURCE_MARKER_PREFIX = "<!-- AGENT_CANON_WIKI_SOURCE_COMMIT="
 AGENT_CANON_BIN = Path("tools/bin/agent-canon")
+
+
+def _wiki_temp_dir() -> str | None:
+    """Return parent-local staging for formatter scratch files."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "wiki-staging: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="wiki-publication")
+    )
+    directory = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
+        attestation, parent / ".agent-canon" / "tmp" / "wiki", "wiki-staging"
+    )
+    return str(directory.physical_path)
+
+
+def _write_wiki_file(path: Path, data: bytes) -> None:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "wiki-publication: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="wiki-publication")
+    )
+    ParentRootSideEffectBoundary().write_parent_owned_file(
+        attestation, path, data, "wiki-publication"
+    )
 
 
 @dataclass(frozen=True)
@@ -260,7 +312,7 @@ def format_page_for_publish(
     runner: Runner,
     page: Path,
 ) -> bytes:
-    with tempfile.TemporaryDirectory() as page_tmp:
+    with tempfile.TemporaryDirectory(dir=_wiki_temp_dir()) as page_tmp:
         temp_page = Path(page_tmp) / "page.md"
         temp_page.write_text(page.read_text(encoding="utf-8"), encoding="utf-8")
         run_command(
@@ -322,7 +374,7 @@ def publish_prepared_pages(
     remote_url: str,
 ) -> tuple[str, str]:
     for path, data in prepared.items():
-        path.write_bytes(data)
+        _write_wiki_file(path, data)
 
     run_command(
         runner,
@@ -499,9 +551,9 @@ def main() -> int:
     try:
         summary = publish_to_wiki(args)
         if args.summary_out:
-            Path(args.summary_out).write_text(
-                json.dumps(summary, sort_keys=True, indent=2),
-                encoding="utf-8",
+            _write_wiki_file(
+                Path(args.summary_out),
+                json.dumps(summary, sort_keys=True, indent=2).encode("utf-8"),
             )
         print(json.dumps(summary, sort_keys=True))
         return 0

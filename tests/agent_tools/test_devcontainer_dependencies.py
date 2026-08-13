@@ -40,8 +40,8 @@ from tools.agent_tools.devcontainer_dependencies import (
     _parse_dpkg_owned_paths,
     _repository_package_filename,
     _repository_packages_url,
-    build_plan,
     build_parser,
+    build_plan,
     image_install_plan,
     image_verify_plan,
     install_plan,
@@ -55,6 +55,52 @@ from tools.agent_tools.devcontainer_dependencies import (
 
 ROOT = Path(__file__).resolve().parents[2]
 ENGINE = ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
+_PARENT_BOUNDARY_PATH_KEYS = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+)
+
+
+def init_authentic_git(root: Path, *, remote: str = "https://example.invalid/fixture.git") -> None:
+    """Create the minimal authenticated Git parent used by side-effect fixtures."""
+    root.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        ["git", "init", "--quiet", "-b", "main", str(root)], check=True
+    )
+    subprocess.run(
+        ["git", "-C", str(root), "config", "user.name", "Fixture Test"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(root), "config", "user.email", "fixture@example.invalid"],
+        check=True,
+    )
+    marker = root / ".fixture-root"
+    marker.write_text("authenticated fixture\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(root), "add", ".fixture-root"], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "commit", "--quiet", "-m", "fixture root"],
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(root), "remote", "add", "origin", remote], check=True
+    )
 
 
 def default_verification(
@@ -445,6 +491,22 @@ class LeanToolchainRetryRunner(FakeRunner):
 
 
 class DependencyModelTests(unittest.TestCase):
+    def setUp(self) -> None:
+        """Keep synthetic repository boundaries independent of the outer test runner."""
+        super().setUp()
+        saved = {key: os.environ.get(key) for key in _PARENT_BOUNDARY_PATH_KEYS}
+        for key in _PARENT_BOUNDARY_PATH_KEYS:
+            os.environ.pop(key, None)
+
+        def restore_environment() -> None:
+            for key, value in saved.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+        self.addCleanup(restore_environment)
+
     def test_base_capabilities_include_gnupg_for_repository_bootstrap(self) -> None:
         """A fixed image capability satisfies apt-repository gpg prerequisites."""
         self.assertIn("gnupg", BASE_CAPABILITIES)
@@ -560,6 +622,7 @@ class DependencyModelTests(unittest.TestCase):
         identity = RuntimeIdentity("ubuntu", "22.04", "linux/amd64")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             image_root = root / "image-dependencies"
             install_runner = FakeRunner()
             self.assertEqual(
@@ -700,6 +763,114 @@ class DependencyModelTests(unittest.TestCase):
                 )
             self.assertFalse(image_root.exists())
 
+    def test_image_safe_gate_accepts_only_immutable_rust_and_cargo_records(self) -> None:
+        """Image installs admit pinned Rust and canonical Cargo snapshots only."""
+        rust = parse_record(
+            record(
+                "rust-toolchain",
+                method="rust-toolchain",
+                version="1.89.0",
+                source="https://static.rust-lang.org/dist",
+                components=["rust-analyzer"],
+            ),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        cargo = parse_record(
+            record(
+                "agent-canon-cli",
+                method="cargo-source-build",
+                source="rust/agent-canon",
+                repo="https://github.com/example/agent-canon.git",
+                source_identity="canonical-snapshot",
+                source_tree_sha256="a" * 64,
+                cargo_lock_sha256="b" * 64,
+                locked=True,
+            ),
+            path=Path("fixture.toml"),
+            index=1,
+        )
+        active = parse_record(
+            record(
+                "active-cli",
+                method="cargo-source-build",
+                source="rust/agent-canon",
+                repo="https://github.com/example/agent-canon.git",
+                source_identity="active-source",
+                locked=True,
+            ),
+            path=Path("fixture.toml"),
+            index=2,
+        )
+
+        self.assertTrue(dependency_module._image_record_is_safe(rust))
+        self.assertTrue(dependency_module._image_record_is_safe(cargo))
+        self.assertFalse(dependency_module._image_record_is_safe(active))
+
+    def test_image_owned_full_plan_publishes_final_binary_only_for_cargo(self) -> None:
+        """Image final-binary publication does not run for apt or Rust records."""
+        apt = parse_record(
+            record("apt-tool", method="apt-package"),
+            path=Path("fixture.toml"),
+            index=0,
+        )
+        rust = parse_record(
+            record(
+                "rust-toolchain",
+                method="rust-toolchain",
+                version="1.89.0",
+                source="https://static.rust-lang.org/dist",
+            ),
+            path=Path("fixture.toml"),
+            index=1,
+        )
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (apt, rust)),))
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            image_root = root / "image-layer"
+            installer = Installer(
+                FakeRunner(), image_owned=True, image_owned_root=image_root
+            )
+            with mock.patch.object(installer, "_publish_final_binary") as publish:
+                self.assertEqual(
+                    installer.install(
+                        plan,
+                        workspace=root,
+                        receipts=image_root / "receipts",
+                        final_binary_dir=Path("/usr/local/bin"),
+                    ),
+                    ("apt-tool", "rust-toolchain"),
+                )
+            publish.assert_not_called()
+
+            cargo = parse_record(
+                record(
+                    "agent-canon-cli",
+                    method="cargo-source-build",
+                    source="rust/agent-canon",
+                    repo="https://github.com/example/agent-canon.git",
+                    source_identity="canonical-snapshot",
+                    source_tree_sha256="a" * 64,
+                    cargo_lock_sha256="b" * 64,
+                    locked=True,
+                ),
+                path=Path("fixture.toml"),
+                index=2,
+            )
+            cargo_plan = build_plan(
+                (loaded_manifest(Path("fixture.toml"), (cargo,)),)
+            )
+            with self.assertRaisesRegex(
+                DependencyError, "requires a final binary directory"
+            ):
+                Installer(
+                    FakeRunner(), image_owned=True, image_owned_root=image_root
+                ).install(
+                    cargo_plan,
+                    workspace=root,
+                    receipts=image_root / "missing-receipts",
+                )
+
     def test_image_install_failure_does_not_publish_target_and_freezes_tree(self) -> None:
         parsed = parse_record(
             record("image-tool", method="apt-package"),
@@ -710,6 +881,7 @@ class DependencyModelTests(unittest.TestCase):
         identity = RuntimeIdentity("ubuntu", "22.04", "linux/amd64")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             failed_root = root / "failed-image"
             with self.assertRaises(DependencyError):
                 image_install_plan(
@@ -724,10 +896,12 @@ class DependencyModelTests(unittest.TestCase):
             publish_failure_root = root / "publish-failure"
             original_replace = dependency_module.os.replace
 
-            def fail_target_publish(source: Path, destination: Path) -> None:
+            def fail_target_publish(
+                source: object, destination: object, **kwargs: object
+            ) -> None:
                 if destination == publish_failure_root:
                     raise OSError("publish")
-                original_replace(source, destination)
+                original_replace(source, destination, **kwargs)
 
             with mock.patch.object(
                 dependency_module.os, "replace", side_effect=fail_target_publish
@@ -863,6 +1037,7 @@ class DependencyModelTests(unittest.TestCase):
         identity = RuntimeIdentity("ubuntu", "22.04", "linux/amd64")
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             image_root = root / "image-dependencies"
             with (
                 mock.patch.object(Installer, "install_record"),
@@ -1656,32 +1831,35 @@ class DependencyModelTests(unittest.TestCase):
                 )
             return result
 
-        with (
-            mock.patch.object(runner, "run", side_effect=run_with_key_fingerprint),
-            mock.patch(
-                "tools.agent_tools.devcontainer_dependencies._download",
-                side_effect=write_download,
-            ),
-        ):
-            Installer(runner)._install_apt_repository(
-                parsed, Path("/tmp/workspace"), repair=False
-            )
-            successful_calls = tuple(runner.calls)
-            runner.calls.clear()
-            runner.environments.clear()
-            mismatched = replace(
-                parsed,
-                repository_package_sha256=hashlib.sha256(b"different deb").hexdigest(),
-            )
-            with self.assertRaisesRegex(
-                DependencyError, "immutable apt package SHA256 mismatch"
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary)
+            init_authentic_git(workspace)
+            with (
+                mock.patch.object(runner, "run", side_effect=run_with_key_fingerprint),
+                mock.patch(
+                    "tools.agent_tools.devcontainer_dependencies._download",
+                    side_effect=write_download,
+                ),
             ):
                 Installer(runner)._install_apt_repository(
-                    mismatched, Path("/tmp/workspace"), repair=False
+                    parsed, workspace, repair=False
                 )
-            self.assertFalse(
-                any(command[:2] == ("apt-get", "install") for command in runner.calls)
-            )
+                successful_calls = tuple(runner.calls)
+                runner.calls.clear()
+                runner.environments.clear()
+                mismatched = replace(
+                    parsed,
+                    repository_package_sha256=hashlib.sha256(b"different deb").hexdigest(),
+                )
+                with self.assertRaisesRegex(
+                    DependencyError, "immutable apt package SHA256 mismatch"
+                ):
+                    Installer(runner)._install_apt_repository(
+                        mismatched, workspace, repair=False
+                    )
+                self.assertFalse(
+                    any(command[:2] == ("apt-get", "install") for command in runner.calls)
+                )
 
         local_installs = [
             command
@@ -1715,15 +1893,21 @@ class DependencyModelTests(unittest.TestCase):
         )
         plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
         with tempfile.TemporaryDirectory() as temporary:
-            receipt = Path(temporary) / "repo.json"
-            Installer._write_receipt(receipt, plan, parsed)
+            root = Path(temporary)
+            init_authentic_git(root)
+            receipt = root / "repo.json"
+            installer = Installer()
+            installer._parent_attestation = dependency_module._parent_attestation(
+                root, "test-receipt"
+            )
+            installer._write_receipt(receipt, plan, parsed)
             payload = json.loads(receipt.read_text(encoding="utf-8"))
             self.assertEqual(payload["repository_packages"]["sha256"], rolling_sha)
             self.assertEqual(payload["repository_package"]["sha256"], immutable_sha)
-            self.assertTrue(Installer._receipt_matches(receipt, plan, parsed))
+            self.assertTrue(installer._receipt_matches(receipt, plan, parsed))
             payload["repository_package"]["sha256"] = rolling_sha
             receipt.write_text(json.dumps(payload) + "\n", encoding="utf-8")
-            self.assertFalse(Installer._receipt_matches(receipt, plan, parsed))
+            self.assertFalse(installer._receipt_matches(receipt, plan, parsed))
 
     def test_apt_executable_ownership_resolves_symlink_with_same_package(self) -> None:
         parsed = parse_record(
@@ -1879,6 +2063,7 @@ class DependencyModelTests(unittest.TestCase):
         """Manifest executable resolution is receipt-bound and independent of PATH."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             prefix = root / "npm"
             bin_dir = prefix / "bin"
             bin_dir.mkdir(parents=True)
@@ -2002,6 +2187,7 @@ class DependencyModelTests(unittest.TestCase):
         """A secondary provider may reject generic help while remaining bound."""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             prefix = root / "npm"
             bin_dir = prefix / "bin"
             bin_dir.mkdir(parents=True)
@@ -2034,6 +2220,9 @@ class DependencyModelTests(unittest.TestCase):
             plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
             with mock.patch.object(dependency_module, "NPM_GLOBAL_PREFIX", str(prefix)):
                 installer = Installer()
+                installer._parent_attestation = dependency_module._parent_attestation(
+                    root, "test-receipt"
+                )
                 bindings = installer._executable_bindings(parsed, workspace=root)
                 receipt = root / "receipts" / "pyright-language-server.json"
                 installer._write_receipt(receipt, plan, parsed, executable_bindings=bindings)
@@ -2196,6 +2385,7 @@ class DependencyModelTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             with (
                 mock.patch(
                     "tools.agent_tools.devcontainer_dependencies.architecture",
@@ -2472,6 +2662,8 @@ class DependencyModelTests(unittest.TestCase):
                 "tree",
                 "clang-format",
                 "clangd-language-server",
+                "rust-toolchain",
+                "agent-canon-cli",
             },
         )
         for removed in (
@@ -2483,9 +2675,7 @@ class DependencyModelTests(unittest.TestCase):
             "detect-secrets",
             "elan",
             "rustup-init",
-            "rust-toolchain",
             "lean-toolchain",
-            "agent-canon-cli",
             "pyyaml",
         ):
             self.assertNotIn(removed, ids)
@@ -2741,6 +2931,7 @@ class DependencyModelTests(unittest.TestCase):
         plan = build_plan((loaded_manifest(Path("x.toml"), (parsed,)),))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             runner = FakeRunner()
             installer = Installer(runner)
             receipts = root / "receipts"
@@ -2968,6 +3159,7 @@ class DependencyModelTests(unittest.TestCase):
         active = self._active_source_record()
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             source = root / "rust" / "agent-canon"
             source.mkdir(parents=True)
             (source / "Cargo.toml").write_text(
@@ -3079,9 +3271,9 @@ class DependencyModelTests(unittest.TestCase):
                 "  if [ \"$1\" = '--manifest-path' ]; then manifest=\"$2\"; shift 2; else shift; fi\n"
                 "done\n"
                 "crate_dir=\"$(dirname \"$manifest\")\"\n"
-                "mkdir -p \"$crate_dir/target/release\"\n"
-                "printf '%s\\n' '#!/usr/bin/env sh' \"printf '%s\\n' 'agent-canon 0.1.0'\" > \"$crate_dir/target/release/agent-canon\"\n"
-                "chmod +x \"$crate_dir/target/release/agent-canon\"\n"
+                "mkdir -p \"${CARGO_TARGET_DIR:?}/release\"\n"
+                "printf '%s\\n' '#!/usr/bin/env sh' \"printf '%s\\n' 'agent-canon 0.1.0'\" > \"${CARGO_TARGET_DIR:?}/release/agent-canon\"\n"
+                "chmod +x \"${CARGO_TARGET_DIR:?}/release/agent-canon\"\n"
                 "printf '%s\\n' mutation > \"$crate_dir/build-mutation\"\n"
                 "git -C \"$crate_dir\" add build-mutation\n"
                 "git -C \"$crate_dir\" commit -m 'build mutation' >/dev/null\n",
@@ -3153,10 +3345,15 @@ class DependencyModelTests(unittest.TestCase):
             tools = parent / "tools"
             tools.mkdir()
             (tools / "lib").mkdir()
+            (tools / "agent_tools").mkdir()
             shutil.copy2(ROOT / "tools" / "rebuild_agent_tools.sh", tools)
             shutil.copy2(
                 ROOT / "tools" / "lib" / "agent_canon_source_identity.sh",
                 tools / "lib",
+            )
+            shutil.copy2(
+                ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
+                tools / "agent_tools",
             )
             fake_bin = root / "fake-bin"
             fake_bin.mkdir()
@@ -3168,9 +3365,9 @@ class DependencyModelTests(unittest.TestCase):
                 "  if [ \"$1\" = '--manifest-path' ]; then manifest=\"$2\"; shift 2; else shift; fi\n"
                 "done\n"
                 "crate_dir=\"$(dirname \"$manifest\")\"\n"
-                "mkdir -p \"$crate_dir/target/release\"\n"
-                "printf '%s\\n' '#!/usr/bin/env bash' \"echo 'agent-canon test 0.1.0'\" > \"$crate_dir/target/release/agent-canon\"\n"
-                "chmod +x \"$crate_dir/target/release/agent-canon\"\n"
+                "mkdir -p \"${CARGO_TARGET_DIR:?}/release\"\n"
+                "printf '%s\\n' '#!/usr/bin/env bash' \"echo 'agent-canon test 0.1.0'\" > \"${CARGO_TARGET_DIR:?}/release/agent-canon\"\n"
+                "chmod +x \"${CARGO_TARGET_DIR:?}/release/agent-canon\"\n"
                 "if [ \"${AGENT_CANON_TEST_MUTATE_SOURCE:-0}\" = \"1\" ]; then\n"
                 "  printf '%s\\n' mutation > \"$crate_dir/build-mutation\"\n"
                 "  git -C \"$crate_dir\" add build-mutation\n"
@@ -3179,10 +3376,19 @@ class DependencyModelTests(unittest.TestCase):
                 encoding="utf-8",
             )
             cargo.chmod(0o755)
-            tools_home = root / "tools-home"
+            tools_home = parent / ".agent-canon" / "tools-home"
             environment = dict(os.environ)
             environment["PATH"] = f"{fake_bin}{os.pathsep}{environment['PATH']}"
             environment["AGENT_CANON_TOOLS_HOME"] = str(tools_home)
+            environment["CARGO_HOME"] = str(parent / ".agent-canon/cache/cargo-home")
+            environment["CARGO_TARGET_DIR"] = str(
+                parent / ".agent-canon/cache/cargo-target"
+            )
+            environment["AGENT_CANON_CLI_TARGET_DIR"] = environment[
+                "CARGO_TARGET_DIR"
+            ]
+            host_home = parent / "host-home"
+            environment["HOME"] = str(host_home)
             environment["AGENT_CANON_SKIP_USR_LOCAL_LINK"] = "1"
 
             accepted = subprocess.run(
@@ -3194,10 +3400,32 @@ class DependencyModelTests(unittest.TestCase):
                 text=True,
             )
             self.assertEqual(accepted.returncode, 0, accepted.stdout + accepted.stderr)
+            self.assertIn(
+                f"AGENT_CANON_TOOL_REBUILD_CARGO_HOME={parent / '.agent-canon/cache/cargo-home'}",
+                accepted.stdout,
+            )
+            self.assertFalse((host_home / ".cargo").exists())
+            self.assertFalse((source / "target").exists())
+            self.assertFalse((source / "rust" / "agent-canon" / "target").exists())
             state = (tools_home / "agent-canon" / ".build-state").read_text(
                 encoding="utf-8"
             )
             self.assertIn(f"agent_canon_source_commit={source_commit}\n", state)
+
+            outside_environment = dict(environment)
+            outside_tools = root / "outside-tools"
+            outside_environment["AGENT_CANON_TOOLS_HOME"] = str(outside_tools)
+            outside = subprocess.run(
+                ["bash", str(tools / "rebuild_agent_tools.sh")],
+                cwd=parent,
+                env=outside_environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertNotEqual(outside.returncode, 0)
+            self.assertIn("PARENT_ROOT_SIDE_EFFECT_ERROR", outside.stderr)
+            self.assertFalse(outside_tools.exists())
 
             published_binary = tools_home / "agent-canon" / "bin" / "agent-canon"
             published_binary_before_mutation = published_binary.read_bytes()
@@ -3252,6 +3480,7 @@ class DependencyModelTests(unittest.TestCase):
         plan = build_plan((loaded_manifest(Path("x.toml"), (provider, dependent)),))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             runner = FakeRunner(fail_on="apt-get")
             with self.assertRaisesRegex(
                 DependencyError, "dependency unavailable: dependent depends on provider"
@@ -3277,6 +3506,7 @@ class DependencyModelTests(unittest.TestCase):
         )
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             cache = root / "ms-playwright"
             executable = cache / "chromium-123" / "chrome-linux" / "chrome"
             executable.parent.mkdir(parents=True)
@@ -3346,6 +3576,7 @@ class DependencyModelTests(unittest.TestCase):
         plan = build_plan((loaded_manifest(Path("fixture.toml"), (rust, lean, cargo)),))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             (root / "rust" / "agent-canon").mkdir(parents=True)
             binary = root / "rust" / "agent-canon" / "target" / "release" / "agent-cli"
             binary.parent.mkdir(parents=True)
@@ -3391,7 +3622,9 @@ class DependencyModelTests(unittest.TestCase):
         tool_environment = runner.environments[cargo_build_index]
         self.assertIsNotNone(tool_environment)
         assert tool_environment is not None
-        self.assertEqual(tool_environment["CARGO_HOME"], f"{root}/.cargo")
+        self.assertEqual(
+            tool_environment["CARGO_HOME"], f"{root}/.agent-canon/cache/cargo-home"
+        )
         self.assertEqual(tool_environment["RUSTUP_HOME"], f"{root}/.rustup")
         self.assertEqual(tool_environment["ELAN_HOME"], f"{root}/.elan")
         self.assertEqual(
@@ -3412,6 +3645,7 @@ class DependencyModelTests(unittest.TestCase):
         plan = build_plan((loaded_manifest(Path("fixture.toml"), (lean,)),))
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
+            init_authentic_git(root)
             receipts = root / "receipts"
             runner = LeanToolchainRetryRunner()
             with self.assertRaises(DependencyError):
@@ -3483,6 +3717,7 @@ class DependencyModelTests(unittest.TestCase):
         dockerfile = (ROOT / ".devcontainer" / "Dockerfile").read_text(
             encoding="utf-8"
         )
+        dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8")
         post_create = (ROOT / ".devcontainer" / "post-create.sh").read_text(
             encoding="utf-8"
         )
@@ -3492,7 +3727,21 @@ class DependencyModelTests(unittest.TestCase):
             dockerfile,
         )
         self.assertIn("COPY --from=node-provider /usr/local/lib/node_modules", dockerfile)
+        self.assertIn(
+            "COPY tools/agent_tools/parent_root_side_effects.py "
+            "/opt/agent-canon/tools/agent_tools/parent_root_side_effects.py",
+            dockerfile,
+        )
+        self.assertIn("!tools/agent_tools/parent_root_side_effects.py", dockerignore)
         self.assertIn("image-install --workspace /opt/agent-canon", dockerfile)
+        self.assertIn(
+            "CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo", dockerfile
+        )
+        self.assertIn(
+            "PATH=/usr/local/share/agent-canon/toolchains/cargo/bin:$PATH", dockerfile
+        )
+        self.assertIn("--final-binary-dir /usr/local/bin", dockerfile)
+        self.assertIn("rm -rf /opt/agent-canon /opt/agent-canon-source", dockerfile)
         self.assertIn("/usr/local/share/agent-canon/image-dependencies", dockerfile)
         self.assertIn("/etc/profile.d/agent-canon-tools.sh", dockerfile)
         self.assertIn("python3-pip", dockerfile)

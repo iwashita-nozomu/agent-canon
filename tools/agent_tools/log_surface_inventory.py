@@ -14,11 +14,29 @@ import argparse
 import ast
 import fnmatch
 import json
+import os
 import re
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Literal, cast
+
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
 
 SurfaceKind = Literal["hook", "skill", "tool"]
 Certainty = Literal["static", "dynamic"]
@@ -56,6 +74,24 @@ RUST_TOOL_PATTERNS = (
 RUST_PRINT_PATTERN = re.compile(r'^\s*(?:e?println)\s*!\s*\(\s*"(?P<value>[^"]*)')
 MAX_DIFF_RECORDS = 20
 OUTPUT_LINE_VARIABLES = {"lines", "output_lines", "report_lines"}
+
+
+def _write_parent_output(path: Path, payload: bytes, purpose: str) -> None:
+    """Publish output through the attested parent when running as a child."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(
+            attestation, path, payload, purpose
+        )
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        f"{purpose}: explicit parent root is required",
+    )
 
 
 @dataclass(frozen=True, order=True)
@@ -570,10 +606,10 @@ def scan_markdown_key_values(
 
 def write_inventory(path: Path, inventory: Inventory) -> None:
     """Write one inventory JSON file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(inventory.to_json_payload(), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    _write_parent_output(
+        path,
+        (json.dumps(inventory.to_json_payload(), indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        "log-surface-inventory",
     )
 
 

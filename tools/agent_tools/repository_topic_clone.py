@@ -12,14 +12,56 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
-import shutil
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol, cast, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, cast, runtime_checkable
+
+if TYPE_CHECKING:
+    from . import parent_root_side_effects as _parent_boundary
+elif __package__:
+    from . import parent_root_side_effects as _parent_boundary
+else:  # direct CLI execution
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import parent_root_side_effects as _parent_boundary
+
+
+def _attest_parent(
+    request: _parent_boundary.ParentRootAttestationRequest,
+) -> _parent_boundary.ParentRootAttestationReceipt:
+    return _parent_boundary.attest_parent_root(request)
+
+
+def _resolve_parent_path(
+    attestation: _parent_boundary.ParentRootAttestationReceipt,
+    candidate: Path | str,
+    purpose: str,
+) -> Path:
+    return _parent_boundary.resolve_parent_owned_path(
+        attestation, candidate, purpose, create=False
+    ).physical_path
+
+
+def _parent_request(
+    root: Path,
+    *,
+    clone_root: Path | None = None,
+    purpose: str,
+) -> _parent_boundary.ParentRootAttestationRequest:
+    return _parent_boundary.ParentRootAttestationRequest(
+        cwd=root, explicit_root=root, clone_root=clone_root, purpose=purpose
+    )
+
+
+def _parent_error(exc: Exception) -> str:
+    reject = getattr(getattr(exc, "reject", None), "value", "boundary")
+    detail = getattr(exc, "detail", str(exc))
+    return f"parent-root-attestation:{reject}:{detail}"
+
 
 MARKER_PREFIX = "repository-topic-clone"
 LEGACY_MARKER_PREFIX = "agent-canon.topic"
@@ -56,9 +98,10 @@ class GitCommandError(RepositoryTopicCloneError):
         )
 
 
-def _run_git(repo: Path, args: Sequence[str]) -> str:
+def _run_git(repo: Path, args: Sequence[str], *, pass_fds: tuple[int, ...] = ()) -> str:
     result = subprocess.run(
-        ["git", "-C", str(repo), *args], check=False, capture_output=True, text=True
+        ["git", "-C", str(repo), *args], check=False, capture_output=True, text=True,
+        pass_fds=pass_fds,
     )
     if result.returncode != 0:
         raise GitCommandError(repo, args, result.stderr)
@@ -84,6 +127,7 @@ class RepositoryTopicCloneRequest:
     topic: str
     branch: str
     owner_evidence: Path
+    parent_attestation: _parent_boundary.ParentRootAttestationReceipt | None = None
 
 
 @dataclass(frozen=True)
@@ -95,6 +139,8 @@ class PrepareReceipt:
     branch: str
     candidate_sha: str
     candidate_tree: str
+    clone_dev: int | None = None
+    clone_ino: int | None = None
 
 
 @dataclass(frozen=True)
@@ -273,6 +319,13 @@ def _repository_workspace_root(
 ) -> Path:
     """Validate the selected repository root before lifecycle path handling."""
     root = Path(workspace_root).absolute()
+    try:
+        attestation = _attest_parent(
+            _parent_request(root, purpose="repository-topic-clone")
+        )
+        root = Path(getattr(attestation, "parent_root"))
+    except Exception as exc:
+        raise RepositoryTopicCloneError(_parent_error(exc)) from exc
     _reject_symlink_components(root, "workspace root")
     _reject_symlink_components(root / "workspace", "workspace directory")
     if not root.is_dir():
@@ -302,13 +355,7 @@ def _repository_workspace_root(
 
 
 def _topic_root(workspace_root: Path, topic: str, *, create: bool) -> Path:
-    _reject_symlink_components(workspace_root.absolute(), "workspace root")
     workspace_dir = workspace_root / "workspace"
-    if workspace_dir.is_symlink():
-        raise RepositoryTopicCloneError(
-            f"workspace directory must not be a symlink: {workspace_dir}"
-        )
-    _reject_symlink_components(workspace_dir.absolute(), "workspace directory")
     root = workspace_dir / topic_slug(topic)
     if root.exists():
         if root.is_symlink():
@@ -320,7 +367,9 @@ def _topic_root(workspace_root: Path, topic: str, *, create: bool) -> Path:
                 f"topic workspace path is not a directory: {root}"
             )
     elif create:
-        root.mkdir(parents=True, exist_ok=True)
+        raise RepositoryTopicCloneError(
+            f"topic workspace creation requires parent boundary capability: {root}"
+        )
     else:
         raise RepositoryTopicCloneError(f"topic workspace is absent: {root}")
     return root
@@ -367,8 +416,26 @@ def computed_clone_path(
 ) -> Path:
     """Return the sole lifecycle-owned clone path for a request."""
     _repository_name(request.repository)
-    workspace = _topic_root(request.workspace_root, request.topic, create=create_topic)
-    return _safe_under(workspace, workspace / request.repository, "topic clone path")
+    try:
+        attestation = request.parent_attestation
+        if attestation is None:
+            attestation = _attest_parent(
+                _parent_request(
+                    request.workspace_root,
+                    purpose="repository-topic-clone",
+                )
+            )
+        if create_topic:
+            _parent_boundary.ensure_parent_owned_directory(
+                attestation,
+                request.workspace_root / "workspace" / topic_slug(request.topic),
+                "repository-topic-workspace",
+            )
+        workspace = _topic_root(request.workspace_root, request.topic, create=False)
+        candidate = _safe_under(workspace, workspace / request.repository, "topic clone path")
+        return _resolve_parent_path(attestation, candidate, "repository-topic-clone")
+    except Exception as exc:
+        raise RepositoryTopicCloneError(_parent_error(exc)) from exc
 
 
 def projected_clone_path(
@@ -384,11 +451,18 @@ def projected_clone_path(
         )
     _reject_symlink_components(workspace.absolute(), "workspace directory")
     topic_root = workspace / topic_slug(topic)
-    return _safe_under(
+    candidate = _safe_under(
         topic_root,
         topic_root / _repository_name(repository),
         "topic clone path",
     )
+    try:
+        attestation = _attest_parent(
+            _parent_request(root.absolute(), purpose="repository-topic-clone")
+        )
+        return _resolve_parent_path(attestation, candidate, "repository-topic-clone")
+    except Exception as exc:
+        raise RepositoryTopicCloneError(_parent_error(exc)) from exc
 
 
 def _remote_url(path: Path) -> str:
@@ -422,7 +496,7 @@ def _marker_namespace_present(path: Path, prefix: str) -> bool:
         )
     except GitCommandError:
         return False
-    return bool(output.strip())
+    return any(line.strip() for line in output.splitlines())
 
 
 def _legacy_marker_matches(
@@ -602,8 +676,24 @@ def request(
         branch=_normalise_branch(branch),
         owner_evidence=_require_evidence(owner_evidence, repository_root),
     )
+    try:
+        request_state = RepositoryTopicCloneRequest(
+            url=request_state.url,
+            repository=request_state.repository,
+            workspace_root=request_state.workspace_root,
+            topic=request_state.topic,
+            branch=request_state.branch,
+            owner_evidence=request_state.owner_evidence,
+            parent_attestation=_attest_parent(
+                _parent_request(repository_root, purpose="repository-topic-clone")
+            ),
+        )
+    except Exception as exc:
+        raise RepositoryTopicCloneError(_parent_error(exc)) from exc
     owner_sha = _evidence_sha256(request_state.owner_evidence)
     clone = computed_clone_path(request_state, create_topic=True)
+    if request_state.parent_attestation is None:
+        raise RepositoryTopicCloneError("parent-root-attestation:boundary:attestation missing")
     state = _inspect(clone, request_state, owner_sha=owner_sha)
     if state.state in {
         "absent",
@@ -616,9 +706,35 @@ def request(
                 clone, request_state.url, request_state.branch
             )
         else:
-            _run_git(
-                request_state.workspace_root, ["clone", request_state.url, str(clone)]
+            boundary = _parent_boundary.ParentRootSideEffectBoundary()
+            target = boundary.open_parent_owned_target(
+                request_state.parent_attestation,
+                clone,
+                "repository-topic-clone-create",
             )
+            try:
+                _run_git(
+                    request_state.workspace_root,
+                    ["clone", request_state.url, target.proc_path],
+                    pass_fds=(target.target_fd,),
+                )
+                observed = os.fstat(target.target_fd)
+                if (observed.st_dev, observed.st_ino) != (target.target_dev, target.target_ino):
+                    raise RepositoryTopicCloneError(
+                        "parent-root-attestation:root_race_detected:clone target identity changed"
+                    )
+            except Exception as exc:
+                try:
+                    boundary._abort_reserved_target(  # pyright: ignore[reportPrivateUsage]  # noqa: SLF001
+                        request_state.parent_attestation,
+                        target,
+                        "repository-topic-clone-create-failure",
+                    )
+                except Exception as abort_exc:
+                    raise RepositoryTopicCloneError(_parent_error(abort_exc)) from exc
+                raise
+            else:
+                target.close()
             branch_source = _ensure_branch(
                 clone, request_state.url, request_state.branch
             )
@@ -649,15 +765,17 @@ def request(
         raise RepositoryTopicCloneError(
             f"prepared clone not ready: {final_state.state}"
         )
-
     candidate_sha = _run_git(clone, ["rev-parse", branch_name]).strip()
     candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
+    clone_identity = clone.stat()
     receipt = PrepareReceipt(
         request=request_state,
         clone=clone,
         branch=branch_name,
         candidate_sha=candidate_sha,
         candidate_tree=candidate_tree,
+        clone_dev=clone_identity.st_dev,
+        clone_ino=clone_identity.st_ino,
     )
     if policy is not None:
         policy.apply(operation="prepare", request=request_state, receipt=receipt)
@@ -864,6 +982,10 @@ def cleanup(
     else:
         _run_git(clone, ["fetch", "origin", "main"])
         origin_main_sha = _run_git(clone, ["rev-parse", "origin/main"]).strip()
+        if evidence is None:
+            raise RepositoryTopicCloneError(
+                "cleanup hold: integrated publication evidence is missing"
+            )
         readback = cast(Mapping[str, object], evidence["publication_readback"])
         pr_identity = cast(Mapping[str, object], readback["pr_identity"])
         merge_sha = cast(str, pr_identity["merge_commit_sha"])
@@ -885,9 +1007,33 @@ def cleanup(
             request=request_state, clone=clone, removed=False, evidence=evidence_kind
         )
 
-    shutil.rmtree(clone)
-    if topic_root.exists() and not any(topic_root.iterdir()):
-        topic_root.rmdir()
+    try:
+        attestation = _attest_parent(
+            _parent_request(
+                request_state.workspace_root,
+                purpose="repository-topic-clone-cleanup",
+            )
+        )
+        capability = _parent_boundary.resolve_parent_owned_path(
+            attestation, clone, "repository-topic-clone-cleanup", create=False
+        )
+        if capability.physical_path != clone or not capability.physical_path.is_dir():
+            raise RepositoryTopicCloneError("cleanup hold: clone path identity changed")
+        if capability.target_dev is None or capability.target_ino is None:
+            raise RepositoryTopicCloneError("cleanup hold: clone identity receipt is missing")
+    except Exception as exc:
+        if isinstance(exc, RepositoryTopicCloneError):
+            raise
+        raise RepositoryTopicCloneError(f"cleanup hold: {_parent_error(exc)}") from exc
+    _parent_boundary.ParentRootSideEffectBoundary().remove_parent_owned_tree(
+        attestation, capability, "repository-topic-clone-cleanup"
+    )
+    topic_capability = _parent_boundary.resolve_parent_owned_path(
+        attestation, topic_root, "repository-topic-workspace-cleanup", create=False
+    )
+    _parent_boundary.ParentRootSideEffectBoundary().remove_empty_parent_owned_directory(
+        attestation, topic_capability, "repository-topic-workspace-cleanup"
+    )
     return CleanupProof(
         request=request_state, clone=clone, removed=True, evidence=evidence_kind
     )

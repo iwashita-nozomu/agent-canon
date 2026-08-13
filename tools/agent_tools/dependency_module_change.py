@@ -20,6 +20,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+try:
+    from . import parent_root_side_effects as _parent_boundary
+except ImportError:  # direct CLI execution
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import parent_root_side_effects as _parent_boundary  # type: ignore[no-redef]
+
 from repository_topic_clone import (
     RepositoryTopicCloneError,
     RepositoryTopicCloneRequest,
@@ -39,6 +45,22 @@ from repository_topic_clone import (
 
 class DependencyModuleChangeError(RuntimeError):
     """Raised when dependency module lifecycle metadata cannot be projected."""
+
+
+def _attested_workspace_root(root: Path) -> Path:
+    """Resolve the selected parent through the shared side-effect boundary."""
+    try:
+        return _parent_boundary.attest_parent_root(
+            _parent_boundary.ParentRootAttestationRequest(
+                cwd=root, explicit_root=root, purpose="dependency-module-change"
+            )
+        ).parent_root
+    except Exception as exc:
+        reject = getattr(getattr(exc, "reject", None), "value", "boundary")
+        detail = getattr(exc, "detail", str(exc))
+        raise DependencyModuleChangeError(
+            f"parent-root-attestation:{reject}:{detail}"
+        ) from exc
 
 
 class GitCommandError(DependencyModuleChangeError):
@@ -167,6 +189,7 @@ def _topic_request_from_args(
     branch: str,
     owner_evidence: Path,
 ) -> RepositoryTopicCloneRequest:
+    root = _attested_workspace_root(root)
     modules = _parse_gitmodules(root)
     module = _select_module(modules, module_path)
     if not module.basename:

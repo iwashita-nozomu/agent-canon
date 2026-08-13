@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import sys
@@ -36,6 +37,13 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest  # noqa: E402
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
 from prompt_capture import redact_sensitive_text  # noqa: E402
 from runtime_log_paths import (  # noqa: E402
     eval_result_search_dirs,
@@ -55,6 +63,22 @@ BEHAVIOR_HOOK_EVENTS = frozenset({"UserPromptSubmit", "PreToolUse", "PostToolUse
 WORKFLOW_ATTRIBUTION_KINDS = frozenset({"owner", "context", "missing"})
 PROMPT_CAPTURE_STATUSES = frozenset({"present", "missing"})
 PROMPT_FINGERPRINT_RE = re.compile(r"^[0-9a-f]{16}$")
+
+
+def _parent_write(path: Path, data: bytes, purpose: str) -> None:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
+    ParentRootSideEffectBoundary().write_parent_owned_file(
+        attestation, path, data, purpose
+    )
 PROMPT_CAPTURE_CAUSE_RE = re.compile(r"^[a-z][a-z0-9_-]*$")
 BEHAVIOR_HINT_FIELDS = frozenset(
     {
@@ -798,10 +822,12 @@ def compact_summary(report: EvalAccumulationReport) -> dict[str, object]:
 
 def write_compact_summary(path: Path, report: EvalAccumulationReport) -> None:
     """Write a bounded JSON summary for agent consumption."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(compact_summary(report), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    _parent_write(
+        path,
+        (json.dumps(compact_summary(report), indent=2, sort_keys=True) + "\n").encode(
+            "utf-8"
+        ),
+        "eval-accumulation-summary",
     )
 
 

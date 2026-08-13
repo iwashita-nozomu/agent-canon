@@ -30,6 +30,26 @@ SCRIPT = REPO_ROOT / "tools" / "ci" / "check_github_workflows.py"
 RUNTIME_DASHBOARD_WORKFLOW = (
     REPO_ROOT / ".github" / "workflows" / "agent-runtime-dashboard.yml"
 )
+_PARENT_BOUNDARY_PATH_KEYS = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+)
 
 
 class GitHubWorkflowCheckTest(unittest.TestCase):
@@ -80,6 +100,10 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         shutil.copy2(
             REPO_ROOT / "tools" / "agent_tools" / "agent_canon_source_root.py",
             module,
+        )
+        shutil.copy2(
+            REPO_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
+            module.parent / "parent_root_side_effects.py",
         )
         executable = root / "tools" / "bin" / "agent-canon"
         executable.parent.mkdir(parents=True)
@@ -197,6 +221,8 @@ raise SystemExit(2)
         """Execute the workflow-owned schedule command in a fresh root."""
         _condition, command = self.scheduled_graph_command()
         environment = os.environ.copy()
+        for key in _PARENT_BOUNDARY_PATH_KEYS:
+            environment.pop(key, None)
         environment.update(
             {
                 "GITHUB_WORKSPACE": str(root),
@@ -663,8 +689,10 @@ raise SystemExit(2)
         self.assertIn(start, source)
         embedded = source.split(start, 1)[1].split(end, 1)[0]
         readback_script = textwrap.dedent(embedded)
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmp_dir:
             report_root = Path(tmp_dir)
+            bootstrap_environment = os.environ.copy()
+            bootstrap_environment["AGENT_CANON_PARENT_ROOT"] = str(REPO_ROOT)
             bootstrap = subprocess.run(
                 [
                     sys.executable,
@@ -684,6 +712,7 @@ raise SystemExit(2)
                     "scheduler",
                 ],
                 cwd=REPO_ROOT,
+                env=bootstrap_environment,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -1362,6 +1391,36 @@ raise SystemExit(2)
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_text:edit_scope:", result.stdout)
+
+    def test_parent_bounded_workflow_writers_use_repo_owned_outputs(self) -> None:
+        """Workflow writers authenticate the repo before publishing evidence."""
+        expected = {
+            "AGENT_CANON_PARENT_ROOT": "${{ github.workspace }}",
+            "AGENT_CANON_ACTIVE_REPOSITORY_ROOT": "${{ github.workspace }}",
+        }
+        dashboard_path = (
+            REPO_ROOT / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+        )
+        dashboard = yaml.safe_load(dashboard_path.read_text(encoding="utf-8"))
+        self.assertEqual(dashboard["jobs"]["dashboard"]["env"], expected)
+
+        issue_path = REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml"
+        issue = yaml.safe_load(issue_path.read_text(encoding="utf-8"))
+        for job_name in ("issue-mirror-sync", "issue-mirror-check"):
+            self.assertEqual(issue["jobs"][job_name]["env"], expected)
+        source = issue_path.read_text(encoding="utf-8")
+        self.assertEqual(
+            source.count(
+                'summary_file="${GITHUB_WORKSPACE}/.agent-canon/'
+                'issue-mirror-${GITHUB_JOB}.md"'
+            ),
+            2,
+        )
+        self.assertEqual(
+            source.count('cat "${summary_file}" >> "${GITHUB_STEP_SUMMARY}"'),
+            2,
+        )
+        self.assertNotIn('--summary-file "${GITHUB_STEP_SUMMARY}"', source)
 
     def test_issue_mirror_workflow_with_checkout_failure_summary_passes(self) -> None:
         """Standalone issue mirror can only fail checkout by writing failure summary."""

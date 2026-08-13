@@ -59,6 +59,12 @@ from hook_safety import (  # noqa: E402
     secret_block_payload,
     secret_kind,
 )
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
 from prompt_classifier import PromptClassifierInputs, freeze  # noqa: E402
 from subagent_selection import select_subagents  # noqa: E402
 from tool_selection import select_tools  # noqa: E402
@@ -73,6 +79,23 @@ WORKFLOW_MONITOR_REPORT_DIR_ENV = "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR"
 ACTIVE_RUN_POINTER = Path("reports") / "agents" / ".active_run"
 REPORT_ROOT_RELATIVE = ACTIVE_RUN_POINTER.parent
 MAX_HOOK_PAYLOAD_BYTES = 256 * 1024
+
+
+def _parent_bound_report(path: Path, purpose: str) -> Path | None:
+    """Return a report path only after parent capability validation."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        return None
+    try:
+        parent = Path(configured)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+        )
+        return ParentRootSideEffectBoundary().resolve_parent_owned_path(
+            attestation, path, purpose, create=False
+        ).physical_path
+    except (ParentRootSideEffectError, OSError, RuntimeError, ValueError):
+        return None
 
 
 @dataclass(frozen=True)
@@ -314,7 +337,7 @@ def resolve_report_target(state: HookRootState) -> Path | None:
             )
         except (OSError, RuntimeError, ValueError):
             return None
-        return resolved if resolved.is_dir() else None
+        return _parent_bound_report(resolved, "hook-report-projection") if resolved.is_dir() else None
     report_root = state.active_root / REPORT_ROOT_RELATIVE
     target = _active_report_target(
         state.active_root / ACTIVE_RUN_POINTER,
@@ -322,13 +345,14 @@ def resolve_report_target(state: HookRootState) -> Path | None:
         report_root=report_root,
     )
     if target is not None:
-        return target
+        return _parent_bound_report(target, "hook-report-projection")
     if state.standalone:
-        return _active_report_target(
+        standalone_target = _active_report_target(
             state.active_root / ".active_run",
             active_root=state.active_root,
             report_root=report_root,
         )
+        return _parent_bound_report(standalone_target, "hook-report-projection") if standalone_target is not None else None
     return None
 
 

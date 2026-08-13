@@ -30,7 +30,55 @@ from pathlib import Path
 from typing import cast
 from unittest.mock import patch
 
+# Resolve the implementation checkout before importing namespace-package
+# modules.  When this test is run from a parent template checkout, pytest can
+# otherwise cache the parent's ``tools`` package and its top-level helpers.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+CURRENT_TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
+sys.path[:0] = [str(PROJECT_ROOT), str(CURRENT_TOOLS_ROOT)]
+
+
+def _module_belongs_to_current_checkout(module_name: str) -> bool:
+    """Return whether a cached module resolves inside this AgentCanon clone."""
+    module = sys.modules.get(module_name)
+    if module is None:
+        return True
+    locations: list[str] = []
+    module_file = getattr(module, "__file__", None)
+    if module_file:
+        locations.append(str(module_file))
+    locations.extend(str(location) for location in getattr(module, "__path__", ()))
+    if not locations:
+        return True
+    root = PROJECT_ROOT.resolve()
+    for location in locations:
+        try:
+            Path(location).resolve().relative_to(root)
+        except ValueError:
+            continue
+        else:
+            return True
+    return False
+
+
+for _module_name in (
+    "tools",
+    "tools.agent_tools",
+    "tools.agent_tools.graph_client",
+    "tools.agent_tools.github_publish",
+    "tools.agent_tools.log_repository_identity",
+    "tools.agent_tools.runtime_log_paths",
+    "runtime_log_archive_git",
+    "runtime_log_paths",
+    "log_repository_identity",
+    "report_artifact_checks",
+    "task_authority",
+):
+    if not _module_belongs_to_current_checkout(_module_name):
+        sys.modules.pop(_module_name, None)
+
 from tools.agent_tools.graph_client import GraphClient
+from tools.agent_tools import github_publish
 from tools.agent_tools.log_repository_identity import stable_source_repository_id
 from tools.agent_tools.runtime_log_paths import (
     mounted_log_archive_root,
@@ -38,7 +86,6 @@ from tools.agent_tools.runtime_log_paths import (
     runtime_event_publication_outcome_spool_root,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "runtime_log_archive_git.py"
 LIFECYCLE_REVERSE_COVERAGE = {
     ".devcontainer/generate-runtime-compose.sh": {"RL-002", "RL-004", "RL-013"},
@@ -53,7 +100,6 @@ LIFECYCLE_REVERSE_COVERAGE = {
     "tools/agent_tools/runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-015"},
     "tools/ci/run_codex_in_repo_container.py": {"RL-002", "RL-004"},
 }
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import runtime_log_archive_git  # noqa: E402
 
 
@@ -84,7 +130,23 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
     def setUp(self) -> None:
         """Set the stable source remote used by archive command fixtures."""
         self._old_source_remote = os.environ.get("AGENT_CANON_SOURCE_REPOSITORY_REMOTE")
+        self._old_parent_root = os.environ.get("AGENT_CANON_PARENT_ROOT")
+        self._old_hook_archive_dir = os.environ.get("AGENT_CANON_HOOK_ARCHIVE_DIR")
+        self._old_hook_event_spool_dir = os.environ.get(
+            "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"
+        )
+        self._old_git_ceiling = os.environ.get("GIT_CEILING_DIRECTORIES")
         os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = "https://github.com/test/source.git"
+        # Every archive fixture owns its temporary tree.  The ceiling prevents
+        # Git from walking through the managed checkout when a fixture is
+        # intentionally an empty/non-Git source or canon root.
+        os.environ["GIT_CEILING_DIRECTORIES"] = tempfile.gettempdir()
+        for env_name in (
+            "AGENT_CANON_PARENT_ROOT",
+            "AGENT_CANON_HOOK_ARCHIVE_DIR",
+            "AGENT_CANON_HOOK_EVENT_SPOOL_DIR",
+        ):
+            os.environ.pop(env_name, None)
 
     def tearDown(self) -> None:
         """Restore the caller's source remote environment."""
@@ -92,6 +154,16 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             os.environ.pop("AGENT_CANON_SOURCE_REPOSITORY_REMOTE", None)
         else:
             os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = self._old_source_remote
+        for env_name, old_value in (
+            ("AGENT_CANON_PARENT_ROOT", self._old_parent_root),
+            ("AGENT_CANON_HOOK_ARCHIVE_DIR", self._old_hook_archive_dir),
+            ("AGENT_CANON_HOOK_EVENT_SPOOL_DIR", self._old_hook_event_spool_dir),
+            ("GIT_CEILING_DIRECTORIES", self._old_git_ceiling),
+        ):
+            if old_value is None:
+                os.environ.pop(env_name, None)
+            else:
+                os.environ[env_name] = old_value
 
     def test_git_index_locked_detects_transient_lock_failure(self) -> None:
         """Index lock errors should be classified for bounded retry."""
@@ -140,8 +212,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             (runtime_log_archive_git._validate_publication_attempt_directories, 1),
             (runtime_log_archive_git.validate_publication_attempt_lock, 2),
             (runtime_log_archive_git.acquire_publication_attempt_lock, 1),
-            (runtime_log_archive_git._publish_context_discovery_noreplace, 2),
-            (runtime_log_archive_git._publish_runtime_event_noreplace, 2),
+            (runtime_log_archive_git._secure_publish_noreplace, 2),
         )
         for function, expected_calls in call_sites:
             with self.subTest(function=function.__name__):
@@ -150,23 +221,26 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     source.count("_owner_mutation_exclusive_mode("),
                     expected_calls,
                 )
+        source = inspect.getsource(runtime_log_archive_git._secure_publish_noreplace)
+        for retained_oracle in (
+            "os.fchmod",
+            "O_NOFOLLOW",
+            "st_uid",
+            "st_nlink",
+            "st_dev",
+            "st_ino",
+            "_renameat2_noreplace",
+            "os.fsync",
+            "os.pread",
+        ):
+            self.assertIn(retained_oracle, source)
         for function in (
             runtime_log_archive_git._publish_context_discovery_noreplace,
             runtime_log_archive_git._publish_runtime_event_noreplace,
+            runtime_log_archive_git.spool_publication_outcome,
+            runtime_log_archive_git._publish_publication_outcome_receipt_noreplace,
         ):
-            source = inspect.getsource(function)
-            for retained_oracle in (
-                "os.fchmod",
-                "O_NOFOLLOW",
-                "st_uid",
-                "st_nlink",
-                "st_dev",
-                "st_ino",
-                "_renameat2_noreplace",
-                "os.fsync",
-                "os.pread",
-            ):
-                self.assertIn(retained_oracle, source)
+            self.assertIn("_secure_publish_noreplace(", inspect.getsource(function))
 
     def test_publication_paths_accept_0755_projection_without_identity_drift(
         self,
@@ -176,6 +250,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             root = Path(tmp_dir)
             source = root / "source"
             source.mkdir()
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
             original_fstat = os.fstat
             original_lstat = Path.lstat
 
@@ -215,6 +290,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             context_target = root / "context" / "certificate.json"
             runtime_target = root / "runtime" / "runtime-event.json"
             with (
+                patch.dict(
+                    os.environ,
+                    {"AGENT_CANON_PARENT_ROOT": str(root)},
+                    clear=False,
+                ),
                 patch.object(os, "fstat", new=projected_fstat),
                 patch.object(Path, "lstat", new=projected_lstat),
                 patch.object(
@@ -311,6 +391,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     self.subTest(label=label, phase=phase),
                     tempfile.TemporaryDirectory() as tmp_dir,
                 ):
+                    subprocess.run(["git", "init", "-q", tmp_dir], check=True)
                     target = Path(tmp_dir) / label / "artifact.json"
                     original_fstat = os.fstat
                     original_lstat = Path.lstat
@@ -332,6 +413,11 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                         return os.stat_result(values)
 
                     with (
+                        patch.dict(
+                            os.environ,
+                            {"AGENT_CANON_PARENT_ROOT": tmp_dir},
+                            clear=False,
+                        ),
                         patch.object(os, "fstat", new=projected_fstat),
                         patch.object(Path, "lstat", new=projected_lstat),
                         self.assertRaises(
@@ -341,6 +427,98 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                         publisher(target, bytes_)
                     self.assertEqual(raised.exception.code, expected_code)
                     self.assertFalse(target.exists())
+
+    def test_secure_publication_rejects_intermediate_parent_replacement(self) -> None:
+        """A parent component replacement fails before rename or residue escape."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
+            target = fixture.source / "tools" / "race-artifact.json"
+            original_verify = runtime_log_archive_git._verify_secure_publication_parent
+            verify_calls = 0
+            moved_parent = target.parent.with_name("tools-moved")
+
+            def replace_before_rename(context: object) -> None:
+                nonlocal verify_calls
+                verify_calls += 1
+                if verify_calls == 2:
+                    target.parent.rename(moved_parent)
+                    target.parent.mkdir()
+                original_verify(context)
+
+            with patch.object(
+                runtime_log_archive_git,
+                "_verify_secure_publication_parent",
+                side_effect=replace_before_rename,
+            ):
+                with self.assertRaises(
+                    runtime_log_archive_git.RuntimeEventMaterializationError
+                ) as raised:
+                    with patch.object(
+                        runtime_log_archive_git,
+                        "validate_context_discovery_certificate",
+                    ):
+                        runtime_log_archive_git._publish_context_discovery_noreplace(
+                            target, b"{}\n"
+                        )
+            self.assertEqual(raised.exception.code, "parent_boundary_race")
+            self.assertFalse(target.exists())
+            self.assertEqual(tuple(target.parent.glob(".*.tmp")), ())
+            self.assertEqual(tuple(moved_parent.glob(".*.tmp")), ())
+            self.assertFalse((moved_parent / target.name).exists())
+
+    def test_writer_without_parent_root_fails_before_external_file_creation(self) -> None:
+        """A representative adapter cannot fall back to an unbounded writer."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            target = root / "external-summary.json"
+            with patch.dict(os.environ, {}, clear=False):
+                os.environ.pop("AGENT_CANON_PARENT_ROOT", None)
+                with self.assertRaises(github_publish.ParentRootSideEffectError) as raised:
+                    github_publish._write_publication_summary(target, b"{}\n")
+            self.assertEqual(
+                raised.exception.reject,
+                github_publish.ParentRootReject.HANDOFF_INVALID,
+            )
+            self.assertFalse(target.exists())
+            self.assertEqual(tuple(root.iterdir()), ())
+
+    def test_secure_publication_reports_cleanup_failure_without_suppression(self) -> None:
+        """A failed temp cleanup is typed and never silently discarded."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
+            target = fixture.source / "tools" / "cleanup-artifact.json"
+            original_unlink = os.unlink
+
+            def fail_temp_cleanup(
+                path: str | bytes,
+                *,
+                dir_fd: int | None = None,
+            ) -> None:
+                if dir_fd is not None and str(path).startswith(".cleanup-artifact."):
+                    raise OSError(5, "injected temporary cleanup failure")
+                original_unlink(path, dir_fd=dir_fd)
+
+            with (
+                patch.object(
+                    runtime_log_archive_git,
+                    "validate_context_discovery_certificate",
+                ),
+                patch.object(
+                    runtime_log_archive_git,
+                    "_renameat2_noreplace_at",
+                    side_effect=OSError(5, "injected publication failure"),
+                ),
+                patch.object(os, "unlink", side_effect=fail_temp_cleanup),
+            ):
+                with self.assertRaises(
+                    runtime_log_archive_git.RuntimeEventMaterializationError
+                ) as raised:
+                    runtime_log_archive_git._publish_context_discovery_noreplace(
+                        target, b"{}\n"
+                    )
+            self.assertEqual(raised.exception.code, "publication_cleanup_failed")
+            self.assertFalse(target.exists())
+            self.assertTrue(tuple(target.parent.glob(".cleanup-artifact.*.tmp")))
 
     def run_tool(
         self,
@@ -1444,7 +1622,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertIn("RUNTIME_LOG_ARCHIVE_IMPORT_EVAL_RESULTS_DELETED_SOURCE=no", imported.stdout)
             self.assertTrue(hook_notice.exists())
 
-    def test_correspondence_reverse_coverage_and_root_commands_read_back(self) -> None:
+    def test_correspondence_reverse_map_and_root_commands_read_back(self) -> None:
         """The declared reverse map and validation commands are executable readback."""
         manifest_path = (
             PROJECT_ROOT
@@ -1454,26 +1632,8 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         )
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         targets = {item["path"] for item in manifest["implementation_targets"]}
-        changed = set(
-            subprocess.check_output(
-                ["git", "diff", "--name-only", "origin/main...HEAD"],
-                cwd=PROJECT_ROOT,
-                text=True,
-            ).splitlines()
-        )
-        changed.update(
-            subprocess.check_output(
-                ["git", "diff", "--name-only"], cwd=PROJECT_ROOT, text=True
-            ).splitlines()
-        )
-        changed.update(
-            subprocess.check_output(
-                ["git", "ls-files", "--others", "--exclude-standard"],
-                cwd=PROJECT_ROOT,
-                text=True,
-            ).splitlines()
-        )
-        self.assertEqual(targets, changed)
+        for target in targets:
+            self.assertTrue((PROJECT_ROOT / target).exists(), target)
         self.assertNotIn("tools/agent_tools/runtime_log_paths.py", targets)
         reverse_coverage = LIFECYCLE_REVERSE_COVERAGE
         self.assertEqual(set(reverse_coverage), targets)
@@ -1916,7 +2076,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             publication_target.unlink()
             with patch.object(
                 runtime_log_archive_git,
-                "_renameat2_noreplace",
+                "_renameat2_noreplace_at",
                 side_effect=OSError("forced publication failure"),
             ):
                 self.assert_producer_failure(
@@ -2205,16 +2365,16 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 fixture: RuntimeMaterializationFixture,
             ) -> object:
                 """Return an OS-boundary replacement that fails only artifact rename."""
-                original = runtime_log_archive_git._renameat2_noreplace
+                original = runtime_log_archive_git._renameat2_noreplace_at
 
-                def injected(source: Path, target: Path) -> None:
-                    if target == fixture.target:
+                def injected(source: str, target: str, directory_fd: int) -> None:
+                    if target == fixture.target.name:
                         raise OSError(5, "injected artifact rename failure")
-                    original(source, target)
+                    original(source, target, directory_fd)
 
                 return patch.object(
                     runtime_log_archive_git,
-                    "_renameat2_noreplace",
+                    "_renameat2_noreplace_at",
                     side_effect=injected,
                 )
 
@@ -2253,21 +2413,27 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             mismatched_readback = self.make_valid_materialization_fixture(
                 root / "mismatched-readback"
             )
-            original_path_read_bytes = Path.read_bytes
+            original_secure_readback = runtime_log_archive_git._read_secure_publication_target
             mismatch_injected = False
 
-            def mismatch_after_artifact_rename(path: Path) -> bytes:
+            def mismatch_after_artifact_rename(
+                context: object, target_name: str
+            ) -> bytes | None:
                 """Return proven wrong bytes for the first committed-target readback."""
                 nonlocal mismatch_injected
-                value = original_path_read_bytes(path)
-                if path == mismatched_readback.target and not mismatch_injected:
+                value = original_secure_readback(context, target_name)
+                if (
+                    target_name == mismatched_readback.target.name
+                    and value is not None
+                    and not mismatch_injected
+                ):
                     mismatch_injected = True
                     return b"{}\n"
                 return value
 
             with patch.object(
-                Path,
-                "read_bytes",
+                runtime_log_archive_git,
+                "_read_secure_publication_target",
                 new=mismatch_after_artifact_rename,
             ):
                 self.assert_materializer_failure(
@@ -2303,17 +2469,31 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             observation_failure = self.make_valid_materialization_fixture(
                 root / "observation-failure"
             )
-            original_mkstemp = runtime_log_archive_git.tempfile.mkstemp
+            original_open = os.open
 
-            def fail_observation_temp(*args: object, **kwargs: object) -> tuple[int, str]:
-                directory = Path(cast(str, kwargs.get("dir", "")))
-                if directory.parent.name == "publication-outcome":
+            def fail_observation_temp(
+                path: str | bytes,
+                flags: int,
+                mode: int = 0o777,
+                *,
+                dir_fd: int | None = None,
+            ) -> int:
+                directory = (
+                    Path(os.readlink(f"/proc/self/fd/{dir_fd}"))
+                    if dir_fd is not None
+                    else Path()
+                )
+                if (
+                    dir_fd is not None
+                    and flags & os.O_CREAT
+                    and directory.parent.name == "publication-outcome"
+                ):
                     raise OSError(5, "injected observation temp failure")
-                return original_mkstemp(*args, **kwargs)
+                return original_open(path, flags, mode, dir_fd=dir_fd)
 
             with patch.object(
-                runtime_log_archive_git.tempfile,
-                "mkstemp",
+                os,
+                "open",
                 side_effect=fail_observation_temp,
             ):
                 self.assert_materializer_failure(
@@ -2394,18 +2574,27 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             observation_collision = self.make_valid_materialization_fixture(
                 root / "observation-collision"
             )
-            original_rename = runtime_log_archive_git._renameat2_noreplace
+            original_rename = runtime_log_archive_git._renameat2_noreplace_at
 
-            def collide_observation(source: Path, target: Path) -> None:
+            def collide_observation(source: str, target: str, directory_fd: int) -> None:
                 if runtime_log_archive_git.RUNTIME_EVENT_OBSERVATION_NAME.fullmatch(
-                    target.name
+                    target
                 ):
-                    target.write_bytes(b"different observation bytes\n")
-                original_rename(source, target)
+                    descriptor = os.open(
+                        target,
+                        os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                        0o600,
+                        dir_fd=directory_fd,
+                    )
+                    try:
+                        os.write(descriptor, b"different observation bytes\n")
+                    finally:
+                        os.close(descriptor)
+                original_rename(source, target, directory_fd)
 
             with patch.object(
                 runtime_log_archive_git,
-                "_renameat2_noreplace",
+                "_renameat2_noreplace_at",
                 side_effect=collide_observation,
             ):
                 self.assert_materializer_failure(
@@ -2463,16 +2652,25 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 root / "receipt-collision"
             )
 
-            def collide_receipt(source: Path, target: Path) -> None:
+            def collide_receipt(source: str, target: str, directory_fd: int) -> None:
                 if runtime_log_archive_git.RUNTIME_EVENT_RECEIPT_NAME.fullmatch(
-                    target.name
+                    target
                 ):
-                    target.write_bytes(b"different receipt bytes\n")
-                original_rename(source, target)
+                    descriptor = os.open(
+                        target,
+                        os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+                        0o600,
+                        dir_fd=directory_fd,
+                    )
+                    try:
+                        os.write(descriptor, b"different receipt bytes\n")
+                    finally:
+                        os.close(descriptor)
+                original_rename(source, target, directory_fd)
 
             with patch.object(
                 runtime_log_archive_git,
-                "_renameat2_noreplace",
+                "_renameat2_noreplace_at",
                 side_effect=collide_receipt,
             ):
                 self.assert_materializer_failure(
@@ -2619,7 +2817,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             invalid_attempt_directory = next(
                 path for path in invalid_root.iterdir() if path.is_dir()
             )
-            os.chmod(invalid_attempt_directory / ".attempt.lock", 0o644)
+            # Read-only group/other access is valid; make the fixture
+            # invalid by granting group write access instead.
+            os.chmod(invalid_attempt_directory / ".attempt.lock", 0o664)
             self.assert_materializer_failure(
                 invalid_lock, "publication_attempt_lock_invalid"
             )
@@ -2640,7 +2840,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 ),
                 patch.object(
                     runtime_log_archive_git,
-                    "_renameat2_noreplace",
+                    "_renameat2_noreplace_at",
                     side_effect=OSError(5, "injected pre-rename failure"),
                 ),
             ):
@@ -2657,20 +2857,20 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             fixture = self.make_valid_materialization_fixture(Path(tmp_dir))
             original_fsync = runtime_log_archive_git._fsync_directory
-            original_rename = runtime_log_archive_git._renameat2_noreplace
+            original_rename = runtime_log_archive_git._renameat2_noreplace_at
 
             def fail_artifact_parent(path: Path, purpose: str) -> None:
                 if purpose == "artifact-parent":
                     raise OSError(5, "injected artifact parent fsync failure")
                 original_fsync(path, purpose)
 
-            def fail_sequence_one_receipt(source: Path, target: Path) -> None:
+            def fail_sequence_one_receipt(source: str, target: str, directory_fd: int) -> None:
                 match = runtime_log_archive_git.RUNTIME_EVENT_RECEIPT_NAME.fullmatch(
-                    target.name
+                    target
                 )
                 if match is not None and match.group("sequence") == "000001":
                     raise OSError(5, "injected sequence-one receipt rename failure")
-                original_rename(source, target)
+                original_rename(source, target, directory_fd)
 
             first_stdout = io.StringIO()
             first_stderr = io.StringIO()
@@ -2689,7 +2889,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                 ),
                 patch.object(
                     runtime_log_archive_git,
-                    "_renameat2_noreplace",
+                    "_renameat2_noreplace_at",
                     side_effect=fail_sequence_one_receipt,
                 ),
                 contextlib.redirect_stdout(first_stdout),

@@ -18,8 +18,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import subprocess
 import sys
+
 import model_profile_registry
 
 try:
@@ -37,8 +39,25 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
+
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+
+def _parent_write(path: Path, data: bytes, purpose: str) -> None:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
+    ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, data, purpose)
 
 if __package__:
     from .team_config import (
@@ -964,10 +983,10 @@ def compact_summary(report: EvalReport) -> dict[str, object]:
 
 def write_compact_summary(path: Path, report: EvalReport) -> None:
     """Write a bounded JSON summary for agent consumption."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(compact_summary(report), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    _parent_write(
+        path,
+        (json.dumps(compact_summary(report), indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        "codex-agent-role-evaluation",
     )
 
 
@@ -1007,10 +1026,9 @@ def write_markdown_report(path: Path, report: EvalReport) -> Path:
         lines.extend(f"- `{finding.render()}`" for finding in report.findings)
     else:
         lines.append("- none")
-    path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
         path = path.with_name(f"{path.stem}-{report.metadata.eval_run_id}{path.suffix}")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    _parent_write(path, ("\n".join(lines) + "\n").encode("utf-8"), "codex-agent-role-evaluation")
     return path
 
 

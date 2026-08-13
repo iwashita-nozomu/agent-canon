@@ -12,9 +12,17 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
+import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
+
+try:
+    from . import parent_root_side_effects as _parent_boundary
+except ImportError:  # direct script execution
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import parent_root_side_effects as _parent_boundary  # type: ignore[no-redef]
 
 LAYOUT_STANDALONE = "standalone"
 LAYOUT_VENDORED = "vendored"
@@ -43,6 +51,7 @@ class RootResolution:
     source_root: Path
     layout: str
     canon_root: Path
+    parent_attestation: object | None = None
 
 
 def _default_pythonpath(*, root: Path) -> str:
@@ -79,12 +88,26 @@ def _run_subcommand(resolution: RootResolution, command: Sequence[str]) -> int:
     if not command:
         raise SourceRootFailure("agent_canon_source_root_command_missing", "No command provided")
     executable = _resolve_executable(resolution, command[0])
-    env = os.environ.copy()
+    try:
+        attestation = resolution.parent_attestation
+        if attestation is None:
+            attestation = _parent_boundary.attest_parent_root(
+                _parent_boundary.ParentRootAttestationRequest(
+                    cwd=resolution.current_repository_root,
+                    explicit_root=resolution.current_repository_root,
+                    source_root=resolution.source_root,
+                    purpose="agent-canon-source-root",
+                )
+            )
+        env = _parent_boundary.child_environment(cast(Any, attestation), os.environ)
+    except Exception as exc:
+        if isinstance(exc, _parent_boundary.ParentRootSideEffectError):
+            raise SourceRootFailure(
+                f"agent_canon_parent_root_{exc.reject.value}", exc.detail
+            ) from exc
+        raise
     env["PYTHONPATH"] = _default_pythonpath(root=resolution.source_root)
     env[SOURCE_PREFIX_ENV] = _source_prefix(resolution)
-    env["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(
-        resolution.current_repository_root
-    )
     process = subprocess.run(
         (str(executable), *command[1:]),
         cwd=resolution.source_root.as_posix(),

@@ -22,17 +22,94 @@ SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "issue_sync.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import issue_sync  # noqa: E402
 
+_PARENT_BOUNDARY_PATH_KEYS = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+    "AGENT_CANON_TASK_ID",
+    "AGENT_CANON_REPOSITORY_ID",
+    "AGENT_CANON_TASK_REPOSITORY",
+    "AGENT_CANON_LIFECYCLE_ID",
+    "AGENT_CANON_EXPECTED_IMAGE_TAG",
+    "AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT",
+)
+
 
 class IssueSyncTest(unittest.TestCase):
     """Exercise local issue validation and sync planning."""
 
+    def parent_bound_environment(
+        self,
+        root: Path,
+        base: dict[str, str] | None = None,
+    ) -> dict[str, str]:
+        """Return a clean environment bound to one real fixture repository."""
+        if not (root / ".git").exists():
+            subprocess.run(
+                ["git", "init", "-q", "-b", "main", str(root)],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "remote",
+                    "add",
+                    "origin",
+                    "https://example.invalid/parent.git",
+                ],
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "-c",
+                    "user.name=Test",
+                    "-c",
+                    "user.email=test@example.invalid",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "fixture",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        environment = (os.environ if base is None else base).copy()
+        for key in _PARENT_BOUNDARY_PATH_KEYS:
+            environment.pop(key, None)
+        fixture_root = str(root.resolve())
+        environment["AGENT_CANON_PARENT_ROOT"] = fixture_root
+        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = fixture_root
+        return environment
+
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-        """Run the issue sync checker."""
+        """Run the issue sync checker in its authenticated fixture root."""
         return subprocess.run(
             [sys.executable, str(SCRIPT), "--root", str(root), *args],
             check=False,
             capture_output=True,
             text=True,
+            env=self.parent_bound_environment(root),
         )
 
     def run_checker_with_env(
@@ -41,13 +118,13 @@ class IssueSyncTest(unittest.TestCase):
         env: dict[str, str],
         *args: str,
     ) -> subprocess.CompletedProcess[str]:
-        """Run the issue sync checker with an explicit environment."""
+        """Run issue sync with fake tools inside its authenticated root."""
         return subprocess.run(
             [sys.executable, str(SCRIPT), "--root", str(root), *args],
             check=False,
             capture_output=True,
             text=True,
-            env=env,
+            env=self.parent_bound_environment(root, env),
         )
 
     def test_missing_required_field_fails(self) -> None:
@@ -263,7 +340,7 @@ class IssueSyncTest(unittest.TestCase):
                 "--apply",
             )
             self.assertEqual(apply_result.returncode, 0, apply_result.stdout + apply_result.stderr)
-            self.assertIn(f"ISSUE_SYNC_CREATED=1", apply_result.stdout)
+            self.assertIn("ISSUE_SYNC_CREATED=1", apply_result.stdout)
             state = json.loads((bin_dir / "gh_state.json").read_text(encoding="utf-8"))
             issue_number = next(iter(state["issues"]))
             self.assertEqual(state["issues"][issue_number]["title"], expected_title)
@@ -517,12 +594,14 @@ class IssueSyncTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             summary = root / "summary.md"
+            summary.write_text("existing summary\n", encoding="utf-8")
             self.write_issue(root, "open", "AC-20260517-test-issue")
 
             result = self.run_checker(root, "--summary-file", str(summary))
             text = summary.read_text(encoding="utf-8")
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(text.startswith("existing summary\n"))
             self.assertIn("## Issue Mirror Check", text)
             self.assertIn("missing_github_links: `1`", text)
 

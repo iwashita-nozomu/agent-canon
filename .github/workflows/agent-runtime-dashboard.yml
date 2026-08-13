@@ -27,6 +27,9 @@ concurrency:
 jobs:
   dashboard:
     runs-on: ubuntu-latest
+    env:
+      AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
+      AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
     steps:
       - name: PR required-check compatibility
         if: github.event_name == 'pull_request'

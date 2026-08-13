@@ -47,10 +47,69 @@ else:
     from packets import iter_artifacts as _iter_artifacts
 
 import json as _json
+import os as _os
 from collections.abc import Mapping as _Mapping
+from pathlib import Path as _Path
+
+if __package__:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest as _ParentRootAttestationRequest,
+    )
+    from .parent_root_side_effects import (
+        ParentRootReject as _ParentRootReject,
+    )
+    from .parent_root_side_effects import (
+        ParentRootSideEffectBoundary as _ParentRootSideEffectBoundary,
+    )
+    from .parent_root_side_effects import (
+        ParentRootSideEffectError as _ParentRootSideEffectError,
+    )
+    from .parent_root_side_effects import (
+        attest_parent_root as _attest_parent_root,
+    )
+else:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest as _ParentRootAttestationRequest,
+    )
+    from parent_root_side_effects import (
+        ParentRootReject as _ParentRootReject,
+    )
+    from parent_root_side_effects import (
+        ParentRootSideEffectBoundary as _ParentRootSideEffectBoundary,
+    )
+    from parent_root_side_effects import (
+        ParentRootSideEffectError as _ParentRootSideEffectError,
+    )
+    from parent_root_side_effects import (
+        attest_parent_root as _attest_parent_root,
+    )
 
 from task_authority import AUTHORITY_FILE_NAME as _AUTHORITY_FILE_NAME
 from task_authority import build_default_task_authority as _build_default_task_authority
+
+
+def _parent_writer(purpose: str):
+    configured = _os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise _ParentRootSideEffectError(
+            _ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = _Path(configured).resolve(strict=True)
+    attestation = _attest_parent_root(
+        _ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
+    return _ParentRootSideEffectBoundary(), attestation
+
+
+def _write_parent(path: _Path, data: str, purpose: str) -> None:
+    boundary, attestation = _parent_writer(purpose)
+    boundary.write_parent_owned_file(attestation, path, data.encode("utf-8"), purpose)
+
+
+def _ensure_parent(path: _Path, purpose: str) -> None:
+    boundary, attestation = _parent_writer(purpose)
+    boundary.ensure_parent_owned_directory(attestation, path, purpose)
 
 if __package__:
     from .team_config import (
@@ -283,7 +342,7 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
         "CREATED_AT": spec.created_at_iso,
     }
     capacity_runtime = capacity_runtime_for_spec(spec)
-    spec.report_dir.mkdir(parents=True, exist_ok=True)
+    _ensure_parent(spec.report_dir, "agent-team-run-bundle")
     active_design_packet = run_active_design_packet(spec)
     created_files = list(_iter_artifacts(spec.config, spec.roles, active_design_packet))
     selected_templates = {
@@ -299,16 +358,18 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
         template_name = selected_templates.get(artifact, artifact)
         if _has_template(template_name):
             output_path = resolve_report_bundle_artifact_path(spec.report_dir, artifact)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(
+            _write_parent(
+                output_path,
                 _render_template(template_name, replacements),
-                encoding="utf-8",
+                "agent-team-artifact",
             )
-    (spec.report_dir / spec.config.artifacts["team_manifest"]).write_text(
+    _write_parent(
+        spec.report_dir / spec.config.artifacts["team_manifest"],
         _build_manifest(spec, capacity_runtime),
-        encoding="utf-8",
+        "agent-team-manifest",
     )
-    (spec.report_dir / "closeout_packet.json").write_text(
+    _write_parent(
+        spec.report_dir / "closeout_packet.json",
         _json.dumps(
             {
                 "capacity_request": __capacity_projection(capacity_runtime, spec),
@@ -318,10 +379,11 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
             sort_keys=True,
         )
         + "\n",
-        encoding="utf-8",
+        "agent-team-closeout",
     )
     created_files.append("closeout_packet.json")
-    (spec.report_dir / spec.config.artifacts["verification"]).write_text(
+    _write_parent(
+        spec.report_dir / spec.config.artifacts["verification"],
         "\n".join(
             [
                 f"run_id={spec.run_id}",
@@ -334,19 +396,20 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
                 "",
             ]
         ),
-        encoding="utf-8",
+        "agent-team-verification",
     )
     authority_roles = {
         role.id: role.write_policy.mode not in {"read_only", "artifacts_only"}
         for role in spec.roles
     }
-    (spec.report_dir / _AUTHORITY_FILE_NAME).write_text(
+    _write_parent(
+        spec.report_dir / _AUTHORITY_FILE_NAME,
         _build_default_task_authority(
             run_id=spec.run_id,
             task=spec.task,
             roles=authority_roles,
         ),
-        encoding="utf-8",
+        "agent-team-authority",
     )
     created_files.append(_AUTHORITY_FILE_NAME)
     _write_initial_wave_execution_gate(spec)

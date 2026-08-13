@@ -14,13 +14,30 @@
 from __future__ import annotations
 
 import json
+import os
 import re
-import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from typing import cast
 
 import yaml
+
+if __package__:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+else:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
 
 if __package__:
     from .agent_canon_source_root import resolve_agent_canon_source_root
@@ -62,15 +79,11 @@ else:
 
 if __package__:
     from .workspace_scope import (
-        GIT_STATUS_SHORT_MIN_LINE_LENGTH,
-        GIT_STATUS_SHORT_PATH_START,
         resolve_role_write_scope,
         schedule_wave_row,
     )
 else:
     from workspace_scope import (
-        GIT_STATUS_SHORT_MIN_LINE_LENGTH,
-        GIT_STATUS_SHORT_PATH_START,
         resolve_role_write_scope,
         schedule_wave_row,
     )
@@ -768,37 +781,12 @@ def subagent_wave_record_command(report_dir: Path | str = "<run-report-dir>") ->
     return SUBAGENT_WAVE_RECORD_COMMAND_TEMPLATE.format(report_dir=str(report_dir))
 
 
-def discover_changed_paths(workspace_root: Path) -> tuple[str, ...]:
-    """Return changed paths from git status when available."""
-    result = subprocess.run(
-        ["git", "-C", str(workspace_root), "status", "--short"],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if result.returncode != 0:
-        return ()
-
-    changed: list[str] = []
-    for raw_line in result.stdout.splitlines():
-        line = raw_line.rstrip()
-        if len(line) < GIT_STATUS_SHORT_MIN_LINE_LENGTH:
-            continue
-        path_part = line[GIT_STATUS_SHORT_PATH_START:]
-        if " -> " in path_part:
-            _, path_part = path_part.split(" -> ", 1)
-        normalized = path_part.strip()
-        if normalized and normalized not in changed:
-            changed.append(normalized)
-    return tuple(changed)
-
-
 def language_review_candidates(
     workspace_root: Path,
     changed_paths: tuple[str, ...] = (),
 ) -> tuple[str, ...]:
     """Return explicit language-review candidates from changed paths."""
-    candidate_paths = changed_paths or discover_changed_paths(workspace_root)
+    candidate_paths = changed_paths
     normalized_paths = tuple(
         raw_path.replace("\\", "/").lstrip("./") for raw_path in candidate_paths
     )
@@ -1058,7 +1046,21 @@ def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
         while insert_at > 0 and not lines[insert_at - 1].strip():
             insert_at -= 1
         lines.insert(insert_at, line)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    rendered = ("\n".join(lines) + "\n").encode("utf-8")
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="manifest-rendering")
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(
+            attestation, path, rendered, "manifest-rendering"
+        )
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        "manifest-rendering: explicit parent root is required",
+    )
 
 
 def build_manifest(

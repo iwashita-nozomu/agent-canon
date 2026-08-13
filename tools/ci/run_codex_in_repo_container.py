@@ -23,12 +23,17 @@ from container_runtime import (
     build_build_command,
     build_run_command,
     build_shell_invocation,
+    emit_not_created_lifecycle_receipt,
     join_shell_lines,
+    lifecycle_context,
     load_or_default_pack,
     load_toml,
     print_label_and_command,
     resolve_builder,
+    scope_pack_image_tag,
+    start_container_lifecycle,
     workspace_path,
+    write_lifecycle_receipt,
 )
 
 
@@ -55,7 +60,7 @@ class CodexProfile:
     description: str
 
 
-NESTED_XDG_STATE_ROOT = "/tmp/agent-canon-xdg-state"
+NESTED_XDG_STATE_ROOT = "/workspace/.agent-canon/nested-xdg-state"
 NESTED_RUNTIME_OWNED_ENV = frozenset(
     {"HOME", "XDG_STATE_HOME", "AGENT_CANON_CONTAINER_USER"}
 )
@@ -216,9 +221,6 @@ def build_parser() -> argparse.ArgumentParser:
         "--skip-build", action="store_true", help="Skip the build step."
     )
     parser.add_argument(
-        "--keep-image", action="store_true", help="Keep the built image."
-    )
-    parser.add_argument(
         "--print-only", action="store_true", help="Print commands without executing."
     )
     parser.add_argument(
@@ -249,13 +251,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Command to run inside the nested Codex container. Defaults to `codex`.",
     )
     return parser
-
-
-def cleanup_image(builder: str, image_tag: str) -> None:
-    """Remove one image quietly."""
-    subprocess.run(
-        [builder, "image", "rm", "-f", image_tag], check=False, capture_output=True
-    )
 
 
 def find_profile(profiles: list[CodexProfile], name: str) -> CodexProfile:
@@ -308,6 +303,7 @@ def build_nested_codex_script(
     )
     lines = [
         "set -euo pipefail",
+        f'mkdir -p "{workspace_root}/.agent-canon"',
         'mkdir -p "$HOME"',
         'mkdir -p "$HOME/.codex"',
         'export AGENT_CANON_CODEX_SESSION_ROOT="${AGENT_CANON_CODEX_SESSION_ROOT:-$HOME/.codex/sessions}"',
@@ -325,7 +321,7 @@ def build_nested_codex_script(
     if run_uid is not None and run_gid is not None:
         lines.extend(
             [
-                'workspace_marker="$(mktemp)"',
+                f'workspace_marker="$(mktemp {shlex.quote(workspace_root)}/.agent-canon/nested-marker.XXXXXX)"',
                 'trap \'rm -f "$workspace_marker"\' EXIT',
                 "# Separate marker and post-create mtimes on coarse timestamp filesystems.",
                 "sleep 1",
@@ -346,6 +342,7 @@ def build_nested_codex_script(
             [
                 'if [ "$(id -u)" -eq 0 ]; then',
                 f'  chown -R {run_uid}:{run_gid} "$HOME" || true',
+                f'  chown -h {run_uid}:{run_gid} {shlex.quote(workspace_root)}/.agent-canon || true',
                 f'  find -P {shlex.quote(workspace)} -xdev -mindepth 1 -uid 0 -newer "$workspace_marker" '
                 f'-exec chown -h {run_uid}:{run_gid} {{}} +',
                 '  rm -f "$workspace_marker"',
@@ -384,6 +381,10 @@ def main() -> int:
             cli_forward_env,
         )
         builder = resolve_builder(args.builder, print_only=args.print_only)
+        lifecycle = lifecycle_context(workspace_root, builder, "nested-codex")
+        if not args.skip_build:
+            pack = scope_pack_image_tag(pack, lifecycle)
+        lifecycle = lifecycle.bind_image_tag(pack.image_tag)
 
         mount_host_ssh_dir = defaults.mount_host_ssh_dir or args.mount_host_ssh_dir
         forward_ssh_auth_sock = (
@@ -439,7 +440,7 @@ def main() -> int:
             run_uid=os.getuid() if use_host_user else None,
             run_gid=os.getgid() if use_host_user else None,
         )
-        build_command = build_build_command(builder, pack)
+        build_command = build_build_command(builder, pack, labels=lifecycle.labels())
         run_command = build_run_command(
             builder,
             pack,
@@ -449,27 +450,45 @@ def main() -> int:
             mounts=tuple(mounts),
             user="root" if use_host_user else None,
             tty=tty,
+            labels=lifecycle.labels(),
         )
 
         print_label_and_command("build", build_command)
         print_label_and_command("run", run_command)
 
         if args.print_only:
+            emit_not_created_lifecycle_receipt(workspace_root, lifecycle)
             return 0
 
-        image_built_here = False
-        if not args.skip_build:
-            build_result = subprocess.run(build_command, check=False)
-            if build_result.returncode != 0:
-                return build_result.returncode
-            image_built_here = True
+        lifecycle_run = start_container_lifecycle(
+            workspace_root, builder, "nested-codex", context=lifecycle
+        )
+        if lifecycle_run.receipt.state != "snapshot":
+            write_lifecycle_receipt(workspace_root, lifecycle_run.receipt)
+            print(
+                f"container lifecycle unavailable: {lifecycle_run.receipt.failure or lifecycle_run.receipt.before.query_status}",
+                file=sys.stderr,
+            )
+            return 2
 
+        command_exit = 0
         try:
-            run_result = subprocess.run(run_command, check=False)
-            return run_result.returncode
+            if not args.skip_build:
+                command_exit = subprocess.run(build_command, check=False).returncode
+            if command_exit == 0:
+                command_exit = subprocess.run(run_command, check=False).returncode
         finally:
-            if image_built_here and not args.keep_image:
-                cleanup_image(builder, pack.image_tag)
+            # Nested Codex is never allowed to retain a task-created image;
+            # lifecycle ownership ends with this invocation.
+            cleanup_result = lifecycle_run.finish(cleanup=True)
+        if cleanup_result.state not in {"cleaned", "not-created"}:
+            print(
+                f"container lifecycle cleanup state={cleanup_result.state}: {cleanup_result.failure}",
+                file=sys.stderr,
+            )
+            if command_exit == 0:
+                command_exit = 2
+        return command_exit
     except (RuntimeError, ValueError) as exc:
         print(str(exc), file=sys.stderr)
         return 2

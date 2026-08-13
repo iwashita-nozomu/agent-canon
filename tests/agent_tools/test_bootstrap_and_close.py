@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -1562,7 +1563,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
         """A clean AgentCanon update surface may refresh despite unrelated parent dirt."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            report_root = Path(tmp_dir) / "reports"
+            report_root = workspace_root / "reports" / "agents"
             seed_workspace_config(workspace_root)
             checklist = (
                 workspace_root
@@ -1596,6 +1597,15 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 ).read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
+            (source_agent_tools / "parent_root_side_effects.py").write_text(
+                (
+                    PROJECT_ROOT
+                    / "tools"
+                    / "agent_tools"
+                    / "parent_root_side_effects.py"
+                ).read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
             (source_agent_tools / "surface_manifest.py").write_text(
                 "#!/usr/bin/env python3\n",
                 encoding="utf-8",
@@ -1605,6 +1615,24 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (source_root / "tools" / "sync_agent_canon.sh").chmod(0o755)
+            subprocess.run(["git", "init"], cwd=source_root, check=True)
+            subprocess.run(["git", "add", "."], cwd=source_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Start Test",
+                    "-c",
+                    "user.email=bootstrap@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: seed AgentCanon source",
+                ],
+                cwd=source_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
             subprocess.run(
                 [
@@ -1635,6 +1663,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             (workspace_root / "local-note.md").write_text(
                 "unrelated\n", encoding="utf-8"
             )
+            environment = dict(os.environ)
+            environment["AGENT_CANON_PARENT_ROOT"] = str(workspace_root)
 
             result = subprocess.run(
                 [
@@ -1652,6 +1682,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(report_root),
                 ],
                 cwd=PROJECT_ROOT,
+                env=environment,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -3923,31 +3954,84 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("DOCUMENT_STRUCTURE_STATUS=complete", result.stdout)
             self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=no", result.stdout)
 
-    def test_task_close_rejects_non_git_workspace(self) -> None:
-        """task_close should fail closed when it cannot resolve the current diff ref."""
+    def test_task_close_accepts_parent_owned_nested_workspace_without_git(self) -> None:
+        """A nested workspace may use the authenticated outer Git identity."""
         with tempfile.TemporaryDirectory() as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            report_dir = workspace_root / "reports" / "agents" / "non-git-closeout"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            run_id = "non-git-closeout"
-            write_ready_closeout_bundle(report_dir, run_id)
-            write_ready_diff_check_artifact(report_dir)
-
-            result = subprocess.run(
+            parent_root = Path(tmp_dir) / "parent"
+            parent_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=parent_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--run-id",
-                    run_id,
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "init",
                 ],
+                cwd=parent_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "remote",
+                    "add",
+                    "origin",
+                    "https://example.invalid/task-close-parent.git",
+                ],
+                cwd=parent_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            workspace_root = parent_root / "workspace" / "nested"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            run_id = "parent-owned-nested-closeout"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            with patch.dict(
+                os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}
+            ):
+                write_ready_closeout_bundle(
+                    report_dir, run_id, workspace=workspace_root
+                )
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+
+            environment = dict(os.environ)
+            environment["AGENT_CANON_PARENT_ROOT"] = str(parent_root)
+            outer_head = current_git_head(parent_root)
+            expected_outer_diff_ref = current_diff_ref(workspace_root)
+            result = subprocess.run(
+                [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
                 cwd=workspace_root,
+                env=environment,
                 check=False,
                 capture_output=True,
                 text=True,
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("Unable to resolve git HEAD", result.stderr)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CLOSEOUT_READY=yes", result.stdout)
+            self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
+            self.assertIn(
+                f"DIFF_CHECK_CURRENT_DIFF_REF={expected_outer_diff_ref}",
+                result.stdout,
+            )
+            self.assertTrue(expected_outer_diff_ref.startswith(outer_head))
+            self.assertNotIn("Unable to resolve git HEAD", result.stderr)
+            self.assertTrue(report_dir.resolve().is_relative_to(parent_root.resolve()))
 
     def test_task_close_rejects_stale_closeout_and_artifact_diff_ref(self) -> None:
         """task_close should compare matching closeout/artifact refs to the current diff ref."""
@@ -4164,8 +4248,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "reports/agents/old-run/workflow_monitoring.md", result.stdout
             )
 
-    def test_task_close_rejects_tracked_other_agent_run_reports(self) -> None:
-        """Tracked old agent run bundles are not durable source canon."""
+    def test_task_close_allows_tracked_other_agent_run_reports(self) -> None:
+        """Pre-existing tracked agent run history is baseline state."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -4202,10 +4286,28 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            subprocess.run(
+                [
+                    "git",
+                    "remote",
+                    "add",
+                    "origin",
+                    "https://example.invalid/task-close-tracked.git",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             run_id = "test-task-close-tracked-old-agent-run"
             report_dir = workspace_root / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            with patch.dict(
+                os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}
+            ):
+                write_ready_closeout_bundle(
+                    report_dir, run_id, workspace=workspace_root
+                )
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
 
             result = subprocess.run(
@@ -4216,16 +4318,16 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=no", result.stdout)
-            self.assertIn("report_artifact_tracked_outside_current_run", result.stdout)
-            self.assertIn(
-                "reports/agents/old-run/workflow_monitoring.md", result.stdout
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=yes", result.stdout)
+            self.assertNotIn(
+                "report_artifact_tracked_outside_current_run", result.stdout
             )
 
     def test_task_close_rejects_ignored_reports_outside_run_bundle(self) -> None:

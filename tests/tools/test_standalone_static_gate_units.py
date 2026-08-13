@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import tempfile
 from pathlib import Path
@@ -44,6 +45,75 @@ def test_static_unit_runner_has_four_explicit_units() -> None:
     for unit in UNITS:
         assert f"{unit})" in text
     assert "unknown standalone static-gate unit" in text
+
+
+def test_static_unit_runner_self_reentry_uses_one_parent_boundary() -> None:
+    text = RUNNER.read_text(encoding="utf-8")
+    assert 'if [[ -z "${AGENT_CANON_CHILD_HANDOFF:-}" ]]' in text
+    assert "exec-parent-bound" in text
+    assert "--issue-handoff" in text
+    assert "verify-child" in text
+    assert "--consume" in text
+    assert "unset AGENT_CANON_CHILD_HANDOFF" in text
+    assert '"standalone-static-gate-unit"' in text
+    assert '"${CARGO_TARGET_DIR:?}/debug/agent-canon"' in text
+    assert "trap cleanup_eval EXIT" in text
+    assert "trap cleanup_eval RETURN" not in text
+    assert "mktemp" not in text
+    assert "rm -rf" not in text
+
+
+def test_eval_unit_surfaces_cleanup_failure_without_masking_primary_status(
+    tmp_path: Path,
+) -> None:
+    """EXIT cleanup fails visibly and never replaces an earlier unit failure."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_python = fake_bin / "python3"
+    fake_python.write_text(
+        "#!/usr/bin/env bash\n"
+        "set -eu\n"
+        "case \"$*\" in\n"
+        "  *' verify-child '*) exit 0 ;;\n"
+        "  *' temp-dir '*) mkdir -p \"$FAKE_TEMP_ROOT\"; printf '%s\\n' \"$FAKE_TEMP_ROOT\"; exit 0 ;;\n"
+        "  *' ensure-dir '*)\n"
+        "    candidate=''\n"
+        "    while [ \"$#\" -gt 0 ]; do\n"
+        "      if [ \"$1\" = '--candidate' ]; then candidate=\"$2\"; break; fi\n"
+        "      shift\n"
+        "    done\n"
+        "    mkdir -p \"$candidate\"; printf '%s\\n' \"$candidate\"; exit 0 ;;\n"
+        "  *' remove-tree '*) exit \"${FAKE_REMOVE_STATUS:?}\" ;;\n"
+        "  *'run_accumulated_agent_evals.py'*) exit \"${FAKE_EVAL_STATUS:?}\" ;;\n"
+        "  *) exit 0 ;;\n"
+        "esac\n",
+        encoding="utf-8",
+    )
+    fake_python.chmod(0o755)
+
+    def run(eval_status: int) -> subprocess.CompletedProcess[str]:
+        case_root = tmp_path / f"case-{eval_status}"
+        return subprocess.run(
+            ["bash", str(RUNNER), "eval"],
+            cwd=ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            env={
+                **os.environ,
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+                "AGENT_CANON_CHILD_HANDOFF": "fixture-single-use-token",
+                "AGENT_CANON_HANDOFF_AUDIENCE": "standalone-static-gate-unit",
+                "AGENT_CANON_CHILD_PURPOSE": "standalone-static-gate-unit",
+                "AGENT_CANON_HOOK_ARCHIVE_DIR": str(case_root / "hook-archive"),
+                "FAKE_TEMP_ROOT": str(case_root / "temp-root"),
+                "FAKE_EVAL_STATUS": str(eval_status),
+                "FAKE_REMOVE_STATUS": "41",
+            },
+        )
+
+    assert run(0).returncode == 41
+    assert run(23).returncode == 23
 
 
 def test_static_unit_runner_and_full_wrapper_are_shell_syntax_valid() -> None:
