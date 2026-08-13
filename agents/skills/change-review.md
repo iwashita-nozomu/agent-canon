@@ -148,18 +148,91 @@ not create parallel full-review workflows.
 - validation is static/targeted first. Full suites or remote CI run once for the
   final candidate only when the touched contract requires them.
 
+## Conditional Cause Investigation Before Required Action
+
+Cause investigation is conditional, not a universal review ceremony. Activate
+the bounded investigation when causal ambiguity remains unresolved, or when an
+evidence-linked alternative could change the owner, fix surface, or validation
+route. For a straightforward finding where a type, schema, parser, compiler,
+state invariant, or targeted reproduction establishes one cause, record a
+compact direct cause proof and derive the action from it; no named receipt is
+required. Rejected, duplicate, already-covered, and unreachable findings keep
+their reason/evidence and do not acquire a cause receipt.
+
+For an activated finding, a solution proposal MUST NOT be derived from the
+symptom alone. Record a compact `Cause Investigation Receipt` (a cause-evidence
+note). It has no fixed schema or candidate count; record the applicable
+evidence needed to establish:
+
+- `Observation`: the reproduced symptom or static observation, with the
+  current source snapshot and exact entrypoint;
+- `Incoming Callers/Entrypoints`: evidence-linked callers, dispatchers,
+  parsers, public imports, workflow triggers, and configuration entrypoints
+  that can reach the observation;
+- `Owning Mechanism/State/Guards`: the state transition or mechanism that
+  creates the behavior, including guard predicates, invariants, and any
+  duplicated or over-strict checks;
+- `Downstream Consumers/Side Effects/Cleanup`: consumers, writes, process or
+  resource effects, error handling, rollback, and cleanup paths affected by
+  the mechanism;
+- `Sibling Implementations/Tests/Docs/Config`: comparable implementations,
+  regression tests, documentation, and configuration that can confirm or
+  disconfirm the ownership and contract;
+- `Temporal Evidence`: latest remote/default branch, related issue/PR, or
+  branch history when snapshot drift, a recent change, or a stale generated
+  surface is plausible. This section is conditional, not a mandatory history
+  sweep;
+- `Reachability and Overcheck Analysis`: a proof or targeted observation for
+  each disputed branch/guard. Record an unreachable branch as rejected with
+  `reason_code=unreachable_branch`, and an unnecessary or duplicated guard as
+  `reason_code=overcheck`, rather than proposing a test or repair for behavior
+  that cannot occur;
+- `Alternative Disposition`: each alternative that could change the owner,
+  fix surface, or validation is either disconfirmed or explicitly bounded,
+  with its evidence reference;
+- `Selected Cause` and `Expected Mechanism`: the causal explanation and the
+  state/mechanism change expected to remove the symptom;
+- `Action Derivation`: the required action is derived from the selected cause
+  and expected mechanism, and names the contract and validation it preserves.
+
+These are evidence dimensions, not a ceremony checklist for every finding.
+Mark an inapplicable dimension as such when that itself bounds the alternative;
+do not manufacture a caller, side effect, sibling, or history search.
+
+The activated investigation starts from the changed diff and expands through
+evidence-linked incoming and outgoing edges. It does not require an arbitrary
+full-repository scan or a fixed number of candidates. Stop only when every
+alternative that could change the owner, fix surface, or validation has been
+disconfirmed or bounded. If a static invariant or targeted reproduction proves
+one cause, the direct-proof path is complete. For an activated finding, the
+operation is complete at
+`cause_hypothesis_selected -> action_derived_from_cause -> validation_route_bound`;
+for a straightforward finding it is
+`direct_cause_proof -> action_derived_from_cause -> validation_route_bound`.
+`cause_unproven` applies only when ambiguity remains and blocks the action.
+
 ## Default Sequence
 
 1. `git diff --stat` と `git diff --name-only` で変更面を固定します。
 1. 破壊的変更、削除、rename、config 変更を先に見ます。
-1. docs と tests が実装に追随しているか確認します。
+1. 変更面について、causal ambiguity または owner/fix/validation を変え得る
+   alternative があるか判定します。該当する場合だけ cause-evidence note/receipt を作り、
+   incoming callers/entrypoints、owning mechanism/state/guards、downstream
+   consumers/side effects/cleanup、sibling implementations/tests/docs/config
+   を evidence-linked にたどります。straightforward finding は direct cause proof
+   を記録し、rejected/duplicate/already-covered/unreachable finding はその reason/evidence
+   だけで閉じます。必要な場合だけ latest remote/Issue/branch history を確認します。
+1. 選択した contract surface に対して docs と tests が追随しているか確認します。
 1. Python の class、dataclass、`Protocol`、継承、public API、型境界、依存方向が変わる場合は `python-review` を追加し、`$oop-readability-check` と `check_solid_evidence.py` の evidence を review input にします。
 1. まず static checks と targeted validation を実行し、full repository
    dependency review、full suite、remote CI は最終候補の契約が選択した場合だけ一度実行します。
 1. findings を hypothesis として priority 順に並べ、current snapshot、reachable
    path、contract、witness/static proof を付けます。parent / integration owner が
    accept または reject を adjudicate します。
-1. 各 finding に `issue_route` を付けます。現在の review loop で閉じるものは
+1. `required_action` または solution proposal は、activated finding では
+   cause-evidence note/receipt の `Selected Cause` と `Expected Mechanism` から、
+   straightforward finding では direct cause proof から導出します。各 finding に
+   `issue_route` を付けます。現在の review loop で閉じるものは
    `run_local_resolution`、運用上残すものは既存 `issues/open/` または新規
    local issue、外部 triage が必要なものは `issue_sync.py` による GitHub mirror
    plan へ接続します。
@@ -176,7 +249,7 @@ Finding rows include:
 
 - `severity`
 - `evidence`
-- `required_action`
+- `required_action` (action-bearing finding の場合だけ)
 - `intent_preservation`
 - `issue_route`
 - `rerun_review_required`

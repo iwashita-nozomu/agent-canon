@@ -128,11 +128,66 @@ bash tools/agent_tools/run_repo_dependency_review.sh \
   --design-doc-claim-path documents/design/<topic>.md
 ```
 
+## Cause Investigation Surface
+
+Dependency evidence is used to investigate the cause before it is used to
+propose a fix when causal ambiguity remains unresolved, or when an
+evidence-linked alternative could change the owner, fix surface, or validation
+route. A straightforward finding with a type, schema, parser, compiler, state
+invariant, or targeted reproduction proving one cause may use a compact direct
+cause proof instead; no named receipt is required. Rejected, duplicate,
+already-covered, and unreachable findings retain their reason/evidence without
+a cause receipt.
+
+For an activated packet, record a compact `Cause Investigation Receipt` (a
+cause-evidence note) before the action. It has no fixed schema or candidate
+count: expand the
+changed target through evidence-linked edges and record the applicable evidence
+needed to establish:
+
+- `Observation` and the current source snapshot;
+- `Incoming Callers/Entrypoints`: callers, public imports, dispatchers,
+  parsers, workflow triggers, and configuration entrypoints that can reach the
+  target;
+- `Owning Mechanism/State/Guards`: the state owner, transition/mechanism,
+  invariants, guard predicates, and duplicated or over-strict checks;
+- `Downstream Consumers/Side Effects/Cleanup`: consumers, writes, process or
+  resource effects, failures, rollback, and cleanup paths;
+- `Sibling Implementations/Tests/Docs/Config`: comparable code and all
+  evidence-linked test, documentation, and configuration surfaces;
+- `Temporal Evidence`: latest remote/default branch, Issue/PR, and branch
+  history only when snapshot drift or a recent/stale surface is plausible;
+- `Reachability and Overcheck Analysis`: proof or targeted evidence for each
+  disputed branch or guard. A statically impossible branch is recorded as
+  `reason_code=unreachable_branch`; an unnecessary or duplicate guard is
+  recorded as `reason_code=overcheck`;
+- `Alternative Disposition`, `Selected Cause`, `Expected Mechanism`, and
+  `Action Derivation` connecting the cause to the owner, fix, contract, and
+  validation route.
+
+These are evidence dimensions rather than a mandatory ceremony for every
+packet. Mark an inapplicable dimension as bounded when that is supported by the
+evidence; do not manufacture a caller, side effect, sibling, or history search.
+
+The breadth is evidence-driven: do not impose an arbitrary full-repository
+scan or fixed candidate count. Stop when every alternative that could change
+the owner, fix surface, or validation has been disconfirmed or bounded. A
+static type/schema/parser/compiler/state invariant may establish a single
+cause; in that case record the invariant and why the narrower traversal is
+complete. Do not turn a symptom into a fix merely because its file appears in
+the search result. A packet is complete only when
+`cause_hypothesis_selected -> action_derived_from_cause -> impact_and_validation_bound`
+is read back from the note/receipt. A straightforward packet may instead read
+back `direct_cause_proof -> action_derived_from_cause -> impact_and_validation_bound`.
+
 ## Interpretation
 
 - code dependency は実 import / include / source 関係、header dependency は design / implementation / environment / test の明示文脈です。混ぜずに別々の evidence として記録します。
 - Python code 変更では、`helper_function_inventory.py --changed --all-functions` を関数 / class / method 単位の evidence として使います。この tool は変更 Python file を報告対象にしつつ、whole-repo call graph context から direct callers / callees を保持します。変更 Python file count が 0 件の場合は `HELPER_INVENTORY_FILES=0` を scope evidence にします。
 - 修正箇所を選ぶ task では、先に `scan_code_dependencies.sh` で実コード依存を抜き、次に header dependency graph で読むべき design / docs / tests を確認します。
+- `required_action` や solution proposal より先に causal ambiguity と owner / fix / validation を変え得る alternative の有無を判定します。該当時だけ cause-evidence note/receipt を完成させ、incoming callers/entrypoints、owning mechanism/state/guards、downstream consumers/side effects/cleanup、sibling implementations/tests/docs/config を evidence-linked にたどります。straightforward finding は direct cause proof、rejected/duplicate/already-covered/unreachable finding は reason/evidence だけで閉じます。snapshot drift が原因候補になり得る場合だけ latest remote/Issue/branch history を追加します。
+- 原因候補の探索は evidence-linked な範囲で止めます。全 repo の機械的走査や固定候補数は要求せず、owner / fix / validation を変え得る代替が disconfirmed または bounded になった時点で完了します。静的 invariant が単一原因を証明する場合は、その invariant と狭い scope の十分性を direct cause proof に残します。
+- activated packet の `required_action` は `Selected Cause` と `Expected Mechanism` から、straightforward packet の action は direct cause proof から導出します。症状だけの修正提案は `cause_unproven` として保留します。発生不能な分岐と過剰・重複ガードは、`reason_code=unreachable_branch|overcheck` と証拠を残して review 対象から除外します。
 - コード改善の修正箇所を選ぶ task では、`agents/workflows/hypothesis-validation-workflow.md` に従って `Observation`、`Hypothesis`、`Expected Mechanism`、`Candidate Comparison`、`Disconfirming Evidence`、`Support Evidence`、`fix_surface_validated=yes` を実装前に固定します。
 - 実装後は `Post-Change Evidence` と `Hypothesis Decision: supported|rejected|inconclusive` を残します。`rejected` または `inconclusive` の場合は、同じ実装 pass を広げず次仮説へ戻します。
 - changed-file header / scan / format failure は fix-now blocker です。
@@ -225,6 +280,7 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Read `documents/design/dependency-manifest-design.md`.
 1. If the task selects or justifies a fix surface, read `agents/workflows/hypothesis-validation-workflow.md`.
 1. For code-improvement work, do not implement until the artifact records `Observation`, `Hypothesis`, `Expected Mechanism`, `Candidate Comparison`, `Disconfirming Evidence`, `Support Evidence`, and `fix_surface_validated=yes`.
+1. Before `required_action` or a solution proposal, activate cause investigation only when causal ambiguity remains unresolved or an alternative could change owner/fix/validation. For an activated packet, record a compact cause-evidence note/receipt covering the applicable incoming callers/entrypoints, owning mechanism/state/guards, downstream consumers/side effects/cleanup, sibling implementations/tests/docs/config, conditional temporal evidence, reachability/overcheck analysis, alternative disposition, selected cause, expected mechanism, and action derivation. For a straightforward packet, record direct cause proof instead; rejected/duplicate/already-covered/unreachable findings need no receipt. Do not require an arbitrary full-repository scan or fixed candidate count; stop when owner/fix/validation-changing alternatives are disconfirmed or bounded, or record the invariant that proves a narrower scope sufficient.
 1. After the change, record `Post-Change Evidence` and `Hypothesis Decision: supported|rejected|inconclusive`. If the decision is `rejected` or `inconclusive`, return to hypothesis selection instead of expanding the implementation pass.
 1. Choose the mode that answers the task without hiding dependency evidence:
    - code dependency surface: run `scan_code_dependencies.sh`
