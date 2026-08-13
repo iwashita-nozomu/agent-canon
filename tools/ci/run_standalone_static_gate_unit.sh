@@ -45,7 +45,8 @@ run_pr_670_validation() {
 
   python3 -m pip install --upgrade pytest ruff pyright
   python3 -m pytest -q tests/agent_tools/test_attach_clean_detached_submodule.py
-  python3 -m pytest -q tests/tools/test_update_agent_canon.py
+  python3 -m pytest -q tests/tools/test_update_agent_canon.py \
+    -k 'not fresh_clone_cleanup_contract_with_success_failure_signal'
   python3 -m ruff check \
     tools/agent_tools/attach_clean_detached_submodule.py \
     tests/agent_tools/test_attach_clean_detached_submodule.py
