@@ -141,6 +141,30 @@ owner / fix / validation を変え得る代替がすべて disconfirmed また�
 `direct_cause_proof -> action_derived_from_cause -> validation_route_bound` を使います。
 症状だけからの提案は `cause_unproven` として H0.5/H1 に戻します。
 
+## Gate H0.75. 根本原因に対する修正スコープ
+
+`Selected Cause` と `Expected Mechanism`、または straightforward path の
+`direct cause proof` が確定した後は、修正の目的を root-cause closure に固定します。
+`minimum-diff`、`smallest-local-patch`、`smallest patch` を repair objective として
+選ぶことは明示的に禁止します。証拠が示す complete replaceable owning responsibility
+unit を選び、症状を含む一つの file や近傍行だけを修正面とはみなしません。
+
+選択した unit は、root mechanism と evidence-linked な reachable consumers、side
+effects、failure handling、rollback、cleanup を閉じ、影響を受ける contract、docs、tests、
+validation まで read back して初めて complete です。これは evidence-bounded に行い、
+選択した owner、mechanism、consumer、contract、validation を変えない unrelated repository
+cleanup や historical tidying は追加しません。
+
+symptom suppression、root mechanism を開いたままの wrapper / compatibility shim、
+test-only relaxation / oracle weakening、root mechanism closure のない nearby local patch
+は repair failure です。小さい diff が許されるのは、complete owning unit と reachable effects
+がすべて閉じることを証拠が示した場合だけであり、diff size は選択基準ではありません。
+
+H0.75 の完了状態は
+`complete_owning_unit_selected -> root_mechanism_closed -> reachable_effects_closed ->
+contract_docs_tests_validation_closed` です。これに達しない action は H0.5/H1 の
+cause/scope analysis に戻し、symptom-level repair を開始しません。
+
 ## Gate H1. 仮説
 
 依存抽出のあと、実装前に仮説を 1 つ以上書きます。

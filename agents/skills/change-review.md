@@ -211,6 +211,34 @@ for a straightforward finding it is
 `direct_cause_proof -> action_derived_from_cause -> validation_route_bound`.
 `cause_unproven` applies only when ambiguity remains and blocks the action.
 
+## Root-Cause Repair Scope After Cause Selection
+
+After `Selected Cause` and `Expected Mechanism` are established (or after a
+straightforward finding has a direct cause proof), the repair objective is
+root-cause closure, not a minimum diff. `minimum-diff`, `smallest-local-patch`,
+and `smallest patch` are explicitly prohibited as repair objectives. Select the
+complete replaceable owning responsibility unit identified by the evidence,
+even when that unit spans more than the file containing the symptom.
+
+The selected unit is complete only when the root mechanism is closed and its
+evidence-linked reachable consumers, side effects, failure handling, rollback,
+and cleanup are covered. The repair also closes the affected contract, docs,
+tests, and validation route. Keep this closure evidence-bounded: do not expand
+into unrelated repository cleanup or historical tidying that cannot change the
+selected owner, mechanism, consumers, contract, or validation.
+
+Symptom suppression, a wrapper or compatibility shim that leaves the root
+mechanism open, test-only relaxation or oracle weakening, and a nearby local
+patch without root mechanism closure are repair failures. A smaller diff is
+acceptable only when the evidence proves that the complete owning unit and all
+reachable effects are fully closed; size is never the selection criterion.
+
+The action reaches
+`complete_owning_unit_selected -> root_mechanism_closed -> reachable_effects_closed ->
+contract_docs_tests_validation_closed` before it can be accepted. A proposal
+that stops at symptom suppression, a wrapper, test-only relaxation, or a nearby
+local patch returns to cause/scope analysis rather than opening a repair wave.
+
 ## Default Sequence
 
 1. `git diff --stat` と `git diff --name-only` で変更面を固定します。
