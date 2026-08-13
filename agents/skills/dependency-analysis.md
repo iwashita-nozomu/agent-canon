@@ -180,6 +180,35 @@ the search result. A packet is complete only when
 is read back from the note/receipt. A straightforward packet may instead read
 back `direct_cause_proof -> action_derived_from_cause -> impact_and_validation_bound`.
 
+## Root-Cause Repair Scope After Cause Selection
+
+After `Selected Cause` and `Expected Mechanism` are established (or after a
+straightforward packet has a direct cause proof), dependency evidence selects
+the complete replaceable owning responsibility unit, not the smallest diff.
+`minimum-diff`, `smallest-local-patch`, and `smallest patch` are explicitly
+prohibited as repair objectives. A file-sized or nearby candidate is not the
+repair scope merely because a search hit points to the symptom.
+
+The selected unit is complete only when the root mechanism is closed and every
+evidence-linked reachable consumer, side effect, failure path, rollback, and
+cleanup path is covered. The Change Impact Packet must bind the affected
+contract, docs, tests, and validation route as part of that closure. Keep the
+unit evidence-bounded: do not expand into unrelated repository cleanup or
+historical tidying that cannot change the selected owner, mechanism, consumer,
+contract, or validation.
+
+Symptom suppression, a wrapper or compatibility shim that leaves the root
+mechanism open, test-only relaxation or oracle weakening, and a nearby local
+patch without root mechanism closure are repair failures. A smaller diff is
+acceptable only when evidence proves that the complete owning unit and all
+reachable effects are closed; diff size is never the scope-selection criterion.
+
+Read back
+`complete_owning_unit_selected -> root_mechanism_closed -> reachable_effects_closed ->
+contract_docs_tests_validation_closed` before deriving `required_action` or a
+solution proposal. Otherwise return to cause/scope analysis with
+`repair_scope_incomplete` rather than creating a symptom-level repair batch.
+
 ## Interpretation
 
 - code dependency は実 import / include / source 関係、header dependency は design / implementation / environment / test の明示文脈です。混ぜずに別々の evidence として記録します。
