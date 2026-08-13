@@ -18,6 +18,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -117,7 +118,7 @@ class ParentRepoReadinessTest(unittest.TestCase):
             )
 
     def test_shared_surface_receipt(self) -> None:
-        """The manifest exposes only the minimal root projection surfaces."""
+        """The manifest exposes the complete minimal runtime projection."""
         manifest = load_manifest(
             PROJECT_ROOT,
             ".",
@@ -130,14 +131,19 @@ class ParentRepoReadinessTest(unittest.TestCase):
         }
         self.assertEqual(
             set(active),
-            {"AGENTS.md", ".codex/config.toml", ".codex/agents", "tools/agent-canon"},
+            {
+                "AGENTS.md",
+                ".codex/config.toml",
+                ".codex/agents",
+                "tools/agent-canon",
+            },
         )
         for entry in active.values():
             self.assertEqual(entry.projection_producer, "agent-canon")
             self.assertEqual(entry.projection_kind, "runtime_surface")
 
     def test_materialized_minimal_projection(self) -> None:
-        """Manifest materialization creates only the four active symlink views."""
+        """Materialization keeps every relative role config reference loadable."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_parent_fixture(root)
@@ -154,6 +160,14 @@ class ParentRepoReadinessTest(unittest.TestCase):
                     os.path.relpath(root / target, projection.parent),
                     path,
                 )
+
+            config_path = root / ".codex" / "config.toml"
+            config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+            for role_name, role in config["agents"].items():
+                if not isinstance(role, dict):
+                    continue
+                role_path = config_path.parent / role["config_file"]
+                self.assertTrue(role_path.is_file(), f"{role_name}: {role_path}")
 
     def test_tree_present_adds_checked_token_and_command(self) -> None:
         """Tree availability should be reported without relying on the host tool."""
@@ -268,8 +282,8 @@ class ParentRepoReadinessTest(unittest.TestCase):
         self.assertIn(".agents", root_absent_specs)
         self.assertIn(".vscode", root_absent_specs)
 
-    def test_agentcanon_workflow_sources_stay_standalone_only(self) -> None:
-        """AgentCanon workflows remain source-owned but are never root copies."""
+    def test_retired_agentcanon_workflows_stay_unprojected(self) -> None:
+        """Retired workflows remain absent from parent projection specs."""
         manifest = load_manifest(
             PROJECT_ROOT,
             ".",
@@ -284,9 +298,6 @@ class ParentRepoReadinessTest(unittest.TestCase):
         ):
             self.assertIn(workflow, root_absent_paths)
             self.assertNotIn(f"{workflow}:", copy_specs)
-            source = PROJECT_ROOT / workflow
-            self.assertTrue(source.is_file(), workflow)
-            self.assertIn("workflow_dispatch:", source.read_text(encoding="utf-8"))
 
     def write_parent_fixture(self, root: Path) -> None:
         """Create a synthetic template-derived parent repo."""

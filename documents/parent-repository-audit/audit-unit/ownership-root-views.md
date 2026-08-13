@@ -23,7 +23,7 @@ downstream implementation ../../../agents/skills/agent-canon-update.md owns pin 
 
 ## Invariant
 
-`vendor/agent-canon`、root `AGENTS.md`、`.codex/config.toml`、
+`vendor/agent-canon`、root `AGENTS.md`、`.codex/config.toml`、`.codex/agents/`、
 `tools/agent-canon/` の active views は canonical source と整合し、pin は意図した
 remote/main を指す。`agents/`、`.agents/`、`.devcontainer/`、`.vscode/`、GitHub
 paths は親-owned regular content として保持する。MCP、個人 Codex state、template
@@ -63,6 +63,7 @@ shared surface、source-root resolver、pin、root AGENTS の変更時だけ本 
 
 - `pattern:vendor/agent-canon/**`
 - `pattern:.codex/config.toml`
+- `pattern:.codex/agents/**`
 - `pattern:tools/agent-canon/**`
 - `pattern:AGENTS.md`
 - `pattern:ROOT_AGENTS.md`

@@ -53,7 +53,8 @@ downstream design ../../README.md AgentCanon source reader route
 
 The active child views `.codex/config.toml`, `.codex/agents`, and
 `tools/agent-canon` shown above are required when the AgentCanon runtime is
-installed. Additional children under `.codex/` and `tools/` are parent-owned optional content. Other allowed extensions
+installed. Additional children under
+`.codex/` and `tools/` are parent-owned optional content. Other allowed extensions
 include `.agents/`, `agents/`, `.github/`, `.vscode/`, `docker/`, `experiments/`,
 `notes/`, `reports/`, implementation directories, and additional parent content.
 Their presence, absence, and internal shape are owned by the relevant parent
@@ -70,6 +71,7 @@ AgentCanon source の topic branch と PR から行います。
 
 - `AGENTS.md`: root runtime instruction の view。
 - `.codex/config.toml`: shared Codex runtime config の view。
+- `.codex/agents`: config が相対 path で参照する generated role 定義の view。
 - `tools/agent-canon`: shared automation の唯一のAgentCanon view。
 
 ### Regular directory / file
@@ -80,7 +82,7 @@ Regular surface は親レポが ownership を持ち、親固有の責務や stat
 
 - `.devcontainer/`: 親固有 source と regular `devcontainer.json` の実体 directory。
 - `.codex/`: parent config overlay と project-specific skill の容器。AgentCanon が
-  投影するのは `.codex/config.toml` だけです。
+  投影するのは runtime bundle の `.codex/config.toml` と `.codex/agents` です。
 - `.agents/`、`agents/`: 親が必要に応じて所有する regular runtime/document content。
 - `.vscode/`: 親が所有する regular editor content。欠落や追加ファイルは有効です。
 - `.github/`: 親レポの workflow、issue、PR automation を所有する regular container。

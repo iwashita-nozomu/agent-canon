@@ -10,10 +10,10 @@
 version = 1
 prefix = "vendor/agent-canon"
 
-# The parent root exposes only the instruction entrypoint, the Codex config
-# with its config-relative agent definitions, and the AgentCanon CLI/tool
-# namespace. The source tree itself remains under the vendor prefix; this
-# manifest is not a second ownership map.
+# The parent root exposes only the instruction entrypoint, the complete Codex
+# runtime configuration, and the AgentCanon CLI/tool namespace.  The source
+# tree itself remains under the vendor prefix; this manifest is not a second
+# ownership map.
 [[surface]]
 path = "AGENTS.md"
 mode = "symlink"
