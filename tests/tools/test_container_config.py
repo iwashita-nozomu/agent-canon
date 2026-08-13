@@ -913,6 +913,68 @@ def test_generator_projects_project_identity_and_exact_repository_mount(
     assert "\n      target:" not in compose
 
 
+def test_vendored_generator_uses_source_boundary_and_parent_publication_root(
+    tmp_path: Path,
+) -> None:
+    """Vendored generation imports AgentCanon code but publishes under the parent root."""
+    repo = tmp_path / "workspace" / "topic" / "template"
+    source = repo / "vendor" / "agent-canon"
+    write_generator_boundary(source)
+    subprocess.run(
+        ["git", "init", "--quiet", str(repo)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    write_file(
+        source,
+        ".devcontainer/generate-runtime-compose.sh",
+        GENERATOR.read_text(encoding="utf-8"),
+    )
+    (source / ".devcontainer/generate-runtime-compose.sh").chmod(0o755)
+    write_file(
+        repo,
+        "docker/packs/default.toml",
+        "\n".join(
+            [
+                "[pack]",
+                'name = "template"',
+                'dockerfile = "docker/Dockerfile"',
+                'context = "."',
+                'image_tag = "template:fixture"',
+                'platform = "linux/amd64"',
+                "",
+                "[runtime]",
+                'shell = "/bin/bash"',
+                'workdir = "/workspace"',
+                'workspace_mount = "/workspace"',
+                "",
+            ]
+        ),
+    )
+    write_file(repo, "docker/Dockerfile", "FROM scratch\n")
+    generator = source / ".devcontainer/generate-runtime-compose.sh"
+    result = subprocess.run(
+        ["bash", str(generator)],
+        cwd=repo,
+        env={
+            **os.environ,
+            "HOME": str(tmp_path / "missing-home"),
+            "AGENT_CANON_ACTIVE_REPOSITORY_ROOT": str(repo),
+        },
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    compose = (repo / ".devcontainer/docker-compose.generated.yml").read_text(
+        encoding="utf-8"
+    )
+    assert f'source: "{repo.resolve()}"' in compose
+    assert f'source: "{source.resolve()}"' not in compose
+
+
 def test_gpu_admission_scenario_projects_runtime_and_preserves_all_host_groups(
     tmp_path: Path,
 ) -> None:

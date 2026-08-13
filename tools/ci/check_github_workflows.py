@@ -172,16 +172,6 @@ VENDOR_IMPROVEMENT_GUIDE_WORKFLOW_REQUIREMENTS = (
     "GITHUB_STEP_SUMMARY",
     "actions/upload-artifact@v4",
 )
-VENDOR_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS = (
-    "pull_request:",
-    "push:",
-    "eval_accumulation_check.py",
-    "evaluate_workflow_selection.py",
-    "evaluate_report_quality.py",
-    "generate_agent_runtime_dashboard.py",
-    "GITHUB_STEP_SUMMARY",
-    "actions/upload-artifact@v4",
-)
 AGENT_CANON_STATIC_GATES_WORKFLOW_REQUIREMENTS = (
     "pull_request:",
     "workflow_dispatch:",
@@ -1204,7 +1194,7 @@ def workflow_header_requirement_specs(root: Path) -> list[tuple[Path, Sequence[s
         specs.append(
             (
                 vendor_workflow_dir / "agent-runtime-dashboard.yml",
-                VENDOR_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS,
+                STANDALONE_RUNTIME_DASHBOARD_WORKFLOW_REQUIREMENTS,
             )
         )
         specs.append(
