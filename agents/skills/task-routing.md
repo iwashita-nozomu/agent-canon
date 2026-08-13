@@ -2,146 +2,40 @@
 <!--
 @dependency-start
 contract skill
-responsibility Documents task-routing skill.
+responsibility Selects one canonical skill route plus evidence-backed deferred candidates without duplicate routing state sets.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/design/tool-skill-routing-refactor.md short tool and skill naming policy
-upstream design ./agent-orchestration.md owns Decision Sufficiency policy and verdict validation
+upstream design ../../documents/design/responsibility-rationale.md routing-state rationale
+upstream design ./agent-orchestration.md owns later Decision Sufficiency and write-safety policy
 downstream implementation ../../tools/agent_tools/route.py selects short routing areas
 downstream implementation ../../tests/agent_tools/test_task_routing_fast_path.py validates packet-free ordinary routing
 upstream design ./skill-dependencies.yaml owns typed skill prerequisites, successors, order, and parallel relations
-downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives the invocation order from that dictionary
-downstream implementation ../../tools/agent_tools/skill_dependency_map.py statically validates and generates the dependency graph
-downstream implementation ../../tools/agent_tools/agent_team.py materializes route ToolCall tokens
+downstream implementation ../../tools/agent_tools/skill_route_catalog.py derives invocation order
+downstream implementation ../../tools/agent_tools/skill_dependency_map.py validates and generates dependency graph
 @dependency-end
 -->
 
-## Reader Map
-
-- Purpose: chooses short AgentCanon tool, skill, profile, check, runtime,
-  closeout, or evidence routes from long candidate lists.
-- Use When: a prompt, changed area, or broad routing surface needs compact
-  active/deferred skill selection or official system-skill delegation.
-- Section path: Purpose and Use When define triggers; Standard Command gives
-  the operational entrypoint; Outputs and Official System Skill Delegation
-  describe route products.
-- Boundary: this skill selects routes; the selected skills still own execution
-  rules and validation.
-
-`agent-orchestration` owns request mode, later implementation decisions,
-coordination activation, and write safety. This skill only resolves the compact
-route name and selected command from the prompt, changed paths, or an explicit
-area/name; it does not require an implementation packet or add a second
-execution workflow. Decision Sufficiency remains an `agent-orchestration`
-check for a selected high-risk or genuinely ambiguous implementation owner,
-not an input to this skill.
-
 ## Purpose
 
-短い tool / skill 名で、task に必要な profile、check、runtime、closeout、
-AgentCanon update、docs、log/eval の経路を選びます。
-prompt から public skill set を選ぶときは fast path の
-`python3 tools/agent_tools/route.py --prompt` で `$agent-orchestration`
-first の `ACTIVE_SKILLS` / `DEFERRED_SKILLS` /
-`RELATED_SKILL_CANDIDATES` を機械的に確認します。
-`RELATED_SKILL_CANDIDATES` は次 stage で evidence が揃ったときに追加する
-候補であり、初期 skill 読み込みには含めません。
-skill が呼ばれない、呼び出しが遅い、関連 skill 候補が狭いという
-runtime feedback では、prompt routing の結果を入口にし、観測 evidence は
-`agent-log-analysis`、durable issue 候補は `issue-finding-report`、再発防止の
-学習は `agent-learning` へ分けます。
-公式 system skill で足りる task は、AgentCanon 側で別 skill を増やさず、
-`$openai-docs`、`$skill-creator`、`$skill-installer`、`$imagegen`、
-`$plugin-creator` へ route します。
+Choose the minimum skill/tool route from a prompt, changed paths, or explicit area. Ordinary routing does not require a Decision Sufficiency packet; later high-risk or genuinely ambiguous implementation owners may invoke that policy through `agent-orchestration`.
 
-## Use When
+## Canonical output
 
-- 候補 tool 名や skill 名が長く、どれを使うべきか迷う。
-- user prompt から repo-changing / routing-only と public skill set を確認したい。
-- skill が呼ばれない、関連 skill が狭い、公式 skill へ移譲できるかなど、
-  skill / tool routing の入口と後続候補を機械的に確認したい。
-- `template_agent_canon_tool_skillization_500_candidates.md` 系の提案を実装へ落とす。
-- workflow 本文を読む前に、変更 surface と risk に合う check や runtime profile を機械的に決めたい。
-- repository-topic clone など specialized clone 経路を選ぶ前に、最初の route 選定で
-  `agent-orchestration` / dependency route だけを候補化し、後続で `repository-topic-clone`
-  か `dependency-module-change` を固定する。
+Routing has two authoritative concepts:
 
-## Standard Command
-
-Select the short route directly from the prompt, changed paths, or an explicit
-area/name. Ordinary routing does not require a Decision Sufficiency packet,
-owner, replaceable unit, implementation mechanism, validation route,
-unresolved branch, handoff record, or `packet_ref`. If the selected route later
-enters high-risk or genuinely ambiguous implementation work, that
-implementation owner may use `agent-orchestration` Decision Sufficiency before
-editing. `route.py` does not create or forward a substitute pre-routing record.
-
-Executable routing is supplied directly in
-`run.repo_tool_routing_policy.*.tool_call_token` when a route operation is
-selected. The canonical route token has
-`tool_id=route`, an `agent-canon.route.args.v1` argument schema, typed
-arguments, intent, and typed failure semantics. The selected-skill packet token
-has `tool_id=skill-tool-commands` and
-`agent-canon.skill-tool-commands.args.v1`. Do not reconstruct either token as a
-prose shell command.
-
-Model/profile policy and implementation capacity are not `route.py` policy.
-Use the canonical model-profile/materializer and capacity-handshake owners for
-those projections; `route.py` remains the public skill-route composer.
-
-```bash
-python3 tools/agent_tools/route.py --area checks --changed <path>
-python3 tools/agent_tools/route.py --name profile_surface_resolver.py
-python3 tools/agent_tools/route.py --prompt "<user request>" --format json
-python3 tools/agent_tools/skill_tool_commands.py show --skill <skill> --format text
+```text
+SELECTED_SKILLS=<ordered skills that should execute now>
+DEFERRED_CANDIDATES=<candidate skills + activation evidence still required>
 ```
 
-## Outputs
+`SELECTED_SKILLS` is the one source of truth for execution. Deferred candidates do not execute until their evidence becomes true.
 
-- `ROUTE`
-- `AREA`
-- `NEXT_ACTION`
-- `COMMANDS`
-- `EVIDENCE`
-- machine-readable `TOOL_CALL_TOKEN`
-- prompt routing の場合は `MODE`, `SKILLS`, `ACTIVE_SKILLS`,
-  `DEFERRED_SKILLS`, `MATCHED_SKILLS`, `RELATED_SKILL_CANDIDATES`,
-  `RELATED_SKILLS`, `REASONS`
+Historical names such as `SKILLS`, `ACTIVE_SKILLS`, `MATCHED_SKILLS`, `RELATED_SKILLS`, or `RELATED_SKILL_CANDIDATES` may be accepted as compatibility reads while callers migrate, but they are not independent state owners. New consumers read only the canonical selected/candidate state. If compatibility projections are emitted, they must be derived from the canonical state and may not carry extra routing meaning.
 
-## Activation Boundary
+## Operation
 
-Task-catalog roles, default review packs, and related-skill candidates are
-candidate evidence, not automatic work. Activate an owner-critical skill before
-its edit, artifact, PR, pin, or integration operation. Activate a reviewer only
-when the selected validation or unresolved branch needs that review. Deferred
-candidates do not create packets, waves, or follow-up work.
+Use `python3 tools/agent_tools/route.py --prompt ...` or the canonical changed-path route. Select the smallest owner set whose responsibilities are reachable from the request. Add a candidate only with a concrete activation condition; do not execute candidates preemptively or replace routing with another classifier/handoff schema.
 
-Long candidate names are aliases. Do not create a new public tool or skill
-until `route.py --name <candidate>` returns `STATUS=unknown` and the missing
-route is genuinely reusable.
+## Boundary
 
-Runtime route tokens are materialized by `agent_team.py` under
-`run.repo_tool_routing_policy`. Related skill candidates remain dynamic
-triggers; activation materializes a new token. Any later Decision Sufficiency
-verdict belongs to the selected implementation route and is not a task-routing
-output.
-
-### Canonical Skill Dependency Order
-
-`catalog.yaml` is the complete public-skill identity and trigger catalog;
-`skill-dependencies.yaml` is the sole source for prerequisite expansion,
-successor/parallel candidates, responsibility groups, and explicit ordering.
-The routing implementation derives the call order from the validated map, so
-keywords and prose do not maintain a second scheduling table. Validate it with
-`python3 tools/agent_tools/skill_dependency_map.py check --root .` and generate
-the user-facing graph with its `graph` subcommand.
-
-## Official System Skill Delegation
-
-Task routing keeps official system skills as host-provided capabilities:
-
-- OpenAI / Codex current product facts route to `$openai-docs`.
-- Skill creation or skill-instruction refactor guidance routes to
-  `$skill-creator` after the local AgentCanon owner surface is identified.
-- External skill installation routes to `$skill-installer`.
-- Bitmap image asset creation routes to `$imagegen`.
-- Codex plugin scaffolding routes to `$plugin-creator`.
+Routing chooses owners; selected skills own their execution and validation. `agent-orchestration` owns coordination, later implementation decisions, and write safety.
