@@ -133,6 +133,32 @@ class WorkflowMonitorTest(unittest.TestCase):
         self.assertIn(evidence_refs[0], text)
         self.assertNotIn("plausible repository state", text)
 
+    def test_monitor_append_preserves_prepared_monitoring_prefix(self) -> None:
+        """Post-move monitoring appends to prepared bytes instead of replacing them."""
+        module = load_monitor_module()
+        entries_type = getattr(module, "MonitoringEntries")
+        append_monitoring = getattr(module, "append_monitoring")
+        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT / ".agent-canon") as tmp_dir:
+            report_dir = Path(tmp_dir) / "run"
+            report_dir.mkdir(parents=True)
+            prepared = "prepared-monitoring-prefix\n"
+            (report_dir / "workflow_monitoring.md").write_text(
+                prepared, encoding="utf-8"
+            )
+            with mock.patch.dict(
+                os.environ, {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
+            ):
+                append_monitoring(
+                    report_dir,
+                    entries_type(signals=("source=post-move",)),
+                )
+            text = (report_dir / "workflow_monitoring.md").read_text(
+                encoding="utf-8"
+            )
+
+        self.assertTrue(text.startswith(prepared))
+        self.assertIn("source=post-move", text)
+
     def test_monitor_rejects_duplicate_lifecycle_evidence_refs(self) -> None:
         """One evidence identity may be recorded only once in a monitor event."""
         module = load_monitor_module()

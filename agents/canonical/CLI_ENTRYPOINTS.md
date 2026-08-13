@@ -61,7 +61,7 @@ upstream design README.md canonical workflow index
 標準 bundle を作るときは次を使います。
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent-canon/agent_tools/bootstrap_agent_run.py \
   --task "short task summary" \
   --task-id T1 \
   --owner "human-or-agent" \
@@ -76,7 +76,7 @@ path、`document_flow_required` からなる closed record です。unknown fiel
 `run.active_design_packet` です。
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent-canon/agent_tools/bootstrap_agent_run.py \
   --task "design packet run" \
   --task-id T12 \
   --owner codex \
@@ -92,7 +92,7 @@ decision または distinct unresolved claim/risk が選択したものだけ ma
 へ反映されます。
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent-canon/agent_tools/bootstrap_agent_run.py \
   --task "research-backed change" \
   --task-id T4 \
   --owner "codex" \
@@ -107,7 +107,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 unresolved claim/risk が選択した role だけを materialize します。
 
 ```bash
-python3 tools/agent_tools/bootstrap_agent_run.py \
+python3 tools/agent-canon/agent_tools/bootstrap_agent_run.py \
   --task "comprehensive development pass" \
   --task-id T12 \
   --owner "codex" \
@@ -138,7 +138,7 @@ The generic source-bound context certificate is created first from native
 Codex rollout evidence and the active run bundle:
 
 ```bash
-python3 tools/agent_tools/runtime_log_archive_git.py append-context-discovery \
+python3 tools/agent-canon/agent_tools/runtime_log_archive_git.py append-context-discovery \
   --run-id <run-id> --agent-context-id <agent-context-id> --turn-id <turn-id>
 ```
 
@@ -150,7 +150,7 @@ Missing, duplicate, malformed, or mismatched native evidence fails closed.
 The runtime-event materializer then consumes exactly one certificate:
 
 ```bash
-python3 tools/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
+python3 tools/agent-canon/agent_tools/runtime_log_archive_git.py materialize-runtime-event \
   --result-family <requirements|design|review|validation|lifecycle> \
   --run-id <run-id> --gate-id <gate-id> --base-ref <base-ref>
 ```
@@ -178,8 +178,8 @@ the hot path without building repository/archive context, then publish one
 explicit checkpoint when requested:
 
 ```bash
-python3 tools/agent_tools/runtime_log_archive_git.py check-hook-hot-path
-python3 tools/agent_tools/runtime_log_archive_git.py sync
+python3 tools/agent-canon/agent_tools/runtime_log_archive_git.py check-hook-hot-path
+python3 tools/agent-canon/agent_tools/runtime_log_archive_git.py sync
 ```
 
 `sync` owns one nonblocking lock and one archive ensure. It snapshots, ingests,
@@ -192,10 +192,10 @@ that transaction also captures one prepared-artifact/committed-receipt pair;
 the pair is optional for source-only graph availability:
 
 ```bash
-tools/bin/agent-canon graph build --root <repo-root> --format json
-tools/bin/agent-canon graph status --root <repo-root> --format json
-tools/bin/agent-canon graph query --root <repo-root> --relation dependency --all --format json
-tools/bin/agent-canon graph context --root <repo-root> --path <repo-relative-path> --format json
+tools/agent-canon/bin/agent-canon graph build --root <repo-root> --format json
+tools/agent-canon/bin/agent-canon graph status --root <repo-root> --format json
+tools/agent-canon/bin/agent-canon graph query --root <repo-root> --relation dependency --all --format json
+tools/agent-canon/bin/agent-canon graph context --root <repo-root> --path <repo-relative-path> --format json
 ```
 
 `status`, `query`, and `context` are read-only consumers. They reuse the

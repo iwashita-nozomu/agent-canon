@@ -116,6 +116,21 @@ def test_registry_is_closed_and_has_typed_projection(workspace: Path) -> None:
     )
 
 
+def test_registry_reads_explicit_source_root_when_state_root_differs(
+    workspace: Path,
+) -> None:
+    """Derived state does not become an implicit AgentCanon source."""
+    source = workspace / "agentcanon-source"
+    source_registry = source / "agents" / "model_profiles.toml"
+    source_registry.parent.mkdir(parents=True)
+    source_registry.write_bytes(
+        (workspace / "agents" / "model_profiles.toml").read_bytes()
+    )
+    (workspace / "agents" / "model_profiles.toml").unlink()
+    loaded = load_model_profile_registry(workspace, source_root=source)
+    assert loaded.registry_id == "test"
+
+
 def test_common_claim_evidence_contract_is_validated(workspace: Path) -> None:
     registry = load_model_profile_registry(workspace)
     assert not validate_common_return_schema(registry).valid

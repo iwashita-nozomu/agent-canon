@@ -448,10 +448,25 @@ def _profile_digest_payload(item: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def load_model_profile_registry(root: os.PathLike[str] | str = ".") -> ModelProfileRegistry:
-    root_path = Path(root)
+def load_model_profile_registry(
+    root: os.PathLike[str] | str = ".",
+    *,
+    source_root: os.PathLike[str] | str | None = None,
+) -> ModelProfileRegistry:
+    """Load the registry from an explicit AgentCanon source root.
+
+    ``root`` remains the standalone positional API.  Derived callers pass
+    ``source_root`` so a parent workspace can never silently become the source
+    registry root.
+    """
+    root_path = Path(source_root if source_root is not None else root).resolve()
+    registry_path = root_path / "agents" / "model_profiles.toml"
+    if not registry_path.is_file():
+        raise ModelProfileRegistryError(
+            f"model_profile_registry_source_missing:{registry_path.relative_to(root_path)}"
+        )
     data = _closed_mapping(
-        _read_toml_file(root_path / "agents" / "model_profiles.toml"),
+        _read_toml_file(registry_path),
         fields=_ROOT_FIELDS,
         required=_ROOT_FIELDS - {"writer_isolation_policy"},
         label="registry",

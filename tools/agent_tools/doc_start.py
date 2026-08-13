@@ -17,6 +17,11 @@ UTC = timezone.utc
 from pathlib import Path
 
 if __package__:
+    from .agent_canon_source_root import resolve_agent_canon_source_root
+else:
+    from agent_canon_source_root import resolve_agent_canon_source_root
+
+if __package__:
     from .team_config import (
         RunBundleSpec,
         load_task_catalog,
@@ -39,9 +44,9 @@ else:
     from agent_team import create_run_bundle
 
 if __package__:
-    from .workspace_scope import make_run_id, resolve_report_root
+    from .workspace_scope import make_run_id, resolve_repository_roots
 else:
-    from workspace_scope import make_run_id, resolve_report_root
+    from workspace_scope import make_run_id, resolve_repository_roots
 
 DOC_KIND_MAP = {
     "long-form": {
@@ -137,14 +142,21 @@ def build_parser(specialist_choices: tuple[str, ...]) -> argparse.ArgumentParser
 
 def main() -> int:
     """Run the doc-start command."""
-    config = load_team_config()
-    catalog = load_task_catalog(config)
+    source_resolution = resolve_agent_canon_source_root(Path(__file__).resolve())
+    source_root = source_resolution.source_root
+    config = load_team_config(source_root / "agents" / "agents_config.json")
+    catalog = load_task_catalog(config, root=source_root)
     args = build_parser(specialist_role_ids(config)).parse_args()
     created_at = datetime.now(UTC).replace(microsecond=0)
     created_at_iso = created_at.isoformat().replace("+00:00", "Z")
     workspace_root = Path(args.workspace_root).resolve()
-    report_root = resolve_report_root(args.report_root, workspace_root)
-    report_root.mkdir(parents=True, exist_ok=True)
+    repository_roots = resolve_repository_roots(
+        workspace_root,
+        args.report_root,
+        source_root=source_root,
+        canon_root=source_resolution.canon_root,
+    )
+    report_root = repository_roots.report_root
     run_id = args.run_id or make_run_id(args.task, created_at)
     report_dir = report_root / run_id
 
@@ -172,11 +184,14 @@ def main() -> int:
             created_at_iso=created_at_iso,
             roles=roles,
             workspace_root=workspace_root,
+            agentcanon_source_root=repository_roots.agentcanon_source_root,
+            report_root=repository_roots.report_root,
+            repository_roots=repository_roots,
             workflow_family_id=workflow_family_id,
             task_catalog=catalog,
         )
     )
-    created_files = materialization.created_files
+    created_files = materialization
 
     review_roles = tuple(
         role.id

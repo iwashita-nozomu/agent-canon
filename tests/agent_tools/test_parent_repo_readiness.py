@@ -28,6 +28,7 @@ TEST_TEMP_ROOT = PROJECT_ROOT / ".agent-canon" / "test-parent-repo-readiness"
 TEST_HOME = PROJECT_ROOT / ".agent-canon" / "test-home"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
+from agent_canon_source_root import resolve_agent_canon_source_root  # noqa: E402
 from parent_repo_readiness import SubmoduleShapeChecker  # noqa: E402
 from surface_manifest import (  # noqa: E402
     load_manifest,
@@ -194,6 +195,30 @@ class ParentRepoReadinessTest(unittest.TestCase):
                     continue
                 role_path = config_path.parent / role["config_file"]
                 self.assertTrue(role_path.is_file(), f"{role_name}: {role_path}")
+
+    def test_derived_projection_resolves_source_and_public_tool_roots(self) -> None:
+        """A derived parent keeps source bytes below vendor and exposes one public prefix."""
+        with self.temporary_directory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.git(root, "init", "--quiet")
+            source = root / "agent-canon-source"
+            (source / "agents" / "skills").mkdir(parents=True)
+            (source / "agents" / "skills" / "catalog.yaml").write_text(
+                "skills: []\n", encoding="utf-8"
+            )
+            vendor = root / "vendor" / "agent-canon"
+            vendor.parent.mkdir(parents=True)
+            vendor.symlink_to("../agent-canon-source", target_is_directory=True)
+
+            resolution = resolve_agent_canon_source_root(root)
+
+            self.assertEqual(resolution.layout, "vendored")
+            self.assertEqual(resolution.source_root, source.resolve())
+            self.assertEqual(
+                resolution.public_tool_root,
+                (root / "tools" / "agent-canon").absolute(),
+            )
+            self.assertNotEqual(resolution.current_repository_root, resolution.source_root)
 
     def test_tree_present_adds_checked_token_and_command(self) -> None:
         """Tree availability should be reported without relying on the host tool."""

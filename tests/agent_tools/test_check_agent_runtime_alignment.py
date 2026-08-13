@@ -142,8 +142,8 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
     def test_alignment_script_passes(self) -> None:
         """The runtime alignment checker should succeed without findings."""
         environment = os.environ.copy()
-        environment["AGENT_CANON_PARENT_ROOT"] = str(PROJECT_ROOT)
-        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(PROJECT_ROOT)
+        environment["AGENT_CANON_PARENT_ROOT"] = str(PROJECT_ROOT.parents[2])
+        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(PROJECT_ROOT.parents[2])
         result = subprocess.run(
             [sys.executable, str(SCRIPT_PATH)],
             cwd=PROJECT_ROOT,
@@ -155,6 +155,25 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
+
+    def test_alignment_script_standalone_parent_uses_external_fixture_parent(self) -> None:
+        """Standalone parent-bound checks keep derived reports outside source."""
+        environment = os.environ.copy()
+        environment["AGENT_CANON_PARENT_ROOT"] = str(PROJECT_ROOT)
+        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(PROJECT_ROOT)
+        before = set(PROJECT_ROOT.parent.glob(".agent-canon-runtime-parent-*"))
+        result = subprocess.run(
+            [sys.executable, str(SCRIPT_PATH)],
+            cwd=PROJECT_ROOT,
+            env=environment,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+        after = set(PROJECT_ROOT.parent.glob(".agent-canon-runtime-parent-*"))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
+        self.assertEqual(after, before)
 
     def test_retired_command_accepts_catalog_backed_validation_owner(self) -> None:
         """A tombstone may route to a canonical validation tool in the catalog."""
@@ -1004,7 +1023,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         """Derived workspaces need not expose shared AgentCanon docs at root."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             workspace_root = Path(tmp_dir)
-            entries = resolve_cross_cutting_document_packet(workspace_root)
+            entries = resolve_cross_cutting_document_packet(
+                workspace_root,
+                PROJECT_ROOT,
+            )
             review_process = (
                 PROJECT_ROOT / "documents" / "conventions" / "REVIEW_PROCESS.md"
             ).resolve()
@@ -1026,9 +1048,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             packet = resolve_role_document_packet(
                 config=config,
                 role=role,
-                report_dir=workspace_root / "reports" / "agents" / "_packet_probe",
+                report_dir=PROJECT_ROOT / "reports" / "agents" / "_packet_probe",
                 workspace_root=workspace_root,
                 active_design_packet=active_design_packet,
+                agentcanon_source_root=PROJECT_ROOT,
             )
             non_artifact_paths = {
                 entry.path for entry in packet.read_before_work if not entry.rationale.startswith("run artifact:")
@@ -1048,6 +1071,7 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             report_dir=PROJECT_ROOT / "reports" / "agents" / "_packet_probe",
             workspace_root=PROJECT_ROOT,
             active_design_packet=active_design_packet,
+            agentcanon_source_root=PROJECT_ROOT,
         )
         sectioned_entries = [
             entry for entry in packet.read_before_work if entry.sections
