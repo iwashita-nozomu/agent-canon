@@ -355,7 +355,7 @@ requirement.
       "affects_owner_edit_validation": false,
       "blocking": false,
       "serialized_in_decision_packet": true,
-      "validator_owner": "absolute path to agents/skills/agent-orchestration.md#validate_decision_sufficiency_packet"
+      "validator_owner": "agents/skills/agent-orchestration.md#Decision Sufficiency Packet"
     }
   ],
   "rejection": null,

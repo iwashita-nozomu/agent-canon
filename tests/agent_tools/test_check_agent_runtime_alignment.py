@@ -9,6 +9,8 @@
 
 from __future__ import annotations
 
+import ast
+import json
 import os
 import subprocess
 import sys
@@ -32,6 +34,8 @@ from implementation_dispatch import (  # noqa: E402
     workflow_topology_policy_violations,
 )
 from packets import (  # noqa: E402
+    markdown_document_headings,
+    markdown_heading_anchor,
     resolve_active_design_packet_config,
     resolve_cross_cutting_document_packet,
     resolve_document_section_locators,
@@ -56,6 +60,45 @@ def loaded_task_catalog_raw() -> dict[str, object]:
     return yaml.safe_load(
         (PROJECT_ROOT / "agents" / "task_catalog.yaml").read_text(encoding="utf-8")
     )
+
+
+def top_level_function_names(source: str) -> set[str]:
+    """Return only function definitions owned directly by a Python module."""
+    tree = ast.parse(source)
+    return {
+        node.name
+        for node in tree.body
+        if isinstance(node, (ast.AsyncFunctionDef, ast.FunctionDef))
+    }
+
+
+def module_string_constant(source: str, name: str) -> str:
+    """Resolve one top-level string constant from a Python module."""
+    tree = ast.parse(source)
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(
+            isinstance(target, ast.Name) and target.id == name
+            for target in node.targets
+        ):
+            continue
+        value = ast.literal_eval(node.value)
+        if isinstance(value, str):
+            return value
+    raise AssertionError(f"missing string constant: {name}")
+
+
+def imported_names(source: str) -> set[str]:
+    """Return names imported by a Python module, independent of import style."""
+    tree = ast.parse(source)
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            names.update(alias.asname or alias.name for alias in node.names)
+        elif isinstance(node, ast.ImportFrom):
+            names.update(alias.asname or alias.name for alias in node.names)
+    return names
 
 
 def test_missing_report_bundle_path_uses_existing_git_parent(tmp_path: Path) -> None:
@@ -386,41 +429,94 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
     def test_decision_sufficiency_has_one_owner_and_pointer_only_consumers(self) -> None:
         """DSV semantics stay canonical while packets, Spark, closeout, and evals consume it."""
-        owner = (
+        owner_document_path = (
             PROJECT_ROOT / "agents" / "skills" / "agent-orchestration.md"
-        ).read_text(encoding="utf-8")
+        )
+        owner_document = owner_document_path.read_text(encoding="utf-8")
         manifest_rendering = (
             PROJECT_ROOT / "tools" / "agent_tools" / "manifest_rendering.py"
         ).read_text(encoding="utf-8")
         lifecycle_contract = (
             PROJECT_ROOT / "tools" / "agent_tools" / "update_lifecycle_contract.py"
         ).read_text(encoding="utf-8")
-        subagents = (
-            PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md"
+        implementation_route = (
+            PROJECT_ROOT / "tools" / "agent_tools" / "implementation_route.py"
         ).read_text(encoding="utf-8")
-        consumer_docs = [
-            PROJECT_ROOT / ".agents" / "skills" / "agent-orchestration" / "SKILL.md",
-            PROJECT_ROOT / "agents" / "skills" / "task-routing.md",
+        pointer_docs = [
             PROJECT_ROOT / "agents" / "skills" / "agent-canon-update.md",
             PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md",
         ]
 
-        self.assertEqual(owner.count("## Decision Sufficiency Packet"), 1)
-        self.assertIn("唯一の意味論 owner", owner)
-        self.assertNotIn("def validate_decision_sufficiency_packet", manifest_rendering)
-        self.assertNotIn("def validate_decision_sufficiency_packet", lifecycle_contract)
-        self.assertIn(
-            'DECISION_SUFFICIENCY_OWNER = "agents/skills/agent-orchestration.md#Decision Sufficiency Packet"',
+        owner_reference = module_string_constant(
             manifest_rendering,
+            "DECISION_SUFFICIENCY_OWNER",
         )
-        self.assertIn("import_decision_sufficiency_verdict", manifest_rendering)
-        self.assertIn("selected owner gate", subagents)
+        owner_path_text, separator, owner_anchor = owner_reference.partition("#")
+        self.assertTrue(separator)
+        owner_relative_path = Path(owner_path_text)
+        self.assertFalse(owner_relative_path.is_absolute())
+        owner_path = (PROJECT_ROOT / owner_relative_path).resolve()
+        self.assertEqual(owner_path.relative_to(PROJECT_ROOT), owner_relative_path)
+        self.assertEqual(owner_path, owner_document_path.resolve())
+        self.assertTrue(owner_path.is_file())
+
+        json_start = owner_document.index("```json") + len("```json")
+        json_end = owner_document.index("```", json_start)
+        owner_record = cast(
+            dict[str, object],
+            json.loads(owner_document[json_start:json_end]),
+        )
+        irrelevant_unknowns = cast(
+            list[object],
+            owner_record["irrelevant_unknowns"],
+        )
+        self.assertEqual(len(irrelevant_unknowns), 1)
+        unknown = cast(dict[str, object], irrelevant_unknowns[0])
+        self.assertEqual(unknown["validator_owner"], owner_reference)
+
+        owner_headings = markdown_document_headings(owner_path)
+        owner_anchor_candidates = {
+            owner_anchor,
+            markdown_heading_anchor(owner_anchor),
+        }
+        resolved_owner_headings = [
+            heading
+            for heading in owner_headings
+            if heading in owner_anchor_candidates
+            or markdown_heading_anchor(heading) in owner_anchor_candidates
+        ]
+        self.assertEqual(
+            resolved_owner_headings,
+            ["Decision Sufficiency Packet"],
+        )
+
+        semantic_consumers = {
+            "manifest_rendering": manifest_rendering,
+            "implementation_route": implementation_route,
+            "update_lifecycle_contract": lifecycle_contract,
+        }
+        for name, source in semantic_consumers.items():
+            with self.subTest(consumer=name):
+                self.assertNotIn(
+                    "validate_decision_sufficiency_packet",
+                    top_level_function_names(source),
+                )
+        self.assertIn(
+            "import_decision_sufficiency_verdict",
+            imported_names(manifest_rendering),
+        )
+        self.assertIn(
+            "update_lifecycle_contract",
+            imported_names(implementation_route),
+        )
+        for path in pointer_docs:
+            with self.subTest(pointer_doc=path):
+                self.assertIn(owner_reference, path.read_text(encoding="utf-8"))
+
+        self.assertIn("selected owner gate", (
+            PROJECT_ROOT / "agents" / "canonical" / "CODEX_SUBAGENTS.md"
+        ).read_text(encoding="utf-8"))
         self.assertIn("decision_sufficiency_packet_ref", manifest_rendering)
-        for path in consumer_docs:
-            with self.subTest(path=path):
-                text = path.read_text(encoding="utf-8")
-                self.assertNotIn("## Decision Sufficiency Packet", text)
-                self.assertNotIn('"schema": "agent-canon.decision-sufficiency.v1"', text)
 
     def test_generated_role_views_cannot_claim_model_authority(self) -> None:
         """Both runtime docs reject generated-view authority and manual model edits."""
