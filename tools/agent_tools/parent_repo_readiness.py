@@ -21,6 +21,7 @@ import json
 import os
 import shlex
 import shutil
+import subprocess
 import sys
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import asdict, dataclass
@@ -231,27 +232,155 @@ class SubmoduleShapeChecker:
         return tuple(findings)
 
     def check_git_marker(self, source_root: Path) -> tuple[Finding, ...]:
-        """Return findings for a missing or non-submodule .git marker."""
-        git_marker = source_root / ".git"
-        if not git_marker.exists():
+        """Return findings for the Git identity of the checked-out submodule.
+
+        A submodule may use either an absorbed gitfile or the older embedded
+        git directory layout.  The readiness contract is therefore expressed
+        through Git's identity plumbing rather than the physical ``.git``
+        representation.
+        """
+        index_result = self.run_git(
+            self.root, "ls-files", "--stage", "--", self.prefix
+        )
+        index_entries = self.parse_index_entries(index_result.stdout, self.prefix)
+        if index_result.returncode != 0 or not index_entries:
+            detail = (
+                "parent-index-unavailable"
+                if index_result.returncode != 0
+                else "missing-gitlink-index"
+            )
             return (
                 Finding(
                     ERROR,
                     "agent_canon_submodule",
-                    f"{self.prefix}/.git",
-                    "missing-git-marker",
+                    self.prefix,
+                    detail,
                 ),
             )
-        if git_marker.is_dir():
+        if len(index_entries) != 1:
             return (
                 Finding(
                     ERROR,
                     "agent_canon_submodule",
-                    f"{self.prefix}/.git",
-                    "expected-submodule-gitfile",
+                    self.prefix,
+                    "index-entry-not-stage0",
+                ),
+            )
+        _path, mode, index_oid, stage = index_entries[0]
+        if stage != "0":
+            return (
+                Finding(
+                    ERROR,
+                    "agent_canon_submodule",
+                    self.prefix,
+                    "index-entry-not-stage0",
+                ),
+            )
+        if mode != "160000":
+            return (
+                Finding(
+                    ERROR,
+                    "agent_canon_submodule",
+                    self.prefix,
+                    "index-entry-not-gitlink",
+                ),
+            )
+
+        child_head_result = self.run_git(source_root, "rev-parse", "--verify", "HEAD")
+        child_oid = child_head_result.stdout.strip()
+        if child_head_result.returncode != 0 or not child_oid:
+            return (
+                Finding(
+                    ERROR,
+                    "agent_canon_submodule",
+                    self.prefix,
+                    "uninitialized-submodule",
+                ),
+            )
+        if child_oid != index_oid:
+            return (
+                Finding(
+                    ERROR,
+                    "agent_canon_submodule",
+                    self.prefix,
+                    "gitlink-oid-mismatch",
+                ),
+            )
+
+        superproject_result = self.run_git(
+            source_root, "rev-parse", "--show-superproject-working-tree"
+        )
+        superproject = superproject_result.stdout.strip()
+        expected_root = self.root.resolve()
+        if superproject_result.returncode != 0 or not superproject:
+            return (
+                Finding(
+                    ERROR,
+                    "agent_canon_submodule",
+                    self.prefix,
+                    "superproject-unavailable",
+                ),
+            )
+        if Path(superproject).resolve() != expected_root:
+            return (
+                Finding(
+                    ERROR,
+                    "agent_canon_submodule",
+                    self.prefix,
+                    "wrong-superproject",
+                ),
+            )
+
+        status_result = self.run_git(
+            source_root, "status", "--porcelain", "--untracked-files=all"
+        )
+        if status_result.returncode != 0:
+            return (
+                Finding(
+                    ERROR,
+                    "agent_canon_submodule",
+                    self.prefix,
+                    "submodule-status-unavailable",
+                ),
+            )
+        if status_result.stdout:
+            return (
+                Finding(
+                    ERROR,
+                    "agent_canon_submodule",
+                    self.prefix,
+                    "dirty-submodule",
                 ),
             )
         return ()
+
+    @staticmethod
+    def run_git(cwd: Path, *args: str) -> subprocess.CompletedProcess[str]:
+        """Run one Git plumbing query without interpreting storage layout."""
+        return subprocess.run(
+            ["git", "-C", str(cwd), *args],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+    @staticmethod
+    def parse_index_entries(
+        output: str, prefix: str
+    ) -> tuple[tuple[str, str, str, str], ...]:
+        """Parse exact-prefix stage entries returned by Git."""
+        entries: list[tuple[str, str, str, str]] = []
+        for line in output.splitlines():
+            metadata, separator, path = line.partition("\t")
+            if not separator:
+                continue
+            if path != prefix:
+                continue
+            fields = metadata.split()
+            if len(fields) != 3:
+                continue
+            entries.append((path, fields[0], fields[1], fields[2]))
+        return tuple(entries)
 
 
 class SurfaceReadinessChecker:
@@ -529,6 +658,11 @@ class ParentRepoReadinessChecker:
                 self.root, self.prefix, self.skip_submodule_check
             ).run()
         )
+        checked.append(
+            "submodule_check:skipped"
+            if self.skip_submodule_check
+            else "submodule_check:git-identity"
+        )
         try:
             manifest = load_manifest(self.root, self.prefix, self.manifest_path)
             findings.extend(
@@ -613,7 +747,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--skip-submodule-check",
         action="store_true",
-        help="Skip the .git-file submodule shape check for synthetic fixtures.",
+        help="Skip Git identity checks for synthetic fixtures.",
     )
     parser.add_argument(
         "--strict-warnings",
