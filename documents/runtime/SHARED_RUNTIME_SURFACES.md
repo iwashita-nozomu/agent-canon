@@ -8,6 +8,7 @@ downstream design ./runtime-profiles-and-check-matrix.md runtime profile and val
 downstream implementation ../../tools/agent_tools/surface_manifest.py parses the surface manifest
 downstream implementation ../../tools/sync_agent_canon.sh enforces root-view synchronization
 downstream implementation ../../tools/agent_tools/check_convention_compliance.py verifies manifest/doc wiring
+downstream implementation ../../tests/tools/test_update_agent_canon_surface_migration.py verifies config-relative role-file resolution in a parent fixture
 @dependency-end
 -->
 
@@ -20,15 +21,15 @@ path ownership and path classes are declared only by
 `responsibility-scope.toml`; this manifest describes projection mechanics.
 
 AgentCanon source is authoritative under `vendor/agent-canon/`. The root
-projection contains only the instruction view `AGENTS.md`, the runtime config
-view `.codex/config.toml`, and the shared CLI/tool namespace
-`tools/agent-canon`. The update lifecycle may create optional transaction state
-under `.agent-canon/`. Tests, notes, memory, evidence, editor, and GitHub paths
-are not mirrored shared surfaces. Parent `.devcontainer/` content is likewise
-never projected: `devcontainer.json`, `rootless/`, and `gpu-admission/` are
-retired/non-projecting paths. A parent may own regular files at those paths;
-only a stale symlink that still resolves into AgentCanon is eligible for removal
-during migration.
+projection contains the instruction view `AGENTS.md`, the Codex runtime unit
+formed by `.codex/config.toml` and its config-relative `.codex/agents/`
+definitions, and the shared CLI/tool namespace `tools/agent-canon`. The update
+lifecycle may create optional transaction state under `.agent-canon/`. Tests,
+notes, memory, evidence, editor, and GitHub paths are not mirrored shared
+surfaces. Parent `.devcontainer/` content is likewise never projected:
+`devcontainer.json`, `rootless/`, and `gpu-admission/` are retired/non-projecting
+paths. A parent may own regular files at those paths; only a stale symlink that
+still resolves into AgentCanon is eligible for removal during migration.
 Standalone AgentCanon may retain and validate its own regular `.vscode` source
 files; that standalone source ownership is separate from any parent `.vscode`
 directory, which remains parent-owned regular content.
@@ -88,8 +89,16 @@ The active projection is deliberately limited to:
 | --- | --- | --- |
 | `AGENTS.md` | symlink | `ROOT_AGENTS.md` |
 | `.codex/config.toml` | symlink | `.codex/config.toml` |
+| `.codex/agents` | symlink | `.codex/agents` |
 | `tools/agent-canon` | symlink | `tools` |
 | `.agent-canon` | optional transaction state | update lifecycle |
+
+Codex resolves each role `config_file = "agents/<role>.toml"` relative to the
+projected `.codex/config.toml` directory. Consequently the config file and
+`.codex/agents` directory are one runtime projection unit: `link-root` creates
+both relative symlinks and `check` requires both targets to exist. Role files
+remain generated AgentCanon source views; they are neither copied into the
+parent nor replaced with parent-local placeholders.
 
 The standalone source may keep its own `rootless/` and `gpu-admission/`
 selectors. Those source files are not parent projections and are validated only
@@ -119,7 +128,10 @@ AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent
 `link-root` and `check` consume the manifest and do not maintain a second
 hard-coded list. They must preserve parent-owned regular content and may remove
 only stale symlinks for entries in the retired group. A missing path is created
-only after checking the manifest, source tree, and owner map.
+only after checking the manifest, source tree, and owner map. At an active
+symlink surface, existing regular parent content produces a typed
+`SHARED_SURFACE_CONFLICT` and remains unchanged. Replacement requires the
+explicit `AGENT_CANON_FORCE_RELINK=1` migration route.
 
 Project-local automation must stay in project-owned paths; the shared namespace
 does not absorb parent tools.

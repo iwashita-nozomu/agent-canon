@@ -129,20 +129,22 @@ class ParentRepoReadinessTest(unittest.TestCase):
             if entry.mode in {"symlink", "repo_state"} and not entry.optional
         }
         self.assertEqual(
-            set(active), {"AGENTS.md", ".codex/config.toml", "tools/agent-canon"}
+            set(active),
+            {"AGENTS.md", ".codex/config.toml", ".codex/agents", "tools/agent-canon"},
         )
         for entry in active.values():
             self.assertEqual(entry.projection_producer, "agent-canon")
             self.assertEqual(entry.projection_kind, "runtime_surface")
 
     def test_materialized_minimal_projection(self) -> None:
-        """Manifest materialization creates only the three active symlink views."""
+        """Manifest materialization creates only the four active symlink views."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_parent_fixture(root)
             for path, target in {
                 "AGENTS.md": "vendor/agent-canon/ROOT_AGENTS.md",
                 ".codex/config.toml": "vendor/agent-canon/.codex/config.toml",
+                ".codex/agents": "vendor/agent-canon/.codex/agents",
                 "tools/agent-canon": "vendor/agent-canon/tools",
             }.items():
                 projection = root / path

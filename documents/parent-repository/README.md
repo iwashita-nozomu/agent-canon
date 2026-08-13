@@ -38,7 +38,8 @@ downstream design ../../README.md AgentCanon source reader route
 ├── AGENTS.md -> vendor/agent-canon/ROOT_AGENTS.md
 ├── README.md                         # parent-owned regular file
 ├── .codex/
-│   └── config.toml -> vendor/agent-canon/.codex/config.toml
+│   ├── config.toml -> ../vendor/agent-canon/.codex/config.toml
+│   └── agents -> ../vendor/agent-canon/.codex/agents
 ├── .devcontainer/                    # parent-owned regular directory
 │   ├── parent-environment.sh         # optional pair: value source
 │   ├── parent-environment.toml       # optional pair: ordered name manifest
@@ -50,9 +51,9 @@ downstream design ../../README.md AgentCanon source reader route
 └── vendor/agent-canon/                # AgentCanon submodule pin
 ```
 
-The active child views `.codex/config.toml` and `tools/agent-canon` shown above are
-required when the AgentCanon runtime is installed. Additional children under
-`.codex/` and `tools/` are parent-owned optional content. Other allowed extensions
+The active child views `.codex/config.toml`, `.codex/agents`, and
+`tools/agent-canon` shown above are required when the AgentCanon runtime is
+installed. Additional children under `.codex/` and `tools/` are parent-owned optional content. Other allowed extensions
 include `.agents/`, `agents/`, `.github/`, `.vscode/`, `docker/`, `experiments/`,
 `notes/`, `reports/`, implementation directories, and additional parent content.
 Their presence, absence, and internal shape are owned by the relevant parent

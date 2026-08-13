@@ -488,8 +488,8 @@ before editing.
 
 | Step | Required check                                                                                                                             |
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1    | Classify each touched path as AgentCanon-owned, template-owned, parent-owned regular content, or one of the three active root views.       |
-| 2    | Check the AgentCanon submodule pin and repair only the three active root views with the request-evidence-authorized source-root resolver `exec tools/sync_agent_canon.sh link-root` route when needed. |
+| 1    | Classify each touched path as AgentCanon-owned, template-owned, parent-owned regular content, or one of the four active root views.       |
+| 2    | Check the AgentCanon submodule pin and repair only the four active root views with the request-evidence-authorized source-root resolver `exec tools/sync_agent_canon.sh link-root` route when needed. |
 | 3    | Keep product Dockerfiles focused on product dependencies; standalone AgentCanon `.devcontainer/Dockerfile` owns digest-pinned Node and manifest-selected image tools. |
 | 4    | Keep workspace-dependent Python package ownership in the parent image or explicit image-build route; do not install it from active post-create/runners.       |
 | 5    | Ensure Docker workflows checkout `vendor/agent-canon/` before parent devcontainer smoke.                                                   |

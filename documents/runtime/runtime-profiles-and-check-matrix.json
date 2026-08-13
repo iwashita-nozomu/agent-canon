@@ -28,8 +28,9 @@
       "activates": [
         "`AGENTS.md`",
         "`.codex/config.toml`",
+        "`.codex/agents`",
         "`tools/agent-canon`",
-        "project-owned `agents/`, `.agents/`, `.codex/`, and `tools/` remain separate"
+        "other project-owned `agents/`, `.agents/`, `.codex/`, and `tools/` content remains separate"
       ],
       "required_when": "An agent performs or reviews repo work"
     },

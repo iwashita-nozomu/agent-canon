@@ -910,6 +910,8 @@ ensure_surface_sync_safe() {
   local -a paths=()
   local status=""
   local spec=""
+  local path=""
+  local abs_path=""
 
   if [ "$force" = "1" ] || [ "$FORCE_RELINK" = "1" ]; then
     return
@@ -926,6 +928,16 @@ ensure_surface_sync_safe() {
   )
 
   [ "${#paths[@]}" -gt 0 ] || return
+  while IFS= read -r spec; do
+    [ -n "$spec" ] || continue
+    path="${spec%%:*}"
+    abs_path="$ROOT_DIR/$path"
+    if [ -e "$abs_path" ] && [ ! -L "$abs_path" ]; then
+      echo "SHARED_SURFACE_CONFLICT[$path]=parent_regular_path" >&2
+      die "active shared surface '$path' is parent-owned regular content; preserve it or explicitly rerun with AGENT_CANON_FORCE_RELINK=1"
+    fi
+  done < <(build_link_specs)
+
   refresh_git_index_for_paths "${paths[@]}"
   status="$(git -C "$ROOT_DIR" status --short -- "${paths[@]}")"
   if [ -n "$status" ]; then

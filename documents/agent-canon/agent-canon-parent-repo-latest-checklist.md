@@ -34,8 +34,8 @@ failure routes, and the legacy compatibility appendix for non-submodule repos.
 | Path | Expected State | Owner | Check |
 | --- | --- | --- | --- |
 | `vendor/agent-canon/` | AgentCanon Git submodule checkout and parent gitlink | AgentCanon | `git submodule status vendor/agent-canon` and `git rev-parse HEAD:vendor/agent-canon` |
-| `AGENTS.md`, `.codex/config.toml`, `tools/agent-canon` | active root runtime views of AgentCanon | AgentCanon | source-root resolver `check` |
-| `agents/`, `.agents/`, `.codex/agents/`, `.vscode/`, `.devcontainer/` | optional parent-owned regular content | template or derived repo | parent structure/environment checks when present |
+| `AGENTS.md`, `.codex/config.toml`, `.codex/agents`, `tools/agent-canon` | active root runtime views of AgentCanon | AgentCanon | source-root resolver `check` |
+| `agents/`, `.agents/`, other `.codex/` children, `.vscode/`, `.devcontainer/` | optional parent-owned regular content | template or derived repo | parent structure/environment checks when present |
 | `tools/` | parent-owned regular container; shared tooling is only `tools/agent-canon/` | parent / AgentCanon | source-root resolver `check` |
 | `vendor/agent-canon/templates/` | centralized AgentCanon template source with no parent-root symlink view | AgentCanon | manifest `link-specs` and consumer path readback |
 | `.github/` | parent-owned GitHub workflows, templates, and automation | template or derived repo | GitHub workflow checks |

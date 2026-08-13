@@ -129,7 +129,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "documents/runtime/SHARED_RUNTIME_SURFACES.md": (
         "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml AGENTS.md "
-        ".codex/config.toml tools/agent-canon Root `tools/` is a parent-owned regular container "
+        ".codex/config.toml .codex/agents tools/agent-canon Root `tools/` is a parent-owned regular container "
         "tools/agent-canon -> ../vendor/agent-canon/tools "
         "vendor/agent-canon/tools/ "
         "Project-local automation must stay in project-owned paths\n"
@@ -139,6 +139,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         'prefix = "vendor/agent-canon"\n'
         'path = "AGENTS.md"\n'
         'path = ".codex/config.toml"\n'
+        'path = ".codex/agents"\n'
         'path = "tools/agent-canon"\n'
         'path = ".agent-canon"\n'
         'mode = "removed_legacy"\n'

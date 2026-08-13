@@ -4,6 +4,7 @@
 # contract test
 # responsibility Verifies parent submodule readiness and non-destructive root-surface migration.
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
+# upstream design ../../documents/runtime/shared-runtime-surfaces.toml projection paths
 # upstream implementation ../../tools/sync_agent_canon.sh root-surface synchronization
 # upstream implementation ../../tools/agent_tools/agent_canon_source_root.py RootResolution contract
 # @dependency-end
@@ -16,6 +17,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 from types import ModuleType
@@ -321,6 +323,95 @@ class SurfaceMigrationTest(unittest.TestCase):
         self.assertTrue(root.is_dir())
         self.assertEqual(sentinel.read_text(encoding="utf-8"), "preserve parent root\n")
         self.assertTrue((root / "vendor" / "agent-canon").is_dir())
+
+    def test_link_root_projects_config_and_resolves_every_agent_role(self) -> None:
+        """The projected config keeps every config-relative role file reachable."""
+        root = self.clone_parent_fixture()
+
+        result = self.run_sync(root, "link-root")
+        check = self.run_sync(root, "check")
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+        config_path = root / ".codex" / "config.toml"
+        roles_path = root / ".codex" / "agents"
+        self.assertTrue(config_path.is_symlink())
+        self.assertEqual(
+            os.readlink(config_path),
+            "../vendor/agent-canon/.codex/config.toml",
+        )
+        self.assertTrue(roles_path.is_symlink())
+        self.assertEqual(
+            os.readlink(roles_path),
+            "../vendor/agent-canon/.codex/agents",
+        )
+
+        config = tomllib.loads(config_path.read_text(encoding="utf-8"))
+        role_config_files = {
+            role: metadata["config_file"]
+            for role, metadata in config["agents"].items()
+            if isinstance(metadata, dict) and "config_file" in metadata
+        }
+        self.assertTrue(role_config_files)
+        source_roles = (
+            root / "vendor" / "agent-canon" / ".codex" / "agents"
+        ).resolve()
+        for role, relative_path in role_config_files.items():
+            with self.subTest(role=role):
+                resolved = config_path.parent / relative_path
+                self.assertTrue(resolved.is_file(), resolved)
+                self.assertTrue(resolved.resolve().is_relative_to(source_roles))
+
+    def test_link_root_preserves_parent_owned_agent_role_directories(self) -> None:
+        """Regular parent role directories are typed conflicts, not deleted data."""
+        root = self.clone_parent_fixture()
+        roles_path = root / ".codex" / "agents"
+        roles_path.mkdir(parents=True)
+        marker = roles_path / "parent-role.toml"
+        marker.write_text('model = "parent-owned"\n', encoding="utf-8")
+        self.git(root, "add", ".codex/agents/parent-role.toml")
+        self.git(root, "commit", "-m", "fixture parent-owned role config")
+
+        result = self.run_sync(
+            root,
+            "link-root",
+            env_overrides={"AGENT_CANON_FORCE_RELINK": "0"},
+        )
+
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn(
+            "SHARED_SURFACE_CONFLICT[.codex/agents]=parent_regular_path",
+            result.stderr,
+        )
+        self.assertTrue(roles_path.is_dir())
+        self.assertFalse(roles_path.is_symlink())
+        self.assertEqual(
+            marker.read_text(encoding="utf-8"),
+            'model = "parent-owned"\n',
+        )
+
+        untracked_root = self.clone_parent_fixture()
+        untracked_roles = untracked_root / ".codex" / "agents"
+        untracked_roles.mkdir(parents=True)
+        untracked_marker = untracked_roles / "local-role.toml"
+        untracked_marker.write_text('model = "untracked"\n', encoding="utf-8")
+
+        untracked_result = self.run_sync(
+            untracked_root,
+            "link-root",
+            env_overrides={"AGENT_CANON_FORCE_RELINK": "0"},
+        )
+
+        self.assertNotEqual(untracked_result.returncode, 0)
+        self.assertIn(
+            "SHARED_SURFACE_CONFLICT[.codex/agents]=parent_regular_path",
+            untracked_result.stderr,
+        )
+        self.assertTrue(untracked_roles.is_dir())
+        self.assertEqual(
+            untracked_marker.read_text(encoding="utf-8"),
+            'model = "untracked"\n',
+        )
 
     def test_diverged_transition_path_is_preserved_without_blocking(self) -> None:
         """Preserve parent-owned divergence while migrating every known identity."""
