@@ -68,7 +68,7 @@ run_pr_670_validation() {
     if git rev-parse --verify HEAD^2 >/dev/null 2>&1; then
       pr_head="$(git rev-parse HEAD^2)"
     fi
-    source_merge="$(git rev-parse "${pr_head}^")"
+    source_merge="$(git rev-parse "${pr_head}^^")"
     test "$(git rev-parse "${source_merge}^{tree}")" = "28922fe7550f3c42f40a974df06533369f37f72b"
 
     agent_remote="${tmp_root}/agent-canon.git"
