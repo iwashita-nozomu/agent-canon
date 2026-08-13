@@ -577,7 +577,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "`check_agent_runtime_alignment.py` |\n"
         "| skill routing and public skill surface | "
         "`vendor/agent-canon/agents/skills/catalog.yaml` | "
-        "`python3 tools/agent_tools/route.py --prompt` |\n"
+        "`python3 tools/agent-canon/agent_tools/route.py --prompt` |\n"
         "| report and closeout structure | `task_close.py` | closeout gate |\n"
     ),
     "AGENTS.md": (
