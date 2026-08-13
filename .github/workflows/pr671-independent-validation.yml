@@ -30,8 +30,12 @@ jobs:
           git merge --no-edit origin/main
           echo "main_head=$(git rev-parse origin/main)"
           echo "validation_merge=$(git rev-parse HEAD)"
-      - name: Rebuild canonical graph
-        run: tools/bin/agent-canon graph build
+      - name: Rebuild canonical graph with external staging
+        run: |
+          mkdir -p "$RUNNER_TEMP/pr671-graph-staging" "$RUNNER_TEMP/pr671-cargo-target"
+          TMPDIR="$RUNNER_TEMP/pr671-graph-staging" \
+          CARGO_TARGET_DIR="$RUNNER_TEMP/pr671-cargo-target" \
+            cargo run --manifest-path rust/agent-canon/Cargo.toml -- graph build --root "$GITHUB_WORKSPACE"
       - name: Check design claims
         run: python3 tools/agent_tools/check_design_doc_claims.py --root . documents/design/devcontainer/parent-devcontainer-policy.md
       - name: Check prose reasoning graph and print diagnostics
