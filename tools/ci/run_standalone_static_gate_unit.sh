@@ -49,9 +49,9 @@ run_rust() {
 
 run_contracts() {
   node --version
-  python3 -m pytest -q \
-    tests/agent_tools/test_visualization_contract.py \
-    tests/agent_tools/test_render_dependency_manifest_graph.py
+  python3 -m unittest \
+    tests.agent_tools.test_visualization_contract \
+    tests.agent_tools.test_render_dependency_manifest_graph
   python3 "${TOOLS_ROOT}/agent_tools/tool_catalog.py"
   python3 "${TOOLS_ROOT}/agent_tools/tool_proof_coverage.py"
   python3 "${TOOLS_ROOT}/agent_tools/responsibility_scope.py"
