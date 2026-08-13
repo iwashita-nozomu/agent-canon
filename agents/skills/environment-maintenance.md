@@ -105,10 +105,13 @@ CIで同じimageとtest commandを再利用できる状態にします。
 ## Validation
 
 ```bash
+python3 tools/ci/container_config.py
 docker build -f <Dockerfile> --target <canonical-target> -t <image> .
 docker run --rm <runtime-wiring> <image> <canonical-full-test-command>
 ```
 
+- `container_config.py` はDockerfile、Dev Container、Compose、CIの静的なowner/target境界を検査します。
+  completion evidenceは後続のimage buildと`docker run`による標準テスト一式です。
 - supported profileごとに上記を実行します。
 - GPU deviceを必要とするtestはGPU runner上のcontainer実行で確認します。
 - focused policy testで、Dockerfile外のdependency導入とDev Container/CIのalternate
