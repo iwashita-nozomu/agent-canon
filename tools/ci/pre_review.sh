@@ -4,7 +4,6 @@
 # responsibility Runs verifier pre-review checks through the shared Python quality runner.
 # upstream design ../README.md shared automation index
 # upstream implementation ./run_python_quality_checks.sh shared Python quality gate
-# downstream implementation ../../.github/workflows/agent-coordination.yml verifier stage calls this entrypoint
 # @dependency-end
 set -euo pipefail
 
