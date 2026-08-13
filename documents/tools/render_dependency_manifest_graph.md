@@ -202,8 +202,11 @@ The exact marker prefix is
 `visualization_coverage.marker` object; Markdown stores one adjacent HTML
 comment immediately before its Mermaid fence; DOT stores a graph comment; HTML
 stores `script[type=application/json][id=agent-canon-visualization-coverage]`.
-The separate identity tokens are also serialized, so marker presence alone
-cannot pass readback.
+HTML readback reconstructs identity only from visible/reader-accessible SVG and
+table records carrying `data-agent-canon-source-id`, then joins those records
+back to the embedded GraphIR v2. The marker, GraphIR JSON, comments, CSS,
+JavaScript strings, and hidden identity payloads are never visible identity
+evidence. HTML does not emit a hidden identity sidecar.
 
 TSV remains byte-for-byte producer evidence and checker authority. It is copied
 or generated transactionally and retained in artifact descriptors, but it does
@@ -224,10 +227,23 @@ output publication の契約は維持します。
 
 - Rendered HTML is a single in-file workbench with static graph/table evidence and
   inline interaction script.
-- No external network requests.
+- The native SVG and node/edge tables are complete evidence channels. Directory
+  module rows and containment-edge rows are complete in their dedicated tables;
+  source IDs, endpoints, kinds, and full paths must agree across duplicate
+  channels.
+- Offline readback rejects external/resource-bearing HTML attributes, CSS
+  `url()`/`@import`, and executable JavaScript network/import APIs. URLs or
+  network-looking words in graph JSON, visible labels, comments, ordinary
+  strings, or template text are data and do not fail the resource graph.
+- No external network requests, browser installation, npm package, or DOM shim
+  is used by the checker.
 - IR is embedded in-page via JSON script for inspector/filter parity.
 - Keyboard entry for interactive controls follows standard activation parity with
   pointer behavior and explicit focus semantics.
+- The inline `buildAdjacency`/`graphNeighborhood`/`visibleModel` region is pure
+  model logic. It returns the complete selected node/edge model and has no
+  silent fixed-cap or truncation branch; the Node `vm` harness exercises its
+  default, query, focus/depth, and direction/kind filter states.
 
 ## CLI and Reference
 
