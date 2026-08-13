@@ -11,6 +11,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -30,6 +31,8 @@ from unittest import mock
 from tools.agent_tools import devcontainer_dependencies as dependency_module
 from tools.agent_tools.devcontainer_dependencies import (
     BASE_CAPABILITIES,
+    CommandCapability,
+    CommandProvenance,
     DependencyError,
     EnvironmentBoundaryModel,
     Installer,
@@ -42,6 +45,9 @@ from tools.agent_tools.devcontainer_dependencies import (
     _repository_packages_url,
     build_parser,
     build_plan,
+    build_post_create_execution_graph,
+    check_python_source_safety,
+    classify_command,
     image_install_plan,
     image_verify_plan,
     install_plan,
@@ -733,6 +739,10 @@ class DependencyModelTests(unittest.TestCase):
                     _test_image_root=image_root,
                     runner=FakeRunner(),
                 )
+
+    def test_image_verify_never_reaches_mutating_edges(self) -> None:
+        """The immutable image verifier exposes no mutation edge."""
+        self.test_image_install_and_verify_are_immutable_and_read_only()
 
     def test_image_install_requires_root_and_image_safe_method_whitelist(self) -> None:
         unsafe = parse_record(
@@ -1714,7 +1724,11 @@ class DependencyModelTests(unittest.TestCase):
             index=0,
         )
 
-        def write_fixture(url: str, destination: Path) -> None:
+        def write_fixture(
+            url: str,
+            destination: Path,
+            **_: object,
+        ) -> None:
             self.assertEqual(
                 url,
                 "https://apt.example.test/jammy/dists/jammy/main/"
@@ -1800,7 +1814,11 @@ class DependencyModelTests(unittest.TestCase):
         )
         runner = FakeRunner()
 
-        def write_download(url: str, destination: Path) -> None:
+        def write_download(
+            url: str,
+            destination: Path,
+            **_: object,
+        ) -> None:
             if url == package_url:
                 destination.write_bytes(immutable)
             elif url.endswith("/Packages"):
@@ -2375,7 +2393,11 @@ class DependencyModelTests(unittest.TestCase):
         )
         runner = FakeRunner()
 
-        def download(url: str, destination: Path) -> None:
+        def download(
+            url: str,
+            destination: Path,
+            **_: object,
+        ) -> None:
             self.assertEqual(
                 url,
                 "https://static.rust-lang.org/rustup/archive/1.28.2/"
@@ -2899,8 +2921,260 @@ class DependencyModelTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(DependencyError, "requires executable, args"):
             parse_record(incomplete_apt, path=Path("fixture.toml"), index=0)
-        self.assertNotIn("shell=True", ENGINE.read_text(encoding="utf-8"))
-        self.assertNotIn("eval(", ENGINE.read_text(encoding="utf-8"))
+
+    def test_source_command_safety_is_structural(self) -> None:
+        """AST findings track executable calls, not comments or spelling."""
+        fixtures = (
+            ("import subprocess as sp\nsp.run([], shell=True)\n", CommandCapability.SHELL_EVALUATION),
+            ("from subprocess import run as execute\nexecute([], shell=value)\n", CommandCapability.SHELL_EVALUATION),
+            ("import subprocess\nsubprocess.run([], shell=False)\n", None),
+            ("# shell=True\nmessage = 'eval('\n", None),
+            ("eval(value)\n", CommandCapability.DYNAMIC_INTERPRETER),
+            ("eval_result = 'diagnostic'\n", None),
+        )
+        for source, capability in fixtures:
+            with self.subTest(source=source):
+                findings = check_python_source_safety(source)
+                self.assertEqual(
+                    findings[0].capability if findings else None,
+                    capability,
+                )
+        self.assertEqual(check_python_source_safety(ENGINE), ())
+
+    def test_verification_command_capabilities(self) -> None:
+        """Typed verifier commands pass while mutating graphs fail closed."""
+        context = CommandProvenance(
+            "image-verify", "typed-verifier", "verify-declared-executable"
+        )
+        safe = (
+            ("dpkg-query", "--show", "--showformat=x", "pkg"),
+            ("npm", "ls", "--global", "--prefix", "/usr/local", "--json", "--depth=0", "pkg"),
+            ("rustup", "show", "active-toolchain"),
+            ("git", "-C", "/src", "rev-parse", "--verify", "HEAD"),
+            ("tool", "--version"),
+        )
+        for command in safe:
+            with self.subTest(command=command):
+                self.assertIn(CommandCapability.ARGV, classify_command(command, context=context))
+        unsafe = (
+            ("env", "sh", "-c", "echo unsafe"),
+            ("python3", "-c", "print(unsafe)"),
+            ("sudo", "apt-get", "install", "pkg"),
+            ("apt-get", "install", "pkg"),
+            ("npm", "install", "pkg"),
+            ("curl", "https://example.invalid/pkg"),
+        )
+        for command in unsafe:
+            with self.subTest(command=command):
+                with self.assertRaisesRegex(DependencyError, r"command-boundary-"):
+                    classify_command(command, context=context)
+
+    def test_wrappers_are_recursive(self) -> None:
+        """Apply the finite wrapper grammar recursively and fail closed."""
+        context = CommandProvenance(
+            "image-verify", "typed-verifier", "verify-declared-executable"
+        )
+        self.assertIn(
+            CommandCapability.EXECUTABLE_VERIFICATION,
+            classify_command(("env", "FOO=bar", "tool", "--version"), context=context),
+        )
+        for command, prefix in (
+            (("env", "sh", "-c", "tool --version"), "command-boundary-shell-evaluation"),
+            (("timeout", "5", "python3", "-c", "x"), "command-boundary-unknown"),
+            (("env", "-S", "tool --version"), "command-boundary-unknown"),
+        ):
+            with self.subTest(command=command):
+                with self.assertRaisesRegex(DependencyError, prefix):
+                    classify_command(command, context=context)
+
+    def test_post_create_execution_graph_is_verify_only(self) -> None:
+        """Observed post-create edges are classified without source greps."""
+        root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, root)
+        script = root / ".devcontainer" / "post-create.sh"
+        script.parent.mkdir(parents=True)
+        script.write_text("#!/bin/bash\n# apt-get curl sudo dependency_receipts\necho 'npm install'\n", encoding="utf-8")
+        parent_hook = script.parent / "post-create-parent.sh"
+        parent_hook.write_text("#!/bin/bash\nexit 0\n", encoding="utf-8")
+        graph = build_post_create_execution_graph(
+            (
+                ("id", "-u"),
+                ("mktemp", "/tmp/probe"),
+                ("cat", "/tmp/probe"),
+                ("rm", "-f", "/tmp/probe"),
+                ("bash", str(script)),
+            ),
+            builtins=("cd", "printf", "source", "test", "trap", "exit"),
+            redirections=("workspace-write-probe",),
+            owner_root=root,
+            parent_root=root,
+            parent_hook_path=str(parent_hook),
+            parent_hook_exit_status=0,
+        )
+        self.assertEqual(len(graph.external_commands()), 5)
+        self.assertEqual(graph.parent_hook_exit_status, 0)
+        for command in (("bash", "-c", "echo unsafe"), ("xargs", "echo")):
+            with self.subTest(command=command):
+                with self.assertRaisesRegex(DependencyError, r"command-boundary-"):
+                    build_post_create_execution_graph((command,))
+
+    def test_owned_post_create_paths_reject_arbitrary_and_symlink_files(self) -> None:
+        """Owner path checks reject in-root lookalikes and symlink aliases."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            devcontainer = root / ".devcontainer"
+            devcontainer.mkdir()
+            canonical_script = devcontainer / "post-create.sh"
+            canonical_script.write_text("#!/bin/bash\n", encoding="utf-8")
+            canonical_script.chmod(0o755)
+            context = CommandProvenance(
+                "post-create",
+                "shared-post-create",
+                "post-create-readback",
+                owner_root=str(root),
+            )
+            self.assertIn(
+                CommandCapability.READ_ONLY_QUERY,
+                classify_command(("bash", str(canonical_script)), context=context),
+            )
+            arbitrary = root / "tmp-like.sh"
+            arbitrary.write_text("#!/bin/bash\n", encoding="utf-8")
+            arbitrary.chmod(0o755)
+            alias = root / "alias.sh"
+            alias.symlink_to(canonical_script)
+            for path in (arbitrary, alias):
+                with self.subTest(path=path):
+                    with self.assertRaisesRegex(DependencyError, "command-boundary-unknown"):
+                        classify_command(("bash", str(path)), context=context)
+            verifier = root / "tools" / "agent_tools" / "devcontainer_dependencies.py"
+            verifier.parent.mkdir(parents=True)
+            verifier.write_text("# owned verifier fixture\n", encoding="utf-8")
+            verifier_alias = root / "verifier-alias.py"
+            verifier_alias.symlink_to(verifier)
+            verifier_arbitrary = root / "tmp-like-verifier.py"
+            verifier_arbitrary.write_text("# lookalike verifier\n", encoding="utf-8")
+            verifier_context = replace(context, owner_root=str(root))
+            self.assertIn(
+                CommandCapability.READ_ONLY_QUERY,
+                classify_command(
+                    ("python3", str(verifier), "image-verify"),
+                    context=verifier_context,
+                ),
+            )
+            for path in (verifier_alias, verifier_arbitrary):
+                with self.subTest(verifier_path=path):
+                    with self.assertRaisesRegex(DependencyError, "command-boundary-unknown"):
+                        classify_command(
+                            ("python3", str(path), "image-verify"),
+                            context=verifier_context,
+                        )
+
+    def test_parent_hook_path_requires_canonical_non_symlink_file(self) -> None:
+        """Parent hook observation checks owner containment and canonical path only."""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            devcontainer = root / ".devcontainer"
+            devcontainer.mkdir()
+            canonical = devcontainer / "post-create-parent.sh"
+            canonical.write_text("#!/bin/bash\n# internal commands are not inspected\n", encoding="utf-8")
+            arbitrary = root / "tmp-like-hook.sh"
+            arbitrary.write_text("#!/bin/bash\n", encoding="utf-8")
+            alias = root / "hook-alias.sh"
+            alias.symlink_to(canonical)
+            for path in (arbitrary, alias):
+                with self.subTest(path=path):
+                    with self.assertRaisesRegex(DependencyError, "command-boundary-unknown"):
+                        build_post_create_execution_graph(
+                            (),
+                            owner_root=root,
+                            parent_root=root,
+                            parent_hook_path=str(path),
+                            parent_hook_exit_status=0,
+                        )
+            graph = build_post_create_execution_graph(
+                (),
+                owner_root=root,
+                parent_root=root,
+                parent_hook_path=str(canonical),
+                parent_hook_exit_status=0,
+            )
+            self.assertEqual(graph.parent_hook_path, str(canonical))
+
+    def test_image_receipt_binds_install_owner(self) -> None:
+        """Image plan and receipt records retain image-install ownership."""
+        parsed = parse_record(record("image-tool", method="apt-package"), path=Path("fixture.toml"), index=0)
+        plan = build_plan((loaded_manifest(Path("fixture.toml"), (parsed,)),))
+        payload = dependency_module._image_plan_payload(plan, ("image-tool",))
+        self.assertEqual(payload["owner"], "image-installer")
+        self.assertEqual(payload["phase"], "image-install")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            init_authentic_git(root)
+            receipt = root / "receipt.json"
+            installer = Installer(FakeRunner())
+            installer._parent_attestation = dependency_module._parent_attestation(root, "receipt-owner")
+            installer._write_receipt(receipt, plan, parsed)
+            saved = json.loads(receipt.read_text(encoding="utf-8"))
+            self.assertEqual(saved["owner"], "image-installer")
+            self.assertEqual(saved["phase"], "image-install")
+            self.assertEqual(saved["record_fingerprint"], parsed.fingerprint())
+
+    def test_network_operations_are_phase_gated(self) -> None:
+        """Reject unowned and image-verify network edges before URL open."""
+        with tempfile.TemporaryDirectory() as temporary:
+            destination = Path(temporary) / "asset"
+            with self.assertRaisesRegex(DependencyError, "command-boundary-network-fetch"):
+                dependency_module._download("https://example.invalid/asset", destination)
+            with self.assertRaisesRegex(DependencyError, "command-boundary-network-fetch"):
+                dependency_module._download(
+                    "https://example.invalid/asset",
+                    destination,
+                    operation=dependency_module.NetworkOperation(
+                        phase="image-verify",
+                        owner="typed-verifier",
+                        operation="download-release-asset",
+                        method="release-asset",
+                        record_id="asset",
+                        url="https://example.invalid/asset",
+                        allow_network=False,
+                    ),
+                )
+            for operation, method, record_id in (
+                ("unknown-download", "release-asset", "asset"),
+                ("download-apt-key", "release-asset", "asset"),
+                ("download-release-asset", "release-asset", ""),
+            ):
+                with self.subTest(operation=operation, method=method, record_id=record_id):
+                    with self.assertRaisesRegex(DependencyError, "command-boundary-network-fetch"):
+                        dependency_module._download(
+                            "https://example.invalid/asset",
+                            destination,
+                            operation=dependency_module.NetworkOperation(
+                                phase="image-install",
+                                owner="image-installer",
+                                operation=operation,
+                                method=method,
+                                record_id=record_id,
+                                url="https://example.invalid/asset",
+                                allow_network=True,
+                            ),
+                        )
+
+    def test_single_runner_adapter_inventory(self) -> None:
+        """Keep the Installer's direct runner edge inside one adapter."""
+        tree = ast.parse(ENGINE.read_text(encoding="utf-8"))
+        calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "run"
+            and isinstance(node.func.value, ast.Attribute)
+            and node.func.value.attr == "runner"
+            and isinstance(node.func.value.value, ast.Name)
+            and node.func.value.value.id == "self"
+        ]
+        self.assertEqual(len(calls), 1)
 
     def test_safe_extraction_rejects_traversal_and_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -3750,14 +4024,24 @@ class DependencyModelTests(unittest.TestCase):
         self.assertIn("build-essential", dockerfile)
         self.assertIn("ninja-build", dockerfile)
         self.assertIn("image-verify --workspace", post_create)
-        self.assertNotIn("apt-get", post_create)
-        self.assertNotIn("npm install", post_create)
-        self.assertNotIn("pip install", post_create)
-        self.assertNotIn("cargo install", post_create)
-        self.assertNotIn("curl", post_create)
-        self.assertNotIn("sudo", post_create)
-        self.assertNotIn("project-install", post_create)
-        self.assertNotIn("dependency_receipts", post_create)
+        graph = build_post_create_execution_graph(
+            (
+                (
+                    "python3",
+                    str(ENGINE),
+                    "image-verify",
+                    "--workspace",
+                    str(ROOT),
+                ),
+                ("id", "-u"),
+                ("mktemp", f"{ROOT}/identity-write.XXXXXX"),
+                ("cat", f"{ROOT}/identity-write.fixture"),
+                ("rm", "-f", f"{ROOT}/identity-write.fixture"),
+            ),
+            builtins=("cd", "printf", "source", "test", "case", "trap", "exit"),
+            redirections=("workspace-write-probe",),
+        )
+        self.assertEqual(len(graph.external_commands()), 5)
 
     def test_project_extras_are_ordered_and_installed_then_checked(self) -> None:
         workspace = Path(tempfile.mkdtemp())
