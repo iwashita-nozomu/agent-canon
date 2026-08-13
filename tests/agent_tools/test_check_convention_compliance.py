@@ -1691,13 +1691,31 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
         self.assertEqual(missing, [])
 
-    def test_review_issue_routing_requires_markers(self) -> None:
-        """Review findings keep durable issue routing markers."""
+    def test_review_issue_routing_is_conditional_and_keeps_owner_markers(self) -> None:
+        """Only durable review follow-up uses issue routing markers."""
+        self.assertNotIn(
+            "agents/skills/change-review.md",
+            REVIEW_ISSUE_ROUTING_MARKERS,
+        )
+        self.assertIn(
+            "documents/conventions/REVIEW_PROCESS.md",
+            REVIEW_ISSUE_ROUTING_MARKERS,
+        )
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
             review_skill = root / "agents" / "skills" / "change-review.md"
             review_skill.write_text("review findings only\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            review_process = root / "documents" / "conventions" / "REVIEW_PROCESS.md"
+            review_process.write_text("review policy without durable follow-up\n", encoding="utf-8")
 
             result = self.run_checker(root)
 
@@ -1856,8 +1874,18 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
         self.assertEqual(missing, [])
 
-    def test_source_file_definition_order_requires_review_markers(self) -> None:
-        """Source definition order guidance stays wired to Python review evidence."""
+    def test_source_file_definition_order_is_owned_by_conventions_not_python_review(
+        self,
+    ) -> None:
+        """Definition-order guidance remains in its semantic convention owners."""
+        self.assertNotIn(
+            "agents/skills/python-review.md",
+            SOURCE_FILE_DEFINITION_ORDER_MARKERS,
+        )
+        self.assertIn(
+            "documents/conventions/python/09_file_roles.md",
+            SOURCE_FILE_DEFINITION_ORDER_MARKERS,
+        )
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
@@ -1872,9 +1900,19 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             result = self.run_checker(root)
 
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            file_roles = root / "documents" / "conventions" / "python" / "09_file_roles.md"
+            file_roles.write_text("python file roles without ordering owner\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("source_file_definition_order", result.stdout)
-            self.assertIn("missing-marker:定義順", result.stdout)
+            self.assertIn("missing-marker:読者順序", result.stdout)
 
     def test_source_file_definition_order_requires_catalog_trigger(self) -> None:
         """Source definition order feedback stays visible in deterministic routing."""

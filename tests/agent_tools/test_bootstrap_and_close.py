@@ -405,10 +405,17 @@ def ready_closeout_evidence_lines(
         "## Document Structure Evidence",
         f"- document_structure_paths: {document_structure_paths}",
         "- document_structure_status: skipped",
+        "- structure_activation: format_only",
         "- document_split_decision: not_applicable:format-only: fixture closeout bundle",
         "- structure_planning: not_applicable",
+        "- prose_graph_activation: not_selected",
         "- prose_graph: not_applicable",
         "- structure_contract: skipped: fixture format-only route",
+        "- structure_owner: not_applicable",
+        "- structure_source: not_applicable",
+        "- structure_reader: not_applicable",
+        "- structure_layout: not_applicable",
+        "- structure_validation_topology: not_applicable",
         "- md_style_check: pass",
         "- format_only_reason: fixture closeout bundle",
         "",
@@ -3952,6 +3959,131 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("DOCUMENT_STRUCTURE_STATUS=complete", result.stdout)
+            self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=no", result.stdout)
+
+    def test_task_close_accepts_bounded_existing_topology_route(self) -> None:
+        """A bounded Markdown edit may close with positive existing-topology evidence."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
+            (workspace_root / "README.md").write_text("# Seed\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=workspace_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "-m",
+                    "seed markdown",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (workspace_root / "README.md").write_text(
+                "# Seed\n\nUpdated.\n", encoding="utf-8"
+            )
+            run_id = "test-task-close-doc-existing-topology"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            environment = {**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)}
+            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}):
+                write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+            closeout_path = report_dir / "closeout_gate.md"
+            text = closeout_path.read_text(encoding="utf-8")
+            replacements = {
+                "- document_structure_status: skipped": "- document_structure_status: complete",
+                "- structure_activation: format_only": "- structure_activation: not_required",
+                "- document_split_decision: not_applicable:format-only: fixture closeout bundle": "- document_split_decision: keep:existing-topology:README.md",
+                "- structure_planning: not_applicable": "- structure_planning: not_required",
+                "- prose_graph: not_applicable": "- prose_graph: not_selected",
+                "- structure_contract: skipped: fixture format-only route": "- structure_contract: not_required:existing-topology:README.md",
+                "- structure_owner: not_applicable": "- structure_owner: README.md owner",
+                "- structure_source: not_applicable": "- structure_source: README.md canonical source",
+                "- structure_reader: not_applicable": "- structure_reader: repository entry reader",
+                "- structure_layout: not_applicable": "- structure_layout: existing README layout",
+                "- structure_validation_topology: not_applicable": "- structure_validation_topology: targeted Markdown check",
+            }
+            for old, new in replacements.items():
+                text = text.replace(old, new)
+            closeout_path.write_text(text, encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
+                cwd=workspace_root,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=yes", result.stdout)
+
+    def test_task_close_rejects_required_structure_route_without_identity(self) -> None:
+        """Required structure activation must identify its topology and owners."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
+            (workspace_root / "README.md").write_text("# Seed\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=workspace_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "-m",
+                    "seed markdown",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (workspace_root / "README.md").write_text(
+                "# Seed\n\nUpdated.\n", encoding="utf-8"
+            )
+            run_id = "test-task-close-doc-required-identity"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            environment = {**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)}
+            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}):
+                write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+            closeout_path = report_dir / "closeout_gate.md"
+            text = closeout_path.read_text(encoding="utf-8")
+            replacements = {
+                "- document_structure_status: skipped": "- document_structure_status: complete",
+                "- structure_activation: format_only": "- structure_activation: required",
+                "- document_split_decision: not_applicable:format-only: fixture closeout bundle": "- document_split_decision: keep:README topology",
+                "- structure_planning: not_applicable": "- structure_planning: complete",
+                "- prose_graph: not_applicable": "- prose_graph: not_selected",
+                "- structure_contract: skipped: fixture format-only route": "- structure_contract: required:README topology",
+            }
+            for old, new in replacements.items():
+                text = text.replace(old, new)
+            closeout_path.write_text(text, encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
+                cwd=workspace_root,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertNotEqual(result.returncode, 0)
             self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=no", result.stdout)
 
     def test_task_close_accepts_parent_owned_nested_workspace_without_git(self) -> None:

@@ -437,11 +437,16 @@ def expand_eval_entry(
             f"eval {eval_id} target_glob expected_count={expected_count} "
             f"actual_count={len(paths)} pattern={pattern}"
         )
+    canonical_target = (
+        resolve_target(root, str(entry["canonical_target"]))
+        if entry.get("canonical_target") is not None
+        else None
+    )
     return tuple(
         PromptEval(
             eval_id=f"{eval_id}:{path.relative_to(root).as_posix()}",
             target=path,
-            canonical_target=None,
+            canonical_target=canonical_target,
             kind=kind,
             description=description,
             checklist=checklist,

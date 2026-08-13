@@ -2,358 +2,64 @@
 <!--
 @dependency-start
 contract skill
-responsibility Documents reader-facing report writing workflow and quality criteria.
-upstream design README.md shared skill canon index
-upstream design catalog.yaml public skill family catalog
-upstream design structure-planning.md reusable structure contract skill
+responsibility Writes evidence-backed reader-facing reports with semantic claim/evidence, inference, limitation, and action boundaries.
+upstream design ../../documents/design/responsibility-rationale.md report semantics and finding-closure rationale
+upstream design structure-planning.md optional structural-decision owner
 upstream design result-artifact-writeout.md raw result artifact placement skill
-upstream design prose-reasoning-graph.md prose graph diagnostics and handoff overlay
-upstream design ../workflows/slide-production-workflow.md slide template, slot, and layout review workflow
-downstream design html-output.md consumes report content for explicit HTML rendering and browser publication
-downstream design ../../evidence/agent-evals/report_quality_eval.toml report quality checklist eval manifest
-downstream implementation ../../.agents/skills/report-writing/SKILL.md exposes this workflow as a runtime skill
-downstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report writing prompt surfaces
 upstream design code-visualization.md sole public visualization owner and typed projection contract
+downstream implementation ../../.agents/skills/report-writing/SKILL.md exposes this workflow as a runtime skill
+downstream implementation ../../tools/agent_tools/evaluate_report_quality.py validates report prompt surfaces
 downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates this adapter dependency header
 @dependency-end
 -->
 
-## Visualization Adapter Boundary
-
-Report source packets and evidence remain native report-writing facts. Any
-Mermaid, report, storyboard, wiki, or browser graph embedding passes the
-complete selected facts to `code-visualization` and consumes its
-`VisualizationSourceUniverse`, canonical `ToolCall`,
-`ProjectionCoverageManifest`, mandatory post-format readback, and final
-coverage status. Report composition and visual placement are adapter concerns;
-the universal omission and granularity policy is owned only by
-`code-visualization`.
-
-## Reader Map
-
-- Purpose: write reader-facing reports from existing evidence while preserving
-  source packets, limitations, quality criteria, and actionability.
-- Section path: Purpose and Use When introduce scope; Source Packet and Report
-  Quality Checklist define inputs and acceptance; Finding Closure Loop,
-  Required Structure, Review Route, Relationship To Other Skills, Closeout
-  Tokens, and provenance sections carry operations.
-- Use when: status, audit, evaluation, experiment, review, decision, or
-  presentation evidence needs human-readable synthesis.
-- Boundary: raw result storage stays with `result-artifact-writeout`; nontrivial
-  structure is fixed first with `structure-planning` and graph-backed handoff
-  when needed.
-
 ## Purpose
 
-`report-writing` is the skill for writing reader-facing reports from existing
-evidence, including decision briefs, experiment summaries, presentation
-narratives, PPT storyboards, and slide-ready visual asset plans. It owns report
-prose, claim hygiene, quality review criteria, reader actionability, and
-presentation asset traceability. In the common document pipeline, file
-responsibility selects this as the DSL-to-prose projection adapter when the
-document's job is evidence-backed status, audit, evaluation, review, decision,
-recommendation, or presentation narrative. For nontrivial structure, call
-`prose-reasoning-graph` and `structure-planning` before prose projection.
+`report-writing` turns existing evidence into reader-facing status, audit, evaluation, experiment, review, decision, recommendation, or presentation prose. Correctness is semantic: material claims map to evidence, observations are separated from inference, material limitations are visible, and the reader can determine the next action.
 
-Reports can be Markdown or HTML. The default report output is Markdown unless
-the user explicitly asks for HTML, a browser page, dashboard, web view, or
-external browser publication. When HTML is explicit, use `html-output` after the
-source packet and report structure are fixed.
-When a deck or PPT is in scope, use the slide production workflow after the
-report source packet and presentation asset packet are fixed.
+The canonical rationale is `documents/design/responsibility-rationale.md`. Raw artifacts remain owned by `result-artifact-writeout`. A structure plan is optional and activates only when `structure-planning` identifies a genuine structural decision.
 
-It does not own raw result storage. Use `result-artifact-writeout` for
-append-only hook, skill, tool, eval, experiment, and raw machine artifacts, then
-use this skill to turn that evidence into a report a human can evaluate.
+## Source packet
 
-## Use When
+Before drafting, identify the audience/decision, the source artifacts or stable IDs, directly observed facts, inferred claims, material limitations/uncertainty, and the requested next action. Add provenance needed to interpret the evidence. Do not create placeholder fields for evidence classes that do not apply.
 
-- A user asks for a report, status report, evaluation report, audit report,
-  experiment report, review report, decision brief, presentation narrative, PPT
-  storyboard, slide asset plan, or improvement guide.
-- Tool, hook, skill, eval, experiment, or CI outputs need reader-facing
-  synthesis.
-- A generated report may influence a workflow, skill, policy, or issue.
-- A report needs explicit quality criteria before it is accepted.
-- A report needs a first figure/table, presentation storyboard, ponchi-e or
-  concept diagram, source-to-section map, source-to-slide map, metric contract,
-  or invalid interpretation boundary; in that case use `structure-planning`
-  before drafting.
-- File / document responsibility classifies the output as a report adapter
-  target; in that case create or receive a prose graph handoff, then use graph
-  diagnostics, explanation, and integration plan as evidence for reader flow and
-  claim support while keeping the report source packet authoritative.
-- A report is being written from graph/DSL structure; in that case close
-  `fix-now` findings at the DSL/projection stage before projecting to report
-  prose.
-- A report needs HTML output only when the user explicitly asks for HTML or a
-  browser-readable page; in that case use `html-output` after report planning.
-- A report is meant for external presentation and therefore needs slide-ready
-  visuals, data figures, generated images, figure provenance, reference blocks,
-  and layout/preview gates.
+When external references support a material claim, use an existing durable source
+note or create a source packet with the URL/DOI, access date, source identity,
+and adoption/exclusion decision. A browser tab, temporary download, or chat-only
+summary is not provenance. For evaluation or experiment reports, add a reader guide that states the denominator, metric directionality, valid and invalid
+comparisons, and what result would change the next action.
 
-## Source Packet
+## Semantic acceptance
 
-Before drafting, fix these inputs:
+A report is acceptable when:
 
-- audience: who will read the report
-- decision context: what decision or action the report should support
-- purpose and non-goals: what the report will and will not settle
-- source artifacts: paths, commands, run ids, issue ids, PR ids, commits, or
-  logs used as evidence
-- observed facts: what the source artifacts directly show
-- inferred claims: interpretations derived from the facts
-- limitations: missing data, partial runs, stale sources, uncertainty, and
-  blocked checks
-- next action: concrete follow-up owner, command, PR, issue, or workflow route
-- output format: `markdown` by default, `html` when explicitly requested, or
-  `deck` / `ppt` when the user asks for slide output
-- structure contract: required when the report has a nontrivial reader
-  structure; use `structure-planning` to fix first artifact, source-to-section
-  map, metric contract, section order, and invalid interpretations
-- visual plan: for reports that explain workflow, dependency, ownership,
-  routing, state, review gate, handoff, or multi-step evidence flow, use
-  `structure-planning` to decide whether the first visual should be a Mermaid
-  diagram, table, or text-only outline
-- presentation asset needs: required when a deck, PPT, talk, or external
-  presentation is in scope; list the core story, first visual, ponchi-e/concept
-  diagrams, data-backed figures, generated-image prompts or asset paths, slide
-  slot mapping, reference/footnote plan, and layout/preview gate
-- DSL/projection closure: required when file responsibility selects this report
-  adapter for nontrivial output; revise the structure contract,
-  source-to-section map, graph-backed rewrite packet, or graph-backed units and
-  rerun graph diagnostics until the selected profile has no active `fix-now`
-  findings before writing report prose
-- selected ordering: when the prose graph handoff includes
-  `selected_ordering.ordered_anchors`, use that whole-document topological
-  sentence order as the DSL-to-prose input sequence before drafting report
-  sections or paragraph transitions
-- positive responsibility prose: state what the report observes, infers,
-  recommends, limits, and hands off. Boundary, Limitation, and Non-Goal sections
-  hold boundary statements; `ad hoc` labels are replaced with a named
-  responsibility, evidence gap, verification route, or prompt-defect
-  classification
+- every material factual or recommendation claim has source support or is explicitly identified as inference;
+- observations and interpretations are distinguishable;
+- limitations that could change the reader's decision are present;
+- raw evidence and reader synthesis are not conflated;
+- the next action or conclusion is scoped to what the evidence supports;
+- the report does not become a second policy/source-of-truth surface.
 
-## CompletionCoverage Reader Projection
+No fixed heading count is required. A compact status may satisfy these obligations in a few paragraphs or a small table. External/audit/presentation reports may select more structure when the reader contract requires it. `Report Quality Checklist` is an authoring/review aid, not a mandatory body section.
 
-When a report presents completion or closeout evidence, it is a deterministic
-reader of `agent-canon.completion-coverage.v1`, not a policy owner. Preserve
-the source binding, semantic kinds, typed owner/state/API/dependency evidence,
-W1 certificate references, validation-failure response, and the independent
-`all_planned_chunks_complete` and `overall_delivery_complete` predicates.
+## Finding closure
 
-Expose the five mapping error sets—`uncovered`, `multiply_mapped`, `orphan`,
-`redundant`, and `empty`—without converting a failure into an empty success.
-Responsibility boundaries, decisions, failures, deferrals, and publication
-transitions remain distinct records. W2-12 is one broad
-`ExecutionResourcePlan` plan/actual/readback/failure consumer mapping; W2-19
-is one ordered nine-item GPU certificate mapping. The report does not implement
-resource production or GPU logic.
+Close accepted blocking findings before finalizing. A finding is blocking when it identifies a material factual error, unsupported claim, broken source mapping, or other defect that can change the reader's interpretation or action.
 
-Use the one canonical Markdown/math/Mermaid format/check route and consume the
-official PostToolUse/Stop JSON dispatcher evidence. Do not add a second CI,
-formatter, checker, dispatcher, score, line/length heuristic, test-count,
-coverage, mutation, private-helper, or checker-retest gate to a report.
+Style/advisory findings, demonstrated tool false positives, explicitly out-of-scope findings, and accepted risks may remain with a short reason. Completion is **not** raw `finding_count == 0`; do not rewrite indefinitely to appease an advisory checker. Rerun only the checker/review surface affected by a changed claim or section.
 
-## Report Quality Checklist
+## Structure and visuals
 
-Use this checklist before publishing or handing off a reader-facing report:
+Do not invoke `structure-planning`, Mermaid, semantic-index, or prose-graph tools merely because a report is nontrivial. Use structure planning only for a real topology decision; use visualization only when it materially improves the reader's understanding. A table or prose is valid without a `text-only` receipt. Selected diagrams delegate rendering/coverage/readback to `code-visualization`.
 
-- [ ] Audience and decision context are explicit.
-- [ ] Purpose and non-goals are explicit.
-- [ ] Source artifacts, commands, commits, issues, PRs, or run ids are cited by
-  stable path or stable id.
-- [ ] Observations are separated from interpretations.
-- [ ] Each recommendation or strong claim has evidence, or is labeled as an
-  inference.
-- [ ] Limitations, uncertainty, missing checks, and stale evidence are called
-  out.
-- [ ] Provenance includes command, runtime, branch, commit, timestamp, or
-  report generator when applicable.
-- [ ] The report is actionable: next steps are scoped and assigned to a route,
-  owner, command, issue, or PR.
-- [ ] Raw artifacts and reader-facing summary paths are not conflated or
-  overwritten.
-- [ ] For external presentations, the first visual, ponchi-e/concept diagrams,
-  data-backed figures, generated images, reference blocks, and slide previews
-  are mapped to claims and source artifacts.
-- [ ] Conceptual visuals are labeled separately from data-backed figures.
-- [ ] The report does not become a second policy truth surface. Any rule change
-  is routed to the canonical skill, workflow, tool, document, or issue.
-- [ ] Nontrivial process, dependency, ownership, routing, state, review-gate, or
-  multi-step evidence flow is shown with a Mermaid diagram, or the source packet
-  explains why a table or text-only outline is clearer.
+## Output formats
 
-## Finding Closure Loop
+Markdown is the default reader-facing format. Use `html-output` only when HTML/browser output is explicitly requested. Use the slide-production workflow for requested deck/PPT artifacts. Neither HTML serving nor slide production is implied by writing a report.
 
-When a report has graph diagnostics, reviewer findings, report-quality findings,
-or other writing findings, the writing pass is not complete until the selected
-finding set is empty. The standard loop is:
+## Review route
 
-For prose graph handoffs, run this loop first at the DSL/projection stage. Do
-not spend a prose rewrite pass on a report whose section contract,
-source-to-section map, or paragraph bridge is already known to be structurally
-invalid.
+Use a report reviewer when claim impact, external publication, ambiguity, or evidence complexity warrants independent review. Small internal status reports may complete with direct source-backed review; no `not_required` token is necessary.
 
-1. Draft or revise the report from the source packet and structure contract.
-1. Run the applicable graph, review, or report-quality checker.
-1. Classify each finding as `fix-now`, `out-of-scope`, `tool-false-positive`,
-   or `prompt-defect`.
-1. Rewrite the responsible section, paragraph, sentence, table, figure caption,
-   or equation needed to remove every `fix-now` finding.
-1. Record the canonical result and route any unresolved finding to the owning
-   gate; do not create a second checker or retest gate.
+## Completion evidence
 
-Do not accept a report merely because the loop hit an iteration budget. If the
-same finding class persists after repeated targeted rewrites, stop and record a
-`prompt-defect` finding against the sentence-generation or section-generation
-prompt. The next work item is then prompt repair, not more blind rewriting.
-
-`out-of-scope` and `tool-false-positive` classifications require a short reason
-and an artifact path. They are not silent passes. A report may close with those
-classifications only when the active task explicitly excludes them or the tool
-finding is demonstrably not about the requested report profile.
-
-## Required Structure
-
-Use a structure that fits the report type, but keep these sections explicit:
-
-1. Summary
-1. Source Packet
-1. Observations
-1. Interpretation
-1. Limitations
-1. Next Actions
-1. Report Quality Checklist
-
-For compact reports, these can be short paragraphs or a table. Do not omit the
-source packet or limitations only because the report is short.
-
-When `structure-planning` is active, treat its ordered structure as the starting
-outline and do not add sections that lack a mapped source, an explicit
-inference label, or a stated limitation. If the structure contract records
-`discourse_relations=<path>`, use that JSONL as paragraph-order and transition
-evidence; do not treat discourse edge scores as source evidence for factual
-claims.
-
-When a report uses Mermaid, keep the diagram source in a fenced `mermaid` block
-inside the Markdown report or the source artifact that renders the report. The
-diagram must have nearby prose that names the question it answers and the
-constraints it does not represent.
-
-For external presentations, add a `Presentation Asset Packet` before detailed
-results or slide drafting. It must include:
-
-1. Core story and non-goals
-1. First visual and its question
-1. Required ponchi-e/concept diagrams
-1. Required data-backed figures and tables
-1. Generated-image prompts or asset paths, when generated images are used
-1. Slide/storyboard order and template slot mapping
-1. Reference, footnote, and evidence annotation plan
-1. Layout/preview gate and artifact manifest path
-
-## Review Route
-
-Use `report_reviewer` when the report is claim-heavy, external-facing,
-slide-backed, high-impact, or used as PR / issue / policy evidence. The reviewer
-checks:
-
-- structure and reader flow
-- source-to-claim traceability
-- overclaiming and unsupported recommendations
-- missing limitations
-- stale or ambiguous evidence paths
-- presentation asset traceability and conceptual/data-backed visual separation
-
-For PPT or deck output, also run a layout review so generated images, equations,
-references, footnotes, and slide previews remain readable after insertion.
-
-Small internal status notes may record `report_reviewer=not_required` with a
-reason.
-
-## Relationship To Other Skills
-
-- `result-artifact-writeout`: owns raw artifact, summary artifact, manifest,
-  unique id, and overwrite policy.
-- `structure-planning`: owns the pre-draft structure contract, first artifact,
-  source-to-section map, metric contract, section order, and invalid
-  interpretations.
-- `html-output`: owns explicit HTML rendering, layout checks, optional
-  `$imagegen` visual assets, and local/external browser server publication.
-- `slide-production-workflow`: owns fixed template use, slide slot mapping,
-  layout review, reference visibility, and preview evidence for PPT/deck output.
-- `long-form-writing`: owns general explanatory prose for README, guide,
-  migration, workflow, or specification responsibilities.
-- `experiment-lifecycle`: owns experiment run protocol and rerun decisions.
-- `change-review`: owns findings-first code or document review output.
-- `report-writing`: owns reader-facing synthesis and report quality gates.
-
-## Closeout Tokens
-
-Record these in `workflow_monitoring.md`, a handoff, or the report itself:
-
-```text
-report_writing=complete
-report_output_format=<markdown|html|deck|ppt>
-report_quality_checklist=<pass|fail>
-report_source_packet=<path-or-inline>
-presentation_asset_packet=<path|inline|not_required>
-structure_contract=<path|inline|not_required>
-report_reviewer=<path|not_required>
-report_rule_drift=<none|canonical_update_required>
-```
-
-## Reader Guide For Evaluations And Experiments
-
-Evaluation and experiment reports must include a reader guide before the
-detailed table. The guide must state:
-
-- what to inspect first
-- each key metric's denominator and directionality
-- valid and invalid comparisons
-- the main caveat
-- what result would change the next action
-
-When the report is presentation-backed, the reader guide must also state which
-slide or first visual to inspect first, which visuals are conceptual, which are
-data-backed, and what evidence path supports each strong claim.
-
-## External Source Provenance
-
-Reports that use web pages, papers, official docs, or downloaded artifacts must
-cite existing durable source notes or create/update source packets before
-publishing. Include URL/DOI, access date, claim used, limitation,
-adoption/exclusion decision, and artifact location. Browser tabs, download
-caches, temporary PDFs, and chat-only summaries are not enough provenance.
-
-## Runtime Contract Clauses
-
-The runtime discovery adapter delegates these required operating clauses to this canonical owner.
-
-1. Read `agents/skills/report-writing.md`.
-1. Select this as the DSL-to-prose projection adapter when file/document responsibility is evidence-backed status, audit, evaluation, review, decision, recommendation, or operational report; do not select it by length.
-1. Classify the report before writing: `status-report`, `evaluation-report`, `experiment-report`, `review-report`, `audit-report`, `decision-brief`, `presentation-narrative`, `ppt-storyboard`, or `improvement-guide`.
-1. Choose output format: default to Markdown unless the user explicitly asks for HTML, browser view, dashboard, web page, external browser publication, or a slide deck/PPT. If HTML is explicit, use `$html-output` after the source packet and structure are fixed; if a deck or PPT is in scope, use the slide-production workflow after the report source packet is fixed.
-1. Build a source packet with audience, decision context, source artifacts, observed facts, inferred claims, limitations, provenance, requested next action, and any presentation asset needs such as ponchi-e/concept diagrams, slide figures, storyboard order, template slots, references, and preview artifacts.
-1. Use `$structure-planning` before drafting when the report has a nontrivial reader structure, first figure/table/ponchi-e, presentation storyboard, comparison, metric interpretation, source-to-section map, source-to-slide map, or invalid interpretation boundary.
-1. When the report explains workflow, dependency, ownership, routing, state transition, review gate, handoff, or multi-step evidence flow, have `$structure-planning` set a `visual_plan` and use Mermaid as the default first visual unless a table or text-only outline is clearer.
-1. When `$structure-planning` is active, use its structure contract as the report skeleton and do not add sections or claims that lack mapped evidence, an explicit inference label, or a stated limitation; if it records `discourse_relations=<path>`, use those edge scores to check paragraph order and transition claims.
-1. For nontrivial report creation or revision, create or receive a `$prose-reasoning-graph` handoff before drafting report prose; for an existing repository Markdown report, use `check-document` so prose diagnostics and document-canon diagnostics are generated together.
-1. Read prose graph projection, diagnostics, explanation, and integration plan as advisory evidence for reader flow, unsupported claims, paragraph bridges, and split/merge/reorder operations; keep the report source packet authoritative for factual claims.
-1. When the prose graph handoff includes `selected_ordering.ordered_anchors`, use that whole-document topological sentence order as the DSL-to-prose input sequence before drafting report sections or paragraph transitions.
-1. Project report responsibilities into positive prose contracts: state what the report observes, infers, recommends, limits, and hands off. Use negative boundary wording only inside an explicit Boundary, Limitation, or Non-Goal slot, and replace `ad hoc` labels with a named responsibility, evidence gap, verification route, or prompt-defect classification.
-1. Before writing report prose, close `fix-now` findings at the DSL/projection stage: revise the structure contract, source-to-section map, graph-backed rewrite packet, or graph-backed units, rerun graph diagnostics, and only draft report prose after the selected profile has no active findings.
-1. After projecting DSL/projection state to report prose, rerun the graph check. If new findings appear only after projection, record `dsl_to_prose_prompt_defect` against this skill's report prose-generation prompt and repair that prompt before continuing.
-1. If the report uses external references, first inspect existing repo reference notes and cite/update those durable source packets; a browser tab, downloaded temp file, or chat-only source summary is not enough provenance.
-1. Use `$result-artifact-writeout` when the task also writes raw machine results, append-only eval evidence, hook logs, or experiment artifacts; do not treat the reader report as the raw evidence store.
-1. For external presentations, include a presentation asset packet before prose or slide drafting. It must list the core story, first visual, required ponchi-e/concept diagrams, data-backed figures, generated-image prompts or asset paths, slide slot mapping, reference/footnote plan, and layout/preview gate.
-1. Run a finding-closure loop before accepting the report: draft or revise, run the applicable graph/review/report-quality checker, classify every finding, rewrite targeted text for every `fix-now` finding, and rerun until no active findings remain.
-1. If the same finding class persists after repeated targeted rewrites, do not continue blindly and do not mark the report complete. Record a `prompt-defect` finding against the sentence-generation or section-generation prompt and make prompt repair the next work item.
-1. Apply the Report Quality Checklist: audience and decision fit, purpose and non-goals, evidence traceability, observation/interpretation separation, claim strength, limitations and uncertainty, provenance, actionability, artifact integrity, presentation asset traceability, and rule-drift control.
-1. Keep Mermaid diagrams as fenced `mermaid` blocks with nearby prose stating what the diagram answers and what it does not claim.
-1. For `evaluation-report` and `experiment-report`, include a reader guide before detailed results. The guide must state what to inspect first, each key metric's denominator and directionality, which comparisons are valid or invalid, the main caveat, and what result would change the next action.
-1. Mark every recommendation or claim with a source path, stable artifact id, command, or explicit `inference` label.
-1. Keep generated reports out of policy truth. If a report changes a rule, update the canonical skill, workflow, tool, or document and cite the report as evidence.
-1. For claim-heavy, external-facing, slide-backed, or high-impact reports, route a read-only `report_reviewer` pass before closeout and store the review artifact path. For PPT/deck output, also require a layout review for generated images, equations, references, and slide previews.
-1. Record closeout tokens: `report_writing=complete`, `report_output_format=<markdown|html|deck|ppt>`, `report_quality_checklist=pass|fail`, `report_source_packet=<path-or-inline>`, `presentation_asset_packet=<path|inline|not_required>`, `structure_contract=<path|inline|not_required>`, `report_reviewer=<path|not_required>`, and `report_rule_drift=<none|canonical_update_required>`.
+Read back the report artifact plus the evidence actually selected for it: source packet/provenance, material limitations, selected review result, and any explicitly requested presentation/HTML validation. Do not require fixed seven-section structure or fixed optional closeout fields.
