@@ -5,8 +5,12 @@ on:
     branches:
       - canon/close-devcontainer-design-diagnostics-614
 
+concurrency:
+  group: pr671-independent-validation
+  cancel-in-progress: true
+
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   validate:
@@ -16,7 +20,8 @@ jobs:
         with:
           ref: canon/close-devcontainer-design-diagnostics-614
           fetch-depth: 0
-          persist-credentials: true
+          submodules: false
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
@@ -89,7 +94,12 @@ jobs:
         run: python3 tools/agent_tools/check_design_doc_claims.py --root . documents/design/devcontainer/parent-devcontainer-policy.md
       - name: Check prose reasoning graph and print diagnostics
         run: |
-          mkdir -p "$RUNNER_TEMP/pr671-parent"
+          rm -rf "$RUNNER_TEMP/pr671-parent"
+          git init -q -b main "$RUNNER_TEMP/pr671-parent"
+          git -C "$RUNNER_TEMP/pr671-parent" config user.name agent-canon-validation
+          git -C "$RUNNER_TEMP/pr671-parent" config user.email agent-canon-validation@users.noreply.github.com
+          git -C "$RUNNER_TEMP/pr671-parent" remote add origin https://example.invalid/pr671-validation-parent.git
+          git -C "$RUNNER_TEMP/pr671-parent" commit --allow-empty -m 'initialize validation parent'
           out=$(mktemp -d -p "$RUNNER_TEMP" pr671-prose.XXXXXX)
           AGENT_CANON_PARENT_ROOT="$RUNNER_TEMP/pr671-parent" \
             python3 tools/agent_tools/prose_reasoning_graph.py check-document documents/design/devcontainer/parent-devcontainer-policy.md --profile all --out-dir "$out"
@@ -97,7 +107,7 @@ jobs:
           find "$out" -maxdepth 2 -type f -print -exec sed -n '1,400p' {} \;
       - name: Check docs
         run: |
-          mkdir -p "$RUNNER_TEMP/pr671-docs-tmp" "$RUNNER_TEMP/pr671-parent"
+          mkdir -p "$RUNNER_TEMP/pr671-docs-tmp"
           AGENT_CANON_PARENT_ROOT="$RUNNER_TEMP/pr671-parent" \
           TMPDIR="$RUNNER_TEMP/pr671-docs-tmp" \
           CARGO_TARGET_DIR="$RUNNER_TEMP/pr671-cargo-target" \
@@ -106,20 +116,15 @@ jobs:
         run: |
           bash tools/agent_tools/check_dependency_header_format.sh --require-header documents/design/devcontainer/parent-devcontainer-policy.md
           git diff --check origin/main...HEAD
-      - name: Remove temporary validator and read back final scope
+      - name: Validate final scope and read back document
         run: |
           git checkout -- .github/workflows/agent-canon-static-gates.yml
-          rm .github/workflows/pr671-independent-validation.yml
-          git add -u .github/workflows/pr671-independent-validation.yml
-          git commit -m 'ci: remove temporary PR671 validator'
-          changed=$(git diff --name-only origin/main...HEAD)
-          printf 'final_changed_files:\n%s\n' "$changed"
+          changed=$(git diff --name-only origin/main...HEAD -- . ':(exclude).github/workflows/pr671-independent-validation.yml')
+          printf 'final_changed_files_after_validator_removal:\n%s\n' "$changed"
           test "$changed" = 'documents/design/devcontainer/parent-devcontainer-policy.md'
-          test -z "$(git status --porcelain --untracked-files=no)"
           git diff --check origin/main...HEAD
           git show HEAD:documents/design/devcontainer/parent-devcontainer-policy.md >/tmp/pr671-readback.md
           test -s /tmp/pr671-readback.md
           echo "readback_sha256=$(sha256sum /tmp/pr671-readback.md | awk '{print $1}')"
           echo "readback_lines=$(wc -l </tmp/pr671-readback.md)"
           sed -n '1,120p' /tmp/pr671-readback.md
-          git push origin HEAD:canon/close-devcontainer-design-diagnostics-614
