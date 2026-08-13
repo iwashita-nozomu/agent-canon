@@ -18,6 +18,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
@@ -37,6 +38,28 @@ from parent_root_side_effects import (  # noqa: E402
     ParentRootSideEffectBoundary,
 )
 
+_SYNTHETIC_ROOT_BOUNDARY_ENV_KEYS = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+    "AGENT_CANON_PREFIX",
+)
+
 
 class AgentCanonSourceRootCLITests(unittest.TestCase):
     """Validate CLI subcommand wiring without touching real owner roots."""
@@ -51,20 +74,17 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                     cwd=root, explicit_root=root, purpose="agent-canon-source-root"
                 )
             )
-            os_temp = root.parent / "source-root-os-temp"
             environment = ParentRootSideEffectBoundary().child_environment(
                 receipt,
                 {
                     "HOME": "/unchanged/home",
-                    "TMPDIR": str(os_temp),
-                    "TEMP": str(os_temp),
-                    "TMP": str(os_temp),
                 },
             )
             self.assertEqual(environment["HOME"], "/unchanged/home")
-            self.assertEqual(environment["TMPDIR"], str(os_temp))
-            self.assertEqual(environment["TEMP"], str(os_temp))
-            self.assertEqual(environment["TMP"], str(os_temp))
+            expected_tmp = str((root / ".agent-canon" / "tmp").resolve())
+            self.assertEqual(environment["TMPDIR"], expected_tmp)
+            self.assertEqual(environment["TEMP"], expected_tmp)
+            self.assertEqual(environment["TMP"], expected_tmp)
 
     def _mock_resolution(self, command_root: Path) -> RootResolution:
         return RootResolution(
@@ -73,6 +93,25 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             layout="standalone",
             canon_root=command_root,
         )
+
+    def _synthetic_root_environment(
+        self, command_root: Path, overrides: dict[str, str] | None = None
+    ) -> dict[str, str]:
+        """Bind fixture child state to its synthetic repository root."""
+        environment = os.environ.copy()
+        for key in _SYNTHETIC_ROOT_BOUNDARY_ENV_KEYS:
+            environment.pop(key, None)
+        fixture_tmp = command_root / ".agent-canon" / "tmp"
+        environment.update(
+            {
+                "TMPDIR": str(fixture_tmp),
+                "TEMP": str(fixture_tmp),
+                "TMP": str(fixture_tmp),
+            }
+        )
+        if overrides:
+            environment.update(overrides)
+        return environment
 
     def _write_post_create_fixture(
         self, root: Path, *, derived: bool
@@ -179,7 +218,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             ],
             cwd=command_root,
             env={
-                **os.environ,
+                **self._synthetic_root_environment(command_root),
                 "SHARED_STATUS": str(shared_status),
                 "PARENT_STATUS": str(parent_status),
             },
@@ -259,6 +298,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                 check=False,
                 capture_output=True,
                 text=True,
+                env=self._synthetic_root_environment(clone),
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -281,7 +321,12 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             script.chmod(stat.S_IXUSR | stat.S_IRUSR)
 
             parser = build_parser().parse_args(["exec", "tools/agent_tool.sh", "fail"])
-            result = run(parser, resolver=lambda _: self._mock_resolution(root))
+            with patch.dict(
+                os.environ,
+                self._synthetic_root_environment(root),
+                clear=True,
+            ):
+                result = run(parser, resolver=lambda _: self._mock_resolution(root))
             self.assertEqual(result, 1)
 
     def test_post_create_entrypoint_runs_shared_then_derived_hook(self) -> None:
@@ -350,10 +395,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                         .read_text(encoding="utf-8")
                     )
                     test_log = root / "devcontainer-command.log"
-                    environment = {
-                        **os.environ,
-                        "AGENT_CANON_TEST_LOG": str(test_log),
-                    }
+                    environment = self._synthetic_root_environment(
+                        command_root,
+                        {"AGENT_CANON_TEST_LOG": str(test_log)},
+                    )
                     for key in (
                         "initializeCommand",
                         "postCreateCommand",

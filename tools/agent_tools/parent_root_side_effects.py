@@ -2860,9 +2860,10 @@ class ParentRootSideEffectBoundary:
         *,
         issue_handoff: bool = True,
     ) -> dict[str, str]:
-        """Bind persistent child state to the parent and preserve OS temporary state."""
+        """Bind persistent child state and temporary state to the parent."""
         env = dict(os.environ if base_env is None else base_env)
         root = attestation.parent_root
+        default_tmp = root / ".agent-canon" / "tmp"
         default_cache = root / ".agent-canon" / "cache"
         default_target = default_cache / "cargo-target"
 
@@ -2877,6 +2878,9 @@ class ParentRootSideEffectBoundary:
         # directories.  In particular, a late invalid value must not leave
         # earlier defaults behind as an observable partial side effect.
         paths = {
+            "TMPDIR": parent_local_value("TMPDIR", default_tmp),
+            "TEMP": parent_local_value("TEMP", default_tmp),
+            "TMP": parent_local_value("TMP", default_tmp),
             "XDG_CACHE_HOME": parent_local_value("XDG_CACHE_HOME", default_cache),
             "PYTHONPYCACHEPREFIX": parent_local_value(
                 "PYTHONPYCACHEPREFIX", default_cache / "pycache"
