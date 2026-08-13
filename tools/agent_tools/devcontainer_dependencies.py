@@ -4019,14 +4019,15 @@ class Installer:
         # parent. Resolve it before considering the standalone layout so a
         # stale parent-root copy cannot win merely because it exists.
         source_projection = workspace_root.parent / "agent-canon-source" / record.source
-        if source_projection.is_dir():
+        source_projection_is_dir = source_projection.is_dir()
+        if source_projection_is_dir:
             source = source_projection.resolve()
         elif vendor_root.is_dir():
             source = (vendor_root / record.source).resolve()
         else:
             source = standalone_source.resolve()
         allowed_roots = [workspace_root]
-        if source_projection.is_dir():
+        if source_projection_is_dir:
             allowed_roots.append(source_projection.parent.parent.resolve())
         if not any(
             os.path.commonpath((str(root), str(source))) == str(root)

@@ -21,7 +21,6 @@
 # upstream implementation ../../rust/agent-canon/src/memory.rs owns memory CLI validation reused by the Rust build gate.
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
 # upstream implementation ../ci/run_python_quality_checks.sh owns shared Python static quality checks
-# downstream implementation ../../tests/tools/test_agent_canon_pr.py verifies authenticated re-execution and unique scratch
 # downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py verifies parent and standalone graph routes
 # @dependency-end
 

@@ -169,6 +169,9 @@ class ParentOwnedTargetHandle:
     purpose: str
     target_dev: int
     target_ino: int
+    parent_name: str
+    parent_dev: int
+    parent_ino: int
 
     @property
     def proc_path(self) -> str:
@@ -180,10 +183,16 @@ class ParentOwnedTargetHandle:
         target_fd, parent_fd = self.target_fd, self.parent_fd
         self.target_fd = -1
         self.parent_fd = -1
-        if target_fd >= 0:
-            os.close(target_fd)
-        if parent_fd >= 0:
-            os.close(parent_fd)
+        errors: list[OSError] = []
+        for fd in (target_fd, parent_fd):
+            if fd < 0:
+                continue
+            try:
+                os.close(fd)
+            except OSError as exc:
+                errors.append(exc)
+        if errors:
+            raise errors[0]
 
 
 @dataclass
@@ -1188,8 +1197,10 @@ class ParentRootSideEffectBoundary:
             precedence = "resolver"
         ambient_root = os.environ.get("AGENT_CANON_ACTIVE_REPOSITORY_ROOT", "").strip()
         if ambient_root and _physical(Path(ambient_root), strict=True) != root:
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH,
-                                            "ambient active repository root is inconsistent")
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH,
+                f"ambient active repository root is inconsistent: ambient={ambient_root} requested={root}",
+            )
         parent_dev, parent_ino = _identity(root)
         source = _physical(request.source_root, strict=True) if request.source_root else None
         clone = _physical(request.clone_root, strict=True) if request.clone_root else None
@@ -1199,7 +1210,10 @@ class ParentRootSideEffectBoundary:
             if not _contains(root, path):
                 raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH, f"{label} root is outside parent root")
             if _git_toplevel(path) != path:
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_MISMATCH, f"{label} is not an authenticated Git checkout")
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISMATCH,
+                    f"{label} is not an authenticated Git checkout: {path}",
+                )
         if source is not None and clone is not None and source == clone:
             raise ParentRootSideEffectError(ParentRootReject.ROOT_AMBIGUOUS, "source and clone roots are identical")
         # An outer parent is admitted only with all three authenticated binding files.
@@ -1645,6 +1659,7 @@ class ParentRootSideEffectBoundary:
                     "parent identity changed after target reservation",
                 )
             os.fsync(parent_fd)
+            parent_info = os.fstat(parent_fd)
             return ParentOwnedTargetHandle(
                 parent_fd=parent_fd,
                 target_fd=target_fd,
@@ -1652,6 +1667,9 @@ class ParentRootSideEffectBoundary:
                 purpose=purpose,
                 target_dev=info.st_dev,
                 target_ino=info.st_ino,
+                parent_name=name,
+                parent_dev=parent_info.st_dev,
+                parent_ino=parent_info.st_ino,
             )
         except Exception as exc:
             cleanup_errors: list[OSError] = []
@@ -1682,6 +1700,82 @@ class ParentRootSideEffectBoundary:
                 ParentRootReject.ROOT_RACE_DETECTED,
                 f"cannot reserve clone target: {exc}",
             ) from exc
+
+    def _abort_reserved_target(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        handle: ParentOwnedTargetHandle,
+        purpose: str,
+    ) -> None:
+        """Remove only the exact target reserved by an open target handle."""
+        if sys.platform != "linux":
+            raise ParentRootSideEffectError(ParentRootReject.UNSUPPORTED_PLATFORM, sys.platform)
+        try:
+            if handle.parent_fd < 0 or handle.target_fd < 0:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"reserved-target handle is closed ({purpose})",
+                )
+            parent_info = os.fstat(handle.parent_fd)
+            if (parent_info.st_dev, parent_info.st_ino) != (
+                handle.parent_dev,
+                handle.parent_ino,
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"reserved-target parent identity changed ({purpose})",
+                )
+            observed = os.fstat(handle.target_fd)
+            if (observed.st_dev, observed.st_ino) != (
+                handle.target_dev,
+                handle.target_ino,
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"reserved-target identity changed ({purpose})",
+                )
+            parent_fd = handle.parent_fd
+            name = handle.parent_name
+            target_fd = handle.target_fd
+            if _identity(attestation.parent_root) != (
+                attestation.parent_dev,
+                attestation.parent_ino,
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"parent identity changed before reserved-target abort ({purpose})",
+                )
+            observed = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            expected = (handle.target_dev, handle.target_ino)
+            if (observed.st_dev, observed.st_ino) != expected:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"reserved-target identity changed before removal ({purpose})",
+                )
+            opened = os.fstat(target_fd)
+            if (opened.st_dev, opened.st_ino) != expected:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"reserved-target open identity changed ({purpose})",
+                )
+            self._remove_open_tree(target_fd)
+            os.rmdir(name, dir_fd=parent_fd)
+            os.fsync(parent_fd)
+            if _identity(attestation.parent_root) != (
+                attestation.parent_dev,
+                attestation.parent_ino,
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"parent identity changed during reserved-target abort ({purpose})",
+                )
+        except OSError as exc:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"cannot abort reserved target ({purpose}): {exc}",
+            ) from exc
+        finally:
+            handle.close()
 
     def atomic_publish(self, receipt: ParentOwnedPathReceipt, data: bytes) -> ParentOwnedPathReceipt:
         """Publish with same-directory O_EXCL temp, fsync, renameat, and identity checks."""
@@ -2638,7 +2732,16 @@ class ParentRootSideEffectBoundary:
                     ParentRootReject.ROOT_RACE_DETECTED,
                     "file identity changed before read",
                 )
-            return os.read(fd, 1 << 24)
+            chunks: list[bytes] = []
+            while True:
+                try:
+                    chunk = os.read(fd, 1 << 20)
+                except InterruptedError:
+                    continue
+                if not chunk:
+                    break
+                chunks.append(chunk)
+            return b"".join(chunks)
         except OSError as exc:
             raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED,
                                             f"cannot read parent-owned file: {exc}") from exc

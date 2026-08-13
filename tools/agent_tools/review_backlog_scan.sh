@@ -126,19 +126,22 @@ if [[ -z "$REPORT_DIR" ]]; then
   REPORT_DIR="$ROOT_DIR/reports/agents/review-backlog-scan"
 fi
 REPORT_DIR="$(realpath -m "$REPORT_DIR")"
-if [[ -n "${AGENT_CANON_PARENT_ROOT:-}" ]]; then
-  parent_root_real="$(realpath -m "$AGENT_CANON_PARENT_ROOT")"
-  case "$REPORT_DIR" in
-    "$parent_root_real"|"$parent_root_real"/*) ;;
-    *) echo "REVIEW_BACKLOG_SCAN=fail reason=report_dir_outside_parent"; exit 2 ;;
-  esac
-fi
 if [[ -n "$SEMANTIC_QUERY_FILE" ]]; then
   SEMANTIC_QUERY_FILE="$(realpath -m "$SEMANTIC_QUERY_FILE")"
 fi
-mkdir -p "$REPORT_DIR"
-
 TOOL_DIR="$ROOT_DIR/tools/agent_tools"
+BOUNDARY_SCRIPT="$TOOL_DIR/parent_root_side_effects.py"
+if [[ ! -f "$BOUNDARY_SCRIPT" ]]; then
+  BOUNDARY_SCRIPT="$AGENT_CANON_SOURCE_ROOT/tools/agent_tools/parent_root_side_effects.py"
+fi
+REVIEW_SCAN_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-$ROOT_DIR/.agent-canon/cache/review-scan-target}"
+REVIEW_SCAN_TARGET_DIR="$(python3 "$BOUNDARY_SCRIPT" resolve \
+  --root "$ROOT_DIR" --candidate "$REVIEW_SCAN_TARGET_DIR" \
+  --purpose "review-backlog-scan-target")"
+REVIEW_SCAN_TARGET_READY=0
+REPORT_DIR="$(python3 "$BOUNDARY_SCRIPT" ensure-dir \
+  --root "$ROOT_DIR" --candidate "$REPORT_DIR" \
+  --purpose "review-backlog-scan-report")"
 REPORT="$REPORT_DIR/review_backlog_scan.md"
 COMMAND_STATUS="$REPORT_DIR/review_backlog_scan_status.tsv"
 NONZERO_COMMANDS=0
@@ -211,19 +214,31 @@ record_command() {
   fi
 }
 
+ensure_review_scan_target() {
+  if [[ "$REVIEW_SCAN_TARGET_READY" -eq 0 ]]; then
+    REVIEW_SCAN_TARGET_DIR="$(python3 "$BOUNDARY_SCRIPT" ensure-dir \
+      --root "$ROOT_DIR" --candidate "$REVIEW_SCAN_TARGET_DIR" \
+      --purpose "review-backlog-scan-target")"
+    REVIEW_SCAN_TARGET_READY=1
+  fi
+}
+
 run_agent_canon() {
   if command -v cargo >/dev/null 2>&1 && [[ -f "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/Cargo.toml" ]]; then
-    CARGO_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}/.agent-canon/cache/review-scan-target}" \
+    ensure_review_scan_target
+    CARGO_TARGET_DIR="$REVIEW_SCAN_TARGET_DIR" \
       cargo run --quiet --manifest-path "$AGENT_CANON_SOURCE_ROOT/rust/agent-canon/Cargo.toml" -- "$@"
     return
   fi
   if command -v cargo >/dev/null 2>&1 && [[ -f "$ROOT_DIR/rust/agent-canon/Cargo.toml" ]]; then
-    CARGO_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}/.agent-canon/cache/review-scan-target}" \
+    ensure_review_scan_target
+    CARGO_TARGET_DIR="$REVIEW_SCAN_TARGET_DIR" \
       cargo run --quiet --manifest-path "$ROOT_DIR/rust/agent-canon/Cargo.toml" -- "$@"
     return
   fi
   if command -v cargo >/dev/null 2>&1 && [[ -f "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]]; then
-    CARGO_TARGET_DIR="${AGENT_CANON_REVIEW_SCAN_TARGET_DIR:-${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}/.agent-canon/cache/review-scan-target}" \
+    ensure_review_scan_target
+    CARGO_TARGET_DIR="$REVIEW_SCAN_TARGET_DIR" \
       cargo run --quiet --manifest-path "$ROOT_DIR/vendor/agent-canon/rust/agent-canon/Cargo.toml" -- "$@"
     return
   fi

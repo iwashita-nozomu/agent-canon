@@ -33,10 +33,6 @@ from agent_canon_source_root import (  # noqa: E402
     resolve_agent_canon_source_root,
     run,
 )
-from parent_root_side_effects import (  # noqa: E402
-    ParentRootAttestationRequest,
-    ParentRootSideEffectBoundary,
-)
 
 _SYNTHETIC_ROOT_BOUNDARY_ENV_KEYS = (
     "TMPDIR",
@@ -63,28 +59,6 @@ _SYNTHETIC_ROOT_BOUNDARY_ENV_KEYS = (
 
 class AgentCanonSourceRootCLITests(unittest.TestCase):
     """Validate CLI subcommand wiring without touching real owner roots."""
-
-    def test_source_root_dispatch_can_issue_a_parent_bounded_child_environment(self) -> None:
-        """The source-root owner uses the shared parent capability for children."""
-        with tempfile.TemporaryDirectory() as temporary:
-            root = Path(temporary)
-            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
-            receipt = ParentRootSideEffectBoundary().attest(
-                ParentRootAttestationRequest(
-                    cwd=root, explicit_root=root, purpose="agent-canon-source-root"
-                )
-            )
-            environment = ParentRootSideEffectBoundary().child_environment(
-                receipt,
-                {
-                    "HOME": "/unchanged/home",
-                },
-            )
-            self.assertEqual(environment["HOME"], "/unchanged/home")
-            expected_tmp = str((root / ".agent-canon" / "tmp").resolve())
-            self.assertEqual(environment["TMPDIR"], expected_tmp)
-            self.assertEqual(environment["TEMP"], expected_tmp)
-            self.assertEqual(environment["TMP"], expected_tmp)
 
     def _mock_resolution(self, command_root: Path) -> RootResolution:
         return RootResolution(

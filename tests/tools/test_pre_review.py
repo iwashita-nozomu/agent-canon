@@ -76,9 +76,27 @@ def test_pre_review_uses_boundary_report_and_parent_local_child_env(
     assert not (tmp_path / "outside-report.txt").exists()
 
 
-def test_pre_review_has_no_direct_report_redirection() -> None:
-    source = SCRIPT.read_text(encoding="utf-8")
-
-    assert '>"${REPORT_FILE}"' not in source
-    assert '>>"${REPORT_FILE}"' not in source
-    assert "--purpose pre-review-report-content" in source
+def test_pre_review_rejects_external_report_dir_without_side_effect(
+    tmp_path: Path,
+) -> None:
+    parent = tmp_path / "parent"
+    (parent / "tools" / "ci").mkdir(parents=True)
+    (parent / "tools" / "agent_tools").mkdir(parents=True)
+    shutil.copy2(SCRIPT, parent / "tools" / "ci" / SCRIPT.name)
+    shutil.copy2(BOUNDARY, parent / "tools" / "agent_tools" / BOUNDARY.name)
+    subprocess.run(("git", "init", "-q", "-b", "main"), cwd=parent, check=True)
+    outside = tmp_path / "outside-report"
+    env = {key: value for key, value in os.environ.items() if key not in PATH_ENV_KEYS}
+    env["AGENT_REPORT_DIR"] = str(outside)
+    result = subprocess.run(
+        ("bash", str(parent / "tools" / "ci" / SCRIPT.name)),
+        cwd=parent,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode != 0
+    assert "symlink_escape" in result.stderr or "outside" in result.stderr
+    assert not outside.exists()
+    assert not (parent / "reports").exists()

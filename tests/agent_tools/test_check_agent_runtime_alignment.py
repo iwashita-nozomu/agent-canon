@@ -58,6 +58,21 @@ def loaded_task_catalog_raw() -> dict[str, object]:
     )
 
 
+def test_missing_report_bundle_path_uses_existing_git_parent(tmp_path: Path) -> None:
+    """A future report bundle is checked without being created."""
+    parent = tmp_path / "parent"
+    subprocess.run(["git", "init", "-q", "-b", "main", str(parent)], check=True)
+    report_dir = parent / "reports" / "agents" / "future-run"
+
+    resolved = resolve_report_bundle_artifact_path(
+        report_dir,
+        "intent_brief.md",
+    )
+
+    assert resolved == report_dir / "intent_brief.md"
+    assert not report_dir.exists()
+
+
 class AgentRuntimeAlignmentTest(unittest.TestCase):
     """Verify that the runtime alignment checker passes on the checked-in canon."""
 
@@ -80,19 +95,6 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             ),
             encoding="utf-8",
         )
-
-    def test_missing_report_bundle_path_uses_existing_git_parent(self) -> None:
-        """A future report bundle is checked without being created."""
-        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as tmp_dir:
-            report_dir = Path(tmp_dir) / "reports" / "agents" / "future-run"
-
-            resolved = resolve_report_bundle_artifact_path(
-                report_dir,
-                "intent_brief.md",
-            )
-
-            self.assertEqual(resolved, report_dir / "intent_brief.md")
-            self.assertFalse(report_dir.exists())
 
     def test_alignment_script_passes(self) -> None:
         """The runtime alignment checker should succeed without findings."""

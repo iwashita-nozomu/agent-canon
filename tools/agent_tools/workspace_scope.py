@@ -145,6 +145,9 @@ def resolve_report_bundle_artifact_path(
     parts = tuple(part for part in relative_path.parts if part not in {"", "."})
     if not parts:
         raise ReportBundleArtifactPathError(declared_path, "not_relative")
+    for component in parts:
+        if component == "..":
+            raise ReportBundleArtifactPathError(declared_path, "outside_bundle")
     report_root = report_dir.resolve()
     try:
         configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
@@ -180,8 +183,6 @@ def resolve_report_bundle_artifact_path(
         raise ReportBundleArtifactPathError(declared_path, exc.reject.value) from exc
     lexical_path = report_root
     for index, component in enumerate(parts):
-        if component == "..":
-            raise ReportBundleArtifactPathError(declared_path, "outside_bundle")
         lexical_path = lexical_path / component
         if lexical_path.is_symlink():
             raise ReportBundleArtifactPathError(declared_path, "symlink_component")

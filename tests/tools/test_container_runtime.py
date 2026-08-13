@@ -22,7 +22,6 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
-
 from tools.ci import container_runtime as runtime_module
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -325,29 +324,33 @@ def test_cli_mount_cannot_override_linked_target(tmp_path: Path) -> None:
         runtime.resolve_linked_data_mounts = original
 
 
-def test_docker_host_profile_requires_socket_and_projects_rw_bind() -> None:
+def test_docker_host_profile_requires_socket_and_projects_rw_bind(tmp_path: Path) -> None:
     """Explicit docker-host selection requires and projects an existing socket."""
     runtime = load_runtime_module()
-    socket_path = PROJECT_ROOT / "s"
-    if socket_path.exists():
-        pytest.skip("short parent-local socket path is already occupied")
+    fixture_root = tmp_path / "container-runtime-fixture"
+    fixture_root.mkdir(parents=True, exist_ok=True)
+    directory_fd = os.open(fixture_root, os.O_RDONLY | os.O_DIRECTORY)
+    socket_path = Path(f"/proc/self/fd/{directory_fd}/s")
     sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-    sock.bind(str(socket_path))
     try:
-        assert runtime.resolve_docker_host_mounts(socket_path=socket_path) == (
-            f"{socket_path}:/var/run/docker.sock",
-        )
-    finally:
-        sock.close()
-        socket_path.unlink()
-    with pytest.raises(ValueError, match="existing Unix socket"):
-        runtime.resolve_docker_host_mounts(socket_path=socket_path)
-    socket_path.write_text("not a socket\n", encoding="utf-8")
-    try:
+        try:
+            sock.bind(str(socket_path))
+            assert runtime.resolve_docker_host_mounts(socket_path=socket_path) == (
+                f"{socket_path}:/var/run/docker.sock",
+            )
+        finally:
+            sock.close()
+            socket_path.unlink(missing_ok=True)
+        assert not (fixture_root / "s").exists()
+        with pytest.raises(ValueError, match="existing Unix socket"):
+            runtime.resolve_docker_host_mounts(socket_path=socket_path)
+        socket_path.write_text("not a socket\n", encoding="utf-8")
         with pytest.raises(ValueError, match="existing Unix socket"):
             runtime.resolve_docker_host_mounts(socket_path=socket_path)
     finally:
         socket_path.unlink(missing_ok=True)
+        os.close(directory_fd)
+    assert not (fixture_root / "s").exists()
 
 
 def test_docker_host_profile_reaches_direct_run_command(tmp_path: Path) -> None:

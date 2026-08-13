@@ -179,21 +179,6 @@ ROOT_DIR="$(realpath -e "$ROOT_DIR")" || {
 SCRIPT_TOOLS_ROOT="$(dirname "$(realpath -m "$script_dir")")"
 cd "$ROOT_DIR"
 
-if [[ -n "${AGENT_CANON_PARENT_ROOT:-}" ]]; then
-  parent_root_real="$(realpath -e "$AGENT_CANON_PARENT_ROOT")" || {
-    echo "REPO_DEPENDENCY_REVIEW=fail reason=parent_root_missing"
-    exit 2
-  }
-  root_real="$(realpath -e "$ROOT_DIR")" || {
-    echo "REPO_DEPENDENCY_REVIEW=fail reason=root_missing"
-    exit 2
-  }
-  case "$root_real" in
-    "$parent_root_real"|"$parent_root_real"/*) ;;
-    *) echo "REPO_DEPENDENCY_REVIEW=fail reason=root_outside_parent"; exit 2 ;;
-  esac
-fi
-
 if [[ "$HEADER_SCAN_ONLY" -eq 1 && ( -z "$CHANGED_PATH_PACKET" || -z "$TRUSTED_BASE_SHA" ) ]]; then
   echo "REPO_DEPENDENCY_REVIEW=fail reason=header_scan_trusted_packet_required"
   exit 2
@@ -232,10 +217,16 @@ if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
   dependency_query_file="$(mktemp "$tmp_base/dependency-query.XXXXXX")"
   owner_query_file="$(mktemp "$tmp_base/owner-query.XXXXXX")"
   cleanup_review_tmp() {
-    rm -f "$status_file" "$dependency_query_file" "$owner_query_file"
+    local primary_status=$?
+    local cleanup_status=0
+    trap - EXIT
     python3 "${script_dir}/parent_root_side_effects.py" remove-tree \
       --root "$REVIEW_PARENT_ROOT" --candidate "$tmp_base" \
-      --purpose dependency-review-temp >/dev/null 2>&1 || true
+      --purpose dependency-review-temp >/dev/null || cleanup_status=$?
+    if [[ "$primary_status" -ne 0 ]]; then
+      exit "$primary_status"
+    fi
+    exit "$cleanup_status"
   }
   trap cleanup_review_tmp EXIT
 

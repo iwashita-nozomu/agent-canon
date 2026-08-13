@@ -34,8 +34,10 @@ def test_policy_module_imports_as_package() -> None:
     assert result.returncode == 0, result.stderr
 
 
-def test_retrieve_inventory_blob_uses_parent_temp_receipt() -> None:
+def test_retrieve_inventory_blob_uses_parent_temp_receipt(tmp_path: Path) -> None:
     """Git retrieval uses a parent-owned temporary receipt and removes it."""
+    parent = tmp_path / "parent"
+    subprocess.run(["git", "init", "-q", "-b", "main", str(parent)], check=True)
     created: list[object] = []
     original_open = policy.ParentRootSideEffectBoundary.open_parent_owned_target
 
@@ -71,7 +73,7 @@ def test_retrieve_inventory_blob_uses_parent_temp_receipt() -> None:
         return original_run(args, **kwargs)
 
     with mock.patch.dict(
-        os.environ, {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
+        os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent)}
     ), mock.patch.object(
         policy.ParentRootSideEffectBoundary,
         "open_parent_owned_target",
@@ -84,8 +86,12 @@ def test_retrieve_inventory_blob_uses_parent_temp_receipt() -> None:
     assert not created[0].physical_path.exists()
 
 
-def test_retrieve_inventory_blob_rejects_replaced_target_without_outside_write() -> None:
+def test_retrieve_inventory_blob_rejects_replaced_target_without_outside_write(
+    tmp_path: Path,
+) -> None:
     """An in-parent target replacement is typed while Git retains the inherited fd."""
+    parent = tmp_path / "parent"
+    subprocess.run(["git", "init", "-q", "-b", "main", str(parent)], check=True)
     created: list[object] = []
     original_open = policy.ParentRootSideEffectBoundary.open_parent_owned_target
     original_run = subprocess.run
@@ -131,7 +137,7 @@ def test_retrieve_inventory_blob_rejects_replaced_target_without_outside_write()
         return subprocess.CompletedProcess(args, 0, blob, b"")
 
     with mock.patch.dict(
-        os.environ, {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
+        os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent)}
     ), mock.patch.object(
         policy.ParentRootSideEffectBoundary,
         "open_parent_owned_target",
@@ -147,7 +153,7 @@ def test_retrieve_inventory_blob_rejects_replaced_target_without_outside_write()
     assert len(created) == 1
     assert target_path is not None and moved_path is not None
     with mock.patch.dict(
-        os.environ, {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
+        os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent)}
     ):
         boundary, attestation = policy._parent_capability()
         for path in (target_path, moved_path):

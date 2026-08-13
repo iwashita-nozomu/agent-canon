@@ -24,44 +24,79 @@ source "${SCRIPT_DIR}/lib/update_materialization.sh"
 source "${SCRIPT_DIR}/lib/git_authority.sh"
 ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")"
-python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
-  attest --root "$ROOT_DIR" --purpose agent-canon-update >/dev/null
-CANON_PARENT_TMP_CANDIDATE="${AGENT_CANON_PARENT_TMPDIR:-$ROOT_DIR/.agent-canon/tmp/update}"
+AGENT_CANON_SOURCE_ROOT="$(git -C "${CANON_TOOLS_ROOT}" rev-parse --show-toplevel)"
+PARENT_ROOT_DIR="${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}"
+PARENT_ROOT_DIR="$(cd "${PARENT_ROOT_DIR}" && pwd -P)"
+AGENT_CANON_BOUNDARY_SCRIPT="${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py"
+
+if [[ "${PARENT_ROOT_DIR}" != "${ROOT_DIR}" \
+  && "${AGENT_CANON_CHILD_PURPOSE:-}" != "agent-canon-update-script" ]]; then
+  echo "AGENT_CANON_UPDATE_PARENT_HANDOFF=missing" >&2
+  echo "AGENT_CANON_UPDATE_PARENT_ROOT=${PARENT_ROOT_DIR}" >&2
+  echo "AGENT_CANON_UPDATE_SOURCE_ROOT=${AGENT_CANON_SOURCE_ROOT}" >&2
+  exit 2
+fi
+if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "agent-canon-update-script" ]]; then
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
+    --root "${PARENT_ROOT_DIR}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-update-script \
+    --consume >/dev/null
+else
+  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${PARENT_ROOT_DIR}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-update-script \
+    --issue-handoff \
+    -- bash "${BASH_SOURCE[0]}" "$@"
+fi
+unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
+
+CANON_PARENT_TMP_CANDIDATE="${AGENT_CANON_PARENT_TMPDIR:-$PARENT_ROOT_DIR/.agent-canon/tmp/update}"
 CANON_PARENT_TMPDIR="$(python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
-  ensure-dir --root "$ROOT_DIR" --candidate "$CANON_PARENT_TMP_CANDIDATE" --purpose agent-canon-update)"
+  ensure-dir --root "$PARENT_ROOT_DIR" --candidate "$CANON_PARENT_TMP_CANDIDATE" --purpose agent-canon-update)"
 export TMPDIR="$CANON_PARENT_TMPDIR"
 parent_ensure_dir() {
   python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
-    ensure-dir --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-update}"
+    ensure-dir --root "$PARENT_ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-update}"
 }
 parent_temp_dir() {
   python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
-    temp-dir --root "$ROOT_DIR" --candidate "$1" --prefix "$2" --purpose "${3:-agent-canon-update}"
+    temp-dir --root "$PARENT_ROOT_DIR" --candidate "$1" --prefix "$2" --purpose "${3:-agent-canon-update}"
 }
 parent_write_file() {
   local candidate="$1" content="${2-}"
   printf '%s' "$content" | python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
-    write --root "$ROOT_DIR" --candidate "$candidate" --purpose "${3:-agent-canon-update}" >/dev/null
+    write --root "$PARENT_ROOT_DIR" --candidate "$candidate" --purpose "${3:-agent-canon-update}" >/dev/null
 }
 parent_remove_file() {
   python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
-    remove-file --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-update}" >/dev/null
+    remove-file --root "$PARENT_ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-update}" >/dev/null
 }
 parent_remove_tree() {
   python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
-    remove-tree --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-update}" >/dev/null
+    remove-tree --root "$PARENT_ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-update}" >/dev/null
 }
 parent_copy_file() {
   python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
-    copy --root "$ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
+    copy --root "$PARENT_ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
 }
 parent_move_path() {
   python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
-    move --root "$ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
+    move --root "$PARENT_ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
 }
 parent_symlink() {
   python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
-    symlink --root "$ROOT_DIR" --target "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
+    symlink --root "$PARENT_ROOT_DIR" --target "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
+}
+run_parent_bound_sync() {
+  AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${PARENT_ROOT_DIR}" \
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${PARENT_ROOT_DIR}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-sync-script \
+    --issue-handoff \
+    -- bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" "$@"
 }
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 SUPERPROJECT_DIR=""
@@ -377,7 +412,13 @@ rebuild_agent_tools_if_available() {
     echo "AGENT_CANON_TOOL_REBUILD=skipped_missing_tool"
     return
   fi
-  bash "$rebuild_tool"
+  AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${PARENT_ROOT_DIR}" \
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+      --root "${PARENT_ROOT_DIR}" \
+      --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+      --purpose agent-canon-rebuild-script \
+      --issue-handoff \
+      -- bash "$rebuild_tool"
 }
 
 emit_queue_receipt() {
@@ -399,7 +440,7 @@ emit_queue_receipt() {
       "$source_main_readback_evidence_ref" "$predecessor_388_evidence_ref" \
       "$predecessor_389_evidence_ref" "$source_projection_packet" \
       "$queue_output" "$frontier_output" \
-      "$AGENT_CANON_DIR" "$current_marker" "$ROOT_DIR" <<'PY'
+      "$AGENT_CANON_DIR" "$current_marker" "$PARENT_ROOT_DIR" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -532,7 +573,7 @@ accept_dependency_frontier() {
       "$rebind_receipt_file" "$source_main_sha" "$source_main_tree" \
       "$acceptance_evidence_ref" \
       "$accepted_output" "$SOURCE_PROJECTION_PACKET" "$g4_output" \
-      "$ROOT_DIR" <<'PY'
+      "$PARENT_ROOT_DIR" "$ROOT_DIR" <<'PY'
 import hashlib
 import json
 import sys
@@ -564,9 +605,10 @@ from update_lifecycle_contract import (
     output_path,
     packet_path,
     g4_path,
-    root_dir,
+    parent_root_dir,
+    logical_root_dir,
 ) = sys.argv[1:]
-root = Path(root_dir)
+root = Path(parent_root_dir)
 boundary = ParentRootSideEffectBoundary()
 attestation = boundary.attest(
     ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="update-frontier")
@@ -638,7 +680,7 @@ g4 = materialize_gate_verdict(
             }
         )
     ).hexdigest(),
-    owner=str(Path(root_dir).resolve())
+    owner=str(Path(logical_root_dir).resolve())
     + "/tools/update_agent_canon.sh#accept_dependency_frontier",
     verdict="pass",
 )
@@ -684,7 +726,7 @@ advance_source_projection() {
   mapfile -t projection_values < <(
     PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
       python3 - "$packet" "$binding_file" "$rebind_file" \
-        "$source_main_sha" "$source_main_tree" "$ROOT_DIR" <<'PY'
+        "$source_main_sha" "$source_main_tree" "$PARENT_ROOT_DIR" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -830,7 +872,7 @@ cmd_plan() {
     echo "agent_canon_plan_branch=$branch"
     return
   fi
-  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" plan "$branch"
+  run_parent_bound_sync plan "$branch"
 }
 
 cmd_latest() {
@@ -882,7 +924,7 @@ cmd_latest() {
   latest_log_dir="$(parent_temp_dir "$CANON_PARENT_TMPDIR" latest-log)"
   latest_log="$latest_log_dir/output"
   local latest_output=""
-  latest_output="$(bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" ensure-latest "$branch" 2>&1)" || latest_rc=$?
+  latest_output="$(run_parent_bound_sync ensure-latest "$branch" 2>&1)" || latest_rc=$?
   parent_write_file "$latest_log" "$latest_output"
   if [ "$latest_rc" -ne 0 ]; then
     cat "$latest_log"
@@ -910,7 +952,7 @@ cmd_latest() {
   fi
   parent_remove_file "$latest_log"
 
-  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" check
+  run_parent_bound_sync check
   rebuild_agent_tools_if_available
   acknowledge_update_todos_if_available || todo_rc=$?
   if [ "$todo_rc" -eq 2 ]; then
@@ -943,7 +985,7 @@ cmd_apply() {
   latest_log_dir="$(parent_temp_dir "$CANON_PARENT_TMPDIR" latest-log)"
   latest_log="$latest_log_dir/output"
   local latest_output=""
-  latest_output="$(bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" ensure-latest "$branch" 2>&1)" || latest_rc=$?
+  latest_output="$(run_parent_bound_sync ensure-latest "$branch" 2>&1)" || latest_rc=$?
   parent_write_file "$latest_log" "$latest_output"
   cat "$latest_log"
   if [ "$latest_rc" -ne 0 ]; then
@@ -972,7 +1014,7 @@ cmd_status() {
     echo "agent_canon_source_worktree_status=$(git -C "$AGENT_CANON_DIR" status --porcelain=v1 --untracked-files=all | wc -l | tr -d ' ')"
     return
   fi
-  bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" status
+  run_parent_bound_sync status
 }
 
 cmd_merge_main_into_current() {

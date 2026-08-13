@@ -31,7 +31,6 @@ import os
 import re
 import subprocess
 import sys
-import tempfile
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -50,6 +49,12 @@ AGENT_TOOLS_DIR = Path(__file__).resolve().parents[1] / "agent_tools"
 if str(AGENT_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_DIR))
 
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
 
 PARENT_ENVIRONMENT_MANIFEST = ".devcontainer/parent-environment.toml"
 ENVIRONMENT_NAME_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\Z")
@@ -980,8 +985,10 @@ def validate_generated_compose(
     *,
     profile: str = "default",
     compose_path: Path | None = None,
+    runtime_source: Path | None = None,
 ) -> list[Finding]:
     """Validate generated Compose meaning rather than generator implementation text."""
+    runtime_source = runtime_source or (root / ".agent-canon/runtime")
     if compose_path is None:
         if (root / "vendor" / "agent-canon").is_dir():
             compose_path = root / ".agent-canon" / "docker-compose.generated.yml"
@@ -1437,8 +1444,8 @@ def validate_generated_compose(
                 )
             )
         else:
-            runtime_source, runtime_target = volume_fields(runtime_mounts[0])
-            if runtime_source != str(root / ".agent-canon/runtime"):
+            actual_runtime_source, runtime_target = volume_fields(runtime_mounts[0])
+            if actual_runtime_source != str(runtime_source):
                 findings.append(
                     Finding(
                         "dependency_contract_violation",
@@ -1809,7 +1816,7 @@ def validate_generated_compose(
                 "DEVCONTAINER_GPU_REQUEST": "all",
                 "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
                 "AGENT_CANON_SHARED_RUNTIME_SOURCE": "/var/lib/agent-canon/runtime",
-                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(root / ".agent-canon/runtime"),
+                "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(runtime_source),
                 "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
                 "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-provision.json",
                 "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": "/var/lib/agent-canon/runtime/shared-runtime-readback.json",
@@ -1869,12 +1876,34 @@ def validate_generated_compose_scenarios(
     if not script_path.is_file() or script_path.stat().st_mode & 0o111 == 0:
         return []
     findings: list[Finding] = []
+    boundary = ParentRootSideEffectBoundary()
+    runtime_source: Path | None = None
     temporary_parent = root / ".agent-canon" / "tmp"
-    temporary_parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(
-        prefix="container-config-", dir=temporary_parent
-    ) as tmp_dir:
-        temporary_root = Path(tmp_dir)
+    agent_canon_dir = root / ".agent-canon"
+    temporary_parent_existed = temporary_parent.is_dir()
+    agent_canon_dir_existed = agent_canon_dir.is_dir()
+    try:
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=root, explicit_root=root, purpose="container-config-runtime"
+            )
+        )
+        temporary = boundary.create_parent_owned_temp_directory(
+            attestation,
+            temporary_parent,
+            "container-config-runtime",
+            "container-config",
+        )
+    except ParentRootSideEffectError as exc:
+        return [
+            Finding(
+                "dependency_contract_violation",
+                script_path.relative_to(root).as_posix(),
+                f"container-config-runtime-boundary:{exc}",
+            )
+        ]
+    temporary_root = temporary.physical_path
+    try:
         base_environment = {
             name: value
             for name, value in os.environ.items()
@@ -1891,20 +1920,24 @@ def validate_generated_compose_scenarios(
         scenarios: list[tuple[str, dict[str, str]]] = [("default", {})]
         packs_dir = root / "docker" / "packs"
         if packs_dir.is_dir():
+            runtime_source = boundary.ensure_parent_owned_directory(
+                attestation,
+                temporary_root / "runtime",
+                "container-config-runtime-source",
+            ).physical_path
             scenarios.append(
                 (
                     "gpu-admission",
                     {
                         "AGENT_CANON_GPU_ADMISSION_PROFILE": "gpu-admission",
-                        "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(root / ".agent-canon/runtime"),
-                        "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(root / ".agent-canon/runtime"),
+                        "AGENT_CANON_SHARED_RUNTIME_SOURCE": str(runtime_source),
+                        "AGENT_CANON_SHARED_RUNTIME_HOST_SOURCE": str(runtime_source),
                         "AGENT_CANON_SHARED_RUNTIME_TARGET": "/var/lib/agent-canon/runtime",
-                        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(root / ".agent-canon/runtime/shared-runtime-provision.json"),
-                        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(root / ".agent-canon/runtime/shared-runtime-readback.json"),
+                        "AGENT_CANON_SHARED_RUNTIME_PROVISION_RECEIPT": str(runtime_source / "shared-runtime-provision.json"),
+                        "AGENT_CANON_SHARED_RUNTIME_READBACK_RECEIPT": str(runtime_source / "shared-runtime-readback.json"),
                     },
                 )
             )
-            (root / ".agent-canon/runtime").mkdir(parents=True, exist_ok=True)
         for profile, additions in scenarios:
             compose_path = temporary_root / f"{profile}.yml"
             scenario_pack = pack
@@ -1945,7 +1978,26 @@ def validate_generated_compose_scenarios(
                     scenario_pack,
                     profile=profile,
                     compose_path=compose_path,
+                    runtime_source=(runtime_source if profile == "gpu-admission" else None),
                 )
+            )
+    finally:
+        boundary.remove_parent_owned_tree(
+            attestation, temporary, "container-config-runtime-cleanup"
+        )
+        if not temporary_parent_existed and temporary_parent.is_dir():
+            parent_receipt = boundary.resolve_parent_owned_path(
+                attestation, temporary_parent, "container-config-runtime-base-cleanup", create=False
+            )
+            boundary.remove_empty_parent_owned_directory(
+                attestation, parent_receipt, "container-config-runtime-base-cleanup"
+            )
+        if not agent_canon_dir_existed and agent_canon_dir.is_dir():
+            root_receipt = boundary.resolve_parent_owned_path(
+                attestation, agent_canon_dir, "container-config-agent-base-cleanup", create=False
+            )
+            boundary.remove_empty_parent_owned_directory(
+                attestation, root_receipt, "container-config-agent-base-cleanup"
             )
     return findings
 

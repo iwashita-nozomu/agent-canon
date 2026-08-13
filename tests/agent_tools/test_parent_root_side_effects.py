@@ -544,7 +544,20 @@ def test_atomic_publish_and_child_environment_keep_home_unchanged(tmp_path: Path
     assert env["CARGO_TARGET_DIR"] == env["AGENT_CANON_CLI_TARGET_DIR"]
 
 
-@pytest.mark.parametrize("name", ("TMPDIR", "TEMP", "TMP", "AGENT_CANON_CLI_TARGET_DIR"))
+@pytest.mark.parametrize(
+    "name",
+    (
+        "TMPDIR",
+        "TEMP",
+        "TMP",
+        "XDG_CACHE_HOME",
+        "PYTHONPYCACHEPREFIX",
+        "AGENT_CANON_TOOLS_HOME",
+        "AGENT_CANON_CLI_TARGET_DIR",
+        "CARGO_HOME",
+        "CARGO_TARGET_DIR",
+    ),
+)
 def test_child_environment_rejects_external_override_before_creating_directories(
     tmp_path: Path,
     name: str,
@@ -563,6 +576,58 @@ def test_child_environment_rejects_external_override_before_creating_directories
     assert not (tmp_path / ".agent-canon" / "tmp").exists()
     assert not (tmp_path / ".agent-canon" / "cache").exists()
     assert not external.exists()
+
+
+def test_abort_reserved_target_failure_leaves_target_absent(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    sibling = tmp_path / "workspace" / "topic" / "sibling"
+    sibling.mkdir(parents=True)
+    (sibling / "keep.txt").write_text("keep\n", encoding="utf-8")
+    target = tmp_path / "workspace" / "topic" / "agent-canon"
+    handle = boundary.open_parent_owned_target(receipt, target, "clone-target")
+    (target / "partial" / "nested").mkdir(parents=True)
+    (target / "partial" / "nested" / "residue.txt").write_text(
+        "residue\n", encoding="utf-8"
+    )
+
+    boundary._abort_reserved_target(receipt, handle, "clone-failure")
+
+    assert not target.exists()
+    assert (sibling / "keep.txt").read_text(encoding="utf-8") == "keep\n"
+    with pytest.raises(ParentRootSideEffectError):
+        boundary._abort_reserved_target(receipt, handle, "clone-failure-reuse")
+
+
+def test_abort_reserved_target_closes_fds_on_validation_error(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    target = tmp_path / "workspace" / "topic" / "validation-error"
+    handle = boundary.open_parent_owned_target(receipt, target, "validation-error")
+    parent_fd, target_fd = handle.parent_fd, handle.target_fd
+    handle.parent_dev += 1
+    with pytest.raises(ParentRootSideEffectError):
+        boundary._abort_reserved_target(receipt, handle, "validation-error")
+    with pytest.raises(OSError):
+        os.fstat(parent_fd)
+    with pytest.raises(OSError):
+        os.fstat(target_fd)
+    published = boundary.resolve_parent_owned_path(receipt, target, "validation-error")
+    boundary.remove_parent_owned_tree(receipt, published, "validation-error-cleanup")
+
+
+def test_read_parent_owned_file_reads_exact_large_payload(tmp_path: Path) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    payload = (b"0123456789abcdef" * ((16 * 1024 * 1024) // 16 + 1))[: 16 * 1024 * 1024 + 17]
+    target = boundary.resolve_parent_owned_path(receipt, "reports/large.bin", "large-read")
+    published = boundary.atomic_publish(target, payload)
+
+    assert boundary.read_parent_owned_file(published) == payload
 
 
 def test_child_environment_rejects_target_alias_mismatch_before_creating_directories(

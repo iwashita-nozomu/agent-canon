@@ -3271,9 +3271,9 @@ class DependencyModelTests(unittest.TestCase):
                 "  if [ \"$1\" = '--manifest-path' ]; then manifest=\"$2\"; shift 2; else shift; fi\n"
                 "done\n"
                 "crate_dir=\"$(dirname \"$manifest\")\"\n"
-                "mkdir -p \"$crate_dir/target/release\"\n"
-                "printf '%s\\n' '#!/usr/bin/env sh' \"printf '%s\\n' 'agent-canon 0.1.0'\" > \"$crate_dir/target/release/agent-canon\"\n"
-                "chmod +x \"$crate_dir/target/release/agent-canon\"\n"
+                "mkdir -p \"${CARGO_TARGET_DIR:?}/release\"\n"
+                "printf '%s\\n' '#!/usr/bin/env sh' \"printf '%s\\n' 'agent-canon 0.1.0'\" > \"${CARGO_TARGET_DIR:?}/release/agent-canon\"\n"
+                "chmod +x \"${CARGO_TARGET_DIR:?}/release/agent-canon\"\n"
                 "printf '%s\\n' mutation > \"$crate_dir/build-mutation\"\n"
                 "git -C \"$crate_dir\" add build-mutation\n"
                 "git -C \"$crate_dir\" commit -m 'build mutation' >/dev/null\n",
@@ -3365,9 +3365,9 @@ class DependencyModelTests(unittest.TestCase):
                 "  if [ \"$1\" = '--manifest-path' ]; then manifest=\"$2\"; shift 2; else shift; fi\n"
                 "done\n"
                 "crate_dir=\"$(dirname \"$manifest\")\"\n"
-                "mkdir -p \"$crate_dir/target/release\"\n"
-                "printf '%s\\n' '#!/usr/bin/env bash' \"echo 'agent-canon test 0.1.0'\" > \"$crate_dir/target/release/agent-canon\"\n"
-                "chmod +x \"$crate_dir/target/release/agent-canon\"\n"
+                "mkdir -p \"${CARGO_TARGET_DIR:?}/release\"\n"
+                "printf '%s\\n' '#!/usr/bin/env bash' \"echo 'agent-canon test 0.1.0'\" > \"${CARGO_TARGET_DIR:?}/release/agent-canon\"\n"
+                "chmod +x \"${CARGO_TARGET_DIR:?}/release/agent-canon\"\n"
                 "if [ \"${AGENT_CANON_TEST_MUTATE_SOURCE:-0}\" = \"1\" ]; then\n"
                 "  printf '%s\\n' mutation > \"$crate_dir/build-mutation\"\n"
                 "  git -C \"$crate_dir\" add build-mutation\n"
@@ -3405,6 +3405,8 @@ class DependencyModelTests(unittest.TestCase):
                 accepted.stdout,
             )
             self.assertFalse((host_home / ".cargo").exists())
+            self.assertFalse((source / "target").exists())
+            self.assertFalse((source / "rust" / "agent-canon" / "target").exists())
             state = (tools_home / "agent-canon" / ".build-state").read_text(
                 encoding="utf-8"
             )

@@ -56,6 +56,23 @@ def write_file(root: Path, relative: str, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
+def agent_canon_tree_snapshot(repo: Path) -> tuple[tuple[str, str, bytes | str], ...]:
+    """Capture the complete .agent-canon tree without following symlinks."""
+    base = repo / ".agent-canon"
+    if not base.exists():
+        return ()
+    entries: list[tuple[str, str, bytes | str]] = []
+    for path in sorted(base.rglob("*")):
+        relative = path.relative_to(base).as_posix()
+        if path.is_symlink():
+            entries.append((relative, "symlink", path.readlink().as_posix()))
+        elif path.is_dir():
+            entries.append((relative, "directory", b""))
+        else:
+            entries.append((relative, "file", path.read_bytes()))
+    return tuple(entries)
+
+
 def write_generator_boundary(root: Path) -> None:
     """Provide the authenticated publication capability to generator fixtures."""
     boundary = root / "tools/agent_tools/parent_root_side_effects.py"
@@ -542,6 +559,65 @@ def test_generator_scenarios_require_default_and_gpu_compose_outputs(
         "default-scenario-compose-required",
         "gpu-admission-scenario-compose-required",
     }
+
+
+def test_generated_compose_scenario_cleanup_preserves_source_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Successful generation leaves only pre-existing source state."""
+    repo = write_topic_fixture(tmp_path)
+    sentinel = repo / ".agent-canon" / "source-sentinel.txt"
+    sentinel.parent.mkdir(parents=True)
+    sentinel.write_text("source\n", encoding="utf-8")
+    before = sentinel.read_bytes()
+    before_tree = agent_canon_tree_snapshot(repo)
+    module = load_container_config_module()
+    original_run = module.subprocess.run
+
+    def fake_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        command = args[0]
+        if isinstance(command, list) and command[:2] == ["git", "-C"]:
+            return original_run(*args, **kwargs)
+        environment = kwargs["env"]
+        assert isinstance(environment, dict)
+        Path(environment["AGENT_CANON_DOCKER_COMPOSE_OUTPUT"]).write_text(
+            "services: {}\n", encoding="utf-8"
+        )
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(module.subprocess, "run", fake_run)
+    monkeypatch.setattr(module, "validate_generated_compose", lambda *args, **kwargs: [])
+    assert module.validate_generated_compose_scenarios(repo, None) == []
+    assert sentinel.read_bytes() == before
+    assert agent_canon_tree_snapshot(repo) == before_tree
+    assert not (repo / ".agent-canon" / "tmp").exists()
+    assert not (repo / ".agent-canon" / "runtime").exists()
+
+
+def test_generated_compose_failure_cleanup_preserves_source_snapshot(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Injected generator failure still removes task temp and preserves source."""
+    repo = write_topic_fixture(tmp_path)
+    sentinel = repo / ".agent-canon" / "source-sentinel.txt"
+    sentinel.parent.mkdir(parents=True)
+    sentinel.write_text("source\n", encoding="utf-8")
+    before_tree = agent_canon_tree_snapshot(repo)
+    module = load_container_config_module()
+    original_run = module.subprocess.run
+
+    def failed_run(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+        command = args[0]
+        if isinstance(command, list) and command[:2] == ["git", "-C"]:
+            return original_run(*args, **kwargs)
+        return subprocess.CompletedProcess(args, 17, "", "injected failure")
+
+    monkeypatch.setattr(module.subprocess, "run", failed_run)
+    findings = module.validate_generated_compose_scenarios(repo, None)
+    assert any("default-scenario-generation-failed:rc=17" in f.detail for f in findings)
+    assert sentinel.read_text(encoding="utf-8") == "source\n"
+    assert agent_canon_tree_snapshot(repo) == before_tree
+    assert not (repo / ".agent-canon" / "tmp").exists()
 
 
 def generate_gpu_admission_compose(tmp_path: Path) -> tuple[Path, Path]:

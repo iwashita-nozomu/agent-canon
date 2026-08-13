@@ -14,7 +14,6 @@ import hashlib
 import json
 import os
 import re
-import secrets
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -63,140 +62,6 @@ def _parent_error(exc: Exception) -> str:
     detail = getattr(exc, "detail", str(exc))
     return f"parent-root-attestation:{reject}:{detail}"
 
-
-def _binding_source(root: Path) -> tuple[Path, Path] | None:
-    """Locate an actual checked-out gitlink source and its module manifest."""
-    manifest = root / ".gitmodules"
-    if not manifest.is_file():
-        return None
-    result = subprocess.run(
-        ["git", "-C", str(root), "config", "--file", str(manifest), "--null", "--list"],
-        check=False, capture_output=True, text=True,
-    )
-    entries: dict[str, str] = {}
-    for record in result.stdout.split("\0"):
-        key, separator, value = record.partition("\n")
-        if separator and key.startswith("submodule.") and key.endswith(".path"):
-            entries[key[len("submodule."):-len(".path")]] = value.strip()
-    for path in entries.values():
-        candidate = root / path
-        if candidate.is_dir():
-            try:
-                if Path(_run_git(candidate, ["rev-parse", "--show-toplevel"]).strip()).resolve() == candidate.resolve():
-                    return candidate, manifest
-            except RepositoryTopicCloneError:
-                continue
-    return None
-
-
-def _binding_paths(root: Path, request: RepositoryTopicCloneRequest) -> tuple[Path, Path]:
-    binding_dir = root / ".agent-canon" / "parent-bindings" / topic_slug(request.topic) / request.repository
-    return binding_dir / "marker.json", binding_dir / "owner.json"
-
-
-def _managed_binding_required(
-    root: Path,
-    request: RepositoryTopicCloneRequest,
-    clone: Path,
-    attestation: _parent_boundary.ParentRootAttestationReceipt | None,
-) -> bool:
-    """Classify a clone as managed when any authenticated binding trace exists."""
-    marker_path, owner_path = _binding_paths(root, request)
-    binding_dir = marker_path.parent
-    if (
-        binding_dir.exists()
-        or binding_dir.is_symlink()
-        or marker_path.exists()
-        or marker_path.is_symlink()
-        or owner_path.exists()
-        or owner_path.is_symlink()
-    ):
-        return True
-    binding_mode = _marker(clone, "binding-mode")
-    if binding_mode == "managed":
-        return True
-    if binding_mode == "unmanaged":
-        return (
-            attestation is not None
-            and (
-                attestation.source_root is not None
-                or attestation.clone_root is not None
-                or attestation.marker is not None
-                or attestation.module is not None
-                or attestation.owner is not None
-            )
-        )
-    if attestation is not None and (
-        attestation.source_root is not None
-        or attestation.clone_root is not None
-        or attestation.marker is not None
-        or attestation.module is not None
-        or attestation.owner is not None
-    ):
-        return True
-    # A module manifest is itself a managed-root declaration.  If its source
-    # was removed, renamed, or corrupted, cleanup must hold rather than
-    # silently downgrading to the generic root-only route.
-    manifest = root / ".gitmodules"
-    return manifest.exists() or manifest.is_symlink()
-
-
-def _materialize_parent_binding(
-    request: RepositoryTopicCloneRequest,
-    attestation: _parent_boundary.ParentRootAttestationReceipt,
-    clone: Path,
-    branch: str,
-) -> _parent_boundary.ParentRootAttestationReceipt:
-    """Materialize approved v2 marker/owner JSON and re-attest the full matrix."""
-    located = _binding_source(request.workspace_root)
-    if located is None:
-        return attestation
-    source, manifest = located
-    boundary = _parent_boundary.ParentRootSideEffectBoundary()
-    binding_dir = request.workspace_root / ".agent-canon" / "parent-bindings" / topic_slug(request.topic) / request.repository
-    boundary.ensure_parent_owned_directory(attestation, binding_dir, "topic-binding")
-    parent_remote = _run_git(request.workspace_root, ["remote", "get-url", "origin"]).strip()
-    parent_repo_id = hashlib.sha256(
-        f"{request.workspace_root.resolve()}\0{parent_remote.rstrip('/')}".encode("utf-8")
-    ).hexdigest()
-    source_commit = _run_git(source, ["rev-parse", "HEAD"]).strip()
-    source_tree = _run_git(source, ["rev-parse", "HEAD^{tree}"]).strip()
-    owner_body: dict[str, str] = {
-        "schema": "agent-canon.owner-evidence.v1", "parent_repo_id": parent_repo_id,
-        "physical_parent": str(request.workspace_root.resolve()),
-        "module_path": source.relative_to(request.workspace_root).as_posix(),
-        "remote_url": parent_remote, "observed_commit": source_commit,
-        "observed_tree": source_tree,
-    }
-    owner_body["evidence_sha256"] = hashlib.sha256(
-        json.dumps(owner_body, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    ).hexdigest()
-    owner_receipt = boundary.resolve_parent_owned_path(attestation, binding_dir / "owner.json", "topic-owner")
-    owner_published = boundary.atomic_publish(
-        owner_receipt, (json.dumps(owner_body, sort_keys=True) + "\n").encode("utf-8")
-    )
-    owner_sha = hashlib.sha256(boundary.read_parent_owned_file(owner_published)).hexdigest()
-    marker_body = {
-        "schema": "agent-canon.repository-topic.v2", "parent_repo_id": parent_repo_id,
-        "topic_slug": topic_slug(request.topic), "repo_name": request.repository,
-        "clone_path": str(clone.resolve()), "remote_url": _remote_url(clone),
-        "branch": branch, "owner_evidence_sha256": owner_sha,
-        "source_commit": source_commit, "source_tree": source_tree,
-        "created_at": "parent-boundary", "nonce": secrets.token_hex(16),
-    }
-    marker_receipt = boundary.resolve_parent_owned_path(attestation, binding_dir / "marker.json", "topic-marker")
-    boundary.atomic_publish(marker_receipt, (json.dumps(marker_body, sort_keys=True) + "\n").encode("utf-8"))
-    return _parent_boundary.attest_parent_root(
-        _parent_boundary.ParentRootAttestationRequest(
-            cwd=request.workspace_root, explicit_root=request.workspace_root,
-            source_root=source, clone_root=clone,
-            topic_marker=marker_receipt.physical_path,
-            gitmodules=manifest, owner_evidence=owner_receipt.physical_path,
-            expected_remote=parent_remote,
-            expected_module_digest=hashlib.sha256(manifest.read_bytes()).hexdigest(),
-            purpose="repository-topic-clone",
-        )
-    )
 
 MARKER_PREFIX = "repository-topic-clone"
 LEGACY_MARKER_PREFIX = "agent-canon.topic"
@@ -631,11 +496,7 @@ def _marker_namespace_present(path: Path, prefix: str) -> bool:
         )
     except GitCommandError:
         return False
-    return any(
-        line.strip().rsplit(".", 1)[-1] != "binding-mode"
-        for line in output.splitlines()
-        if line.strip()
-    )
+    return any(line.strip() for line in output.splitlines())
 
 
 def _legacy_marker_matches(
@@ -661,20 +522,12 @@ def _set_marker(
     owner_sha: str,
     branch: str,
 ) -> None:
-    binding_mode = _marker(path, "binding-mode")
-    if binding_mode not in {"managed", "unmanaged"}:
-        binding_mode = (
-            "managed"
-            if _binding_source(request.workspace_root) is not None
-            else "unmanaged"
-        )
     for field, value in {
         "repository": request.repository,
         "topic": topic_slug(request.topic),
         "branch": branch,
         "url": _normalise_url(request.url),
         "owner-evidence-sha256": owner_sha,
-        "binding-mode": binding_mode,
     }.items():
         _run_git(path, ["config", "--local", f"{MARKER_PREFIX}.{field}", value])
 
@@ -853,7 +706,8 @@ def request(
                 clone, request_state.url, request_state.branch
             )
         else:
-            target = _parent_boundary.ParentRootSideEffectBoundary().open_parent_owned_target(
+            boundary = _parent_boundary.ParentRootSideEffectBoundary()
+            target = boundary.open_parent_owned_target(
                 request_state.parent_attestation,
                 clone,
                 "repository-topic-clone-create",
@@ -869,7 +723,17 @@ def request(
                     raise RepositoryTopicCloneError(
                         "parent-root-attestation:root_race_detected:clone target identity changed"
                     )
-            finally:
+            except Exception as exc:
+                try:
+                    boundary._abort_reserved_target(  # pyright: ignore[reportPrivateUsage]  # noqa: SLF001
+                        request_state.parent_attestation,
+                        target,
+                        "repository-topic-clone-create-failure",
+                    )
+                except Exception as abort_exc:
+                    raise RepositoryTopicCloneError(_parent_error(abort_exc)) from exc
+                raise
+            else:
                 target.close()
             branch_source = _ensure_branch(
                 clone, request_state.url, request_state.branch
@@ -901,21 +765,6 @@ def request(
         raise RepositoryTopicCloneError(
             f"prepared clone not ready: {final_state.state}"
         )
-    try:
-        request_state = RepositoryTopicCloneRequest(
-            url=request_state.url,
-            repository=request_state.repository,
-            workspace_root=request_state.workspace_root,
-            topic=request_state.topic,
-            branch=request_state.branch,
-            owner_evidence=request_state.owner_evidence,
-            parent_attestation=_materialize_parent_binding(
-                request_state, request_state.parent_attestation, clone, branch_name
-            ),
-        )
-    except Exception as exc:
-        raise RepositoryTopicCloneError(_parent_error(exc)) from exc
-
     candidate_sha = _run_git(clone, ["rev-parse", branch_name]).strip()
     candidate_tree = _run_git(clone, ["rev-parse", f"{candidate_sha}^{{tree}}"]).strip()
     clone_identity = clone.stat()
@@ -1159,35 +1008,12 @@ def cleanup(
         )
 
     try:
-        managed_binding = _managed_binding_required(
-            request_state.workspace_root,
-            request_state,
-            clone,
-            request_state.parent_attestation,
-        )
-        located = _binding_source(request_state.workspace_root)
-        if managed_binding:
-            if located is None:
-                raise RepositoryTopicCloneError(
-                    "cleanup hold: managed parent binding source/module is missing or corrupt"
-                )
-            binding = _binding_paths(request_state.workspace_root, request_state)
-            if any(not path.is_file() or path.is_symlink() for path in binding):
-                raise RepositoryTopicCloneError(
-                    "cleanup hold: parent binding marker/owner is missing or not a regular file"
-                )
-            source, manifest = located
-            attestation = _attest_parent(_parent_boundary.ParentRootAttestationRequest(
-                cwd=request_state.workspace_root, explicit_root=request_state.workspace_root,
-                source_root=source, clone_root=clone, topic_marker=binding[0],
-                gitmodules=manifest, owner_evidence=binding[1],
-                expected_remote=_run_git(request_state.workspace_root, ["remote", "get-url", "origin"]).strip(),
-                expected_module_digest=hashlib.sha256(manifest.read_bytes()).hexdigest(),
+        attestation = _attest_parent(
+            _parent_request(
+                request_state.workspace_root,
                 purpose="repository-topic-clone-cleanup",
-            ))
-        else:
-            attestation = _attest_parent(_parent_request(
-                request_state.workspace_root, purpose="repository-topic-clone-cleanup"))
+            )
+        )
         capability = _parent_boundary.resolve_parent_owned_path(
             attestation, clone, "repository-topic-clone-cleanup", create=False
         )

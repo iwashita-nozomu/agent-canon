@@ -427,6 +427,145 @@ def test_prepare_rejects_unsafe_repository_name_and_symlink_workspace(
     assert list(external.iterdir()) == []
 
 
+def test_clone_failure_aborts_partial_target_and_preserves_sibling(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed clone removes only its newly reserved target, including residue."""
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    sibling = workspace / "workspace" / "topic-failure" / "sibling"
+    sibling.mkdir(parents=True)
+    (sibling / "keep.txt").write_text("keep\n", encoding="utf-8")
+    original_run_git = rtc._run_git
+
+    def fail_clone(
+        path: Path, args: list[str], *, pass_fds: tuple[int, ...] = ()
+    ) -> str:
+        if args and args[0] == "clone":
+            target = Path(args[-1])
+            (target / "partial" / "nested").mkdir(parents=True)
+            (target / "partial" / "nested" / "residue.txt").write_text(
+                "residue\n", encoding="utf-8"
+            )
+            raise rtc.GitCommandError(path, args, "injected clone failure")
+        return original_run_git(path, args, pass_fds=pass_fds)
+
+    monkeypatch.setattr(rtc, "_run_git", fail_clone)
+    with pytest.raises(rtc.GitCommandError, match="injected clone failure"):
+        rtc.request(
+            remote_url,
+            "repo-failure",
+            workspace,
+            "topic-failure",
+            "feature/failure",
+            evidence,
+        )
+
+    clone = workspace / "workspace" / "topic-failure" / "repo-failure"
+    assert not clone.exists()
+    assert (sibling / "keep.txt").read_text(encoding="utf-8") == "keep\n"
+
+
+def test_unrelated_dirty_module_does_not_trigger_managed_relation(
+    tmp_path: Path,
+) -> None:
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    vendor = workspace / "vendor" / "agent-canon"
+    subprocess.run(["git", "clone", "-q", remote_url, str(vendor)], check=True)
+    (vendor / "dirty.txt").write_text("dirty\n", encoding="utf-8")
+    (workspace / ".gitmodules").write_text(
+        '[submodule "vendor/agent-canon"]\n'
+        "\tpath = vendor/agent-canon\n"
+        "\turl = https://example.invalid/unrelated.git\n",
+        encoding="utf-8",
+    )
+    source_sha = run_git(vendor, "rev-parse", "HEAD")
+    run_git(workspace, "add", ".gitmodules", "vendor/agent-canon")
+    run_git(
+        workspace,
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        f"160000,{source_sha},vendor/agent-canon",
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(workspace),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "module",
+        ],
+        check=True,
+        capture_output=True,
+    )
+
+    prepared = rtc.request(
+        remote_url, "requested-repo", workspace, "topic", "feature/topic", evidence
+    )
+    assert prepared.clone.is_dir()
+
+
+def test_matching_but_unmanaged_module_uses_generic_relation(
+    tmp_path: Path,
+) -> None:
+    _, remote_url = init_remote(tmp_path)
+    evidence = write_evidence(tmp_path)
+    workspace = tmp_path / "parent"
+    init_workspace_parent(workspace)
+    vendor = workspace / "vendor" / "requested-repo"
+    subprocess.run(["git", "clone", "-q", remote_url, str(vendor)], check=True)
+    (workspace / ".gitmodules").write_text(
+        '[submodule "vendor/requested-repo"]\n'
+        "\tpath = vendor/requested-repo\n"
+        f"\turl = {remote_url}\n",
+        encoding="utf-8",
+    )
+    source_sha = run_git(vendor, "rev-parse", "HEAD")
+    run_git(workspace, "add", ".gitmodules", "vendor/requested-repo")
+    run_git(
+        workspace,
+        "update-index",
+        "--add",
+        "--cacheinfo",
+        f"160000,{source_sha},vendor/requested-repo",
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(workspace),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "module",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    prepared = rtc.request(
+        remote_url, "requested-repo", workspace, "topic", "feature/topic", evidence
+    )
+    assert prepared.clone.is_dir()
+    run_git(prepared.clone, "push", "-u", "origin", "feature/topic")
+    removed = rtc.cleanup(prepared.request, apply=True)
+    assert removed.removed
+    assert not prepared.clone.exists()
+
+
 @pytest.mark.parametrize(
     "root_kind",
     ("non-repository", "nested", "missing-ignore", "untracked-ignore", "global-ignore", "info-ignore"),
@@ -602,45 +741,10 @@ def test_cleanup_without_publication_packet_matches_remote_head(tmp_path: Path) 
     assert not request.clone.exists()
 
 
-def test_cleanup_holds_when_managed_module_binding_disappears(tmp_path: Path) -> None:
-    """A managed manifest cannot silently fall back to root-only cleanup."""
-    remote, remote_url = init_remote(tmp_path)
-    evidence = write_evidence(tmp_path)
-    workspace = tmp_path / "parent"
-    init_workspace_parent(workspace)
-    request = rtc.request(
-        remote_url,
-        "repo-managed-missing",
-        workspace,
-        "topic-managed-missing",
-        "feature/cleanup",
-        evidence,
-    )
-    run_git(request.clone, "push", "-u", "origin", "feature/cleanup")
-    run_git(
-        request.clone,
-        "config",
-        "repository-topic-clone.binding-mode",
-        "managed",
-    )
-    (workspace / ".gitmodules").write_text(
-        '[submodule "vendor/agent-canon"]\n'
-        "\tpath = vendor/agent-canon\n"
-        "\turl = https://example.invalid/agent-canon.git\n",
-        encoding="utf-8",
-    )
-    with pytest.raises(
-        rtc.RepositoryTopicCloneError,
-        match="managed parent binding source/module is missing or corrupt",
-    ):
-        rtc.cleanup(request.request, apply=True)
-    assert request.clone.exists()
-
-
-def test_cleanup_holds_when_binding_directory_is_present_but_files_are_missing(
+def test_stale_binding_directory_does_not_promote_generic_cleanup(
     tmp_path: Path,
 ) -> None:
-    """A partial historical binding is a hard hold even without a live module."""
+    """Stale historical binding artifacts do not select managed cleanup."""
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
     workspace = tmp_path / "parent"
@@ -662,12 +766,12 @@ def test_cleanup_holds_when_binding_directory_is_present_but_files_are_missing(
         / request.request.repository
     )
     binding_dir.mkdir(parents=True)
-    with pytest.raises(
-        rtc.RepositoryTopicCloneError,
-        match="managed parent binding source/module is missing or corrupt",
-    ):
-        rtc.cleanup(request.request, apply=True)
-    assert request.clone.exists()
+    stale = binding_dir / "stale.json"
+    stale.write_text("stale\n", encoding="utf-8")
+    removed = rtc.cleanup(request.request, apply=True)
+    assert removed.removed
+    assert not request.clone.exists()
+    assert stale.read_text(encoding="utf-8") == "stale\n"
 
 
 def test_cleanup_accepts_exact_legacy_module_markers_read_only(

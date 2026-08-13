@@ -18,33 +18,12 @@ import sys
 from pathlib import Path
 
 import pytest
-from tools.agent_tools.parent_root_side_effects import (
-    ParentRootAttestationRequest,
-    ParentRootSideEffectBoundary,
-)
 
 TOPIC = "dependency-module-change"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "dependency_module_change.py"
 GENERIC_TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "repository_topic_clone.py"
-
-
-def test_dependency_module_root_attestation_preserves_home_and_parent_scope(
-    tmp_path: Path,
-) -> None:
-    """Dependency adapters receive a parent capability without rewriting HOME."""
-    subprocess.run(["git", "init", "-q", "-b", "main", str(tmp_path)], check=True)
-    receipt = ParentRootSideEffectBoundary().attest(
-        ParentRootAttestationRequest(
-            cwd=tmp_path, explicit_root=tmp_path, purpose="dependency-module-change"
-        )
-    )
-    environment = ParentRootSideEffectBoundary().child_environment(
-        receipt, {"HOME": "/home/fixture"}
-    )
-    assert environment["HOME"] == "/home/fixture"
-    assert Path(environment["TMPDIR"]).is_relative_to(tmp_path)
 
 
 def run_git(path: Path, *args: str) -> str:

@@ -23,60 +23,89 @@ if [ -n "$SUPERPROJECT_DIR" ]; then
 else
   ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 fi
-python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-  attest --root "$ROOT_DIR" --purpose agent-canon-sync >/dev/null
-CANON_PARENT_TMP_CANDIDATE="${AGENT_CANON_PARENT_TMPDIR:-$ROOT_DIR/.agent-canon/tmp/sync}"
+AGENT_CANON_SOURCE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd -P)"
+SOURCE_GIT_TOPLEVEL="$(git -C "${AGENT_CANON_SOURCE_ROOT}" rev-parse --show-toplevel 2>/dev/null || true)"
+if [[ "${SOURCE_GIT_TOPLEVEL}" != "${AGENT_CANON_SOURCE_ROOT}" ]]; then
+  AGENT_CANON_SOURCE_ROOT="${ROOT_DIR}"
+fi
+PARENT_ROOT_DIR="${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}"
+PARENT_ROOT_DIR="$(cd "${PARENT_ROOT_DIR}" && pwd -P)"
+AGENT_CANON_BOUNDARY_SCRIPT="${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py"
+if [[ "${PARENT_ROOT_DIR}" != "${ROOT_DIR}" \
+  && "${AGENT_CANON_CHILD_PURPOSE:-}" != "agent-canon-sync-script" ]]; then
+  echo "AGENT_CANON_SYNC_PARENT_HANDOFF=missing" >&2
+  echo "AGENT_CANON_SYNC_PARENT_ROOT=${PARENT_ROOT_DIR}" >&2
+  echo "AGENT_CANON_SYNC_SOURCE_ROOT=${AGENT_CANON_SOURCE_ROOT}" >&2
+  exit 2
+fi
+if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "agent-canon-sync-script" ]]; then
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
+    --root "${PARENT_ROOT_DIR}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-sync-script \
+    --consume >/dev/null
+else
+  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${PARENT_ROOT_DIR}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-sync-script \
+    --issue-handoff \
+    -- bash "${BASH_SOURCE[0]}" "$@"
+fi
+unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
+
+CANON_PARENT_TMP_CANDIDATE="${AGENT_CANON_PARENT_TMPDIR:-$PARENT_ROOT_DIR/.agent-canon/tmp/sync}"
 CANON_PARENT_TMPDIR="$(python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-  ensure-dir --root "$ROOT_DIR" --candidate "$CANON_PARENT_TMP_CANDIDATE" --purpose agent-canon-sync)"
+  ensure-dir --root "$PARENT_ROOT_DIR" --candidate "$CANON_PARENT_TMP_CANDIDATE" --purpose agent-canon-sync)"
 export TMPDIR="$CANON_PARENT_TMPDIR"
 parent_ensure_dir() {
   python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-    ensure-dir --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-sync}"
+    ensure-dir --root "$PARENT_ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-sync}"
 }
 parent_temp_dir() {
   python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-    temp-dir --root "$ROOT_DIR" --candidate "$1" --prefix "$2" --purpose "${3:-agent-canon-sync}"
+    temp-dir --root "$PARENT_ROOT_DIR" --candidate "$1" --prefix "$2" --purpose "${3:-agent-canon-sync}"
 }
 parent_write_file() {
   local candidate="$1" content="${2-}"
   printf '%s' "$content" | python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-    write --root "$ROOT_DIR" --candidate "$candidate" --purpose "${3:-agent-canon-sync}" >/dev/null
+    write --root "$PARENT_ROOT_DIR" --candidate "$candidate" --purpose "${3:-agent-canon-sync}" >/dev/null
 }
 parent_remove_file() {
   python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-    remove-file --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-sync}" >/dev/null
+    remove-file --root "$PARENT_ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-sync}" >/dev/null
 }
 parent_remove_tree() {
   python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-    remove-tree --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-sync}" >/dev/null
+    remove-tree --root "$PARENT_ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-sync}" >/dev/null
 }
 parent_remove_empty_dir() {
   python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-    remove-empty-dir --root "$ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-sync}" >/dev/null
+    remove-empty-dir --root "$PARENT_ROOT_DIR" --candidate "$1" --purpose "${2:-agent-canon-sync}" >/dev/null
 }
 parent_checkout_index() {
   python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-    checkout-index --root "$ROOT_DIR" --repository "$ROOT_DIR" --index-path "$1" \
+    checkout-index --root "$PARENT_ROOT_DIR" --repository "$ROOT_DIR" --index-path "$1" \
     --candidate "$2" --purpose "${3:-agent-canon-sync}" >/dev/null
 }
 parent_copy_file() {
   python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-    copy --root "$ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-sync}" >/dev/null
+    copy --root "$PARENT_ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-sync}" >/dev/null
 }
 parent_capture_subprocess() {
   local candidate="$1" purpose="$2"
   shift 2
   python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-    capture-subprocess --root "$ROOT_DIR" --candidate "$candidate" \
+    capture-subprocess --root "$PARENT_ROOT_DIR" --candidate "$candidate" \
     --purpose "$purpose" -- "$@"
 }
 parent_move_path() {
   python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-    move --root "$ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-sync}" >/dev/null
+    move --root "$PARENT_ROOT_DIR" --source "$1" --candidate "$2" --purpose "${3:-agent-canon-sync}" >/dev/null
 }
 parent_symlink() {
   python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-    symlink --root "$ROOT_DIR" --target "$1" --candidate "$2" --purpose "${3:-agent-canon-sync}" >/dev/null
+    symlink --root "$PARENT_ROOT_DIR" --target "$1" --candidate "$2" --purpose "${3:-agent-canon-sync}" >/dev/null
 }
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 if [ "$PREFIX" = "." ]; then
@@ -1538,13 +1567,13 @@ ensure_repo_local_goal() {
       "$PREFIX"/*|./"$PREFIX"/*|../"$PREFIX"/*|*"$PREFIX"/goal.md)
         parent_remove_file "$path"
         repo_local_goal_template | python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-          write --root "$ROOT_DIR" --candidate "$path" --purpose agent-canon-sync >/dev/null
+          write --root "$PARENT_ROOT_DIR" --candidate "$path" --purpose agent-canon-sync >/dev/null
         echo "goal_md=converted_from_shared_symlink"
         ;;
     esac
   elif [ ! -e "$path" ]; then
     repo_local_goal_template | python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-      write --root "$ROOT_DIR" --candidate "$path" --purpose agent-canon-sync >/dev/null
+      write --root "$PARENT_ROOT_DIR" --candidate "$path" --purpose agent-canon-sync >/dev/null
     echo "goal_md=created_repo_local_placeholder"
   fi
   return 0
@@ -1758,7 +1787,7 @@ copy_path() {
   fi
   parent_ensure_dir "$(dirname "$abs_path")"
   project_copy_source "$abs_source" "$abs_path" | python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \
-    write --root "$ROOT_DIR" --candidate "$abs_path" --purpose agent-canon-sync >/dev/null
+    write --root "$PARENT_ROOT_DIR" --candidate "$abs_path" --purpose agent-canon-sync >/dev/null
   chmod --reference="$abs_source" "$abs_path"
 }
 
@@ -2454,7 +2483,7 @@ print_plan_summary() {
   echo "agent_canon_plan_route=$route"
   echo "agent_canon_plan_requires_clean=$requires_clean"
   case "$route" in
-    submodule_detached|submodule_detached_dirty|submodule_detached_nonpin|submodule_detached_requires_main|submodule_detached_invalid_stage0_gitlink|submodule_detached_main_descendant|submodule_detached_main_divergent|submodule_detached_main_worktree_collision|submodule_remote_resolution_failed|submodule_remote_object_unavailable|submodule_remote_probe_cleanup_failed|submodule_origin_main_fetch_failed|submodule_origin_main_mismatch|remote_resolution_failed|remote_object_unavailable|remote_probe_cleanup_failed|unresolved_submodule_merge_conflict|submodule_merge_conflict|submodule_materialization_collision) ;;
+    submodule_detached|submodule_detached_dirty|submodule_detached_nonpin|submodule_detached_requires_main|submodule_detached_invalid_stage0_gitlink|submodule_detached_main_descendant|submodule_detached_main_divergent|submodule_detached_main_worktree_collision|submodule_remote_resolution_failed|submodule_remote_object_unavailable|submodule_remote_probe_cleanup_failed|submodule_origin_main_mismatch|remote_resolution_failed|remote_object_unavailable|remote_probe_cleanup_failed|unresolved_submodule_merge_conflict|submodule_merge_conflict|submodule_materialization_collision) ;;
     *)
       echo "agent_canon_plan_apply_command=AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> $PUBLIC_SYNC_COMMAND ensure-latest $branch"
       ;;
@@ -2845,7 +2874,7 @@ cmd_plan() {
   fi
 
   if [ "$prefix_mode" = "submodule" ]; then
-    if [ "$route" = "submodule_origin_main_fetch_failed" ] || [ "$route" = "submodule_origin_main_mismatch" ]; then
+    if [ "$route" = "submodule_origin_main_mismatch" ]; then
       :
     elif [ "$unresolved_merge_conflict" = "yes" ]; then
       route="unresolved_submodule_merge_conflict"
@@ -2937,7 +2966,7 @@ cmd_plan() {
       echo "NEXT_ACTION=preserve_probe_evidence_then_repair_agentcanon_remote_probe_cleanup"
       return 3
       ;;
-    submodule_origin_main_fetch_failed|submodule_origin_main_mismatch)
+    submodule_origin_main_mismatch)
       echo "agent_canon_plan_status=blocked"
       echo "NEXT_ACTION=repair_agentcanon_origin_main_tracking_then_rerun_plan"
       return 2
