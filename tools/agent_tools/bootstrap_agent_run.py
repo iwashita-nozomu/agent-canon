@@ -183,13 +183,11 @@ if __package__:
     from .agent_team import (
         PreparedRunBundle,
         prepare_run_bundle,
-        run_active_design_packet,
     )
 else:
     from agent_team import (  # type: ignore[no-redef]
         PreparedRunBundle,
         prepare_run_bundle,
-        run_active_design_packet,
     )
 
 if __package__:

@@ -96,7 +96,6 @@ else:
 if __package__:
     from .team_config import (
         ROOT,
-        TEAM_CONFIG_PATH,
         Role,
         RunBundleSpec,
         SubagentWaveSlot,
@@ -112,7 +111,6 @@ if __package__:
 else:
     from team_config import (
         ROOT,
-        TEAM_CONFIG_PATH,
         Role,
         RunBundleSpec,
         SubagentWaveSlot,

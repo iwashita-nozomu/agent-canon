@@ -25,10 +25,6 @@ from route import implementation_handoff_required, load_skill_route_rules
 
 if TYPE_CHECKING:
     if __package__:
-        from .agent_canon_source_root import RepositoryRoots
-    else:
-        from agent_canon_source_root import RepositoryRoots
-    if __package__:
         from .packets import ActiveDesignPacketConfig
     else:
         from packets import ActiveDesignPacketConfig
