@@ -30,7 +30,7 @@ jobs:
           git merge --no-edit origin/main
           echo "main_head=$(git rev-parse origin/main)"
           echo "validation_merge=$(git rev-parse HEAD)"
-      - name: Rebuild canonical graph, classify main blocker, and rebuild complete graph
+      - name: Rebuild canonical graph, classify main blocker, and rebuild fresh graph
         run: |
           mkdir -p "$RUNNER_TEMP/pr671-graph-staging" "$RUNNER_TEMP/pr671-cargo-target"
           set +e
@@ -70,18 +70,20 @@ jobs:
           TMPDIR="$RUNNER_TEMP/pr671-graph-staging" \
           CARGO_TARGET_DIR="$RUNNER_TEMP/pr671-cargo-target" \
             cargo run --manifest-path rust/agent-canon/Cargo.toml -- graph build --root "$GITHUB_WORKSPACE" \
-            | tee /tmp/pr671-graph-complete.json
+            | tee /tmp/pr671-graph-fresh.json
           python3 - <<'PY'
           import json
 
-          result = json.load(open('/tmp/pr671-graph-complete.json', encoding='utf-8'))
-          assert result['status'] == 'complete'
+          result = json.load(open('/tmp/pr671-graph-fresh.json', encoding='utf-8'))
+          assert result['status'] == 'fresh'
+          assert result['graph_status'] == 'fresh'
           assert result['integration_record']['verified'] is True
           assert result['unresolved_count'] == 0
           assert result['ambiguous_count'] == 0
           assert result['uncovered_count'] == 0
-          print('canonical_graph=complete_after_ephemeral_current_main_normalization')
+          print('canonical_graph=fresh_after_ephemeral_current_main_normalization')
           print(f"graph_fingerprint={result['graph_fingerprint']}")
+          print(f"input_fingerprint={result['input_fingerprint']}")
           PY
       - name: Check design claims
         run: python3 tools/agent_tools/check_design_doc_claims.py --root . documents/design/devcontainer/parent-devcontainer-policy.md
