@@ -5,8 +5,6 @@
 # upstream design ../README.md shared automation index
 # upstream implementation ./run_python_quality_checks.sh shared Python quality gate
 # upstream implementation ../agent_tools/parent_root_side_effects.py owns report paths, child state, and exact cleanup
-# downstream implementation ../../.github/workflows/agent-coordination.yml verifier stage calls this entrypoint
-# downstream implementation ../../tests/tools/test_pre_review.py verifies report publication and child environment containment
 # @dependency-end
 set -euo pipefail
 

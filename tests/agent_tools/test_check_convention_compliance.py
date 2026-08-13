@@ -299,8 +299,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "SOLID principle signal OOP readability report class Protocol\n"
     ),
     "agents/skills/pr-processing.md": (
-        "PR Essence problem / user request design intent canonical owner "
-        "behavior or contract delta evidence route\n"
+        "single-candidate fast path base/head/diff/check/authority "
+        "dependency evidence\n"
     ),
     "agents/skills/subagent-bootstrap.md": (
         "selected_agent_type write_capable_handoff_blocker evidence "
@@ -1737,6 +1737,21 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 "missing-marker:Behavior or contract delta:",
                 result.stdout,
             )
+
+    def test_pr_essence_documentation_does_not_bind_operational_skill(self) -> None:
+        """PR body/workflow owners retain essence fields without skill duplication."""
+        self.assertNotIn(
+            "agents/skills/pr-processing.md",
+            PR_ESSENCE_DOCUMENTATION_MARKERS,
+        )
+        self.assertIn(
+            ".github/PULL_REQUEST_TEMPLATE.md",
+            PR_ESSENCE_DOCUMENTATION_MARKERS,
+        )
+        self.assertIn(
+            "agents/workflows/agent-canon-pr-workflow.md",
+            PR_ESSENCE_DOCUMENTATION_MARKERS,
+        )
 
     def test_minimal_fixture_covers_pr_essence_documentation_surfaces(self) -> None:
         """The minimal test fixture includes every PR essence documentation surface."""

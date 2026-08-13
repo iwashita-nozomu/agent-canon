@@ -8,6 +8,7 @@
 # upstream design ../documents/rule/dependency-module-changes.md decorates that lifecycle with pin/projection policy.
 # upstream design ../documents/agent-canon/agent-canon-github-remote.md defines the canonical AgentCanon GitHub remote.
 # upstream implementation ./sync_agent_canon.sh performs low-level submodule freshness and root-view synchronization.
+# upstream implementation ./agent_tools/attach_clean_detached_submodule.py safely attaches a reconstructible detached parent submodule before planning/apply.
 # upstream implementation ./agent_tools/update_lifecycle_contract.py owns queue/frontier receipt mechanics and guards.
 # upstream implementation ./rebuild_agent_tools.sh rebuilds compiled AgentCanon tools after safe updates.
 # downstream implementation ./agent_tools/agent_canon_update_todos.py advances parent-repo AgentCanon update TODO state after safe updates.
@@ -303,6 +304,15 @@ route_requires_agent_workflow() {
       ;;
   esac
   return 1
+}
+
+attach_reconstructible_detached_parent_submodule() {
+  local branch="$1"
+  if [ "$AGENT_CANON_SOURCE_MODE" != "parent_projection" ]; then
+    return 0
+  fi
+  python3 "$CANON_TOOLS_ROOT/agent_tools/attach_clean_detached_submodule.py" \
+    --root "$ROOT_DIR" --prefix "$PREFIX" --branch "$branch"
 }
 
 acknowledge_update_todos_if_available() {
@@ -826,6 +836,8 @@ cmd_plan() {
 cmd_latest() {
   local branch="${1:-$DEFAULT_BRANCH}"
   local plan_output=""
+  local plan_rc=0
+  local attach_rc=0
   local route=""
   local prefix_mode=""
   local dirty_update_surface=""
@@ -843,15 +855,17 @@ cmd_latest() {
     return
   fi
 
-  local plan_rc=0
+  attach_reconstructible_detached_parent_submodule "$branch" || attach_rc=$?
+  if [ "$attach_rc" -ne 0 ]; then
+    return "$attach_rc"
+  fi
+
   plan_output="$(cmd_plan "$branch" 2>&1)" || plan_rc=$?
   printf '%s\n' "$plan_output"
-  route="$(plan_value agent_canon_plan_route "$plan_output")"
   if [ "$plan_rc" -ne 0 ]; then
-    echo "AGENT_CANON_LATEST_PLAN_RC=$plan_rc"
-    emit_agentcanon_conflict_workflow_route "plan_rc=$plan_rc;route=${route:-unknown}"
     return "$plan_rc"
   fi
+  route="$(plan_value agent_canon_plan_route "$plan_output")"
   prefix_mode="$(plan_value agent_canon_plan_prefix_mode "$plan_output")"
   dirty_update_surface="$(plan_value agent_canon_plan_dirty_update_surface "$plan_output")"
   submodule_worktree_status="$(plan_value agent_canon_plan_submodule_worktree_status "$plan_output")"
@@ -913,10 +927,16 @@ cmd_apply() {
   local branch="${1:-$DEFAULT_BRANCH}"
   local latest_log=""
   local latest_rc=0
+  local attach_rc=0
 
   if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
     cmd_merge_main_into_current "$branch"
     return
+  fi
+
+  attach_reconstructible_detached_parent_submodule "$branch" || attach_rc=$?
+  if [ "$attach_rc" -ne 0 ]; then
+    return "$attach_rc"
   fi
   require_accepted_dependency_frontier
 

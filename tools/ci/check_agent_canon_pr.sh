@@ -91,6 +91,8 @@ AGENT_CANON_PR_TEMP_ROOT="$(
     --prefix pr-check. \
     --purpose agent-canon-pr
 )"
+# Keep static-gate unit scratch under the authenticated parent-owned lifecycle.
+export TMPDIR="${AGENT_CANON_PR_TEMP_ROOT}"
 PR_GATE_RECEIPT="${AGENT_CANON_PR_TEMP_ROOT}/pr-gate-prepared.receipt"
 cleanup_agent_canon_pr_temp_root() {
   local status=$?
@@ -429,35 +431,12 @@ emit_generated_completeness_receipt() {
 }
 
 run_standalone_static_gate_ci() {
-  cargo build --manifest-path rust/agent-canon/Cargo.toml
-  local memory_cli="${AGENT_CANON_CLI_TARGET_DIR}/debug/agent-canon"
-  if [[ ! -x "${memory_cli}" ]]; then
-    echo "AGENT_CANON_MEMORY_CLI_BUILD=fail"
-    echo "AGENT_CANON_MEMORY_CLI_REASON=rust build did not produce ${memory_cli}" >&2
-    return 1
-  fi
-  echo "AGENT_CANON_MEMORY_CLI_BUILD=${memory_cli}"
-  "${memory_cli}" memory validate --root .
-  cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
-  cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
-  cargo test --manifest-path rust/agent-canon/Cargo.toml
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_catalog.py"
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_proof_coverage.py"
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/responsibility_scope.py"
-  BASE_REF="${GITHUB_BASE_REF:-main}"
-  git fetch origin "${BASE_REF}" --depth=1 || true
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/import_responsibility.py" --changed --baseline-ref "origin/${BASE_REF}"
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/issue_sync.py"
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 "${CANON_TOOLS_ROOT}/agent_tools/eval_accumulation_check.py"
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/smoke_test_research_perspective_pack.py"
-  run_convention_compliance_gate
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check
-  python3 "${CANON_TOOLS_ROOT}/ci/check_github_workflows.py"
-  python3 "${CANON_TOOLS_ROOT}/ci/container_config.py"
+  local unit
+  local units=(rust contracts eval workflow-container)
+  for unit in "${units[@]}"; do
+    AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
+      bash "${SCRIPT_DIR}/run_standalone_static_gate_unit.sh" "${unit}"
+  done
 }
 
 github_repo_security_status() {
