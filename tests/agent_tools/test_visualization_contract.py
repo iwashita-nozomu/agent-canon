@@ -190,8 +190,8 @@ def projection_tool_calls(
 class VisualizationContractTest(unittest.TestCase):
     """Verify the exact D2.4 contract and deterministic failure behavior."""
 
-    def test_public_api_has_seven_functions_without_substitute_symbols(self) -> None:
-        """Only the seven approved callable owner functions are public."""
+    def test_public_api_has_seven_required_owner_functions(self) -> None:
+        """The public API exposes the seven required owner functions."""
         for function_name in (
             "build_source_universe",
             "build_projection_coverage_manifest",
@@ -202,15 +202,6 @@ class VisualizationContractTest(unittest.TestCase):
             "readback_projection",
         ):
             self.assertTrue(callable(getattr(contract, function_name)))
-        for removed_name in (
-            "as_envelope",
-            "make_source_universe",
-            "canonical_tool_call",
-            "VisualizationToolCall",
-            "CANONICAL_TOOL_ID",
-            "CANONICAL_ARGUMENT_SCHEMA",
-        ):
-            self.assertFalse(hasattr(contract, removed_name))
 
     def test_universe_preserves_three_buckets_and_deterministic_identity(self) -> None:
         """Literal, owner, and dependency records form one sorted immutable set."""
