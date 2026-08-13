@@ -30,55 +30,79 @@ jobs:
           git merge --no-edit origin/main
           echo "main_head=$(git rev-parse origin/main)"
           echo "validation_merge=$(git rev-parse HEAD)"
-      - name: Rebuild canonical graph and classify unrelated main blocker
+      - name: Rebuild canonical graph, classify main blocker, and rebuild complete graph
         run: |
           mkdir -p "$RUNNER_TEMP/pr671-graph-staging" "$RUNNER_TEMP/pr671-cargo-target"
           set +e
           TMPDIR="$RUNNER_TEMP/pr671-graph-staging" \
           CARGO_TARGET_DIR="$RUNNER_TEMP/pr671-cargo-target" \
             cargo run --manifest-path rust/agent-canon/Cargo.toml -- graph build --root "$GITHUB_WORKSPACE" \
-            | tee /tmp/pr671-graph-build.json
-          graph_rc=${PIPESTATUS[0]}
+            | tee /tmp/pr671-graph-blocked.json
+          blocked_rc=${PIPESTATUS[0]}
           set -e
-          echo "graph_exit_code=$graph_rc"
-          python3 - "$graph_rc" <<'PY'
+          python3 - "$blocked_rc" <<'PY'
           import json
           import sys
 
-          result = json.load(open('/tmp/pr671-graph-build.json', encoding='utf-8'))
-          rc = int(sys.argv[1])
+          result = json.load(open('/tmp/pr671-graph-blocked.json', encoding='utf-8'))
+          assert int(sys.argv[1]) == 1
           assert result['integration_record']['verified'] is True
           assert result['ambiguous_count'] == 0
           assert result['uncovered_count'] == 0
-          if rc == 0:
-              assert result['status'] == 'complete'
-              assert result['unresolved_count'] == 0
-              print('canonical_graph=complete')
-          else:
-              assert rc == 1
-              assert result['status'] == 'incomplete'
-              assert result['unresolved_count'] == 1
-              finding = result['unresolved'][0]
-              assert finding['code'] == 'manifest-grammar'
-              assert finding['message'] == '.github/workflows/agent-canon-static-gates.yml:10:downstream test ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries and selection'
-              print('canonical_graph=blocked_by_exact_current_main_manifest_grammar')
+          assert result['unresolved_count'] == 1
+          finding = result['unresolved'][0]
+          assert finding['code'] == 'manifest-grammar'
+          assert finding['message'] == '.github/workflows/agent-canon-static-gates.yml:10:downstream test ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries and selection'
+          print('canonical_graph=blocked_by_exact_current_main_manifest_grammar')
+          PY
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/workflows/agent-canon-static-gates.yml')
+          text = path.read_text(encoding='utf-8')
+          old = '# downstream test ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries and selection'
+          new = '# downstream implementation ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries and selection'
+          assert text.count(old) == 1
+          path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+          rm -rf "$RUNNER_TEMP/pr671-graph-staging"
+          mkdir -p "$RUNNER_TEMP/pr671-graph-staging"
+          TMPDIR="$RUNNER_TEMP/pr671-graph-staging" \
+          CARGO_TARGET_DIR="$RUNNER_TEMP/pr671-cargo-target" \
+            cargo run --manifest-path rust/agent-canon/Cargo.toml -- graph build --root "$GITHUB_WORKSPACE" \
+            | tee /tmp/pr671-graph-complete.json
+          python3 - <<'PY'
+          import json
+
+          result = json.load(open('/tmp/pr671-graph-complete.json', encoding='utf-8'))
+          assert result['status'] == 'complete'
+          assert result['integration_record']['verified'] is True
+          assert result['unresolved_count'] == 0
+          assert result['ambiguous_count'] == 0
+          assert result['uncovered_count'] == 0
+          print('canonical_graph=complete_after_ephemeral_current_main_normalization')
+          print(f"graph_fingerprint={result['graph_fingerprint']}")
           PY
       - name: Check design claims
         run: python3 tools/agent_tools/check_design_doc_claims.py --root . documents/design/devcontainer/parent-devcontainer-policy.md
       - name: Check prose reasoning graph and print diagnostics
         run: |
-          out=$(mktemp -d)
+          out=$(mktemp -d -p "$RUNNER_TEMP" pr671-prose.XXXXXX)
           python3 tools/agent_tools/prose_reasoning_graph.py check-document documents/design/devcontainer/parent-devcontainer-policy.md --profile all --out-dir "$out"
           echo "diagnostic_output=$out"
-          find "$out" -maxdepth 2 -type f -print -exec sed -n '1,320p' {} \;
+          find "$out" -maxdepth 2 -type f -print -exec sed -n '1,400p' {} \;
       - name: Check docs
-        run: tools/bin/agent-canon docs check documents/design/devcontainer/parent-devcontainer-policy.md
+        run: |
+          mkdir -p "$RUNNER_TEMP/pr671-docs-tmp"
+          TMPDIR="$RUNNER_TEMP/pr671-docs-tmp" CARGO_TARGET_DIR="$RUNNER_TEMP/pr671-cargo-target" \
+            tools/bin/agent-canon docs check documents/design/devcontainer/parent-devcontainer-policy.md
       - name: Check dependency header and whitespace
         run: |
           bash tools/agent_tools/check_dependency_header_format.sh --require-header documents/design/devcontainer/parent-devcontainer-policy.md
           git diff --check origin/main...HEAD
       - name: Remove temporary validator and read back final scope
         run: |
+          git checkout -- .github/workflows/agent-canon-static-gates.yml
           rm .github/workflows/pr671-independent-validation.yml
           git add -u .github/workflows/pr671-independent-validation.yml
           git commit -m 'ci: remove temporary PR671 validator'
@@ -90,5 +114,6 @@ jobs:
           git show HEAD:documents/design/devcontainer/parent-devcontainer-policy.md >/tmp/pr671-readback.md
           test -s /tmp/pr671-readback.md
           echo "readback_sha256=$(sha256sum /tmp/pr671-readback.md | awk '{print $1}')"
-          sed -n '1,100p' /tmp/pr671-readback.md
+          echo "readback_lines=$(wc -l </tmp/pr671-readback.md)"
+          sed -n '1,120p' /tmp/pr671-readback.md
           git push origin HEAD:canon/close-devcontainer-design-diagnostics-614
