@@ -94,23 +94,29 @@ jobs:
         run: python3 tools/agent_tools/check_design_doc_claims.py --root . documents/design/devcontainer/parent-devcontainer-policy.md
       - name: Check prose reasoning graph and print diagnostics
         run: |
-          rm -rf "$RUNNER_TEMP/pr671-parent"
-          git init -q -b main "$RUNNER_TEMP/pr671-parent"
-          git -C "$RUNNER_TEMP/pr671-parent" config user.name agent-canon-validation
-          git -C "$RUNNER_TEMP/pr671-parent" config user.email agent-canon-validation@users.noreply.github.com
-          git -C "$RUNNER_TEMP/pr671-parent" remote add origin https://example.invalid/pr671-validation-parent.git
-          git -C "$RUNNER_TEMP/pr671-parent" commit --allow-empty -m 'initialize validation parent'
-          out=$(mktemp -d -p "$RUNNER_TEMP" pr671-prose.XXXXXX)
-          AGENT_CANON_PARENT_ROOT="$RUNNER_TEMP/pr671-parent" \
+          rm -rf "$RUNNER_TEMP/pr671-prose-parent"
+          git init -q -b main "$RUNNER_TEMP/pr671-prose-parent"
+          git -C "$RUNNER_TEMP/pr671-prose-parent" config user.name agent-canon-validation
+          git -C "$RUNNER_TEMP/pr671-prose-parent" config user.email agent-canon-validation@users.noreply.github.com
+          git -C "$RUNNER_TEMP/pr671-prose-parent" remote add origin https://example.invalid/pr671-prose-parent.git
+          git -C "$RUNNER_TEMP/pr671-prose-parent" commit --allow-empty -m 'initialize prose validation parent'
+          out=$(mktemp -d -p "$RUNNER_TEMP/pr671-prose-parent" pr671-prose.XXXXXX)
+          AGENT_CANON_PARENT_ROOT="$RUNNER_TEMP/pr671-prose-parent" \
             python3 tools/agent_tools/prose_reasoning_graph.py check-document documents/design/devcontainer/parent-devcontainer-policy.md --profile all --out-dir "$out"
           echo "diagnostic_output=$out"
           find "$out" -maxdepth 2 -type f -print -exec sed -n '1,400p' {} \;
       - name: Check docs
         run: |
-          mkdir -p "$RUNNER_TEMP/pr671-docs-tmp"
-          AGENT_CANON_PARENT_ROOT="$RUNNER_TEMP/pr671-parent" \
-          TMPDIR="$RUNNER_TEMP/pr671-docs-tmp" \
-          CARGO_TARGET_DIR="$RUNNER_TEMP/pr671-cargo-target" \
+          rm -rf "$RUNNER_TEMP/pr671-docs-parent"
+          git init -q -b main "$RUNNER_TEMP/pr671-docs-parent"
+          git -C "$RUNNER_TEMP/pr671-docs-parent" config user.name agent-canon-validation
+          git -C "$RUNNER_TEMP/pr671-docs-parent" config user.email agent-canon-validation@users.noreply.github.com
+          git -C "$RUNNER_TEMP/pr671-docs-parent" remote add origin https://example.invalid/pr671-docs-parent.git
+          git -C "$RUNNER_TEMP/pr671-docs-parent" commit --allow-empty -m 'initialize docs validation parent'
+          mkdir -p "$RUNNER_TEMP/pr671-docs-parent/tmp" "$RUNNER_TEMP/pr671-docs-parent/cargo-target"
+          AGENT_CANON_PARENT_ROOT="$RUNNER_TEMP/pr671-docs-parent" \
+          TMPDIR="$RUNNER_TEMP/pr671-docs-parent/tmp" \
+          CARGO_TARGET_DIR="$RUNNER_TEMP/pr671-docs-parent/cargo-target" \
             tools/bin/agent-canon docs check documents/design/devcontainer/parent-devcontainer-policy.md
       - name: Check dependency header and whitespace
         run: |
