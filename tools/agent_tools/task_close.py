@@ -19,6 +19,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -28,6 +29,22 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import capacity_handshake
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
+
+
+def _parent_validate(path: Path, purpose: str) -> None:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
+    ParentRootSideEffectBoundary().resolve_parent_owned_path(attestation, path, purpose, create=False)
 
 if __package__:
     from .tool_calls import (
@@ -79,12 +96,17 @@ DOCUMENT_SPLIT_DECISION_PREFIXES = (
     "rename:",
 )
 DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX = "not_applicable:format-only:"
+DOCUMENT_STRUCTURE_ACTIVATIONS = {"required", "not_required", "format_only"}
+DOCUMENT_STRUCTURE_VALUE_MISSING = {"", "missing", "none", "not_applicable"}
 COMPLETION_COVERAGE_ARTIFACT_NAME = "completion_coverage.json"
 AGENT_CANON_PREFIX = "vendor/agent-canon"
 
 
 def _resolve_report_root(report_root: str | None, workspace_root: Path) -> Path:
     """Load the team CLI helper only for the CLI/report path."""
+    # Keep report-root resolution tied to the requested workspace.  The
+    # parent capability below validates the resulting path and must not
+    # silently relocate lifecycle artifacts to the configured parent root.
     return resolve_report_root(report_root, workspace_root)
 
 
@@ -810,23 +832,58 @@ def document_structure_evidence_ready(
     normalized_changed = {Path(path).as_posix() for path in changed_markdown}
     paths_recorded = normalized_changed.issubset(recorded_paths)
     status = evidence.get("document_structure_status", "")
+    activation = evidence.get("structure_activation", "")
     structure_contract = evidence.get("structure_contract", "")
     split_decision_ready = document_split_decision_ready(
         status, evidence.get("document_split_decision", "")
     )
-    complete_route = (
-        status == "complete"
+    identity_ready = all(
+        evidence.get(field, "") not in DOCUMENT_STRUCTURE_VALUE_MISSING
+        for field in (
+            "structure_owner",
+            "structure_source",
+            "structure_reader",
+            "structure_layout",
+            "structure_validation_topology",
+        )
+    )
+    required_route = (
+        activation == "required"
         and evidence.get("structure_planning") == "complete"
-        and evidence.get("prose_graph") == "complete"
-        and structure_contract
-        not in {"", "missing", "none", "not_applicable"}
-        and "skipped" not in structure_contract
+        and evidence.get("prose_graph_activation") in {"selected", "not_selected"}
+        and (
+            (
+                evidence.get("prose_graph_activation") == "selected"
+                and evidence.get("prose_graph") == "complete"
+            )
+            or (
+                evidence.get("prose_graph_activation") == "not_selected"
+                and evidence.get("prose_graph") == "not_selected"
+            )
+        )
+        and structure_contract.startswith("required:")
+        and identity_ready
+    )
+    existing_topology_route = (
+        activation == "not_required"
+        and evidence.get("structure_planning") == "not_required"
+        and evidence.get("prose_graph_activation") == "not_selected"
+        and evidence.get("prose_graph") == "not_selected"
+        and structure_contract.startswith("not_required:existing-topology:")
+        and identity_ready
+    )
+    complete_route = status == "complete" and activation in {"required", "not_required"} and (
+        required_route or existing_topology_route
     )
     skipped_route = (
         status == "skipped"
+        and activation == "format_only"
         and evidence.get("md_style_check") == "pass"
-        and "skipped" in evidence.get("structure_contract", "")
-        and evidence.get("format_only_reason", "") not in {"", "missing", "none"}
+        and evidence.get("document_split_decision", "").startswith(
+            DOCUMENT_SPLIT_DECISION_FORMAT_ONLY_PREFIX
+        )
+        and structure_contract.startswith("skipped:")
+        and evidence.get("format_only_reason", "") not in DOCUMENT_STRUCTURE_VALUE_MISSING
     )
     return paths_recorded, split_decision_ready, split_decision_ready and (
         complete_route or skipped_route
@@ -1286,6 +1343,7 @@ def main() -> int:
         report_dir = (
             _resolve_report_root(args.report_root, Path.cwd()) / str(args.run_id)
         ).resolve()
+    _parent_validate(report_dir, "task-close")
     workspace = Path.cwd().resolve()
     active_run = active_run_name(report_dir)
 

@@ -175,14 +175,21 @@ downstream design ../../documents/design/dependency-manifest-design.md defines d
 
 ## Document Structure Evidence（文書 structure evidence）
 
-<!-- changed Markdown source file は closeout 前に document route を分類し、全 changed Markdown source path を `document_structure_paths` に列挙します。`document_split_decision` は `keep:<reason>`、`split:<new-owner-boundary>`、`merge:<target>`、`inline:<target-section>`、`rename:<new-path>`、`not_applicable:format-only:<reason>` の形式で記録します。substantive edit では structure status、structure planning、prose graph、structure contract artifact を complete とし、typo/link/format-only では skipped、理由、`md_style_check: pass` を記録します。reports/ 配下の generated run-bundle Markdown はこの source-document gate の外です。 -->
+<!-- changed Markdown source file は closeout 前に document route を分類し、全 changed Markdown source path を `document_structure_paths` に列挙します。`structure_activation=required` は未決の owner/source/reader/layout/validation topology を選択した route、`structure_activation=not_required` は既存 topology を明示して行う bounded edit、`structure_activation=format_only` は formatter-only route です。`document_split_decision` は `keep:<reason>`、`split:<new-owner-boundary>`、`merge:<target>`、`inline:<target-section>`、`rename:<new-path>`、`not_applicable:format-only:<reason>` の形式で記録します。complete route は activation に応じた positive structure evidence を記録し、format-only は skipped、理由、`md_style_check: pass` を記録します。reports/ 配下の generated run-bundle Markdown はこの source-document gate の外です。 -->
 
 - document_structure_paths:
 - document_structure_status:
+- structure_activation:
 - document_split_decision:
 - structure_planning:
+- prose_graph_activation:
 - prose_graph:
 - structure_contract:
+- structure_owner:
+- structure_source:
+- structure_reader:
+- structure_layout:
+- structure_validation_topology:
 - md_style_check:
 - format_only_reason:
 

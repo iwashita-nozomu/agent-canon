@@ -31,6 +31,23 @@ else:
     from workspace_scope import resolve_report_root
 from task_authority import ACTIVE_RUN_POINTER
 
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+
 LEDGER_SEMANTIC_KINDS = (
     "request_clause",
     "responsibility_unit",
@@ -82,6 +99,32 @@ class MaterializerError(ValueError):
         self.code = code
         self.detail = detail
         super().__init__(code if not detail else f"{code}:{detail}")
+
+
+def _parent_capability(purpose: str):
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
+    return ParentRootSideEffectBoundary(), attestation
+
+
+def _parent_path(path: Path, purpose: str, *, create: bool = False) -> Path:
+    boundary, attestation = _parent_capability(purpose)
+    if create:
+        boundary.ensure_parent_owned_directory(attestation, path.parent, purpose)
+    return boundary.resolve_parent_owned_path(attestation, path, purpose).physical_path
+
+
+def _parent_write(path: Path, data: bytes, purpose: str) -> None:
+    boundary, attestation = _parent_capability(purpose)
+    boundary.write_parent_owned_file(attestation, path, data, purpose)
 
 
 def _git_blob_oid(data: bytes) -> str:
@@ -613,11 +656,15 @@ def build_parser() -> argparse.ArgumentParser:
 def append_ledger_event(report_dir: Path, event: dict[str, object]) -> Path:
     """Append one semantic event to the existing run-local work ledger."""
     event_identity = _validate_ledger_event(event, report_dir)
-    report_dir.mkdir(parents=True, exist_ok=True)
+    _parent_path(report_dir / "work_log.md", "work-log", create=True)
     work_log_path = report_dir / "work_log.md"
     if not work_log_path.exists():
         _log_run_work_entry(report_dir, "ledger-bootstrap")
-    lines = work_log_path.read_text(encoding="utf-8").splitlines()
+    boundary, attestation = _parent_capability("work-log")
+    work_receipt = boundary.resolve_parent_owned_path(
+        attestation, work_log_path, "work-log", create=False
+    )
+    lines = boundary.read_parent_owned_file(work_receipt).decode("utf-8").splitlines()
     heading = "## Ledger Events"
     if heading not in lines:
         lines.extend(["", heading, ""])
@@ -641,7 +688,12 @@ def append_ledger_event(report_dir: Path, event: dict[str, object]) -> Path:
             return work_log_path
     if line not in lines:
         lines.append(line)
-        work_log_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        boundary.write_parent_owned_file(
+            attestation,
+            work_log_path,
+            ("\n".join(lines) + "\n").encode("utf-8"),
+            "work-log",
+        )
     return work_log_path
 
 
@@ -710,10 +762,11 @@ def _resolve_active_report_dir(workspace_root: Path, report_root: Path) -> Path 
 
 def _log_run_work_entry(report_dir: Path, entry: str) -> Path:
     """Append one entry to the run-bundle work log."""
-    report_dir.mkdir(parents=True, exist_ok=True)
+    _parent_path(report_dir / "work_log.md", "work-log", create=True)
     work_log_path = report_dir / "work_log.md"
     if not work_log_path.exists():
-        work_log_path.write_text(
+        _parent_write(
+            work_log_path,
             "\n".join(
                 [
                     "# Work Log",
@@ -729,13 +782,21 @@ def _log_run_work_entry(report_dir: Path, entry: str) -> Path:
                     "## Entries",
                     "",
                 ]
-            ),
-            encoding="utf-8",
+            ).encode("utf-8"),
+            "work-log",
         )
-    with work_log_path.open("a", encoding="utf-8") as handle:
-        if work_log_path.stat().st_size > 0:
-            handle.write("\n")
-        handle.write(f"- {entry}\n")
+    boundary, attestation = _parent_capability("work-log")
+    receipt = boundary.resolve_parent_owned_path(
+        attestation, work_log_path, "work-log", create=False
+    )
+    existing = boundary.read_parent_owned_file(receipt)
+    separator = b"\n" if existing else b""
+    boundary.write_parent_owned_file(
+        attestation,
+        work_log_path,
+        existing + separator + f"- {entry}\n".encode("utf-8"),
+        "work-log",
+    )
     return work_log_path
 
 

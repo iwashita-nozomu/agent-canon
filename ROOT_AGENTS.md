@@ -336,7 +336,7 @@ proof obligation, or replacement unit together even when the chunk is long.
 | task bootstrap and CLI entrypoints | `vendor/agent-canon/agents/canonical/CLI_ENTRYPOINTS.md`; `bootstrap_agent_run.py` | generated task packet |
 | subagent lifecycle, same-role instances, wave ledger | `vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md`; `team_manifest.yaml`; `schedule.md`; `workflow_monitoring.md` | `workflow_monitor.py`; closeout lifecycle evidence |
 | role behavior and stage conditions | `vendor/agent-canon/.codex/agents/*.toml`; `vendor/agent-canon/agents/agents_config.json` | `check_agent_runtime_alignment.py` |
-| skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml`; `vendor/agent-canon/.agents/skills/*/SKILL.md` | `python3 tools/agent_tools/route.py --prompt`; `check_agent_runtime_alignment.py` |
+| skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml`; `vendor/agent-canon/.agents/skills/*/SKILL.md` | `python3 tools/agent-canon/agent_tools/route.py --prompt`; `check_agent_runtime_alignment.py` |
 | internal workflow routines | `vendor/agent-canon/agents/internal-routines/README.md` | `repo_structure_contract.py`; runtime alignment |
 | design-to-implementation correspondence | `vendor/agent-canon/agents/internal-routines/design-implementation-correspondence.md`; `vendor/agent-canon/documents/design/*.md` | `check_design_doc_claims.py`; design/review readback |
 | implementation flow graph and source packet | run bundle design packet; `vendor/agent-canon/agents/workflows/implementation-waterfall-workflow.md`; `vendor/agent-canon/agents/COMMUNICATION_PROTOCOL.md` | design review; dependency review |
@@ -418,8 +418,8 @@ branch / PR workflow, then reflected in the template through the clean
 
 ```bash
 AGENT_CANON_COMMIT_REQUEST_EVIDENCE="evidence:$(sha256sum agents/workflows/agent-canon-pr-workflow.md | awk '{print $1}')" \
-  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh link-root
-  PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check
+  PYTHONPATH=tools/agent-canon python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec tools/sync_agent_canon.sh link-root
+  PYTHONPATH=tools/agent-canon python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec tools/sync_agent_canon.sh check
 ```
 
 Run these commands when `agents/skills/agent-canon-update.md` (active root
@@ -441,8 +441,8 @@ evidence, and subagent lifecycle evidence.
 For active root projection updates and parent root sync, closeout also cites
 `agentcanon_structure_followup=required` and
 `agentcanon_structure_followup=pass`, including the parent-root
-request-evidence-authorized `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` link-root and
-`PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` check evidence.
+request-evidence-authorized `PYTHONPATH=tools/agent-canon python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec tools/sync_agent_canon.sh` link-root and
+`PYTHONPATH=tools/agent-canon python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec tools/sync_agent_canon.sh` check evidence.
 
 A no-subagents closeout is valid for routing-only/advisory tasks, read-only audits, or a bounded
 parent-direct route with owner/path/validation evidence. An out-of-scope or unbounded exception
@@ -468,8 +468,8 @@ These are common commands, not a default checklist. Select the most targeted com
 that validates the changed responsibility unit, active profile, or blocking
 finding.
 
-- `python3 vendor/agent-canon/tools/agent_tools/check_agent_runtime_alignment.py`
-- `python3 vendor/agent-canon/tools/agent_tools/repo_structure_contract.py --root vendor/agent-canon --contract vendor/agent-canon/documents/structure/repo-structure-contract.toml`
-- `python3 vendor/agent-canon/tools/agent_tools/responsibility_scope.py --root .`
-- `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh` check
-- `python3 vendor/agent-canon/tools/agent_tools/task_close.py ...`
+- `python3 tools/agent-canon/agent_tools/check_agent_runtime_alignment.py`
+- `python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec python3 tools/agent_tools/repo_structure_contract.py --root . --contract documents/structure/repo-structure-contract.toml`
+- `python3 tools/agent-canon/agent_tools/responsibility_scope.py --root .`
+- `PYTHONPATH=tools/agent-canon python3 tools/agent-canon/agent_tools/agent_canon_source_root.py exec tools/sync_agent_canon.sh` check
+- `python3 tools/agent-canon/agent_tools/task_close.py ...`

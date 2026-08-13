@@ -30,14 +30,13 @@ class RunAllChecksScriptTest(unittest.TestCase):
         text = SCRIPT.read_text(encoding="utf-8")
 
         archive_marker = (
-            'AGENT_CANON_CI_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-'
+            '--candidate "${AGENT_CANON_HOOK_ARCHIVE_DIR:-'
             '${AGENT_CANON_SOURCE_ROOT}/.agent-canon/log-archive}"'
         )
-        mkdir_marker = 'mkdir -p "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"'
-        eval_default_marker = (
-            'AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${AGENT_CANON_CI_EVAL_LOG_DIR}"'
-        )
-        state_default_marker = 'AGENT_CANON_CI_EVAL_LOG_DIR_VALUE="${WORKSPACE_ROOT}/.state/agent-eval-runs/run-all-checks"'
+        archive_boundary_marker = "--purpose run-all-checks-hook-archive"
+        explicit_eval_marker = "--purpose run-all-checks-explicit-eval-log"
+        temporary_eval_marker = "--purpose run-all-checks-eval-log"
+        cleanup_marker = "--purpose run-all-checks-cleanup"
         producer_marker = (
             'run_accumulated_agent_evals.py" "${accumulated_eval_args[@]}"'
         )
@@ -47,16 +46,17 @@ class RunAllChecksScriptTest(unittest.TestCase):
         )
 
         self.assertIn(archive_marker, text)
-        self.assertIn(mkdir_marker, text)
-        self.assertIn(eval_default_marker, text)
-        self.assertIn(state_default_marker, text)
+        self.assertIn(archive_boundary_marker, text)
+        self.assertIn(explicit_eval_marker, text)
+        self.assertIn(temporary_eval_marker, text)
+        self.assertIn(cleanup_marker, text)
         self.assertIn(command_env_marker, text)
         self.assertIn(
             '--run-id run-all-checks --log-dir "${AGENT_CANON_CI_EVAL_LOG_DIR_VALUE}"',
             text,
         )
         self.assertLess(text.index(archive_marker), text.index(producer_marker))
-        self.assertLess(text.index(mkdir_marker), text.index(producer_marker))
+        self.assertLess(text.index(archive_boundary_marker), text.index(producer_marker))
         self.assertLess(text.index(producer_marker), text.index(checker_marker))
         self.assertNotIn("export AGENT_CANON_HOOK_ARCHIVE_DIR", text)
 
@@ -158,6 +158,38 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertNotIn('bash "${CANON_TOOLS_ROOT}/ci/run_all_checks.sh"', pr_text)
         self.assertNotIn("PR_QUICK_CI_ARGS=", pr_text)
 
+    def test_all_checks_invokes_agent_canon_via_parent_boundary_script(self) -> None:
+        """The boundary adapter should be used for agent-canon execution."""
+        text = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn(
+            'python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound',
+            text,
+        )
+        self.assertIn('--source-root "${AGENT_CANON_SOURCE_ROOT}"', text)
+        self.assertIn("--purpose run-all-checks-script", text)
+        self.assertIn("verify-child", text)
+
+    def test_all_checks_installs_setup_cleanup_before_allocations(self) -> None:
+        """A rejected late override must not leave earlier setup directories."""
+        text = SCRIPT.read_text(encoding="utf-8")
+
+        trap_marker = "trap cleanup_run_all_checks_temp EXIT"
+        hook_allocation = (
+            'python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" ensure-dir \\\n'
+            '    --root "${WORKSPACE_ROOT}" \\\n'
+            '    --candidate "${AGENT_CANON_CI_HOOK_ARCHIVE_DIR}"'
+        )
+        self.assertIn(trap_marker, text)
+        self.assertIn(hook_allocation, text)
+        self.assertLess(text.index(trap_marker), text.index(hook_allocation))
+        self.assertIn("--purpose run-all-checks-setup-rollback", text)
+
+    def test_all_checks_removes_home_tools_defaults_for_cli_target(self) -> None:
+        """CLI fallback should no longer infer target paths from HOME/.tools."""
+        text = SCRIPT.read_text(encoding="utf-8")
+        self.assertIn('AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${WORKSPACE_ROOT}/.agent-canon/cache/cargo-target}"', text)
+        self.assertNotIn('${HOME}/.tools/agent-canon/cargo-target', text)
+
     def test_pr_gate_has_no_legacy_profile(self) -> None:
         """The PR gate must keep one explicit full maintenance/source route."""
         pr_text = PR_SCRIPT.read_text(encoding="utf-8")
@@ -239,6 +271,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
             "python_quality_runner=tools/ci/run_python_quality_checks.sh",
             pre_review_text,
         )
+        self.assertIn("exec-parent-bound", pre_review_text)
         self.assertIn("python_quality_args+=(--quick)", ci_text)
         self.assertIn("PYTHON_QUALITY_CHECKS=pass", quality_text)
         self.assertIn('PYTHON_SOURCE_PATHS+=("$candidate_path")', quality_text)

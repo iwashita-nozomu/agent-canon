@@ -36,7 +36,9 @@ CATALOG_PATH = "tools/catalog.yaml"
 TOOL_DOCS_PATH = "documents/tools/tool-docs.toml"
 PUBLIC_SURFACE_PRODUCER_VERSION = "public-surface.v1"
 ID_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-TOOL_REFERENCE_RE = re.compile(r"\btools/[A-Za-z0-9_./-]+\.(?:py|sh)\b")
+TOOL_REFERENCE_RE = re.compile(
+    r"(?<![A-Za-z0-9_./-])tools/[A-Za-z0-9_./-]+\.(?:py|sh)\b"
+)
 DEFAULT_COMMAND_SOURCES = (
     "tools/ci/run_all_checks.sh",
     "tools/ci/check_agent_canon_pr.sh",
@@ -202,8 +204,15 @@ def has_non_string_key(mapping: Mapping[str, object], key: str) -> bool:
     return key in mapping and not isinstance(mapping[key], str)
 
 
-def resolve_repo_path(root: Path, relative_path: str) -> Path:
-    """Resolve a path through the root view or vendored AgentCanon source."""
+def resolve_repo_path(
+    root: Path,
+    relative_path: str,
+    *,
+    source_root: Path | None = None,
+) -> Path:
+    """Resolve a catalog path below an explicit source root when supplied."""
+    if source_root is not None:
+        return source_root.resolve() / relative_path
     root_path = root / relative_path
     if root_path.exists():
         return root_path
@@ -991,6 +1000,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(render_json(report, public))
     elif args.format == "markdown":
         print(render_markdown(report))
+        # Markdown is the catalog crosswalk projection.  The public-surface
+        # extractor is intentionally reported by the JSON/text projections;
+        # minimal catalog fixtures need not materialize Rust/CLI inputs merely
+        # to render this catalog-owned view.
+        return 1 if report.findings else 0
     else:
         for finding in report.findings:
             print(finding.render())

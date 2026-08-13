@@ -1,20 +1,19 @@
 # @dependency-start
 # contract configuration
-# responsibility Checks and optionally synchronizes AgentCanon local issues with GitHub Issues.
+# responsibility Synchronizes AgentCanon local issues with GitHub Issues only at publication boundaries.
+# upstream design ../../documents/design/responsibility-rationale.md durable issue and remote reconciliation rationale
 # upstream design ../../issues/README.md durable local issue and GitHub mirror policy
 # upstream implementation ../../tools/agent_tools/issue_sync.py validates and syncs issue mirrors
 # downstream implementation ../../tools/ci/check_github_workflows.py validates workflow wiring
 # @dependency-end
 
-# Standalone-only workflow. Template and derived repositories should not copy
-# this workflow because their canonical issue mirror lives in the AgentCanon repo.
 name: Issue Mirror
 
 on:
   pull_request:
   push:
     branches:
-      - "**"
+      - main
   workflow_dispatch:
 
 concurrency:
@@ -23,8 +22,11 @@ concurrency:
 
 jobs:
   issue-mirror-sync:
-    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
+    env:
+      AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
+      AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
     permissions:
       contents: read
       issues: write
@@ -40,49 +42,48 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Sync linked GitHub issues
+      - name: Validate and synchronize linked GitHub issues
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          summary_file="${GITHUB_WORKSPACE}/.agent-canon/issue-mirror-${GITHUB_JOB}.md"
           python3 tools/agent_tools/issue_sync.py \
             --root . \
             --repo "${GITHUB_REPOSITORY}" \
             --github-check \
             --sync-github \
-            --summary-file "${GITHUB_STEP_SUMMARY}"
+            --summary-file "${summary_file}"
+          cat "${summary_file}" >> "${GITHUB_STEP_SUMMARY}"
 
   issue-mirror-check:
-    needs: issue-mirror-sync
     if: always()
+    needs: issue-mirror-sync
     runs-on: ubuntu-latest
+    env:
+      AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
+      AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
     permissions:
       contents: read
-      issues: read
     steps:
+      - name: PR required-check compatibility
+        if: github.event_name == 'pull_request'
+        run: echo "Remote issue reconciliation is intentionally skipped for pull requests."
+
       - name: Checkout repository
         id: checkout
+        if: github.event_name != 'pull_request'
         uses: actions/checkout@v4
         with:
           submodules: false
           persist-credentials: false
 
-      - name: Setup Python
-        if: steps.checkout.outcome == 'success'
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Check issue mirror
-        if: steps.checkout.outcome == 'success'
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Confirm publication sync
+        if: github.event_name != 'pull_request' && steps.checkout.outcome == 'success'
         run: |
-          python3 tools/agent_tools/issue_sync.py \
-            --root . \
-            --repo "${GITHUB_REPOSITORY}" \
-            --github-check \
-            --allow-github-auth-unavailable \
-            --summary-file "${GITHUB_STEP_SUMMARY}"
+          if [ "${{ needs.issue-mirror-sync.result }}" != "success" ]; then
+            echo "Issue mirror publication sync did not succeed." >&2
+            exit 1
+          fi
 
       - name: Record issue mirror unavailable
         if: failure() && steps.checkout.outcome != 'success'

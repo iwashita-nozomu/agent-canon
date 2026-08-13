@@ -25,6 +25,19 @@ import subprocess
 from pathlib import Path
 
 try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootSideEffectBoundary,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootSideEffectBoundary,
+        attest_parent_root,
+    )
+
+try:
     from .log_repository_identity import (
         SourceRepositoryIdentityError,
         stable_source_id,
@@ -57,6 +70,36 @@ AGENT_CANON_ROOT_MARKERS = (
 )
 
 
+def _parent_path(active_root: Path, candidate: Path, purpose: str) -> Path:
+    """Authenticate and contain a writer path beneath the outer repository.
+
+    Runtime path helpers remain usable by read-only legacy callers when the
+    parent handoff is absent.  A bounded child handoff makes the parent root
+    mandatory and rejects external overrides before a writer receives them.
+    The caller's candidate remains the logical path returned by this resolver;
+    the boundary is used only to authenticate and containment-check it.
+    """
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        return candidate
+    parent = Path(configured)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(
+            cwd=parent,
+            explicit_root=parent,
+            purpose=purpose,
+        )
+    )
+    boundary = ParentRootSideEffectBoundary()
+    boundary.resolve_parent_owned_path(
+        attestation,
+        candidate,
+        purpose,
+        create=False,
+    )
+    return candidate
+
+
 def safe_slug(value: str) -> str:
     """Return a filesystem-safe lowercase path segment."""
     slug = re.sub(r"[^A-Za-z0-9_.-]+", "-", value).strip("._-").casefold()
@@ -82,24 +125,27 @@ def hook_event_spool_root(active_root: Path) -> Path:
     """Return the O(1) repo-owned hook-event spool root."""
     override = os.environ.get(HOOK_EVENT_SPOOL_DIR_ENV, "").strip()
     if override:
-        return Path(override).resolve() / repo_log_key(active_root)
-    return (
-        active_root.resolve()
+        candidate = Path(override) / repo_log_key(active_root)
+        return _parent_path(active_root, candidate, "runtime-event-spool")
+    candidate = (
+        active_root
         / ".agent-canon"
         / "runtime-event-spool"
         / "hook-events"
         / repo_log_key(active_root)
     )
+    return _parent_path(active_root, candidate, "runtime-event-spool")
 
 
 def runtime_event_publication_outcome_spool_root(active_root: Path) -> Path:
     """Return the repo-local publication-outcome observation spool root."""
-    return (
-        active_root.resolve()
+    candidate = (
+        active_root
         / ".agent-canon"
         / "runtime-event-spool"
         / "publication-outcome"
     )
+    return _parent_path(active_root, candidate, "publication-outcome-spool")
 
 
 def post_tooluse_spool_path(root: Path, hook_run_id: str) -> Path:
@@ -180,7 +226,8 @@ def codex_runtime_summary_file(canon_root: Path) -> str:
 
 def mounted_log_archive_root(canon_root: Path) -> Path:
     """Return the preferred AgentCanon-local log archive mount path."""
-    return canon_root / LOG_ARCHIVE_PARENT
+    candidate = canon_root / LOG_ARCHIVE_PARENT
+    return _parent_path(canon_root, candidate, "runtime-log-archive")
 
 
 def is_agent_canon_root(root: Path) -> bool:
@@ -211,7 +258,7 @@ def _log_archive_root(canon_root: Path) -> Path:
     """Return the active hook log archive root."""
     override = os.environ.get(HOOK_ARCHIVE_DIR_ENV, "").strip()
     if override:
-        return Path(override)
+        return _parent_path(canon_root, Path(override), "hook-log-archive")
     mount = mounted_log_archive_root(canon_root)
     if mount.is_dir():
         return mount

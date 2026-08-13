@@ -4,6 +4,7 @@
 # responsibility Projects and validates dependency relations captured by the canonical graph.
 # upstream design ../../documents/design/dependency-manifest-design.md dependency graph semantics
 # upstream implementation ../../rust/agent-canon/src/graph.rs owns dependency parsing, binding, and storage
+# upstream implementation ./parent_root_side_effects.py owns graph scratch and TSV publication
 # downstream implementation ./render_dependency_manifest_graph.py renders exported dependency TSV
 # @dependency-end
 set -euo pipefail
@@ -53,20 +54,53 @@ while [[ $# -gt 0 ]]; do
 done
 
 ROOT_DIR="$(realpath -m "$ROOT_DIR")"
+PARENT_ROOT="${AGENT_CANON_PARENT_ROOT:-$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)}"
+if [[ -z "$PARENT_ROOT" ]]; then
+  echo "DEPENDENCY_GRAPH=fail reason=missing-parent-root" >&2
+  exit 1
+fi
+PARENT_ROOT="$(cd "$PARENT_ROOT" && pwd -P)"
+CANON_SCRIPT_PATH="$(realpath -m "${BASH_SOURCE[0]}")"
+BOUNDARY_SCRIPT="$(dirname "$CANON_SCRIPT_PATH")/parent_root_side_effects.py"
 if [[ -x "$ROOT_DIR/vendor/agent-canon/tools/bin/agent-canon" ]]; then
   GRAPH_CLI="$ROOT_DIR/vendor/agent-canon/tools/bin/agent-canon"
-else
+elif [[ -x "$ROOT_DIR/tools/bin/agent-canon" ]]; then
   GRAPH_CLI="$ROOT_DIR/tools/bin/agent-canon"
+elif [[ -x "$PARENT_ROOT/vendor/agent-canon/tools/bin/agent-canon" ]]; then
+  GRAPH_CLI="$PARENT_ROOT/vendor/agent-canon/tools/bin/agent-canon"
+else
+  GRAPH_CLI="$PARENT_ROOT/tools/bin/agent-canon"
 fi
+TEMP_ROOT="$(
+  python3 "$BOUNDARY_SCRIPT" temp-dir \
+    --root "$PARENT_ROOT" \
+    --candidate "${AGENT_CANON_PARENT_TMPDIR:-$PARENT_ROOT/.agent-canon/tmp}" \
+    --prefix dependency-graph. \
+    --purpose dependency-graph
+)"
 
-status_file="$(mktemp)"
-query_file="$(mktemp)"
-all_edges="$(mktemp)"
-edges_file="$(mktemp)"
-manifest_files="$(mktemp)"
-selected_file="$(mktemp)"
-scope_file="$(mktemp)"
-trap 'rm -f "$status_file" "$query_file" "$all_edges" "$edges_file" "$manifest_files" "$selected_file" "$scope_file"' EXIT
+status_file="$TEMP_ROOT/status.json"
+query_file="$TEMP_ROOT/query.json"
+all_edges="$TEMP_ROOT/all-edges.tsv"
+edges_file="$TEMP_ROOT/edges.tsv"
+manifest_files="$TEMP_ROOT/manifest.txt"
+selected_file="$TEMP_ROOT/selected.txt"
+scope_file="$TEMP_ROOT/scope.txt"
+
+cleanup_dependency_graph_temp() {
+  local status=$?
+  local cleanup_status=0
+  trap - EXIT
+  python3 "$BOUNDARY_SCRIPT" remove-tree \
+    --root "$PARENT_ROOT" \
+    --candidate "$TEMP_ROOT" \
+    --purpose dependency-graph-cleanup >/dev/null || cleanup_status=$?
+  if [[ "$status" -eq 0 && "$cleanup_status" -ne 0 ]]; then
+    status=$cleanup_status
+  fi
+  exit "$status"
+}
+trap cleanup_dependency_graph_temp EXIT
 
 set +e
 "$GRAPH_CLI" graph status --root "$ROOT_DIR" --profile default --format json >"$status_file"
@@ -147,11 +181,15 @@ if [[ "$PRINT_EDGES" -eq 1 ]]; then
   cat "$edges_file"
 fi
 if [[ -n "$GRAPH_TSV_OUTPUT" ]]; then
-  mkdir -p "$(dirname "$GRAPH_TSV_OUTPUT")"
+  graph_output_staging="$TEMP_ROOT/graph-output.tsv"
   {
     printf 'direction\tkind\tsource\ttarget\n'
     cat "$edges_file"
-  } >"$GRAPH_TSV_OUTPUT"
+  } >"$graph_output_staging"
+  python3 "$BOUNDARY_SCRIPT" write \
+    --root "$PARENT_ROOT" \
+    --candidate "$GRAPH_TSV_OUTPUT" \
+    --purpose dependency-graph-output <"$graph_output_staging" >/dev/null
   echo "DEPENDENCY_GRAPH_TSV=$GRAPH_TSV_OUTPUT"
 fi
 

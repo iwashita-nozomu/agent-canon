@@ -186,7 +186,7 @@ unit を同じ変更で更新しません。
 | Unit file | owner responsibility | 主対象 |
 | --- | --- | --- |
 | `audit-unit/repository-structure.md` | structure required path kind | `documents/structure/**` と責務 scope の存在/kind |
-| `audit-unit/ownership-root-views.md` | AgentCanon pin と active source/view ownership | `vendor/agent-canon`、`AGENTS.md`、`.codex/config.toml`、`tools/agent-canon` |
+| `audit-unit/ownership-root-views.md` | AgentCanon pin と active source/view ownership | `vendor/agent-canon`、`AGENTS.md`、`.codex/config.toml`、`.codex/agents`、`tools/agent-canon` |
 | `audit-unit/environment-containers.md` | Docker/devcontainer と環境境界 | `docker/`、`.devcontainer/`、environment manifests |
 | `audit-unit/dependency-integrity.md` | dependency header/graph と import boundary | headers、manifests、dependency tools |
 | `audit-unit/code-type-boundaries.md` | code API/type/runtime boundary | implementation、public APIs、static type tools |

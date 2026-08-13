@@ -15,11 +15,29 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
+
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
 
 REQUIRED_FIELDS = (
     "issue_id",
@@ -40,6 +58,22 @@ OPEN_STATUSES = {"open", "in_progress", "deferred"}
 CLOSED_STATUSES = {"resolved", "wontfix", "deferred"}
 ISSUE_ID_RE = re.compile(r"^AC-\d{8}-[a-z0-9]+(?:-[a-z0-9]+)*$")
 FIELD_RE = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$")
+
+
+def _write_issue_output(path: Path, payload: bytes, purpose: str) -> None:
+    """Publish issue evidence/source updates through the parent root."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, payload, purpose)
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        f"{purpose}: explicit parent root is required for publication",
+    )
 
 
 @dataclass(frozen=True)
@@ -614,14 +648,18 @@ def replace_github_issue(path: Path, url: str) -> None:
         filtered.append(line)
     lines = filtered
     if replaced:
-        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        _write_issue_output(path, ("\n".join(lines) + "\n").encode("utf-8"), "issue-sync-source")
         return
     for index, line in enumerate(lines):
         if line.startswith("evidence:"):
             lines.insert(index + 1, f"github_issue: {url}")
-            path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            _write_issue_output(path, ("\n".join(lines) + "\n").encode("utf-8"), "issue-sync-source")
             return
-    path.write_text("\n".join([*lines, f"github_issue: {url}"]) + "\n", encoding="utf-8")
+    _write_issue_output(
+        path,
+        ("\n".join([*lines, f"github_issue: {url}"]) + "\n").encode("utf-8"),
+        "issue-sync-source",
+    )
 
 
 def apply_missing_links(issues: Sequence[IssueRecord], repo: str) -> tuple[str, ...]:
@@ -774,9 +812,27 @@ def render_markdown_summary(report: IssueSyncReport) -> str:
 
 def append_summary(path: Path, report: IssueSyncReport) -> None:
     """Append Markdown summary output to a file."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("a", encoding="utf-8") as handle:
-        handle.write(render_markdown_summary(report))
+    rendered = render_markdown_summary(report)
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="issue-sync-summary")
+        )
+        boundary = ParentRootSideEffectBoundary()
+        with boundary.open_parent_owned_file(
+            attestation,
+            path,
+            "issue-sync-summary",
+            create=True,
+            mode="a+",
+        ) as handle:
+            handle.write(rendered)
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        "issue-sync-summary: explicit parent root is required",
+    )
 
 
 def main(argv: Sequence[str] | None = None) -> int:

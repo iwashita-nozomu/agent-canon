@@ -692,6 +692,40 @@ entries:
       - tests/agent_tools/test_hook_event_log.py
       - tests/agent_tools/test_runtime_log_archive_git.py
 
+  - id: workflow-monitor
+    summary: Appends typed workflow behavior and wave evidence to an agent run bundle.
+    path: tools/agent_tools/workflow_monitor.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/workflow_monitor.py --report-dir <report-dir>
+    writes: true
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_workflow_monitor.py
+
+  - id: waterfall-gate-check
+    summary: Checks the next approved waterfall gate against the prepared run bundle.
+    path: tools/agent_tools/waterfall_gate_check.py
+    family: agent_tools
+    role: workflow
+    status: canonical
+    command: python3 tools/agent_tools/waterfall_gate_check.py --report-dir <report-dir> --gate <gate>
+    writes: false
+    default_wiring:
+      ci: false
+      pr_check: false
+    docs:
+      - tools/README.md
+      - documents/tools/README.md
+    tests:
+      - tests/agent_tools/test_waterfall_gate_check.py
+
   - id: agent-canon-graph
     summary: Builds and serves the one-build dependency graph with an optional persisted runtime-evidence snapshot.
     path: rust/agent-canon/src/graph.rs

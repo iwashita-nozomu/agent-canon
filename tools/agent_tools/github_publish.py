@@ -26,6 +26,23 @@ from pathlib import Path
 from typing import cast
 from urllib.parse import urlparse
 
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+
 from artifact_identity import canonical_json_bytes
 from update_lifecycle_contract import (
     binding_identity,
@@ -48,6 +65,24 @@ GITHUB_PUBLICATION_PACKET_SCHEMA = "agent-canon.github-publication-packet.v1"
 ACTIVE_PACKET_MATERIALIZATION_SCHEMA = (
     "waterfall.active_design_packet_materialization.v1"
 )
+
+
+def _write_publication_summary(path: Path, payload: bytes) -> None:
+    """Write local publication evidence beneath the parent root."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="github-publication-staging")
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(
+            attestation, path, payload, "github-publication-staging"
+        )
+        return
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        "github-publication-staging: explicit parent root is required",
+    )
 
 
 @dataclass(frozen=True)
@@ -1949,8 +1984,10 @@ def emit_summary(args: argparse.Namespace, summary: Mapping[str, object]) -> Non
     summary_out = getattr(args, "summary_out", None)
     if summary_out:
         path = Path(summary_out)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        _write_publication_summary(
+            path,
+            (json.dumps(summary, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        )
     for line in summary_lines(summary):
         print(line)
 

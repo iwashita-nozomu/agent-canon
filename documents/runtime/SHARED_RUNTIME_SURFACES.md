@@ -20,11 +20,13 @@ path ownership and path classes are declared only by
 `responsibility-scope.toml`; this manifest describes projection mechanics.
 
 AgentCanon source is authoritative under `vendor/agent-canon/`. The root
-projection contains only the instruction view `AGENTS.md`, the runtime config
-view `.codex/config.toml`, and the shared CLI/tool namespace
-`tools/agent-canon`. The update lifecycle may create optional transaction state
-under `.agent-canon/`. Tests, notes, memory, evidence, editor, and GitHub paths
-are not mirrored shared surfaces. Parent `.devcontainer/` content is likewise
+projection contains only the instruction view `AGENTS.md`, the Codex runtime
+config bundle `.codex/config.toml` and `.codex/agents`, and the shared CLI/tool
+namespace `tools/agent-canon`. The role directory is part of the config bundle:
+Codex resolves every `[agents.<name>].config_file` relative to the declaring
+config path. The update lifecycle may create optional transaction state under
+`.agent-canon/`. Tests, notes, memory, evidence, editor, and GitHub paths are
+not mirrored shared surfaces. Parent `.devcontainer/` content is likewise
 never projected: `devcontainer.json`, `rootless/`, and `gpu-admission/` are
 retired/non-projecting paths. A parent may own regular files at those paths;
 only a stale symlink that still resolves into AgentCanon is eligible for removal
@@ -88,6 +90,7 @@ The active projection is deliberately limited to:
 | --- | --- | --- |
 | `AGENTS.md` | symlink | `ROOT_AGENTS.md` |
 | `.codex/config.toml` | symlink | `.codex/config.toml` |
+| `.codex/agents` | symlink | `.codex/agents` |
 | `tools/agent-canon` | symlink | `tools` |
 | `.agent-canon` | optional transaction state | update lifecycle |
 

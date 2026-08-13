@@ -115,3 +115,31 @@ verification = { kind = "apt-repository", executable = "clangd-18", args = ["--v
 deps = ["ca-certificates"]
 provides = ["clangd-18"]
 failure_policy = "fail"
+
+[[records]]
+id = "rust-toolchain"
+package = "rust"
+method = "rust-toolchain"
+version = "1.89.0"
+source = "https://static.rust-lang.org"
+components = ["rust-src", "rustfmt", "clippy", "rust-analyzer"]
+verification = { kind = "rust-toolchain" }
+deps = ["rustup-init", "build-essential", "curl"]
+provides = ["rust", "cargo", "rustfmt", "clippy", "rust-analyzer"]
+failure_policy = "fail"
+
+[[records]]
+id = "agent-canon-cli"
+package = "agent-canon"
+method = "cargo-source-build"
+version = "0.1.0"
+source = "rust/agent-canon"
+repo = "https://github.com/iwashita-nozomu/agent-canon.git"
+source_identity = "canonical-snapshot"
+source_tree_sha256 = "6084cc155d0166cb06e661a07cae7a0630c34df21ee7e9d4c6816d875ec5d15c"
+cargo_lock_sha256 = "060b8825843b14b12bebb9da095503f4ec7f68a77934e595c082957cb1f72638"
+locked = true
+verification = { kind = "cargo-binary", path = "target/release/agent-canon", args = ["--version"], output_contains = "agent-canon 0.1.0" }
+deps = ["cargo"]
+provides = ["agent-canon"]
+failure_policy = "fail"

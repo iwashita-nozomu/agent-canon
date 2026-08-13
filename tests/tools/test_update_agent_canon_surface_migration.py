@@ -102,7 +102,9 @@ class SurfaceMigrationTest(unittest.TestCase):
 
     def clone_parent_fixture(self, *, activate_transition: bool = False) -> Path:
         """Return a parent fixture with a real main-branch AgentCanon submodule."""
-        tmp_root = Path(tempfile.mkdtemp())
+        tmp_root_handle = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp_root_handle.cleanup)
+        tmp_root = Path(tmp_root_handle.name)
         source = tmp_root / "source"
         parent = tmp_root / "parent"
 
@@ -116,7 +118,12 @@ class SurfaceMigrationTest(unittest.TestCase):
                 "__pycache__",
                 ".pytest_cache",
                 ".ruff_cache",
+                "reports",
             ),
+        )
+        self.assertFalse(
+            (source / "reports").exists(),
+            "fixture copy must not ingest parent-local reports/temp output",
         )
         self.git(source, "init")
         self.configure_git(source)

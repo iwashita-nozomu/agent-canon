@@ -19,7 +19,7 @@ primary family は `Scoped Change`、`Large Delivery`、`Research-Driven Change`
 ## この文書の読み方
 
 - この文書は、原因仮説、依存抽出、修正候補比較、編集前妥当性検証の overlay workflow を所有します。
-- `Gate H0` は code dependency と header dependency の分離、`Gate H1-H3` は仮説と着手条件、`Gate H4-H5` は実装後判定と closeout を扱います。
+- `Gate H0` は code dependency と header dependency の分離、`Gate H0.5` は因果が未確定な場合だけの原因仮説探索、`Gate H1-H3` は仮説と着手条件、`Gate H4-H5` は実装後判定と closeout を扱います。
 - 実装前の原因特定では `## Gate H0. 依存抽出` と `## Gate H1. 仮説` を先に読み、修正候補が固定されてから `Gate H2-H3` へ進みます。
 - chunked reading では、現在の gate 番号を作業単位にし、support / disconfirming evidence と validation route を見失わないようにします。
 
@@ -32,6 +32,7 @@ primary family は `Scoped Change`、`Large Delivery`、`Research-Driven Change`
 - 仮説が間違いだと分かる反証条件と、改善が支持されたと見なす検証条件を先に固定する。
 - 妥当性が通ってから初めて実装へ進む。
 - 実装前の reasoning と実装後の supported / rejected / inconclusive decision を review 可能な artifact に残す。
+- 症状から先に対策を提案せず、原因仮説の探索、反証、作用範囲の bounded 判定を終えてから required action を導出する。
 
 ## 適用条件
 
@@ -91,6 +92,79 @@ bash tools/agent_tools/run_repo_dependency_review.sh
 - `Design Context:` upstream design / environment / test のどれを読む必要があるか。
 - `Downstream Risk:` 変更候補から見て影響を受ける docs / tests / tools / workflows。
 
+## Gate H0.5. 条件付き原因仮説探索
+
+まず causal ambiguity が未解決か、evidence-linked な alternative により owner、
+fix surface、validation route が変わり得るかを判定します。該当しない
+straightforward finding は、type、schema、parser、compiler、state invariant、または
+targeted reproduction による compact direct cause proof から action を導出でき、named
+receipt は不要です。rejected、duplicate、already-covered、unreachable finding は
+reason/evidence だけで閉じ、receipt を要求しません。
+
+該当する場合だけ、`required_action`、`fix now`、`follow-up`、または solution proposal
+の前に compact な cause-evidence note/`Cause Investigation Receipt` を作成します。これは
+fixed schema や fixed candidate count ではありません。H0 の dependency evidence を変更面から原因の
+生成機構と到達可能な影響へ展開し、単なる症状の所在を修正箇所とみなしません。
+
+Note/receipt には、原因・所有者・修正・validation の判断を変え得る、該当する evidence を
+記録します。次は探索する evidence の種類であり、全 task に同じ ceremony を要求する
+固定 field 表ではありません。
+
+- `Observation` と current source snapshot、実際の entrypoint / witness;
+- `Incoming Callers/Entrypoints`: caller、public import、dispatcher、parser、workflow
+  trigger、config entrypoint;
+- `Owning Mechanism/State/Guards`: mechanism、state transition、invariant、guard
+  predicate、発生不能な分岐、重複・過剰判定;
+- `Downstream Consumers/Side Effects/Cleanup`: consumer、write、process/resource
+  effect、failure、rollback、cleanup;
+- `Sibling Implementations/Tests/Docs/Config`: 比較実装と evidence-linked な test、doc、config;
+- `Temporal Evidence`: snapshot drift、recent change、stale generated surface が候補に
+  なり得る場合だけ latest remote/default branch、Issue/PR、branch history;
+- `Reachability and Overcheck Analysis`: disputed branch/guard ごとの proof または targeted
+  observation。発生不能なら `reason_code=unreachable_branch`、不要・重複 guard なら
+  `reason_code=overcheck` として記録する;
+- `Alternative Disposition`: owner、fix surface、validation を変え得る各代替を
+  `disconfirmed or bounded` と証拠付きで分類する;
+- `Selected Cause`、`Expected Mechanism`、`Action Derivation`: 選択した原因がどの
+  state/mechanism を変え、どの contract と validation を保つ action に導くか。
+
+該当しない dimension は、証拠で候補が bounded になった場合にその旨を記録します。
+caller、side effect、sibling、history を存在しないのに作ったり、候補数を満たすための
+全 repo scan を追加したりしません。
+
+探索は activation 後の evidence-linked scope で行い、任意の全 repo scan や固定候補数を要求しません。
+owner / fix / validation を変え得る代替がすべて disconfirmed または bounded になったら
+停止します。type、schema、parser、compiler、state invariant が単一原因を証明する場合は、
+その証明と狭い scope で十分な理由を direct cause proof に残します。Activated receipt が
+`cause_hypothesis_selected -> action_derived_from_cause -> validation_route_bound` に
+到達するまで required action を提案してはいけません。Straightforward path は
+`direct_cause_proof -> action_derived_from_cause -> validation_route_bound` を使います。
+症状だけからの提案は `cause_unproven` として H0.5/H1 に戻します。
+
+## Gate H0.75. 根本原因に対する修正スコープ
+
+`Selected Cause` と `Expected Mechanism`、または straightforward path の
+`direct cause proof` が確定した後は、修正の目的を root-cause closure に固定します。
+`minimum-diff`、`smallest-local-patch`、`smallest patch` を repair objective として
+選ぶことは明示的に禁止します。証拠が示す complete replaceable owning responsibility
+unit を選び、症状を含む一つの file や近傍行だけを修正面とはみなしません。
+
+選択した unit は、root mechanism と evidence-linked な reachable consumers、side
+effects、failure handling、rollback、cleanup を閉じ、影響を受ける contract、docs、tests、
+validation まで read back して初めて complete です。これは evidence-bounded に行い、
+選択した owner、mechanism、consumer、contract、validation を変えない unrelated repository
+cleanup や historical tidying は追加しません。
+
+symptom suppression、root mechanism を開いたままの wrapper / compatibility shim、
+test-only relaxation / oracle weakening、root mechanism closure のない nearby local patch
+は repair failure です。小さい diff が許されるのは、complete owning unit と reachable effects
+がすべて閉じることを証拠が示した場合だけであり、diff size は選択基準ではありません。
+
+H0.75 の完了状態は
+`complete_owning_unit_selected -> root_mechanism_closed -> reachable_effects_closed ->
+contract_docs_tests_validation_closed` です。これに達しない action は H0.5/H1 の
+cause/scope analysis に戻し、symptom-level repair を開始しません。
+
 ## Gate H1. 仮説
 
 依存抽出のあと、実装前に仮説を 1 つ以上書きます。
@@ -134,6 +208,10 @@ bash tools/agent_tools/run_repo_dependency_review.sh
 
 - code dependency edge が修正候補に到達している。
 - header dependency edge が読むべき design / docs / tests を示している。
+- H0.5 が activated の場合、compact cause-evidence note/`Cause Investigation Receipt` が、該当する incoming callers/entrypoints、owning
+  mechanism/state/guards、downstream consumers/side effects/cleanup、sibling
+  implementations/tests/docs/config、必要な temporal evidence、reachability/overcheck、
+  alternative disposition を含み、selected cause と expected mechanism を read back している。straightforward path は direct cause proof を read back している。
 - 修正候補の近傍に既存実装、命名、test precedent がある。
 - alternative surface を比較し、今回触らない理由を説明できる。
 - expected mechanism と validation command が対応している。可読性改善なら readability / refactor surface / review、性能改善なら benchmark、公理的 correctness なら unit / property / parity test を使う。
@@ -152,6 +230,8 @@ bash tools/agent_tools/run_repo_dependency_review.sh
 
 - `Code Dependency Evidence` がある。
 - `Header Dependency Evidence` がある。
+- H0.5 が activated の場合は cause-evidence note/`Cause Investigation Receipt` があり、required action が `Selected Cause` と
+  `Expected Mechanism` から導出されている。straightforward path では direct cause proof から導出されている。
 - `Hypothesis` と `Disconfirming Evidence` がある。
 - `Expected Mechanism` と `Support Evidence` がある。
 - `Candidate Comparison` と `Selected Surface` がある。単一候補の場合は、候補が 1 つで足りる理由がある。

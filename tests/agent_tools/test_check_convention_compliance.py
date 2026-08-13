@@ -129,7 +129,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     ),
     "documents/runtime/SHARED_RUNTIME_SURFACES.md": (
         "surface_manifest.py documents/runtime/shared-runtime-surfaces.toml AGENTS.md "
-        ".codex/config.toml tools/agent-canon Root `tools/` is a parent-owned regular container "
+        ".codex/config.toml .codex/agents tools/agent-canon Root `tools/` is a parent-owned regular container "
         "tools/agent-canon -> ../vendor/agent-canon/tools "
         "vendor/agent-canon/tools/ "
         "Project-local automation must stay in project-owned paths\n"
@@ -139,6 +139,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         'prefix = "vendor/agent-canon"\n'
         'path = "AGENTS.md"\n'
         'path = ".codex/config.toml"\n'
+        'path = ".codex/agents"\n'
         'path = "tools/agent-canon"\n'
         'path = ".agent-canon"\n'
         'mode = "removed_legacy"\n'
@@ -299,8 +300,8 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "SOLID principle signal OOP readability report class Protocol\n"
     ),
     "agents/skills/pr-processing.md": (
-        "PR Essence problem / user request design intent canonical owner "
-        "behavior or contract delta evidence route\n"
+        "single-candidate fast path base/head/diff/check/authority "
+        "dependency evidence\n"
     ),
     "agents/skills/subagent-bootstrap.md": (
         "selected_agent_type write_capable_handoff_blocker evidence "
@@ -576,7 +577,7 @@ MINIMAL_REPO_FILES: dict[str, str] = {
         "`check_agent_runtime_alignment.py` |\n"
         "| skill routing and public skill surface | "
         "`vendor/agent-canon/agents/skills/catalog.yaml` | "
-        "`python3 tools/agent_tools/route.py --prompt` |\n"
+        "`python3 tools/agent-canon/agent_tools/route.py --prompt` |\n"
         "| report and closeout structure | `task_close.py` | closeout gate |\n"
     ),
     "AGENTS.md": (
@@ -1690,13 +1691,31 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
         self.assertEqual(missing, [])
 
-    def test_review_issue_routing_requires_markers(self) -> None:
-        """Review findings keep durable issue routing markers."""
+    def test_review_issue_routing_is_conditional_and_keeps_owner_markers(self) -> None:
+        """Only durable review follow-up uses issue routing markers."""
+        self.assertNotIn(
+            "agents/skills/change-review.md",
+            REVIEW_ISSUE_ROUTING_MARKERS,
+        )
+        self.assertIn(
+            "documents/conventions/REVIEW_PROCESS.md",
+            REVIEW_ISSUE_ROUTING_MARKERS,
+        )
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
             review_skill = root / "agents" / "skills" / "change-review.md"
             review_skill.write_text("review findings only\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            review_process = root / "documents" / "conventions" / "REVIEW_PROCESS.md"
+            review_process.write_text("review policy without durable follow-up\n", encoding="utf-8")
 
             result = self.run_checker(root)
 
@@ -1737,6 +1756,21 @@ class CheckConventionComplianceTest(unittest.TestCase):
                 "missing-marker:Behavior or contract delta:",
                 result.stdout,
             )
+
+    def test_pr_essence_documentation_does_not_bind_operational_skill(self) -> None:
+        """PR body/workflow owners retain essence fields without skill duplication."""
+        self.assertNotIn(
+            "agents/skills/pr-processing.md",
+            PR_ESSENCE_DOCUMENTATION_MARKERS,
+        )
+        self.assertIn(
+            ".github/PULL_REQUEST_TEMPLATE.md",
+            PR_ESSENCE_DOCUMENTATION_MARKERS,
+        )
+        self.assertIn(
+            "agents/workflows/agent-canon-pr-workflow.md",
+            PR_ESSENCE_DOCUMENTATION_MARKERS,
+        )
 
     def test_minimal_fixture_covers_pr_essence_documentation_surfaces(self) -> None:
         """The minimal test fixture includes every PR essence documentation surface."""
@@ -1840,8 +1874,18 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
         self.assertEqual(missing, [])
 
-    def test_source_file_definition_order_requires_review_markers(self) -> None:
-        """Source definition order guidance stays wired to Python review evidence."""
+    def test_source_file_definition_order_is_owned_by_conventions_not_python_review(
+        self,
+    ) -> None:
+        """Definition-order guidance remains in its semantic convention owners."""
+        self.assertNotIn(
+            "agents/skills/python-review.md",
+            SOURCE_FILE_DEFINITION_ORDER_MARKERS,
+        )
+        self.assertIn(
+            "documents/conventions/python/09_file_roles.md",
+            SOURCE_FILE_DEFINITION_ORDER_MARKERS,
+        )
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.copy_minimal_repo(root)
@@ -1856,9 +1900,19 @@ class CheckConventionComplianceTest(unittest.TestCase):
 
             result = self.run_checker(root)
 
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.copy_minimal_repo(root)
+            file_roles = root / "documents" / "conventions" / "python" / "09_file_roles.md"
+            file_roles.write_text("python file roles without ordering owner\n", encoding="utf-8")
+
+            result = self.run_checker(root)
+
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
             self.assertIn("source_file_definition_order", result.stdout)
-            self.assertIn("missing-marker:定義順", result.stdout)
+            self.assertIn("missing-marker:読者順序", result.stdout)
 
     def test_source_file_definition_order_requires_catalog_trigger(self) -> None:
         """Source definition order feedback stays visible in deterministic routing."""

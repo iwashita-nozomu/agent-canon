@@ -2,7 +2,7 @@
 name: worktree-start
 description: "Legacy cleanup only. Use when inspecting or retiring stale WORKTREE_SCOPE.md/action-log state; do not use to create, recreate, resume, or move work into a git worktree."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"8801a1f0e24a7a3232937be8930e96c66cec1a2c92d7420bf5997108fa1bb581"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"4d70aa01cdf7affe1b896369f519720ba7e878181f75bd2634854877ee69c752"} -->
 
 <!--
 @dependency-start

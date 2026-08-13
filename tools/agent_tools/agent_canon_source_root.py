@@ -12,9 +12,17 @@ from __future__ import annotations
 import argparse
 import os
 import subprocess
+import sys
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, cast
+
+try:
+    from . import parent_root_side_effects as _parent_boundary
+except ImportError:  # direct script execution
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import parent_root_side_effects as _parent_boundary  # type: ignore[no-redef]
 
 LAYOUT_STANDALONE = "standalone"
 LAYOUT_VENDORED = "vendored"
@@ -43,16 +51,103 @@ class RootResolution:
     source_root: Path
     layout: str
     canon_root: Path
+    parent_attestation: object | None = None
+    public_tool_root: Path | None = None
+
+    @property
+    def repository_roots(self) -> "RepositoryRoots":
+        """Return the immutable root identity used by runtime consumers."""
+        return RepositoryRoots(
+            workspace_root=self.current_repository_root,
+            agentcanon_source_root=self.source_root,
+            report_root=self.current_repository_root / "reports" / "agents",
+            layout=self.layout,
+            public_tool_root=self.public_tool_root,
+        )
+
+
+@dataclass(frozen=True)
+class RepositoryRoots:
+    """Typed source/state/report roots for one AgentCanon execution."""
+
+    workspace_root: Path
+    agentcanon_source_root: Path
+    report_root: Path
+    layout: str
+    public_tool_root: Path | None = None
+
+    def __post_init__(self) -> None:
+        """Canonicalize roots and reject an invalid source/report boundary."""
+        if self.layout not in {LAYOUT_STANDALONE, LAYOUT_VENDORED, LAYOUT_OVERRIDE}:
+            raise SourceRootFailure(
+                "runtime_roots_invalid",
+                f"unknown AgentCanon layout: {self.layout}",
+            )
+        for field_name in (
+            "workspace_root",
+            "agentcanon_source_root",
+            "report_root",
+            "public_tool_root",
+        ):
+            value = getattr(self, field_name)
+            if value is not None and not isinstance(value, Path):
+                object.__setattr__(self, field_name, Path(value))
+        workspace = self.workspace_root.resolve()
+        source = self.agentcanon_source_root.resolve()
+        report = self.report_root.resolve()
+        if workspace != source and _is_within(report, source):
+            raise SourceRootFailure(
+                "runtime_roots_invalid",
+                f"report root must not be below AgentCanon source root: {report}",
+            )
+        object.__setattr__(self, "workspace_root", workspace)
+        object.__setattr__(self, "agentcanon_source_root", source)
+        object.__setattr__(self, "report_root", report)
+        if self.public_tool_root is not None:
+            # Keep the lexical public-view path (which may be a managed
+            # symlink into the source pin) distinct from canonical source
+            # containment.  The source executable check owns source bytes;
+            # public argv validation owns this view when it is materialized.
+            object.__setattr__(self, "public_tool_root", self.public_tool_root.absolute())
 
 
 def _default_pythonpath(*, root: Path) -> str:
     """Build a deterministic pythonpath for delegated owner-owned command execution."""
-    tools_path = str(root / "tools")
-    repository_tools_path = str(root.resolve() / "tools")
+    source_tools = root.resolve() / "tools"
+    tools_path = str(source_tools)
     extra = os.environ.get("PYTHONPATH", "").strip()
+    entries = [tools_path]
     if extra:
-        return ":".join((tools_path, repository_tools_path, extra))
-    return ":".join((tools_path, repository_tools_path))
+        for entry in extra.split(os.pathsep):
+            if not entry:
+                continue
+            candidate = Path(entry).expanduser()
+            try:
+                canonical = candidate.resolve()
+            except (OSError, RuntimeError) as exc:
+                raise SourceRootFailure(
+                    "agent_canon_source_root_pythonpath_invalid",
+                    f"Unable to resolve inherited PYTHONPATH entry: {entry}",
+                ) from exc
+            if canonical == source_tools:
+                continue
+            if canonical == source_tools / "agent_tools" and "agent-canon" in candidate.parts:
+                # The standalone public self-view aliases the selected source
+                # tools tree; retain only the canonical source tools entry.
+                continue
+            if canonical.name == "agent_tools" and canonical.parent.name == "tools":
+                raise SourceRootFailure(
+                    "agent_canon_source_root_pythonpath_conflict",
+                    f"Inherited PYTHONPATH points at an untyped agent_tools path: {entry}",
+                )
+            if canonical.name == "tools" and (canonical / "agent_tools").is_dir():
+                raise SourceRootFailure(
+                    "agent_canon_source_root_pythonpath_conflict",
+                    f"Inherited PYTHONPATH points at a repository tools root: {entry}",
+                )
+            if str(canonical) not in entries:
+                entries.append(str(canonical))
+    return os.pathsep.join(entries)
 
 
 def _resolve_executable(root_resolution: RootResolution, command: str) -> Path:
@@ -78,15 +173,35 @@ def _run_subcommand(resolution: RootResolution, command: Sequence[str]) -> int:
     """Execute a delegated command inside the resolved AgentCanon owner root."""
     if not command:
         raise SourceRootFailure("agent_canon_source_root_command_missing", "No command provided")
-    executable = _resolve_executable(resolution, command[0])
-    env = os.environ.copy()
+    interpreter = command[0] in {"python", "python3", sys.executable}
+    if interpreter and len(command) > 1:
+        executable = _resolve_executable(resolution, command[1])
+        child_command = (command[0], str(executable), *command[2:])
+    else:
+        executable = _resolve_executable(resolution, command[0])
+        child_command = (str(executable), *command[1:])
+    try:
+        attestation = resolution.parent_attestation
+        if attestation is None:
+            attestation = _parent_boundary.attest_parent_root(
+                _parent_boundary.ParentRootAttestationRequest(
+                    cwd=resolution.current_repository_root,
+                    explicit_root=resolution.current_repository_root,
+                    source_root=resolution.source_root,
+                    purpose="agent-canon-source-root",
+                )
+            )
+        env = _parent_boundary.child_environment(cast(Any, attestation), os.environ)
+    except Exception as exc:
+        if isinstance(exc, _parent_boundary.ParentRootSideEffectError):
+            raise SourceRootFailure(
+                f"agent_canon_parent_root_{exc.reject.value}", exc.detail
+            ) from exc
+        raise
     env["PYTHONPATH"] = _default_pythonpath(root=resolution.source_root)
     env[SOURCE_PREFIX_ENV] = _source_prefix(resolution)
-    env["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(
-        resolution.current_repository_root
-    )
     process = subprocess.run(
-        (str(executable), *command[1:]),
+        child_command,
         cwd=resolution.source_root.as_posix(),
         env=env,
         check=False,
@@ -187,6 +302,9 @@ def _same_canonical_entity(left: Path, right: Path) -> bool:
 
 def _explicit_resolution(raw_root: Path, source: Path, canon: Path) -> RootResolution:
     """Resolve explicit source and canon roots without collapsing their identities."""
+    current_root = _find_current_repository_root(raw_root)
+    source = _resolve_path(source, failure_code="agent_canon_source_root_override_invalid", root=source)
+    canon = _resolve_path(canon, failure_code="agent_canon_canon_root_override_invalid", root=canon)
     if not _has_catalog(source):
         raise SourceRootFailure(
             "agent_canon_source_root_override_missing",
@@ -198,10 +316,11 @@ def _explicit_resolution(raw_root: Path, source: Path, canon: Path) -> RootResol
             f"Override canon root has no AgentCanon catalog: {canon}",
         )
     return RootResolution(
-        current_repository_root=_find_current_repository_root(raw_root),
+        current_repository_root=current_root,
         source_root=source,
         layout=LAYOUT_OVERRIDE,
         canon_root=canon,
+        public_tool_root=current_root / "tools" / "agent-canon",
     )
 
 
@@ -215,8 +334,8 @@ def _explicit_override(raw_root: Path) -> RootResolution | None:
             "agent_canon_source_root_override_incomplete",
             "AGENT_CANON_SOURCE_ROOT and AGENT_CANON_ROOT must be supplied together",
         )
-    source_root = Path(source_override).expanduser().resolve()
-    canon_root = Path(canon_override).expanduser().resolve()
+    source_root = Path(source_override).expanduser()
+    canon_root = Path(canon_override).expanduser()
     return _explicit_resolution(raw_root, source_root, canon_root)
 
 
@@ -233,8 +352,8 @@ def resolve_agent_canon_source_root(
                 "agent_canon_source_root_override_incomplete",
                 "source_root and canon_root must be supplied together",
             )
-        source = source_root.expanduser().resolve()
-        canon = canon_root.expanduser().resolve()
+        source = source_root.expanduser()
+        canon = canon_root.expanduser()
         return _explicit_resolution(raw_root, source, canon)
 
     explicit = _explicit_override(raw_root)
@@ -276,6 +395,7 @@ def resolve_agent_canon_source_root(
                 source_root=vendor_source_root,
                 layout=LAYOUT_VENDORED,
                 canon_root=vendor_source_root,
+                public_tool_root=current_repository_root / "tools" / "agent-canon",
             )
         candidate_labels = (
             f"{LAYOUT_STANDALONE}:{current_repository_root}",
@@ -293,6 +413,9 @@ def resolve_agent_canon_source_root(
         source_root=source_root,
         layout=layout,
         canon_root=source_root,
+        public_tool_root=current_repository_root / "tools" / "agent-canon"
+        if layout == LAYOUT_VENDORED
+        else source_root / "tools" / "agent-canon",
     )
 
 

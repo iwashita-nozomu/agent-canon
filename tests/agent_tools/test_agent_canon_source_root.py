@@ -18,6 +18,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
@@ -28,14 +29,51 @@ from agent_canon_source_root import (  # noqa: E402
     LAYOUT_VENDORED,
     RootResolution,
     SourceRootFailure,
+    _default_pythonpath,
     build_parser,
     resolve_agent_canon_source_root,
     run,
 )
 
+_SYNTHETIC_ROOT_BOUNDARY_ENV_KEYS = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+    "AGENT_CANON_PREFIX",
+)
+
 
 class AgentCanonSourceRootCLITests(unittest.TestCase):
     """Validate CLI subcommand wiring without touching real owner roots."""
+
+    def test_pythonpath_rejects_untyped_agent_tools_alias(self) -> None:
+        """Inherited repository tool roots cannot shadow the selected source."""
+        with tempfile.TemporaryDirectory() as workspace:
+            root = Path(workspace)
+            tools = root / "tools"
+            (tools / "agent_tools").mkdir(parents=True)
+            with patch.dict(os.environ, {"PYTHONPATH": str(tools / "agent_tools")}):
+                with self.assertRaises(SourceRootFailure) as raised:
+                    _default_pythonpath(root=root)
+            self.assertEqual(
+                raised.exception.code,
+                "agent_canon_source_root_pythonpath_conflict",
+            )
 
     def _mock_resolution(self, command_root: Path) -> RootResolution:
         return RootResolution(
@@ -44,6 +82,25 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             layout="standalone",
             canon_root=command_root,
         )
+
+    def _synthetic_root_environment(
+        self, command_root: Path, overrides: dict[str, str] | None = None
+    ) -> dict[str, str]:
+        """Bind fixture child state to its synthetic repository root."""
+        environment = os.environ.copy()
+        for key in _SYNTHETIC_ROOT_BOUNDARY_ENV_KEYS:
+            environment.pop(key, None)
+        fixture_tmp = command_root / ".agent-canon" / "tmp"
+        environment.update(
+            {
+                "TMPDIR": str(fixture_tmp),
+                "TEMP": str(fixture_tmp),
+                "TMP": str(fixture_tmp),
+            }
+        )
+        if overrides:
+            environment.update(overrides)
+        return environment
 
     def _write_post_create_fixture(
         self, root: Path, *, derived: bool
@@ -65,6 +122,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         shutil.copy2(
             resolver_source,
             source / "tools" / "agent_tools" / resolver_source.name,
+        )
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
+            source / "tools" / "agent_tools" / "parent_root_side_effects.py",
         )
         devcontainer = source / ".devcontainer"
         devcontainer.mkdir(parents=True)
@@ -98,11 +159,8 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
         )
         (devcontainer / "post-attach.sh").chmod(0o755)
         if derived:
-            (parent / ".git").mkdir(parents=True)
-            (source / ".git").write_text(
-                "gitdir: ../../.git/modules/vendor/agent-canon\n",
-                encoding="utf-8",
-            )
+            subprocess.run(["git", "init", "-q", "-b", "main", str(parent)], check=True)
+            subprocess.run(["git", "init", "-q", "-b", "main", str(source)], check=True)
             parent_devcontainer = parent / ".devcontainer"
             parent_devcontainer.mkdir(parents=True)
             (parent_devcontainer / "post-create-parent.sh").write_text(
@@ -123,7 +181,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             )
             command_root = parent
         else:
-            (source / ".git").mkdir()
+            subprocess.run(["git", "init", "-q", "-b", "main", str(source)], check=True)
             (source / "tools" / "agent-canon").symlink_to(
                 ".", target_is_directory=True
             )
@@ -149,7 +207,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             ],
             cwd=command_root,
             env={
-                **os.environ,
+                **self._synthetic_root_environment(command_root),
                 "SHARED_STATUS": str(shared_status),
                 "PARENT_STATUS": str(parent_status),
             },
@@ -186,6 +244,8 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             copy_ignore = shutil.ignore_patterns(
                 ".git",
                 ".agent-canon",
+                "reports",
+                "workspace",
                 "__pycache__",
                 ".pytest_cache",
                 ".ruff_cache",
@@ -227,15 +287,62 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                 check=False,
                 capture_output=True,
                 text=True,
+                env=self._synthetic_root_environment(clone),
             )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("shared surface source manifest is valid", result.stdout)
 
+    def test_exec_command_supports_python_source_contract_readback(self) -> None:
+        """The source wrapper can run a Python checker with source-relative paths."""
+        with tempfile.TemporaryDirectory() as workspace:
+            clone = Path(workspace) / "agent-canon"
+
+            def ignore_clone_links(directory: str, names: list[str]) -> set[str]:
+                """Avoid copying the source self-view into the temporary clone."""
+                ignored = set(
+                    shutil.ignore_patterns(
+                        ".git", ".agent-canon", "reports", "workspace"
+                    )(directory, names)
+                )
+                if Path(directory).resolve() == (PROJECT_ROOT / "tools").resolve():
+                    ignored.add("agent-canon")
+                return ignored
+
+            shutil.copytree(
+                PROJECT_ROOT,
+                clone,
+                symlinks=True,
+                ignore=ignore_clone_links,
+            )
+            subprocess.run(["git", "init", "-q"], cwd=clone, check=True)
+            (clone / "tools" / "agent-canon").symlink_to(".", target_is_directory=True)
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    PUBLIC_RESOLVER,
+                    "exec",
+                    "python3",
+                    "tools/agent_tools/repo_structure_contract.py",
+                    "--root",
+                    ".",
+                    "--contract",
+                    "documents/structure/repo-structure-contract.toml",
+                ],
+                cwd=clone,
+                env=self._synthetic_root_environment(clone),
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_exec_command_propagates_nonzero_exit(self) -> None:
         """Propagate a non-zero delegated command return code to the caller."""
         with tempfile.TemporaryDirectory() as workspace:
             root = Path(workspace)
+            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
             script = root / "tools" / "agent_tool.sh"
             script.parent.mkdir(parents=True, exist_ok=True)
             script.write_text(
@@ -248,7 +355,12 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             script.chmod(stat.S_IXUSR | stat.S_IRUSR)
 
             parser = build_parser().parse_args(["exec", "tools/agent_tool.sh", "fail"])
-            result = run(parser, resolver=lambda _: self._mock_resolution(root))
+            with patch.dict(
+                os.environ,
+                self._synthetic_root_environment(root),
+                clear=True,
+            ):
+                result = run(parser, resolver=lambda _: self._mock_resolution(root))
             self.assertEqual(result, 1)
 
     def test_post_create_entrypoint_runs_shared_then_derived_hook(self) -> None:
@@ -317,10 +429,10 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                         .read_text(encoding="utf-8")
                     )
                     test_log = root / "devcontainer-command.log"
-                    environment = {
-                        **os.environ,
-                        "AGENT_CANON_TEST_LOG": str(test_log),
-                    }
+                    environment = self._synthetic_root_environment(
+                        command_root,
+                        {"AGENT_CANON_TEST_LOG": str(test_log)},
+                    )
                     for key in (
                         "initializeCommand",
                         "postCreateCommand",
@@ -370,12 +482,9 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             parent = Path(workspace) / "parent"
             source = parent / "vendor" / "agent-canon"
             catalog = source / "agents" / "skills" / "catalog.yaml"
-            (parent / ".git").mkdir(parents=True)
+            subprocess.run(["git", "init", "-q", "-b", "main", str(parent)], check=True)
             source.mkdir(parents=True)
-            (source / ".git").write_text(
-                "gitdir: ../../.git/modules/vendor/agent-canon\n",
-                encoding="utf-8",
-            )
+            subprocess.run(["git", "init", "-q", "-b", "main", str(source)], check=True)
             catalog.parent.mkdir(parents=True)
             catalog.write_text("skills: []\n", encoding="utf-8")
 

@@ -13,14 +13,18 @@
 from __future__ import annotations
 
 import argparse
-import shutil
-import tempfile
+import os
 from datetime import datetime, timezone
 
 UTC = timezone.utc
 from pathlib import Path
 
 import yaml
+
+if __package__:
+    from .agent_canon_source_root import resolve_agent_canon_source_root
+else:
+    from agent_canon_source_root import resolve_agent_canon_source_root
 
 if __package__:
     from .packets import ActiveDesignPacketConfig
@@ -48,13 +52,21 @@ else:
     from agent_team import create_run_bundle, run_active_design_packet
 
 if __package__:
-    from .workspace_scope import resolve_role_write_scope
+    from .workspace_scope import resolve_repository_roots, resolve_role_write_scope
 else:
-    from workspace_scope import resolve_role_write_scope
+    from workspace_scope import resolve_repository_roots, resolve_role_write_scope
 
 ROOT = Path(__file__).resolve().parents[2]
-CODEX_AGENT_ROOT = ROOT / ".codex" / "agents"
-TASK_CATALOG = ROOT / "agents" / "task_catalog.yaml"
+from parent_root_side_effects import (  # noqa: E402
+    ParentOwnedPathReceipt,
+    ParentRootAttestationReceipt,
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
+
 BASE_RESEARCH_ROLE_IDS = (
     "researcher",
     "research_reviewer",
@@ -81,6 +93,29 @@ ROLE_TO_ARTIFACT_KEY = {
     "fair_data_reviewer": "fair_data_review",
     "ml_science_reviewer": "ml_science_review",
 }
+
+
+def _parent_capability(
+    purpose: str,
+) -> tuple[ParentRootSideEffectBoundary, ParentRootAttestationReceipt]:
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
+    parent = Path(configured)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
+    return ParentRootSideEffectBoundary(), attestation
+
+
+def _ensure_parent(path: Path, purpose: str) -> None:
+    boundary, attestation = _parent_capability(purpose)
+    boundary.ensure_parent_owned_directory(attestation, path, purpose)
+
+
+def _write_parent(path: Path, data: bytes, purpose: str) -> None:
+    boundary, attestation = _parent_capability(purpose)
+    boundary.write_parent_owned_file(attestation, path, data, purpose)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -137,19 +172,17 @@ def find_by_id(entries: object, entry_id: str) -> dict[str, object]:
     raise RuntimeError(f"missing entry with id={entry_id}")
 
 
-def prepare_workspace(workspace_root: Path) -> None:
+def prepare_workspace(workspace_root: Path, source_root: Path) -> None:
     """Create a minimal workspace that satisfies manifest scope resolution."""
-    (workspace_root / ".codex").mkdir(parents=True, exist_ok=True)
-    (workspace_root / "agents").mkdir(parents=True, exist_ok=True)
-    (workspace_root / "python").mkdir(parents=True, exist_ok=True)
-    (workspace_root / "documents").mkdir(parents=True, exist_ok=True)
-    (workspace_root / "reports" / "runtime").mkdir(parents=True, exist_ok=True)
-    shutil.copy2(ROOT / ".codex" / "config.toml", workspace_root / ".codex" / "config.toml")
-    shutil.copy2(
-        ROOT / "agents" / "model_profiles.toml",
-        workspace_root / "agents" / "model_profiles.toml",
+    for directory in (".codex", "python", "documents", "reports/runtime"):
+        _ensure_parent(workspace_root / directory, "research-perspective-smoke")
+    _write_parent(
+        workspace_root / ".codex" / "config.toml",
+        (source_root / ".codex" / "config.toml").read_bytes(),
+        "research-perspective-smoke",
     )
-    (workspace_root / "WORKTREE_SCOPE.md").write_text(
+    _write_parent(
+        workspace_root / "WORKTREE_SCOPE.md",
         "\n".join(
             [
                 "# Worktree Scope",
@@ -162,14 +195,16 @@ def prepare_workspace(workspace_root: Path) -> None:
                 "- `reports/runtime`",
                 "",
             ]
-        ),
-        encoding="utf-8",
+        ).encode("utf-8"),
+        "research-perspective-smoke",
     )
 
 
-def validate_task_catalog() -> None:
+def validate_task_catalog(source_root: Path) -> None:
     """Check that the task catalog exposes the review pack."""
-    data = yaml.safe_load(TASK_CATALOG.read_text(encoding="utf-8"))
+    data = yaml.safe_load(
+        (source_root / "agents" / "task_catalog.yaml").read_text(encoding="utf-8")
+    )
     ensure(isinstance(data, dict), "task catalog did not parse as a mapping")
 
     research_family = find_by_id(
@@ -233,9 +268,10 @@ def validate_runtime_surfaces(
     report_dir: Path,
     workspace_root: Path,
     active_design_packet: ActiveDesignPacketConfig,
+    source_root: Path,
 ) -> None:
     """Check that config, agent inventory, templates, and bundle outputs align."""
-    config = load_team_config()
+    config = load_team_config(source_root / "agents" / "agents_config.json")
     manifest_path = report_dir / config.artifacts["team_manifest"]
     manifest_text = manifest_path.read_text(encoding="utf-8")
 
@@ -244,7 +280,7 @@ def validate_runtime_surfaces(
         artifact_key = ROLE_TO_ARTIFACT_KEY[role_id]
         artifact_name = config.artifacts[artifact_key]
         artifact_path = report_dir / artifact_name
-        codex_agent_path = CODEX_AGENT_ROOT / f"{role_id}.toml"
+        codex_agent_path = source_root / ".codex" / "agents" / f"{role_id}.toml"
 
         if not codex_agent_path.is_file():
             raise RuntimeError(f"missing Codex agent definition: {codex_agent_path}")
@@ -287,28 +323,52 @@ def validate_runtime_surfaces(
 def main() -> int:
     """Run the smoke test."""
     args = build_parser().parse_args()
-    temp_paths: list[Path] = []
+    source_resolution = resolve_agent_canon_source_root(Path(__file__).resolve())
+    source_root = source_resolution.source_root
+    temp_receipts: list[
+        tuple[
+            ParentRootSideEffectBoundary,
+            ParentRootAttestationReceipt,
+            ParentOwnedPathReceipt,
+        ]
+    ] = []
 
     if args.workspace_root is None:
-        workspace_root = ROOT
+        workspace_root = source_root
     else:
         workspace_root = Path(args.workspace_root).resolve()
-        workspace_root.mkdir(parents=True, exist_ok=True)
+        _ensure_parent(workspace_root, "research-perspective-smoke")
 
     if args.report_root is None:
-        report_root = Path(tempfile.mkdtemp(prefix="research-pack-reports-"))
-        temp_paths.append(report_root)
+        configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+        if not configured:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "research-perspective-smoke: explicit parent root is required",
+            )
+        parent = Path(configured)
+        temp_root = parent / ".agent-canon" / "tmp" / "research-pack"
+        boundary, attestation = _parent_capability("research-perspective-smoke")
+        report_receipt = boundary.create_parent_owned_temp_directory(
+            attestation,
+            temp_root,
+            "research-perspective-smoke",
+            "research-pack-reports",
+        )
+        report_root = report_receipt.physical_path
+        temp_receipts.append((boundary, attestation, report_receipt))
     else:
         report_root = Path(args.report_root).resolve()
-        report_root.mkdir(parents=True, exist_ok=True)
+        _ensure_parent(report_root, "research-perspective-smoke")
 
+    primary_error: BaseException | None = None
     try:
         if args.workspace_root is not None:
-            prepare_workspace(workspace_root)
-        validate_task_catalog()
+            prepare_workspace(workspace_root, source_root)
+        validate_task_catalog(source_root)
 
-        config = load_team_config()
-        task_catalog = load_task_catalog(config)
+        config = load_team_config(source_root / "agents" / "agents_config.json")
+        task_catalog = load_task_catalog(config, root=source_root)
         specialist_roles = tuple(
             resolve_role(config, role_id)
             for role_id in BASE_RESEARCH_ROLE_IDS + PERSPECTIVE_ROLE_IDS
@@ -317,6 +377,12 @@ def main() -> int:
         created_at = datetime.now(UTC).replace(microsecond=0)
         created_at_iso = created_at.isoformat().replace("+00:00", "Z")
         report_dir = (report_root / args.run_id).resolve()
+        repository_roots = resolve_repository_roots(
+            workspace_root.resolve(),
+            report_root,
+            source_root=source_root,
+            canon_root=source_resolution.canon_root,
+        )
 
         run_spec = RunBundleSpec(
             config=config,
@@ -327,6 +393,9 @@ def main() -> int:
             created_at_iso=created_at_iso,
             roles=roles,
             workspace_root=workspace_root.resolve(),
+            agentcanon_source_root=repository_roots.agentcanon_source_root,
+            report_root=repository_roots.report_root,
+            repository_roots=repository_roots,
             task_catalog=task_catalog,
         )
         active_design_packet = run_active_design_packet(run_spec)
@@ -336,6 +405,7 @@ def main() -> int:
             report_dir,
             workspace_root.resolve(),
             active_design_packet,
+            repository_roots.agentcanon_source_root,
         )
 
         print(f"RUN_ID={args.run_id}")
@@ -344,10 +414,23 @@ def main() -> int:
         print(f"ACTIVE_ROLES={','.join(role.id for role in roles)}")
         print("SMOKE_TEST=pass")
         return 0
+    except BaseException as exc:
+        primary_error = exc
+        raise
     finally:
         if not args.keep_temp:
-            for path in reversed(temp_paths):
-                shutil.rmtree(path, ignore_errors=True)
+            cleanup_error: ParentRootSideEffectError | None = None
+            for boundary, attestation, receipt in reversed(temp_receipts):
+                try:
+                    boundary.remove_parent_owned_tree(
+                        attestation, receipt, "research-perspective-smoke-cleanup"
+                    )
+                except ParentRootSideEffectError as exc:
+                    cleanup_error = cleanup_error or exc
+            if cleanup_error is not None:
+                if primary_error is not None:
+                    raise cleanup_error from primary_error
+                raise cleanup_error
 
 
 if __name__ == "__main__":

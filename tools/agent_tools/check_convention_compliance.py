@@ -10,7 +10,6 @@
 # upstream design ../../agents/skills/codex-task-workflow.md implementation workflow skill
 # upstream design ../../agents/skills/subagent-bootstrap.md subagent handoff skill
 # upstream design ../../agents/skills/tool-finding-report.md tool warning closeout skill
-# upstream design ../../agents/skills/pr-processing.md PR body and run-bundle evidence skill
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR essence workflow
 # upstream design ../../agents/workflows/pr-queue-cleanup-workflow.md PR queue cleanup body update workflow
 # upstream design ../../agents/skills/md-style-check.md Markdown small-edit skill route
@@ -392,13 +391,6 @@ DOCUMENT_SPLIT_DECISION_MARKERS = {
         "check_convention_compliance.py",
         "task_close.py",
     ),
-    "agents/skills/structure-planning.md": (
-        "document_unit",
-        "document_split_decision",
-        "split_when",
-        "merge_when",
-        "invalid_split_boundaries",
-    ),
     "agents/skills/long-form-writing.md": (
         "document_split_decision",
         "owner",
@@ -612,13 +604,6 @@ REFACTOR_SEQUENCE_MARKERS = {
     ),
 }
 REVIEW_ISSUE_ROUTING_MARKERS = {
-    "agents/skills/change-review.md": (
-        "issue_route",
-        "issues/open/",
-        "issue_sync.py",
-        "new_local_issue",
-        "github_mirror",
-    ),
     "documents/conventions/REVIEW_PROCESS.md": (
         "Review Finding Issue Routing",
         "issue_route",
@@ -641,14 +626,6 @@ PR_ESSENCE_DOCUMENTATION_MARKERS = {
         "Canonical owner / responsibility unit:",
         "Behavior or contract delta:",
         "Evidence route:",
-    ),
-    "agents/skills/pr-processing.md": (
-        "PR Essence",
-        "problem / user request",
-        "design intent",
-        "canonical owner",
-        "behavior or contract delta",
-        "evidence route",
     ),
     "agents/workflows/agent-canon-pr-workflow.md": (
         "PR Essence",
@@ -692,6 +669,7 @@ SURFACE_POLICY_MARKERS = (
     "documents/runtime/shared-runtime-surfaces.toml",
     "AGENTS.md",
     ".codex/config.toml",
+    ".codex/agents",
     "tools/agent-canon",
     "Root `tools/` is a parent-owned regular container",
     "tools/agent-canon -> ../vendor/agent-canon/tools",
@@ -703,6 +681,7 @@ SURFACE_MANIFEST_MARKERS = (
     'prefix = "vendor/agent-canon"',
     'path = "AGENTS.md"',
     'path = ".codex/config.toml"',
+    'path = ".codex/agents"',
     'path = "tools/agent-canon"',
     'path = ".agent-canon"',
     'mode = "removed_legacy"',
@@ -789,7 +768,7 @@ OWNER_MAP_ENTRYPOINT_TABLE_ROWS = {
                 (
                     "skill routing and public skill surface",
                     "vendor/agent-canon/agents/skills/catalog.yaml",
-                    "python3 tools/agent_tools/route.py --prompt",
+                    "python3 tools/agent-canon/agent_tools/route.py --prompt",
                 ),
                 (
                     "report and closeout structure",
@@ -1389,7 +1368,7 @@ def check_review_issue_routing(root: Path) -> list[Finding]:
 
 
 def check_pr_essence_documentation(root: Path) -> list[Finding]:
-    """Verify PR routes preserve change essence in body and run-bundle evidence."""
+    """Verify PR body and lifecycle workflow owners preserve change essence."""
     paths = tuple(PR_ESSENCE_DOCUMENTATION_MARKERS)
     findings = check_required_files(root, paths, "pr_essence_documentation")
     for path, markers in PR_ESSENCE_DOCUMENTATION_MARKERS.items():

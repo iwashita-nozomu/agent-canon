@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import sys
@@ -76,27 +77,15 @@ BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run
 TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 WORKTREE_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "worktree_start.py"
 SETUP_WORKTREE_SCRIPT = PROJECT_ROOT / "tools" / "setup_worktree.sh"
+TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
+TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
 
 
 def seed_workspace_config(workspace_root: Path) -> None:
-    """Seed explicit runtime inputs consumed by bootstrap and bundle loading."""
+    """Seed parent state only; AgentCanon source stays outside the fixture."""
     config_path = workspace_root / ".codex" / "config.toml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_bytes((PROJECT_ROOT / ".codex" / "config.toml").read_bytes())
-    registry_path = workspace_root / "agents" / "model_profiles.toml"
-    registry_path.parent.mkdir(parents=True, exist_ok=True)
-    registry_path.write_bytes(
-        (PROJECT_ROOT / "agents" / "model_profiles.toml").read_bytes()
-    )
-    for relative_path in (
-        "agents/canonical/CODEX_WORKFLOW.md",
-        "templates/agents/design_brief.md",
-        "agents/workflows/implementation-waterfall-workflow.md",
-        "documents/design/dependency-manifest-design.md",
-    ):
-        destination = workspace_root / relative_path
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_bytes((PROJECT_ROOT / relative_path).read_bytes())
 
 
 def expected_workflow_spawn_budget(family_id: str) -> tuple[int, int]:
@@ -404,10 +393,17 @@ def ready_closeout_evidence_lines(
         "## Document Structure Evidence",
         f"- document_structure_paths: {document_structure_paths}",
         "- document_structure_status: skipped",
+        "- structure_activation: format_only",
         "- document_split_decision: not_applicable:format-only: fixture closeout bundle",
         "- structure_planning: not_applicable",
+        "- prose_graph_activation: not_selected",
         "- prose_graph: not_applicable",
         "- structure_contract: skipped: fixture format-only route",
+        "- structure_owner: not_applicable",
+        "- structure_source: not_applicable",
+        "- structure_reader: not_applicable",
+        "- structure_layout: not_applicable",
+        "- structure_validation_topology: not_applicable",
         "- md_style_check: pass",
         "- format_only_reason: fixture closeout bundle",
         "",
@@ -929,6 +925,17 @@ def write_ready_closeout_bundle(
 class BootstrapAndCloseTest(unittest.TestCase):
     """Verify machine-driven task start and close behavior."""
 
+    def setUp(self) -> None:
+        """Place isolated fixtures under one authenticated parent checkout."""
+        parent_env = patch.dict(
+            os.environ,
+            {
+                "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT),
+            },
+        )
+        parent_env.start()
+        self.addCleanup(parent_env.stop)
+
     def test_retired_tool_names_are_not_permanent_update_surfaces(self) -> None:
         """One-time transition candidates do not reserve future parent paths."""
         update_paths = set(surface_manifest_paths(PROJECT_ROOT))
@@ -946,7 +953,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
         payload: dict[str, object],
     ) -> dict[str, object]:
         """Persist and consume one isolated update-lifecycle closeout record."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_dir = Path(tmp_dir)
             (report_dir / "update_lifecycle_closeout.json").write_text(
                 json.dumps(payload),
@@ -1308,7 +1315,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_skips_agent_canon_preflight_in_source_repo(self) -> None:
         """Source AgentCanon runs do not require a derived-repo update target."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             source_root = PROJECT_ROOT / "vendor" / "agent-canon"
             if not source_root.exists():
                 source_root = PROJECT_ROOT
@@ -1347,7 +1354,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_materializes_explicit_active_design_packet(self) -> None:
         """The run bootstrap persists and routes one typed packet end to end."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             root = Path(tmp_dir)
             report_root = root / f"reports-{BOOTSTRAP_SCRIPT.stem}"
             run_id = f"graph-{BOOTSTRAP_SCRIPT.stem}"
@@ -1415,7 +1422,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "active_design_packet:field_unknown:unexpected_contract",
             ),
         )
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             root = Path(tmp_dir)
             for index, (packet, expected_error) in enumerate(cases):
                 report_root = root / f"reports-{BOOTSTRAP_SCRIPT.stem}-{index}"
@@ -1455,7 +1462,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_routes_dirty_shared_canon_to_pr_first_workflow(self) -> None:
         """Dirty shared-canon surfaces should not point only to commit-or-stash."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             seed_workspace_config(workspace_root)
@@ -1510,7 +1517,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_reports_parent_repo_latest_checklist(self) -> None:
         """Parent repos should expose the AgentCanon latest-state checklist at task start."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             seed_workspace_config(workspace_root)
@@ -1560,9 +1567,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
         self,
     ) -> None:
         """A clean AgentCanon update surface may refresh despite unrelated parent dirt."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            report_root = Path(tmp_dir) / "reports"
+            report_root = workspace_root / "reports" / "agents"
             seed_workspace_config(workspace_root)
             checklist = (
                 workspace_root
@@ -1596,6 +1603,15 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 ).read_text(encoding="utf-8"),
                 encoding="utf-8",
             )
+            (source_agent_tools / "parent_root_side_effects.py").write_text(
+                (
+                    PROJECT_ROOT
+                    / "tools"
+                    / "agent_tools"
+                    / "parent_root_side_effects.py"
+                ).read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
             (source_agent_tools / "surface_manifest.py").write_text(
                 "#!/usr/bin/env python3\n",
                 encoding="utf-8",
@@ -1605,6 +1621,24 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (source_root / "tools" / "sync_agent_canon.sh").chmod(0o755)
+            subprocess.run(["git", "init"], cwd=source_root, check=True)
+            subprocess.run(["git", "add", "."], cwd=source_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Start Test",
+                    "-c",
+                    "user.email=bootstrap@example.invalid",
+                    "commit",
+                    "-m",
+                    "test: seed AgentCanon source",
+                ],
+                cwd=source_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
             subprocess.run(
                 [
@@ -1635,6 +1669,8 @@ class BootstrapAndCloseTest(unittest.TestCase):
             (workspace_root / "local-note.md").write_text(
                 "unrelated\n", encoding="utf-8"
             )
+            environment = dict(os.environ)
+            environment["AGENT_CANON_PARENT_ROOT"] = str(workspace_root)
 
             result = subprocess.run(
                 [
@@ -1652,6 +1688,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     str(report_root),
                 ],
                 cwd=PROJECT_ROOT,
+                env=environment,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -1680,7 +1717,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_blocks_eval_transient_until_explicit_cleanup(self) -> None:
         """Eval captures stop make, remain intact, and allow a rerun after cleanup."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             seed_workspace_config(workspace_root)
@@ -1826,7 +1863,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
         self,
     ) -> None:
         """Bootstrap exposes owner-derived routing and creates one run bundle."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -1925,7 +1962,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_uses_default_worker_candidate(self) -> None:
         """The implementer role should materialize the first codex_agents entry by default."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -1995,7 +2032,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_selects_spark_worker_with_explicit_evidence(self) -> None:
         """A later implementer candidate requires explicit parent-packet evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -2055,7 +2092,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_rejects_invalid_agent_type_selection(self) -> None:
         """Invalid role-to-agent parent-packet selections should fail closed."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -2094,7 +2131,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_plain_fix_activates_subagent_bootstrap(self) -> None:
         """Plain fix prompts should match route.py write-capable handoff."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -2136,7 +2173,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_plain_refactor_activates_subagent_bootstrap(self) -> None:
         """Plain refactor prompts should match route.py write-capable handoff."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -2180,7 +2217,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_review_only_does_not_activate_subagent_bootstrap(self) -> None:
         """Review-only do-not-edit prompts should not emit implementation handoff."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -2234,7 +2271,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_academic_route_uses_current_bounded_dynamic_waves(self) -> None:
         """Academic routing follows the current bounded designer/worker sequence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -2310,7 +2347,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_large_refactor_bootstrap_suggests_refactor_skill(self) -> None:
         """Large refactor should advertise the dedicated refactor skill."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -2396,7 +2433,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_defaults_report_root_to_workspace_reports_agents(self) -> None:
         """bootstrap_agent_run should default report output under the workspace root."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             seed_workspace_config(workspace_root)
@@ -2479,7 +2516,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
         self,
     ) -> None:
         """Custom report-root mode should baseline the active pointer it writes."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "custom-reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -2519,7 +2556,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_emits_mechanical_spawn_budget_for_task(self) -> None:
         """Bootstrap projects the task catalog budget into output and manifest."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -2608,7 +2645,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_bootstrap_warns_when_multi_agent_task_lacks_task_id(self) -> None:
         """A repo-wide bootstrap without --task-id should not silently lose fan-out evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -2704,7 +2741,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_all_task_ids_bootstrap_with_prompt_packet(self) -> None:
         """Every catalog task should create a workflow-specific subagent prompt packet."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
@@ -2803,7 +2840,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_worktree_start_rejects_branch_kickoff(self) -> None:
         """worktree_start.py is cleanup-only and must not create branch worktrees."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             subprocess.run(
@@ -2828,7 +2865,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_setup_worktree_wrapper_rejects_legacy_creation(self) -> None:
         """setup_worktree.sh should warn and stop instead of creating worktrees."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             subprocess.run(
@@ -2854,7 +2891,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_locked_bundle(self) -> None:
         """task_close should fail while closeout is still locked."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             subprocess.run(
                 [
@@ -2896,7 +2933,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_accepts_unlocked_bundle(self) -> None:
         """task_close should pass after verification and closeout statuses are resolved."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-ready"
             report_dir = report_root / run_id
@@ -3016,7 +3053,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_accepts_profile_selected_targeted_static_analysis(self) -> None:
         """task_close should allow targeted static analysis selected by the risk profile."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-targeted-static-analysis"
             report_dir = report_root / run_id
@@ -3057,7 +3094,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_pending_profile_selected_static_analysis(self) -> None:
         """task_close should not treat targeted routing as a waiver for pending checks."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-pending-targeted-static-analysis"
             report_dir = report_root / run_id
@@ -3095,7 +3132,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_open_tool_warning(self) -> None:
         """task_close should fail while workflow monitoring has open tool warnings."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-open-tool-warning"
             report_dir = report_root / run_id
@@ -3142,7 +3179,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_defaults_report_root_to_workspace_cwd(self) -> None:
         """task_close --run-id should resolve reports/agents under the current workspace."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             seed_workspace_config(workspace_root)
@@ -3311,7 +3348,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_placeholder_final_review(self) -> None:
         """task_close should not accept an untouched final_review.md template."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-placeholder-final-review"
             report_dir = report_root / run_id
@@ -3349,7 +3386,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
         for case_id, decision in cases.items():
             with (
                 self.subTest(case_id=case_id),
-                tempfile.TemporaryDirectory() as tmp_dir,
+                tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir,
             ):
                 report_root = Path(tmp_dir) / "reports"
                 run_id = f"test-task-close-negative-final-review-{case_id}"
@@ -3381,7 +3418,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_stale_inactive_report_bundle(self) -> None:
         """task_close should reject a report bundle when .active_run points elsewhere."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-inactive-run"
             report_dir = report_root / run_id
@@ -3410,7 +3447,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_missing_active_run_marker(self) -> None:
         """task_close should reject a report bundle when .active_run is absent."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-missing-active-run"
             report_dir = report_root / run_id
@@ -3439,7 +3476,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_missing_mechanical_loop_or_diff_check(self) -> None:
         """task_close should fail when parent-only closeout skips the final diff loop."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-missing-diff-loop"
             report_dir = report_root / run_id
@@ -3480,7 +3517,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_missing_subagent_lifecycle_evidence(self) -> None:
         """task_close should fail when run-local subagent close evidence is missing."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-missing-subagent-lifecycle"
             report_dir = report_root / run_id
@@ -3518,7 +3555,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_policy_value_as_observed_subagent_reuse(self) -> None:
         """task_close should require observed prior-task subagent reuse to be none."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-policy-value-is-not-observation"
             report_dir = report_root / run_id
@@ -3553,7 +3590,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_missing_diff_check_artifact(self) -> None:
         """task_close should fail when diff-check evidence points to a missing artifact."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-missing-diff-artifact"
             report_dir = report_root / run_id
@@ -3601,7 +3638,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
         ]
         for case_id, artifact_kwargs, expected_blocker in cases:
             with self.subTest(case_id=case_id):
-                with tempfile.TemporaryDirectory() as tmp_dir:
+                with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
                     report_root = Path(tmp_dir) / "reports"
                     run_id = f"test-task-close-invalid-diff-artifact-{case_id}"
                     report_dir = report_root / run_id
@@ -3636,7 +3673,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_incomplete_mechanical_loop_evidence(self) -> None:
         """task_close should fail when mechanical loop structured evidence is incomplete."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-incomplete-mechanical-loop"
             report_dir = report_root / run_id
@@ -3673,7 +3710,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
         self,
     ) -> None:
         """Changed source Markdown paths require document structure evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
@@ -3735,7 +3772,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
         self,
     ) -> None:
         """Document structure evidence must cover the changed Markdown paths."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
@@ -3796,7 +3833,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_markdown_change_without_split_decision(self) -> None:
         """Document structure closeout must include split decision evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
@@ -3859,7 +3896,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
         self,
     ) -> None:
         """A complete document structure route requires a real structure contract."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
@@ -3923,35 +3960,213 @@ class BootstrapAndCloseTest(unittest.TestCase):
             self.assertIn("DOCUMENT_STRUCTURE_STATUS=complete", result.stdout)
             self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=no", result.stdout)
 
-    def test_task_close_rejects_non_git_workspace(self) -> None:
-        """task_close should fail closed when it cannot resolve the current diff ref."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+    def test_task_close_accepts_bounded_existing_topology_route(self) -> None:
+        """A bounded Markdown edit may close with positive existing-topology evidence."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
-            report_dir = workspace_root / "reports" / "agents" / "non-git-closeout"
-            report_dir.mkdir(parents=True, exist_ok=True)
-            run_id = "non-git-closeout"
-            write_ready_closeout_bundle(report_dir, run_id)
-            write_ready_diff_check_artifact(report_dir)
-
-            result = subprocess.run(
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
+            (workspace_root / "README.md").write_text("# Seed\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=workspace_root, check=True)
+            subprocess.run(
                 [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--run-id",
-                    run_id,
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "-m",
+                    "seed markdown",
                 ],
                 cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (workspace_root / "README.md").write_text(
+                "# Seed\n\nUpdated.\n", encoding="utf-8"
+            )
+            run_id = "test-task-close-doc-existing-topology"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            environment = {**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)}
+            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}):
+                write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+            closeout_path = report_dir / "closeout_gate.md"
+            text = closeout_path.read_text(encoding="utf-8")
+            replacements = {
+                "- document_structure_status: skipped": "- document_structure_status: complete",
+                "- structure_activation: format_only": "- structure_activation: not_required",
+                "- document_split_decision: not_applicable:format-only: fixture closeout bundle": "- document_split_decision: keep:existing-topology:README.md",
+                "- structure_planning: not_applicable": "- structure_planning: not_required",
+                "- prose_graph: not_applicable": "- prose_graph: not_selected",
+                "- structure_contract: skipped: fixture format-only route": "- structure_contract: not_required:existing-topology:README.md",
+                "- structure_owner: not_applicable": "- structure_owner: README.md owner",
+                "- structure_source: not_applicable": "- structure_source: README.md canonical source",
+                "- structure_reader: not_applicable": "- structure_reader: repository entry reader",
+                "- structure_layout: not_applicable": "- structure_layout: existing README layout",
+                "- structure_validation_topology: not_applicable": "- structure_validation_topology: targeted Markdown check",
+            }
+            for old, new in replacements.items():
+                text = text.replace(old, new)
+            closeout_path.write_text(text, encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
+                cwd=workspace_root,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=yes", result.stdout)
+
+    def test_task_close_rejects_required_structure_route_without_identity(self) -> None:
+        """Required structure activation must identify its topology and owners."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+            workspace_root = Path(tmp_dir) / "workspace"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(["git", "init", "-q"], cwd=workspace_root, check=True)
+            (workspace_root / "README.md").write_text("# Seed\n", encoding="utf-8")
+            subprocess.run(["git", "add", "README.md"], cwd=workspace_root, check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "-m",
+                    "seed markdown",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            (workspace_root / "README.md").write_text(
+                "# Seed\n\nUpdated.\n", encoding="utf-8"
+            )
+            run_id = "test-task-close-doc-required-identity"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            environment = {**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)}
+            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}):
+                write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+            closeout_path = report_dir / "closeout_gate.md"
+            text = closeout_path.read_text(encoding="utf-8")
+            replacements = {
+                "- document_structure_status: skipped": "- document_structure_status: complete",
+                "- structure_activation: format_only": "- structure_activation: required",
+                "- document_split_decision: not_applicable:format-only: fixture closeout bundle": "- document_split_decision: keep:README topology",
+                "- structure_planning: not_applicable": "- structure_planning: complete",
+                "- prose_graph: not_applicable": "- prose_graph: not_selected",
+                "- structure_contract: skipped: fixture format-only route": "- structure_contract: required:README topology",
+            }
+            for old, new in replacements.items():
+                text = text.replace(old, new)
+            closeout_path.write_text(text, encoding="utf-8")
+
+            result = subprocess.run(
+                [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
+                cwd=workspace_root,
+                env=environment,
                 check=False,
                 capture_output=True,
                 text=True,
             )
 
             self.assertNotEqual(result.returncode, 0)
-            self.assertIn("Unable to resolve git HEAD", result.stderr)
+            self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=no", result.stdout)
+
+    def test_task_close_accepts_parent_owned_nested_workspace_without_git(self) -> None:
+        """A nested workspace may use the authenticated outer Git identity."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+            parent_root = Path(tmp_dir) / "parent"
+            parent_root.mkdir(parents=True, exist_ok=True)
+            subprocess.run(
+                ["git", "init", "-q"],
+                cwd=parent_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=Task Close Test",
+                    "-c",
+                    "user.email=task-close@example.invalid",
+                    "commit",
+                    "--allow-empty",
+                    "-m",
+                    "init",
+                ],
+                cwd=parent_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "remote",
+                    "add",
+                    "origin",
+                    "https://example.invalid/task-close-parent.git",
+                ],
+                cwd=parent_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            workspace_root = parent_root / "workspace" / "nested"
+            workspace_root.mkdir(parents=True, exist_ok=True)
+            run_id = "parent-owned-nested-closeout"
+            report_dir = workspace_root / "reports" / "agents" / run_id
+            report_dir.mkdir(parents=True, exist_ok=True)
+            with patch.dict(
+                os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}
+            ):
+                write_ready_closeout_bundle(
+                    report_dir, run_id, workspace=workspace_root
+                )
+            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+
+            environment = dict(os.environ)
+            environment["AGENT_CANON_PARENT_ROOT"] = str(parent_root)
+            outer_head = current_git_head(parent_root)
+            expected_outer_diff_ref = current_diff_ref(workspace_root)
+            result = subprocess.run(
+                [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
+                cwd=workspace_root,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("CLOSEOUT_READY=yes", result.stdout)
+            self.assertIn(f"REPORT_DIR={report_dir}", result.stdout)
+            self.assertIn(
+                f"DIFF_CHECK_CURRENT_DIFF_REF={expected_outer_diff_ref}",
+                result.stdout,
+            )
+            self.assertTrue(expected_outer_diff_ref.startswith(outer_head))
+            self.assertNotIn("Unable to resolve git HEAD", result.stderr)
+            self.assertTrue(report_dir.resolve().is_relative_to(parent_root.resolve()))
 
     def test_task_close_rejects_stale_closeout_and_artifact_diff_ref(self) -> None:
         """task_close should compare matching closeout/artifact refs to the current diff ref."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-stale-diff-ref"
             report_dir = report_root / run_id
@@ -3987,7 +4202,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_diff_ref_includes_untracked_files(self) -> None:
         """Untracked workspace files should make captured diff-check refs stale."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             subprocess.run(
@@ -4042,7 +4257,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_untracked_reports_outside_run_bundle(self) -> None:
         """Generated report files outside reports/agents should block closeout."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             subprocess.run(
@@ -4107,7 +4322,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_other_agent_run_reports(self) -> None:
         """Only the current run bundle may carry untracked agent reports."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             subprocess.run(
@@ -4164,9 +4379,9 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "reports/agents/old-run/workflow_monitoring.md", result.stdout
             )
 
-    def test_task_close_rejects_tracked_other_agent_run_reports(self) -> None:
-        """Tracked old agent run bundles are not durable source canon."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+    def test_task_close_allows_tracked_other_agent_run_reports(self) -> None:
+        """Pre-existing tracked agent run history is baseline state."""
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             subprocess.run(
@@ -4202,10 +4417,28 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
+            subprocess.run(
+                [
+                    "git",
+                    "remote",
+                    "add",
+                    "origin",
+                    "https://example.invalid/task-close-tracked.git",
+                ],
+                cwd=workspace_root,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
             run_id = "test-task-close-tracked-old-agent-run"
             report_dir = workspace_root / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
-            write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
+            with patch.dict(
+                os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}
+            ):
+                write_ready_closeout_bundle(
+                    report_dir, run_id, workspace=workspace_root
+                )
             write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
 
             result = subprocess.run(
@@ -4216,21 +4449,21 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     run_id,
                 ],
                 cwd=workspace_root,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
                 check=False,
                 capture_output=True,
                 text=True,
             )
 
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=no", result.stdout)
-            self.assertIn("report_artifact_tracked_outside_current_run", result.stdout)
-            self.assertIn(
-                "reports/agents/old-run/workflow_monitoring.md", result.stdout
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=yes", result.stdout)
+            self.assertNotIn(
+                "report_artifact_tracked_outside_current_run", result.stdout
             )
 
     def test_task_close_rejects_ignored_reports_outside_run_bundle(self) -> None:
         """Ignored generated report roots are still closeout blockers."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             subprocess.run(
@@ -4298,7 +4531,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_allows_ignored_old_agent_run_reports(self) -> None:
         """Ignored agent run bundles are local log cache, not source-tree leakage."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             (workspace_root / ".gitignore").write_text(
@@ -4358,7 +4591,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_allows_tracked_durable_reports(self) -> None:
         """Tracked durable reports are repository canon, not run-bundle leakage."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             workspace_root.mkdir(parents=True, exist_ok=True)
             subprocess.run(
@@ -4417,7 +4650,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_accepts_mid_task_user_input_wave_checkpoint(self) -> None:
         """A classified mid-task user input checkpoint should preserve closeout readiness."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-mid-task-user-input"
             report_dir = report_root / run_id
@@ -4445,7 +4678,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_mid_task_user_input_without_packet(self) -> None:
         """Mid-task user input rows should include a checkpoint packet path."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-mid-task-user-input-missing-packet"
             report_dir = report_root / run_id
@@ -4478,7 +4711,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_scope_change_without_fresh_wave_evidence(self) -> None:
         """Scope-changing additions should not close without fresh wave evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-scope-change-missing-fresh-wave"
             report_dir = report_root / run_id
@@ -4518,7 +4751,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_accepts_scope_change_with_fresh_wave_evidence(self) -> None:
         """Scope-changing additions may close after fresh wave evidence exists."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-scope-change-fresh-wave"
             report_dir = report_root / run_id
@@ -4558,7 +4791,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_scope_change_with_unrelated_wave_evidence(self) -> None:
         """Fresh-wave evidence should be scoped to the current run bundle."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             unrelated_evidence = Path(tmp_dir) / "unrelated-wave.md"
             unrelated_evidence.write_text(
                 "not a current-run wave artifact\n", encoding="utf-8"
@@ -4603,7 +4836,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_new_task_without_fresh_run_bundle(self) -> None:
         """New tasks should not be absorbed into the current run without a fresh run."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-new-task-missing-fresh-run"
             report_dir = report_root / run_id
@@ -4643,7 +4876,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_new_task_with_missing_fresh_run_path(self) -> None:
         """Fresh-run evidence should point at an existing run bundle directory."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-new-task-missing-fresh-run-path"
             report_dir = report_root / run_id
@@ -4685,7 +4918,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_new_task_with_unrelated_fresh_run_dir(self) -> None:
         """Fresh-run evidence should be a sibling reports/agents run directory."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             unrelated_run_dir = Path(tmp_dir) / "unrelated-run"
             unrelated_run_dir.mkdir(parents=True, exist_ok=True)
             report_root = Path(tmp_dir) / "reports"
@@ -4728,7 +4961,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_accepts_new_task_with_fresh_run_bundle(self) -> None:
         """Current run closeout may pass after the new task has a fresh run bundle."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-new-task-fresh-run"
             report_dir = report_root / run_id
@@ -4766,7 +4999,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_chunk_only_completion(self) -> None:
         """task_close should fail when only a chunk is complete."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-chunk-only"
             report_dir = report_root / run_id
@@ -4862,7 +5095,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_partial_spec_or_ignored_review_findings(self) -> None:
         """task_close should fail when spec coverage or review integration is incomplete."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-partial-spec"
             report_dir = report_root / run_id
@@ -4957,7 +5190,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_missing_post_fix_full_review_completion(self) -> None:
         """task_close should fail when review-driven fixes skipped the final full rerun."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-missing-post-fix-review"
             report_dir = report_root / run_id
@@ -5071,7 +5304,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_missing_canonical_tree_head_completion(self) -> None:
         """task_close should fail when canonical tree-head cleanup is incomplete."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-missing-canonical-tree-head"
             report_dir = report_root / run_id
@@ -5166,7 +5399,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
 
     def test_task_close_rejects_empty_work_log(self) -> None:
         """task_close should fail when the run-local work log is still empty."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-close-empty-work-log"
             report_dir = report_root / run_id

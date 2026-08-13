@@ -9,6 +9,7 @@
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
 # upstream design ../../templates/documents/github/pull-request/agent_canon.md canonical template-side AgentCanon PR checklist
 # upstream implementation ../agent_tools/run_repo_dependency_review.sh strict dependency review
+# upstream implementation ../agent_tools/parent_root_side_effects.py owns PR scratch, archive, and child execution boundaries
 # upstream implementation ./agent_canon_pr_graph_selector.py selects and evaluates parent graph gating from trusted diff and persisted graph evidence
 # upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py skill/workflow prompt parity eval
 # upstream implementation ../agent_tools/run_accumulated_agent_evals.py writes required eval family reports before accumulation validation
@@ -20,6 +21,7 @@
 # upstream implementation ../../rust/agent-canon/src/memory.rs owns memory CLI validation reused by the Rust build gate.
 # upstream implementation ./check_github_workflows.py GitHub workflow and PR template checks
 # upstream implementation ../ci/run_python_quality_checks.sh owns shared Python static quality checks
+# downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py verifies parent and standalone graph routes
 # @dependency-end
 
 set -euo pipefail
@@ -42,27 +44,67 @@ if [ ! -f "${CANON_SYNC_TOOL}" ]; then
   echo "AGENT_CANON_PR_SOURCE_TOOLS_REASON=agent_canon_source_tools_root_resolve_failed"
   exit 1
 fi
-AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${HOME}/.tools/agent-canon/cargo-target}"
+AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${WORKSPACE_ROOT}/.agent-canon/cache/cargo-target}"
+AGENT_CANON_BOUNDARY_SCRIPT="${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py"
 AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}"
 if [ ! -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ] \
   && [ -f "${WORKSPACE_ROOT}/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]; then
   AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
 fi
 cd "${WORKSPACE_ROOT}"
-
-AGENT_CANON_PR_TEMP_ROOT_CREATED=0
-if [[ -z "${AGENT_CANON_PR_TEMP_ROOT:-}" ]]; then
-  AGENT_CANON_PR_TEMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/agent-canon-pr-check.XXXXXX")"
-  AGENT_CANON_PR_TEMP_ROOT_CREATED=1
+export AGENT_CANON_PARENT_ROOT="${WORKSPACE_ROOT}"
+export AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${WORKSPACE_ROOT}"
+if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "agent-canon-pr-script" ]]; then
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-pr-script \
+    --consume >/dev/null
+else
+  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose agent-canon-pr-script \
+    --issue-handoff \
+    -- bash "${BASH_SOURCE[0]}"
 fi
+unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
+AGENT_CANON_CLI_TARGET_DIR="$(
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" resolve \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${AGENT_CANON_CLI_TARGET_DIR}" \
+    --purpose agent-canon-pr-cli-target
+)"
+
+AGENT_CANON_PR_TEMP_BASE="${AGENT_CANON_PR_TEMP_ROOT:-${WORKSPACE_ROOT}/.agent-canon/tmp}"
+AGENT_CANON_PR_TEMP_BASE="$(
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" ensure-dir \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${AGENT_CANON_PR_TEMP_BASE}" \
+    --purpose agent-canon-pr-temp-base
+)"
+AGENT_CANON_PR_TEMP_ROOT="$(
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" temp-dir \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${AGENT_CANON_PR_TEMP_BASE}" \
+    --prefix pr-check. \
+    --purpose agent-canon-pr
+)"
+# Keep static-gate unit scratch under the authenticated parent-owned lifecycle.
+export TMPDIR="${AGENT_CANON_PR_TEMP_ROOT}"
 PR_GATE_RECEIPT="${AGENT_CANON_PR_TEMP_ROOT}/pr-gate-prepared.receipt"
 cleanup_agent_canon_pr_temp_root() {
-  if [[ -n "${PR_GATE_RECEIPT:-}" ]]; then
-    rm -f -- "${PR_GATE_RECEIPT}" 2>/dev/null || true
+  local status=$?
+  local cleanup_status=0
+  trap - EXIT
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" remove-tree \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${AGENT_CANON_PR_TEMP_ROOT}" \
+    --purpose agent-canon-pr-cleanup >/dev/null || cleanup_status=$?
+  if [[ "$status" -eq 0 && "$cleanup_status" -ne 0 ]]; then
+    status=$cleanup_status
   fi
-  if [[ "${AGENT_CANON_PR_TEMP_ROOT_CREATED}" -eq 1 ]]; then
-    rm -rf "${AGENT_CANON_PR_TEMP_ROOT}"
-  fi
+  exit "$status"
 }
 trap cleanup_agent_canon_pr_temp_root EXIT
 PR_DEPENDENCY_REVIEW_DIR="${AGENT_CANON_PR_TEMP_ROOT}/dependency-review/agent-canon-pr"
@@ -74,7 +116,12 @@ else
   PR_AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}"
 fi
 PR_HOOK_ARCHIVE_DIR="${AGENT_CANON_HOOK_ARCHIVE_DIR:-${PR_AGENT_CANON_SOURCE_ROOT}/.agent-canon/log-archive}"
-mkdir -p "${PR_HOOK_ARCHIVE_DIR}"
+PR_HOOK_ARCHIVE_DIR="$(
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" ensure-dir \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${PR_HOOK_ARCHIVE_DIR}" \
+    --purpose agent-canon-pr-hook-archive
+)"
 
 REMOTE_NAME="${AGENT_CANON_REMOTE_NAME:-agent-canon}"
 AGENT_CANON_GITHUB_REPO="${AGENT_CANON_GITHUB_REPO:-iwashita-nozomu/agent-canon}"
@@ -120,31 +167,28 @@ run_shared_surface_check() {
 }
 
 run_agent_canon() {
+  local command=()
   if [ -x "${CANON_TOOLS_ROOT}/bin/agent-canon" ]; then
-    "${CANON_TOOLS_ROOT}/bin/agent-canon" "$@"
-    return $?
-  fi
-  if [ -x "${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" ]; then
-    "${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" "$@"
-    return $?
-  fi
-  if [ -x "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon" ]; then
-    "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon" "$@"
-    return $?
-  fi
-  if [ -x "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon" ]; then
-    "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon" "$@"
-    return $?
-  fi
-  if command -v cargo >/dev/null 2>&1 \
+    command=("${CANON_TOOLS_ROOT}/bin/agent-canon" "$@")
+  elif [ -x "${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" ]; then
+    command=("${AGENT_CANON_SOURCE_ROOT}/tools/bin/agent-canon" "$@")
+  elif [ -x "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon" ]; then
+    command=("${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon" "$@")
+  elif [ -x "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon" ]; then
+    command=("${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/release/agent-canon" "$@")
+  elif command -v cargo >/dev/null 2>&1 \
     && [ -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ]; then
-    CARGO_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR}" \
-      cargo run --quiet --manifest-path "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" -- "$@"
-    return $?
+    command=(cargo run --quiet --manifest-path "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" -- "$@")
+  else
+    echo "AGENT_CANON_CLI_BLOCKER=agent_canon_cli_unavailable" >&2
+    echo "AGENT_CANON_CLI_REASON=agent-canon CLI binary/shim missing and cargo route unavailable" >&2
+    return 127
   fi
-  echo "AGENT_CANON_CLI_BLOCKER=agent_canon_cli_unavailable" >&2
-  echo "AGENT_CANON_CLI_REASON=agent-canon CLI binary/shim missing and cargo route unavailable" >&2
-  return 127
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    -- "${command[@]}"
+  return $?
 }
 
 PR_GATE_DEPENDENCY_GRAPH_REASON=""
@@ -181,7 +225,10 @@ agentcanon_pr_dependency_graph_required() {
   local selector_output=""
   local selector_rc=0
   local selector_status=""
-  mkdir -p "${PR_DEPENDENCY_REVIEW_DIR}"
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" ensure-dir \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${PR_DEPENDENCY_REVIEW_DIR}" \
+    --purpose agent-canon-pr-dependency-review >/dev/null
   PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET="${PR_DEPENDENCY_REVIEW_DIR}/changed-paths.json"
   local selector_args=(
     --root "${WORKSPACE_ROOT}"
@@ -334,7 +381,10 @@ write_pr_gate_receipt() {
     printf 'graph=%s\n' "${dependency_graph_status}"
     printf 'selector_reason=%s\n' "${selector_reason}"
     printf 'selector_evidence=%s\n' "${selector_evidence}"
-  } >"${PR_GATE_RECEIPT}"
+  } | python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" write \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${PR_GATE_RECEIPT}" \
+    --purpose agent-canon-pr-receipt >/dev/null
 }
 
 consume_source_correctness_receipt() {
@@ -380,35 +430,12 @@ emit_generated_completeness_receipt() {
 }
 
 run_standalone_static_gate_ci() {
-  cargo build --manifest-path rust/agent-canon/Cargo.toml
-  local memory_cli="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/target/debug/agent-canon"
-  if [[ ! -x "${memory_cli}" ]]; then
-    echo "AGENT_CANON_MEMORY_CLI_BUILD=fail"
-    echo "AGENT_CANON_MEMORY_CLI_REASON=rust build did not produce target/debug/agent-canon" >&2
-    return 1
-  fi
-  echo "AGENT_CANON_MEMORY_CLI_BUILD=${memory_cli}"
-  "${memory_cli}" memory validate --root .
-  cargo fmt --manifest-path rust/agent-canon/Cargo.toml -- --check
-  cargo clippy --manifest-path rust/agent-canon/Cargo.toml --all-targets -- -D warnings
-  cargo test --manifest-path rust/agent-canon/Cargo.toml
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_catalog.py"
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/tool_proof_coverage.py"
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/responsibility_scope.py"
-  BASE_REF="${GITHUB_BASE_REF:-main}"
-  git fetch origin "${BASE_REF}" --depth=1 || true
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/import_responsibility.py" --changed --baseline-ref "origin/${BASE_REF}"
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/issue_sync.py"
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"
-  AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
-    python3 "${CANON_TOOLS_ROOT}/agent_tools/eval_accumulation_check.py"
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/smoke_test_research_perspective_pack.py"
-  run_convention_compliance_gate
-  python3 "${CANON_TOOLS_ROOT}/agent_tools/skill_tool_commands.py" check
-  python3 "${CANON_TOOLS_ROOT}/ci/check_github_workflows.py"
-  python3 "${CANON_TOOLS_ROOT}/ci/container_config.py"
+  local unit
+  local units=(rust contracts eval workflow-container)
+  for unit in "${units[@]}"; do
+    AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \
+      bash "${SCRIPT_DIR}/run_standalone_static_gate_unit.sh" "${unit}"
+  done
 }
 
 github_repo_security_status() {
@@ -524,7 +551,10 @@ fi
 if [[ "${PR_GATE_DEPENDENCY_GRAPH_REQUIRED}" -eq 1 ]]; then
   # This graph build produces either a full strict review or scoped diagnostic
   # evidence for the subsequent project-quality ownership boundary.
-  mkdir -p "${PR_DEPENDENCY_REVIEW_DIR}"
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" ensure-dir \
+    --root "${WORKSPACE_ROOT}" \
+    --candidate "${PR_DEPENDENCY_REVIEW_DIR}" \
+    --purpose agent-canon-pr-dependency-review >/dev/null
   graph_build_result="${PR_DEPENDENCY_REVIEW_DIR}/graph-build.json"
   graph_producer_identity=""
   if ! graph_producer_identity="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \

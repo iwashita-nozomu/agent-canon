@@ -1719,19 +1719,19 @@
       "clause_registry": [
         {
           "clause_id": "CANON-ADF",
-          "source_ref": "repo:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate"
+          "source_ref": "agentcanon:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate"
         },
         {
           "clause_id": "CANON-SOURCE-PACKET",
-          "source_ref": "repo:templates/agents/design_brief.md#section:implementation-source-packet"
+          "source_ref": "agentcanon:templates/agents/design_brief.md#section:implementation-source-packet"
         },
         {
           "clause_id": "CANON-SIDE-EFFECT",
-          "source_ref": "repo:templates/agents/design_brief.md#section:design-side-effect-map"
+          "source_ref": "agentcanon:templates/agents/design_brief.md#section:design-side-effect-map"
         },
         {
           "clause_id": "CANON-TRACE",
-          "source_ref": "repo:templates/agents/design_brief.md#section:design-to-implementation-trace"
+          "source_ref": "agentcanon:templates/agents/design_brief.md#section:design-to-implementation-trace"
         }
       ],
       "abstract_design_frame": {
@@ -1744,11 +1744,11 @@
           "role:designer"
         ],
         "source_refs": [
-          "repo:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate",
-          "repo:templates/agents/design_brief.md#section:abstract-design-frame"
+          "agentcanon:agents/canonical/CODEX_WORKFLOW.md#section:design-integrity-gate",
+          "agentcanon:templates/agents/design_brief.md#section:abstract-design-frame"
         ],
         "dependency_refs": [
-          "header:upstream:design:repo:templates/agents/design_brief.md->repo:documents/design/dependency-manifest-design.md"
+          "header:upstream:design:agentcanon:templates/agents/design_brief.md->agentcanon:documents/design/dependency-manifest-design.md"
         ],
         "output_refs": [
           "artifact:design_brief.md"
@@ -1768,12 +1768,12 @@
           "role:designer"
         ],
         "source_refs": [
-          "repo:templates/agents/design_brief.md#section:implementation-source-packet",
-          "repo:agents/workflows/implementation-waterfall-workflow.md#section:active-design-packet"
+          "agentcanon:templates/agents/design_brief.md#section:implementation-source-packet",
+          "agentcanon:agents/workflows/implementation-waterfall-workflow.md#section:active-design-packet"
         ],
         "dependency_refs": [
           "entry:abstract-design-frame",
-          "header:upstream:design:repo:templates/agents/design_brief.md->repo:documents/design/dependency-manifest-design.md"
+          "header:upstream:design:agentcanon:templates/agents/design_brief.md->agentcanon:documents/design/dependency-manifest-design.md"
         ],
         "output_refs": [
           "artifact:design_brief.md"
@@ -1792,12 +1792,12 @@
           "role:designer"
         ],
         "source_refs": [
-          "repo:templates/agents/design_brief.md#section:design-side-effect-map",
-          "repo:agents/workflows/implementation-waterfall-workflow.md#section:active-design-packet"
+          "agentcanon:templates/agents/design_brief.md#section:design-side-effect-map",
+          "agentcanon:agents/workflows/implementation-waterfall-workflow.md#section:active-design-packet"
         ],
         "dependency_refs": [
           "entry:abstract-design-frame",
-          "header:upstream:design:repo:templates/agents/design_brief.md->repo:documents/design/dependency-manifest-design.md"
+          "header:upstream:design:agentcanon:templates/agents/design_brief.md->agentcanon:documents/design/dependency-manifest-design.md"
         ],
         "output_refs": [
           "artifact:design_brief.md"
@@ -1817,8 +1817,8 @@
           "role:designer"
         ],
         "source_refs": [
-          "repo:templates/agents/design_brief.md#section:design-to-implementation-trace",
-          "repo:agents/canonical/CODEX_WORKFLOW.md#section:5.-implementation"
+          "agentcanon:templates/agents/design_brief.md#section:design-to-implementation-trace",
+          "agentcanon:agents/canonical/CODEX_WORKFLOW.md#section:5.-implementation"
         ],
         "dependency_refs": [
           "entry:abstract-design-frame",

@@ -31,15 +31,26 @@ if __package__:
     from .manifest_rendering import has_template as _has_template
     from .manifest_rendering import render_template as _render_template
     from .manifest_rendering import (
-        write_initial_wave_execution_gate as _write_initial_wave_execution_gate,
+        initial_wave_execution_gate_lines as _initial_wave_execution_gate_lines,
     )
 else:
     from manifest_rendering import build_manifest as _build_manifest
     from manifest_rendering import has_template as _has_template
     from manifest_rendering import render_template as _render_template
     from manifest_rendering import (
-        write_initial_wave_execution_gate as _write_initial_wave_execution_gate,
+        initial_wave_execution_gate_lines as _initial_wave_execution_gate_lines,
     )
+
+if __package__:
+    from .skill_tool_commands import (
+        validate_command_plan_executables as _validate_command_plan_executables,
+    )
+    from .agent_canon_source_root import resolve_agent_canon_source_root as _resolve_source_root
+else:
+    from skill_tool_commands import (  # type: ignore[no-redef]
+        validate_command_plan_executables as _validate_command_plan_executables,
+    )
+    from agent_canon_source_root import resolve_agent_canon_source_root as _resolve_source_root
 
 if __package__:
     from .packets import iter_artifacts as _iter_artifacts
@@ -48,6 +59,8 @@ else:
 
 import json as _json
 from collections.abc import Mapping as _Mapping
+from dataclasses import dataclass as _dataclass
+from pathlib import Path as _Path
 
 from task_authority import AUTHORITY_FILE_NAME as _AUTHORITY_FILE_NAME
 from task_authority import build_default_task_authority as _build_default_task_authority
@@ -208,6 +221,7 @@ if __package__:
         pre_handoff_scope_policy_output_lines,
         repo_tool_routing_policy_output_lines,
         required_output_templates_missing,
+        selected_skill_command_packets,
         same_role_subagent_policy_output_lines,
         standard_agent_wave_sequence_output_lines,
         subagent_wave_record_command,
@@ -226,6 +240,7 @@ else:
         pre_handoff_scope_policy_output_lines,
         repo_tool_routing_policy_output_lines,
         required_output_templates_missing,
+        selected_skill_command_packets,
         same_role_subagent_policy_output_lines,
         standard_agent_wave_sequence_output_lines,
         subagent_wave_record_command,
@@ -247,6 +262,39 @@ else:
     )
 
 del annotations
+
+
+@_dataclass(frozen=True)
+class PreparedRunBundle:
+    """Read-only rendered run bytes ready for staged parent publication."""
+
+    files: tuple[tuple[str, bytes], ...]
+    created_files: tuple[str, ...]
+    active_design_packet: ActiveDesignPacketConfig
+
+
+def _append_section_line(text: str, heading: str, line: str) -> str:
+    """Apply one manifest section line to a rendered buffer."""
+    if line in text:
+        return text
+    lines = text.splitlines()
+    in_section = False
+    insert_at = len(lines)
+    for index, existing in enumerate(lines):
+        stripped = existing.strip()
+        if not stripped.startswith("## "):
+            continue
+        if in_section:
+            insert_at = index
+            break
+        in_section = stripped == heading
+    if not in_section:
+        lines.extend(("", heading, "", line))
+    else:
+        while insert_at > 0 and not lines[insert_at - 1].strip():
+            insert_at -= 1
+        lines.insert(insert_at, line)
+    return "\n".join(lines) + "\n"
 
 
 def run_workflow_family(spec: RunBundleSpec) -> dict[str, object] | None:
@@ -274,17 +322,67 @@ def run_active_design_packet(
     )
 
 
-def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
-    """Create the standard files for a run."""
+def _required_source_root(spec: RunBundleSpec) -> _Path:
+    """Return the immutable source root carried by a run specification."""
+    source_root = spec.agentcanon_source_root
+    if source_root is None and spec.repository_roots is not None:
+        source_root = spec.repository_roots.agentcanon_source_root
+    if source_root is None:
+        raise RuntimeError("runtime_roots_invalid:agentcanon_source_root_missing")
+    return source_root.resolve()
+
+
+def _required_report_root(spec: RunBundleSpec) -> _Path:
+    """Return the explicit report root carried by a run specification."""
+    report_root = spec.report_root
+    if report_root is None and spec.repository_roots is not None:
+        report_root = spec.repository_roots.report_root
+    if report_root is None:
+        raise RuntimeError("runtime_roots_invalid:report_root_missing")
+    return report_root.resolve()
+
+
+def _validate_report_destination(spec: RunBundleSpec, report_root: _Path) -> None:
+    """Require the public destination to be exactly ``report_root/run_id``."""
+    expected = (report_root / spec.run_id).resolve()
+    declared = spec.report_dir.resolve()
+    if declared != expected:
+        raise RuntimeError("runtime_roots_invalid:report_dir_mismatch")
+
+
+def prepare_run_bundle(spec: RunBundleSpec) -> PreparedRunBundle:
+    """Render and validate all initial run bytes without filesystem writes."""
     replacements = {
         "RUN_ID": spec.run_id,
         "TASK": spec.task,
         "OWNER": spec.owner,
         "CREATED_AT": spec.created_at_iso,
     }
+    source_root = _required_source_root(spec)
+    report_root = _required_report_root(spec)
+    _validate_report_destination(spec, report_root)
     capacity_runtime = capacity_runtime_for_spec(spec)
-    spec.report_dir.mkdir(parents=True, exist_ok=True)
     active_design_packet = run_active_design_packet(spec)
+    missing_templates = required_output_templates_missing(
+        spec.config,
+        spec.roles,
+        allowed_missing=(
+            spec.config.artifacts["team_manifest"],
+            spec.config.artifacts["verification"],
+        ),
+        source_root=source_root,
+    )
+    if missing_templates:
+        raise RuntimeError(
+            "preflight_output_templates_missing:" + ",".join(missing_templates)
+        )
+    if spec.selected_skills:
+        source_resolution = _resolve_source_root(source_root)
+        for packet in selected_skill_command_packets(
+            spec.selected_skills,
+            source_root,
+        ):
+            _validate_command_plan_executables(source_resolution, packet)
     created_files = list(_iter_artifacts(spec.config, spec.roles, active_design_packet))
     selected_templates = {
         active_design_packet.design_artifact: spec.config.artifacts["design_brief"],
@@ -295,66 +393,75 @@ def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
             "document_flow_review"
         ],
     }
+    rendered: dict[str, str] = {}
     for artifact in created_files:
         template_name = selected_templates.get(artifact, artifact)
-        if _has_template(template_name):
-            output_path = resolve_report_bundle_artifact_path(spec.report_dir, artifact)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            output_path.write_text(
-                _render_template(template_name, replacements),
-                encoding="utf-8",
+        if _has_template(template_name, source_root=source_root):
+            rendered[artifact] = _render_template(
+                template_name, replacements, source_root=source_root
             )
-    (spec.report_dir / spec.config.artifacts["team_manifest"]).write_text(
-        _build_manifest(spec, capacity_runtime),
-        encoding="utf-8",
+    rendered[spec.config.artifacts["team_manifest"]] = _build_manifest(
+        spec, capacity_runtime
     )
-    (spec.report_dir / "closeout_packet.json").write_text(
-        _json.dumps(
-            {
-                "capacity_request": __capacity_projection(capacity_runtime, spec),
-                "closeout_packet": __closeout_projection(capacity_runtime, spec),
-            },
-            indent=2,
-            sort_keys=True,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
+    rendered["closeout_packet.json"] = _json.dumps(
+        {
+            "capacity_request": __capacity_projection(capacity_runtime, spec),
+            "closeout_packet": __closeout_projection(capacity_runtime, spec),
+        },
+        indent=2,
+        sort_keys=True,
+    ) + "\n"
     created_files.append("closeout_packet.json")
-    (spec.report_dir / spec.config.artifacts["verification"]).write_text(
-        "\n".join(
-            [
-                f"run_id={spec.run_id}",
-                f"task={spec.task}",
-                f"owner={spec.owner}",
-                f"created_at_utc={spec.created_at_iso}",
-                "status=pending",
-                "user_completion_report=locked",
-                "closeout_gate_status=pending",
-                "",
-            ]
-        ),
-        encoding="utf-8",
+    rendered[spec.config.artifacts["verification"]] = "\n".join(
+        (
+            f"run_id={spec.run_id}",
+            f"task={spec.task}",
+            f"owner={spec.owner}",
+            f"created_at_utc={spec.created_at_iso}",
+            "status=pending",
+            "user_completion_report=locked",
+            "closeout_gate_status=pending",
+            "",
+        )
     )
     authority_roles = {
         role.id: role.write_policy.mode not in {"read_only", "artifacts_only"}
         for role in spec.roles
     }
-    (spec.report_dir / _AUTHORITY_FILE_NAME).write_text(
-        _build_default_task_authority(
-            run_id=spec.run_id,
-            task=spec.task,
-            roles=authority_roles,
-        ),
-        encoding="utf-8",
+    rendered[_AUTHORITY_FILE_NAME] = _build_default_task_authority(
+        run_id=spec.run_id,
+        task=spec.task,
+        roles=authority_roles,
     )
     created_files.append(_AUTHORITY_FILE_NAME)
-    _write_initial_wave_execution_gate(spec)
-    unique_created_files: list[str] = []
-    for artifact in created_files:
-        if artifact not in unique_created_files:
-            unique_created_files.append(artifact)
-    return tuple(unique_created_files)
+    for relative, heading, line in _initial_wave_execution_gate_lines(spec):
+        rendered[relative] = _append_section_line(
+            rendered.get(relative, ""), heading, line
+        )
+        if relative not in created_files:
+            created_files.append(relative)
+    unique_created_files = tuple(dict.fromkeys(created_files))
+    return PreparedRunBundle(
+        files=tuple(
+            (path, rendered[path].encode("utf-8")) for path in rendered
+        ),
+        created_files=unique_created_files,
+        active_design_packet=active_design_packet,
+    )
+
+
+def create_run_bundle(spec: RunBundleSpec) -> tuple[str, ...]:
+    """Publish one prepared run through the shared atomic transaction."""
+    prepared = prepare_run_bundle(spec)
+    report_root = _required_report_root(spec)
+    # Keep the compatibility facade on the exact publisher used by bootstrap.
+    # The import is deliberately lazy because bootstrap imports this facade to
+    # prepare its bundle before invoking the publisher with monitoring.
+    if __package__:
+        from .bootstrap_agent_run import publish_prepared_run
+    else:
+        from bootstrap_agent_run import publish_prepared_run  # type: ignore[no-redef]
+    return publish_prepared_run(spec, prepared, report_root)
 
 
 __all__ = (
@@ -411,6 +518,8 @@ __all__ = (
     "materialize_close_agent_tool_call",
     "CloseAgentLifecycleEvidence",
     "create_run_bundle",
+    "prepare_run_bundle",
+    "PreparedRunBundle",
     "run_active_design_packet",
     "run_workflow_family",
     "format_subagent_wave",

@@ -12,10 +12,21 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import os
 from pathlib import Path
+from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
+TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
+TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
+sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+import smoke_test_research_perspective_pack as smoke  # noqa: E402
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+)
 
 
 class ResearchPerspectivePackSmokeTest(unittest.TestCase):
@@ -23,7 +34,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
     def test_run_bundle_includes_document_flow_review_artifact(self) -> None:
         """The always-on bundle should create the document flow review artifact."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-document-flow-review"
             result = subprocess.run(
@@ -42,6 +53,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                 ],
                 cwd=PROJECT_ROOT,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -57,7 +69,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
     def test_run_bundle_starts_with_locked_completion_gate(self) -> None:
         """Fresh bundles should lock user-facing completion until verifier/auditor closeout."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-closeout-gate"
             result = subprocess.run(
@@ -76,6 +88,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                 ],
                 cwd=PROJECT_ROOT,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -102,7 +115,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
     def test_run_bundle_can_enable_academic_writing_reviewers(self) -> None:
         """Academic writing reviewers should create their review artifacts when enabled."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-academic-writing-reviewers"
             result = subprocess.run(
@@ -127,6 +140,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "logic_gap_reviewer",
                 ],
                 cwd=PROJECT_ROOT,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -143,7 +157,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
     def test_task_id_t10_expands_paper_reviewers(self) -> None:
         """Academic-paper task bootstrap should include paper-specific reviewers."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-id-t10"
             result = subprocess.run(
@@ -164,6 +178,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                 ],
                 cwd=PROJECT_ROOT,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -173,14 +188,14 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("TASK_ID=T10", result.stdout)
             self.assertIn("citation_evidence_reviewer", result.stdout)
-            self.assertIn("citation_evidence_review.md", result.stdout)
-            self.assertTrue((report_dir / "citation_evidence_review.md").is_file())
-            self.assertTrue((report_dir / "notation_definition_review.md").is_file())
-            self.assertTrue((report_dir / "logic_gap_review.md").is_file())
+            self.assertNotIn("citation_evidence_review.md", result.stdout)
+            self.assertFalse((report_dir / "citation_evidence_review.md").is_file())
+            self.assertFalse((report_dir / "notation_definition_review.md").is_file())
+            self.assertFalse((report_dir / "logic_gap_review.md").is_file())
 
     def test_task_id_expands_default_research_reviewers(self) -> None:
         """Task-id bootstrap should expand default research reviewers and review packs."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-task-id-t4"
             result = subprocess.run(
@@ -201,6 +216,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     str(PROJECT_ROOT),
                 ],
                 cwd=PROJECT_ROOT,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -213,15 +229,16 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertNotIn("test_designer", result.stdout)
             self.assertIn("python_reviewer", result.stdout)
             self.assertFalse((report_dir / "test_plan.md").is_file())
-            self.assertTrue((report_dir / "report_review.md").is_file())
-            self.assertTrue((report_dir / "python_review.md").is_file())
-            self.assertTrue((report_dir / "reproducibility_review.md").is_file())
-            self.assertTrue((report_dir / "artifact_review.md").is_file())
+            self.assertFalse((report_dir / "report_review.md").is_file())
+            self.assertFalse((report_dir / "python_review.md").is_file())
+            self.assertFalse((report_dir / "reproducibility_review.md").is_file())
+            self.assertFalse((report_dir / "artifact_review.md").is_file())
+
             self.assertFalse((report_dir / "benchmark_review.md").is_file())
 
     def test_run_bundle_can_enable_full_research_perspective_pack(self) -> None:
         """Named optional review packs should expand to all pack specialists."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-full-research-perspective-pack"
             result = subprocess.run(
@@ -242,6 +259,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "research_perspective_review",
                 ],
                 cwd=PROJECT_ROOT,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -259,7 +277,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
 
     def test_run_bundle_can_enable_cpp_reviewer(self) -> None:
         """C++ reviewer should create its review artifact when enabled."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report_root = Path(tmp_dir) / "reports"
             run_id = "test-cpp-reviewer"
             result = subprocess.run(
@@ -280,6 +298,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "cpp_reviewer",
                 ],
                 cwd=PROJECT_ROOT,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -295,11 +314,15 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
         self,
     ) -> None:
         """Changed-path hints should expose a C++ review candidate without activation."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True, exist_ok=True)
             report_root.mkdir(parents=True, exist_ok=True)
+            (workspace_root / ".codex").mkdir(parents=True, exist_ok=True)
+            (workspace_root / ".codex" / "config.toml").write_bytes(
+                (PROJECT_ROOT / ".codex" / "config.toml").read_bytes()
+            )
             (workspace_root / "WORKTREE_SCOPE.md").write_text(
                 "# Worktree Scope\n\n## Editable Directories\n- `src`\n- `include`\n",
                 encoding="utf-8",
@@ -324,6 +347,7 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
                     "include/example.hpp",
                 ],
                 cwd=PROJECT_ROOT,
+                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
                 check=False,
                 capture_output=True,
                 text=True,
@@ -334,6 +358,51 @@ class ResearchPerspectivePackSmokeTest(unittest.TestCase):
             self.assertIn("LANGUAGE_REVIEW_CANDIDATES=cpp_reviewer", result.stdout)
             self.assertIn("cpp_reviewer", result.stdout)
             self.assertFalse((report_dir / "cpp_review.md").exists())
+
+
+def test_cleanup_parent_error_is_reported() -> None:
+    """A temporary-report cleanup failure is surfaced and chains the primary error."""
+    parent_root = PROJECT_ROOT
+    created: list[tuple[ParentRootSideEffectBoundary, object, object]] = []
+    original_create = ParentRootSideEffectBoundary.create_parent_owned_temp_directory
+    original_remove = ParentRootSideEffectBoundary.remove_parent_owned_tree
+
+    def capture_create(boundary, attestation, candidate, purpose, prefix):
+        receipt = original_create(boundary, attestation, candidate, purpose, prefix)
+        created.append((boundary, attestation, receipt))
+        return receipt
+
+    def fail_remove(boundary, attestation, candidate, purpose):
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_RACE_DETECTED, "injected cleanup failure"
+        )
+
+    with mock.patch.dict(
+        smoke.os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}
+    ), mock.patch.object(
+        ParentRootSideEffectBoundary,
+        "create_parent_owned_temp_directory",
+        capture_create,
+    ), mock.patch.object(
+        ParentRootSideEffectBoundary,
+        "remove_parent_owned_tree",
+        fail_remove,
+    ), mock.patch.object(smoke, "validate_task_catalog", side_effect=RuntimeError("primary")), mock.patch.object(
+        sys, "argv", ["smoke_test_research_perspective_pack", "--run-id", "cleanup-test"]
+    ):
+        try:
+            with unittest.TestCase().assertRaises(ParentRootSideEffectError) as raised:
+                smoke.main()
+            assert raised.exception.reject is ParentRootReject.ROOT_RACE_DETECTED
+            assert isinstance(raised.exception.__cause__, RuntimeError)
+        finally:
+            for boundary, attestation, receipt in created:
+                original_remove(boundary, attestation, receipt, "test-cleanup")
+
+
+def test_run_bundle_can_enable_full_research_perspective_pack() -> None:
+    """The full research perspective pack remains available through the smoke fixture."""
+    ResearchPerspectivePackSmokeTest().test_run_bundle_can_enable_full_research_perspective_pack()
 
 
 if __name__ == "__main__":

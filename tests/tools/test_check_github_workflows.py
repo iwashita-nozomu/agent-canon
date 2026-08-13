@@ -2,7 +2,7 @@
 # contract test
 # responsibility Tests GitHub workflow convention checker behavior.
 # upstream implementation ../../tools/ci/check_github_workflows.py convention checker
-# upstream implementation ../../.github/workflows/agent-runtime-dashboard.yml scheduled graph producer orchestration
+# upstream implementation ../../.github/workflows/agent-runtime-dashboard.yml runtime graph producer orchestration
 # upstream implementation ../../tools/agent_tools/agent_canon_source_root.py canonical source-root command execution
 # @dependency-end
 
@@ -24,19 +24,40 @@ from collections.abc import Callable
 from pathlib import Path
 
 import yaml
+from tools.ci.check_github_workflows import check_root_copy_headers
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "tools" / "ci" / "check_github_workflows.py"
 RUNTIME_DASHBOARD_WORKFLOW = (
     REPO_ROOT / ".github" / "workflows" / "agent-runtime-dashboard.yml"
 )
+_PARENT_BOUNDARY_PATH_KEYS = (
+    "TMPDIR",
+    "TEMP",
+    "TMP",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+)
 
 
 class GitHubWorkflowCheckTest(unittest.TestCase):
     """Exercise the GitHub workflow checker."""
 
-    def scheduled_graph_command(self) -> tuple[str, str]:
-        """Read the producer-owned scheduled graph command from its workflow."""
+    def runtime_graph_command(self) -> tuple[str, str]:
+        """Read the producer-owned runtime graph command from its workflow."""
         payload = yaml.safe_load(
             RUNTIME_DASHBOARD_WORKFLOW.read_text(encoding="utf-8")
         )
@@ -48,7 +69,7 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         )
         return str(step["if"]), str(step["run"])
 
-    def scheduled_graph_fixture(self, root: Path) -> tuple[Path, Path]:
+    def runtime_graph_fixture(self, root: Path) -> tuple[Path, Path]:
         """Create a fresh source root with a recording canonical Graph CLI."""
         subprocess.run(
             ["git", "init", "-b", "main"],
@@ -67,9 +88,9 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
             cwd=root,
             check=True,
         )
-        (root / "README.md").write_text("scheduled graph fixture\n", encoding="utf-8")
+        (root / "README.md").write_text("runtime graph fixture\n", encoding="utf-8")
         (root / ".gitignore").write_text(
-            ".agent-canon/\n.scheduled-graph-calls\n",
+            ".agent-canon/\n.runtime-graph-calls\n",
             encoding="utf-8",
         )
         catalog = root / "agents" / "skills" / "catalog.yaml"
@@ -80,6 +101,10 @@ class GitHubWorkflowCheckTest(unittest.TestCase):
         shutil.copy2(
             REPO_ROOT / "tools" / "agent_tools" / "agent_canon_source_root.py",
             module,
+        )
+        shutil.copy2(
+            REPO_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
+            module.parent / "parent_root_side_effects.py",
         )
         executable = root / "tools" / "bin" / "agent-canon"
         executable.parent.mkdir(parents=True)
@@ -94,7 +119,7 @@ from pathlib import Path
 
 root = Path(sys.argv[sys.argv.index("--root") + 1]).resolve()
 command = sys.argv[1:3]
-calls = root / ".scheduled-graph-calls"
+calls = root / ".runtime-graph-calls"
 prior = calls.read_text(encoding="utf-8") if calls.exists() else ""
 calls.write_text(prior + " ".join(command) + "\\n", encoding="utf-8")
 db = root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
@@ -179,24 +204,26 @@ raise SystemExit(2)
             text=True,
         )
         subprocess.run(
-            ["git", "commit", "-m", "scheduled graph fixture"],
+            ["git", "commit", "-m", "runtime graph fixture"],
             cwd=root,
             check=True,
             capture_output=True,
             text=True,
         )
         db = root / ".agent-canon" / "knowledge-graph" / "graph.sqlite"
-        return root / ".scheduled-graph-calls", db
+        return root / ".runtime-graph-calls", db
 
-    def run_scheduled_graph_fixture(
+    def run_runtime_graph_fixture(
         self,
         root: Path,
         *,
         build_mode: str,
     ) -> subprocess.CompletedProcess[str]:
-        """Execute the workflow-owned schedule command in a fresh root."""
-        _condition, command = self.scheduled_graph_command()
+        """Execute the workflow-owned runtime command in a fresh root."""
+        _condition, command = self.runtime_graph_command()
         environment = os.environ.copy()
+        for key in _PARENT_BOUNDARY_PATH_KEYS:
+            environment.pop(key, None)
         environment.update(
             {
                 "GITHUB_WORKSPACE": str(root),
@@ -212,16 +239,16 @@ raise SystemExit(2)
             text=True,
         )
 
-    def test_scheduled_graph_bootstraps_absent_db_and_reads_fresh(self) -> None:
-        """The schedule owner builds once before fresh identity readback."""
-        condition, _command = self.scheduled_graph_command()
-        self.assertEqual(condition, "github.event_name == 'schedule'")
+    def test_runtime_graph_bootstraps_absent_db_and_reads_fresh(self) -> None:
+        """The non-PR runtime route builds once before fresh identity readback."""
+        condition, _command = self.runtime_graph_command()
+        self.assertEqual(condition, "github.event_name != 'pull_request'")
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            calls, db = self.scheduled_graph_fixture(root)
+            calls, db = self.runtime_graph_fixture(root)
             self.assertFalse(db.exists())
 
-            result = self.run_scheduled_graph_fixture(root, build_mode="fresh")
+            result = self.run_runtime_graph_fixture(root, build_mode="fresh")
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertTrue(db.is_file())
@@ -242,14 +269,14 @@ raise SystemExit(2)
             )
             self.assertEqual(payload["input_fingerprint"], expected_fingerprint)
 
-    def test_scheduled_graph_build_failure_and_incomplete_stop_readback(self) -> None:
+    def test_runtime_graph_build_failure_and_incomplete_stop_readback(self) -> None:
         """Build failure and incomplete publication fail before status readback."""
         for build_mode in ("failure", "incomplete"):
             with self.subTest(build_mode=build_mode), tempfile.TemporaryDirectory() as tmp_dir:
                 root = Path(tmp_dir)
-                calls, _db = self.scheduled_graph_fixture(root)
+                calls, _db = self.runtime_graph_fixture(root)
 
-                result = self.run_scheduled_graph_fixture(
+                result = self.run_runtime_graph_fixture(
                     root,
                     build_mode=build_mode,
                 )
@@ -539,175 +566,6 @@ raise SystemExit(2)
                         "canonical_candidate_gate_read_credential_must_be_step_local",
                         result.stdout,
                     )
-
-    def test_direct_workflow_dispatch_input_in_run_fails(self) -> None:
-        """Shell run blocks must not interpolate workflow-dispatch inputs."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_valid_workflow(root)
-            self.copy_required_surfaces(root)
-            workflow = root / ".github" / "workflows" / "agent-coordination.yml"
-            shutil.copy2(
-                REPO_ROOT / ".github" / "workflows" / "agent-coordination.yml",
-                workflow,
-            )
-            source = workflow.read_text(encoding="utf-8")
-            for interpolation in (
-                "${{ inputs.task }}",
-                "${{ inputs['task'] }}",
-                "${{ github.event.inputs.task }}",
-            ):
-                with self.subTest(interpolation=interpolation):
-                    workflow.write_text(
-                        source.replace(
-                            '--task "${AGENT_COORDINATION_TASK}"',
-                            '--task "' + interpolation + '"',
-                        ),
-                        encoding="utf-8",
-                    )
-
-                    result = subprocess.run(
-                        [sys.executable, str(SCRIPT), "--root", str(root)],
-                        check=False,
-                        capture_output=True,
-                        text=True,
-                    )
-
-                    self.assertNotEqual(result.returncode, 0)
-                    self.assertIn(
-                        "direct_workflow_dispatch_input_interpolation",
-                        result.stdout,
-                    )
-
-    def test_specialist_allowlist_rejects_multiline_values(self) -> None:
-        """The canonical workflow guards malformed specialist input before parsing."""
-        workflow = REPO_ROOT / ".github" / "workflows" / "agent-coordination.yml"
-        text = workflow.read_text(encoding="utf-8")
-
-        self.assertIn('case "${AGENT_COORDINATION_SPECIALISTS}" in', text)
-        self.assertIn("*$'\\n'*|*$'\\r'*)", text)
-        self.assertIn(
-            "researcher|research_reviewer|scheduler|schedule_reviewer|"
-            "infra_steward|infra_reviewer",
-            text,
-        )
-        self.assertIn("unsupported specialist role", text)
-
-    def test_coordination_uses_one_intake_bundle(self) -> None:
-        """Normal coordination keeps intake evidence in one job."""
-        workflow = REPO_ROOT / ".github" / "workflows" / "agent-coordination.yml"
-        source = workflow.read_text(encoding="utf-8")
-        self.assertIn("  coordinate:", source)
-        self.assertNotIn("\n  manager:\n", source)
-        self.assertNotIn("manager_reviewer", source)
-        self.assertNotIn("manager_response", source)
-        self.assertNotIn("\n    needs:", source)
-        self.assertEqual(source.count("name: Upload coordination bundle"), 1)
-        self.assertIn("team_manifest.yaml", source)
-        self.assertIn("run.capacity_request.lineage.role_ids", source)
-        self.assertIn("GITHUB_STEP_SUMMARY", source)
-        self.assertIn("SCHEDULED_SPECIALISTS=", source)
-        self.assertIn("executed_role=coordination", source)
-        self.assertIn("finding=none at intake", source)
-        self.assertIn("result=bundle_ready", source)
-        self.assertEqual(source.count("--role manager"), 1)
-
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_valid_workflow(root)
-            self.copy_required_surfaces(root)
-            target = root / ".github" / "workflows" / "agent-coordination.yml"
-            shutil.copy2(workflow, target)
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--root", str(root)],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-
-    def test_coordination_summary_route_is_required(self) -> None:
-        """The checker rejects coordination without packet readback summary evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_valid_workflow(root)
-            self.copy_required_surfaces(root)
-            target = root / ".github" / "workflows" / "agent-coordination.yml"
-            source = REPO_ROOT.joinpath(
-                ".github/workflows/agent-coordination.yml"
-            ).read_text(encoding="utf-8")
-            target.write_text(
-                source.replace("GITHUB_STEP_SUMMARY", "STEP_SUMMARY_REMOVED"),
-                encoding="utf-8",
-            )
-            result = subprocess.run(
-                [sys.executable, str(SCRIPT), "--root", str(root)],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-        self.assertNotEqual(result.returncode, 0)
-        self.assertIn(
-            "coordination_summary_missing:GITHUB_STEP_SUMMARY",
-            result.stdout,
-        )
-
-    def test_coordination_readback_executes_against_generated_manifest(self) -> None:
-        """The workflow's packet readback resolves specialists from a real bundle."""
-        workflow = REPO_ROOT / ".github/workflows/agent-coordination.yml"
-        source = workflow.read_text(encoding="utf-8")
-        start = 'if ! role_readback="$(python3 - "${manifest_path}" <<\'PY\'\n'
-        end = "\n          PY\n"
-        self.assertIn(start, source)
-        embedded = source.split(start, 1)[1].split(end, 1)[0]
-        readback_script = textwrap.dedent(embedded)
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            report_root = Path(tmp_dir)
-            bootstrap = subprocess.run(
-                [
-                    sys.executable,
-                    "tools/agent_tools/bootstrap_agent_run.py",
-                    "--skip-agent-canon-preflight",
-                    "--task",
-                    "coordination readback test",
-                    "--owner",
-                    "workflow-test",
-                    "--workspace-root",
-                    str(REPO_ROOT),
-                    "--report-root",
-                    str(report_root),
-                    "--enable",
-                    "researcher",
-                    "--enable",
-                    "scheduler",
-                ],
-                cwd=REPO_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(bootstrap.returncode, 0, bootstrap.stdout + bootstrap.stderr)
-            report_dir = next(
-                Path(line.split("=", 1)[1])
-                for line in bootstrap.stdout.splitlines()
-                if line.startswith("REPORT_DIR=")
-            )
-            readback = subprocess.run(
-                [sys.executable, "-", str(report_dir / "team_manifest.yaml")],
-                input=readback_script,
-                cwd=REPO_ROOT,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
-
-        self.assertEqual(readback.returncode, 0, readback.stdout + readback.stderr)
-        self.assertIn(
-            "SCHEDULED_SPECIALISTS=test_designer,researcher,scheduler",
-            readback.stdout,
-        )
 
     def test_improvement_guide_is_bounded_and_manual(self) -> None:
         """Improvement guidance does not run for every push or unscoped PR."""
@@ -1363,6 +1221,34 @@ raise SystemExit(2)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("missing_text:edit_scope:", result.stdout)
 
+    def test_parent_bounded_workflow_writers_use_repo_owned_outputs(self) -> None:
+        """Workflow writers authenticate the repo before publishing evidence."""
+        expected = {
+            "AGENT_CANON_PARENT_ROOT": "${{ github.workspace }}",
+            "AGENT_CANON_ACTIVE_REPOSITORY_ROOT": "${{ github.workspace }}",
+        }
+        dashboard_path = (
+            REPO_ROOT / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+        )
+        dashboard = yaml.safe_load(dashboard_path.read_text(encoding="utf-8"))
+        self.assertEqual(dashboard["jobs"]["dashboard"]["env"], expected)
+
+        issue_path = REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml"
+        issue = yaml.safe_load(issue_path.read_text(encoding="utf-8"))
+        for job_name in ("issue-mirror-sync", "issue-mirror-check"):
+            self.assertEqual(issue["jobs"][job_name]["env"], expected)
+        source = issue_path.read_text(encoding="utf-8")
+        self.assertIn(
+            'summary_file="${GITHUB_WORKSPACE}/.agent-canon/'
+            'issue-mirror-${GITHUB_JOB}.md"',
+            source,
+        )
+        self.assertIn(
+            'cat "${summary_file}" >> "${GITHUB_STEP_SUMMARY}"',
+            source,
+        )
+        self.assertNotIn('--summary-file "${GITHUB_STEP_SUMMARY}"', source)
+
     def test_issue_mirror_workflow_with_checkout_failure_summary_passes(self) -> None:
         """Standalone issue mirror can only fail checkout by writing failure summary."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1402,10 +1288,13 @@ raise SystemExit(2)
                 ).replace(
                     "      - name: Checkout repository\n"
                     "        id: checkout\n"
+                    "        if: github.event_name != 'pull_request'\n"
                     "        uses: actions/checkout@v4\n",
                     "      - name: Checkout repository\n"
                     "        id: checkout\n"
-                    "        uses: actions/checkout@v4\n        continue-on-error: true\n",
+                    "        if: github.event_name != 'pull_request'\n"
+                    "        uses: actions/checkout@v4\n"
+                    "        continue-on-error: true\n",
                 ),
                 encoding="utf-8",
             )
@@ -1854,7 +1743,6 @@ raise SystemExit(2)
             ".github/PULL_REQUEST_TEMPLATE.md",
             "templates/documents/github/pull-request/agent_canon.md",
             "agents/workflows/agent-canon-pr-workflow.md",
-            ".github/workflows/agent-coordination.yml",
             ".github/workflows/agent-runtime-dashboard.yml",
             "issues/README.md",
             "issues/closed/AC-20260517-eval-accumulation-gaps.md",
@@ -1898,6 +1786,88 @@ raise SystemExit(2)
                 "template_runtime_dashboard_workflow_must_be_absent_use_agentcanon_repo",
                 result.stdout,
             )
+
+    def test_template_mode_accepts_current_vendored_runtime_dashboard_contract(
+        self,
+    ) -> None:
+        """The vendored canonical dashboard uses the standalone contract unchanged."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            dashboard = (
+                root
+                / "vendor"
+                / "agent-canon"
+                / ".github"
+                / "workflows"
+                / "agent-runtime-dashboard.yml"
+            )
+            dashboard.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(RUNTIME_DASHBOARD_WORKFLOW, dashboard)
+            (root / ".gitmodules").write_text(
+                '[submodule "vendor/agent-canon"]\n'
+                "\tpath = vendor/agent-canon\n"
+                "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
+                encoding="utf-8",
+            )
+
+            dashboard_text = dashboard.read_text(encoding="utf-8")
+            for retired_token in (
+                "evaluate_workflow_selection.py",
+                "evaluate_report_quality.py",
+            ):
+                self.assertNotIn(retired_token, dashboard_text)
+
+            findings = check_root_copy_headers(root)
+
+            self.assertEqual(findings, [])
+
+    def test_template_mode_enforces_runtime_dashboard_contract_tokens(self) -> None:
+        """Template mode rejects each missing token in the shared dashboard contract."""
+        required_tokens = (
+            "workflow_dispatch:",
+            "schedule:",
+            "generate_agent_runtime_dashboard.py",
+        )
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            source = RUNTIME_DASHBOARD_WORKFLOW.read_text(encoding="utf-8")
+            for mode in ("standalone", "template"):
+                with self.subTest(mode=mode):
+                    root = Path(tmp_dir) / mode
+                    dashboard = (
+                        root / ".github" / "workflows" / "agent-runtime-dashboard.yml"
+                    )
+                    if mode == "template":
+                        dashboard = (
+                            root
+                            / "vendor"
+                            / "agent-canon"
+                            / ".github"
+                            / "workflows"
+                            / "agent-runtime-dashboard.yml"
+                        )
+                        (root / ".gitmodules").parent.mkdir(
+                            parents=True, exist_ok=True
+                        )
+                        (root / ".gitmodules").write_text(
+                            '[submodule "vendor/agent-canon"]\n'
+                            "\tpath = vendor/agent-canon\n"
+                            "\turl = https://github.com/iwashita-nozomu/agent-canon.git\n",
+                            encoding="utf-8",
+                        )
+                    dashboard.parent.mkdir(parents=True, exist_ok=True)
+
+                    for token in required_tokens:
+                        with self.subTest(token=token):
+                            dashboard.write_text(
+                                source.replace(token, "REMOVED_RUNTIME_TOKEN"),
+                                encoding="utf-8",
+                            )
+                            findings = check_root_copy_headers(root)
+
+                            self.assertEqual(
+                                [finding.message for finding in findings],
+                                [f"missing_text:{token}"],
+                            )
 
 
 if __name__ == "__main__":

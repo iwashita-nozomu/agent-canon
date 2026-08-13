@@ -67,11 +67,31 @@ RUN ln -sfn ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -sfn ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx \
     && ln -sfn ../lib/node_modules/corepack/dist/corepack.js /usr/local/bin/corepack
 
+RUN set -eux; \
+    curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+      --output /usr/local/bin/rustup-init \
+      https://static.rust-lang.org/rustup/archive/1.28.2/x86_64-unknown-linux-gnu/rustup-init; \
+    echo '20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c  /usr/local/bin/rustup-init' | sha256sum --check --strict; \
+    chmod 0555 /usr/local/bin/rustup-init; \
+    /usr/local/bin/rustup-init --version | grep -F '1.28.2' >/dev/null
+
 COPY .devcontainer/dependencies.toml /opt/agent-canon/.devcontainer/dependencies.toml
 COPY tools/agent_tools/devcontainer_dependencies.py /opt/agent-canon/tools/agent_tools/devcontainer_dependencies.py
+COPY tools/agent_tools/parent_root_side_effects.py /opt/agent-canon/tools/agent_tools/parent_root_side_effects.py
+COPY rust/agent-canon /opt/agent-canon-source/rust/agent-canon
+ENV CARGO_HOME=/usr/local/share/agent-canon/toolchains/cargo \
+    RUSTUP_HOME=/usr/local/share/agent-canon/toolchains/rustup \
+    AGENT_CANON_CARGO_TARGET_DIR=/usr/local/share/agent-canon/toolchains/cargo-target \
+    PATH=/usr/local/share/agent-canon/toolchains/cargo/bin:$PATH
 RUN python3 /opt/agent-canon/tools/agent_tools/devcontainer_dependencies.py \
-      image-install --workspace /opt/agent-canon --vendor-root /opt/agent-canon --format text \
-    && rm -rf /opt/agent-canon
+      image-install --workspace /opt/agent-canon --vendor-root /opt/agent-canon \
+      --final-binary-dir /usr/local/bin --format text \
+    && test -x /usr/local/bin/agent-canon \
+    && test -d /usr/local/share/agent-canon/toolchains/cargo \
+    && test -d /usr/local/share/agent-canon/toolchains/rustup \
+    && rm -rf /opt/agent-canon /opt/agent-canon-source \
+    && test ! -e /opt/agent-canon \
+    && test ! -e /opt/agent-canon-source
 
 RUN install -d -o project -g "${PROJECT_GID}" -m 0755 \
       /home/project/.tools/bin \

@@ -20,7 +20,6 @@ import json
 import os
 import posixpath
 import re
-import tempfile
 import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass
@@ -44,6 +43,25 @@ from skill_route_catalog import (
 )
 from skill_tool_commands import SkillCommandPacket, packet_for_skill
 
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationReceipt,
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationReceipt,
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+
 SCHEMA = "agent_canon.skill_runtime_shim"
 VERSION = 2
 FIXED_POINT_SCHEMA = "agent_canon.skill_runtime_shim.fixed_point"
@@ -60,6 +78,23 @@ SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 ABSOLUTE_LOCATOR_RE = re.compile(
     r"(?<![A-Za-z0-9._~/<>-])/(?:[A-Za-z0-9._-]+/)*[A-Za-z0-9._-]+"
 )
+
+
+def _parent_boundary(
+    root: Path, purpose: str
+) -> tuple[ParentRootSideEffectBoundary, ParentRootAttestationReceipt]:
+    """Return an authenticated capability for every materializer write."""
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            f"{purpose}: explicit parent root is required",
+        )
+    parent = Path(configured).resolve(strict=True)
+    attestation = attest_parent_root(
+        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
+    )
+    return ParentRootSideEffectBoundary(), attestation
 
 
 class MaterializerError(RuntimeError):
@@ -781,38 +816,31 @@ def materialize(root: Path, *, all_skills: bool = False) -> dict[str, object]:
     if any(cast(Sequence[object], row["unmatched_blocks"]) for row in legacy):
         raise LegacyMigrationError(legacy)
     _staged_readback(context, rendered)
+    boundary, attestation = _parent_boundary(root, "skill-shim-materializer")
     delta_paths: list[str] = []
     replaced = 0
     for skill in sorted(context.skill_ids):
         path = _runtime_path(context, skill)
-        path.parent.mkdir(parents=True, exist_ok=True)
         data = rendered[skill].encode("utf-8")
-        before = path.read_bytes() if path.is_file() else None
+        target = boundary.resolve_parent_owned_path(
+            attestation, path, "skill-shim-materializer", create=False
+        )
+        before = (
+            boundary.read_parent_owned_file(target)
+            if target.target_dev is not None
+            else None
+        )
         if before == data:
             continue
-        temporary: str | None = None
         try:
-            with tempfile.NamedTemporaryFile(
-                mode="wb",
-                dir=path.parent,
-                prefix=".SKILL.md.",
-                suffix=".tmp",
-                delete=False,
-            ) as handle:
-                temporary = handle.name
-                handle.write(data)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary, path)
-            temporary = None
+            # Reuse the already authenticated target receipt.  Calling the
+            # convenience writer here would resolve the same path a second
+            # time for every file, repeating component/identity checks and
+            # creating an avoidable per-file attestation window.
+            boundary.atomic_publish(target, data)
             replaced += 1
             delta_paths.append(path.relative_to(context.root).as_posix())
         except OSError as exc:
-            if temporary is not None:
-                try:
-                    os.unlink(temporary)
-                except OSError:
-                    pass
             raise PartialStopError(
                 path.relative_to(context.root).as_posix(), replaced
             ) from exc

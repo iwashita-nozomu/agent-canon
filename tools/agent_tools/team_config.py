@@ -146,6 +146,9 @@ class RunBundleSpec:
     created_at_iso: str
     roles: tuple[Role, ...]
     workspace_root: Path
+    agentcanon_source_root: Path | None = None
+    report_root: Path | None = None
+    repository_roots: "RepositoryRoots | None" = None
     workflow_family_id: str = ""
     manual_specialists: tuple[str, ...] = ()
     task_default_specialists: tuple[str, ...] = ()
@@ -334,10 +337,12 @@ def catalog_stage_waves(catalog: TaskCatalog) -> tuple[StageWave, ...]:
 def current_stage_skills(
     selected_skills: tuple[str, ...],
     task_text: str = "",
+    *,
+    source_root: Path = ROOT,
 ) -> tuple[str, ...]:
     """Return public skills to declare for the current stage only."""
     active_skills = set(CURRENT_STAGE_SKILLS)
-    active_skills.update(catalog_active_stage_skills())
+    active_skills.update(catalog_active_stage_skills(source_root))
     if implementation_handoff_required(task_text):
         active_skills.add("$subagent-bootstrap")
     return tuple(skill for skill in selected_skills if skill in active_skills)
@@ -346,17 +351,19 @@ def current_stage_skills(
 def deferred_stage_skills(
     selected_skills: tuple[str, ...],
     task_text: str = "",
+    *,
+    source_root: Path = ROOT,
 ) -> tuple[str, ...]:
     """Return selected public skills that should wait for dynamic wave triggers."""
-    active = set(current_stage_skills(selected_skills, task_text))
+    active = set(current_stage_skills(selected_skills, task_text, source_root=source_root))
     return tuple(skill for skill in selected_skills if skill not in active)
 
 
-def catalog_active_stage_skills() -> tuple[str, ...]:
+def catalog_active_stage_skills(root: Path = ROOT) -> tuple[str, ...]:
     """Return public skills marked active in the skill catalog."""
     return tuple(
         f"${rule.skill}"
-        for rule in load_skill_route_rules(ROOT)
+        for rule in load_skill_route_rules(root)
         if rule.stage_policy == "active"
     )
 

@@ -5,6 +5,7 @@
 # responsibility Verifies the real PR check routes incomplete graph builds to changed-responsibility acceptance.
 # upstream implementation ../../tools/ci/check_agent_canon_pr.sh owns parent PR graph orchestration
 # upstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py classifies persisted incomplete graph diagnostics
+# upstream implementation ../../tools/agent_tools/parent_root_side_effects.py owns the fixture's parent-local child state
 # upstream design ../../documents/design/dependency-manifest-design.md owns changed-responsibility graph acceptance
 # @dependency-end
 
@@ -25,6 +26,25 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PR_CHECK = PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_pr.sh"
 SELECTOR = PROJECT_ROOT / "tools" / "ci" / "agent_canon_pr_graph_selector.py"
 REPO_PATHS = PROJECT_ROOT / "tools" / "lib" / "repo_paths.sh"
+PARENT_PATH_ENV_KEYS = {
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "PYTHONPYCACHEPREFIX",
+    "TEMP",
+    "TMP",
+    "TMPDIR",
+    "XDG_CACHE_HOME",
+}
 
 
 def run(
@@ -34,6 +54,12 @@ def run(
     environment: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run one fixture command."""
+    if environment is None:
+        environment = {
+            key: value
+            for key, value in os.environ.items()
+            if key not in PARENT_PATH_ENV_KEYS
+        }
     result = subprocess.run(
         list(args),
         cwd=root,
@@ -52,6 +78,16 @@ def write_executable(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(textwrap.dedent(content).lstrip(), encoding="utf-8")
     path.chmod(path.stat().st_mode | stat.S_IXUSR)
+
+
+def pending_handoff_nonces(root: Path) -> dict[str, object]:
+    """Read the single-use handoff ledger without creating it."""
+    state = root / ".agent-canon" / "handoff" / "nonces.json"
+    if not state.exists():
+        return {}
+    value = json.loads(state.read_text(encoding="utf-8"))
+    assert isinstance(value, dict)
+    return value
 
 
 class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
@@ -73,6 +109,18 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         selector_target = source / "tools" / "ci" / SELECTOR.name
         selector_target.parent.mkdir(parents=True)
         shutil.copy2(SELECTOR, selector_target)
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "__init__.py",
+            source / "tools" / "__init__.py",
+        )
+        boundary_target = (
+            source / "tools" / "agent_tools" / "parent_root_side_effects.py"
+        )
+        boundary_target.parent.mkdir(parents=True)
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
+            boundary_target,
+        )
         (source / "tools" / "ci" / "check_agent_canon_pr.sh").write_text(
             "#!/usr/bin/env bash\nexit 0\n",
             encoding="utf-8",
@@ -527,6 +575,15 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         script = parent / "tools" / "ci" / PR_CHECK.name
         script.parent.mkdir(parents=True)
         shutil.copy2(PR_CHECK, script)
+        shutil.copy2(PROJECT_ROOT / "tools" / "__init__.py", parent / "tools")
+        parent_boundary = (
+            parent / "tools" / "agent_tools" / "parent_root_side_effects.py"
+        )
+        parent_boundary.parent.mkdir(parents=True)
+        shutil.copy2(
+            PROJECT_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
+            parent_boundary,
+        )
         repo_paths = parent / "tools" / "lib" / REPO_PATHS.name
         repo_paths.parent.mkdir(parents=True)
         shutil.copy2(REPO_PATHS, repo_paths)
@@ -536,6 +593,10 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         if project_quality_error:
             (parent / "existing_project_type_error.py").write_text(
                 "def existing_error(value: str) -> int:\n    return value\n",
+                encoding="utf-8",
+            )
+            (parent / "pyrightconfig.json").write_text(
+                '{"include":["existing_project_type_error.py"]}\n',
                 encoding="utf-8",
             )
         for relative in (
@@ -611,15 +672,16 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             project_quality_error=scenario == "parent_project_errors",
         )
         fake_bin = fixture_root / "bin"
-        fake_home = fixture_root / "agent-canon-home"
+        fake_home = parent / ".agent-canon" / "fixture-tools"
         fake_installed = fake_home / "agent-canon" / "bin" / "agent-canon"
         fake_installed.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(
             source / "tools" / "agent_tools" / "graph_fixture.py", fake_installed
         )
         fake_installed.chmod(fake_installed.stat().st_mode | stat.S_IXUSR)
-        temp_root = fixture_root / "pr-check-state"
-        temp_root.mkdir()
+        temp_root = parent / ".agent-canon" / "pr-check-state"
+        temp_root.mkdir(parents=True)
+        (temp_root / "preexisting.txt").write_text("preserve\n", encoding="utf-8")
         python_call_log = temp_root / "pr-python-calls.jsonl"
         write_executable(
             fake_bin / "python-recorder",
@@ -664,7 +726,11 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 exec {real_git} \"$@\"
                 """,
             )
-        environment = os.environ.copy()
+        environment = {
+            key: value
+            for key, value in os.environ.items()
+            if key not in PARENT_PATH_ENV_KEYS
+        }
         environment.update(
             {
                 "PATH": f"{fake_bin}:{environment['PATH']}",
@@ -694,6 +760,10 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("AGENT_CANON_PR_GRAPH_ACCEPTANCE=pass", result.stdout)
         self.assertFalse((state / "origin-ls-remote-called").exists())
+        self.assertEqual(
+            (state / "preexisting.txt").read_text(encoding="utf-8"), "preserve\n"
+        )
+        self.assertEqual(pending_handoff_nonces(state.parents[1]), {})
 
     def test_real_pr_check_routes_incomplete_graph_to_scoped_or_blocking_selector(
         self,
@@ -706,20 +776,11 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", valid.stdout)
         self.assertFalse((valid_state / "run-all-checks.log").exists())
         self.assertNotIn("REPO_DEPENDENCY_REVIEW_CALLED", valid.stdout)
-        report = (
-            valid_state
-            / "dependency-review"
-            / "agent-canon-pr"
-            / "changed-responsibility-acceptance.json"
-        )
-        valid_identity = json.loads(report.read_text(encoding="utf-8"))[
-            "graph_identity"
-        ]
-        self.assertEqual(valid_identity["publication"], "published")
-        self.assertEqual(valid_identity["durability"], "durable")
-        self.assertEqual(valid_identity["profile"], "default")
+        self.assertIn('"publication": "published"', valid.stdout)
+        self.assertIn('"durability": "durable"', valid.stdout)
+        self.assertIn('"profile": "default"', valid.stdout)
 
-        reachable, reachable_state = self.run_pr_check("reachable")
+        reachable, _reachable_state = self.run_pr_check("reachable")
         self.assertEqual(reachable.returncode, 2, reachable.stdout + reachable.stderr)
         self.assertIn('"status": "incomplete"', reachable.stdout)
         self.assertIn("AGENT_CANON_PR_GRAPH_ACCEPTANCE=fail", reachable.stdout)
@@ -728,17 +789,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             reachable.stdout,
         )
         self.assertNotIn("REPO_DEPENDENCY_REVIEW_CALLED", reachable.stdout)
-        report = (
-            reachable_state
-            / "dependency-review"
-            / "agent-canon-pr"
-            / "changed-responsibility-acceptance.json"
-        )
-        payload = json.loads(report.read_text(encoding="utf-8"))
-        self.assertEqual(
-            payload["blocking_diagnostics"][0]["classification"],
-            "changed_responsibility",
-        )
+        self.assertIn('"classification": "changed_responsibility"', reachable.stdout)
 
     def test_real_pr_check_runs_header_scan_when_graph_selection_skips(self) -> None:
         """Changed/new files without manifests still reach the trusted header scan."""
@@ -759,7 +810,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertFalse((state / "run-all-checks.log").exists())
         self.assertFalse((state / "agent-canon-eval-calls.log").exists())
         project_quality = run(
-            state.parent / "parent",
+            state.parents[1],
             sys.executable,
             "-m",
             "pyright",
@@ -781,6 +832,18 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             "    pass\n",
             encoding="utf-8",
         )
+        clean_doc = source / "standalone_docstyle_clean.py"
+        clean_doc.write_text('"""Clean standalone fixture."""\n', encoding="utf-8")
+        clean_review = run(
+            source,
+            "tools/bin/agent-canon",
+            "pydocstyle-review",
+            "--target",
+            clean_doc.name,
+            check=False,
+        )
+        self.assertEqual(clean_review.returncode, 0, clean_review.stdout + clean_review.stderr)
+        self.assertEqual(pending_handoff_nonces(source), {})
         standalone_review = run(
             source,
             "tools/bin/agent-canon",
@@ -795,6 +858,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             1,
             standalone_review.stdout + standalone_review.stderr,
         )
+        self.assertEqual(pending_handoff_nonces(source), {})
         shutil.copy2(PR_CHECK, source / "tools" / "ci" / PR_CHECK.name)
         repo_paths = source / "tools" / "lib" / REPO_PATHS.name
         repo_paths.parent.mkdir(parents=True, exist_ok=True)
@@ -828,7 +892,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
 
         fake_bin = fixture_root / "bin"
-        fake_home = fixture_root / "agent-canon-home"
+        fake_home = source / ".agent-canon" / "fixture-tools"
         fake_installed = fake_home / "agent-canon" / "bin" / "agent-canon"
         fake_installed.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(
@@ -839,9 +903,11 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             fake_bin / "cargo",
             """
             #!/usr/bin/env bash
-            mkdir -p rust/agent-canon/target/debug
-            cp tools/bin/agent-canon rust/agent-canon/target/debug/agent-canon
-            chmod +x rust/agent-canon/target/debug/agent-canon
+            set -euo pipefail
+            target_dir="${CARGO_TARGET_DIR:?}"
+            mkdir -p "${target_dir}/debug"
+            cp tools/bin/agent-canon "${target_dir}/debug/agent-canon"
+            chmod +x "${target_dir}/debug/agent-canon"
             exit 0
             """,
         )
@@ -852,9 +918,14 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             exit 1
             """,
         )
-        temp_root = fixture_root / "standalone-pr-check-state"
-        temp_root.mkdir()
-        environment = os.environ.copy()
+        temp_root = source / ".agent-canon" / "standalone-pr-check-state"
+        temp_root.mkdir(parents=True)
+        (temp_root / "preexisting.txt").write_text("preserve\n", encoding="utf-8")
+        environment = {
+            key: value
+            for key, value in os.environ.items()
+            if key not in PARENT_PATH_ENV_KEYS
+        }
         environment.update(
             {
                 "PATH": f"{fake_bin}:{environment['PATH']}",
@@ -877,6 +948,13 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(
+            (temp_root / "preexisting.txt").read_text(encoding="utf-8"),
+            "preserve\n",
+        )
+        self.assertFalse(
+            any(path.name.startswith("pr-check.") for path in temp_root.iterdir())
+        )
         self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", result.stdout)
         self.assertIn(
             "AGENT_CANON_PR_PROJECT_QUALITY_OWNER=agentcanon_project_ci",
@@ -930,6 +1008,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
         self.assertNotIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", result.stdout)
         self.assertFalse((state / "run-all-checks.log").exists())
+        self.assertEqual(pending_handoff_nonces(state.parents[1]), {})
 
     def test_real_pr_check_reports_unchanged_production_baseline_once(self) -> None:
         """Shared correctness stays green while explicit Docstring review reports violations."""
@@ -939,10 +1018,21 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertIn("AGENT_CANON_PR_PROJECT_QUALITY=delegated", result.stdout)
         self.assertFalse((state / "run-all-checks.log").exists())
 
-        parent = state.parent / "parent"
+        parent = state.parents[1]
         target = "baseline_0.py"
         docstyle = run(
             parent,
+            sys.executable,
+            str(parent / "tools" / "agent_tools" / "parent_root_side_effects.py"),
+            "exec-parent-bound",
+            "--root",
+            str(parent),
+            "--source-root",
+            str(parent / "vendor" / "agent-canon"),
+            "--purpose",
+            "pydoc-wrapper-test",
+            "--issue-handoff",
+            "--",
             "vendor/agent-canon/tools/bin/agent-canon",
             "pydocstyle-review",
             "--target",
@@ -951,10 +1041,11 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         )
         explicit_output = docstyle.stdout + docstyle.stderr
         self.assertEqual(docstyle.returncode, 1)
-        self.assertEqual(explicit_output.count("D213:"), 1)
+        self.assertEqual(explicit_output.count("D213:"), 1, explicit_output)
+        self.assertEqual(pending_handoff_nonces(parent), {})
         direct_log = state / "direct-python-calls.jsonl"
         direct_environment = os.environ.copy()
-        fake_bin = state.parent / "bin"
+        fake_bin = state.parents[2] / "bin"
         direct_environment.update(
             {
                 "PATH": f"{fake_bin}:{direct_environment['PATH']}",

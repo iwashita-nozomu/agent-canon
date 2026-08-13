@@ -12,7 +12,29 @@
 
 set -euo pipefail
 
-repo_root="${AGENT_CANON_DEVCONTAINER_REPO_ROOT:-${AGENT_CANON_ACTIVE_REPOSITORY_ROOT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}}"
+yaml_scalar() {
+  local field="$1"
+  local value="$2"
+  python3 - "$field" "$value" <<'PY'
+import json
+import sys
+
+field, value = sys.argv[1:]
+if (
+    not value
+    or value != value.strip()
+    or any(ord(char) < 0x20 or ord(char) == 0x7F for char in value)
+    or any(char in value for char in ('"', "'", "\\"))
+):
+    raise SystemExit(
+        f"devcontainer YAML scalar is unsafe for {field}: quote/control/newline"
+    )
+print(json.dumps(value, ensure_ascii=False))
+PY
+}
+
+agent_canon_source_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+repo_root="${AGENT_CANON_DEVCONTAINER_REPO_ROOT:-${AGENT_CANON_ACTIVE_REPOSITORY_ROOT:-$agent_canon_source_root}}"
 repo_root="$(cd "$repo_root" && pwd -P)"
 workspace_root="$(cd "${repo_root}/.." && pwd -P)"
 [ -d "$workspace_root" ] || {
@@ -77,6 +99,15 @@ if [ "${compose_output_raw#/}" = "$compose_output_raw" ]; then
 else
   compose_output="$compose_output_raw"
 fi
+compose_output_real="$(realpath -m "$compose_output")"
+repo_root_real="$(realpath -m "$repo_root")"
+case "$compose_output_real/" in
+  "$repo_root_real/"*) ;;
+  *)
+    printf 'devcontainer compose output must remain under repository root: %s\n' "$compose_output" >&2
+    exit 1
+    ;;
+esac
 default_project_name="$(
   python3 - "$repo_root" <<'PY'
 from __future__ import annotations
@@ -93,7 +124,15 @@ digest = hashlib.sha1(repo_root.encode("utf-8")).hexdigest()[:8]
 print(f"{slug}-{digest}-devcontainer")
 PY
 )"
-compose_project_name="${DEVCONTAINER_PROJECT_NAME:-$default_project_name}"
+lifecycle_id="${AGENT_CANON_LIFECYCLE_ID:-$(python3 - <<'PY'
+import secrets
+print(secrets.token_hex(16))
+PY
+)}"
+compose_project_base_name="${DEVCONTAINER_PROJECT_NAME:-$default_project_name}"
+compose_project_name="${compose_project_base_name}-${lifecycle_id}"
+task_id="${AGENT_CANON_TASK_ID:-devcontainer-${compose_project_name}}"
+repo_identity="${AGENT_CANON_REPOSITORY_ID:-$repo_root}"
 
 if [ -f "$pack" ]; then
   pack_values_raw="$(
@@ -321,7 +360,6 @@ elif [ "$build_target" = "gpu-runtime" ]; then
   printf 'devcontainer default profile rejects GPU build target: %s\n' "$build_target" >&2
   exit 1
 fi
-
 parent_layout=false
 if [ -d "${repo_root}/vendor/agent-canon" ]; then
   parent_layout=true
@@ -334,6 +372,31 @@ if [ "$gpu_profile" = "gpu-admission" ]; then
     exit 1
   }
 fi
+expected_image_tag="${AGENT_CANON_EXPECTED_IMAGE_TAG:-${compose_project_name}:task-${lifecycle_id}}"
+
+if ! compose_project_name_yaml="$(yaml_scalar compose_project_name "$compose_project_name")"; then
+  exit 1
+fi
+if ! task_id_yaml="$(yaml_scalar task_id "$task_id")"; then
+  exit 1
+fi
+if ! repo_identity_yaml="$(yaml_scalar repo_identity "$repo_identity")"; then
+  exit 1
+fi
+if ! lifecycle_id_yaml="$(yaml_scalar lifecycle_id "$lifecycle_id")"; then
+  exit 1
+fi
+if ! expected_image_tag_yaml="$(yaml_scalar expected_image_tag "$expected_image_tag")"; then
+  exit 1
+fi
+task_repository="${task_id}:${repo_identity}"
+if ! task_repository_yaml="$(yaml_scalar task_repository "$task_repository")"; then
+  exit 1
+fi
+[[ "$compose_project_name" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || {
+  printf 'devcontainer Compose project name is invalid: %s\n' "$compose_project_name" >&2
+  exit 1
+}
 
 optional_mounts=""
 env_optional_mount_profiles=()
@@ -652,44 +715,112 @@ if optional_mount_enabled ssh-agent \
   && [ -S "${SSH_AUTH_SOCK}" ]; then
   environment_lines+=('      SSH_AUTH_SOCK: "/ssh-agent"')
 fi
-mkdir -p "$(dirname "$compose_output")"
-
-{
-  printf 'name: %s\n' "$compose_project_name"
-  printf 'services:\n'
-  printf '  workspace:\n'
-  printf '    platform: %s\n' "$runtime_platform"
-  printf '    user: "%s:%s"\n' "$runtime_user_uid" "$runtime_user_gid"
-  if [ "$gpu_profile" = "gpu-admission" ]; then
-    printf '    gpus: all\n'
-  fi
-  if [ "$compose_mode" = "repo-docker-pack" ]; then
-    printf '    build:\n'
-    printf '      context: ..\n'
-    printf '      dockerfile: %s\n' "$dockerfile"
-    if [ -n "$build_target" ]; then
-      printf '      target: %s\n' "$build_target"
+compose_payload="$(
+  {
+    # Compose project names are validated by yaml_scalar before this point;
+    # retain the canonical unquoted projection used by existing readers.
+    printf 'name: %s\n' "$compose_project_name"
+    printf 'services:\n'
+    printf '  workspace:\n'
+    printf '    labels:\n'
+    printf '      com.agent-canon.task-id: %s\n' "$task_id_yaml"
+    printf '      com.agent-canon.repository: %s\n' "$repo_identity_yaml"
+    printf '      com.agent-canon.task-repository: %s\n' "$task_repository_yaml"
+    printf '      com.agent-canon.lifecycle-id: %s\n' "$lifecycle_id_yaml"
+    printf '    image: %s\n' "$expected_image_tag_yaml"
+    printf '    platform: %s\n' "$runtime_platform"
+    printf '    user: "%s:%s"\n' "$runtime_user_uid" "$runtime_user_gid"
+    if [ "$gpu_profile" = "gpu-admission" ]; then
+      printf '    gpus: all\n'
     fi
-    printf '      args:\n'
-    printf '        PROJECT_UID: "%s"\n' "$project_uid"
-    printf '        PROJECT_GID: "%s"\n' "$project_gid"
-  else
-    printf '    build:\n'
-    printf '      context: ..\n'
-    printf '      dockerfile: .devcontainer/Dockerfile\n'
-    printf '      args:\n'
-    printf '        PROJECT_UID: "%s"\n' "$project_uid"
-    printf '        PROJECT_GID: "%s"\n' "$project_gid"
-  fi
-  printf '    working_dir: %s\n' "$container_repo_root"
-  printf '    volumes:\n'
-  printf '%s\n' "${volume_lines[@]}"
-  printf '    command: %s -lc "sleep infinity"\n' "$runtime_shell"
-  printf '    tty: true\n'
-  printf '    init: true\n'
-  printf '    environment:\n'
-  printf '%s\n' "${environment_lines[@]}"
-} > "$compose_output"
+    if [ "$compose_mode" = "repo-docker-pack" ]; then
+      printf '    build:\n'
+      printf '      context: ..\n'
+      printf '      dockerfile: %s\n' "$dockerfile"
+      if [ -n "$build_target" ]; then
+        printf '      target: %s\n' "$build_target"
+      fi
+      printf '      args:\n'
+      printf '        PROJECT_UID: "%s"\n' "$project_uid"
+      printf '        PROJECT_GID: "%s"\n' "$project_gid"
+      printf '      labels:\n'
+      printf '        com.agent-canon.task-id: %s\n' "$task_id_yaml"
+      printf '        com.agent-canon.repository: %s\n' "$repo_identity_yaml"
+      printf '        com.agent-canon.task-repository: %s\n' "$task_repository_yaml"
+      printf '        com.agent-canon.lifecycle-id: %s\n' "$lifecycle_id_yaml"
+    else
+      printf '    build:\n'
+      printf '      context: ..\n'
+      printf '      dockerfile: .devcontainer/Dockerfile\n'
+      printf '      args:\n'
+      printf '        PROJECT_UID: "%s"\n' "$project_uid"
+      printf '        PROJECT_GID: "%s"\n' "$project_gid"
+      printf '      labels:\n'
+      printf '        com.agent-canon.task-id: %s\n' "$task_id_yaml"
+      printf '        com.agent-canon.repository: %s\n' "$repo_identity_yaml"
+      printf '        com.agent-canon.task-repository: %s\n' "$task_repository_yaml"
+      printf '        com.agent-canon.lifecycle-id: %s\n' "$lifecycle_id_yaml"
+    fi
+    printf '    working_dir: %s\n' "$container_repo_root"
+    printf '    volumes:\n'
+    printf '%s\n' "${volume_lines[@]}"
+    printf '    command: %s -lc "sleep infinity"\n' "$runtime_shell"
+    printf '    tty: true\n'
+    printf '    init: true\n'
+    printf '    environment:\n'
+    printf '%s\n' "${environment_lines[@]}"
+    printf 'networks:\n'
+    printf '  default:\n'
+    printf '    labels:\n'
+    printf '      com.agent-canon.task-id: %s\n' "$task_id_yaml"
+    printf '      com.agent-canon.repository: %s\n' "$repo_identity_yaml"
+    printf '      com.agent-canon.task-repository: %s\n' "$task_repository_yaml"
+    printf '      com.agent-canon.lifecycle-id: %s\n' "$lifecycle_id_yaml"
+  }
+)"
+COMPOSE_PAYLOAD="$compose_payload" python3 - "$repo_root" "$compose_output_real" "$agent_canon_source_root" <<'PY'
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1]).resolve()
+target = Path(sys.argv[2]).resolve(strict=False)
+agent_canon_source_root = Path(sys.argv[3]).resolve()
+try:
+    relative = target.relative_to(root)
+except ValueError as exc:
+    raise SystemExit("compose output escaped repository root") from exc
+payload = os.environ.get("COMPOSE_PAYLOAD", "").encode("utf-8") + b"\n"
+boundary_source = (
+    agent_canon_source_root / "tools" / "agent_tools" / "parent_root_side_effects.py"
+)
+if not boundary_source.is_file():
+    raise SystemExit(
+        "parent_root_side_effects capability is required for Compose publication"
+    )
+sys.path.insert(0, str(agent_canon_source_root / "tools" / "agent_tools"))
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
+
+boundary = ParentRootSideEffectBoundary()
+attestation = boundary.attest(
+    ParentRootAttestationRequest(
+        cwd=root,
+        explicit_root=root,
+        purpose="generate-runtime-compose",
+    )
+)
+boundary.write_parent_owned_file(
+    attestation,
+    relative,
+    payload,
+    "generate-runtime-compose",
+)
+PY
 
 
 printf 'devcontainer runtime generated: name=%s layout=%s gpu=%s mode=%s network=auto secret_mount=%s pack=%s\n' "$compose_project_name" "$workspace_layout" "$gpu_mode" "$compose_mode" "$secret_mount_status" "$pack"

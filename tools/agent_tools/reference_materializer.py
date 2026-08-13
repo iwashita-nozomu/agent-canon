@@ -29,6 +29,23 @@ from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlparse
 
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+except ImportError:
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationRequest,
+        ParentRootReject,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+    )
+
 FETCH_TIMEOUT_SECONDS = 30
 PDF_TEXT_TIMEOUT_SECONDS = 30
 HASH_LENGTH = 12
@@ -184,7 +201,24 @@ class PdfExtractor:
 
     def extract_temp_pdf_with_pdftotext(self, binary: str) -> str:
         """Write fetched PDF bytes to a temp file and run pdftotext."""
-        with tempfile.NamedTemporaryFile(suffix=".pdf") as temp_file:
+        configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+        if not configured:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "reference-materializer-pdf-temp: explicit parent root is required",
+            )
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=parent, explicit_root=parent, purpose="reference-materializer-pdf-temp"
+            )
+        )
+        directory = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
+            attestation,
+            parent / ".agent-canon" / "tmp" / "reference-materializer",
+            "reference-materializer-pdf-temp",
+        )
+        with tempfile.NamedTemporaryFile(suffix=".pdf", dir=directory.physical_path) as temp_file:
             temp_file.write(self.source.data)
             temp_file.flush()
             return run_pdftotext(binary, Path(temp_file.name))
@@ -367,8 +401,21 @@ def write_reference(root: Path, output_dir: Path, reference: ExtractedReference,
     path = output_path(root, output_dir, reference.url, reference.title)
     if path.exists() and not force:
         return path
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render_markdown(root, path, reference), encoding="utf-8")
+    rendered = render_markdown(root, path, reference).encode("utf-8")
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if configured:
+        parent = Path(configured).resolve(strict=True)
+        attestation = attest_parent_root(
+            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="reference-materializer")
+        )
+        ParentRootSideEffectBoundary().write_parent_owned_file(
+            attestation, path, rendered, "reference-materializer"
+        )
+    else:
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "reference-materializer: explicit parent root is required",
+        )
     return path
 
 

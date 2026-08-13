@@ -20,6 +20,7 @@ the active post-create and runner lifecycle performs read-only image verificatio
 from __future__ import annotations
 
 import argparse
+import ast
 import dataclasses
 import hashlib
 import json
@@ -42,6 +43,29 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
+
+try:
+    from .parent_root_side_effects import (
+        ParentRootAttestationReceipt,
+        ParentRootAttestationRequest,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+        child_environment,
+        ensure_parent_owned_directory,
+        resolve_parent_owned_path,
+    )
+except ImportError:  # direct script execution
+    from parent_root_side_effects import (  # type: ignore[no-redef]
+        ParentRootAttestationReceipt,
+        ParentRootAttestationRequest,
+        ParentRootSideEffectBoundary,
+        ParentRootSideEffectError,
+        attest_parent_root,
+        child_environment,
+        ensure_parent_owned_directory,
+        resolve_parent_owned_path,
+    )
 
 from packaging.utils import canonicalize_name
 from packaging.version import InvalidVersion, Version
@@ -72,6 +96,31 @@ HEX_RE = re.compile(r"^[0-9a-fA-F]+$")
 SHA256_RE = re.compile(r"^[0-9a-fA-F]{64}$")
 COMMIT_RE = re.compile(r"^[0-9a-fA-F]{40}$")
 ACTIVE_SOURCE_IDENTITY = "active-source"
+CANONICAL_SNAPSHOT_IDENTITY = "canonical-snapshot"
+RUSTUP_INIT_VERSION = "1.28.2"
+RUSTUP_INIT_URL = (
+    "https://static.rust-lang.org/rustup/archive/1.28.2/"
+    "x86_64-unknown-linux-gnu/rustup-init"
+)
+RUSTUP_INIT_SHA256 = "20a06e644b0d9bd2fbdbfd52d42540bdde820ea7df86e92e533c073da0cdd43c"
+CANONICAL_RUST_SOURCE_FILES = (
+    "Cargo.lock", "Cargo.toml", "src/dependency_manifest.rs", "src/docs.rs",
+    "src/graph.rs", "src/jit_ir_to_lean.rs", "src/main.rs", "src/memory.rs",
+    "src/migration_audit.rs", "src/python_algorithm_contract.rs",
+    "src/python_module_groups.rs", "src/python_structure_hash.rs",
+    "src/python_structure_hash_impact.rs", "src/python_structure_hash_report.rs",
+    "src/python_structure_hash_scope_plan.rs", "src/rust_migration_plan.rs",
+    "src/semantic_index/args.rs", "src/semantic_index/cli.rs",
+    "src/semantic_index/embedding.rs", "src/semantic_index/eval.rs",
+    "src/semantic_index/mod.rs", "src/semantic_index/model.rs",
+    "src/semantic_index/pipeline.rs", "src/semantic_index/query.rs",
+    "src/semantic_index/relations.rs", "src/semantic_index/report.rs",
+    "src/semantic_index/source.rs", "src/semantic_index/storage.rs",
+    "src/semantic_index/tests.rs", "src/structured_analysis.rs",
+    "src/test_design.rs", "tests/python_algorithm_contract_cli.rs",
+)
+CANONICAL_RUST_SOURCE_SHA256 = "6084cc155d0166cb06e661a07cae7a0630c34df21ee7e9d4c6816d875ec5d15c"
+CANONICAL_CARGO_LOCK_SHA256 = "060b8825843b14b12bebb9da095503f4ec7f68a77934e595c082957cb1f72638"
 CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 APT_PACKAGE_RE = re.compile(r"^[a-z0-9][a-z0-9+.-]*$")
 NPM_PACKAGE_RE = re.compile(r"^(?:@[a-z0-9._~-]+/[a-z0-9._~-]+|[a-z0-9._~-]+)$")
@@ -103,6 +152,7 @@ BASE_CAPABILITIES = frozenset(
         "tar",
         "tomli",
         "tomllib",
+        "rustup-init",
         "xz-utils",
     }
 )
@@ -130,14 +180,664 @@ IMAGE_DEPENDENCIES_ROOT = Path("/usr/local/share/agent-canon/image-dependencies"
 IMAGE_PLAN_SCHEMA = "agent-canon.devcontainer-image-dependencies"
 IMAGE_PLAN_SCHEMA_VERSION = 1
 IMAGE_INSTALL_METHODS = frozenset(
-    {"apt-package", "apt-repository", "npm-global", "release-asset"}
+    {
+        "apt-package",
+        "apt-repository",
+        "npm-global",
+        "release-asset",
+        "rust-toolchain",
+        "cargo-source-build",
+    }
 )
 IMAGE_DIRECTORY_MODE = 0o555
 IMAGE_FILE_MODE = 0o444
 
 
+def _parent_attestation(workspace: Path, purpose: str) -> ParentRootAttestationReceipt:
+    """Authenticate the selected parent before dependency side effects."""
+    try:
+        return attest_parent_root(
+            ParentRootAttestationRequest(
+                cwd=workspace, explicit_root=workspace, purpose=purpose
+            )
+        )
+    except ParentRootSideEffectError as exc:
+        raise DependencyError(
+            f"parent-root-attestation:{exc.reject.value}:{exc.detail}"
+        ) from exc
+
+
+def _parent_temp_root(workspace: Path, purpose: str) -> Path:
+    """Return a parent-owned temporary directory for one dependency operation."""
+    # A few pure installer adapters are exercised with a lexical workspace
+    # placeholder by their unit fixtures.  Keep that fixture write parent-local
+    # without manufacturing a repository outside the selected boundary.
+    if not workspace.exists():
+        workspace = workspace.parent
+    attestation = _parent_attestation(workspace, f"dependency-{purpose}")
+    try:
+        receipt = resolve_parent_owned_path(
+            attestation, Path(".agent-canon") / "tmp" / "devcontainer" / purpose,
+            f"dependency-{purpose}", create=False,
+        )
+    except ParentRootSideEffectError as exc:
+        raise DependencyError(
+            f"parent-root-path:{exc.reject.value}:{exc.detail}"
+        ) from exc
+    return ensure_parent_owned_directory(
+        attestation, receipt.physical_path, f"dependency-{purpose}"
+    ).physical_path
+
+
 class DependencyError(ValueError):
     """Base error for schema, merge, plan, and execution failures."""
+
+
+class CommandCapability(str, Enum):  # noqa: UP042
+    """Capabilities reachable from one typed command graph."""
+
+    ARGV = "argv"
+    SHELL_EVALUATION = "shell-evaluation"
+    DYNAMIC_INTERPRETER = "dynamic-interpreter"
+    PACKAGE_INSTALL = "package-install"
+    NETWORK_FETCH = "network-fetch"
+    PRIVILEGE_ESCALATION = "privilege-escalation"
+    READ_ONLY_QUERY = "read-only-query"
+    EXECUTABLE_VERIFICATION = "executable-verification"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True)
+class CommandBoundaryFinding:
+    """Stable structural command-boundary finding."""
+
+    capability: CommandCapability
+    detail: str
+    argv_prefix: tuple[str, ...]
+    phase: str
+
+    def render(self) -> str:
+        """Render the machine-readable failure prefix used by callers."""
+        return f"command-boundary-{self.capability.value}: {self.detail}"
+
+
+@dataclass(frozen=True)
+class CommandProvenance:
+    """Authenticated owner and phase provenance for one command edge."""
+
+    phase: str
+    owner: str
+    operation: str
+    method: str | None = None
+    record_id: str | None = None
+    privileged_requested: bool = False
+    owner_root: str | None = None
+
+
+@dataclass(frozen=True)
+class NetworkOperation:
+    """Typed manifest-owned network edge for image installation."""
+
+    phase: str
+    owner: str
+    operation: str
+    method: str
+    record_id: str
+    url: str
+    allow_network: bool
+
+
+_COMMAND_PHASES = frozenset({"image-install", "image-verify", "post-create"})
+_COMMAND_OWNERS = frozenset(
+    {"image-installer", "typed-verifier", "shared-post-create", "parent-hook"}
+)
+_COMMAND_SHELLS = frozenset(
+    {"bash", "dash", "fish", "ksh", "sh", "tcsh", "zsh"}
+)
+_COMMAND_INTERPRETERS = {
+    "python": {"--version", "-V", "--help"},
+    "python3": {"--version", "-V", "--help"},
+    "pypy": {"--version", "-V", "--help"},
+    "node": {"--version", "-v", "--help"},
+    "nodejs": {"--version", "-v", "--help"},
+    "perl": {"--version", "-v", "--help"},
+    "ruby": {"--version", "-v", "--help"},
+}
+_COMMAND_OPERATION_METHODS = {
+    "verify-apt-package": frozenset({"apt-package"}),
+    "verify-apt-executable-owner": frozenset({"apt-package", "apt-repository"}),
+    "verify-apt-repository-key": frozenset({"apt-repository"}),
+    "verify-npm-package": frozenset({"npm-global"}),
+    "verify-pipx-package": frozenset({"pipx"}),
+    "verify-rust-active": frozenset({"rust-toolchain"}),
+    "verify-rust-installed": frozenset({"rust-toolchain"}),
+    "verify-rust-components": frozenset({"rust-toolchain"}),
+    "verify-rust-tool-version": frozenset({"rust-toolchain"}),
+    "verify-lean-active": frozenset({"lean-toolchain"}),
+    "verify-lean-installed": frozenset({"lean-toolchain"}),
+    "verify-lean-tool-version": frozenset({"lean-toolchain"}),
+    "verify-cargo-source-identity": frozenset({"cargo-source-build"}),
+    "install-apt-package": frozenset({"apt-package"}),
+    "install-apt-repository": frozenset({"apt-repository"}),
+    "install-npm-global": frozenset({"npm-global"}),
+    "install-pipx": frozenset({"pipx"}),
+    "install-release-asset": frozenset({"release-asset"}),
+    "install-rust-toolchain": frozenset({"rust-toolchain"}),
+    "install-lean-toolchain": frozenset({"lean-toolchain"}),
+    "install-cargo-source-build": frozenset({"cargo-source-build"}),
+    "install-browser": frozenset({"browser-install"}),
+}
+_NETWORK_OPERATION_METHODS = {
+    "download-apt-key": "apt-repository",
+    "download-apt-package": "apt-repository",
+    "download-release-asset": "release-asset",
+    "download-packages-index": "apt-repository",
+}
+
+
+def _command_owner_root(context: CommandProvenance) -> Path:
+    """Resolve the canonical source root used for owner-path checks."""
+    root = Path(context.owner_root) if context.owner_root is not None else Path(__file__).resolve().parents[2]
+    try:
+        resolved = root.resolve(strict=True)
+        if not resolved.is_dir():
+            raise NotADirectoryError(str(resolved))
+        return resolved
+    except OSError as exc:
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            "command owner root is not a resolved directory",
+            (),
+            context,
+        ) from exc
+
+
+def _require_canonical_owned_file(
+    path_value: str,
+    *,
+    owner_root: Path,
+    relative: str,
+    context: CommandProvenance,
+) -> None:
+    """Require an exact canonical, non-symlink regular file under owner root."""
+    path = Path(path_value)
+    expected = owner_root / relative
+    if not path.is_absolute() or path.is_symlink() or not path.is_file():
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            f"owned command path is not a non-symlink regular file: {path}",
+            (path_value,),
+            context,
+        )
+    try:
+        resolved = path.resolve(strict=True)
+        expected_resolved = expected.resolve(strict=True)
+        resolved.relative_to(owner_root)
+    except (OSError, ValueError) as exc:
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            f"owned command path is outside its canonical owner root: {path}",
+            (path_value,),
+            context,
+        ) from exc
+    if resolved != expected_resolved:
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            f"owned command path is not canonical: {path}",
+            (path_value,),
+            context,
+        )
+
+
+def _command_failure(
+    capability: CommandCapability,
+    detail: str,
+    argv: Sequence[str],
+    context: CommandProvenance,
+) -> DependencyError:
+    finding = CommandBoundaryFinding(
+        capability,
+        detail,
+        tuple(str(item) for item in argv[:4]),
+        context.phase,
+    )
+    return DependencyError(finding.render())
+
+
+def _command_basename(token: str) -> str:
+    """Resolve only basename spelling; classification never resolves PATH."""
+    return Path(token).name
+
+
+def _command_is_identity_probe(argv: Sequence[str], executable: str) -> bool:
+    return len(argv) == 2 and argv[1] in _COMMAND_INTERPRETERS[executable]
+
+
+def _command_shape_capabilities(
+    argv: Sequence[str], context: CommandProvenance
+) -> set[CommandCapability]:
+    """Classify the final command using the closed owner operation matrix."""
+    executable = _command_basename(argv[0])
+    args = list(argv[1:])
+    capabilities: set[CommandCapability] = {CommandCapability.ARGV}
+
+    if (
+        executable == "bash"
+        and context.owner in {"shared-post-create", "parent-hook"}
+    ):
+        if context.owner == "shared-post-create" and len(argv) == 2:
+            _require_canonical_owned_file(
+                argv[1],
+                owner_root=_command_owner_root(context),
+                relative=".devcontainer/post-create.sh",
+                context=context,
+            )
+        else:
+            raise _command_failure(
+                CommandCapability.SHELL_EVALUATION,
+                "parent hook shell dispatch is a separate owner edge",
+                argv,
+                context,
+            )
+        capabilities.add(CommandCapability.READ_ONLY_QUERY)
+        return capabilities
+    if executable in _COMMAND_SHELLS:
+        raise _command_failure(
+            CommandCapability.SHELL_EVALUATION,
+            "shell executable is an execution boundary",
+            argv,
+            context,
+        )
+    if executable in {"sudo", "doas", "su", "runuser"}:
+        raise _command_failure(
+            CommandCapability.PRIVILEGE_ESCALATION,
+            "explicit privilege wrapper is not an owned verification command",
+            argv,
+            context,
+        )
+    if executable == "eval":
+        raise _command_failure(
+            CommandCapability.DYNAMIC_INTERPRETER,
+            "eval is a dynamic child-command edge",
+            argv,
+            context,
+        )
+    if executable in _COMMAND_INTERPRETERS:
+        if (
+            executable in {"python", "python3"}
+            and context.owner == "shared-post-create"
+            and len(argv) >= 3
+            and Path(argv[1]).name == "devcontainer_dependencies.py"
+            and argv[2] == "image-verify"
+        ):
+            _require_canonical_owned_file(
+                argv[1],
+                owner_root=_command_owner_root(context),
+                relative="tools/agent_tools/devcontainer_dependencies.py",
+                context=context,
+            )
+            capabilities.add(CommandCapability.READ_ONLY_QUERY)
+            return capabilities
+        if not _command_is_identity_probe(argv, executable):
+            capability = (
+                CommandCapability.DYNAMIC_INTERPRETER
+                if any(item in {"-c", "-e", "-E", "-m", "-p", "--eval", "--print", "-"} for item in args)
+                else CommandCapability.UNKNOWN
+            )
+            raise _command_failure(
+                capability,
+                "interpreter command graph is not a fixed identity probe",
+                argv,
+                context,
+            )
+        capabilities.add(CommandCapability.READ_ONLY_QUERY)
+        return capabilities
+    if executable in {"xargs"} or executable == "find" and any(
+        item in {"-exec", "-execdir"} for item in args
+    ):
+        raise _command_failure(
+            CommandCapability.DYNAMIC_INTERPRETER,
+            "child-command selector is dynamic",
+            argv,
+            context,
+        )
+    if executable in {"timeout", "nice", "stdbuf"}:
+        raise _command_failure(
+            CommandCapability.UNKNOWN,
+            "wrapper grammar is not declared by the owner operation",
+            argv,
+            context,
+        )
+
+    if executable in {"apt", "apt-get", "aptitude", "pip", "pipx", "cargo", "playwright"}:
+        mutation_words = {
+            "install", "update", "upgrade", "remove", "uninstall", "purge",
+            "add", "default", "build", "fetch", "sync", "download", "init",
+        }
+        if executable == "pipx" and args[:1] == ["runpip"] and len(args) >= 4 and args[2] == "show":
+            capabilities.add(CommandCapability.READ_ONLY_QUERY)
+            return capabilities
+        if executable == "cargo" and args[:1] == ["build"]:
+            capabilities.update({CommandCapability.PACKAGE_INSTALL, CommandCapability.NETWORK_FETCH})
+        elif any(item in mutation_words for item in args):
+            capabilities.add(CommandCapability.PACKAGE_INSTALL)
+            if executable in {"apt", "apt-get", "aptitude", "pip", "pipx", "cargo", "playwright"}:
+                capabilities.add(CommandCapability.NETWORK_FETCH)
+        else:
+            raise _command_failure(
+                CommandCapability.UNKNOWN,
+                "package-manager command shape is not owner-declared",
+                argv,
+                context,
+            )
+    elif executable == "npm":
+        if args[:2] == ["ls", "--global"] and "--json" in args and "--depth=0" in args:
+            capabilities.add(CommandCapability.READ_ONLY_QUERY)
+        elif args and args[0] in {"install", "update", "uninstall", "exec", "publish"}:
+            capabilities.update({CommandCapability.PACKAGE_INSTALL, CommandCapability.NETWORK_FETCH})
+        elif args == ["--version"]:
+            capabilities.add(CommandCapability.READ_ONLY_QUERY)
+        else:
+            raise _command_failure(
+                CommandCapability.UNKNOWN,
+                "npm command shape is not owner-declared",
+                argv,
+                context,
+            )
+    elif executable in {"rustup", "elan"}:
+        if executable == "rustup" and (
+            args[:3] == ["show", "active-toolchain"]
+            or args[:2] == ["toolchain", "list"]
+            or args[:2] == ["component", "list"]
+            or (
+                args[:1] == ["run"]
+                and len(args) == 4
+                and args[-1] == "--version"
+            )
+        ):
+            capabilities.add(CommandCapability.READ_ONLY_QUERY)
+        elif executable == "elan" and (
+            args[:1] in (["show"], ["toolchain"])
+            or (args[:1] == ["run"] and len(args) == 4 and args[-1] == "--version")
+        ):
+            if args[:1] == ["toolchain"] and args[1:2] not in (["list"],):
+                capabilities.update({CommandCapability.PACKAGE_INSTALL, CommandCapability.NETWORK_FETCH})
+            else:
+                capabilities.add(CommandCapability.READ_ONLY_QUERY)
+        elif any(item in {"install", "uninstall", "add", "default"} for item in args):
+            capabilities.update({CommandCapability.PACKAGE_INSTALL, CommandCapability.NETWORK_FETCH})
+        else:
+            raise _command_failure(
+                CommandCapability.UNKNOWN,
+                "toolchain command shape is not owner-declared",
+                argv,
+                context,
+            )
+    elif executable == "git":
+        if args[:2] == ["-C", args[1] if len(args) > 1 else ""] and args[2:] == ["rev-parse", "--verify", "HEAD"]:
+            capabilities.add(CommandCapability.READ_ONLY_QUERY)
+        elif args == ["--version"]:
+            capabilities.add(CommandCapability.READ_ONLY_QUERY)
+        elif any(item in {"clone", "fetch", "pull", "push", "checkout", "reset"} for item in args):
+            capabilities.add(CommandCapability.PACKAGE_INSTALL)
+        else:
+            raise _command_failure(CommandCapability.UNKNOWN, "git command shape is not owner-declared", argv, context)
+    elif executable == "dpkg-query":
+        if args[:1] in (["--show"], ["--listfiles"]):
+            capabilities.add(CommandCapability.READ_ONLY_QUERY)
+        else:
+            raise _command_failure(
+                CommandCapability.UNKNOWN,
+                "dpkg-query command shape is not owner-declared",
+                argv,
+                context,
+            )
+    elif executable == "gpg":
+        if args[:2] == ["--show-keys", "--with-colons"]:
+            capabilities.add(CommandCapability.READ_ONLY_QUERY)
+        else:
+            capabilities.add(CommandCapability.PACKAGE_INSTALL)
+    elif executable in {"curl", "wget", "aria2c"}:
+        if args in (["--version"], ["-V"], ["--help"]):
+            capabilities.add(CommandCapability.READ_ONLY_QUERY)
+        else:
+            capabilities.add(CommandCapability.NETWORK_FETCH)
+    elif executable == "install":
+        capabilities.add(CommandCapability.PACKAGE_INSTALL)
+    elif executable in {"id", "mktemp", "cat", "rm", "command", "printf", "test", "source", "cd"}:
+        capabilities.add(CommandCapability.READ_ONLY_QUERY)
+    else:
+        capabilities.add(CommandCapability.EXECUTABLE_VERIFICATION)
+
+    return capabilities
+
+
+def classify_command(
+    argv: Sequence[str], *, context: CommandProvenance
+) -> frozenset[CommandCapability]:
+    """Validate and classify one complete command graph under its owner phase."""
+    if context.phase not in _COMMAND_PHASES or context.owner not in _COMMAND_OWNERS or not context.operation:
+        raise _command_failure(CommandCapability.UNKNOWN, "invalid command provenance", argv, context)
+    if context.phase == "image-install" and context.owner != "image-installer":
+        raise _command_failure(CommandCapability.UNKNOWN, "image-install requires image-installer ownership", argv, context)
+    if context.phase == "image-verify" and context.owner != "typed-verifier":
+        raise _command_failure(CommandCapability.UNKNOWN, "image-verify requires typed-verifier ownership", argv, context)
+    if context.phase == "post-create" and context.owner not in {"shared-post-create", "parent-hook"}:
+        raise _command_failure(CommandCapability.UNKNOWN, "post-create requires shared or parent-hook ownership", argv, context)
+    if context.method is not None and context.method not in {item.value for item in Method}:
+        raise _command_failure(CommandCapability.UNKNOWN, "method is not a closed dependency method", argv, context)
+    expected_methods = _COMMAND_OPERATION_METHODS.get(context.operation)
+    if expected_methods is not None and context.method not in expected_methods:
+        raise _command_failure(CommandCapability.UNKNOWN, "operation and method provenance disagree", argv, context)
+    if context.phase == "image-verify" and not context.operation.startswith("verify-"):
+        raise _command_failure(CommandCapability.UNKNOWN, "image verification operation is not a verifier operation", argv, context)
+    if context.phase == "image-install" and not (
+        context.operation.startswith("install-") or context.operation.startswith("verify-")
+    ):
+        raise _command_failure(CommandCapability.UNKNOWN, "image install operation is not owner-declared", argv, context)
+    if not hasattr(argv, "__iter__") or type(argv) in (str, bytes) or not argv:
+        raise _command_failure(CommandCapability.UNKNOWN, "argv must be a non-empty string sequence", (), context)
+    normalized = tuple(argv)
+    if any(type(item) is not str or not item for item in normalized):
+        raise _command_failure(CommandCapability.UNKNOWN, "argv contains an empty or non-string token", normalized, context)
+    if any(CONTROL_RE.search(item) for item in normalized):
+        raise _command_failure(CommandCapability.UNKNOWN, "argv contains an empty or control-character token", normalized, context)
+
+    # Unwrap only the finite env grammar.  env -S and an absent target would
+    # require a second parser and therefore fail closed.
+    if _command_basename(normalized[0]) == "env":
+        index = 1
+        while index < len(normalized) and "=" in normalized[index] and not normalized[index].startswith("-"):
+            index += 1
+        if index >= len(normalized) or normalized[index] == "-S":
+            raise _command_failure(CommandCapability.UNKNOWN, "env child selection is dynamic", normalized, context)
+        if normalized[index] == "--":
+            index += 1
+        if index >= len(normalized):
+            raise _command_failure(CommandCapability.UNKNOWN, "env has no command target", normalized, context)
+        nested = classify_command(normalized[index:], context=context)
+        capabilities = set(nested)
+    else:
+        capabilities = _command_shape_capabilities(normalized, context)
+
+    if context.privileged_requested:
+        capabilities.add(CommandCapability.PRIVILEGE_ESCALATION)
+    if context.phase in {"image-verify", "post-create"}:
+        denied = capabilities & {
+            CommandCapability.SHELL_EVALUATION,
+            CommandCapability.DYNAMIC_INTERPRETER,
+            CommandCapability.UNKNOWN,
+            CommandCapability.PACKAGE_INSTALL,
+            CommandCapability.NETWORK_FETCH,
+            CommandCapability.PRIVILEGE_ESCALATION,
+        }
+        if denied:
+            capability = next(
+                item
+                for item in (
+                    CommandCapability.SHELL_EVALUATION,
+                    CommandCapability.DYNAMIC_INTERPRETER,
+                    CommandCapability.PACKAGE_INSTALL,
+                    CommandCapability.NETWORK_FETCH,
+                    CommandCapability.PRIVILEGE_ESCALATION,
+                    CommandCapability.UNKNOWN,
+                )
+                if item in denied
+            )
+            raise _command_failure(capability, f"{capability.value} is not allowed in {context.phase}", normalized, context)
+    elif CommandCapability.SHELL_EVALUATION in capabilities or CommandCapability.DYNAMIC_INTERPRETER in capabilities or CommandCapability.UNKNOWN in capabilities:
+        capability = next(
+            item for item in (
+                CommandCapability.SHELL_EVALUATION,
+                CommandCapability.DYNAMIC_INTERPRETER,
+                CommandCapability.UNKNOWN,
+            ) if item in capabilities
+        )
+        raise _command_failure(capability, f"{capability.value} is not allowed in image-install", normalized, context)
+    return frozenset(capabilities)
+
+
+@dataclass(frozen=True)
+class PostCreateGraphNode:
+    """One observed shared post-create graph edge."""
+
+    kind: str
+    value: tuple[str, ...]
+    owner: str = "shared-post-create"
+    operation: str = "post-create-readback"
+
+
+@dataclass(frozen=True)
+class PostCreateExecutionGraph:
+    """Typed execution graph recorded by the post-create shell harness."""
+
+    nodes: tuple[PostCreateGraphNode, ...]
+    parent_hook_path: str | None = None
+    parent_hook_exit_status: int | None = None
+
+    def external_commands(self) -> tuple[PostCreateGraphNode, ...]:
+        """Return external command edges in observation order."""
+        return tuple(node for node in self.nodes if node.kind == "external")
+
+
+def build_post_create_execution_graph(
+    commands: Sequence[Sequence[str]],
+    *,
+    builtins: Sequence[str] = (),
+    redirections: Sequence[str] = (),
+    owner_root: Path | str | None = None,
+    parent_root: Path | str | None = None,
+    parent_hook_path: str | None = None,
+    parent_hook_exit_status: int | None = None,
+) -> PostCreateExecutionGraph:
+    """Classify a recorded shell trace without inspecting shell source text."""
+    nodes: list[PostCreateGraphNode] = []
+    for argv in commands:
+        normalized = tuple(argv)
+        classify_command(
+            normalized,
+            context=CommandProvenance(
+                phase="post-create",
+                owner="shared-post-create",
+                operation="post-create-readback",
+                method=None,
+                privileged_requested=False,
+                owner_root=str(owner_root) if owner_root is not None else None,
+            ),
+        )
+        nodes.append(PostCreateGraphNode("external", normalized))
+    nodes.extend(
+        PostCreateGraphNode("builtin", (name,)) for name in builtins
+    )
+    nodes.extend(
+        PostCreateGraphNode("redirection", (value,)) for value in redirections
+    )
+    if parent_hook_path is not None:
+        hook = Path(parent_hook_path)
+        selected_parent_root = (
+            Path(parent_root)
+            if parent_root is not None
+            else Path(owner_root)
+            if owner_root is not None
+            else Path(__file__).resolve().parents[2]
+        )
+        try:
+            selected_parent_root = selected_parent_root.resolve(strict=True)
+            expected_hook = selected_parent_root / ".devcontainer" / "post-create-parent.sh"
+            expected_hook_resolved = expected_hook.resolve(strict=True)
+            hook_resolved = hook.resolve(strict=True)
+            hook_resolved.relative_to(selected_parent_root)
+        except (OSError, ValueError) as exc:
+            raise DependencyError(
+                "command-boundary-unknown: parent hook path is outside its owner root"
+            ) from exc
+        if (
+            not hook.is_absolute()
+            or hook.is_symlink()
+            or not hook.is_file()
+            or hook_resolved != expected_hook_resolved
+        ):
+            raise DependencyError(
+                "command-boundary-unknown: parent hook path is not the canonical non-symlink regular file"
+            )
+        nodes.append(
+            PostCreateGraphNode(
+                "parent-hook",
+                (parent_hook_path, str(parent_hook_exit_status or 0)),
+                owner="parent-hook",
+                operation="parent-hook-dispatch",
+            )
+        )
+    return PostCreateExecutionGraph(
+        tuple(nodes),
+        parent_hook_path=parent_hook_path,
+        parent_hook_exit_status=parent_hook_exit_status,
+    )
+
+
+def check_python_source_safety(source: str | Path) -> tuple[CommandBoundaryFinding, ...]:
+    """Find unsafe Python subprocess/eval structure without lexical matching."""
+    text = Path(source).read_text(encoding="utf-8") if isinstance(source, Path) else source
+    try:
+        tree = ast.parse(text)
+    except SyntaxError as exc:
+        raise DependencyError(f"command-boundary-ast-parse: {exc}") from exc
+    subprocess_aliases: set[str] = {"subprocess"}
+    process_functions: dict[str, str] = {}
+    findings: list[CommandBoundaryFinding] = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                if alias.name == "subprocess":
+                    subprocess_aliases.add(alias.asname or "subprocess")
+        elif isinstance(node, ast.ImportFrom) and node.module == "subprocess":
+            for alias in node.names:
+                if alias.name in {"run", "Popen", "call", "check_call", "check_output"}:
+                    process_functions[alias.asname or alias.name] = alias.name
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Call):
+            continue
+        process_call = False
+        if isinstance(node.func, ast.Attribute) and isinstance(node.func.value, ast.Name):
+            process_call = node.func.value.id in subprocess_aliases and node.func.attr in {
+                "run", "Popen", "call", "check_call", "check_output"
+            }
+        elif isinstance(node.func, ast.Name):
+            process_call = node.func.id in process_functions
+        if process_call:
+            shell = next((keyword.value for keyword in node.keywords if keyword.arg == "shell"), None)
+            if shell is not None and not (isinstance(shell, ast.Constant) and shell.value is False):
+                findings.append(CommandBoundaryFinding(CommandCapability.SHELL_EVALUATION, "subprocess shell value is not literal False", (), "image-install"))
+        if isinstance(node.func, ast.Name) and node.func.id == "eval":
+            findings.append(CommandBoundaryFinding(CommandCapability.DYNAMIC_INTERPRETER, "direct builtin eval call", (), "image-install"))
+    return tuple(findings)
+
+
+def validate_python_source_safety(source: str | Path) -> None:
+    """Raise a stable typed failure when Python source contains unsafe calls."""
+    findings = check_python_source_safety(source)
+    if findings:
+        raise DependencyError(findings[0].render())
 
 
 @dataclass(frozen=True)
@@ -461,6 +1161,8 @@ class DependencyRecord:
     repo: str | None = None
     commit: str | None = None
     source_identity: str | None = None
+    source_tree_sha256: str | None = None
+    cargo_lock_sha256: str | None = None
     locked: bool | None = None
     browser: str | None = None
     browser_cache_path: str | None = None
@@ -970,6 +1672,8 @@ def _validate_method_fields(
             "commit",
             "source_identity",
             "locked",
+            "source_tree_sha256",
+            "cargo_lock_sha256",
         },
         Method.BROWSER_INSTALL: {"browser", "browser_cache_path"},
     }
@@ -1130,9 +1834,25 @@ def _validate_method_values(record: DependencyRecord) -> None:
             )
         assert record.repo is not None
         _validate_https_url(record.repo, f"{record.id}.repo")
-        if record.source_identity is not None and record.source_identity != ACTIVE_SOURCE_IDENTITY:
+        if record.source_identity is not None and record.source_identity not in {
+            ACTIVE_SOURCE_IDENTITY,
+            CANONICAL_SNAPSHOT_IDENTITY,
+        }:
             raise DependencyError(
-                f"{record.id}.source_identity must be {ACTIVE_SOURCE_IDENTITY!r}"
+                f"{record.id}.source_identity must be one of active-source or canonical-snapshot"
+            )
+        if record.source_identity == CANONICAL_SNAPSHOT_IDENTITY:
+            for field_name, value in (
+                ("source_tree_sha256", record.source_tree_sha256),
+                ("cargo_lock_sha256", record.cargo_lock_sha256),
+            ):
+                if value is None or SHA256_RE.fullmatch(value) is None:
+                    raise DependencyError(
+                        f"{record.id}.{field_name} is required for canonical-snapshot"
+                    )
+        elif record.source_tree_sha256 is not None or record.cargo_lock_sha256 is not None:
+            raise DependencyError(
+                f"{record.id}: source snapshot digests require canonical-snapshot"
             )
         if record.commit is not None and COMMIT_RE.fullmatch(record.commit) is None:
             raise DependencyError(f"{record.id}.commit must be a full 40-hex commit")
@@ -1197,6 +1917,8 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         "repo",
         "commit",
         "source_identity",
+        "source_tree_sha256",
+        "cargo_lock_sha256",
         "locked",
         "browser",
         "browser_cache_path",
@@ -1310,6 +2032,12 @@ def parse_record(raw: object, *, path: Path, index: int) -> DependencyRecord:
         commit=_optional_string(raw.get("commit"), f"{record_id}.commit"),
         source_identity=_optional_string(
             raw.get("source_identity"), f"{record_id}.source_identity"
+        ),
+        source_tree_sha256=_optional_string(
+            raw.get("source_tree_sha256"), f"{record_id}.source_tree_sha256"
+        ),
+        cargo_lock_sha256=_optional_string(
+            raw.get("cargo_lock_sha256"), f"{record_id}.cargo_lock_sha256"
         ),
         locked=raw.get("locked") if "locked" in raw else None,
         browser=_optional_string(raw.get("browser"), f"{record_id}.browser"),
@@ -1527,6 +2255,9 @@ def merge_records(manifests: Sequence[LoadedManifest]) -> tuple[DependencyRecord
                 "repo",
                 "commit",
                 "locked",
+                "source_identity",
+                "source_tree_sha256",
+                "cargo_lock_sha256",
                 "browser",
                 "browser_cache_path",
             )
@@ -1728,6 +2459,8 @@ def _image_plan_payload(
     return {
         "schema": IMAGE_PLAN_SCHEMA,
         "schema_version": IMAGE_PLAN_SCHEMA_VERSION,
+        "owner": "image-installer",
+        "phase": "image-install",
         "plan_fingerprint": plan.fingerprint,
         "source_roles": list(plan.source_roles),
         "order": list(selected),
@@ -1757,6 +2490,22 @@ def _image_owner(production: bool) -> tuple[int, int]:
     if production:
         return 0, 0
     return os.geteuid(), os.getegid()
+
+
+def _image_record_is_safe(record: DependencyRecord) -> bool:
+    """Return whether one validated record is immutable enough for an image."""
+    if record.method.value not in IMAGE_INSTALL_METHODS:
+        return False
+    if record.method is Method.CARGO_SOURCE_BUILD:
+        return (
+            record.locked is True
+            and record.source_identity == CANONICAL_SNAPSHOT_IDENTITY
+            and record.source_tree_sha256 is not None
+            and SHA256_RE.fullmatch(record.source_tree_sha256) is not None
+            and record.cargo_lock_sha256 is not None
+            and SHA256_RE.fullmatch(record.cargo_lock_sha256) is not None
+        )
+    return True
 
 
 def _lstat_image_path(path: Path, *, description: str) -> os.stat_result:
@@ -1945,10 +2694,17 @@ def image_install_plan(
     records: Sequence[str] | str | None = None,
     runner: CommandRunner | None = None,
     identity: RuntimeIdentity | None = None,
+    final_binary_dir: Path | None = None,
     _test_image_root: Path | None = None,
 ) -> tuple[str, ...]:
     """Build and publish an immutable image dependency plan and receipts."""
     target, production = _image_target(_test_image_root, require_root=True)
+    if (
+        production
+        and final_binary_dir is not None
+        and final_binary_dir.resolve() != Path("/usr/local/bin")
+    ):
+        raise DependencyError("image final binary directory is not /usr/local/bin")
     if os.path.lexists(target):
         raise DependencyError(
             f"image dependency root already exists; rebuild-required: {target}"
@@ -1958,7 +2714,7 @@ def image_install_plan(
     image_unsafe = [
         record_id
         for record_id in selected_ids
-        if by_id[record_id].method.value not in IMAGE_INSTALL_METHODS
+        if not _image_record_is_safe(by_id[record_id])
     ]
     if image_unsafe:
         raise DependencyError(
@@ -1989,11 +2745,20 @@ def image_install_plan(
     ) as temporary:
         staging = Path(temporary)
         receipts = staging / "receipts"
-        completed = Installer(runner).install(
+        completed = Installer(
+            runner,
+            image_owned=production,
+            image_owned_root=target.parent if production else None,
+        ).install(
             plan,
             workspace=workspace,
             receipts=receipts,
             records=selected_ids,
+            final_binary_dir=(
+                (final_binary_dir or Path("/usr/local/bin"))
+                if production
+                else None
+            ),
         )
         expected = set(selected_ids)
         if set(completed) != expected:
@@ -2098,13 +2863,16 @@ def image_verify_plan(
                 f"image-verify rebuild-required: stale receipt: {record_id}"
             )
         try:
-            installer.verify(
-                record,
-                workspace=workspace,
-                expected_source_identity=Installer._receipt_source_identity(receipt),
-                strict_executables=True,
-                allow_network=False,
-            )
+            if production and record.method is Method.CARGO_SOURCE_BUILD:
+                installer._verify_final_binary_receipt(receipt_payload, record)
+            else:
+                installer.verify(
+                    record,
+                    workspace=workspace,
+                    expected_source_identity=Installer._receipt_source_identity(receipt),
+                    strict_executables=True,
+                    allow_network=False,
+                )
             bindings = receipt_payload.get("executable_bindings")
             if bindings and (
                 installer._executable_bindings(record, workspace=workspace) != bindings
@@ -2562,8 +3330,114 @@ def _expected_executable_path(record: DependencyRecord, executable: str) -> Path
 class Installer:
     """Execute a validated plan with per-record receipt semantics."""
 
-    def __init__(self, runner: CommandRunner | None = None) -> None:
+    def __init__(
+        self,
+        runner: CommandRunner | None = None,
+        *,
+        image_owned: bool = False,
+        image_owned_root: Path | None = None,
+    ) -> None:
         self.runner = runner or SubprocessRunner()
+        self._parent_attestation: ParentRootAttestationReceipt | None = None
+        self._image_owned = image_owned
+        self._image_owned_root = image_owned_root.resolve() if image_owned_root else None
+        self._install_workspace: Path | None = None
+        self._active_record: DependencyRecord | None = None
+        self._active_phase = "image-install"
+        self._active_owner = "image-installer"
+
+    def _operation_for(self, argv: Sequence[str], *, phase: str) -> str:
+        """Derive only the closed operation id for an active owner edge."""
+        command = tuple(str(item) for item in argv)
+        executable = _command_basename(command[0]) if command else ""
+        args = command[1:]
+        if phase in {"image-verify", "post-create"}:
+            if executable == "dpkg-query" and args[:1] == ("--show",):
+                return "verify-apt-package"
+            if executable == "dpkg-query" and args[:1] == ("--listfiles",):
+                return "verify-apt-executable-owner"
+            if executable == "gpg" and args[:2] == ("--show-keys", "--with-colons"):
+                return "verify-apt-repository-key"
+            if executable == "npm":
+                return "verify-npm-package"
+            if executable == "pipx":
+                return "verify-pipx-package"
+            if executable == "rustup":
+                return (
+                    "verify-rust-active"
+                    if args[:2] == ("show", "active-toolchain")
+                    else "verify-rust-components"
+                    if args[:2] == ("component", "list")
+                    else "verify-rust-tool-version"
+                    if args[:1] == ("run",)
+                    else "verify-rust-installed"
+                )
+            if executable == "elan":
+                return (
+                    "verify-lean-active"
+                    if args[:1] == ("show",)
+                    else "verify-lean-tool-version"
+                    if args[:1] == ("run",)
+                    else "verify-lean-installed"
+                )
+            if executable == "git":
+                return "verify-cargo-source-identity"
+            return "verify-declared-executable"
+        method = self._active_record.method.value if self._active_record else ""
+        if executable == "gpg" and args[:2] == ("--show-keys", "--with-colons"):
+            return "verify-apt-repository-key"
+        return {
+            "apt-package": "install-apt-package",
+            "apt-repository": "install-apt-repository",
+            "npm-global": "install-npm-global",
+            "pipx": "install-pipx",
+            "release-asset": "install-release-asset",
+            "rust-toolchain": "install-rust-toolchain",
+            "lean-toolchain": "install-lean-toolchain",
+            "cargo-source-build": "install-cargo-source-build",
+            "browser-install": "install-browser",
+        }.get(method, "image-install")
+
+    def _command_provenance(
+        self,
+        argv: Sequence[str],
+        *,
+        operation: str | None = None,
+        method: str | None = None,
+        phase: str | None = None,
+        owner: str | None = None,
+        record_id: str | None = None,
+        privileged: bool = False,
+    ) -> CommandProvenance:
+        active_phase = phase or self._active_phase
+        active_record = self._active_record
+        return CommandProvenance(
+            phase=active_phase,
+            owner=owner or self._active_owner,
+            operation=operation or self._operation_for(argv, phase=active_phase),
+            method=method or (active_record.method.value if active_record else None),
+            record_id=record_id or (active_record.id if active_record else None),
+            privileged_requested=privileged,
+        )
+
+    def _run_command(
+        self,
+        argv: Sequence[str],
+        context: CommandProvenance,
+        *,
+        workspace: Path | None = None,
+        capture_output: bool = False,
+        env: Mapping[str, str] | None = None,
+    ) -> subprocess.CompletedProcess[str]:
+        """Classify one command graph before the sole runner invocation."""
+        classify_command(argv, context=context)
+        return self.runner.run(
+            argv,
+            cwd=workspace,
+            privileged=context.privileged_requested,
+            capture_output=capture_output,
+            env=env,
+        )
 
     def _path_is_regular_executable(self, path: Path) -> bool:
         """Check one resolved target, allowing deterministic runner fixtures."""
@@ -2580,15 +3454,19 @@ class Installer:
         workspace: Path,
     ) -> tuple[Path, Path]:
         """Resolve apt lexical and real paths through declared package ownership."""
+        self._active_record = record
+        self._active_phase = "image-verify"
+        self._active_owner = "typed-verifier"
         lexical = _configured_executable_path(record, executable)
         owned: set[str] = set()
         owners = record.executable_owner_packages
         for owner_package in owners:
             try:
-                result = self.runner.run(
+                result = self._capture(
                     ["/usr/bin/dpkg-query", "--listfiles", owner_package],
-                    cwd=workspace,
-                    capture_output=True,
+                    workspace=workspace,
+                    operation="verify-apt-executable-owner",
+                    tool_paths=False,
                 )
             except (OSError, subprocess.CalledProcessError) as exc:
                 raise DependencyError(
@@ -2663,6 +3541,97 @@ class Installer:
         path = _current_executable_path(record, executable)
         return path, path
 
+    def _cargo_binary_path(
+        self,
+        record: DependencyRecord,
+        *,
+        source: Path | None = None,
+        workspace: Path | None = None,
+    ) -> Path:
+        """Resolve a Cargo verification binary in the configured build target."""
+        spec = record.verification
+        if spec.path is None:
+            raise DependencyError(f"{record.id}: cargo verification path is missing")
+        relative = Path(spec.path)
+        if (
+            relative.is_absolute()
+            or len(relative.parts) < 2
+            or relative.parts[0] != "target"
+            or any(part in {"", ".", ".."} for part in relative.parts)
+        ):
+            raise DependencyError(f"{record.id}: cargo binary path is unsafe")
+        if source is None:
+            if workspace is None:
+                raise DependencyError(f"{record.id}: Cargo source workspace is missing")
+            source = self._cargo_source(record, workspace)
+        target_root = (
+            os.environ.get("AGENT_CANON_CARGO_TARGET_DIR")
+            if self._image_owned
+            else None
+        )
+        if target_root:
+            return (Path(target_root) / Path(*relative.parts[1:])).resolve()
+        return (source / relative).resolve()
+
+    def _publish_final_binary(
+        self,
+        record: DependencyRecord,
+        *,
+        workspace: Path,
+        final_binary_dir: Path,
+    ) -> Path:
+        """Install a verified Cargo binary into the immutable image PATH."""
+        if not self._image_owned or record.method is not Method.CARGO_SOURCE_BUILD:
+            raise DependencyError(
+                f"{record.id}: final binary publication is image Cargo-only"
+            )
+        final_dir = final_binary_dir.resolve()
+        if final_dir != Path("/usr/local/bin"):
+            raise DependencyError(
+                f"{record.id}: final binary directory is not the image PATH"
+            )
+        source = self._cargo_source(record, workspace)
+        binary = self._cargo_binary_path(record, source=source)
+        if not binary.is_file() or not os.access(binary, os.X_OK):
+            raise DependencyError(f"{record.id}: Cargo build binary is missing: {binary}")
+        name = Path(record.verification.path or "").name
+        if not name or name in {".", ".."}:
+            raise DependencyError(f"{record.id}: final binary name is unsafe")
+        final_binary = final_dir / name
+        self._run(
+            ["install", "-m", "0555", str(binary), str(final_binary)],
+            workspace=workspace,
+            privileged=True,
+            operation="install-cargo-source-build",
+            method=record.method.value,
+            phase="image-install",
+            owner="image-installer",
+            record_id=record.id,
+        )
+        return final_binary
+
+    @staticmethod
+    def _verify_final_binary_receipt(
+        payload: Mapping[str, Any], record: DependencyRecord
+    ) -> None:
+        """Verify the image-owned final binary bound by a Cargo receipt."""
+        spec_path = record.verification.path
+        if spec_path is None:
+            raise DependencyError(f"{record.id}: Cargo verification path is missing")
+        expected = Path("/usr/local/bin") / Path(spec_path).name
+        final_value = payload.get("binary_path")
+        digest = payload.get("binary_sha256")
+        if final_value != str(expected) or not isinstance(digest, str) or not SHA256_RE.fullmatch(digest):
+            raise DependencyError(f"{record.id}: final binary receipt binding is malformed")
+        final_binary = Path(final_value)
+        if final_binary.is_symlink() or not final_binary.is_file() or not os.access(final_binary, os.X_OK):
+            raise DependencyError(f"{record.id}: final image binary is missing: {final_binary}")
+        observed = hashlib.sha256(final_binary.read_bytes()).hexdigest()
+        if observed != digest:
+            raise DependencyError(
+                f"{record.id}: final image binary digest mismatch {observed}!={digest}"
+            )
+
     def dry_run(self, plan: DependencyPlan) -> dict[str, Any]:
         """Return planned actions without network, package, or filesystem installs."""
         by_id = plan.by_id()
@@ -2692,9 +3661,36 @@ class Installer:
         workspace: Path,
         receipts: Path,
         records: Sequence[str] | None = None,
+        final_binary_dir: Path | None = None,
     ) -> tuple[str, ...]:
         """Install records in order, resuming only after live receipt verification."""
-        receipts.mkdir(parents=True, exist_ok=True)
+        self._install_workspace = workspace.resolve()
+        if self._image_owned:
+            if self._image_owned_root is None:
+                raise DependencyError("image-owned install requires an image root")
+            image_root = self._image_owned_root
+            try:
+                receipts = receipts.resolve()
+                receipts.relative_to(image_root)
+            except (OSError, ValueError) as exc:
+                raise DependencyError(
+                    "image-owned receipts must remain under the image root"
+                ) from exc
+            receipts.mkdir(parents=True, exist_ok=True)
+            self._parent_attestation = None
+        else:
+            self._parent_attestation = _parent_attestation(workspace, "dependency-install")
+            try:
+                receipts = resolve_parent_owned_path(
+                    self._parent_attestation, receipts, "dependency-receipts", create=False
+                ).physical_path
+            except ParentRootSideEffectError as exc:
+                raise DependencyError(
+                    f"parent-root-path:{exc.reject.value}:{exc.detail}"
+                ) from exc
+            receipts = ensure_parent_owned_directory(
+                self._parent_attestation, receipts, "dependency-receipts"
+            ).physical_path
         completed: list[str] = []
         by_id = plan.by_id()
         order = tuple(records) if records is not None else plan.order
@@ -2703,6 +3699,12 @@ class Installer:
             raise DependencyError(
                 "selected dependency records are not in the plan: "
                 + ", ".join(unknown)
+            )
+        if self._image_owned and final_binary_dir is None and any(
+            by_id[record_id].method is Method.CARGO_SOURCE_BUILD for record_id in order
+        ):
+            raise DependencyError(
+                "image-owned Cargo install requires a final binary directory"
             )
         unavailable: set[str] = set()
         for record_id in order:
@@ -2774,8 +3776,23 @@ class Installer:
                     executable_bindings = self._executable_bindings(
                         record, workspace=workspace
                     )
+                    final_binary_path = None
+                    if (
+                        final_binary_dir is not None
+                        and record.method is Method.CARGO_SOURCE_BUILD
+                    ):
+                        final_binary_path = self._publish_final_binary(
+                            record,
+                            workspace=workspace,
+                            final_binary_dir=final_binary_dir,
+                        )
                     self._write_receipt(
-                        receipt, plan, record, source_identity, executable_bindings
+                        receipt,
+                        plan,
+                        record,
+                        source_identity,
+                        executable_bindings,
+                        final_binary_path=final_binary_path,
                     )
             except Exception as exc:
                 receipt.unlink(missing_ok=True)
@@ -2824,6 +3841,8 @@ class Installer:
             payload.get("schema") == "agent-canon.devcontainer-dependency-receipt"
             and payload.get("record_id") == record.id
             and payload.get("status") == "pass"
+            and payload.get("owner") == "image-installer"
+            and payload.get("phase") == "image-install"
             and payload.get("manifest_version") == record.version
             and payload.get("plan_fingerprint") == plan.fingerprint
             and payload.get("record_fingerprint") == record.fingerprint()
@@ -2833,6 +3852,8 @@ class Installer:
             == _repository_packages_payload(record)
             and payload.get("repository_package")
             == _repository_package_payload(record)
+            and payload.get("source_tree_sha256") == record.source_tree_sha256
+            and payload.get("cargo_lock_sha256") == record.cargo_lock_sha256
             and (
                 record.method is not Method.CARGO_SOURCE_BUILD
                 or isinstance(payload.get("source_identity"), str)
@@ -2843,6 +3864,9 @@ class Installer:
         self, record: DependencyRecord, *, workspace: Path
     ) -> dict[str, dict[str, str]]:
         """Capture primary probe output and structural secondary bindings."""
+        self._active_record = record
+        self._active_phase = "image-verify"
+        self._active_owner = "typed-verifier"
         bindings: dict[str, dict[str, str]] = {}
         for executable in _executable_binding_names(record):
             lexical_path, path = self._resolve_executable_binding(
@@ -2902,17 +3926,27 @@ class Installer:
         value = payload.get("source_identity")
         return value if isinstance(value, str) else None
 
-    @staticmethod
     def _write_receipt(
+        self,
         path: Path,
         plan: DependencyPlan,
         record: DependencyRecord,
         source_identity: str | None = None,
         executable_bindings: Mapping[str, Mapping[str, str]] | None = None,
+        *,
+        final_binary_path: Path | None = None,
     ) -> None:
+        if (
+            source_identity is None
+            and record.method is Method.CARGO_SOURCE_BUILD
+            and record.source_identity == CANONICAL_SNAPSHOT_IDENTITY
+        ):
+            source_identity = record.source_identity
         payload = {
             "schema": "agent-canon.devcontainer-dependency-receipt",
             "status": "pass",
+            "owner": "image-installer",
+            "phase": "image-install",
             "record_id": record.id,
             "manifest_version": record.version,
             "record_fingerprint": record.fingerprint(),
@@ -2930,14 +3964,77 @@ class Installer:
         repository_package = _repository_package_payload(record)
         if repository_package is not None:
             payload["repository_package"] = repository_package
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(
-            "w", encoding="utf-8", dir=path.parent, delete=False
-        ) as stream:
-            json.dump(payload, stream, sort_keys=True, indent=2)
-            stream.write("\n")
-            temporary = Path(stream.name)
-        os.replace(temporary, path)
+        if record.method is Method.CARGO_SOURCE_BUILD and record.source_identity == CANONICAL_SNAPSHOT_IDENTITY:
+            source = self._cargo_source(
+                record,
+                self._install_workspace
+                or (
+                    self._parent_attestation.parent_root
+                    if self._parent_attestation
+                    else Path.cwd()
+                ),
+            )
+            source_digest, lock_digest = self._cargo_snapshot(source)
+            assert record.verification.path is not None
+            binary = self._cargo_binary_path(record, source=source)
+            binary_path = final_binary_path or binary
+            payload.update(
+                {
+                    "source_tree_sha256": source_digest,
+                    "cargo_lock_sha256": lock_digest,
+                    "binary_path": str(binary_path),
+                    "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+                    "rustup_init_version": RUSTUP_INIT_VERSION,
+                    "rustup_init_sha256": RUSTUP_INIT_SHA256,
+                }
+            )
+            if final_binary_path is not None:
+                payload["build_binary_path"] = str(binary)
+        content = (json.dumps(payload, sort_keys=True, indent=2) + "\n").encode(
+            "utf-8"
+        )
+        if self._image_owned:
+            if self._image_owned_root is None:
+                raise DependencyError("image-owned receipt publication lacks an image root")
+            try:
+                path = path.resolve()
+                path.relative_to(self._image_owned_root)
+            except (OSError, ValueError) as exc:
+                raise DependencyError(
+                    "image-owned receipt escaped the image root"
+                ) from exc
+            path.parent.mkdir(parents=True, exist_ok=True)
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{path.name}.", dir=path.parent
+            )
+            os.close(descriptor)
+            temporary = Path(temporary_name)
+            try:
+                temporary.write_bytes(content)
+                temporary.chmod(0o600)
+                os.replace(temporary, path)
+            finally:
+                temporary.unlink(missing_ok=True)
+            return
+        if self._parent_attestation is None:
+            raise DependencyError(
+                "parent-root-attestation is required before receipt publication"
+            )
+        try:
+            ensure_parent_owned_directory(
+                self._parent_attestation, path.parent, "dependency-receipts"
+            )
+            receipt = resolve_parent_owned_path(
+                self._parent_attestation, path, "dependency-receipt", create=False
+            )
+            ParentRootSideEffectBoundary().atomic_publish(
+                receipt,
+                content,
+            )
+        except ParentRootSideEffectError as exc:
+            raise DependencyError(
+                f"parent-root-receipt:{exc.reject.value}:{exc.detail}"
+            ) from exc
 
     def _run(
         self,
@@ -2946,29 +4043,73 @@ class Installer:
         workspace: Path,
         privileged: bool = False,
         env: Mapping[str, str] | None = None,
+        operation: str | None = None,
+        method: str | None = None,
+        phase: str | None = None,
+        owner: str | None = None,
+        record_id: str | None = None,
     ) -> None:
-        kwargs: dict[str, object] = {
-            "cwd": workspace,
-            "privileged": privileged,
-        }
-        if env is not None:
-            kwargs["env"] = env
-        self.runner.run(argv, **kwargs)  # type: ignore[arg-type]
+        context = self._command_provenance(
+            argv,
+            operation=operation,
+            method=method,
+            phase=phase,
+            owner=owner,
+            record_id=record_id,
+            privileged=privileged,
+        )
+        self._run_command(
+            argv,
+            context,
+            workspace=workspace,
+            env=env,
+        )
 
     def _with_tool_paths(self, command_env: Mapping[str, str] | None) -> dict[str, str]:
         """Publish deterministic Python, Rust, and Lean tool paths."""
-        merged: dict[str, str] = dict(os.environ)
+        if self._parent_attestation is not None:
+            merged = child_environment(self._parent_attestation, os.environ)
+        else:
+            merged = dict(os.environ)
         merged.pop("CARGO_TARGET_DIR", None)
         merged.update(command_env or {})
         home = Path(merged.get("HOME", str(Path.home())))
-        cargo_home = merged.get("CARGO_HOME", str(home / ".cargo"))
-        rustup_home = merged.get("RUSTUP_HOME", str(home / ".rustup"))
-        elan_home = merged.get("ELAN_HOME", str(home / ".elan"))
+        parent_root = (
+            self._parent_attestation.parent_root
+            if self._parent_attestation is not None
+            else None
+        )
+        home_is_parent_owned = parent_root is not None and (
+            home == parent_root or parent_root in home.parents
+        )
+        cargo_home = merged.get(
+            "CARGO_HOME",
+            str(parent_root / ".agent-canon" / "cargo-home")
+            if parent_root is not None
+            else str(home / ".cargo"),
+        )
+        rustup_home = merged.get(
+            "RUSTUP_HOME",
+            str(home / ".rustup") if home_is_parent_owned
+            else str(parent_root / ".agent-canon" / "rustup-home")
+            if parent_root is not None
+            else str(home / ".rustup"),
+        )
+        elan_home = merged.get(
+            "ELAN_HOME",
+            str(home / ".elan") if home_is_parent_owned
+            else str(parent_root / ".agent-canon" / "elan-home")
+            if parent_root is not None
+            else str(home / ".elan"),
+        )
         path_entries = list(filter(None, merged.get("PATH", "").split(os.pathsep)))
         tool_paths = (
-            f"{cargo_home}/bin",
+            str(home / ".cargo" / "bin") if home_is_parent_owned else f"{cargo_home}/bin",
             f"{elan_home}/bin",
-            str(home / ".local" / "bin"),
+            str(home / ".local" / "bin") if home_is_parent_owned
+            else str(parent_root / ".agent-canon" / "local-bin")
+            if parent_root is not None
+            else str(home / ".local" / "bin"),
         )
         merged["CARGO_HOME"] = cargo_home
         merged["RUSTUP_HOME"] = rustup_home
@@ -2982,6 +4123,9 @@ class Installer:
     def install_record(
         self, record: DependencyRecord, *, workspace: Path, repair: bool = False
     ) -> None:
+        self._active_record = record
+        self._active_phase = "image-install"
+        self._active_owner = "image-installer"
         method = record.method
         if method is Method.APT_PACKAGE:
             command = [
@@ -3056,7 +4200,7 @@ class Installer:
                 env=self._with_tool_paths(None),
             )
         elif method is Method.RELEASE_ASSET:
-            self._install_release_asset(record)
+            self._install_release_asset(record, workspace=workspace)
         elif method is Method.RUST_TOOLCHAIN:
             tool_env = self._with_tool_paths(None)
             self._run(
@@ -3164,6 +4308,8 @@ class Installer:
             )
         elif method is Method.CARGO_SOURCE_BUILD:
             source = self._cargo_source(record, workspace)
+            if record.source_identity == CANONICAL_SNAPSHOT_IDENTITY:
+                self._verify_canonical_snapshot(record, workspace)
             source_identity_before = None
             if record.commit is not None:
                 source_identity_before = self._cargo_source_identity(
@@ -3179,7 +4325,16 @@ class Installer:
                     str(source / "Cargo.toml"),
                 ],
                 workspace=workspace,
-                env=self._with_tool_paths({"CARGO_TARGET_DIR": str(source / "target")}),
+                env=self._with_tool_paths(
+                    {
+                        "CARGO_TARGET_DIR": (
+                            os.environ.get("AGENT_CANON_CARGO_TARGET_DIR")
+                            if self._image_owned
+                            else None
+                        )
+                        or str(source / "target")
+                    }
+                ),
             )
             if source_identity_before is not None:
                 source_identity_after = self._cargo_source_identity(
@@ -3190,6 +4345,8 @@ class Installer:
                         f"{record.id}: source identity changed during build "
                         f"{source_identity_before}!={source_identity_after}"
                     )
+            if record.source_identity == CANONICAL_SNAPSHOT_IDENTITY:
+                self._verify_canonical_snapshot(record, workspace)
         elif method is Method.BROWSER_INSTALL:
             assert record.browser is not None
             assert record.browser_cache_path is not None
@@ -3228,6 +4385,9 @@ class Installer:
         allow_network: bool = True,
     ) -> str | None:
         """Dispatch the record's typed owner-specific live verifier."""
+        self._active_record = record
+        self._active_phase = "image-verify"
+        self._active_owner = "typed-verifier"
         source_identity = None
         if record.method is Method.CARGO_SOURCE_BUILD and record.commit is not None:
             source_identity = self._cargo_source_identity(record, workspace)
@@ -3273,12 +4433,28 @@ class Installer:
         *,
         workspace: Path,
         env: Mapping[str, str] | None = None,
+        operation: str | None = None,
+        method: str | None = None,
+        phase: str | None = None,
+        owner: str | None = None,
+        record_id: str | None = None,
+        tool_paths: bool = True,
     ) -> subprocess.CompletedProcess[str]:
-        return self.runner.run(
+        context = self._command_provenance(
             argv,
-            cwd=workspace,
+            operation=operation,
+            method=method,
+            phase=phase,
+            owner=owner,
+            record_id=record_id,
+        )
+        command_env = self._with_tool_paths(env) if tool_paths else env
+        return self._run_command(
+            argv,
+            context,
+            workspace=workspace,
             capture_output=True,
-            env=self._with_tool_paths(env),
+            env=command_env,
         )
 
     @staticmethod
@@ -3308,7 +4484,7 @@ class Installer:
             [
                 "/usr/bin/dpkg-query",
                 "--show",
-                "--showformat=${Status}\t${Version}\t${Package}\\n",
+                "--showformat=${Status}\\t${Version}\\t${Package}\\\\n",
                 record.package,
             ],
             workspace=workspace,
@@ -3379,7 +4555,11 @@ class Installer:
         if observed_source != expected_source:
             raise DependencyError(f"{record.id}: apt repository source is stale")
         if allow_network:
-            self._verify_repository_packages_digest(record)
+            if self._active_phase != "image-install":
+                raise DependencyError(
+                    "command-boundary-network-fetch: image verification cannot fetch"
+                )
+            self._verify_repository_packages_digest(record, workspace=workspace)
 
     @staticmethod
     def _apt_repository_line(record: DependencyRecord, keyring: Path) -> str:
@@ -3393,19 +4573,35 @@ class Installer:
         )
 
     @staticmethod
-    def _verify_repository_packages_digest(record: DependencyRecord) -> None:
+    def _verify_repository_packages_digest(
+        record: DependencyRecord, *, workspace: Path | None = None
+    ) -> None:
         """Verify a pinned Packages index before accepting an apt repository."""
         expected = record.repository_packages_sha256
         if expected is None:
             return
         url = _repository_packages_url(record)
         with tempfile.NamedTemporaryFile(
-            prefix=f"agent-canon-{record.id}-packages-", delete=False
+            prefix=f"agent-canon-{record.id}-packages-",
+            dir=_parent_temp_root(workspace or Path.cwd(), "apt-packages"),
+            delete=False,
         ) as stream:
             temporary = Path(stream.name)
         try:
             try:
-                _download(url, temporary)
+                _download(
+                    url,
+                    temporary,
+                    operation=NetworkOperation(
+                        phase="image-install",
+                        owner="image-installer",
+                        operation="download-packages-index",
+                        method=record.method.value,
+                        record_id=record.id,
+                        url=url,
+                        allow_network=True,
+                    ),
+                )
             except Exception as exc:
                 raise DependencyError(
                     f"{record.id}: Packages index download failed: {url}: {exc}"
@@ -3432,7 +4628,7 @@ class Installer:
     ) -> None:
         toolchain = resolve_npm_toolchain(workspace)
         npm_env = {"PATH": toolchain.path}
-        result = self.runner.run(
+        result = self._capture(
             [
                 str(toolchain.npm),
                 "ls",
@@ -3443,9 +4639,10 @@ class Installer:
                 "--depth=0",
                 record.package,
             ],
-            cwd=workspace,
-            capture_output=True,
+            workspace=workspace,
             env=npm_env,
+            operation="verify-npm-package",
+            tool_paths=False,
         )
         try:
             payload = json.loads(result.stdout)
@@ -3467,11 +4664,12 @@ class Installer:
                 record, executable, workspace=workspace
             )
             command[0] = str(resolved)
-        executable = self.runner.run(
+        executable = self._capture(
             command,
-            cwd=workspace,
-            capture_output=True,
+            workspace=workspace,
             env=npm_env,
+            operation="verify-declared-executable",
+            tool_paths=False,
         )
         self._require_output(executable, spec.output_contains, record.id)
 
@@ -3558,10 +4756,12 @@ class Installer:
             ),
         )
         for tool in tools:
-            self._capture(
+            result = self._capture(
                 ["rustup", "run", record.version, tool, "--version"],
                 workspace=workspace,
             )
+            if tool == "rust-analyzer":
+                self._require_output(result, f"rust-analyzer {record.version}", record.id)
 
     @staticmethod
     def _rust_toolchain_matches(line: str, version: str) -> bool:
@@ -3593,17 +4793,72 @@ class Installer:
         # A vendored AgentCanon checkout is the canonical source in a derived
         # parent. Resolve it before considering the standalone layout so a
         # stale parent-root copy cannot win merely because it exists.
-        if vendor_root.is_dir():
+        source_projection = workspace_root.parent / "agent-canon-source" / record.source
+        source_projection_is_dir = source_projection.is_dir()
+        if source_projection_is_dir:
+            source = source_projection.resolve()
+        elif vendor_root.is_dir():
             source = (vendor_root / record.source).resolve()
         else:
             source = standalone_source.resolve()
-        if os.path.commonpath((str(workspace_root), str(source))) != str(
-            workspace_root
+        allowed_roots = [workspace_root]
+        if source_projection_is_dir:
+            allowed_roots.append(source_projection.parent.parent.resolve())
+        if not any(
+            os.path.commonpath((str(root), str(source))) == str(root)
+            for root in allowed_roots
         ):
             raise DependencyError(f"{record.id}: cargo source escapes workspace")
         if not source.is_dir():
             raise DependencyError(f"{record.id}: cargo source is missing: {source}")
         return source
+
+    @staticmethod
+    def _cargo_snapshot(source: Path) -> tuple[str, str]:
+        """Verify the closed canonical source inventory and return its digests."""
+        expected: set[str] = set(CANONICAL_RUST_SOURCE_FILES)
+        for relative in CANONICAL_RUST_SOURCE_FILES:
+            path = source / relative
+            if path.is_symlink() or not path.is_file():
+                raise DependencyError(f"cargo source snapshot file is missing: {relative}")
+        actual = {
+            path.relative_to(source).as_posix()
+            for path in source.rglob("*")
+            if path.is_file() and not path.is_symlink()
+            and "target" not in path.relative_to(source).parts
+            and ".git" not in path.relative_to(source).parts
+        }
+        if actual != expected:
+            missing = sorted(expected - actual)
+            extra = sorted(actual - expected)
+            raise DependencyError(
+                f"cargo source snapshot inventory mismatch: missing={missing} extra={extra}"
+            )
+        digest = hashlib.sha256()
+        for relative in sorted(CANONICAL_RUST_SOURCE_FILES):
+            blob = hashlib.sha256((source / relative).read_bytes()).hexdigest()
+            digest.update(relative.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(blob.encode("ascii"))
+            digest.update(b"\0")
+        cargo_lock = hashlib.sha256((source / "Cargo.lock").read_bytes()).hexdigest()
+        return digest.hexdigest(), cargo_lock
+
+    def _verify_canonical_snapshot(
+        self, record: DependencyRecord, workspace: Path
+    ) -> tuple[str, str]:
+        source = self._cargo_source(record, workspace)
+        source_digest, lock_digest = self._cargo_snapshot(source)
+        if (
+            source_digest != record.source_tree_sha256
+            or lock_digest != record.cargo_lock_sha256
+        ):
+            raise DependencyError(
+                f"{record.id}: immutable source snapshot mismatch "
+                f"{source_digest}!={record.source_tree_sha256} or "
+                f"{lock_digest}!={record.cargo_lock_sha256}"
+            )
+        return source_digest, lock_digest
 
     def _cargo_source_identity(
         self,
@@ -3619,7 +4874,7 @@ class Installer:
                 f"{record.id}: active-source records have no Git source identity"
             )
         try:
-            result = self.runner.run(
+            result = self._capture(
                 [
                     "git",
                     "-C",
@@ -3628,8 +4883,9 @@ class Installer:
                     "--verify",
                     "HEAD",
                 ],
-                cwd=workspace,
-                capture_output=True,
+                workspace=workspace,
+                operation="verify-cargo-source-identity",
+                tool_paths=False,
             )
         except (OSError, subprocess.CalledProcessError) as exc:
             raise DependencyError(
@@ -3656,11 +4912,19 @@ class Installer:
         spec = record.verification
         assert spec.path is not None and spec.output_contains is not None
         source = self._cargo_source(record, workspace)
+        if record.source_identity == CANONICAL_SNAPSHOT_IDENTITY:
+            self._verify_canonical_snapshot(record, workspace)
         if record.commit is not None:
             self._cargo_source_identity(record, workspace, source=source)
-        binary = (source / spec.path).resolve()
-        if os.path.commonpath((str(source), str(binary))) != str(source):
-            raise DependencyError(f"{record.id}: cargo binary escapes source")
+        binary = self._cargo_binary_path(record, source=source)
+        configured_target = (
+            os.environ.get("AGENT_CANON_CARGO_TARGET_DIR")
+            if self._image_owned
+            else None
+        )
+        allowed_root = Path(configured_target or source / "target").resolve()
+        if os.path.commonpath((str(allowed_root), str(binary))) != str(allowed_root):
+            raise DependencyError(f"{record.id}: cargo binary escapes its target")
         if not binary.is_file() or not os.access(binary, os.X_OK):
             raise DependencyError(f"{record.id}: cargo binary is missing: {binary}")
         result = self._capture([str(binary), *spec.args], workspace=workspace)
@@ -3701,19 +4965,36 @@ class Installer:
     def _install_apt_repository(
         self, record: DependencyRecord, workspace: Path, *, repair: bool = False
     ) -> None:
+        self._active_record = record
+        self._active_phase = "image-install"
+        self._active_owner = "image-installer"
         assert record.key_url is not None
         assert record.key_fingerprint is not None
         with tempfile.TemporaryDirectory(
-            prefix=f"agent-canon-{record.id}-"
+            prefix=f"agent-canon-{record.id}-",
+            dir=_parent_temp_root(workspace, "apt-repository"),
         ) as temporary:
             root = Path(temporary)
             raw_key = root / "key.raw"
             keyring = root / f"{record.id}.gpg"
-            _download(record.key_url, raw_key)
-            fingerprint = self.runner.run(
+            _download(
+                record.key_url,
+                raw_key,
+                operation=NetworkOperation(
+                    phase="image-install",
+                    owner="image-installer",
+                    operation="download-apt-key",
+                    method=record.method.value,
+                    record_id=record.id,
+                    url=record.key_url,
+                    allow_network=True,
+                ),
+            )
+            fingerprint = self._capture(
                 ["gpg", "--show-keys", "--with-colons", str(raw_key)],
-                cwd=workspace,
-                capture_output=True,
+                workspace=workspace,
+                operation="verify-apt-repository-key",
+                tool_paths=False,
             ).stdout
             expected = record.key_fingerprint
             observed = {
@@ -3744,7 +5025,7 @@ class Installer:
             repo_line.write_text(
                 self._apt_repository_line(record, key_destination), encoding="utf-8"
             )
-            self._verify_repository_packages_digest(record)
+            self._verify_repository_packages_digest(record, workspace=workspace)
             self._run(
                 [
                     "install",
@@ -3760,7 +5041,19 @@ class Installer:
             self._run(["apt-get", "update"], workspace=workspace, privileged=True)
             if record.repository_package_url is not None:
                 package_path = root / _repository_package_filename(record)
-                _download(record.repository_package_url, package_path)
+                _download(
+                    record.repository_package_url,
+                    package_path,
+                    operation=NetworkOperation(
+                        phase="image-install",
+                        owner="image-installer",
+                        operation="download-apt-package",
+                        method=record.method.value,
+                        record_id=record.id,
+                        url=record.repository_package_url,
+                        allow_network=True,
+                    ),
+                )
                 assert record.repository_package_sha256 is not None
                 observed = hashlib.sha256(package_path.read_bytes()).hexdigest()
                 if observed != record.repository_package_sha256:
@@ -3780,7 +5073,9 @@ class Installer:
                     command.insert(2, "--reinstall")
                 self._run(command, workspace=workspace, privileged=True)
 
-    def _install_release_asset(self, record: DependencyRecord) -> None:
+    def _install_release_asset(
+        self, record: DependencyRecord, *, workspace: Path
+    ) -> None:
         assert record.destination is not None
         asset_map = dict(record.assets)
         if asset_map:
@@ -3798,12 +5093,25 @@ class Installer:
             else record.source
         )
         with tempfile.TemporaryDirectory(
-            prefix=f"agent-canon-{record.id}-"
+            prefix=f"agent-canon-{record.id}-",
+            dir=_parent_temp_root(workspace or Path.cwd(), "release-asset"),
         ) as temporary:
             root = Path(temporary)
             archive = root / asset
             archive.parent.mkdir(parents=True, exist_ok=True)
-            _download(source, archive)
+            _download(
+                source,
+                archive,
+                operation=NetworkOperation(
+                    phase="image-install",
+                    owner="image-installer",
+                    operation="download-release-asset",
+                    method=record.method.value,
+                    record_id=record.id,
+                    url=source,
+                    allow_network=True,
+                ),
+            )
             checksum_map = dict(record.checksums)
             if checksum_map:
                 expected = checksum_map.get(architecture())
@@ -3835,17 +5143,46 @@ class Installer:
                         f"{record.id}: extracted destination not found"
                     )
                 candidate = matches[0]
-            self._run_install_file(candidate, Path(record.destination))
+            self._run_install_file(candidate, Path(record.destination), workspace=workspace)
 
-    def _run_install_file(self, source: Path, destination: Path) -> None:
-        self.runner.run(
+    def _run_install_file(self, source: Path, destination: Path, *, workspace: Path) -> None:
+        self._run_command(
             ["install", "-D", "-m", "0755", str(source), str(destination)],
-            privileged=True,
+            self._command_provenance(
+                ["install", "-D", "-m", "0755", str(source), str(destination)],
+                operation="install-release-asset",
+                method="release-asset",
+                phase="image-install",
+                owner="image-installer",
+                privileged=True,
+            ),
+            workspace=workspace,
         )
 
 
-def _download(url: str, destination: Path) -> None:
-    """Download a pinned HTTPS asset without invoking a shell command."""
+def _download(
+    url: str,
+    destination: Path,
+    *,
+    operation: NetworkOperation | None = None,
+) -> None:
+    """Download only a manifest-owned image-install network operation."""
+    if operation is None:
+        raise DependencyError(
+            "command-boundary-network-fetch: unowned network operation"
+        )
+    if (
+        operation.phase != "image-install"
+        or operation.owner != "image-installer"
+        or not operation.allow_network
+        or not operation.record_id
+        or operation.operation not in _NETWORK_OPERATION_METHODS
+        or operation.method != _NETWORK_OPERATION_METHODS[operation.operation]
+        or operation.url != url
+    ):
+        raise DependencyError(
+            "command-boundary-network-fetch: network operation is not image-owned"
+        )
     with urllib.request.urlopen(url) as response, destination.open("wb") as output:
         shutil.copyfileobj(response, output)
 
@@ -3977,7 +5314,12 @@ def resolve_verified_executable(
     ):
         raise DependencyError(f"{record_id}: executable receipt binding is stale")
     installer = Installer()
-    installer.verify(record, workspace=workspace, strict_executables=True)
+    installer.verify(
+        record,
+        workspace=workspace,
+        strict_executables=True,
+        allow_network=False,
+    )
     live_bindings = installer._executable_bindings(record, workspace=workspace)
     live = live_bindings.get(executable)
     if live is None:
@@ -4036,6 +5378,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--workspace", default=".")
     parser.add_argument("--vendor-root")
     parser.add_argument("--receipts")
+    parser.add_argument(
+        "--final-binary-dir",
+        help="image-owned destination directory for built Cargo binaries",
+    )
     parser.add_argument("--extras", default="")
     parser.add_argument(
         "--records",
@@ -4093,6 +5439,11 @@ def main(argv: Sequence[str] | None = None) -> int:
                         plan,
                         workspace=workspace,
                         records=selected_records,
+                        final_binary_dir=(
+                            Path(args.final_binary_dir).resolve()
+                            if args.final_binary_dir
+                            else None
+                        ),
                     )
                     payload = {
                         "status": "pass",

@@ -98,6 +98,8 @@ def write_active_packet_manifest(
         created_at_iso="2026-07-26T00:00:00Z",
         roles=(),
         workspace_root=PROJECT_ROOT,
+        agentcanon_source_root=PROJECT_ROOT,
+        report_root=report_dir.parent,
         active_design_packet=normalized_packet,
     )
     projection = active_design_packet_reference_projection(

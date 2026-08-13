@@ -36,6 +36,13 @@ from eval_manifest_paths import (
     relative_manifest_path,
     resolve_eval_manifest,
 )
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    attest_parent_root,
+)
 from runtime_log_paths import agent_canon_root, eval_results_dir
 from workflow_monitor import MonitoringEntries, append_monitoring
 
@@ -47,6 +54,20 @@ GIT_COMMAND_TIMEOUT_SECONDS = 5
 COMPACT_MISSING_REQUIRED_SAMPLE_LIMIT = 5
 COMPACT_MATCHED_FORBIDDEN_SAMPLE_LIMIT = 5
 COMPACT_FAILED_CHECK_SAMPLE_LIMIT = 25
+
+
+def _parent_capability(purpose: str):
+    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    if not configured:
+        raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
+    parent = Path(configured)
+    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
+    return ParentRootSideEffectBoundary(), attestation
+
+
+def _parent_write(path: Path, data: bytes, purpose: str) -> None:
+    boundary, attestation = _parent_capability(purpose)
+    boundary.write_parent_owned_file(attestation, path, data, purpose)
 
 
 @dataclass(frozen=True)
@@ -416,11 +437,16 @@ def expand_eval_entry(
             f"eval {eval_id} target_glob expected_count={expected_count} "
             f"actual_count={len(paths)} pattern={pattern}"
         )
+    canonical_target = (
+        resolve_target(root, str(entry["canonical_target"]))
+        if entry.get("canonical_target") is not None
+        else None
+    )
     return tuple(
         PromptEval(
             eval_id=f"{eval_id}:{path.relative_to(root).as_posix()}",
             target=path,
-            canonical_target=None,
+            canonical_target=canonical_target,
             kind=kind,
             description=description,
             checklist=checklist,
@@ -626,10 +652,10 @@ def compact_summary(bundle: EvalRunBundle, outputs: EvalOutputs) -> dict[str, ob
 
 def write_compact_summary(path: Path, bundle: EvalRunBundle, outputs: EvalOutputs) -> Path:
     """Write a bounded JSON summary for agent consumption."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(compact_summary(bundle, outputs), indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    _parent_write(
+        path,
+        (json.dumps(compact_summary(bundle, outputs), indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        "skill-workflow-evaluation-summary",
     )
     return path
 
@@ -698,8 +724,8 @@ def render_markdown_report(
 def write_report(request: ReportWriteRequest) -> Path:
     """Write a Markdown eval report."""
     report_path = unique_report_path(Path(request.path), request.bundle.metadata)
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(
+    _parent_write(
+        report_path,
         render_markdown_report(
             request.bundle,
             dependency_paths=report_dependency_paths(
@@ -707,8 +733,8 @@ def write_report(request: ReportWriteRequest) -> Path:
                 request.root,
                 request.bundle.manifest,
             ),
-        ),
-        encoding="utf-8",
+        ).encode("utf-8"),
+        "skill-workflow-evaluation-report",
     )
     return report_path
 
@@ -798,7 +824,10 @@ def write_accumulated_report(request: AccumulatedReportRequest) -> Path:
     """Write one non-overwriting accumulated eval report."""
     status = eval_status(request.bundle.results, request.bundle.audit)
     output_dir = request.results_dir
-    output_dir.mkdir(parents=True, exist_ok=True)
+    boundary, attestation = _parent_capability("skill-workflow-evaluation-results")
+    boundary.ensure_parent_owned_directory(
+        attestation, output_dir, "skill-workflow-evaluation-results"
+    )
     report_path = output_dir / report_slug(
         request.bundle.manifest,
         request.bundle.metadata,
@@ -852,9 +881,9 @@ _T14_PARENT_HEADER = (
     "schema=agent_canon.t14.agent_evaluation.v1\n"
     "run_id={run_id}\n"
     "run_root=reports/agents/{run_id}/\n"
-    "workspace_root=/tmp/agentcanon-type-design-workspaces/{run_id}/\n"
+    "workspace_root=.agent-canon/tmp/agentcanon-type-design-workspaces/{run_id}/\n"
     "raw_report_base=reports/agents/{run_id}/evaluator_artifacts/\n"
-    "return_artifact_base=/tmp/agentcanon-type-design-workspaces/{run_id}/\n"
+    "return_artifact_base=.agent-canon/tmp/agentcanon-type-design-workspaces/{run_id}/\n"
     "iteration_count=2\n"
     "scenario_count=3\n"
 )
@@ -862,8 +891,13 @@ _T14_PARENT_HEADER = (
 
 def compute_t14_packet_digest(packet_path: Path) -> str:
     """Return the digest of one canonical, frozen T14 packet."""
+    raw = packet_path.read_bytes()
+    return _compute_t14_packet_digest_bytes(raw)
+
+
+def _compute_t14_packet_digest_bytes(raw: bytes) -> str:
+    """Return the T14 digest after the caller has receipt-read the bytes."""
     try:
-        raw = packet_path.read_bytes()
         text = raw.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise T14EvaluationError("t14-packet-digest-mismatch") from exc
@@ -971,6 +1005,8 @@ def parse_skill_evaluator_report(
     expected_scenario_id: str,
     expected_iteration: int,
     expected_attempt: int,
+    *,
+    raw_bytes: bytes | None = None,
 ) -> SkillEvaluatorReport:
     """Parse one exact five-section, parent-owned T14 evaluator report."""
     if raw_evaluator_report != expected_raw_evaluator_report:
@@ -984,8 +1020,10 @@ def parse_skill_evaluator_report(
         raise SkillEvaluatorReportParseError("t14-report-iteration-path-mismatch")
     if raw_evaluator_report.stem != expected_scenario_id:
         raise SkillEvaluatorReportParseError("t14-report-path-mismatch")
+    if raw_bytes is None:
+        raw_bytes = raw_evaluator_report.read_bytes()
     try:
-        text = raw_evaluator_report.read_bytes().decode("utf-8")
+        text = raw_bytes.decode("utf-8")
     except UnicodeDecodeError as exc:
         raise SkillEvaluatorReportParseError("t14-report-invalid-utf8") from exc
     normalized = text.replace("\r\n", "\n").replace("\r", "\n")
@@ -1091,11 +1129,22 @@ def _t14_summary_blocks(text: str) -> list[dict[str, str]]:
     return summaries
 
 
-def _t14_parent_text(parent_evaluation: Path, run_id: str) -> str:
+def _t14_parent_text(
+    parent_evaluation: Path,
+    run_id: str,
+    *,
+    parent_bytes: bytes | None,
+    parent_present: bool,
+) -> str:
     """Return an existing parent file or the exact initial header."""
-    if not parent_evaluation.exists():
+    if not parent_present:
         return _T14_PARENT_HEADER.format(run_id=run_id) + "\n"
-    text = parent_evaluation.read_text(encoding="utf-8")
+    if parent_bytes is None:
+        raise T14EvaluationError("t14-iteration-order")
+    try:
+        text = parent_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise T14EvaluationError("t14-iteration-order") from exc
     header = _T14_PARENT_HEADER.format(run_id=run_id)
     if not text.startswith(header):
         raise T14EvaluationError("t14-iteration-order")
@@ -1165,28 +1214,107 @@ def record_t14_evaluation(
         raise T14EvaluationError("t14-unexpected-iteration")
     if raw_evaluator_report != expected_raw_evaluator_report:
         raise T14EvaluationError("t14-raw-report-exists")
-    parent_text = _t14_parent_text(parent_evaluation, run_id)
+    boundary, attestation = _parent_capability("skill-workflow-evaluator-raw")
+    parent_receipt = boundary.resolve_parent_owned_path(
+        attestation,
+        parent_evaluation,
+        "skill-workflow-parent-evaluation",
+        create=False,
+    )
+    raw_receipt = boundary.resolve_parent_owned_path(
+        attestation,
+        raw_evaluator_report,
+        "skill-workflow-evaluator-raw",
+        create=False,
+    )
+    expected_raw_receipt = boundary.resolve_parent_owned_path(
+        attestation,
+        expected_raw_evaluator_report,
+        "skill-workflow-evaluator-raw-expected",
+        create=False,
+    )
+    packet_receipt = boundary.resolve_parent_owned_path(
+        attestation,
+        scenario_packet,
+        "skill-workflow-scenario-packet",
+        create=False,
+    )
+    return_artifact = (
+        attestation.parent_root
+        / ".agent-canon"
+        / "tmp"
+        / "agentcanon-type-design-workspaces"
+        / run_id
+        / f"iteration-{expected_iteration}"
+        / f"attempt-{expected_attempt}"
+        / expected_scenario_id
+        / "evaluator_return.bin"
+    )
+    return_receipt = boundary.resolve_parent_owned_path(
+        attestation,
+        return_artifact,
+        "skill-workflow-evaluator-return",
+        create=False,
+    )
+    prior_receipt = None
+    if expected_attempt > 0:
+        prior = (
+            raw_evaluator_report.parent.parent
+            / f"attempt-{expected_attempt - 1}"
+            / raw_evaluator_report.name
+        )
+        prior_receipt = boundary.resolve_parent_owned_path(
+            attestation,
+            prior,
+            "skill-workflow-evaluator-prior-attempt",
+            create=False,
+        )
+
+    parent_bytes = (
+        boundary.read_parent_owned_file(parent_receipt)
+        if parent_receipt.target_dev is not None
+        else None
+    )
+    scenario_bytes = (
+        boundary.read_parent_owned_file(packet_receipt)
+        if packet_receipt.target_dev is not None
+        else None
+    )
+    return_bytes = (
+        boundary.read_parent_owned_file(return_receipt)
+        if return_receipt.target_dev is not None
+        else None
+    )
+    prior_exists = prior_receipt is not None and prior_receipt.target_dev is not None
+    parent_text = _t14_parent_text(
+        parent_evaluation,
+        run_id,
+        parent_bytes=parent_bytes,
+        parent_present=parent_receipt.target_dev is not None,
+    )
     _t14_validate_effective_retry_counts(parent_text)
     _t14_validate_record_order(parent_text, expected_scenario_id, expected_iteration)
-    if raw_evaluator_report.exists():
+    if raw_receipt.target_dev is not None:
         raise T14EvaluationError("t14-raw-report-exists")
-    if expected_attempt > 0:
-        prior = raw_evaluator_report.parent.parent / f"attempt-{expected_attempt - 1}" / raw_evaluator_report.name
-        if not prior.is_file():
-            raise T14EvaluationError("t14-attempt-order")
-    actual_digest = compute_t14_packet_digest(scenario_packet)
+    if expected_raw_receipt.target_dev is not None:
+        raise T14EvaluationError("t14-raw-report-exists")
+    if expected_attempt > 0 and not prior_exists:
+        raise T14EvaluationError("t14-attempt-order")
+    if scenario_bytes is None:
+        raise T14EvaluationError("t14-packet-digest-mismatch")
+    actual_digest = _compute_t14_packet_digest_bytes(scenario_bytes)
     if actual_digest != expected_packet_digest:
         raise T14EvaluationError("t14-packet-digest-mismatch")
-    return_artifact = Path(
-        "/tmp/agentcanon-type-design-workspaces"
-    ) / run_id / f"iteration-{expected_iteration}" / f"attempt-{expected_attempt}" / expected_scenario_id / "evaluator_return.bin"
-    if not return_artifact.is_file() or return_artifact.read_bytes() != evaluator_bytes:
+    if return_bytes is None or return_bytes != evaluator_bytes:
         raise T14EvaluationError("t14-report-failure")
-    raw_evaluator_report.parent.mkdir(parents=True, exist_ok=True)
     try:
-        with raw_evaluator_report.open("xb") as handle:
-            handle.write(evaluator_bytes)
-    except FileExistsError as exc:
+        published_raw_receipt = boundary.write_parent_owned_file(
+            attestation,
+            raw_evaluator_report,
+            evaluator_bytes,
+            "skill-workflow-evaluator-raw",
+        )
+    except OSError as exc:
         raise T14EvaluationError("t14-raw-report-exists") from exc
     report = parse_skill_evaluator_report(
         raw_evaluator_report,
@@ -1195,6 +1323,7 @@ def record_t14_evaluation(
         expected_scenario_id,
         expected_iteration,
         expected_attempt,
+        raw_bytes=boundary.read_parent_owned_file(published_raw_receipt),
     )
     relative_raw = _t14_relative_raw_path(raw_evaluator_report, parent_evaluation)
     effective_retry = expected_attempt + report.retry_count
@@ -1215,11 +1344,12 @@ def record_t14_evaluation(
         + ";".join(f"{requirement_id}:{result_status}" for requirement_id, result_status, _ in report.requirement_results)
         + "\nparser_status=pass\n"
     )
-    parent_evaluation.parent.mkdir(parents=True, exist_ok=True)
-    if parent_evaluation.exists():
-        parent_evaluation.write_text(parent_text + "\n" + block, encoding="utf-8")
-    else:
-        parent_evaluation.write_text(parent_text + block, encoding="utf-8")
+    boundary.write_parent_owned_file(
+        attestation,
+        parent_evaluation,
+        (parent_text + ("\n" if parent_receipt.target_dev is not None else "") + block).encode("utf-8"),
+        "skill-workflow-parent-evaluation",
+    )
     return report
 
 
@@ -1301,54 +1431,69 @@ def append_t14_iteration_summary(
     """Append exactly one deterministic summary for one completed iteration."""
     if iteration not in {1, 2}:
         raise T14EvaluationError("t14-iteration-order")
-    text = parent_evaluation.read_text(encoding="utf-8")
-    summaries = _t14_summary_blocks(text)
-    if any(summary.get("iteration") == str(iteration) for summary in summaries):
-        raise T14EvaluationError("t14-duplicate-summary")
-    if iteration != len(summaries) + 1:
-        raise T14EvaluationError("t14-iteration-order")
-    reports = tuple(scenario_reports)
-    complete_structure = (
-        len(reports) == len(_T14_SCENARIOS)
-        and tuple(report.scenario_id for report in reports) == _T14_SCENARIOS
-        and all(report.iteration == iteration for report in reports)
-        and set(graph_check_status) == set(_T14_SCENARIOS)
-    )
-    try:
-        score = _t14_decimal(parent_score_percent)
-        gap = _t14_decimal(holdout_gap_percent)
-    except T14EvaluationError:
-        score = Decimal("0")
-        gap = Decimal("0")
-        complete_structure = False
-        blocked_reason = "t14-score-out-of-range"
-    else:
-        blocked_reason = "t14-incomplete-iteration"
-    if not complete_structure:
-        blocked = (
-            f"## Iteration {iteration} Summary\n"
-            f"iteration={iteration}\n"
-            "parent_score_percent=unscored\n"
-            "parent_critical_pass=unknown\n"
-            "holdout_gap_percent=unscored\n"
-            "retry_counts=none\n"
-            "ambiguities=none\n"
-            "provenance=none\n"
-            "graph_checks=none\n"
-            "convergence=blocked\n"
-            f"convergence_reason={blocked_reason}\n"
+    boundary, attestation = _parent_capability("skill-workflow-parent-evaluation")
+    with boundary.open_parent_owned_file(
+        attestation,
+        parent_evaluation,
+        "skill-workflow-parent-evaluation",
+        create=False,
+        mode="r+",
+    ) as parent_handle:
+        parent_handle.seek(0)
+        text = parent_handle.read()
+        summaries = _t14_summary_blocks(text)
+        if any(summary.get("iteration") == str(iteration) for summary in summaries):
+            raise T14EvaluationError("t14-duplicate-summary")
+        if iteration != len(summaries) + 1:
+            raise T14EvaluationError("t14-iteration-order")
+        reports = tuple(scenario_reports)
+        complete_structure = (
+            len(reports) == len(_T14_SCENARIOS)
+            and tuple(report.scenario_id for report in reports) == _T14_SCENARIOS
+            and all(report.iteration == iteration for report in reports)
+            and set(graph_check_status) == set(_T14_SCENARIOS)
         )
-        parent_evaluation.write_text(text.rstrip("\n") + "\n\n" + blocked, encoding="utf-8")
-        return
-    summary = _t14_summary_line_values(
-        iteration,
-        reports,
-        graph_check_status,
-        score,
-        parent_critical_pass,
-        gap,
-    )
-    parent_evaluation.write_text(text.rstrip("\n") + "\n\n" + summary, encoding="utf-8")
+        try:
+            score = _t14_decimal(parent_score_percent)
+            gap = _t14_decimal(holdout_gap_percent)
+        except T14EvaluationError:
+            score = Decimal("0")
+            gap = Decimal("0")
+            complete_structure = False
+            blocked_reason = "t14-score-out-of-range"
+        else:
+            blocked_reason = "t14-incomplete-iteration"
+        if not complete_structure:
+            updated = (
+                text.rstrip("\n")
+                + "\n\n"
+                + (
+                    f"## Iteration {iteration} Summary\n"
+                    f"iteration={iteration}\n"
+                    "parent_score_percent=unscored\n"
+                    "parent_critical_pass=unknown\n"
+                    "holdout_gap_percent=unscored\n"
+                    "retry_counts=none\n"
+                    "ambiguities=none\n"
+                    "provenance=none\n"
+                    "graph_checks=none\n"
+                    "convergence=blocked\n"
+                    f"convergence_reason={blocked_reason}\n"
+                )
+            )
+        else:
+            summary = _t14_summary_line_values(
+                iteration,
+                reports,
+                graph_check_status,
+                score,
+                parent_critical_pass,
+                gap,
+            )
+            updated = text.rstrip("\n") + "\n\n" + summary
+        parent_handle.seek(0)
+        parent_handle.write(updated)
+        parent_handle.truncate()
 
 
 def _t14_summary_map(text: str) -> dict[int, dict[str, str]]:
@@ -1393,27 +1538,39 @@ def _t14_failure_code_for_summaries(summaries: Mapping[int, Mapping[str, str]]) 
 
 def finalize_t14_evaluation(parent_evaluation: Path) -> None:
     """Append the sole final parent summary after the two iteration summaries."""
-    text = parent_evaluation.read_text(encoding="utf-8")
-    if "## Parent Summary" in text:
-        raise T14EvaluationError("t14-duplicate-summary")
-    summaries = _t14_summary_map(text)
-    failure_code = _t14_failure_code_for_summaries(summaries)
-    converged = sum(1 for summary in summaries.values() if summary.get("convergence") == "converged")
-    second = summaries.get(2, {})
-    score = second.get("parent_score_percent", "unscored")
-    critical = second.get("parent_critical_pass", "unknown")
-    if failure_code == "none" and critical != "yes":
-        failure_code = "t14-retry-mismatch"
-    completion = "complete" if failure_code == "none" else "incomplete"
-    block = (
-        "## Parent Summary\n"
-        f"consecutive_converged_iterations={converged}\n"
-        f"parent_score_percent={score}\n"
-        f"parent_critical_pass={critical}\n"
-        f"completion={completion}\n"
-        f"failure_code={failure_code}\n"
-    )
-    parent_evaluation.write_text(text.rstrip("\n") + "\n\n" + block, encoding="utf-8")
+    boundary, attestation = _parent_capability("skill-workflow-parent-evaluation")
+    with boundary.open_parent_owned_file(
+        attestation,
+        parent_evaluation,
+        "skill-workflow-parent-evaluation",
+        create=False,
+        mode="r+",
+    ) as parent_handle:
+        parent_handle.seek(0)
+        text = parent_handle.read()
+        if "## Parent Summary" in text:
+            raise T14EvaluationError("t14-duplicate-summary")
+        summaries = _t14_summary_map(text)
+        failure_code = _t14_failure_code_for_summaries(summaries)
+        converged = sum(1 for summary in summaries.values() if summary.get("convergence") == "converged")
+        second = summaries.get(2, {})
+        score = second.get("parent_score_percent", "unscored")
+        critical = second.get("parent_critical_pass", "unknown")
+        if failure_code == "none" and critical != "yes":
+            failure_code = "t14-retry-mismatch"
+        completion = "complete" if failure_code == "none" else "incomplete"
+        block = (
+            "## Parent Summary\n"
+            f"consecutive_converged_iterations={converged}\n"
+            f"parent_score_percent={score}\n"
+            f"parent_critical_pass={critical}\n"
+            f"completion={completion}\n"
+            f"failure_code={failure_code}\n"
+        )
+        updated = text.rstrip("\n") + "\n\n" + block
+        parent_handle.seek(0)
+        parent_handle.write(updated)
+        parent_handle.truncate()
 
 
 def append_prompt_eval_monitoring(

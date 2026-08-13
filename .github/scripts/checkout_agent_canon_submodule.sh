@@ -4,7 +4,9 @@
 # responsibility Checks out the AgentCanon submodule without persisting repository credentials across workflow steps.
 # upstream design ../../documents/agent-canon/agent-canon-github-remote.md defines private submodule auth policy.
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md defines GitHub runtime behavior.
+# upstream implementation ../../tools/agent_tools/parent_root_side_effects.py owns temporary credential material and exact cleanup.
 # downstream implementation ../../tools/ci/check_github_workflows.py enforces workflow usage.
+# downstream implementation ../../tests/tools/test_checkout_agent_canon_submodule.py verifies process-local auth and credential cleanup.
 # @dependency-end
 
 set -euo pipefail
@@ -14,6 +16,16 @@ token="${AGENT_CANON_REPO_TOKEN:-}"
 ssh_key="${AGENT_CANON_REPO_SSH_KEY:-}"
 unset AGENT_CANON_REPO_TOKEN AGENT_CANON_REPO_SSH_KEY
 ssh_key_dir=""
+parent_root="$(git rev-parse --show-toplevel)"
+boundary_script="${parent_root}/tools/agent_tools/parent_root_side_effects.py"
+if [ ! -f "$boundary_script" ] && [ -f "${parent_root}/vendor/agent-canon/tools/agent_tools/parent_root_side_effects.py" ]; then
+  boundary_script="${parent_root}/vendor/agent-canon/tools/agent_tools/parent_root_side_effects.py"
+fi
+if [ ! -f "$boundary_script" ]; then
+  echo "AGENT_CANON_SUBMODULE=missing_boundary path=${boundary_script}" >&2
+  exit 2
+fi
+cd "$parent_root"
 
 # Credentials are never written to GITHUB_ENV, and no global URL rewrite is
 # persisted.
@@ -30,15 +42,25 @@ if [ -z "$submodule_url" ]; then
 fi
 
 cleanup_ssh_key() {
+  local status=$?
+  local cleanup_status=0
+  trap - EXIT
   if [ -n "$ssh_key_dir" ]; then
-    rm -rf "$ssh_key_dir"
+    python3 "$boundary_script" remove-tree \
+      --root "$parent_root" \
+      --candidate "$ssh_key_dir" \
+      --purpose agent-canon-submodule-auth-cleanup >/dev/null || cleanup_status=$?
   fi
+  if [ "$status" -eq 0 ] && [ "$cleanup_status" -ne 0 ]; then
+    status=$cleanup_status
+  fi
+  exit "$status"
 }
 
 trap cleanup_ssh_key EXIT
 
-if git -C "$submodule_path" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  if [ -n "$(git -C "$submodule_path" status --short --untracked-files=all)" ]; then
+if git -c "safe.directory=${parent_root}/${submodule_path}" -C "$submodule_path" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  if [ -n "$(git -c "safe.directory=${parent_root}/${submodule_path}" -C "$submodule_path" status --short --untracked-files=all)" ]; then
     cat >&2 <<EOF
 AGENT_CANON_SUBMODULE=dirty
 Refusing to update dirty submodule '${submodule_path}'.
@@ -52,16 +74,33 @@ prepare_ssh_key() {
   [ -n "$ssh_key" ] || return 0
   [ -z "$token" ] || return 0
 
-  ssh_key_dir="$(mktemp -d "${RUNNER_TEMP:-/tmp}/agent-canon-ssh.XXXXXX")"
-  printf '%s\n' "$ssh_key" | tr -d '\r' >"${ssh_key_dir}/key"
-  chmod 600 "${ssh_key_dir}/key"
-  ssh-keyscan github.com >"${ssh_key_dir}/known_hosts" 2>/dev/null
+  ssh_key_dir="$(
+    python3 "$boundary_script" temp-dir \
+      --root "$parent_root" \
+      --candidate "$parent_root/.agent-canon/tmp" \
+      --prefix agent-canon-ssh. \
+      --purpose agent-canon-submodule-auth
+  )"
+  printf '%s\n' "$ssh_key" | tr -d '\r' | python3 "$boundary_script" write \
+    --root "$parent_root" \
+    --candidate "${ssh_key_dir}/key" \
+    --purpose agent-canon-submodule-ssh-key >/dev/null
+  python3 "$boundary_script" capture-subprocess \
+    --root "$parent_root" \
+    --candidate "${ssh_key_dir}/known_hosts" \
+    --purpose agent-canon-submodule-known-hosts \
+    -- ssh-keyscan github.com >/dev/null
   export GIT_SSH_COMMAND="ssh -i ${ssh_key_dir}/key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile=${ssh_key_dir}/known_hosts"
 }
 
 git_auth() {
+  local safe_directory_args=(
+    -c "safe.directory=${parent_root}"
+    -c "safe.directory=${parent_root}/${submodule_path}"
+  )
   if [ -n "$token" ]; then
     git \
+      "${safe_directory_args[@]}" \
       -c "url.https://x-access-token:${token}@github.com/.insteadOf=https://github.com/" \
       -c "url.https://x-access-token:${token}@github.com/.insteadOf=git@github.com:" \
       "$@"
@@ -69,15 +108,15 @@ git_auth() {
   fi
   if [ -n "$ssh_key" ]; then
     git \
+      "${safe_directory_args[@]}" \
       -c "url.git@github.com:.insteadOf=https://github.com/" \
       "$@"
     return
   fi
-  git "$@"
+  git "${safe_directory_args[@]}" "$@"
 }
 
 export GIT_TERMINAL_PROMPT=0
-git config --global --add safe.directory "$PWD" || true
 
 if git ls-remote "$submodule_url" HEAD >/dev/null 2>&1; then
   token=""
@@ -118,7 +157,6 @@ fi
 
 git_auth submodule sync --recursive "$submodule_path"
 git_auth -c protocol.version=2 submodule update --init --force --depth=1 --recursive "$submodule_path"
-git config --global --add safe.directory "$PWD/$submodule_path" || true
 
-submodule_sha="$(git -C "$submodule_path" rev-parse HEAD)"
+submodule_sha="$(git -c "safe.directory=${parent_root}/${submodule_path}" -C "$submodule_path" rev-parse HEAD)"
 echo "AGENT_CANON_SUBMODULE=ready path=${submodule_path} sha=${submodule_sha}"
