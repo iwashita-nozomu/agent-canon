@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -23,7 +24,8 @@ from typing import cast
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RENDER_GRAPH = PROJECT_ROOT / "tools" / "agent_tools" / "render_dependency_manifest_graph.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
-from render_dependency_manifest_graph import GraphIR  # noqa: E402
+import visualization_contract as contract  # noqa: E402
+from render_dependency_manifest_graph import HTML_SCRIPT, GraphIR  # noqa: E402
 
 
 def run_renderer(*args: str, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -617,17 +619,6 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
 
     def test_regression_no_fixed_evidence_caps_and_large_focus_options(self) -> None:
         """High-degree, diagnostic, broken target, and focus evidence is not fixed-count sliced."""
-        source_text = RENDER_GRAPH.read_text(encoding="utf-8")
-        for forbidden in (
-            "MAX_REPORTED_CYCLES",
-            "MAX_REPORTED_BROKEN_TARGETS",
-            "HIGH_DEGREE_NODE_LIMIT",
-            "MAX_DATALIST_OPTIONS",
-            "nodeRecords.slice",
-            "incident.slice",
-            "viz_contract._",
-        ):
-            self.assertNotIn(forbidden, source_text)
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             graph = root / "graph.tsv"
@@ -663,6 +654,7 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
             self.assertIn("nodeRecords.forEach", rendered_html)
             self.assertIn("Complete node list (1206)", rendered_html)
             self.assertIn("node-1205.md", rendered_html)
+            self.assertNotIn("trimVisibleModel", rendered_html)
 
     def test_regression_bundle_text_and_json_formats(self) -> None:
         """Bundle stdout respects --format for text and JSON envelopes."""
@@ -752,10 +744,7 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
             self.assertEqual(report["source_counts"]["module"], 1)
             self.assertEqual(report["source_counts"], report["rendered_counts"])
             self.assertEqual(report["source_counts"], report["readback_counts"])
-            self.assertNotIn("MAX_RENDER_NODES", rendered_html)
-            self.assertNotIn("fetch(", rendered_html)
-            self.assertNotIn("XMLHttpRequest", rendered_html)
-            self.assertNotIn('import "', rendered_html)
+            self.assertEqual(report["violations"], [])
             self.assertIn('id="direction-filters"', rendered_html)
             self.assertIn('id="focus"', rendered_html)
             self.assertIn('id="inspector-content"', rendered_html)
@@ -819,6 +808,239 @@ class RenderDependencyManifestGraphContractTest(unittest.TestCase):
             rendered_html = html_out.read_text(encoding="utf-8")
             for identity in identities:
                 self.assertIn(identity, rendered_html)
+
+    def test_issue694_html_readback_uses_visible_nested_records_and_ir_order(self) -> None:
+        """Visible deletion/decoys fail while nested IR and input-order joins remain exact."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            for path in ("root.md", "a/b/c.md", "a/b/deep/d.py"):
+                target = root / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(path, encoding="utf-8")
+            graph = root / "graph.tsv"
+            rows = [
+                ("downstream", "implementation", "a/b/deep/d.py", "root.md"),
+                ("upstream", "design", "root.md", "a/b/c.md"),
+            ]
+            write_graph(graph, rows)
+            html_out = root / "graph.html"
+            result = run_renderer(
+                "--root", str(root), "--graph-tsv", str(graph),
+                "--html-out", str(html_out), "--format", "json",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            envelope = json.loads(result.stdout)
+            coverage = envelope["visualization_coverage"]["dependency_graph.html"]
+            self.assertEqual(coverage["report"]["status"], "pass")
+            rendered = html_out.read_text(encoding="utf-8")
+            embedded = rendered.split(
+                '<script id="graph-data" type="application/json">', 1
+            )[1].split("</script>", 1)[0]
+            ir = json.loads(embedded)
+            universe = envelope["visualization_source_universe"]
+            universe_ids = {item["item_id"] for item in universe["items"]}
+            ir_node_ids = {node["id"] for node in ir["nodes"]}
+            ir_edge_ids = {edge["id"] for edge in ir["edges"]}
+            self.assertTrue({"dir:.", "dir:a", "dir:a/b", "dir:a/b/deep"} <= ir_node_ids)
+            self.assertTrue(
+                {item_id for item_id in universe_ids if item_id.startswith("dir:")} <= ir_node_ids
+            )
+            self.assertTrue(
+                {item_id for item_id in universe_ids if item_id.startswith("contains:")} <= ir_edge_ids
+            )
+            for item in universe["items"]:
+                if item["item_id"].startswith("edge:") and item["item_id"].split(":", 2)[1].isdigit():
+                    ordinal = int(item["item_id"].split(":", 2)[1])
+                    edge = next(edge for edge in ir["edges"] if edge["id"] == f"edge:{ordinal:06d}")
+                    payload = json.loads(item["payload_json"])
+                    self.assertEqual(edge["payload_json"]["direction"], payload["direction"])
+                    self.assertEqual(edge["payload_json"]["kind"], payload["kind"])
+                    self.assertEqual(edge["payload_json"]["source"], payload["source"])
+                    self.assertEqual(edge["payload_json"]["target"], payload["target"])
+                    self.assertEqual(edge["payload_json"]["row"], ordinal)
+
+            def readback(value: str) -> contract.ReadbackProjection:
+                return contract.readback_projection(
+                    value, "html", artifact_id="dependency_graph.html",
+                    renderer_id="dependency-manifest-graph",
+                )
+
+            without_svg = re.sub(
+                r'<svg id="static-graph".*?</svg>', "", rendered, count=1, flags=re.S
+            )
+            deleted = readback(without_svg)
+            self.assertEqual(deleted["status"], "fail")
+            self.assertIn("visible_surface_missing", {v["code"] for v in deleted["violations"]})
+            with_hidden_decoy = rendered.replace(
+                "</body>",
+                '<div hidden data-agent-canon-source-id="node:decoy">node:decoy</div></body>',
+            )
+            self.assertEqual(readback(with_hidden_decoy)["status"], "pass")
+            without_nodes = re.sub(
+                r'<table id="node-table".*?</table>', "", rendered, count=1, flags=re.S
+            )
+            missing_table = readback(without_nodes)
+            self.assertEqual(missing_table["status"], "fail")
+            self.assertIn("visible_surface_missing", {v["code"] for v in missing_table["violations"]})
+
+    def test_issue694_html_resource_graph_is_context_sensitive(self) -> None:
+        """Resource-bearing contexts fail offline while graph text and strings remain data."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            graph = root / "graph.tsv"
+            write_graph(graph, [("upstream", "design", "https://text.example", "node.md")])
+            (root / "node.md").write_text("node", encoding="utf-8")
+            output = root / "graph.html"
+            result = run_renderer(
+                "--root", str(root), "--graph-tsv", str(graph),
+                "--html-out", str(output), "--format", "json",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rendered = output.read_text(encoding="utf-8")
+
+            def readback(value: str) -> contract.ReadbackProjection:
+                return contract.readback_projection(
+                    value, "html", artifact_id="dependency_graph.html",
+                    renderer_id="dependency-manifest-graph",
+                )
+
+            text_only = rendered.replace(
+                "</body>",
+                "<p>https://text.example fetch( XMLHttpRequest import(</p></body>",
+            )
+            self.assertEqual(readback(text_only)["status"], "pass")
+            html_resource = rendered.replace(
+                "</head>", '<link rel="stylesheet" href="https://example.invalid/x.css"></head>',
+            )
+            self.assertIn("external_resource", {v["code"] for v in readback(html_resource)["violations"]})
+            css_resource = rendered.replace(
+                "</head>", "<style>.x { background: url(https://example.invalid/x.png) }</style></head>",
+            )
+            self.assertIn("external_resource", {v["code"] for v in readback(css_resource)["violations"]})
+            js_string = rendered.replace(
+                "</body>", '<script>const label = "fetch(https://example.invalid)";</script></body>',
+            )
+            self.assertEqual(readback(js_string)["status"], "pass")
+            js_api = rendered.replace(
+                "</body>", '<script>fetch("https://example.invalid");</script></body>',
+            )
+            self.assertIn("script_network_api", {v["code"] for v in readback(js_api)["violations"]})
+
+    def test_issue694_html_visible_payload_and_graph_ir_duplicates_fail_closed(self) -> None:
+        """Exact visible fields, duplicate IR records, and edge endpoints are authoritative."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            graph = root / "graph.tsv"
+            write_graph(
+                graph,
+                [
+                    ("upstream", "design", "a.md", "a/b.md"),
+                    ("downstream", "implementation", "a/b.md", "a.md"),
+                ],
+            )
+            (root / "a.md").write_text("a", encoding="utf-8")
+            (root / "a").mkdir()
+            (root / "a" / "b.md").write_text("b", encoding="utf-8")
+            output = root / "graph.html"
+            result = run_renderer(
+                "--root", str(root), "--graph-tsv", str(graph),
+                "--html-out", str(output), "--format", "json",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            rendered = output.read_text(encoding="utf-8")
+            data_start = '<script id="graph-data" type="application/json">'
+            embedded = rendered.split(data_start, 1)[1].split("</script>", 1)[0]
+
+            def readback(value: str) -> contract.ReadbackProjection:
+                return contract.readback_projection(
+                    value, "html", artifact_id="dependency_graph.html",
+                    renderer_id="dependency-manifest-graph",
+                )
+
+            exact_field = rendered.replace(
+                '<tr data-agent-canon-source-id="node:a.md"><td>root</td><td><code>a.md</code></td><td><code>root</code></td><td><code>a.md</code></td>',
+                '<tr data-agent-canon-source-id="node:a.md"><td>root</td><td><code>a.md</code></td><td><code>root</code></td><td><code>a.md2</code></td>',
+                1,
+            )
+            exact_failure = readback(exact_field)
+            self.assertEqual(exact_failure["status"], "fail")
+            self.assertIn(
+                "ir_surface_mismatch",
+                {violation["code"] for violation in exact_failure["violations"]},
+            )
+
+            ir = json.loads(embedded)
+
+            def with_ir(mutator: object) -> str:
+                changed = json.loads(embedded)
+                mutator(changed)
+                return rendered.replace(embedded, json.dumps(changed, ensure_ascii=False), 1)
+
+            duplicate_mutators = {
+                "native node": lambda value: value["nodes"].append(value["nodes"][0]),
+                "directory node": lambda value: value["nodes"].append(
+                    next(node for node in value["nodes"] if node["kind"] == "directory")
+                ),
+                "dependency edge": lambda value: value["edges"].append(
+                    next(edge for edge in value["edges"] if edge["relation"] != "contains")
+                ),
+                "containment edge": lambda value: value["edges"].append(
+                    next(edge for edge in value["edges"] if edge["relation"] == "contains")
+                ),
+            }
+            self.assertTrue(ir["nodes"])
+            for label, mutator in duplicate_mutators.items():
+                with self.subTest(label=label):
+                    duplicate = readback(with_ir(mutator))
+                    self.assertEqual(duplicate["status"], "fail")
+                    self.assertIn(
+                        "ir_surface_mismatch",
+                        {violation["code"] for violation in duplicate["violations"]},
+                    )
+
+            def swap_dependency_endpoints(value: dict[str, object]) -> None:
+                edge = next(edge for edge in value["edges"] if edge["relation"] != "contains")
+                edge["from_node_id"], edge["to_node_id"] = edge["to_node_id"], edge["from_node_id"]
+
+            endpoint_failure = readback(with_ir(swap_dependency_endpoints))
+            self.assertEqual(endpoint_failure["status"], "fail")
+            self.assertIn(
+                "ir_surface_mismatch",
+                {violation["code"] for violation in endpoint_failure["violations"]},
+            )
+
+    def test_issue694_node_vm_model_region_preserves_filter_semantics(self) -> None:
+        """The exact inline model region executes offline for default/query/focus/filter states."""
+        model = HTML_SCRIPT.split("/* AGENT_CANON_MODEL_BEGIN */", 1)[1].split(
+            "/* AGENT_CANON_MODEL_END */", 1
+        )[0]
+        nodes = [{"id": f"node-{index:04d}.md", "group": "root"} for index in range(2048)]
+        edges = [
+            {"direction": "upstream", "kind": "design", "source": nodes[index]["id"], "target": nodes[index + 1]["id"]}
+            for index in range(2047)
+        ]
+        harness = f"""
+const vm = require('vm');
+const DATA = {json.dumps({'nodes': nodes, 'edges': edges, 'directions': ['upstream'], 'kinds': ['design']})};
+const nodeRecords = DATA.nodes.map((node) => ({{...node, search: node.id.toLowerCase()}}));
+const edgeRecords = DATA.edges.map((edge, index) => ({{...edge, index, sourceSearch: edge.source.toLowerCase(), targetSearch: edge.target.toLowerCase()}}));
+const byId = new Map(nodeRecords.map((node) => [node.id, node]));
+const state = {{query: '', focus: '', depth: 1, directions: new Set(DATA.directions), kinds: new Set(DATA.kinds)}};
+function addListValue(map, key, value) {{ if (!map.has(key)) map.set(key, []); map.get(key).push(value); }}
+{model}
+function check(actual, expected, name) {{ if (actual !== expected) throw new Error(name + ': ' + actual + ' != ' + expected); }}
+let result = visibleModel(); check(result.nodes.length, 2048, 'default nodes'); check(result.edges.length, 2047, 'default edges');
+state.query = 'node-0001'; result = visibleModel(); check(result.edges.length, 2, 'query edges'); check(result.nodes.length, 3, 'query nodes');
+state.query = ''; state.focus = 'node-1000.md'; state.depth = 0; result = visibleModel(); check(result.nodes.length, 1, 'focus depth 0 nodes'); check(result.edges.length, 0, 'focus depth 0 edges');
+state.depth = 1; result = visibleModel(); check(result.nodes.length, 3, 'focus depth 1 nodes'); check(result.edges.length, 2, 'focus depth 1 edges');
+state.focus = ''; state.directions.clear(); result = visibleModel(); check(result.nodes.length, 2048, 'filter retains isolated nodes'); check(result.edges.length, 0, 'filter edges');
+state.query = 'no-match'; result = visibleModel(); check(result.nodes.length, 0, 'empty query nodes'); check(result.edges.length, 0, 'empty query edges');
+"""
+        with tempfile.NamedTemporaryFile("w", suffix=".js", encoding="utf-8") as script:
+            script.write(harness)
+            script.flush()
+            result = subprocess.run(["node", script.name], capture_output=True, text=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
 
 
 if __name__ == "__main__":
