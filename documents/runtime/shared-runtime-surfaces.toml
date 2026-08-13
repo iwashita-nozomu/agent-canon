@@ -9,9 +9,10 @@
 version = 1
 prefix = "vendor/agent-canon"
 
-# The parent root exposes only the instruction entrypoint, Codex config, and
-# the AgentCanon CLI/tool namespace.  The source tree itself remains under the
-# vendor prefix; this manifest is not a second ownership map.
+# The parent root exposes only the instruction entrypoint, the complete Codex
+# runtime configuration, and the AgentCanon CLI/tool namespace.  The source
+# tree itself remains under the vendor prefix; this manifest is not a second
+# ownership map.
 [[surface]]
 path = "AGENTS.md"
 mode = "symlink"
@@ -24,6 +25,14 @@ local_override_allowed = false
 path = ".codex/config.toml"
 mode = "symlink"
 source = ".codex/config.toml"
+projection_producer = "agent-canon"
+projection_kind = "runtime_surface"
+local_override_allowed = false
+
+[[surface]]
+path = ".codex/agents"
+mode = "symlink"
+source = ".codex/agents"
 projection_producer = "agent-canon"
 projection_kind = "runtime_surface"
 local_override_allowed = false
@@ -58,7 +67,6 @@ paths = [
   ".agents",
   "agents",
   ".codex/README.md",
-  ".codex/agents",
   ".codex/hooks.json",
   ".codex/hooks",
   ".devcontainer",
