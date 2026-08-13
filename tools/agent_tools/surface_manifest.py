@@ -73,6 +73,7 @@ DOC_ALWAYS_REQUIRED_MARKERS = (
     "documents/runtime/shared-runtime-surfaces.toml",
     "AGENTS.md",
     ".codex/config.toml",
+    ".codex/agents",
     "tools/agent-canon",
     "Root `tools/` is a parent-owned regular container",
     "tools/agent-canon -> ../vendor/agent-canon/tools",
