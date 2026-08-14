@@ -31,6 +31,20 @@ from typing import cast
 DEFAULT_MANIFEST = Path("documents/runtime/shared-runtime-surfaces.toml")
 DEFAULT_DOC = Path("documents/runtime/SHARED_RUNTIME_SURFACES.md")
 NORMALIZED_SNAPSHOT_SCHEMA = "agent-canon.surface-manifest.v1"
+ALLOWED_INTEGRATION_MODES = frozenset({"live-agent-canon", "static-seed"})
+ALLOWED_SELECTIONS = frozenset({"explicit-opt-in", "default"})
+LEGACY_MANIFEST_VERSION = 1
+SYNC_SPEC_COMMANDS = frozenset(
+    {
+        "link-specs",
+        "copy-specs",
+        "update-transition-specs",
+        "regular-specs",
+        "removed-legacy-paths",
+        "root-absent-paths",
+    }
+)
+MANIFEST_COMMANDS = SYNC_SPEC_COMMANDS | frozenset({"normalized-snapshot", "check-doc"})
 ALLOWED_MODES = frozenset(
     {
         "symlink",
@@ -72,7 +86,16 @@ ALLOWED_PROJECTION_KINDS = frozenset(
     }
 )
 CURRENT_TOP_LEVEL_KEYS = frozenset(
-    {"version", "prefix", "surface", "group", "update_transition"}
+    {
+        "version",
+        "prefix",
+        "integration_mode",
+        "default_consumer",
+        "selection",
+        "surface",
+        "group",
+        "update_transition",
+    }
 )
 LEGACY_TOP_LEVEL_KEYS = frozenset({"version", "prefix", "surface", "group"})
 CURRENT_SURFACE_KEYS = frozenset(
@@ -114,6 +137,33 @@ DOC_ALWAYS_REQUIRED_MARKERS = (
     "vendor/agent-canon/tools/",
     "Project-local automation must stay in project-owned paths",
 )
+
+
+@dataclass(frozen=True)
+class SurfaceSelection:
+    """Typed integration selection metadata for one surface manifest."""
+
+    integration_mode: str
+    default_consumer: bool
+    selection: str
+
+    @property
+    def is_live_agent_canon(self) -> bool:
+        """Return whether this selection is the explicitly selected live mode."""
+        return (
+            self.integration_mode == "live-agent-canon"
+            and self.default_consumer is False
+            and self.selection == "explicit-opt-in"
+        )
+
+    def require_live_agent_canon(self, operation: str) -> None:
+        """Reject sync operations for a non-live or default consumer manifest."""
+        if not self.is_live_agent_canon:
+            raise ValueError(
+                f"{operation} requires live-agent-canon,false,explicit-opt-in selection"
+            )
+
+
 @dataclass(frozen=True)
 class SurfaceEntry:
     """One root runtime surface contract."""
@@ -136,8 +186,28 @@ class SurfaceManifest:
     """Validated manifest content."""
 
     prefix: str
+    surface_selection: SurfaceSelection
     entries: tuple[SurfaceEntry, ...]
     update_transitions: tuple[UpdateTransition, ...]
+
+    @property
+    def integration_mode(self) -> str:
+        """Return the validated integration mode."""
+        return self.surface_selection.integration_mode
+
+    @property
+    def default_consumer(self) -> bool:
+        """Return the validated default-consumer flag."""
+        return self.surface_selection.default_consumer
+
+    @property
+    def selection(self) -> str:
+        """Return the validated selection mode."""
+        return self.surface_selection.selection
+
+    def require_live_agent_canon(self, operation: str) -> None:
+        """Require the explicit live integration for a sync operation."""
+        self.surface_selection.require_live_agent_canon(operation)
 
     def by_mode(self, mode: str) -> tuple[SurfaceEntry, ...]:
         """Return manifest entries for one mode."""
@@ -187,16 +257,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="Manifest path relative to AgentCanon prefix or root.",
     )
     subcommands = parser.add_subparsers(dest="command", required=True)
-    for command in (
-        "link-specs",
-        "copy-specs",
-        "update-transition-specs",
-        "regular-specs",
-        "removed-legacy-paths",
-        "root-absent-paths",
-        "normalized-snapshot",
-        "check-doc",
-    ):
+    for command in sorted(MANIFEST_COMMANDS):
         subcommands.add_parser(command)
     return parser
 
@@ -215,6 +276,13 @@ def bool_value(mapping: Mapping[str, object], key: str, default: bool) -> bool:
     if not isinstance(value, bool):
         raise ValueError(f"{key} must be a boolean")
     return value
+
+
+def required_string_value(mapping: Mapping[str, object], key: str) -> str:
+    """Return a mandatory string field."""
+    if key not in mapping:
+        raise ValueError(f"{key} is required")
+    return string_value(mapping, key)
 
 
 def path_list(mapping: Mapping[str, object]) -> tuple[str, ...]:
@@ -245,6 +313,57 @@ def validate_entry(entry: SurfaceEntry) -> SurfaceEntry:
     if entry.mode in {"symlink", "copy"} and not entry.source_or_default():
         raise ValueError(f"{entry.path}: {entry.mode} requires a source")
     return entry
+
+
+def validate_manifest_metadata(
+    integration_mode: str, default_consumer: bool, selection: str
+) -> SurfaceSelection:
+    """Validate the top-level integration selection contract."""
+    if integration_mode not in ALLOWED_INTEGRATION_MODES:
+        raise ValueError(f"invalid integration_mode {integration_mode}")
+    if selection not in ALLOWED_SELECTIONS:
+        raise ValueError(f"invalid selection {selection}")
+    if integration_mode == "live-agent-canon":
+        if default_consumer:
+            raise ValueError(
+                "live-agent-canon integration must not be the default consumer"
+            )
+        if selection != "explicit-opt-in":
+            raise ValueError(
+                "live-agent-canon integration requires explicit-opt-in selection"
+            )
+    elif not default_consumer or selection != "default":
+        raise ValueError(
+            "static-seed integration must be the default consumer with default selection"
+        )
+    return SurfaceSelection(integration_mode, default_consumer, selection)
+
+
+def selection_from_mapping(data: Mapping[str, object]) -> SurfaceSelection:
+    """Load complete metadata or map an unannotated v1 manifest to its legacy mode."""
+    metadata_keys = frozenset({"integration_mode", "default_consumer", "selection"})
+    present = metadata_keys.intersection(data)
+    if not present:
+        if "version" not in data:
+            raise ValueError(
+                "version = 1 is required for an unannotated legacy manifest"
+            )
+        version = data["version"]
+        if type(version) is not int:
+            raise ValueError("version must be an integer")
+        if version != LEGACY_MANIFEST_VERSION:
+            raise ValueError(
+                "integration metadata is required for non-v1 surface manifests"
+            )
+        return SurfaceSelection("live-agent-canon", False, "explicit-opt-in")
+    if present != metadata_keys:
+        missing = ",".join(sorted(metadata_keys - present))
+        raise ValueError(f"integration metadata must be complete; missing {missing}")
+    return validate_manifest_metadata(
+        required_string_value(data, "integration_mode"),
+        bool_value(data, "default_consumer", False),
+        required_string_value(data, "selection"),
+    )
 
 
 def default_local_override(projection_producer: str) -> bool:
@@ -406,9 +525,12 @@ def _normalize_manifest_schema(
     current field names directly, so a legacy file cannot silently influence
     sync or cleanup decisions.
     """
-    version = data.get("version")
-    if type(version) is not int or version != 1:
-        raise ValueError(f"unsupported manifest version {version!r}")
+    if "version" in data:
+        version = data["version"]
+        if type(version) is not int:
+            raise ValueError("version must be an integer")
+        if version != LEGACY_MANIFEST_VERSION:
+            raise ValueError(f"unsupported manifest version {version!r}")
     unknown_top_level = set(data) - CURRENT_TOP_LEVEL_KEYS
     if unknown_top_level:
         raise ValueError(
@@ -487,6 +609,7 @@ def load_manifest(
     raw_data = cast(
         Mapping[str, object], tomllib.loads(path.read_text(encoding="utf-8"))
     )
+    surface_selection = selection_from_mapping(raw_data)
     data = _normalize_manifest_schema(
         raw_data, allow_legacy_aliases=allow_legacy_aliases
     )
@@ -509,6 +632,7 @@ def load_manifest(
         raise ValueError("duplicate update_transition ids")
     return SurfaceManifest(
         prefix=manifest_prefix,
+        surface_selection=surface_selection,
         entries=tuple(entries),
         update_transitions=update_transitions,
     )
@@ -677,6 +801,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             args.manifest,
             allow_legacy_aliases=args.command == "normalized-snapshot",
         )
+        if args.command in SYNC_SPEC_COMMANDS:
+            manifest.require_live_agent_canon(args.command)
     except ValueError as exc:
         print(f"SURFACE_MANIFEST_ERROR={exc}", file=sys.stderr)
         return 1

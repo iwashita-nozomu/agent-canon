@@ -1,18 +1,20 @@
 # @dependency-start
 # contract reference
-# responsibility Defines the minimal AgentCanon root projection mechanics.
-# upstream design ./SHARED_RUNTIME_SURFACES.md shared root projection policy
+# responsibility Defines the explicit opt-in live AgentCanon root projection mechanics.
+# upstream design ./SHARED_RUNTIME_SURFACES.md explicit live integration policy
 # downstream implementation ../../tools/agent_tools/surface_manifest.py parses this manifest
-# downstream implementation ../../tools/sync_agent_canon.sh consumes link and retired-path specs
+# downstream implementation ../../tools/sync_agent_canon.sh consumes link and retired-path specs only after explicit live integration selection
 # @dependency-end
 
 version = 1
 prefix = "vendor/agent-canon"
+integration_mode = "live-agent-canon"
+default_consumer = false
+selection = "explicit-opt-in"
 
-# The parent root exposes only the instruction entrypoint, the complete Codex
-# runtime configuration, and the AgentCanon CLI/tool namespace.  The source
-# tree itself remains under the vendor prefix; this manifest is not a second
-# ownership map.
+# These projections belong only to the named live integration. The default
+# template/bootstrap path owns a source-free static seed and never consumes
+# this manifest.
 [[surface]]
 path = "AGENTS.md"
 mode = "symlink"
@@ -45,9 +47,6 @@ projection_producer = "agent-canon"
 projection_kind = "runtime_surface"
 local_override_allowed = false
 
-# Optional transaction state is created by the update lifecycle only when a
-# parent explicitly selects that route.  It is never materialized as a shared
-# root mirror by link-root.
 [[surface]]
 path = ".agent-canon"
 mode = "repo_state"
@@ -56,9 +55,6 @@ projection_kind = "transaction_state"
 optional = true
 local_override_allowed = false
 
-# Retired root views are removed only when the parent path is still a symlink
-# (or a known generated copy).  Parent-owned regular content is preserved by
-# sync_agent_canon.sh.
 [[group]]
 mode = "removed_legacy"
 projection_producer = "legacy"

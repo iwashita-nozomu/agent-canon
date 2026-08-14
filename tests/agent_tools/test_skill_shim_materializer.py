@@ -45,7 +45,13 @@ class SkillShimMaterializerTest(unittest.TestCase):
 
     def test_materialize_fixed_point(self) -> None:
         """Two runs preserve all records/projections and the second run is empty."""
-        actual = fixed_point_acceptance(PROJECT_ROOT)
+        # Materializer writes are intentionally parent-bound even in direct unit
+        # runs. Scope the capability to this test instead of mutating the test
+        # process environment at module import time.
+        with patch.dict(
+            "os.environ", {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
+        ):
+            actual = fixed_point_acceptance(PROJECT_ROOT)
         expected = json.loads(
             (
                 PROJECT_ROOT

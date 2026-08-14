@@ -113,12 +113,16 @@ ISSUE_CONTRACT_MARKERS: dict[str, tuple[tuple[str, str], ...]] = {
     ),
     "start-repository": (
         (
-            "remote-doc-template-path",
-            "vendor/agent-canon/documents/agent-canon/agent-canon-github-remote.md",
+            "remote-doc-project-path",
+            "documents/contracts/template-github-remote.md",
         ),
         (
-            "profile-doc-template-path",
-            "vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md",
+            "bootstrap-doc-project-path",
+            "documents/contracts/template-bootstrap.md",
+        ),
+        (
+            "static-seed-contract-path",
+            "documents/contracts/static-seed-export.md",
         ),
     ),
     "tool-finding-report": (

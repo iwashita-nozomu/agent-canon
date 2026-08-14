@@ -137,6 +137,9 @@ MINIMAL_REPO_FILES: dict[str, str] = {
     "documents/runtime/shared-runtime-surfaces.toml": (
         'version = 1\n'
         'prefix = "vendor/agent-canon"\n'
+        'integration_mode = "live-agent-canon"\n'
+        'default_consumer = false\n'
+        'selection = "explicit-opt-in"\n'
         'path = "AGENTS.md"\n'
         'path = ".codex/config.toml"\n'
         'path = ".codex/agents"\n'
