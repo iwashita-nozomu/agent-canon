@@ -5,8 +5,10 @@ contract skill
 responsibility Executes targeted commands inside an already-running Dev Container.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../CONTAINER_OPERATIONS.md container and devcontainer ownership boundary
+upstream design ./environment-maintenance.md canonical image-build and full-test acceptance owner
 downstream implementation ../../tools/agent_tools/skill_shim_materializer.py runtime discovery shim
 downstream implementation ../../tools/agent_tools/route.py prompt route
+downstream implementation ../../tests/agent_tools/test_environment_skill_expected_structure.py acceptance-boundary contract
 @dependency-end
 -->
 
@@ -16,7 +18,8 @@ downstream implementation ../../tools/agent_tools/route.py prompt route
 - Use When: 起動済み container で `devcontainer exec` を使い、zsh または caller-selected test を実行するときに使います。
 - Boundary: Dockerfile、dependency、devcontainer の起動・build・設定変更は
   `environment-maintenance` または `dependency-design` に渡します。GPU profile の意味は
-  `gpu-execution` の owner に残します。
+  `gpu-execution` の owner に残します。既存containerの実行結果はenvironment acceptanceではなく、
+  canonical imageのbuildと`docker run`による標準テスト一式を置き換えません。
 
 ## Workflow
 
@@ -49,6 +52,8 @@ downstream implementation ../../tools/agent_tools/route.py prompt route
 
 5. caller が指定した targeted test だけを実行し、検証範囲を広げません。startup/build request
    や Dockerfile/dependency/config change はこの skill の owner ではありません。
+   repository environmentの完成判定を求められた場合は`environment-maintenance`へ渡し、
+   clean buildしたcanonical imageを`docker run`して標準テスト一式を実行します。
 
 ## Completion And Failure Semantics
 
@@ -65,3 +70,6 @@ downstream implementation ../../tools/agent_tools/route.py prompt route
 exit status が非ゼロの場合は成功へ変換せず、元の status と出力をそのまま報告します。
 profile selector、workspace、target、または container identity の不一致は fail-closed とし、
 default fallback や別の実行経路で補いません。
+
+このskillの成功はrequested commandの成功だけを示します。image constructionやrepositoryの
+標準テスト一式の成功を示すものではありません。

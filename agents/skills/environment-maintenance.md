@@ -2,110 +2,130 @@
 <!--
 @dependency-start
 contract skill
-responsibility Documents environment-maintenance for this repository.
+responsibility Owns the expected Dockerfile-to-image-to-test structure for repository environments.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../CONTAINER_OPERATIONS.md canonical container and devcontainer ownership boundary
-upstream design ../../documents/design/devcontainer/parent-dependency-manifest-followup.md dependency-design packet and parent follow-up contract
+downstream implementation ./dependency-design.md dependency placement under the expected structure
+downstream implementation ./environment-cleanup.md environment cleanup route
+downstream implementation ./devcontainer-exec.md targeted running-container execution boundary
+downstream implementation ../../tests/agent_tools/test_environment_skill_expected_structure.py expected-structure contract
 @dependency-end
 -->
 
-
 ## Reader Map
 
-- Purpose: routes Docker, CI, dependency, and development-environment changes
-  through explicit proposal, validation, and rollback evidence.
-- Use When: touching runtime images, dependency manifests, CI, devcontainer, or
-  environment compatibility guidance.
-- Section path: Purpose, Use When, and Core References set scope; Required
-  Proposal Fields, Operating Rules, and Validation are the operational rules;
-  Boundary limits environment authority.
-- Boundary: environment-dependent tools should not become hidden local
-  prerequisites.
+- Purpose: Docker、CI、dependency、Dev Container の変更を、同じ canonical image
+  から実行と検証が完結する構造へそろえます。
+- Use When: runtime image、dependency、CI、Dev Container、Compose、container profile、
+  environment compatibility guidance を変更するときに使います。
+- Section path: Expected Structure を判断の起点にし、Required Change Fields、
+  Operating Rules、Validation、Completion の順で閉じます。
+- Boundary: source、data、model、credential、GPU driver/device などの runtime input は
+  image 外に置けますが、標準環境の構築には使いません。
+
+## Expected Structure
+
+環境設計は次の完成状態から逆算します。
+
+```text
+Dockerfile -> canonical image -> docker run <canonical-full-test-command> -> pass
+```
+
+- Dockerfile の canonical target が、repository の標準実行・開発・検証commandに
+  必要なOS package、language runtime、compiler、CLI、Python/Node等のdependency、
+  shell/runtime設定を所有します。
+- buildしたimageは、Feature、initialize、post-create、post-attach、host interpreter、
+  mounted installer、workspace venv、previous container stateに依存せず、
+  `docker run`からrepositoryの標準テスト一式を完了します。
+- Dev Container、Compose、runtime pack、GitHub Actionsは同じimageを選択・build・runし、
+  source/data mount、UID/GID、GPU/device、port、credential、secret、environment variable
+  の配線だけを担当します。
+- optional workflow capabilityが追加imageを必要とする場合も、そのworkflowが選ぶ
+  Dockerfile/OCI image targetとして完成させます。container起動後のinstallへ逃がしません。
+
+provider、manifest、Feature、lifecycle hook、Compose generatorなどの実装機構を選ぶ前に、
+この期待構造とcanonical full test commandを確定します。
 
 ## Purpose
 
-Docker、CI、dependency、runtime guidance を同じ変更でそろえ、どの code requirement が環境変更を要求したかを明示します。
+code requirementが必要とする環境capabilityをcanonical imageへ配置し、local、Dev Container、
+CIで同じimageとtest commandを再利用できる状態にします。
 
 ## Use When
 
-- Dockerfile 更新
-- CI 更新
-- dependency / runtime upgrade
-- repo-wide な tool 導入提案
-- host / container / CI の責務分担を決める変更
+- Dockerfileやcontainer image targetを更新する
+- dependency/runtime/toolchainを追加・更新・削除する
+- CI、Dev Container、Compose、runtime packを変更する
+- host/container/CIの責務分担を修正する
+- Dockerfile外のinstallerやmutable environmentを除去する
 
 ## Core References
 
 - `CONTAINER_OPERATIONS.md`
-- `documents/conventions/coding-conventions-project.md`
 - `documents/contracts/github-first-module-and-devcontainer-policy.md`
-- `documents/tools/README.md`
-- project-owned `docker/`（packs / Python execution rules は optional）
-- AgentCanon-owned `tools/ci/codex-container-profiles.toml`
-- `documents/contracts/server-host-contract.md`
-- `templates/documents/server_runtime_layout.template.toml`
-- `docker/`
+- `documents/conventions/coding-conventions-project.md`
+- project-owned `Dockerfile` / `docker/`
 - `.devcontainer/`
+- `.github/workflows/`
 - `README.md`
-- `templates/agents/environment_change_proposal.md`
+- `agents/skills/dependency-design.md`
 
-## Required Proposal Fields
+## Required Change Fields
 
-- code requirement と blocked command
-- 既存環境で足りない理由
-- 導入理由
-- 影響範囲
-- host / Docker / CI のどこを正本にするか
-- `pyproject.toml` selected extras、Docker image fixed Python/native capabilities、digest-pinned official Node OCI provider image、typed `.devcontainer/dependencies.toml`、`.devcontainer/` の更新要否
-- devcontainer / runtime pack / compose 相当面の更新要否
-- validation plan
-- rollback plan
+- canonical image targetとprofile
+- profileごとのcanonical full test command
+- imageへ含めるruntime/build/test dependency
+- image外に残すsource/data/model/credential/device等のruntime input
+- Dev Container、Compose、CIが参照する同一image target
+- Dockerfile外installerを削除する変更面
+- validation commandとrollback
 
 ## Operating Rules
 
-- Consume a passing `dependency-design` packet before changing dependency
-  manifests, devcontainer lifecycle order, or related validators.
-  Carry its owner, record inventory, merge/order evidence, and security fields
-  into the environment change.
-
-- Treat `CONTAINER_OPERATIONS.md` as the source of truth for Dockerfile,
-  `docker/`, `.devcontainer/`, validator, and Makefile target ownership. This
-  skill is only the routing checklist.
-- Docker / runtime を変える task は、先に `templates/agents/environment_change_proposal.md` に code requirement と blocked command を書きます。
-- 「何となく便利だから」で repo 正本の環境を変えません。必ず code path、command、run profile のどれが詰まっているかを残します。
-- code requirement を host-only の手元 install で回避できても、repo-wide に必要なものは Docker / CI / docs の正本へ入れます。
-- repo の共通環境に入れる tool は、個人環境前提の host-global install を正本にしません。
-- 独立した Python CLI は typed `.devcontainer/dependencies.toml` manifest から image build 時に `pipx` で隔離 install します。親が必要とする project Python dependencies は `pyproject.toml` selected extras に宣言し、親 image build の project-dependency lifecycle が導入・検証します。post-create は image-verify/readback のみを実行します。
-- Codex CLI、agent 用 npm / Node、GitHub CLI / `gh`、auth、host mount 方針は `CONTAINER_OPERATIONS.md` の devcontainer boundary に従います。
-- environment gate、Docker validation、venv prohibition check は Python に依存しない shell entrypoint を優先します。
-- Docker images own fixed Python/native capabilities, manifest tools, and parent-owned project dependencies; Node/npm is copied at image build from the exact digest-pinned official Node OCI provider image. A project-owned `VIRTUAL_ENV` may be selected by the project runtime contract, but the shared post-create lifecycle performs only image-verify and container runtime readback. It performs no editable install, pip setup, package mutation, network access, or workspace repair. Do not require a distro venv package, host-created virtual environments, or ad hoc `virtualenv`, `conda`, `uv`, `pipenv`, or `poetry` environments.
-- 1 回限りの手元補助なら、repo 正本に昇格させず代替案を先に検討します。
-- Docker、CI、README、workflow command が変わる場合は、同じ変更でそろえます。
-- Docker 変更では image fixed capabilities、digest-pinned official Node OCI provider image、`pyproject.toml` selected extras、optional runtime pack/rules、typed Agent tool manifest、parent-owned devcontainer、AgentCanon-owned Codex profiles、関連 README の要否を同じ pass で判定します。
-- `host / docker image / CI / shared script` のどこが source of truth かを曖昧にしたまま実装へ進めません。
-- 依存追加の提案だけで終わらせず、validate と rollback まで記録します。
-- canonical container の `safe.directory` 方針は `CONTAINER_OPERATIONS.md` と repo-local Docker runbook に従います。
-- 既存 code が要求する runtime capability を満たせないなら、implementation gate の前に environment design を凍結します。
+- dependencyの追加・移動・削除がある場合は、Expected Structureを固定したうえで
+  `dependency-design`へ渡し、各dependencyのimage target、provider、version/lock、
+  validation commandを決めます。
+- 標準commandに必要なdependencyはDockerfile build時に導入します。
+  typed manifestを使う場合もmanifestはbuild inputであり、runtime installerのownerにはしません。
+- Dev Container Feature、initialize/post-create/post-attach、Compose generator、
+  CI runner setup、shell startupからpackage manager、dependency resolver、venv生成、
+  editable install、global tool installを実行しません。
+- post-create等を残す場合は、image-owned stateとruntime wiringのread-only確認に限定し、
+  その処理がなくても`docker run`の標準テスト一式は成功しなければなりません。
+- local developer convenienceだけを理由にhost-global installやproject image外のbootstrapを
+  canonical routeへ昇格させません。
+- GPU imageはdeviceなしでbuild可能にし、GPU backend/deviceを必要とする標準テストは
+  GPU runner上で同じimageを`docker run --gpus ...`して実行します。
+- Dockerfile、Dev Container、Compose、CI、READMEのimage targetとcommandを同じ変更でそろえます。
+- 既存のrunning Dev Container内でcommandが通ることをenvironment acceptanceにしません。
+  previous mutable stateを排除したimage build/runがacceptance ownerです。
+- validation failureを解消するためにtest範囲やoracleを弱めません。imageに不足するcapabilityを
+  Dockerfileへ戻すか、canonical commandの実責務が誤っていることをowner evidenceで修正します。
 
 ## Validation
 
-- `bash tools/docker_dependency_validator.sh`
-- `python3 tools/ci/container_config.py`
-- exact Node OCI provider image digest and typed dependency extras readback
-- image-build project-dependency readback and image-verify plan/receipt/live-state readback
-- Agent tool manifest validation and explicit GPU host-orchestration checks
-- `make docker-build-check`
-- `python3 tools/ci/run_container_pack.py --print-only`（project pack を使う場合だけ `--pack <path>`）
-- `make server-check`
-- `make ci-quick`
-- 必要なら `make ci`
-- 文書更新を含む場合は `tools/bin/agent-canon docs check`
-- environment / CI validation failure を修復へ回す場合は、変更前に
-  validation-failure-response packet の `failing_contract`、
-  `observation_level`、`cause_classification`、`intent_preservation`、
-  `evidence` を記録し、pass 目的の validation downscope や oracle weakening を避けます。
+```bash
+python3 tools/ci/container_config.py
+docker build -f <Dockerfile> --target <canonical-target> -t <image> .
+docker run --rm <runtime-wiring> <image> <canonical-full-test-command>
+```
+
+- `container_config.py` はDockerfile、Dev Container、Compose、CIの静的なowner/target境界を検査します。
+  completion evidenceは後続のimage buildと`docker run`による標準テスト一式です。
+- supported profileごとに上記を実行します。
+- GPU deviceを必要とするtestはGPU runner上のcontainer実行で確認します。
+- focused policy testで、Dockerfile外のdependency導入とDev Container/CIのalternate
+  environment constructionを拒否します。
+- 文書変更はrepositoryのcanonical docs checkで検証します。
+
+## Completion
+
+- canonical Docker imageをbuildできる。
+- buildしたimageを`docker run`し、repositoryの標準テスト一式が追加setupなしで全て成功する。
+- Dev Container、Compose、CIは同じimageを使用し、起動後にenvironmentを構築しない。
 
 ## Boundary
 
-- 実験 loop 自体の運用は `adaptive-improvement-loop` または `research-workflow` を使います。
-- 差分レビューは `change-review` を使います。
+- 起動済みDev Container内のtargeted command実行は`devcontainer-exec`が所有します。
+- 実験loop自体の運用は`adaptive-improvement-loop`または`research-workflow`を使います。
+- 差分レビューは`change-review`を使います。
