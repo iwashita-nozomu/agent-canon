@@ -46,6 +46,17 @@ SCHEMA_FIELDS = {
 ENVIRONMENTS = {"tooling", "product"}
 ROUTES = {"docker", "devcontainer"}
 ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
+RECORD_IDENTITY_KEYS = (
+    "AGENT_CANON_PARENT_ROOT",
+    "AGENT_CANON_PARENT_ROOT_DEV",
+    "AGENT_CANON_PARENT_ROOT_INO",
+    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+    "AGENT_CANON_SOURCE_ROOT",
+    "AGENT_CANON_ROOT",
+    "AGENT_CANON_CHILD_HANDOFF",
+    "AGENT_CANON_CHILD_PURPOSE",
+    "AGENT_CANON_HANDOFF_AUDIENCE",
+)
 
 
 class SchemaError(ValueError):
@@ -215,8 +226,14 @@ def record_environment(
     child_environment = boundary.child_environment(
         attestation,
         base_env=record_environment_base,
-        issue_handoff=True,
+        issue_handoff=False,
     )
+    # A broad test record owns nested Git fixtures. Exporting the suite parent
+    # as ambient repository identity would make those fixtures authenticate the
+    # wrong root. Keep record-local state and the shared prebuilt tool selector;
+    # a writer test issues a capability for the fixture root it actually owns.
+    for key in RECORD_IDENTITY_KEYS:
+        child_environment.pop(key, None)
     return child_environment, record_receipt
 
 

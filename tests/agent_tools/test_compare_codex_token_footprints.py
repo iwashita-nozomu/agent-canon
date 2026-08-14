@@ -17,6 +17,11 @@ import time
 import unittest
 from pathlib import Path
 
+from tools.agent_tools.parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "compare_codex_token_footprints.py"
 
@@ -86,6 +91,68 @@ def write_two_event_session(path: Path, total_tokens: int) -> None:
         stream.write("\n")
 
 
+def writer_environment(root: Path) -> dict[str, str]:
+    """Issue a fixture-local parent capability for the monitoring writer."""
+    subprocess.run(
+        ["git", "init", "--quiet", "--initial-branch=main", str(root)],
+        check=True,
+    )
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith("AGENT_CANON_")
+        and key
+        not in {
+            "HOME",
+            "TMPDIR",
+            "TEMP",
+            "TMP",
+            "XDG_CACHE_HOME",
+            "XDG_CONFIG_HOME",
+            "XDG_DATA_HOME",
+            "PYTHONPYCACHEPREFIX",
+            "AGENT_CANON_TOOLS_HOME",
+            "CARGO_HOME",
+            "CARGO_TARGET_DIR",
+            "AGENT_CANON_CLI_TARGET_DIR",
+        }
+    }
+    boundary = ParentRootSideEffectBoundary()
+    purpose = "token-footprint-test"
+    attestation = boundary.attest(
+        ParentRootAttestationRequest(
+            cwd=root,
+            explicit_root=root,
+            purpose=purpose,
+        )
+    )
+    child = boundary.child_environment(
+        attestation,
+        base_env=environment,
+        issue_handoff=True,
+    )
+    for key, relative, purpose in (
+        ("HOME", ".agent-canon-test-home", "token-footprint-test-HOME"),
+        (
+            "XDG_CONFIG_HOME",
+            ".agent-canon-test-config",
+            "token-footprint-test-XDG-CONFIG-HOME",
+        ),
+        (
+            "XDG_DATA_HOME",
+            ".agent-canon-test-data",
+            "token-footprint-test-XDG-DATA-HOME",
+        ),
+    ):
+        directory = boundary.ensure_parent_owned_directory(
+            attestation,
+            root / relative,
+            purpose,
+        )
+        child[key] = str(directory.physical_path)
+    return child
+
+
 class CompareCodexTokenFootprintsTest(unittest.TestCase):
     """Verify session token footprint comparison status and evidence."""
 
@@ -113,7 +180,8 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
                     "--report-dir",
                     str(report_dir),
                 ],
-                cwd=PROJECT_ROOT,
+                cwd=root,
+                env=writer_environment(root),
                 check=False,
                 capture_output=True,
                 text=True,
@@ -182,7 +250,8 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
                     "--report-dir",
                     str(report_dir),
                 ],
-                cwd=PROJECT_ROOT,
+                cwd=root,
+                env=writer_environment(root),
                 check=False,
                 capture_output=True,
                 text=True,
