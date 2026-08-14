@@ -6,6 +6,8 @@
 # upstream design ../../documents/runtime/shared-runtime-surfaces.toml machine-readable surface manifest
 # downstream implementation ../sync_agent_canon.sh consumes sync specs from this manifest
 # downstream implementation ./check_convention_compliance.py validates manifest wiring
+# downstream implementation ../../tests/tools/test_update_agent_canon_surface_migration.py verifies nested retired descendants
+# downstream implementation ../../tests/tools/test_testrunner_schema.py validates source test-list ownership metadata
 # @dependency-end
 """Parse AgentCanon runtime surface projection manifests."""
 
@@ -68,6 +70,38 @@ ALLOWED_PROJECTION_KINDS = frozenset(
         "transaction_state",
         "removed_legacy",
     }
+)
+CURRENT_TOP_LEVEL_KEYS = frozenset(
+    {"version", "prefix", "surface", "group", "update_transition"}
+)
+LEGACY_TOP_LEVEL_KEYS = frozenset({"version", "prefix", "surface", "group"})
+CURRENT_SURFACE_KEYS = frozenset(
+    {
+        "path",
+        "mode",
+        "projection_producer",
+        "projection_kind",
+        "source",
+        "local_override_allowed",
+        "optional",
+    }
+)
+CURRENT_GROUP_KEYS = frozenset(
+    {
+        "mode",
+        "projection_producer",
+        "projection_kind",
+        "source_prefix",
+        "paths",
+        "local_override_allowed",
+        "optional",
+    }
+)
+LEGACY_SURFACE_KEYS = frozenset(
+    {"path", "mode", "owner", "class", "source", "local_override_allowed", "optional"}
+)
+LEGACY_GROUP_KEYS = frozenset(
+    {"mode", "owner", "class", "paths", "local_override_allowed"}
 )
 DOC_ALWAYS_REQUIRED_MARKERS = (
     "documents/runtime/shared-runtime-surfaces.toml",
@@ -362,10 +396,100 @@ def manifest_tables(data: Mapping[str, object], key: str) -> tuple[Mapping[str, 
     return tuple(tables)
 
 
-def load_manifest(root: Path, prefix: str, raw_manifest: str) -> SurfaceManifest:
+def _normalize_manifest_schema(
+    data: Mapping[str, object], *, allow_legacy_aliases: bool
+) -> Mapping[str, object]:
+    """Validate the manifest schema and normalize the one legacy alias form.
+
+    Legacy ``owner``/``class`` fields are accepted only for the producer's
+    version-1 normalized-snapshot command.  All other commands consume the
+    current field names directly, so a legacy file cannot silently influence
+    sync or cleanup decisions.
+    """
+    version = data.get("version")
+    if type(version) is not int or version != 1:
+        raise ValueError(f"unsupported manifest version {version!r}")
+    unknown_top_level = set(data) - CURRENT_TOP_LEVEL_KEYS
+    if unknown_top_level:
+        raise ValueError(
+            "unknown top-level manifest keys: "
+            + ",".join(sorted(unknown_top_level))
+        )
+
+    normalized = dict(data)
+    legacy_modes: list[bool] = []
+    for table_name, allowed_current, allowed_legacy in (
+        ("surface", CURRENT_SURFACE_KEYS, LEGACY_SURFACE_KEYS),
+        ("group", CURRENT_GROUP_KEYS, LEGACY_GROUP_KEYS),
+    ):
+        tables = manifest_tables(data, table_name)
+        normalized_tables: list[Mapping[str, object]] = []
+        for index, table in enumerate(tables):
+            fields = set(table)
+            current_pair = {
+                "projection_producer",
+                "projection_kind",
+            } & fields
+            legacy_pair = {"owner", "class"} & fields
+            location = f"{table_name}[{index}]"
+            if current_pair and legacy_pair:
+                raise ValueError(f"{location}: dual current and legacy aliases")
+            if current_pair:
+                if current_pair != {"projection_producer", "projection_kind"}:
+                    raise ValueError(f"{location}: incomplete current projection pair")
+                if fields - allowed_current:
+                    raise ValueError(
+                        f"{location}: unknown current keys: "
+                        + ",".join(sorted(fields - allowed_current))
+                    )
+                legacy_modes.append(False)
+                normalized_tables.append(table)
+                continue
+            if legacy_pair:
+                if legacy_pair != {"owner", "class"}:
+                    raise ValueError(f"{location}: incomplete legacy owner/class pair")
+                if not allow_legacy_aliases:
+                    raise ValueError(f"{location}: legacy aliases are unsupported here")
+                if fields - allowed_legacy:
+                    raise ValueError(
+                        f"{location}: unknown legacy keys: "
+                        + ",".join(sorted(fields - allowed_legacy))
+                    )
+                converted = dict(table)
+                converted["projection_producer"] = converted.pop("owner")
+                converted["projection_kind"] = converted.pop("class")
+                legacy_modes.append(True)
+                normalized_tables.append(converted)
+                continue
+            raise ValueError(f"{location}: projection pair is missing")
+        normalized[table_name] = normalized_tables
+
+    if allow_legacy_aliases and any(legacy_modes):
+        if not all(legacy_modes):
+            raise ValueError("normalized snapshot cannot mix current and legacy aliases")
+        if set(data) - LEGACY_TOP_LEVEL_KEYS:
+            raise ValueError(
+                "legacy normalized snapshot has unsupported top-level keys: "
+                + ",".join(sorted(set(data) - LEGACY_TOP_LEVEL_KEYS))
+            )
+    return normalized
+
+
+def load_manifest(
+    root: Path,
+    prefix: str,
+    raw_manifest: str,
+    *,
+    allow_legacy_aliases: bool = False,
+) -> SurfaceManifest:
     """Load and validate the surface manifest."""
     path = manifest_path(root, prefix, raw_manifest)
-    data = cast(Mapping[str, object], tomllib.loads(path.read_text(encoding="utf-8")))
+    raw_data = cast(
+        Mapping[str, object], tomllib.loads(path.read_text(encoding="utf-8"))
+    )
+    data = _normalize_manifest_schema(
+        raw_data, allow_legacy_aliases=allow_legacy_aliases
+    )
     manifest_prefix = string_value(data, "prefix", prefix)
     entries: list[SurfaceEntry] = []
     for group in manifest_tables(data, "group"):
@@ -547,7 +671,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     root = Path(args.root).resolve()
     try:
-        manifest = load_manifest(root, args.prefix, args.manifest)
+        manifest = load_manifest(
+            root,
+            args.prefix,
+            args.manifest,
+            allow_legacy_aliases=args.command == "normalized-snapshot",
+        )
     except ValueError as exc:
         print(f"SURFACE_MANIFEST_ERROR={exc}", file=sys.stderr)
         return 1
