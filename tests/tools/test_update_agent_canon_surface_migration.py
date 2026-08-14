@@ -63,6 +63,12 @@ def load_root_resolution_module() -> ModuleType:
 class SurfaceMigrationTest(unittest.TestCase):
     """Verify migration behavior for legacy parent root surfaces."""
 
+    def test_source_notes_do_not_retain_personal_memory_projections(self) -> None:
+        """Source notes remain usable without the retired personal-memory links."""
+        for name in ("USER_PREFERENCES.md", "AGENT_PHILOSOPHY.md"):
+            path = PROJECT_ROOT / "notes" / "themes" / name
+            self.assertFalse(os.path.lexists(path), path)
+
     def git(self, root: Path, *args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
         """Run one Git command in a fixture repository."""
         return subprocess.run(

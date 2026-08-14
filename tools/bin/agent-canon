@@ -28,17 +28,27 @@ resolve_roots() {
     fi
     parent_root="$(cd "${active_root}" && pwd -P)" || return 2
     source_root="$(cd "${AGENT_CANON_SOURCE_ROOT}" && pwd -P)" || return 2
+    boundary_script="${source_root}/tools/agent_tools/parent_root_side_effects.py"
     return 0
   fi
 
   # Normal invocations use the canonical resolver with the explicit current
   # cwd and wrapper-owned source root.  Environment identity claims are not a
   # root-selection mechanism; the parent boundary authenticates the result.
+  local resolver_root="${canon_root}"
+  if [ ! -f "${resolver_root}/agents/skills/catalog.yaml" ]; then
+    local cwd_root="$(pwd -P)"
+    if [ -f "${cwd_root}/agents/skills/catalog.yaml" ]; then
+      resolver_root="${cwd_root}"
+    elif [ -f "${cwd_root}/vendor/agent-canon/agents/skills/catalog.yaml" ]; then
+      resolver_root="${cwd_root}/vendor/agent-canon"
+    fi
+  fi
   local resolution
   local -a resolution_lines
   resolution="$(
-    PYTHONPATH="${canon_root}/tools${PYTHONPATH:+:${PYTHONPATH}}" \
-      python3 - "${canon_root}" <<'PY'
+    PYTHONPATH="${resolver_root}/tools${PYTHONPATH:+:${PYTHONPATH}}" \
+      python3 - "${resolver_root}" <<'PY'
 from pathlib import Path
 import sys
 
@@ -62,6 +72,7 @@ PY
   fi
   parent_root="${resolution_lines[0]}"
   source_root="${resolution_lines[1]}"
+  boundary_script="${source_root}/tools/agent_tools/parent_root_side_effects.py"
   if [ -n "${active_root}" ] \
     && [ "$(cd "${active_root}" && pwd -P)" != "${parent_root}" ]; then
     echo "agent-canon active repository root is not authoritative without a child handoff" >&2

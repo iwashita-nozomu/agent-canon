@@ -2074,8 +2074,8 @@ class RouteToolTest(unittest.TestCase):
         self.assertIn("structure-refactor", decision["matched_skills"])
         self.assertIn("structure-refactor", decision["active_skills"])
 
-    def test_prompt_routes_parent_repo_specific_skill_lane_design(self) -> None:
-        """Parent-repo-specific skill lane design should reach routing and structure."""
+    def test_prompt_routes_parent_repo_project_skill_discovery_lane(self) -> None:
+        """Parent-repo skill discovery should use the canonical structural lane."""
         result = self.run_route(
             "--prompt",
             "親レポに固有スキルを置けるようにする設計修正",
@@ -2091,14 +2091,14 @@ class RouteToolTest(unittest.TestCase):
         self.assertNotIn("environment-maintenance", decision["active_skills"])
         self.assertTrue(
             any(
-                "task-routing:structural_concept=parent_repo_project_skill_lane"
+                "task-routing:structural_concept=repository_skill_discovery_surface"
                 in reason
                 for reason in decision["reasons"]
             )
         )
         self.assertTrue(
             any(
-                "structure-refactor:structural_concept=parent_repo_project_skill_lane"
+                "structure-refactor:structural_concept=repository_skill_discovery_surface"
                 in reason
                 for reason in decision["reasons"]
             )

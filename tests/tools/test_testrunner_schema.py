@@ -35,8 +35,10 @@ class TestRunnerSchemaTest(unittest.TestCase):
         route: str = "docker",
     ) -> subprocess.CompletedProcess[str]:
         """Run the public runner against a temporary source root/list."""
+        parent_root = root.parent.parent
         env = {
             **os.environ,
+            "AGENT_CANON_PARENT_ROOT": str(parent_root),
             "AGENT_CANON_SOURCE_ROOT": str(root),
             "AGENT_CANON_TESTLIST": str(list_path),
             "AGENT_CANON_ACTIVE_ROUTE": route,
@@ -53,8 +55,11 @@ class TestRunnerSchemaTest(unittest.TestCase):
     def fixture(self, record_text: str) -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
         """Create a minimal source root with one declared owner/scope."""
         temp_dir = tempfile.TemporaryDirectory()
-        root = Path(temp_dir.name)
+        parent_root = Path(temp_dir.name)
+        root = parent_root / "vendor" / "agent-canon"
+        root.mkdir(parents=True)
         (root / "owner.py").write_text("# owner\n", encoding="utf-8")
+        subprocess.run(["git", "init", "--quiet", str(parent_root)], check=True)
         subprocess.run(["git", "init", "--quiet", str(root)], check=True)
         tool_dir = root / "tools" / "agent_tools"
         tool_dir.mkdir(parents=True)
@@ -69,6 +74,49 @@ class TestRunnerSchemaTest(unittest.TestCase):
         )
         list_path = root / "testlist.toml"
         list_path.write_text(record_text, encoding="utf-8")
+        (parent_root / ".gitmodules").write_text(
+            '[submodule "vendor/agent-canon"]\n'
+            "\tpath = vendor/agent-canon\n"
+            "\turl = https://example.invalid/agent-canon.git\n",
+            encoding="utf-8",
+        )
+        subprocess.run(["git", "-C", str(root), "add", "-A"], check=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "user.name=Runner Fixture",
+                "-c",
+                "user.email=runner-fixture@example.invalid",
+                "commit",
+                "-q",
+                "-m",
+                "source fixture",
+            ],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(parent_root), "add", ".gitmodules", "vendor/agent-canon"],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(parent_root),
+                "-c",
+                "user.name=Runner Fixture",
+                "-c",
+                "user.email=runner-fixture@example.invalid",
+                "commit",
+                "-q",
+                "-m",
+                "parent fixture",
+            ],
+            check=True,
+        )
         return temp_dir, root, list_path
 
     def test_comments_and_required_typed_fields_are_accepted(self) -> None:

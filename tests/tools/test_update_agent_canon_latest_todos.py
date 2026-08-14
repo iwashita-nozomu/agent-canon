@@ -51,6 +51,13 @@ def lifecycle_binding() -> dict[str, object]:
     }
 
 
+def test_update_and_sync_rebase_inherited_runner_tmpdir_before_handoff() -> None:
+    """Both parent-bound update entrypoints rebase runner-owned temp state."""
+    for script_name in ("update_agent_canon.sh", "sync_agent_canon.sh"):
+        script = (PROJECT_ROOT / "tools" / script_name).read_text(encoding="utf-8")
+        assert "--rebase-inherited-temp" in script
+
+
 def test_latest_consumes_g4_g5_receipts_without_rechecking_source(tmp_path: Path) -> None:
     """The downstream latest gate trusts one ordered projection/readback bundle."""
     binding = lifecycle_binding()
@@ -267,7 +274,7 @@ def _make_parent_with_tools_projection_with_submodule(
             source_dir = PROJECT_ROOT / "tools" / source_dir_name
             target_dir = vendor_tool_root / source_dir_name
             if not target_dir.exists():
-                shutil.copytree(source_dir, target_dir)
+                shutil.copytree(source_dir, target_dir, symlinks=True)
     if not init_submodule:
         shutil.rmtree(repo / "vendor" / "agent-canon")
     return repo, helper
@@ -289,8 +296,12 @@ def _make_parent_with_legacy_projection(tmp_root: Path) -> Path:
     legacy_agent_tools = repo / "vendor" / "agent-canon" / "tools" / "agent_tools"
     shutil.rmtree(legacy_ci, ignore_errors=True)
     shutil.rmtree(legacy_agent_tools, ignore_errors=True)
-    shutil.copytree(PROJECT_ROOT / "tools" / "ci", legacy_ci)
-    shutil.copytree(PROJECT_ROOT / "tools" / "agent_tools", legacy_agent_tools)
+    shutil.copytree(PROJECT_ROOT / "tools" / "ci", legacy_ci, symlinks=True)
+    shutil.copytree(
+        PROJECT_ROOT / "tools" / "agent_tools",
+        legacy_agent_tools,
+        symlinks=True,
+    )
     for asset in [
         "agents",
         "evidence",
@@ -317,7 +328,7 @@ def _make_parent_with_legacy_projection(tmp_root: Path) -> Path:
                 shutil.copy2(source_path, target_path)
             continue
         if source_path.is_dir():
-            shutil.copytree(source_path, target_path)
+            shutil.copytree(source_path, target_path, symlinks=True)
         elif source_path.is_file():
             shutil.copy2(source_path, target_path)
     legacy_contract = repo / "vendor" / "agent-canon" / "documents" / "repo-structure-contract.toml"
@@ -335,7 +346,7 @@ def _make_parent_with_legacy_projection(tmp_root: Path) -> Path:
         shutil.copy2(PROJECT_ROOT / "ROOT_AGENTS.md", legacy_root_file)
     legacy_codex_dir = repo / ".codex"
     if not legacy_codex_dir.exists():
-        shutil.copytree(PROJECT_ROOT / ".codex", legacy_codex_dir)
+        shutil.copytree(PROJECT_ROOT / ".codex", legacy_codex_dir, symlinks=True)
     return repo
 
 
@@ -417,7 +428,7 @@ def test_source_tools_root_prefers_vendor_tools_in_fresh_clone(tmp_path: Path) -
             source_dir = PROJECT_ROOT / "tools" / source_dir_name
             target_dir = fresh_vendor_tools / source_dir_name
             if not target_dir.exists():
-                shutil.copytree(source_dir, target_dir)
+                shutil.copytree(source_dir, target_dir, symlinks=True)
     (fresh_root / "tools").mkdir(parents=True, exist_ok=True)
     fallback_sync = fresh_root / "tools" / "sync_agent_canon.sh"
     fallback_sync.write_text(

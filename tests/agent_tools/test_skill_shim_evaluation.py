@@ -25,8 +25,10 @@ TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
 sys.path.insert(0, str(TOOLS_ROOT))
 
 import skill_shim_evaluation  # noqa: E402
+from skill_route_catalog import load_skill_catalog  # noqa: E402
 from skill_shim_evaluation import (  # noqa: E402
     ProducerError,
+    _host_envelope_value,
     _host_observation,
     _packet_manifest,
     _paired_reduction_summary,
@@ -62,8 +64,9 @@ class SkillShimEvaluationTest(unittest.TestCase):
 
     def test_tokens_measurement_fixture_has_paired_rows(self) -> None:
         """The fresh host fixture has current/generated rows and no absent usage."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as tmp_dir:
             output = Path(tmp_dir) / "measurement.json"
+            environment = os.environ | {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
             result = subprocess.run(
                 [
                     sys.executable,
@@ -87,19 +90,132 @@ class SkillShimEvaluationTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
                 check=False,
+                env=environment,
             )
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             payload = json.loads(output.read_text(encoding="utf-8"))
             self.assertEqual(payload["schema"], "agent_canon.skill_runtime_shim.measurement")
             self.assertEqual(payload["summary"]["scenario_row_count"], 12)
-            self.assertEqual(payload["summary"]["candidate_row_count"], 132)
+            catalog = load_skill_catalog(PROJECT_ROOT)
+            self.assertEqual(
+                payload["summary"]["candidate_row_count"],
+                payload["summary"]["scenario_row_count"]
+                + (2 * len(catalog["skill_families"])),
+            )
+            self.assertEqual(
+                payload["summary"]["host_envelope_count"],
+                (payload["summary"]["scenario_row_count"] // 2)
+                + len(catalog["skill_families"]),
+            )
             self.assertEqual(payload["summary"]["deterministic_reduction_status"], "pass")
-            self.assertEqual(payload["summary"]["paired_reduction_row_count"], 66)
+            self.assertEqual(
+                payload["summary"]["paired_reduction_row_count"],
+                len(catalog["skill_families"]),
+            )
+            self.assertEqual(
+                payload["summary"]["valid_denominator_row_count"],
+                2 * len(catalog["skill_families"]),
+            )
+            self.assertEqual(payload["summary"]["not_applicable_row_count"], 0)
             self.assertEqual(payload["summary"]["non_positive_reduction_row_count"], 0)
             self.assertEqual(
                 {row["variant"] for row in payload["candidate_rows"]},
                 {"current", "generated"},
             )
+
+    def test_host_envelope_uses_automatic_discovery_fields_only(self) -> None:
+        """Measurement envelopes do not depend on materializer host_entries."""
+        envelope = _host_envelope_value(
+            "gpt-5.4-mini", "medium", "agent-orchestration", "a" * 64
+        )
+        self.assertEqual(
+            set(envelope),
+            {"model_id", "host_profile", "skill_id", "prompt_sha256"},
+        )
+        self.assertNotIn("config_entry_index", envelope)
+        self.assertNotIn("config_order", envelope)
+        self.assertNotIn("config_path", envelope)
+        self.assertNotIn("enabled", envelope)
+
+    def test_measurement_accepts_context_without_host_entries(self) -> None:
+        """The evaluator consumes only the v2 context fields it needs."""
+        context = SimpleNamespace(
+            skill_ids=("agent-orchestration",),
+            source_snapshot_digest="a" * 64,
+        )
+        observations = [
+            {
+                "skill_id": "agent-orchestration",
+                "variant": variant,
+                "prompt": "prompt",
+                "scenario_id": "scenario",
+                "packet_id": "packet",
+                "iteration_id": f"iteration-{variant}",
+                "input_tokens": 1,
+                "canonical_followup_input_tokens": 0,
+                "cache_fields_observed": {},
+            }
+            for variant in ("current", "generated")
+        ]
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            host_dir = Path(tmp_dir) / "host"
+            host_dir.mkdir()
+            for variant in ("current", "generated"):
+                (host_dir / f"{variant}.json").write_text("{}", encoding="utf-8")
+            output = Path(tmp_dir) / "measurement.json"
+            with mock.patch.object(
+                skill_shim_evaluation, "build_context", return_value=context
+            ), mock.patch.object(
+                skill_shim_evaluation,
+                "_packet_manifest",
+                return_value=(
+                    {},
+                    [
+                        {
+                            "scenario_id": "scenario",
+                            "id": "packet",
+                            "category": "discovery-selection",
+                            "packet_class": "full",
+                            "packet_prompt_sha256": "0" * 64,
+                            "target_skill_id": "agent-orchestration",
+                            "iteration_ids": {},
+                        }
+                    ],
+                ),
+            ), mock.patch.object(
+                skill_shim_evaluation, "_validate_host_observations"
+            ), mock.patch.object(
+                skill_shim_evaluation,
+                "_host_observation",
+                side_effect=observations,
+            ), mock.patch.object(
+                skill_shim_evaluation, "build_record", return_value={}
+            ), mock.patch.object(
+                skill_shim_evaluation, "render_shim", return_value="g"
+            ), mock.patch.object(
+                skill_shim_evaluation, "_git_content", return_value=b"current" * 20
+            ), mock.patch.object(
+                skill_shim_evaluation, "_parent_write"
+            ):
+                payload = skill_shim_evaluation.measurement(
+                    PROJECT_ROOT,
+                    "gpt-5.4-mini",
+                    "medium",
+                    Path(tmp_dir) / "manifest.toml",
+                    host_dir,
+                    output,
+                )
+        self.assertEqual(payload["summary"]["deterministic_reduction_status"], "pass")
+        self.assertEqual(payload["summary"]["paired_reduction_row_count"], 1)
+        self.assertEqual(payload["summary"]["host_envelope_count"], 2)
+        self.assertTrue(payload["host_envelopes"])
+        self.assertTrue(
+            all(
+                not {"config_entry_index", "config_order", "config_path", "enabled"}
+                & set(envelope)
+                for envelope in payload["host_envelopes"]
+            )
+        )
 
 
 def test_route_golden_uses_parent_temp_receipt() -> None:
@@ -153,11 +269,16 @@ def test_route_golden_uses_parent_temp_receipt() -> None:
     assert payload["case_count"] == 525
     assert len(created) == 1
     assert not created[0].physical_path.exists()
-    boundary, attestation = skill_shim_evaluation._parent_capability("test-route-cleanup")
-    output_receipt = boundary.resolve_parent_owned_path(
-        attestation, output, "test-route-cleanup", create=False
-    )
-    boundary.remove_parent_owned_file(output_receipt)
+    with mock.patch.dict(
+        os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}
+    ):
+        boundary, attestation = skill_shim_evaluation._parent_capability(
+            "test-route-cleanup"
+        )
+        output_receipt = boundary.resolve_parent_owned_path(
+            attestation, output, "test-route-cleanup", create=False
+        )
+        boundary.remove_parent_owned_file(output_receipt)
 
     def test_host_pairs_fail_closed_for_every_manifest_scenario(self) -> None:
         """Missing, duplicate, mismatched, and incomplete observations fail directly."""
@@ -242,7 +363,7 @@ def test_route_golden_uses_parent_temp_receipt() -> None:
             {
                 "row_type": "candidate",
                 "candidate_row_id": "candidate-deterministic-skill-tools-00-current",
-                "host_envelope_id": "deterministic-skill-tools-00-current",
+                "host_envelope_id": "deterministic-skill-tools-00",
                 "skill_id": "skill-tools-00",
                 "variant": "current",
                 "utf8_bytes": 300,
@@ -252,7 +373,7 @@ def test_route_golden_uses_parent_temp_receipt() -> None:
             {
                 "row_type": "candidate",
                 "candidate_row_id": "candidate-deterministic-skill-tools-00-generated",
-                "host_envelope_id": "deterministic-skill-tools-00-generated",
+                "host_envelope_id": "deterministic-skill-tools-00",
                 "skill_id": "skill-tools-00",
                 "variant": "generated",
                 "utf8_bytes": 250,
@@ -282,7 +403,7 @@ def test_route_golden_uses_parent_temp_receipt() -> None:
         current = {
             "row_type": "candidate",
             "candidate_row_id": "candidate-current",
-            "host_envelope_id": "deterministic-skill-openai-00-current",
+            "host_envelope_id": "deterministic-skill-openai-00",
             "skill_id": "skill-openai-00",
             "variant": "current",
             "utf8_bytes": 500,

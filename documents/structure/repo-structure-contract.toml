@@ -6,7 +6,7 @@
 # upstream design ../runtime/shared-runtime-surfaces.toml machine-readable shared root surface manifest
 # downstream implementation ../../tools/agent_tools/repo_structure_contract.py compares observed trees against this contract
 # downstream implementation ../../tests/agent_tools/test_repo_structure_contract.py tests structure contract validation
-# downstream design ../CONTAINER_OPERATIONS.md standalone public Docker test boundary
+# downstream design ../../CONTAINER_OPERATIONS.md standalone public Docker test boundary
 # downstream implementation ../../docker/Dockerfile builds the standalone source test image
 # downstream implementation ../../test/testrunner.sh runs the typed source test list
 # downstream implementation ../../tests/tools/test_testrunner_schema.py validates the test-list schema

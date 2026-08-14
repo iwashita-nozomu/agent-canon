@@ -69,11 +69,13 @@ docker run --rm agent-canon testrunner.sh
 
 The image copies the source tree, source tests, typed test list, and runner into
 an immutable image layer. It installs the standard Python and native test
-dependencies while building; the runner does not mount a workspace, install
-dependencies at runtime, discover host tests, or ask a parent repository to
-interpret the list. `test/testlist.toml` uses `[[tests]]` records with ordered
-token-array commands and typed `environment`, `require`, `code_owner`, and
-`responsibility_scope` fields. `require = "docker"` selects the canonical
+dependencies while building and materializes one source-root dependency graph
+with the prebuilt Rust CLI, then reads its status back as `fresh`. The runner
+does not mount a workspace, install dependencies at runtime, discover host
+tests, or ask a parent repository to interpret the list. `test/testlist.toml`
+uses `[[tests]]` records with ordered token-array commands and typed
+`environment`, `require`, `code_owner`, and `responsibility_scope` fields.
+`require = "docker"` selects the canonical
 Docker route. A standalone Dev Container caller sets
 `AGENT_CANON_ACTIVE_ROUTE=devcontainer` and selects only
 `require = "devcontainer"` records. Nonmatching records emit an explicit
@@ -82,12 +84,34 @@ Malformed, duplicate, or unsupported records fail before any command starts,
 and a started route succeeds only when at least one record is selected and all
 selected records pass.
 
+The image-build graph is test bootstrap state for this immutable source
+snapshot. Production graph readers retain their independent fail-closed
+precondition: a status or query that is not `fresh` remains an error and never
+rebuilds the graph implicitly.
+
 Parent repositories delegate to this source-Git-root command. They do not
 mirror, wrap, or parse AgentCanon test files. Standalone AgentCanon `notes/**`
 also remains source-owned; a parent keeps its regular `notes/README.md` and
 project note content, while only the explicit AgentCanon-targeting descendants
 are retired and never regenerated. The parent `tools/agent-canon` symlink remains
 the public non-test tool namespace.
+
+### Image Git topology and disposable clones
+
+The public image preserves two real Git roots: `/opt/agent-canon-parent` is the
+parent repository and `/opt/agent-canon-parent/vendor/agent-canon` is its
+submodule worktree. The image build normalizes the source worktree to `main`,
+records the nested `160000` gitlink in the parent, and checks both roots' remotes,
+refs, and credentials before the image is published.
+
+Docker's image filesystem is an overlay lower layer. Git's default local clone
+optimization attempts to hardlink source objects into the destination, which
+fails against that lower layer with `hardlink different from source`. Disposable
+clones in the image therefore use `git clone --bare --no-local`; this changes
+only the transport mechanism, not the source commit, refs, gitlink, or `fsck`
+acceptance. The Dockerfile performs the same clone and `fsck --full` probe at
+build time, and `tools/ci/container_config.py` rejects a missing `--no-local`
+boundary.
 
 ## Canonical Source Contract
 

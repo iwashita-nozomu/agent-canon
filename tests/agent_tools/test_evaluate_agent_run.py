@@ -12,18 +12,24 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Protocol, cast
+from typing import Iterator, Protocol, cast
+from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_agent_run.py"
 MONITOR_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "workflow_monitor.py"
 RUNTIME_PROFILE_INVENTORY = (
-    PROJECT_ROOT / "documents" / "runtime-profiles-and-check-matrix.json"
+    PROJECT_ROOT
+    / "documents"
+    / "runtime"
+    / "runtime-profiles-and-check-matrix.json"
 )
 
 
@@ -59,6 +65,16 @@ def load_evaluate_module() -> EvaluateAgentRunModule:
 def write_lines(path: Path, lines: list[str]) -> None:
     """Write one fixture artifact from lines."""
     path.write_text("\n".join(lines), encoding="utf-8")
+
+
+@contextmanager
+def authenticated_tempdir() -> Iterator[str]:
+    """Create a per-test temp directory inside the authenticated source root."""
+    with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as tmp_dir, mock.patch.dict(
+        os.environ,
+        {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)},
+    ):
+        yield tmp_dir
 
 
 def write_prompt_eval_report(report_dir: Path) -> None:
@@ -164,6 +180,12 @@ def write_workflow_monitoring(report_dir: Path) -> None:
             "## Behavior Events",
             "- skill_invocation=$agent-orchestration status=observed",
             "- subagent_routing=worker stage=implementation status=observed",
+            (
+                "- runtime_profile_projection_gate=pass generated_role_view_v1 "
+                "profile-attribution topology_derived_v1 "
+                "declared_team_peak_plus_nested_reservations_v1 "
+                "requested_capacity_loader model-capacity thread-capacity"
+            ),
             "- tool_call=run_repo_dependency_review.sh status=pass",
             "- tool_call=pyright code_checker=pass checker=pyright scope=repo-wide",
             "- tool_call=ruff code_checker=pass checker=ruff scope=repo-wide",
@@ -289,9 +311,35 @@ class EvaluateAgentRunTest(unittest.TestCase):
             frozenset(response["intent_preservation"]),
         )
 
+    def test_behavior_manifest_accepts_registered_projection_gate_source(self) -> None:
+        """The canonical P5 gate source is part of the evaluator schema."""
+        module = load_evaluate_module()
+        criteria = getattr(module, "load_behavior_manifest")(
+            PROJECT_ROOT / "evidence" / "agent-evals" / "agent_behavior_eval.toml"
+        )
+
+        p5 = next(
+            item
+            for item in criteria
+            if item.name == "p5_runtime_profile_projection_attributed"
+        )
+        self.assertEqual(p5.source, "runtime_profile_projection_gate")
+
+    def test_behavior_manifest_rejects_unregistered_source(self) -> None:
+        """Manifest source identities remain closed to the registered schema."""
+        module = load_evaluate_module()
+        with authenticated_tempdir() as tmp_dir:
+            manifest = Path(tmp_dir) / "invalid.toml"
+            manifest.write_text(
+                '[[criteria]]\nname = "invalid"\nsource = "unknown"\n',
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "invalid source=unknown"):
+                getattr(module, "load_behavior_manifest")(manifest)
+
     def test_evaluate_ready_run_writes_pass_report(self) -> None:
         """A complete run should receive a passing agent evaluation."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
 
@@ -320,7 +368,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
         self,
     ) -> None:
         """The workflow monitor preset should satisfy evaluator closeout evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             (report_dir / "workflow_monitoring.md").unlink()
@@ -339,6 +387,15 @@ class EvaluateAgentRunTest(unittest.TestCase):
                     "stage owner=codex subagent=worker parent_direct_reason=unit-test-run",
                     "--behavior-event",
                     "subagent_routing=worker stage=implementation status=observed",
+                    "--behavior-event",
+                    (
+                        "runtime_profile_projection_gate=pass generated_role_view_v1 "
+                        "profile-attribution topology_derived_v1 "
+                        "declared_team_peak_plus_nested_reservations_v1 "
+                        "requested_capacity_loader model-capacity thread-capacity"
+                    ),
+                    "--behavior-event",
+                    "subagent_lifecycle=closed subagents_closed=yes",
                     "--behavior-event",
                     (
                         "tool_call=evaluate_skill_workflow_prompts.py "
@@ -391,7 +448,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_ready_run_ignores_template_comment_revise_text(self) -> None:
         """Template comments containing revise should not be treated as open findings."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             (report_dir / "change_review.md").write_text(
@@ -462,7 +519,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_missing_workflow_monitoring_fails(self) -> None:
         """Workflow monitoring is required for closeout-quality evaluation."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             (report_dir / "workflow_monitoring.md").unlink()
@@ -488,7 +545,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_pending_improvement_decisions_fail(self) -> None:
         """Skill/config/workflow/memory improvement decisions must be closed."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
@@ -518,7 +575,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_missing_required_signal_fails(self) -> None:
         """Required monitoring signals must cover review, validation, and drift."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -546,7 +603,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_missing_behavior_events_fail(self) -> None:
         """Run behavior events are required, not only final prose summaries."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring = (report_dir / "workflow_monitoring.md").read_text(encoding="utf-8")
@@ -576,7 +633,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_open_tool_warning_fails(self) -> None:
         """An observed tool warning must be closed before agent evaluation passes."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -617,7 +674,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_fix_now_tool_warning_requires_resolution(self) -> None:
         """Fix-now tool warnings cannot be closed by deferral."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -659,7 +716,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_missing_accumulated_prompt_eval_report_fails(self) -> None:
         """Prompt eval evidence must point to a real accumulated report."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -691,7 +748,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_mismatched_accumulated_prompt_eval_run_id_fails(self) -> None:
         """Prompt eval report run ids must match the monitoring event."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             report_path = report_dir / "prompt-eval-report.md"
@@ -722,7 +779,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_inefficient_execution_path_fails(self) -> None:
         """Known inefficient route selection should trigger behavior eval feedback."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -754,7 +811,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_missing_runtime_feedback_event_fails(self) -> None:
         """Run evaluation should require runtime feedback capture or explicit opt-out."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -789,7 +846,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_observed_runtime_feedback_requires_improvement_decision(self) -> None:
         """Observed user feedback should not pass with all improvements not applicable."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -821,7 +878,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_missing_hook_tool_protocol_feedback_fails(self) -> None:
         """Hook and tool outcomes must route into protocol feedback decisions."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -857,7 +914,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_missing_code_checker_results_fail(self) -> None:
         """Run evaluation should require code checker behavior evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -891,7 +948,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
         self,
     ) -> None:
         """Same-intent implementation-bug checker failures require a later pass."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -932,7 +989,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
         self,
     ) -> None:
         """A same-check pass after repair resolves the checker failure route."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -974,7 +1031,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
         self,
     ) -> None:
         """Explicit residual failures may pass when evidence routes them away."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -1012,7 +1069,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_oracle_weakening_without_failure_response_revises(self) -> None:
         """Oracle weakening tokens require complete failure response evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -1046,7 +1103,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
         self,
     ) -> None:
         """A later checker failure contradicts validation_failure_not_observed."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -1080,7 +1137,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
         self,
     ) -> None:
         """Every observed validation failure needs its own evidence packet."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -1122,7 +1179,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
         self,
     ) -> None:
         """A later code_checker=fail without the five fields remains blocking."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -1164,7 +1221,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_missing_validation_failure_observation_fails(self) -> None:
         """The validation failure criterion needs an explicit observation state."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -1196,7 +1253,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_oracle_weakening_with_same_intent_repair_fails(self) -> None:
         """Forbidden oracle weakening is not justified by same-intent repair."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -1280,7 +1337,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
         self,
     ) -> None:
         """Escalated design/user conflict may carry an oracle-change token."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -1320,7 +1377,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
         self,
     ) -> None:
         """Escalation applies only to forbidden tokens in the same event."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             write_ready_run(report_dir)
             monitoring_path = report_dir / "workflow_monitoring.md"
@@ -1365,7 +1422,7 @@ class EvaluateAgentRunTest(unittest.TestCase):
 
     def test_evaluate_incomplete_run_fails_with_feedback(self) -> None:
         """Missing evidence should create fix-now feedback actions."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with authenticated_tempdir() as tmp_dir:
             report_dir = Path(tmp_dir) / "run"
             report_dir.mkdir(parents=True)
             (report_dir / "user_request_contract.md").write_text(

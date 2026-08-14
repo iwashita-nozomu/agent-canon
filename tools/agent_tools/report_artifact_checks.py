@@ -172,6 +172,7 @@ COMPLETION_COVERAGE_TAXONOMY_REFS = (
 RUNTIME_PROFILE_TAXONOMY_PATH = (
     Path(__file__).resolve().parents[2]
     / "documents"
+    / "runtime"
     / "runtime-profiles-and-check-matrix.json"
 )
 COMPLETION_SEMANTIC_KINDS = (

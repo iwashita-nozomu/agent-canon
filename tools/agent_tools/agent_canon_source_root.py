@@ -191,7 +191,16 @@ def _run_subcommand(resolution: RootResolution, command: Sequence[str]) -> int:
                     purpose="agent-canon-source-root",
                 )
             )
-        env = _parent_boundary.child_environment(cast(Any, attestation), os.environ)
+        command_path = command[1] if interpreter and len(command) > 1 else command[0]
+        rebase_inherited_temp = Path(command_path).name in {
+            "sync_agent_canon.sh",
+            "update_agent_canon.sh",
+        }
+        env = _parent_boundary.child_environment(
+            cast(Any, attestation),
+            os.environ,
+            rebase_inherited_temp=rebase_inherited_temp,
+        )
     except Exception as exc:
         if isinstance(exc, _parent_boundary.ParentRootSideEffectError):
             raise SourceRootFailure(

@@ -79,7 +79,11 @@ current stage, and `DEFERRED_SKILLS` for dynamic wave triggers. Use it before
 broad skill-selection prose or subagent fan-out.
 
 `format`, `fix-math`, and `fix-mermaid` write mechanical repairs and then run
-the same adjacent `check` path. A formatter run is complete only when the final
+the same adjacent `check` path. Their text result reports
+`DOCS_<ACTION>=wrote changed_files=<n> changes=<n>` when at least one file
+changes, and `DOCS_<ACTION>=unchanged changed_files=0 changes=0` when the
+rewrite produces no byte changes. The JSON result carries the same state in
+its `status` field. A formatter run is complete only when the final
 `DOCS_CHECK=pass` evidence is present or the unavailable command is recorded as
 a blocker.
 

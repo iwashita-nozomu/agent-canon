@@ -15,10 +15,9 @@ import os
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-# Materializer writes are intentionally parent-bound even in direct unit runs.
-os.environ.setdefault("AGENT_CANON_PARENT_ROOT", str(PROJECT_ROOT))
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
 sys.path.insert(0, str(TOOLS_ROOT))
 
@@ -34,6 +33,15 @@ from skill_shim_materializer import (  # noqa: E402
 
 class SkillShimMaterializerTest(unittest.TestCase):
     """Verify materialization converges without a second writer."""
+
+    def setUp(self) -> None:
+        """Scope source-root authority to this materializer test instance."""
+        parent_environment = patch.dict(
+            os.environ,
+            {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)},
+        )
+        parent_environment.start()
+        self.addCleanup(parent_environment.stop)
 
     def test_materialize_fixed_point(self) -> None:
         """Two runs preserve all records/projections and the second run is empty."""

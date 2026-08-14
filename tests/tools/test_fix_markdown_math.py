@@ -87,7 +87,10 @@ class FixMarkdownMathTest(unittest.TestCase):
             result = self.run_cli(root, "doc.md")
 
             self.assertEqual(result.returncode, 1)
-            self.assertIn("DOCS_FIX_MATH=unchanged", result.stdout)
+            self.assertIn(
+                "DOCS_FIX_MATH=unchanged changed_files=0 changes=0",
+                result.stdout,
+            )
             self.assertIn("DOCS_CHECK=fail", result.stderr)
             self.assertIn(
                 "mathematical notation must use standalone `$$` display math, "

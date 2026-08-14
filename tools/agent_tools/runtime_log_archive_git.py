@@ -58,6 +58,7 @@ from runtime_log_paths import (  # noqa: E402
     log_environment_key,
     mounted_log_archive_root,
     repo_log_key,
+    RUNTIME_EVENT_PUBLICATION_OUTCOME_SPOOL_RELATIVE,
     runtime_event_publication_outcome_spool_root,
     source_git_head,
 )
@@ -2558,6 +2559,15 @@ def acquire_publication_attempt_lock(
         raise RuntimeEventMaterializationError(
             "publication_attempt_lock_invalid", "attempt id is invalid"
         )
+    # The publication spool is source-owned.  Resolve the source before
+    # deriving its path so an outer parent handoff cannot become the path
+    # basis for a nested source checkout.
+    try:
+        source_root = source_root.resolve(strict=True)
+    except (OSError, RuntimeError) as exc:
+        raise RuntimeEventMaterializationError(
+            "publication_attempt_lock_invalid", "source root is unavailable"
+        ) from exc
     spool_root = runtime_event_publication_outcome_spool_root(source_root)
     attempt_directory = spool_root / attempt_id
     lock_path = attempt_directory / ".attempt.lock"
@@ -2565,24 +2575,19 @@ def acquire_publication_attempt_lock(
     locked = False
     body_error: BaseException | None = None
     try:
-        source_root = source_root.resolve(strict=True)
-        configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-        spool_base = Path(configured_parent).resolve(strict=True) if configured_parent else source_root
-        relative_spool = spool_root.relative_to(spool_base)
-        if relative_spool.parts != (
-            ".agent-canon",
-            "runtime-event-spool",
-            "publication-outcome",
-        ):
+        relative_spool = spool_root.relative_to(source_root)
+        if relative_spool != RUNTIME_EVENT_PUBLICATION_OUTCOME_SPOOL_RELATIVE:
             raise RuntimeEventMaterializationError(
                 "publication_attempt_lock_invalid",
                 "publication spool root is not canonical",
             )
-        directory = spool_base
+        directory = source_root
         for component in (*relative_spool.parts, attempt_id):
             directory /= component
             try:
-                _parent_ensure_directory(directory, "publication-outcome-directory")
+                directory = _parent_ensure_directory(
+                    directory, "publication-outcome-directory"
+                )
             except FileExistsError:
                 pass
             metadata = directory.lstat()

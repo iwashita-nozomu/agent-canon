@@ -725,6 +725,21 @@ def validate_public_test_git_context(root: Path) -> list[Finding]:
         ),
         "remote-ref-readback-required": r'git -C "\$\{source_root\}" for-each-ref .* refs/remotes.*git -C "\$\{parent_root\}" for-each-ref .* refs/remotes',
         "credential-readback-required": r'git -C "\$\{source_root\}" config --get-regexp.*credential.*git -C "\$\{parent_root\}" config --get-regexp.*credential',
+        "non-local-bare-clone-readback-required": (
+            r'git clone --bare --no-local "\$\{source_root\}" '
+            r'"\$\{clone_probe\}/agent-canon\.git"'
+        ),
+        "canonical-graph-build-required": (
+            r'"\$\{runtime_root\}/tools/agent-canon/bin/agent-canon" graph build '
+            r'--root "\$\{source_root\}" --profile default --format json'
+        ),
+        "canonical-graph-artifact-readback-required": (
+            r'test -s "\$\{source_root\}/\.agent-canon/knowledge-graph/graph\.sqlite"'
+        ),
+        "canonical-graph-status-readback-required": (
+            r'"\$\{runtime_root\}/tools/agent-canon/bin/agent-canon" graph status '
+            r'--root "\$\{source_root\}" --profile default --format json'
+        ),
     }
     for detail, pattern in dockerfile_rules.items():
         if re.search(pattern, normalized) is None:

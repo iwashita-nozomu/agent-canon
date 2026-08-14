@@ -60,6 +60,7 @@ PARENT_PATH_ENV_KEYS = {
     "TMP",
     "TMPDIR",
     "XDG_CACHE_HOME",
+    "PYTHONPATH",
 }
 
 

@@ -627,11 +627,19 @@ evaluation が返す観測可能な `input_tokens` usage をそのまま artifac
 
 ~~~formula
 U_i = observed host input_tokens(current or generated, fresh gpt-5.4-mini)
-B_i = deterministic_measure(host_envelope + current .agents/skills/<id>/SKILL.md)
+B_i = deterministic_measure(host_envelope + canonical agents/skills/<id>.md)
 G_i = deterministic_measure(host_envelope + generated adapter-only SKILL.md)
 reduction_i = (B_i - G_i) / B_i
 aggregate_reduction = sum(B_i - G_i) / sum(B_i)
 ~~~
+
+`B_i` is the canonical owner baseline, not the current `.agents/skills/<id>/SKILL.md`
+view: that view is already the generated automatic-discovery adapter and therefore cannot
+measure the reduction it provides. Fresh scenario candidate rows remain host-usability
+observations. They are not added to the deterministic reduction denominator, numerator, or
+pair count; each deterministic skill is measured once as one current/generated pair.
+The current and generated members of a pair share one candidate-independent envelope, so
+the envelope is not counted twice.
 
 `deterministic_measure` は既存標準ライブラリだけで完全定義します。入力を UTF-8 に
 decode した後、CRLF/CR を LF、Unicode を NFC、末尾改行を一つに正規化し、
@@ -662,10 +670,6 @@ HostEnvelope = {
   model_id: "gpt-5.4-mini",
   host_profile: "medium",
   skill_id: string,
-  config_entry_index: integer >= 0,
-  config_order: integer >= 0,
-  config_path: string,
-  enabled: boolean,
   prompt_sha256: hex64,
   host_envelope_sha256: hex64,
   host_utf8_bytes: integer >= 0,
@@ -727,7 +731,8 @@ they never contain `current_*` or `generated_*` bytes/scalars. Those values exis
 corresponding `CandidateMeasurementRow`, referenced by `candidate_row_id` from each fresh
 scenario observation.
 
-`host_input_tokens` は host が返した数値、`host_usage_source="fresh_host_evaluation"` は
+`host_envelopes` are derived from automatic `.agents/skills` discovery and model/profile/prompt
+identity only; they do not reconstruct a removed host-config registry. `host_input_tokens` は host が返した数値、`host_usage_source="fresh_host_evaluation"` は
 固定値です。cache field が host から返らない場合は空 object とし、推測した discount は
 記録しません。current/generated は同じ scenario/packet class の別 fresh iteration として
 pairing し、observed token usage と candidate deterministic bytes/scalars を別 row type
@@ -736,16 +741,21 @@ pairing し、observed token usage と candidate deterministic bytes/scalars を
 digest です。B_i=0 は 0 とせず `denominator_status="not_applicable"` とし、zero
 denominator row は aggregate pass を禁止します。
 
-current/generated candidate は scenario identity または deterministic skill identity ごとに
-exact pair として照合します。missing、duplicate、variant/skill/envelope mismatch は
+fresh current/generated candidate は scenario identity ごとに、deterministic current/generated
+candidate は canonical skill identity ごとに exact pair として照合します。missing、duplicate、
+variant/skill/envelope mismatch は
 producer failure とし、各 pair で current の UTF-8 bytes と Unicode scalars の両方が
 generated より厳密に大きい場合だけ positive reduction row と数えます。
+`valid_denominator_row_count`、`not_applicable_row_count`、および deterministic byte/scalar
+totals は deterministic catalog rows だけを母集団とし、fresh scenario rows は host
+observation として別集計します。
 `non_positive_reduction_row_count > 0` は aggregate が 70% 以上でも
 `deterministic_reduction_status="fail"` とします。
 
-報告するのは catalog-derived row の deterministic bytes/scalars total、median、p10/p90、最大値、
-zero-denominator row 数、fresh host の paired input-token total、canonical-followup
-total、fresh evaluator の pass rate です。percentile は fixed nearest-rank p10/p50/p90 と
+報告するのは canonical-owner baseline と generated adapter の catalog-derived deterministic
+bytes/scalars total、median、p10/p90、最大値、zero-denominator row 数、fresh host の paired
+input-token total、canonical-followup total、fresh evaluator の pass rate です。percentile は
+fixed nearest-rank p10/p50/p90 と
 し、目標は deterministic adapter measure の aggregate reduction >= 70%、全 row の
 reduction > 0、critical usability failure=0 とし、
 baseline に対する scenario pass rate の低下を 5 percentage points 未満に制限

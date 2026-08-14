@@ -50,7 +50,10 @@ from packets import (  # noqa: E402
     active_design_packet_mapping,
     resolve_active_design_packet_config,
 )
-from report_artifact_checks import write_completion_coverage_artifact  # noqa: E402
+from report_artifact_checks import (  # noqa: E402
+    RUNTIME_PROFILE_TAXONOMY_PATH,
+    write_completion_coverage_artifact,
+)
 from task_authority import hash_baseline_bytes  # noqa: E402
 from task_close import update_lifecycle_closeout_consumer  # noqa: E402
 from team_config import (  # noqa: E402
@@ -924,6 +927,11 @@ def write_ready_closeout_bundle(
 
 class BootstrapAndCloseTest(unittest.TestCase):
     """Verify machine-driven task start and close behavior."""
+
+    def test_report_artifact_taxonomy_uses_runtime_inventory(self) -> None:
+        """Completion coverage reads the canonical runtime inventory path."""
+        self.assertEqual(RUNTIME_PROFILE_TAXONOMY_PATH, RUNTIME_PROFILE_INVENTORY)
+        self.assertTrue(RUNTIME_PROFILE_TAXONOMY_PATH.is_file())
 
     def setUp(self) -> None:
         """Place isolated fixtures under one authenticated parent checkout."""

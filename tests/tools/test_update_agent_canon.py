@@ -745,7 +745,14 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
             )
             submodule_remote = temp_root / "agent-canon-upstream.git"
             subprocess.run(
-                ["git", "clone", "--bare", str(AGENT_CANON_SOURCE_ROOT), str(submodule_remote)],
+                [
+                    "git",
+                    "clone",
+                    "--bare",
+                    "--no-local",
+                    str(AGENT_CANON_SOURCE_ROOT),
+                    str(submodule_remote),
+                ],
                 check=True,
                 capture_output=True,
                 text=True,

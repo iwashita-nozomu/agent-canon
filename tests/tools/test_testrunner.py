@@ -29,9 +29,10 @@ class TestRunnerBehaviorTest(unittest.TestCase):
 
     def run_runner(self, root: Path, list_path: Path, route: str) -> subprocess.CompletedProcess[str]:
         """Run the runner with an explicit active route."""
+        parent_root = root.parent.parent
         env = {
             **os.environ,
-            "AGENT_CANON_PARENT_ROOT": str(root),
+            "AGENT_CANON_PARENT_ROOT": str(parent_root),
             "AGENT_CANON_SOURCE_ROOT": str(root),
             "AGENT_CANON_TESTLIST": str(list_path),
             "AGENT_CANON_ACTIVE_ROUTE": route,
@@ -48,8 +49,11 @@ class TestRunnerBehaviorTest(unittest.TestCase):
     def fixture(self) -> tuple[tempfile.TemporaryDirectory[str], Path, Path]:
         """Create a source fixture with two independently selectable records."""
         temp_dir = tempfile.TemporaryDirectory()
-        root = Path(temp_dir.name)
+        parent_root = Path(temp_dir.name)
+        root = parent_root / "vendor" / "agent-canon"
+        root.mkdir(parents=True)
         (root / "owner.py").write_text("# owner\n", encoding="utf-8")
+        subprocess.run(["git", "init", "--quiet", str(parent_root)], check=True)
         subprocess.run(["git", "init", "--quiet", str(root)], check=True)
         tool_dir = root / "tools" / "agent_tools"
         tool_dir.mkdir(parents=True)
@@ -81,6 +85,51 @@ responsibility_scope = "container-test-route"
 command = ["python3", "-c", "import sys; sys.exit(0)"]
 """,
             encoding="utf-8",
+        )
+        (parent_root / ".gitmodules").write_text(
+            '[submodule "vendor/agent-canon"]\n'
+            "\tpath = vendor/agent-canon\n"
+            "\turl = https://example.invalid/agent-canon.git\n",
+            encoding="utf-8",
+        )
+        subprocess.run(
+            ["git", "-C", str(root), "add", "-A"], check=True
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "user.name=Runner Fixture",
+                "-c",
+                "user.email=runner-fixture@example.invalid",
+                "commit",
+                "-q",
+                "-m",
+                "source fixture",
+            ],
+            check=True,
+        )
+        subprocess.run(
+            ["git", "-C", str(parent_root), "add", ".gitmodules", "vendor/agent-canon"],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(parent_root),
+                "-c",
+                "user.name=Runner Fixture",
+                "-c",
+                "user.email=runner-fixture@example.invalid",
+                "commit",
+                "-q",
+                "-m",
+                "parent fixture",
+            ],
+            check=True,
         )
         return temp_dir, root, list_path
 
@@ -116,7 +165,7 @@ command = ["python3", "-c", "import sys; sys.exit(0)"]
         self.assertEqual(separator, command)
         fixture[2].write_text(
             prefix
-            + 'command = ["python3", "-c", "import os; assert \'AGENT_CANON_PARENT_ROOT\' not in os.environ"]'
+            + 'command = ["python3", "-c", "import os; from pathlib import Path; assert Path(os.environ[\'AGENT_CANON_SOURCE_ROOT\']) == Path.cwd()"]'
             + suffix,
             encoding="utf-8",
         )
@@ -145,8 +194,8 @@ command = ["python3", "-c", "import sys; sys.exit(0)"]
         with fixture[0]:
             result = self.run_runner(fixture[1], fixture[2], "docker")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn("authority-absent\n", result.stderr)
-        runtime_prefix = fixture[1] / ".agent-canon" / "runtime" / "testrunner."
+        self.assertIn(str(fixture[1].parent.parent), result.stderr)
+        runtime_prefix = fixture[1].parent.parent / ".agent-canon" / "runtime" / "testrunner."
         self.assertIn(str(runtime_prefix), result.stderr)
         self.assertIn("child-stderr\n", result.stderr)
         lines = result.stdout.splitlines()
@@ -157,23 +206,32 @@ command = ["python3", "-c", "import sys; sys.exit(0)"]
             ["start", "pass", "not_selected"],
         )
 
-    def test_docker_route_keeps_parent_state_without_exporting_identity(self) -> None:
-        """Runner state stays parent-local without exporting repository authority."""
+    def test_docker_route_exports_authenticated_parent_identity(self) -> None:
+        """Each record receives parent/source identity and an authenticated handoff."""
         fixture = self.fixture()
         text = fixture[2].read_text(encoding="utf-8")
         command = 'command = ["python3", "-c", "import sys; sys.exit(0)"]'
         prefix, separator, suffix = text.partition(command)
         self.assertEqual(separator, command)
         probe_command = (
-            "import os; from pathlib import Path; "
-            "root = Path.cwd(); assert (root / '.git').is_dir(); "
+            "import os, sys; from pathlib import Path; "
+            "root = Path.cwd(); parent = Path(os.environ['AGENT_CANON_PARENT_ROOT']); "
+            "source = Path(os.environ['AGENT_CANON_SOURCE_ROOT']); "
+            "assert (root / '.git').is_dir(); assert parent == source.parent.parent; "
+            "assert source == root; assert Path(os.environ['AGENT_CANON_ACTIVE_REPOSITORY_ROOT']) == parent; "
             "identity = ('AGENT_CANON_PARENT_ROOT', 'AGENT_CANON_PARENT_ROOT_DEV', "
             "'AGENT_CANON_PARENT_ROOT_INO', 'AGENT_CANON_ACTIVE_REPOSITORY_ROOT', "
             "'AGENT_CANON_SOURCE_ROOT', 'AGENT_CANON_ROOT', "
-            "'AGENT_CANON_CHILD_HANDOFF', 'AGENT_CANON_CHILD_PURPOSE', "
-            "'AGENT_CANON_HANDOFF_AUDIENCE', 'AGENT_CANON_TEST_PARENT_ROOT'); "
-            "assert all(key not in os.environ for key in identity); "
-            "assert Path(os.environ['TMPDIR']).is_relative_to(root); print(root)"
+            "'AGENT_CANON_CHILD_HANDOFF', 'AGENT_CANON_HANDOFF_AUDIENCE'); "
+            "assert all(key in os.environ for key in identity); "
+            "assert os.environ['AGENT_CANON_CHILD_HANDOFF']; "
+            "assert Path(os.environ['TMPDIR']).is_relative_to(parent); "
+            "assert Path(os.environ['AGENT_CANON_RECORD_ROOT']).is_relative_to(parent); "
+            "assert Path(os.environ['AGENT_CANON_TOOLS_HOME']) == parent / '.agent-canon' / 'image-runtime' / 'tools'; "
+            "sys.path.insert(0, str(source / 'tools' / 'agent_tools')); "
+            "from parent_root_side_effects import ParentRootAttestationRequest, ParentRootSideEffectBoundary; "
+            "receipt = ParentRootSideEffectBoundary().attest(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, source_root=source, child_handoff_token=os.environ['AGENT_CANON_CHILD_HANDOFF'], purpose='public-test-runner')); "
+            "assert receipt.parent_root == parent; print(parent)"
         )
         probe = f'command = ["python3", "-c", "{probe_command}"]'
         fixture[2].write_text(prefix + probe + suffix, encoding="utf-8")
@@ -185,7 +243,7 @@ command = ["python3", "-c", "import sys; sys.exit(0)"]
                 cwd=PROJECT_ROOT,
                 env={
                     **environment,
-                    "AGENT_CANON_PARENT_ROOT": str(fixture[1]),
+                    "AGENT_CANON_PARENT_ROOT": str(fixture[1].parent.parent),
                     "AGENT_CANON_SOURCE_ROOT": str(fixture[1]),
                     "AGENT_CANON_TESTLIST": str(fixture[2]),
                     "AGENT_CANON_ACTIVE_ROUTE": "docker",
@@ -195,11 +253,11 @@ command = ["python3", "-c", "import sys; sys.exit(0)"]
                 text=True,
             )
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertIn(f"{fixture[1]}\n", result.stderr)
-        self.assertNotIn("agent-canon-test-parent-", result.stderr)
+        self.assertIn(f"{fixture[1].parent.parent}\n", result.stderr)
+        self.assertNotIn("AGENT_CANON_TEST_PARENT_ROOT", result.stderr)
 
-    def test_record_subprocess_resolves_its_fixture_cwd_without_suite_identity(self) -> None:
-        """A record-owned nested fixture derives identity from its own cwd."""
+    def test_record_subprocess_scrubs_suite_identity_for_fixture_cwd(self) -> None:
+        """A record-owned nested fixture scrubs suite identity before using its cwd."""
         fixture = self.fixture()
         fixture[1].joinpath("owner.py").write_text(
             """from __future__ import annotations
@@ -212,18 +270,28 @@ fixture = Path(os.environ["TMPDIR"]) / "nested-fixture"
 fixture.mkdir()
 subprocess.run(["git", "init", "--quiet", str(fixture)], check=True)
 environment = os.environ.copy()
-for key in (
+identity_keys = (
     "AGENT_CANON_PARENT_ROOT",
     "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
     "AGENT_CANON_SOURCE_ROOT",
     "AGENT_CANON_ROOT",
     "AGENT_CANON_CHILD_HANDOFF",
-):
-    assert key not in environment
+)
+for key in identity_keys:
+    assert key in environment
+assert Path(environment["AGENT_CANON_PARENT_ROOT"]) == Path.cwd().parent.parent
+assert environment["AGENT_CANON_CHILD_HANDOFF"]
+nested_environment = environment.copy()
+for key in identity_keys:
+    nested_environment.pop(key, None)
 observed = subprocess.check_output(
-    ["git", "rev-parse", "--show-toplevel"],
+    [
+        "python3",
+        "-c",
+        "import os, subprocess; assert all(key not in os.environ for key in ('AGENT_CANON_PARENT_ROOT', 'AGENT_CANON_ACTIVE_REPOSITORY_ROOT', 'AGENT_CANON_SOURCE_ROOT', 'AGENT_CANON_ROOT', 'AGENT_CANON_CHILD_HANDOFF')); print(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip())",
+    ],
     cwd=fixture,
-    env=environment,
+    env=nested_environment,
     text=True,
 ).strip()
 assert Path(observed).resolve() == fixture.resolve()

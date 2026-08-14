@@ -85,9 +85,19 @@ REQUIRED_ARTIFACTS = (
     "retrospective.md",
 )
 DEFAULT_BEHAVIOR_MANIFEST = eval_manifest_path("agent_behavior_eval.toml")
+BEHAVIOR_SOURCES = frozenset(
+    {
+        "behavior_events",
+        "bundle",
+        # The runtime-profile projection gate is recorded in the run bundle
+        # by the generated-view and capacity checks.
+        "runtime_profile_projection_gate",
+    }
+)
 RUNTIME_PROFILE_INVENTORY_PATH = (
     Path(__file__).resolve().parents[2]
     / "documents"
+    / "runtime"
     / "runtime-profiles-and-check-matrix.json"
 )
 
@@ -346,7 +356,7 @@ def behavior_criterion_from_manifest_entry(
     mapping = cast(dict[str, object], entry)
     name = str(mapping["name"])
     source = str(mapping.get("source", "behavior_events"))
-    if source not in {"behavior_events", "bundle"}:
+    if source not in BEHAVIOR_SOURCES:
         raise ValueError(f"behavior criterion {name} has invalid source={source}")
     feedback = str(mapping.get("feedback", f"Record behavior evidence for {name}."))
     return BehaviorCriterion(
@@ -938,6 +948,7 @@ def evaluate(
             {
                 "behavior_events": evidence.behavior_events_text,
                 "bundle": evidence.normalized_bundle,
+                "runtime_profile_projection_gate": evidence.normalized_bundle,
             },
             behavior_criteria,
         ),

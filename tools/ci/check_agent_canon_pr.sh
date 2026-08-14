@@ -51,6 +51,14 @@ if [ ! -f "${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml" ] \
   && [ -f "${WORKSPACE_ROOT}/vendor/agent-canon/rust/agent-canon/Cargo.toml" ]; then
   AGENT_CANON_SOURCE_ROOT="${WORKSPACE_ROOT}/vendor/agent-canon"
 fi
+# Every Python child of this public runner must resolve imports from the
+# selected AgentCanon source root. The boundary owns this environment so
+# standalone callers do not depend on a host-provided PYTHONPATH.
+AGENT_CANON_SOURCE_PYTHONPATH="${AGENT_CANON_SOURCE_ROOT}/tools"
+if [[ -n "${PYTHONPATH:-}" ]]; then
+  AGENT_CANON_SOURCE_PYTHONPATH="${AGENT_CANON_SOURCE_PYTHONPATH}:${PYTHONPATH}"
+fi
+export PYTHONPATH="${AGENT_CANON_SOURCE_PYTHONPATH}"
 cd "${WORKSPACE_ROOT}"
 export AGENT_CANON_PARENT_ROOT="${WORKSPACE_ROOT}"
 export AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${WORKSPACE_ROOT}"

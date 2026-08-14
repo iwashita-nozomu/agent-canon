@@ -37,6 +37,7 @@ from tools.agent_tools.runtime_log_paths import (
     log_branch_key,
     mounted_log_archive_root,
     repo_log_key,
+    RUNTIME_EVENT_PUBLICATION_OUTCOME_SPOOL_RELATIVE,
     runtime_event_publication_outcome_spool_root,
 )
 
@@ -287,6 +288,18 @@ class RuntimeLogPathsTest(unittest.TestCase):
             caller_b / ".agent-canon" / "runtime-event-spool" / "publication-outcome",
         )
         self.assertNotEqual(spool_a, spool_b)
+
+    def test_publication_outcome_root_uses_one_source_relative_layout(self) -> None:
+        """The public resolver and lifecycle lock share one fixed layout."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            source = Path(temp_dir) / "source"
+            source.mkdir()
+            spool_root = runtime_event_publication_outcome_spool_root(source)
+
+        self.assertEqual(
+            spool_root.relative_to(source),
+            RUNTIME_EVENT_PUBLICATION_OUTCOME_SPOOL_RELATIVE,
+        )
 
     def test_parent_capability_rejects_external_runtime_candidate(self) -> None:
         """An external runtime spool override fails before any write."""

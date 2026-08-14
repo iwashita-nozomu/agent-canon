@@ -30,8 +30,11 @@ source-Git-root test route; they are not mirrored as parent test paths. Standalo
 AgentCanon `notes/**` remains canonical in the source Git root. Parent regular
 `notes/README.md` and any other parent project note content remain parent-owned;
 the listed AgentCanon-targeting note descendants are retired once and never
-regenerated. Memory, evidence, editor, and GitHub paths are not mirrored shared
-surfaces. Parent `.devcontainer/` content is likewise
+regenerated. The former `notes/themes/USER_PREFERENCES.md` and
+`notes/themes/AGENT_PHILOSOPHY.md` links into personal memory are absent from
+the source tree and are not recreated by live synchronization. Memory, evidence,
+editor, and GitHub paths are not mirrored shared surfaces. Parent `.devcontainer/`
+content is likewise
 never projected: `devcontainer.json`, `rootless/`, and `gpu-admission/` are
 retired/non-projecting paths. A parent may own regular files at those paths;
 only a stale symlink that still resolves into AgentCanon is eligible for removal

@@ -1085,6 +1085,49 @@ def test_exec_parent_bound_preserves_home_and_bindings(tmp_path: Path) -> None:
     assert pending_handoff_nonces(tmp_path) == {}
 
 
+def test_exec_parent_bound_rebases_inherited_runner_temp(tmp_path: Path) -> None:
+    """Update/sync handoffs rebase runner temp variables before path checks."""
+    git_repo(tmp_path, remote="https://example.invalid/parent.git")
+    inherited_tmp = tmp_path.parent / "outer-runner-tmp"
+    env = _build_clean_env(
+        {
+            "TMPDIR": str(inherited_tmp),
+            "TEMP": str(inherited_tmp),
+            "TMP": str(inherited_tmp),
+        }
+    )
+    code = (
+        "import json, os; "
+        "print(json.dumps({name: os.environ.get(name) for name in "
+        "('TMPDIR', 'TEMP', 'TMP')}))"
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "tools/agent_tools/parent_root_side_effects.py",
+            "exec-parent-bound",
+            "--root",
+            str(tmp_path),
+            "--purpose",
+            "agent-canon-update-script",
+            "--rebase-inherited-temp",
+            "--",
+            sys.executable,
+            "-c",
+            code,
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    data = json.loads(result.stdout.strip())
+    expected = str((tmp_path / ".agent-canon" / "tmp").resolve())
+    assert data == {"TMPDIR": expected, "TEMP": expected, "TMP": expected}
+    assert not inherited_tmp.exists()
+
+
 def test_exec_parent_bound_failure_does_not_leave_pending_handoff(tmp_path: Path) -> None:
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
     result = subprocess.run(

@@ -327,6 +327,28 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             self.assertEqual(evidence["readback_status"], "verified")
             self.assertEqual(evidence["readback_sha256"], "a" * 64)
 
+    def test_publication_attempt_lock_uses_nested_source_path_basis(self) -> None:
+        """An outer parent handoff must not replace the source spool basis."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            outer = Path(tmp_dir) / "outer"
+            source = outer / "source"
+            outer.mkdir()
+            source.mkdir()
+            subprocess.run(["git", "init", "-q", str(outer)], check=True)
+
+            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(outer)}):
+                spool_root = runtime_event_publication_outcome_spool_root(source)
+                with runtime_log_archive_git.acquire_publication_attempt_lock(
+                    source, "c" * 64
+                ) as attempt_lock:
+                    self.assertEqual(attempt_lock.attempt_directory.parent, spool_root)
+                    self.assertEqual(
+                        attempt_lock.lock_path,
+                        spool_root / ("c" * 64) / ".attempt.lock",
+                    )
+
+            self.assertTrue((spool_root / ("c" * 64) / ".attempt.lock").is_file())
+
     def test_publication_paths_reject_group_or_other_writable_projection(
         self,
     ) -> None:

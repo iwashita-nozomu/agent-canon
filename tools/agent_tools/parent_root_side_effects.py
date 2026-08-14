@@ -2962,9 +2962,13 @@ class ParentRootSideEffectBoundary:
         base_env: Mapping[str, str] | None = None,
         *,
         issue_handoff: bool = True,
+        rebase_inherited_temp: bool = False,
     ) -> dict[str, str]:
         """Bind persistent child state and temporary state to the parent."""
         env = dict(os.environ if base_env is None else base_env)
+        if rebase_inherited_temp:
+            for name in ("TMPDIR", "TEMP", "TMP"):
+                env.pop(name, None)
         root = attestation.parent_root
         default_tmp = root / ".agent-canon" / "tmp"
         default_cache = root / ".agent-canon" / "cache"
@@ -3033,8 +3037,18 @@ class ParentRootSideEffectBoundary:
         purpose: str,
         *,
         issue_handoff: bool = False,
+        rebase_inherited_temp: bool = False,
     ) -> int:
-        """Create parent-owned child env and execute argv without a shell."""
+        """Create parent-owned child env and execute argv without a shell.
+
+        Update/sync entrypoints are often launched by a runner that exports
+        ``TMPDIR`` (and its portable aliases) for its own temporary state.
+        Those values are inherited input, not an update/sync temp selection;
+        rebasing them here lets the child environment bind them to the
+        authenticated parent before the normal path checks run.  Callers that
+        need an explicit temporary location use ``AGENT_CANON_PARENT_TMPDIR``
+        and resolve it after the handoff.
+        """
         if not argv:
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_MISMATCH,
@@ -3045,7 +3059,11 @@ class ParentRootSideEffectBoundary:
                 ParentRootReject.ROOT_MISMATCH,
                 "exec command contains NUL",
             )
-        env = self.child_environment(attestation, issue_handoff=issue_handoff)
+        env = self.child_environment(
+            attestation,
+            issue_handoff=issue_handoff,
+            rebase_inherited_temp=rebase_inherited_temp,
+        )
         if issue_handoff:
             env["AGENT_CANON_CHILD_PURPOSE"] = purpose
         os.execvpe(argv[0], list(argv), env)
@@ -3224,11 +3242,13 @@ def child_environment(
     base_env: Mapping[str, str] | None = None,
     *,
     issue_handoff: bool = True,
+    rebase_inherited_temp: bool = False,
 ) -> dict[str, str]:
     return _DEFAULT_BOUNDARY.child_environment(
         attestation,
         base_env,
         issue_handoff=issue_handoff,
+        rebase_inherited_temp=rebase_inherited_temp,
     )
 
 
@@ -3268,6 +3288,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
     exec_bound.add_argument("--source-root", type=Path)
     exec_bound.add_argument("--consume-inherited-handoff", action="store_true")
     exec_bound.add_argument("--issue-handoff", action="store_true")
+    exec_bound.add_argument("--rebase-inherited-temp", action="store_true")
     exec_bound.add_argument("--purpose", default="shell-side-effect")
     exec_bound.add_argument("argv", nargs=argparse.REMAINDER)
     verify_child = sub.add_parser("verify-child")
@@ -3411,6 +3432,7 @@ def _main(argv: Sequence[str] | None = None) -> int:
                     command,
                     args.purpose,
                     issue_handoff=args.issue_handoff,
+                    rebase_inherited_temp=args.rebase_inherited_temp,
                 )
             elif args.command == "git-config-add":
                 published = _DEFAULT_BOUNDARY.git_config_add(

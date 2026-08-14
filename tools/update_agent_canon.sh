@@ -47,6 +47,7 @@ else
     --root "${PARENT_ROOT_DIR}" \
     --source-root "${AGENT_CANON_SOURCE_ROOT}" \
     --purpose agent-canon-update-script \
+    --rebase-inherited-temp \
     --issue-handoff \
     -- bash "${BASH_SOURCE[0]}" "$@"
 fi

@@ -46,17 +46,6 @@ SCHEMA_FIELDS = {
 ENVIRONMENTS = {"tooling", "product"}
 ROUTES = {"docker", "devcontainer"}
 ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]*$")
-RECORD_IDENTITY_KEYS = (
-    "AGENT_CANON_PARENT_ROOT",
-    "AGENT_CANON_PARENT_ROOT_DEV",
-    "AGENT_CANON_PARENT_ROOT_INO",
-    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
-    "AGENT_CANON_SOURCE_ROOT",
-    "AGENT_CANON_ROOT",
-    "AGENT_CANON_CHILD_HANDOFF",
-    "AGENT_CANON_CHILD_PURPOSE",
-    "AGENT_CANON_HANDOFF_AUDIENCE",
-)
 
 
 class SchemaError(ValueError):
@@ -181,20 +170,8 @@ def child_environment(
                 ),
             }
         )
-        record_env = boundary.child_environment(
-            attestation,
-            base_env=base_env,
-            issue_handoff=False,
-        )
-        # The parent capability owns only runner side effects.  A test record
-        # must resolve its own repository from its cwd, especially when the
-        # record launches a temporary fixture subprocess.  Keep the
-        # parent-owned tools selector above; remove all identity and handoff
-        # claims added by the generic boundary from the record environment.
-        for key in RECORD_IDENTITY_KEYS:
-            record_env.pop(key, None)
         return (
-            record_env,
+            base_env,
             boundary,
             attestation,
             runtime_receipt,
@@ -203,6 +180,44 @@ def child_environment(
     except (ImportError, OSError, RuntimeError, ValueError, subprocess.SubprocessError) as error:
         fail(f"source root child environment unavailable: {error}")
     raise AssertionError("unreachable")
+
+
+def record_environment(
+    base_environment: dict[str, str],
+    boundary: Any,
+    attestation: Any,
+    runtime_receipt: Any,
+    record_id: str,
+) -> tuple[dict[str, str], Any]:
+    """Issue one authenticated handoff and parent-owned state root per record."""
+    record_receipt = boundary.create_parent_owned_temp_directory(
+        attestation,
+        runtime_receipt.physical_path,
+        "public-test-runner-record-base",
+        f"record-{record_id}",
+    )
+    record_root = record_receipt.physical_path
+    record_environment_base = dict(base_environment)
+    record_environment_base.update(
+        {
+            "HOME": str(record_root / "home"),
+            "TMPDIR": str(record_root / "tmp"),
+            "TEMP": str(record_root / "tmp"),
+            "TMP": str(record_root / "tmp"),
+            "XDG_CACHE_HOME": str(record_root / "cache"),
+            "XDG_CONFIG_HOME": str(record_root / "config"),
+            "XDG_DATA_HOME": str(record_root / "data"),
+            "PYTHONPYCACHEPREFIX": str(record_root / "cache" / "pycache"),
+            "AGENT_CANON_RECORD_ROOT": str(record_root),
+            "AGENT_CANON_RECORD_ID": record_id,
+        }
+    )
+    child_environment = boundary.child_environment(
+        attestation,
+        base_env=record_environment_base,
+        issue_handoff=True,
+    )
+    return child_environment, record_receipt
 
 
 def load_scopes(source_root: Path) -> dict[str, tuple[tuple[str, ...], tuple[str, ...]]]:
@@ -375,11 +390,20 @@ def run(source_root: Path, list_path: Path, active_route: str) -> int:
                 continue
             selected_count += 1
             emit({**common, "status": "start", "exit_code": None})
+            record_environment_value: dict[str, str] | None = None
+            record_receipt: Any | None = None
             try:
+                record_environment_value, record_receipt = record_environment(
+                    environment,
+                    boundary,
+                    attestation,
+                    runtime_receipt,
+                    record["id"],
+                )
                 process = subprocess.Popen(
                     argv,
                     cwd=source_root,
-                    env=environment,
+                    env=record_environment_value,
                     stdout=sys.stderr,
                     stderr=sys.stderr,
                 )
@@ -387,6 +411,13 @@ def run(source_root: Path, list_path: Path, active_route: str) -> int:
             except OSError as error:
                 print(f"testrunner: command start failed: {error}", file=sys.stderr)
                 exit_code = 127
+            finally:
+                if record_receipt is not None and record_receipt.physical_path.exists():
+                    boundary.remove_parent_owned_tree(
+                        attestation,
+                        record_receipt,
+                        "public-test-runner-record-cleanup",
+                    )
             status = "pass" if exit_code == 0 else "fail"
             if status == "fail":
                 failed_count += 1

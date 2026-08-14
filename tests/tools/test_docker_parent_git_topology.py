@@ -34,6 +34,11 @@ def test_image_sources_define_real_parent_vendor_topology() -> None:
     assert "160000:commit:" in dockerfile
     assert "WORKDIR /opt/agent-canon-parent/vendor/agent-canon" in dockerfile
     assert "cargo test --locked --offline --no-run" in dockerfile
+    assert 'git clone --bare --no-local "${source_root}" "${clone_probe}/agent-canon.git"' in dockerfile
+    assert "graph build" in dockerfile
+    assert "graph status" in dockerfile
+    assert '--root "${source_root}" --profile default --format json' in dockerfile
+    assert 'test -s "${source_root}/.agent-canon/knowledge-graph/graph.sqlite"' in dockerfile
     assert "AGENT_CANON_TEST_PARENT_ROOT" not in runner
     assert "child_process_environment" not in runner
 
@@ -56,6 +61,7 @@ def test_built_image_exposes_exact_gitlink_and_is_removed_after_probe() -> None:
     probe = """
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -99,6 +105,39 @@ runtime = parent / '.agent-canon' / 'image-runtime'
 assert (runtime / 'tools' / 'agent-canon' / 'bin' / 'agent-canon').is_file()
 assert os.access(runtime / 'tools' / 'agent-canon' / 'bin' / 'agent-canon', os.X_OK)
 assert (runtime / 'cargo-target').is_dir()
+graph = source / '.agent-canon' / 'knowledge-graph' / 'graph.sqlite'
+assert graph.is_file()
+graph_status = subprocess.run(
+    [
+        str(runtime / 'tools' / 'agent-canon' / 'bin' / 'agent-canon'),
+        'graph',
+        'status',
+        '--root',
+        str(source),
+        '--profile',
+        'default',
+        '--format',
+        'json',
+    ],
+    check=True,
+    capture_output=True,
+    text=True,
+)
+assert json.loads(graph_status.stdout)['status'] == 'fresh'
+clone_probe = source / '.agent-canon' / 'topology-clone'
+subprocess.run(
+    ['git', 'clone', '--bare', '--no-local', str(source), str(clone_probe)],
+    check=True,
+    capture_output=True,
+    text=True,
+)
+subprocess.run(
+    ['git', '--git-dir', str(clone_probe), 'fsck', '--full'],
+    check=True,
+    capture_output=True,
+    text=True,
+)
+shutil.rmtree(clone_probe)
 assert 'AGENT_CANON_TEST_PARENT_ROOT' not in os.environ
 print(json.dumps({'gitlink': source_head, 'parent': str(parent), 'source': str(source)}))
 """

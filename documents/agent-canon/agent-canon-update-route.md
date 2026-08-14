@@ -256,6 +256,15 @@ identity and ordering only; they do not rerun the owned check.
 | `tools/ci/check_agent_canon_pr.py` | materialize/replay G2 from the ordered passing generated-completeness checks |
 | `tools/ci/check_agent_canon_latest.sh` | consume G4-G5 without a second source-main check |
 
+`update_agent_canon.sh` and `sync_agent_canon.sh` rebase inherited `TMPDIR`,
+`TEMP`, and `TMP` values at their parent-bound handoff. Container and test
+runners may export those variables for an outer temporary workspace; they are
+not update/sync path selections. The handoff therefore starts with the
+authenticated parent defaults, while an explicit `AGENT_CANON_PARENT_TMPDIR`
+continues to select the update/sync temporary directory after the handoff.
+Direct parent-bound callers that intentionally preserve inherited values omit
+the rebase option and retain the ordinary external-path rejection.
+
 ## Centralized Template Parent Follow-Up
 
 When a source update changes centralized template owners under source-root

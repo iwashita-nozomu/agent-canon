@@ -375,8 +375,8 @@ def test_public_standalone_docker_route_requires_no_runtime_packs() -> None:
     assert report.packs == ()
 
 
-def test_public_docker_image_prebuilds_rust_runtime_and_test_target() -> None:
-    """The parent/vendor image owns the prebuilt CLI and cargo test target."""
+def test_public_docker_image_prebuilds_rust_runtime_test_target_and_graph() -> None:
+    """The parent/vendor image owns the CLI, cargo target, and fresh graph."""
     dockerfile = PUBLIC_DOCKERFILE.read_text(encoding="utf-8")
     wrapper = (PROJECT_ROOT / "tools" / "bin" / "agent-canon").read_text(
         encoding="utf-8"
@@ -385,13 +385,46 @@ def test_public_docker_image_prebuilds_rust_runtime_and_test_target() -> None:
     assert "agent-canon-parent/vendor/agent-canon" in dockerfile
     assert "git -C \"${parent_root}\" add .gitignore .gitmodules vendor/agent-canon" in dockerfile
     assert "160000:commit:" in dockerfile
+    assert 'git clone --bare --no-local "${source_root}" "${clone_probe}/agent-canon.git"' in dockerfile
     assert "cargo install --locked --path \"${source_root}/rust/agent-canon\"" in dockerfile
     assert "cargo test --locked --offline --no-run" in dockerfile
     assert 'CARGO_TARGET_DIR="${runtime_root}/cargo-target"' in dockerfile
     assert "cargo fetch" not in dockerfile
     assert '--root "${runtime_root}/tools/agent-canon"' in dockerfile
+    assert '"${runtime_root}/tools/agent-canon/bin/agent-canon" graph build' in dockerfile
+    assert '"${source_root}/.agent-canon/knowledge-graph/graph.sqlite"' in dockerfile
+    assert '"${runtime_root}/tools/agent-canon/bin/agent-canon" graph status' in dockerfile
     assert "/opt/agent-canon-runtime" not in wrapper
     assert "AGENT_CANON_TEST_PARENT_ROOT" not in dockerfile
+
+
+def test_public_docker_image_requires_fresh_graph_staging(tmp_path: Path) -> None:
+    """The public image validator rejects removal of the graph precondition."""
+    module = load_container_config_module()
+    root = tmp_path / "source"
+    write_file(
+        root,
+        ".dockerignore",
+        (PROJECT_ROOT / ".dockerignore").read_text(encoding="utf-8"),
+    )
+    dockerfile = (PROJECT_ROOT / "docker/Dockerfile").read_text(encoding="utf-8")
+    write_file(root, "docker/Dockerfile", dockerfile)
+
+    assert module.validate_public_test_git_context(root) == []
+
+    write_file(
+        root,
+        "docker/Dockerfile",
+        dockerfile.replace(
+            '"${runtime_root}/tools/agent-canon/bin/agent-canon" graph build',
+            '"${runtime_root}/tools/agent-canon/bin/agent-canon" graph removed',
+            1,
+        ),
+    )
+    details = {
+        finding.detail for finding in module.validate_public_test_git_context(root)
+    }
+    assert "canonical-graph-build-required" in details
 
 
 @pytest.mark.parametrize(
@@ -441,6 +474,11 @@ def test_public_docker_image_prebuilds_rust_runtime_and_test_target() -> None:
             lambda text: text,
             lambda text: text.replace("'^credential\\.'", "'^other\\.'"),
             "credential-readback-required",
+        ),
+        (
+            lambda text: text,
+            lambda text: text.replace("git clone --bare --no-local", "git clone --bare"),
+            "non-local-bare-clone-readback-required",
         ),
     ),
 )
