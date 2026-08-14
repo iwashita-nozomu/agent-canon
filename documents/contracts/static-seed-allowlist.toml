@@ -1,0 +1,48 @@
+# @dependency-start
+# contract configuration
+# responsibility Defines the sole exact-path allowlist for the template-consumer static seed.
+# upstream design ./static-seed-export.md static seed ownership and exclusion contract
+# downstream implementation ../../tools/agent_tools/export_static_seed.py reads this manifest from one committed Git tree
+# downstream implementation ../../tests/agent_tools/test_export_static_seed.py verifies exact-file and forbidden-surface behavior
+# @dependency-end
+
+version = 1
+source_repository = "iwashita-nozomu/agent-canon"
+files = [
+  ".codex/agents/artifact_reviewer.toml",
+  ".codex/agents/benchmark_reviewer.toml",
+  ".codex/agents/citation_evidence_reviewer.toml",
+  ".codex/agents/cpp_reviewer.toml",
+  ".codex/agents/detailed_design_reviewer.toml",
+  ".codex/agents/detailed_designer.toml",
+  ".codex/agents/diff_triage_reviewer.toml",
+  ".codex/agents/docs_workflow_steward.toml",
+  ".codex/agents/document_flow_reviewer.toml",
+  ".codex/agents/execution_planner.toml",
+  ".codex/agents/experiment_runner.toml",
+  ".codex/agents/explorer.toml",
+  ".codex/agents/fair_data_reviewer.toml",
+  ".codex/agents/literature_researcher.toml",
+  ".codex/agents/logic_gap_reviewer.toml",
+  ".codex/agents/long_form_writer.toml",
+  ".codex/agents/manager_reviewer.toml",
+  ".codex/agents/ml_science_reviewer.toml",
+  ".codex/agents/notation_definition_reviewer.toml",
+  ".codex/agents/oop_readability_reviewer.toml",
+  ".codex/agents/plan_reviewer.toml",
+  ".codex/agents/project_reviewer.toml",
+  ".codex/agents/prompt_config_reviewer.toml",
+  ".codex/agents/python_reviewer.toml",
+  ".codex/agents/report_reviewer.toml",
+  ".codex/agents/reproducibility_reviewer.toml",
+  ".codex/agents/requirements_organizer.toml",
+  ".codex/agents/reviewer.toml",
+  ".codex/agents/scientific_computing_reviewer.toml",
+  ".codex/agents/ship_reviewer.toml",
+  ".codex/agents/skill_evaluator.toml",
+  ".codex/agents/spark_worker.toml",
+  ".codex/agents/terra.toml",
+  ".codex/agents/test_designer.toml",
+  ".codex/agents/worker.toml",
+  ".codex/config.toml",
+]
