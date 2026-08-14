@@ -246,6 +246,22 @@ class CheckBootstrapDocsTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1, result.stdout)
             self.assertIn("static seed must not contain symlinks", result.stdout)
 
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            self.write_static_seed_consumer(root)
+            self.write_file(
+                root / "documents" / "runtime" / "shared-runtime-surfaces.toml",
+                'version = 1\nprefix = "vendor/agent-canon"\n',
+            )
+
+            result = self.run_cli(root, "--static-seed-consumer")
+
+            self.assertEqual(result.returncode, 1, result.stdout)
+            self.assertIn(
+                "documents/runtime/shared-runtime-surfaces.toml: live AgentCanon consumer surface is forbidden",
+                result.stdout,
+            )
+
     def test_live_runtime_manifest_is_explicit_opt_in(self) -> None:
         """The legacy projection manifest must identify itself as non-default."""
         manifest = tomllib.loads(

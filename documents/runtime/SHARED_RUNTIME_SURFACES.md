@@ -36,6 +36,14 @@ The machine-readable source of truth for the opt-in mode is
 `selection = "explicit-opt-in"`. A default-consumer checker must reject those live surfaces rather
 than silently selecting this manifest.
 
+The manifest parser validates these fields as typed selection metadata. The allowed combinations are
+`live-agent-canon` / `false` / `explicit-opt-in` for the live integration and
+`static-seed` / `true` / `default` for a source-free static consumer. Unknown integration or
+selection values, non-boolean `default_consumer`, and mismatched combinations fail closed.
+For compatibility with a historical `version = 1` manifest, omission of all three fields maps to
+the live triple above. This compatibility applies only when all three fields are absent; a partial
+set is invalid, and a non-v1 manifest must state the complete typed selection explicitly.
+
 ## Opt-in Source and Projection
 
 AgentCanon source is authoritative under `vendor/agent-canon/` only after the opt-in mode is
@@ -77,7 +85,15 @@ Each `[[surface]]` in `shared-runtime-surfaces.toml` declares projection metadat
 - `source`: optional AgentCanon-relative source path; and
 - `optional`: whether the path is materialized only by an explicit lifecycle.
 
-The top-level integration metadata is mandatory selection evidence for readers and focused tests.
+The top-level integration metadata is selection evidence for readers and focused tests. New
+manifests must provide all three fields; an unannotated `version = 1` manifest is the sole legacy
+exception and maps to the historical live selection, while partial metadata is rejected.
+`integration_mode` is an enum, `default_consumer` is a TOML boolean, and `selection` is an enum;
+`surface_manifest.py` exposes and validates all three fields on its typed manifest result. The
+`normalized-snapshot` output retains its existing v1 DTO for the Rust graph consumer, while sync
+spec commands require the typed `live-agent-canon` / `false` / `explicit-opt-in` contract. A
+static-seed manifest, including one containing a symlink entry, cannot produce or apply sync
+specifications.
 The `removed_legacy` group records paths that must not be materialized. The manifest contains no
 general path-owner fallback and no full-tree or all-tracked entry. `responsibility-scope.toml` remains
 the sole general owner/class source.

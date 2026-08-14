@@ -102,6 +102,7 @@ checker は AgentCanon module や source resolver を import せず、出力 tre
 allowlist、exporter、consumer checker は次を拒否します。
 
 - live AgentCanon checkout、gitlink、symlink、source mirror
+- `documents/runtime/shared-runtime-surfaces.toml` とその他の source manifest
 - AgentCanon CLI、dispatcher、source resolver、updater、latest checker
 - update/sync transaction state と source manifest
 - AgentCanon 内部の tests、notes、memory、evidence、reports、issues

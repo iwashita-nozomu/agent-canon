@@ -69,6 +69,7 @@ CANONICAL_SOURCE_REPOSITORY = "iwashita-nozomu/agent-canon"
 STATIC_SEED_FORBIDDEN_PATHS = (
     Path(".agent-canon"),
     Path(".gitmodules"),
+    Path("documents/runtime/shared-runtime-surfaces.toml"),
     Path("tools/agent-canon"),
     Path("vendor/agent-canon"),
 )

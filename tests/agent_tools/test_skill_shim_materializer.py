@@ -11,14 +11,12 @@
 from __future__ import annotations
 
 import json
-import os
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-# Materializer writes are intentionally parent-bound even in direct unit runs.
-os.environ.setdefault("AGENT_CANON_PARENT_ROOT", str(PROJECT_ROOT))
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
 sys.path.insert(0, str(TOOLS_ROOT))
 
@@ -37,7 +35,13 @@ class SkillShimMaterializerTest(unittest.TestCase):
 
     def test_materialize_fixed_point(self) -> None:
         """Two runs preserve all records/projections and the second run is empty."""
-        actual = fixed_point_acceptance(PROJECT_ROOT)
+        # Materializer writes are intentionally parent-bound even in direct unit
+        # runs. Scope the capability to this test instead of mutating the test
+        # process environment at module import time.
+        with patch.dict(
+            "os.environ", {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
+        ):
+            actual = fixed_point_acceptance(PROJECT_ROOT)
         expected = json.loads(
             (
                 PROJECT_ROOT

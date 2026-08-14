@@ -166,7 +166,12 @@ def graph_builder_exit_fixture(
     manifest = parent / "documents" / "runtime" / "shared-runtime-surfaces.toml"
     manifest.parent.mkdir(parents=True)
     manifest.write_text(
-        'version = 1\nprefix = "vendor/agent-canon"\n', encoding="utf-8"
+        'version = 1\n'
+        'prefix = "vendor/agent-canon"\n'
+        'integration_mode = "live-agent-canon"\n'
+        'default_consumer = false\n'
+        'selection = "explicit-opt-in"\n',
+        encoding="utf-8",
     )
     base = graph_change_fixture(parent, {})
     source_root = root / "builder-source"
