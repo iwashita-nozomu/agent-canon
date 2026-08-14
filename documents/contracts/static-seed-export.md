@@ -1,13 +1,16 @@
 <!--
 @dependency-start
 contract reference
-responsibility template consumer向け静的seedの所有境界、生成入力、出力、禁止surfaceを定義する。
-upstream design ../../README.md AgentCanon source treeとconsumer配布境界。
-upstream design ./README.md 親レポ利用契約の索引。
-upstream design ./static-seed-allowlist.toml template consumerへ供給する唯一のexact-path allowlist。
-downstream implementation ../../tools/agent_tools/export_static_seed.py committed Git treeからseedを生成する唯一のentrypoint。
-downstream design ../tools/export_static_seed.md maintainer向けcommandと失敗条件。
-downstream implementation ../../tests/agent_tools/test_export_static_seed.py 決定性、禁止surface、source-hidden fixtureを検証する。
+responsibility Defines static-seed ownership, producer input/output, source-free consumer validation, and forbidden surfaces.
+upstream design ../../README.md AgentCanon source tree and consumer distribution boundary
+upstream design ./README.md parent-repository contract index
+upstream design ./static-seed-allowlist.toml sole exact-path allowlist for default consumers
+downstream design ./template-bootstrap.md default source-free bootstrap contract
+downstream implementation ../../tools/agent_tools/export_static_seed.py committed-tree exporter
+downstream implementation ../../tools/docs/check_bootstrap_docs.py source-free consumer structure checker
+downstream design ../tools/export_static_seed.md maintainer commands and failure semantics
+downstream implementation ../../tests/agent_tools/test_export_static_seed.py producer determinism and exclusion tests
+downstream implementation ../../tests/tools/test_check_bootstrap_docs.py source-hidden consumer and bootstrap regression tests
 @dependency-end
 -->
 
@@ -16,30 +19,30 @@ downstream implementation ../../tests/agent_tools/test_export_static_seed.py 決
 ## 目的
 
 AgentCanon は template 保守時の供給元として、通常の consumer repository が直接所有できる
-静的な Codex configuration seed を生成します。生成後の consumer は AgentCanon checkout、
-submodule、CLI、source resolver、updater、同期状態、checkout secret、network access を
-必要としません。
+静的な Codex configuration seed を生成します。生成後の default consumer は AgentCanon checkout、
+CLI、source resolver、updater、同期状態、checkout secret、network access を必要としません。
 
-この契約は producer 側の export だけを所有します。default template/bootstrap 契約の切替、
-既存 submodule・symlink・updater の撤去、派生 repository への移行は #712 および
-`iwashita-nozomu/project_template` #165–#167 が所有します。
+producer export と default bootstrap の境界は次の通りです。
+
+1. AgentCanon maintainer が committed source snapshot から seed を one-way export する。
+1. template maintainer が output と provenance を regular file として review・commit する。
+1. clone/bootstrap/CI/runtime は取り込まれた file を直接読み、再生成や上流探索を行わない。
+1. live AgentCanon integration は別の explicit opt-in contract として扱う。
 
 ## 正本
 
 静的 seed の file set は
-[`static-seed-allowlist.toml`](static-seed-allowlist.toml) の exact path 列だけです。
-生成入口は
-[`export_static_seed.py`](../../tools/agent_tools/export_static_seed.py) だけです。
-allowlist の path は source と出力で同一とし、glob、directory copy、fallback、暗黙追加を
-使用しません。
+[`static-seed-allowlist.toml`](static-seed-allowlist.toml) の exact path 列だけです。生成入口は
+[`export_static_seed.py`](../../tools/agent_tools/export_static_seed.py) だけです。allowlist の path は
+source と出力で同一とし、glob、directory copy、fallback、暗黙追加を使用しません。
 
 allowlist は現在、次の consumer-owned regular file だけを含みます。
 
 - `.codex/config.toml`
 - `.codex/agents/<role>.toml`
 
-`AGENTS.md` / `ROOT_AGENTS.md` は現行 source tree の live AgentCanon runtime 契約を参照するため、
-この seed には含めません。consumer root instruction の移行は #712 の責務です。
+consumer root instruction は project-owned content です。現行 live runtime を参照する source instruction
+file を seed に混ぜません。
 
 ## 生成規則
 
@@ -73,26 +76,53 @@ worktree dirty state、remote state、environment-specific path、乱数は出�
 - source commit object ID
 
 時刻、branch、remote URL、latest 判定、更新履歴、consumer sync state は記録しません。
-全出力 file は mode `0644` の regular file であり、symlink、gitlink、submodule、out-of-tree
-reference は作りません。
+全出力 file は mode `0644` の regular file であり、symlink、gitlink、out-of-tree reference を
+作りません。
 
-## 禁止 surface
+## Source-free Consumer Validation
 
-allowlist と exporter は次を拒否します。
+export 後または consumer migration fixture では、AgentCanon source を不可視化して次を実行します。
 
-- `vendor/agent-canon` を含む checkout、gitlink、submodule、symlink
-- `tools/`、AgentCanon CLI、dispatcher、source resolver、updater、latest checker
-- `.agent-canon/`、source manifest、sync/update state
-- AgentCanon 内部の `tests/`、`notes/`、`memory/`、`evidence/`、`reports/`、`issues/`
+```bash
+python3 tools/docs/check_bootstrap_docs.py \
+  --root <export-or-consumer-root> \
+  --static-seed-consumer
+```
+
+checker は AgentCanon module や source resolver を import せず、出力 tree だけから次を確認します。
+
+- provenance key、repository identity、source commit object ID
+- `.codex/config.toml` と全 role file が non-symlink regular file であること
+- role reference が `.codex/agents/<same-role>.toml` へ閉じ、未参照 role がないこと
+- live checkout、runtime tool、update/sync state が存在しないこと
+- seed payload に resolver、updater、network、source path marker がないこと
+
+## 禁止 Surface
+
+allowlist、exporter、consumer checker は次を拒否します。
+
+- live AgentCanon checkout、gitlink、symlink、source mirror
+- AgentCanon CLI、dispatcher、source resolver、updater、latest checker
+- update/sync transaction state と source manifest
+- AgentCanon 内部の tests、notes、memory、evidence、reports、issues
 - hook、MCP、command、URL、network access を構成する TOML key または内容
 - token、credential、private key、checkout secret を示す path または内容
 - allowlist にない tracked file、重複 path、非正規相対 path、実行可能 file
 
 ## Consumer 取り込み境界
 
-`project_template` maintainer は export 結果を通常の tracked file として review し、template
-repository の変更として取り込みます。取り込み後の file は template/consumer が所有し、
-AgentCanon source への link や runtime import を持ちません。
+Template maintainer は export 結果を通常の tracked file として review し、consumer tree の変更として
+取り込みます。取り込み後の file は template/consumer が所有し、AgentCanon source への link や
+runtime import を持ちません。
 
-この契約は自動 publish、registry、package manager、bot、background update、derived repository
-への同期を定義しません。再生成は maintainer が明示的に実行する一方向操作です。
+この契約は自動 publish、registry、package manager、bot、background update、derived repository への
+同期を定義しません。再生成は maintainer が明示的に実行する一方向操作です。
+
+Migration order は次で固定します。
+
+1. AgentCanon static seed producer と source-free consumer contract を確定する。
+1. consumer tree から live source ownership と projection を削除し、seed を regular file 化する。
+1. canonical Makefile/CI/Docker command を project-owned surface へ切り替える。
+1. bootstrap と descendant fresh-clone acceptance を source-hidden 状態で実行する。
+
+この順序の途中で互換 symlink、代替 vendored runtime、automatic updater を追加しません。

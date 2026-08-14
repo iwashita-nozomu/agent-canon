@@ -1,25 +1,29 @@
 <!--
 @dependency-start
 contract reference
-responsibility Documents Template Bootstrap for this repository.
-upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
-upstream design ../agent-canon/agent-canon-github-remote.md GitHub canonical remote policy
+responsibility Documents the default source-free template bootstrap path.
+upstream design ./static-seed-export.md static seed ownership, provenance, and exclusion contract
 upstream design ./template-github-remote.md template GitHub canonical remote policy
+upstream design ../runtime/SHARED_RUNTIME_SURFACES.md separately selected live integration boundary
+downstream implementation ../../tools/docs/check_bootstrap_docs.py rejects live runtime requirements in the default path
+downstream design ../../agents/skills/start-repository.md default repository-start workflow
 @dependency-end
 -->
 
 # Template Bootstrap
 
-この文書は、`git clone <template>` 直後に新しい repo を使い始めるときの最短 runbook です。
+この文書は、`git clone <template>` 直後に新しい repository を使い始めるための
+**default bootstrap** を定義します。default は source-free です。template が直接所有する
+static seed と project-owned script だけを使い、外部の AgentCanon checkout、runtime tool、
+更新処理、同期状態、checkout credential、network access を必要としません。
 
-## この文書の読み方
+## Reader Map
 
-- この文書は、template clone 直後の初期化、受け入れ確認、開発環境、
-  作業開始までの最短 runbook を扱います。
-- 主な順路は、Clone 直後、初期化、受け入れ確認、開発環境、作業開始です。
-- 新しい template-derived repo を作るときに読みます。
-- 境界: GitHub remote policy や shared runtime surface の詳細はリンク先の
-  documents が正本です。
+- Clone 直後: 通常 clone した tracked tree をそのまま使います。
+- 初期化: project slug、表示名、destination remote だけを設定します。
+- Static seed: template 内の regular file を読み、bootstrap 中には再生成しません。
+- 受け入れ確認: project-owned validation を実行します。
+- Live integration: default とは別の明示選択です。
 
 ## 1. Clone 直後
 
@@ -28,10 +32,13 @@ git clone <template-repo> <your-project>
 cd <your-project>
 ```
 
+追加の source checkout や recursive option は不要です。clone 後の全 tracked file は、
+通常の Git tree だけで読めなければなりません。
+
 ## 2. 初期化
 
-repo 名、表示名、bare remote 名を変える場合は次を使います。
-agent に任せる場合は `$start-repository` を指定し、この tool を呼ばせます。
+repository 名、表示名、destination remote 名を変える場合は次を使います。agent に任せる場合は
+`$start-repository` を指定し、この project-owned entrypoint を呼ばせます。
 
 ```bash
 bash scripts/start_repository.sh \
@@ -39,87 +46,60 @@ bash scripts/start_repository.sh \
   --display-name "Your Project"
 ```
 
-GitHub-backed template では、`vendor/agent-canon` submodule は
-`https://github.com/iwashita-nozomu/agent-canon.git` を canonical remote として使います。
-`--force` を init に渡すと wrapper は agent-canon preflight を block 扱いで skip し、dirty worktree override を優先します。
-AgentCanon は GitHub submodule を正本とし、初期化時に project-local `agent-canon` bare repo は作りません。
+この処理は repository identity と project config だけを変換します。static seed の取得、
+上流最新版の探索、runtime projection、background update は行いません。GitHub access が必要な
+場合も destination repository の作成・push に限定します。
 
-派生 repo から `agent-canon` だけ更新したいときは次を使います。
+## 3. Static Seed Ownership
 
-```bash
-PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/update_agent_canon.sh plan
-```
+[Static Seed Export Contract](static-seed-export.md) に従って template maintainer が生成した
+次の surface を、template/consumer が regular file として直接所有します。
 
-If the plan requires mutation, request current-task user approval before
-running protected `apply` with inline destructive authority/reason fields. Add
-creation authority/reason only when the route creates a branch or worktree;
-force-create or ref-overwrite routes require both authority pairs.
+- `.codex/config.toml`
+- `.codex/agents/<role>.toml`
+- `agent-canon-static-seed.json`
 
-派生 repo 側で shared canon を直す場合は、
-`documents/rule/dependency-module-changes.md` に従って
-`workspace/<topic-slug>/agent-canon/` の managed source clone で
-`--branch` を指定して作業し、そこで通常の GitHub branch / PR を作ります。
-親 repo の `vendor/agent-canon/` は clean pin projection のままです。
+provenance は source repository identity、source commit、schema version だけを保持します。
+consumer 側の latest 状態、同期履歴、時刻、branch、remote URL は持ちません。seed maintenance は
+maintainer が明示的に行う **one-way export** であり、clone、bootstrap、通常 CI、product runtime
+から自動実行しません。
 
-Reuse the current AgentCanon branch. If no suitable branch exists, keep the
-checkout unchanged and request user direction; normal branch creation requires
-same-segment creation authority/reason, while force-create or ref-overwrite
-requires the destructive authority/reason pair as well. After committing only
-task-owned paths, invoke the protected merge wrapper with destructive
-authority/reason and push the already-current branch.
+project 固有の instruction、script、workflow、Docker/Dev Container、editor config は project が
+通常 file として所有します。static seed を上流 source への link、runtime import、代替 package、
+別 checkout に置き換えません。
 
-AgentCanon PR merge 後に派生 repo 側へ戻り、current-task user approval と
-inline destructive authority/reason を得て protected `apply` を実行し、root
-view を修復します。Route が branch/worktree を作成する場合だけ creation
-authority/reason を追加し、force-create/ref-overwrite では両方を置きます。
+## 4. 受け入れ確認
 
-GitHub 管理では template の canonical remote を
-`https://github.com/iwashita-nozomu/project_template.git` にします。`.gitmodules` の AgentCanon URL は
-`https://github.com/iwashita-nozomu/agent-canon.git` にします。
-PR と security 設定の正本は GitHub 側に置きます。
-
-最低限の確認:
-
-```bash
-gh repo view <owner>/<template-repo> --json nameWithOwner,visibility,isPrivate,defaultBranchRef
-gh repo view <owner>/agent-canon --json nameWithOwner,visibility,isPrivate,defaultBranchRef
-git submodule status vendor/agent-canon
-```
-
-## 3. 受け入れ確認
-
-fresh clone と runtime surface が壊れていないことを確認します。
-init 変更を commit したあと、同じ tool で確認できます。
+初期化変更を commit したあと、project-owned validation を実行します。
 
 ```bash
 bash scripts/start_repository.sh --validate-only
 ```
 
-## 4. 開発環境
+最低限、次を確認します。
 
-- host 前提:
-  - `documents/contracts/linux-wsl-host-requirements.md`
-- container:
-  - `docker/README.md`
-- VS Code devcontainer:
-  - `.devcontainer/`
-- VS Code workspace defaults and recommended extensions:
-  - `.vscode/` (AgentCanon-managed root view)
+- static seed と provenance が regular file である。
+- Codex role reference が同じ repository 内の role file へ閉じている。
+- 外部 source、更新状態、runtime tool が無くても bootstrap validation が成功する。
+- destination remote 以外の network や credential を要求しない。
 
-## 5. 作業開始
+## 5. 開発環境
 
-- agent workflow:
-  - `agents/README.md`
-- workflow canon:
-  - `agents/workflows/README.md`
-- work log:
-  - `python3 tools/agent_tools/work_log.py --kind <kind> --message "<what changed>" --next "<next>"`
+- host 前提: `documents/contracts/linux-wsl-host-requirements.md`
+- container: `docker/README.md`
+- VS Code Dev Container: `.devcontainer/`
+- workspace defaults: `.vscode/`
 
-新規作業では追加の `git worktree` を使いません。current checkout の run-local `work_log.md` に継続ログを残します。
+これらはすべて project-owned regular content です。
 
-```bash
-python3 tools/agent_tools/work_log.py \
-  --kind kickoff \
-  --message "references and scope confirmed" \
-  --next "start implementation"
-```
+## 6. Live Integration Is Separate
+
+[Shared Runtime Surfaces](../runtime/SHARED_RUNTIME_SURFACES.md) は、AgentCanon の live integration を
+明示的に採用する repository だけの別契約です。default template/bootstrap はその manifest、
+投影、更新 lifecycle、source-root discovery を選択しません。採用する場合は通常経路の延長ではなく、
+repository architecture の独立した opt-in 変更として review します。
+
+## 7. 作業開始
+
+project の README、workflow、test、docs、Docker command を正本として作業を開始します。
+新規作業が AgentCanon source の存在を暗黙に仮定してはなりません。

@@ -1,108 +1,110 @@
 <!--
 @dependency-start
 contract reference
-responsibility Indexes the centralized AgentCanon template owner and the parent-owned boundary.
-upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared template surface ownership
+responsibility Indexes AgentCanon-owned template sources and the one-way static consumer export boundary.
+upstream design ../documents/contracts/static-seed-export.md static seed allowlist, provenance, and exclusion contract
+upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md separate explicit live integration boundary
 upstream design ../documents/rule/README.md document filename, placement, and language rules
-upstream design ../documents/conventions/DOCSTRING_GUIDE.md owns semantic Docstring clauses and sparse projection traces
+upstream design ../documents/conventions/DOCSTRING_GUIDE.md semantic Docstring clauses and projection traces
 downstream implementation ./agents/README.md reusable agent artifact template source
 downstream implementation ./documents/README.md reader-facing document template source
 downstream implementation ./code/README.md materializable code and Docstring template source
 downstream implementation ./experiments/_template/run.py runnable experiment scaffold source
-downstream implementation ../tools/agent_tools/code_template_rendering.py renders materializable code templates
-downstream implementation ../tools/agent_tools/agent_team.py renders agent templates
-downstream implementation ../tools/experiments/create_experiment_topic.py copies experiment templates
-downstream implementation ../tools/ci/check_github_workflows.py validates checked-in GitHub template targets
+downstream implementation ../tools/agent_tools/export_static_seed.py produces the exact default-consumer seed
+downstream implementation ../tools/agent_tools/code_template_rendering.py renders AgentCanon-internal code templates
+downstream implementation ../tools/agent_tools/agent_team.py renders AgentCanon-internal agent templates
+downstream implementation ../tools/experiments/create_experiment_topic.py copies AgentCanon-internal experiment templates
 @dependency-end
 -->
 
 # Centralized Templates
 
-このディレクトリは、AgentCanon が提供する template の唯一の source owner です。旧来の
-`agents/templates/`、`documents/templates/`、`experiments/_template/` は存在せず、alias、
-wrapper、互換コピーも作りません。
+この directory は、AgentCanon source repository 内で保守する template の唯一の owner です。
+ただし、default template/derived consumer がこの source tree を runtime に参照することはありません。
+consumer へ渡す default surface は
+[Static Seed Export Contract](../documents/contracts/static-seed-export.md) の exact allowlist から生成した
+regular file と最小 provenance だけです。
 
 ## Reader Map
 
-この README は、template source の全体像、各 source view の責務、checked-in target、
-親repoとの境界、更新・再現・cleanup の入口を提供します。最初にこの表で source owner
-を決め、次に対象 template の `what this document contains`、owner、設計 trace、
-validation/readback、lifecycle を読みます。
-
-- purpose: adaptable な AgentCanon template source を一つの canonical path で提供する。
-- intended reader: template利用者、実装者、reviewer、親repo integrator、保守者。
-- what this directory contains: agent artifact、reader-facing document、materializable code、experiment scaffold、GitHub source。
-- canonical source: `templates/`。
-- checked-in / local surfaces: standalone AgentCanon `.github/` targets、run/result、reports。derived parent の `.github` と runtime directories は parent-owned regular content。
-- update owner: 各 source template と対応する checked-in target。
-- required validation: source/target identity、formatter/docs、dependency header、semantic checker。
-- lifecycle: run-local data と generated copies は retention policy / producer owner が cleanup する。
+- AgentCanon maintainer: source template をこの directory で編集し、source-owned checker を実行する。
+- Default consumer maintainer: committed source commit から static seed を one-way export し、通常 file として review する。
+- Default consumer/runtime: 取り込まれた file を直接所有し、AgentCanon source、resolver、updater、同期状態を参照しない。
+- Live integration adopter: default とは別に explicit opt-in runtime contract を選ぶ。
 
 ## Source-view index
 
 | Source view | Responsibility | Materialization rule |
 | --- | --- | --- |
-| `templates/agents/` | task-start、run bundle、review、closeout の artifact template | Agent team がこの path を直接 render する |
-| `templates/documents/` | README、design、experiment、host、remote execution、GitHub template source | standalone AgentCanon の checked-in GitHub targets を source と同時に更新する |
-| `templates/code/` | parse-valid module/class/function と Docstring の materializable source | `render_code_template()` または明示 copy で destination owner へ materialize する |
-| `templates/experiments/_template/` | runnable experiment scaffold の frozen source | `create_experiment_topic.py` が新規 `experiments/<topic>/` へ copy する |
+| `templates/agents/` | task-start、run bundle、review、closeout の artifact template | AgentCanon source 内で agent team が render する |
+| `templates/documents/` | README、design、experiment、host、remote execution、GitHub source | standalone AgentCanon target と source を同時に更新する |
+| `templates/code/` | parse-valid module/class/function と Docstring の materializable source | source-owned renderer が destination owner へ materialize する |
+| `templates/experiments/_template/` | runnable experiment scaffold の frozen source | source-owned experiment command が新規 topic へ copy する |
 | `templates/agents/_partials/` | reader map、review contract、finding/decision の再利用部品 | top-level agent artifact の render 時だけ展開する |
 
-親 template / derived repo は、この正本を
-`vendor/agent-canon/templates/` から直接解決します。root `templates` symlink
-view は materialize しません。親側の `experiments/_template` は source owner
-ではないため削除し、親の `experiments/registry.toml` から `_template`
-entry と対応する docs / tests を削除します。GitHub Issue / PR の checked-in standalone
-targets は `templates/documents/github/` source と同時に更新します。derived parent の
-`.github`、`.devcontainer`、`.vscode`、`agents`、`.agents` は parent-owned regular content
-であり、この source から親rootへ反映しません。
+## Default Consumer Export Boundary
 
-## Experiment copy boundary
+Default consumer に供給する file set は
+`documents/contracts/static-seed-allowlist.toml` の exact path 列だけです。現在の seed は
+`.codex/config.toml` と `.codex/agents/<role>.toml` を含み、出力時に
+`agent-canon-static-seed.json` を加えます。
 
-`create_experiment_topic.py` は `templates/experiments/_template/`、
+次は default consumer へ配布しません。
+
+- AgentCanon の template source directory
+- source resolver、dispatcher、updater、latest checker
+- runtime projection、transaction state、sync state
+- tests、notes、memory、evidence、reports、issues
+- source checkout secret、URL、network command
+- symlink、gitlink、source mirror、代替 package
+
+export は一つの committed source snapshot から実行する maintainer-owned one-way operation です。
+取り込み後の regular file は consumer repository が所有します。consumer CI、bootstrap、product image、
+background task は再生成や上流探索を行いません。
+
+## Experiment Copy Boundary
+
+`create_experiment_topic.py` は AgentCanon source 内で
+`templates/experiments/_template/`、
 `templates/documents/experiment/README.template.md`、および
 `templates/documents/experiment/experiment-provenance.template.toml` を読み、生成先だけを
-`experiments/<topic>/` に書き込みます。source scaffold、source registry、GPU 実行経路は
-直接変更しません。managed runner の実行入口は常に生成後の
-`experiments/<topic>/run.py` です。`run.py` は orchestration だけを担当し、
-`case_model.py`（case/record 型）、`case_execution.py`（case worker と failure 分類）、
-`artifact_schema.py`（summary/manifest schema）、`artifact_io.py`（atomic serialization）、
-`visualization.py`（optional consumer status）が利用者の replaceable extension point です。
+`experiments/<topic>/` に書き込みます。この source-owned operation は default consumer の
+bootstrap/runtime surface ではありません。
 
-## Parent follow-up packet
+managed runner の実行入口は常に生成後の `experiments/<topic>/run.py` です。`run.py` は
+orchestration だけを担当し、`case_model.py`、`case_execution.py`、`artifact_schema.py`、
+`artifact_io.py`、`visualization.py` が replaceable extension point です。
 
-この source change を parent repo に反映するときは、次を同じ parent update packet に記録します。
+## Consumer Migration Packet
 
-- parent integration commit では、tracked entry が旧 `templates -> vendor/agent-canon/templates`
-  symlink であることを確認してからだけ `git rm templates` を実行する。
-- `vendor/agent-canon/templates/` と parent-owned の通常 `templates/` directory を保持する。
-- parent の `experiments/_template/` を削除する。
-- parent registry の `_template` entry を削除する。
-- 削除した scaffold だけを使う parent docs と tests を削除する。
-- derived parent の `.github` regular content を保持し、AgentCanon source の GitHub
-  targets を親rootへ再生成しないことを確認する。
-- pin/root-view 更新後、parent root で
-  `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh check`
-  を pass させる。
+Default consumer を static seed へ切り替える変更は、次を同じ migration packet に記録します。
 
-Parent `experiments/registry.toml` remains project-owned: only the obsolete `_template` entry is
-removed, and all real topic identities stay intact.
+- producer commit と allowlist から seed を一度 export する。
+- provenance と全 output が regular file であることを確認する。
+- consumer が必要とする seed file だけを tracked content として取り込む。
+- 旧 source checkout、runtime projection、update/sync state、runtime-only workflow を削除する。
+- consumer-owned project config、実 topic、product tests、Docker/CI surface を保持する。
+- source checkout を不可視化した fixture で bootstrap と canonical project checks を実行する。
+- static seed の再生成を consumer setup、CI、runtime へ追加しない。
 
-## Docstring projection
+Migration order は AgentCanon static consumer contract、consumer tree ownership、canonical command、
+fresh-clone bootstrap の順です。互換 wrapper や dangling link を中間状態として残しません。
 
-Template Docstring の semantic owner は [Docstring Semantic Contract](../documents/conventions/DOCSTRING_GUIDE.md)
-です。各 consumer は responsibility region と selected semantic delta だけを記録し、固定 section
-や signature、type、namespace、field の事実を繰り返しません。design document または generated
-experiment は、その trace を materialize するとき guide reference と projection anchor を記録します。
+## Docstring Projection
 
-`templates/documents/semantic-responsibility-contract.template.toml` は空の instance
-shape を提供します。値を埋めた semantic responsibility contract は run-local artifact
-として active design packet から参照し、template source へ戻しません。
+Template Docstring の semantic owner は
+[Docstring Semantic Contract](../documents/conventions/DOCSTRING_GUIDE.md) です。各 source consumer は
+responsibility region と selected semantic delta だけを記録し、固定 section や signature、type、
+namespace、field の事実を繰り返しません。
 
-## Required document and artifact fields
+`templates/documents/semantic-responsibility-contract.template.toml` は空の instance shape を提供します。
+値を埋めた semantic responsibility contract は run-local artifact として active design packet から参照し、
+template source へ戻しません。
 
-各 template の利用者は、必要性を判断できる最小の field を埋めます。reader map は文書の
-冒頭に置き、設計・実装・review・experiment・PR の選択がある場合は次を相互参照します。
+## Required Document and Artifact Fields
+
+各 template の利用者は、必要性を判断できる最小の field を埋めます。reader map は文書の冒頭に置き、
+設計・実装・review・experiment・PR の選択がある場合は次を相互参照します。
 
 - owner / responsibility と OOP/type boundary
 - design-to-implementation trace と dependency / side-effect map
@@ -113,6 +115,6 @@ shape を提供します。値を埋めた semantic responsibility contract は 
 - Markdown/math/Mermaid formatter、post-format readback、targeted validation
 - artifact retention、再構築、lifecycle cleanup owner
 
-Markdown の整形・数式・Mermaid は `tools/bin/agent-canon docs check` を必須の一つの入口とし、
-formatter/fixer 後は同じ source path を read back します。examples は適応可能な placeholder
-にし、単一 repo の path、GPU 番号、serial throttle、固有 API を template の意味として固定しません。
+Markdown の整形・数式・Mermaid は source repository の canonical docs checker を使い、formatter/fixer
+後は同じ source path を read back します。examples は適応可能な placeholder にし、単一 repository の
+path、GPU 番号、serial throttle、固有 API を template の意味として固定しません。
