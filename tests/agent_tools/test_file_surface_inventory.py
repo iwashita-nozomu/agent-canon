@@ -148,6 +148,9 @@ class FileSurfaceInventoryTest(unittest.TestCase):
                     [
                         'version = 1',
                         'prefix = "vendor/agent-canon"',
+                        'integration_mode = "live-agent-canon"',
+                        'default_consumer = false',
+                        'selection = "explicit-opt-in"',
                         '',
                         '[[group]]',
                         'mode = "copy"',

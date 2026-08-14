@@ -1607,6 +1607,12 @@ build_update_transition_specs() {
     --root "$ROOT_DIR" --prefix "$PREFIX" --manifest "$SURFACE_MANIFEST" update-transition-specs
 }
 
+require_live_surface_selection() {
+  if ! build_link_specs >/dev/null; then
+    die "surface sync requires live-agent-canon,false,explicit-opt-in selection"
+  fi
+}
+
 active_root_copy_transition_id() {
   local previous_pin=""
   local staged_pin=""
@@ -2030,6 +2036,7 @@ ensure_surface_sync_safe() {
 
 cmd_link_root() {
   local force="${1:-0}"
+  require_live_surface_selection
   ensure_prefix_exists
   assert_parent_submodule_projection_ready || {
     local projection_rc="$?"
@@ -2099,6 +2106,7 @@ cmd_snapshot() {
 }
 
 cmd_check() {
+  require_live_surface_selection
   ensure_prefix_exists
 
   if ! is_submodule_prefix && [ "$PREFIX" = "." ]; then
@@ -2591,6 +2599,7 @@ print_submodule_plan_details() {
 }
 
 cmd_plan() {
+  require_live_surface_selection
   local branch="${1:-$DEFAULT_BRANCH}"
   local local_tree=""
   local local_split=""
@@ -3082,6 +3091,7 @@ cmd_ensure_latest() {
   local remote_tree=""
   local remote_sha=""
 
+  require_live_surface_selection
   ensure_prefix_exists
   if is_submodule_prefix; then
     local remote_url="" local_commit="" worktree_commit="" origin_sha=""
