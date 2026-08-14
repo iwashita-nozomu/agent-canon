@@ -156,6 +156,10 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
 
+    def test_consumer_static_role_projection_readback_passes(self) -> None:
+        """Runtime alignment compares the committed 35-role static snapshot."""
+        runtime_alignment.validate_generated_role_views()
+
     def test_alignment_script_standalone_parent_uses_external_fixture_parent(self) -> None:
         """Standalone parent-bound checks keep derived reports outside source."""
         environment = os.environ.copy()

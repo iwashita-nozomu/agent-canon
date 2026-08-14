@@ -691,8 +691,21 @@ def validate_generated_role_views() -> None:
     registry_ids = {profile.id for profile in registry.model_profiles}
     generated = {
         view.role_id: view
-        for view in model_profile_registry.generate_role_views(registry, root=ROOT)
+        for view in model_profile_registry.generate_role_views(
+            registry,
+            root=ROOT,
+            projection="consumer-static",
+        )
     }
+    role_view_issues = model_profile_registry._role_view_issues(
+        ROOT,
+        projection="consumer-static",
+    )
+    ensure(
+        not role_view_issues,
+        "committed consumer-static role bytes must match the canonical materializer: "
+        + "; ".join(issue.message for issue in role_view_issues),
+    )
     ensure(set(configs) == set(agent_views) == set(bindings), "generated role-view sets must be identical")
     ensure(
         len(configs) == len(registry.role_profile_bindings),
@@ -736,7 +749,14 @@ def validate_codex_agent_settings() -> None:
     """Check executable settings and the canonical generated role projection."""
     configs = parse_codex_agents()
     registry = model_profile_registry.load_model_profile_registry(ROOT)
-    generated = {view.role_id: view for view in model_profile_registry.generate_role_views(registry, ROOT)}
+    generated = {
+        view.role_id: view
+        for view in model_profile_registry.generate_role_views(
+            registry,
+            ROOT,
+            projection="consumer-static",
+        )
+    }
     valid_efforts = {"low", "medium", "high", "xhigh"}
     for role_id, config in sorted(configs.items()):
         forbidden_keys = sorted(FORBIDDEN_AGENT_PROFILE_KEYS & set(config))

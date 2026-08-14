@@ -92,6 +92,13 @@ STATIC_SEED_FORBIDDEN_CONTENT = tuple(
         "vendor/agent-canon",
     )
 )
+STATIC_SEED_FORBIDDEN_PREFIXES = (
+    b"agents/skills/",
+    b"agents/model_profiles.toml",
+    b"tools/agent_tools/",
+    b"../../agents/",
+    b"../../tools/",
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -307,13 +314,20 @@ def iter_static_seed_consumer_findings(root: Path) -> list[str]:
         if extra:
             findings.append(f".codex/agents: unreferenced role files: {extra}")
 
-    controlled_files = {PROVENANCE_PATH.as_posix(), ".codex/config.toml", *referenced_roles}
+    # Scan every config/role payload, including an unreferenced role that will
+    # also be reported by the exact-closure gate.
+    controlled_files = {
+        PROVENANCE_PATH.as_posix(),
+        ".codex/config.toml",
+        *referenced_roles,
+        *actual_roles,
+    }
     for relative in sorted(controlled_files):
         path = root / PurePosixPath(relative)
         if not _is_regular_file(path):
             continue
         lowered = path.read_bytes().lower()
-        for marker in STATIC_SEED_FORBIDDEN_CONTENT:
+        for marker in (*STATIC_SEED_FORBIDDEN_CONTENT, *STATIC_SEED_FORBIDDEN_PREFIXES):
             if marker in lowered:
                 findings.append(
                     f"{relative}: static seed contains forbidden runtime marker: "

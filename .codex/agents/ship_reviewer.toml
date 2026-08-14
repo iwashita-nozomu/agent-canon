@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical ship_reviewer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 02afc64ea65a70464500a94d66540421c3f8bd162b34159818be698f3fcab5fd
+# source canonical digest: 1f4cb8eb9ee61edd4ace6aff2857c8d726a1f5a3a3794e5f05d653157fb17fa2
 
 name = "ship_reviewer"
 description = "High-assurance read-only reviewer for final clause coverage and release readiness."

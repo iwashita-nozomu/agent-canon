@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical long_form_writer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: f8c0d306e98286c6a639b0227518b1de544de91b40cd16a211cb1c6da9302fb9
+# source canonical digest: 5f07b3a93b0448f4fd644e6f7956d2f4f8000743852c683556629d7f28ea06be
 
 name = "long_form_writer"
 description = "Long-form document author for README, workflow, guide, migration, and other reader-facing documents that need roadmap-first drafting."

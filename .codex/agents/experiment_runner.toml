@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical experiment_runner model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 16cb978da4ad9c2a786b41b325eae99b170933108ba15c248cc6acc394240f06
+# source canonical digest: ef46e727576126425bb66f3f1c37a509e1c0c38314f123ae738b43bcb1fb3ad1
 
 name = "experiment_runner"
 description = "Execution-only agent for running bounded experiments and summarizing logs."

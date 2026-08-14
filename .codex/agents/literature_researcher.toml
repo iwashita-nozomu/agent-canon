@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical literature_researcher model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 7cff6ad79b30828241c26ab5bbaff9aab7c7a2def1a3817d0f1e13e6b575b1f5
+# source canonical digest: ea38bbb1255a9a4b7d4baf2a6b03159fbe2d668ba45e3e4b684dd590e54b0033
 
 name = "literature_researcher"
 description = "Read-only agent for paper search, prior-art mapping, and contradictory-source hunting."

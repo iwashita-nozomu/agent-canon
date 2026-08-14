@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical docs_workflow_steward model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 5a0323be001cad9e8acc493cdf9026475d58d3e1be005c6e493566dd8eaaf151
+# source canonical digest: 576c8ab2e14bec6ebc46a39f85834b3a21ec136e7600777cfe9e116ea6b1dca6
 
 name = "docs_workflow_steward"
 description = "Docs and workflow steward for canonical instructions, notes, and agent workflows."

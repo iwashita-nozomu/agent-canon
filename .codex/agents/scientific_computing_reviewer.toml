@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical scientific_computing_reviewer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 0ddd9a811fabd32aee09919fd3222f332635fa203471c03e6c61092bb072c273
+# source canonical digest: f8edd9eef4b799b62ba9dd76a0ce6a19800c08bee0ebfdfc2535cf3e3604738e
 
 name = "scientific_computing_reviewer"
 description = "Read-only reviewer for incremental change, testing, automation, and prototype discipline in research code."

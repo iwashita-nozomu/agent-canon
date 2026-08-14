@@ -97,6 +97,16 @@ FORBIDDEN_CONTENT_MARKERS = (
     b"vendor/agent-canon",
     b"wget ",
 )
+# Exact producer-path prefixes rejected after case normalization.  This gate
+# runs for every allowlisted blob while the immutable plan is built, before a
+# destination directory can be created.
+FORBIDDEN_CONTENT_PREFIXES = (
+    b"agents/skills/",
+    b"agents/model_profiles.toml",
+    b"tools/agent_tools/",
+    b"../../agents/",
+    b"../../tools/",
+)
 FORBIDDEN_TOML_KEYS = frozenset(
     {
         "command",
@@ -282,6 +292,12 @@ def _validate_path_surface(path: str) -> None:
 def _validate_content(path: str, content: bytes) -> None:
     """Reject runtime imports, updater state, secrets, and network behavior."""
     lowered = content.lower()
+    for prefix in FORBIDDEN_CONTENT_PREFIXES:
+        if prefix in lowered:
+            label = prefix.decode("ascii", errors="replace")
+            raise StaticSeedError(
+                f"allowlisted file contains forbidden producer prefix {label!r}: {path}"
+            )
     for marker in FORBIDDEN_CONTENT_MARKERS:
         if marker in lowered:
             label = marker.decode("ascii", errors="replace")
