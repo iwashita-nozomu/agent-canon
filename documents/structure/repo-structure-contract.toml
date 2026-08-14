@@ -6,6 +6,10 @@
 # upstream design ../runtime/shared-runtime-surfaces.toml machine-readable shared root surface manifest
 # downstream implementation ../../tools/agent_tools/repo_structure_contract.py compares observed trees against this contract
 # downstream implementation ../../tests/agent_tools/test_repo_structure_contract.py tests structure contract validation
+# downstream design ../CONTAINER_OPERATIONS.md standalone public Docker test boundary
+# downstream implementation ../../docker/Dockerfile builds the standalone source test image
+# downstream implementation ../../test/testrunner.sh runs the typed source test list
+# downstream implementation ../../tests/tools/test_testrunner_schema.py validates the test-list schema
 # @dependency-end
 
 catalog_kind = "agent_canon_repo_structure_contract"
@@ -64,6 +68,8 @@ allowed_top_level = [
   "agent-canon-environment.toml",
   "agents",
   "templates",
+  "test",
+  "docker",
   "codex-cli-guide",
   "completion-first-review",
   "documents",
@@ -226,6 +232,31 @@ category = "compiled_tooling"
 path = "tests/agent_tools"
 kind = "dir"
 category = "tests"
+
+[[profile.required]]
+path = "docker"
+kind = "dir"
+category = "container_test_route"
+
+[[profile.required]]
+path = "docker/Dockerfile"
+kind = "file"
+category = "container_test_route"
+
+[[profile.required]]
+path = "test"
+kind = "dir"
+category = "container_test_route"
+
+[[profile.required]]
+path = "test/testrunner.sh"
+kind = "file"
+category = "container_test_route"
+
+[[profile.required]]
+path = "test/testlist.toml"
+kind = "file"
+category = "container_test_route"
 
 [[profile.required]]
 path = "memory"

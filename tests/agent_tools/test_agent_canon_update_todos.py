@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -58,7 +59,12 @@ def commit_all(repo: Path, message: str) -> str:
 
 def write_manifest(canon_root: Path, boundary: str) -> None:
     """Write a minimal update TODO manifest."""
-    manifest = canon_root / "documents" / "agent-canon-update-tasks.toml"
+    manifest = (
+        canon_root
+        / "documents"
+        / "agent-canon"
+        / "agent-canon-update-tasks.toml"
+    )
     manifest.parent.mkdir(parents=True, exist_ok=True)
     manifest.write_text(
         "\n".join(
@@ -84,7 +90,10 @@ def write_manifest(canon_root: Path, boundary: str) -> None:
 
 
 def create_canon_repo(root: Path) -> tuple[Path, str, str]:
-    """Create a tiny vendored AgentCanon git repo with one update task."""
+    """Create a parent Git root with one tiny vendored AgentCanon repository."""
+    run_git(root, "init", "-b", "main")
+    (root / ".parent-fixture").write_text("fixture parent\n", encoding="utf-8")
+    commit_all(root, "seed parent")
     canon_root = root / "vendor" / "agent-canon"
     canon_root.mkdir(parents=True, exist_ok=True)
     run_git(canon_root, "init")
@@ -100,11 +109,22 @@ class AgentCanonUpdateTodosTest(unittest.TestCase):
 
     def run_tool(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the update TODO tool in a fixture root."""
+        environment = os.environ.copy()
+        for name in (
+            "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+            "AGENT_CANON_CHILD_HANDOFF",
+            "AGENT_CANON_HANDOFF_AUDIENCE",
+            "AGENT_CANON_SOURCE_ROOT",
+            "AGENT_CANON_ROOT",
+        ):
+            environment.pop(name, None)
+        environment["AGENT_CANON_PARENT_ROOT"] = str(root)
         return subprocess.run(
             [sys.executable, str(TOOL), "--root", str(root), *args],
             check=False,
             capture_output=True,
             text=True,
+            env=environment,
         )
 
     def test_init_creates_parent_state_and_ignored_generated_surface(self) -> None:

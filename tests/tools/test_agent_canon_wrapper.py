@@ -92,6 +92,13 @@ def _prepare_canon_layout(tmp_path: Path) -> tuple[Path, Path, Path]:
     boundary_target = canon_root / "tools" / "agent_tools"
     boundary_target.mkdir(parents=True)
     shutil.copy2(boundary_source, boundary_target / "parent_root_side_effects.py")
+    shutil.copy2(
+        WRAPPER.parents[2] / "tools" / "agent_tools" / "agent_canon_source_root.py",
+        boundary_target / "agent_canon_source_root.py",
+    )
+    catalog = canon_root / "agents" / "skills" / "catalog.yaml"
+    catalog.parent.mkdir(parents=True)
+    catalog.write_text("skills: []\n", encoding="utf-8")
 
     subprocess.run(["git", "-C", str(canon_root), "init", "-q", "-b", "main"], check=True)
     subprocess.run(
@@ -162,6 +169,13 @@ def _prepare_nested_vendor_layout(tmp_path: Path) -> tuple[Path, Path, Path]:
     boundary_target = canon_root / "tools" / "agent_tools"
     boundary_target.mkdir(parents=True)
     shutil.copy2(boundary_source, boundary_target / "parent_root_side_effects.py")
+    shutil.copy2(
+        WRAPPER.parents[2] / "tools" / "agent_tools" / "agent_canon_source_root.py",
+        boundary_target / "agent_canon_source_root.py",
+    )
+    catalog = canon_root / "agents" / "skills" / "catalog.yaml"
+    catalog.parent.mkdir(parents=True)
+    catalog.write_text("skills: []\n", encoding="utf-8")
 
     subprocess.run(["git", "-C", str(outer_root), "init", "-q", "-b", "main"], check=True)
     subprocess.run(["git", "-C", str(canon_root), "init", "-q", "-b", "main"], check=True)
@@ -195,11 +209,41 @@ def _prepare_nested_vendor_layout(tmp_path: Path) -> tuple[Path, Path, Path]:
         [
             "git",
             "-C",
+            str(canon_root),
+            "remote",
+            "add",
+            "origin",
+            "https://example.invalid/agent-canon.git",
+        ],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
             str(outer_root),
             "remote",
             "add",
             "origin",
             "https://example.invalid/outer-agent-canon.git",
+        ],
+        check=True,
+    )
+    (outer_root / ".gitmodules").write_text(
+        """[submodule "vendor/agent-canon"]
+  path = vendor/agent-canon
+  url = https://example.invalid/agent-canon.git
+""",
+        encoding="utf-8",
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(outer_root),
+            "add",
+            ".gitmodules",
+            "vendor/agent-canon",
         ],
         check=True,
     )
@@ -213,7 +257,6 @@ def _prepare_nested_vendor_layout(tmp_path: Path) -> tuple[Path, Path, Path]:
             "-c",
             "user.email=test@example.invalid",
             "commit",
-            "--allow-empty",
             "-m",
             "fixture",
         ],
@@ -274,6 +317,7 @@ def _run_with_fake_installed(
     tmp_path: Path,
     *,
     preserve_home: Path | None = None,
+    exit_code: int = 0,
 ) -> tuple[subprocess.CompletedProcess[str], Path]:
     wrapper, tools_home, _ = _prepare_canon_layout(tmp_path)
     capture = tmp_path / "installed-target.txt"
@@ -285,7 +329,8 @@ def _run_with_fake_installed(
         f'printf \'target=%s\\n\' "${{CARGO_TARGET_DIR-}}" >> "{capture}"\n'
         f'printf \'cli=%s\\n\' "${{AGENT_CANON_CLI_TARGET_DIR-}}" >> "{capture}"\n'
         f'printf \'handoff=%s\\n\' "${{AGENT_CANON_CHILD_HANDOFF-}}" >> "{capture}"\n'
-        f'printf \'purpose=%s\\n\' "${{AGENT_CANON_CHILD_PURPOSE-}}" >> "{capture}"\n',
+        f'printf \'purpose=%s\\n\' "${{AGENT_CANON_CHILD_PURPOSE-}}" >> "{capture}"\n'
+        f'exit {exit_code}\n',
         encoding="utf-8",
     )
     installed_binary.chmod(0o755)
@@ -375,6 +420,59 @@ def test_wrapper_uses_active_repository_root_for_parent_bound_paths(
     assert lines["target"] == lines["cli"]
 
 
+def test_wrapper_nested_scrubbed_env_selects_prebuilt_without_cargo(
+    tmp_path: Path,
+) -> None:
+    """Nested source resolution selects the parent binary without Cargo fallback."""
+    wrapper, tools_home, outer_root = _prepare_nested_vendor_layout(tmp_path)
+    canon_root = wrapper.parents[2]
+    capture = tmp_path / "nested-prebuilt.txt"
+    cargo_capture = tmp_path / "cargo-must-not-run.txt"
+    installed_binary = tools_home / "agent-canon" / "bin" / "agent-canon"
+    installed_binary.write_text(
+        f'#!/bin/sh\nprintf reached > "{capture}"\nexit 37\n',
+        encoding="utf-8",
+    )
+    installed_binary.chmod(0o755)
+    binary_time = 3_000_000_000
+    source_time = binary_time - 1_000
+    os.utime(installed_binary, ns=(binary_time, binary_time))
+    for source_path in (
+        canon_root / "rust" / "agent-canon" / "Cargo.toml",
+        canon_root / "rust" / "agent-canon" / "src" / "main.rs",
+    ):
+        os.utime(source_path, ns=(source_time, source_time))
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    fake_cargo = fake_bin / "cargo"
+    fake_cargo.write_text(
+        f'#!/bin/sh\nprintf reached > "{cargo_capture}"\nexit 41\n',
+        encoding="utf-8",
+    )
+    fake_cargo.chmod(0o755)
+    env = _build_clean_env(
+        {
+            "AGENT_CANON_TOOLS_HOME": str(tools_home),
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+        }
+    )
+
+    result = subprocess.run(
+        [str(wrapper), "--version"],
+        cwd=canon_root,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 37, result.stderr
+    assert capture.is_file()
+    assert not cargo_capture.exists()
+    assert not any(key in env for key in _PARENT_BOUNDARY_PATH_KEYS[-8:])
+    assert outer_root.joinpath(".agent-canon").is_dir()
+
+
 def test_wrapper_isolates_source_fallback_from_repository_target(
     tmp_path: Path,
 ) -> None:
@@ -423,6 +521,61 @@ def test_wrapper_installed_binary_receives_parent_local_paths_and_keeps_home(
     assert lines["handoff"] == ""
     assert lines["purpose"] == ""
     assert _pending_handoff_nonces(tmp_path / "canon") == {}
+
+
+def test_wrapper_preserves_selected_installed_binary_exit_code(tmp_path: Path) -> None:
+    """A selected installed runtime failure is not converted into fallback success."""
+    result, capture = _run_with_fake_installed(tmp_path, exit_code=37)
+
+    assert result.returncode == 37
+    assert capture.is_file()
+
+
+def test_wrapper_preserves_selected_cargo_exit_code_without_installed_fallback(
+    tmp_path: Path,
+) -> None:
+    """A selected Cargo runtime failure does not fall through to an installed binary."""
+    wrapper, tools_home, canon_root = _prepare_canon_layout(tmp_path)
+    fake_bin = tmp_path / "fake-bin"
+    fake_bin.mkdir()
+    fake_cargo = fake_bin / "cargo"
+    fake_cargo.write_text("#!/bin/sh\nexit 41\n", encoding="utf-8")
+    fake_cargo.chmod(0o755)
+    installed_capture = tmp_path / "installed-fallback.txt"
+    installed_binary = tools_home / "agent-canon" / "bin" / "agent-canon"
+    installed_binary.write_text(
+        f'#!/bin/sh\nprintf reached > "{installed_capture}"\n', encoding="utf-8"
+    )
+    installed_binary.chmod(0o755)
+    # Keep the installed candidate stale so Cargo is the selected runtime.
+    source_time = 3_000_000_000
+    os.utime(installed_binary, ns=(1_000_000_000, 1_000_000_000))
+    os.utime(
+        canon_root / "rust" / "agent-canon" / "Cargo.toml",
+        ns=(source_time, source_time),
+    )
+    os.utime(
+        canon_root / "rust" / "agent-canon" / "src" / "main.rs",
+        ns=(source_time, source_time),
+    )
+    env = _build_clean_env(
+        {
+            "AGENT_CANON_TOOLS_HOME": str(tools_home),
+            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+        }
+    )
+
+    result = subprocess.run(
+        [str(wrapper), "--version"],
+        cwd=canon_root,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 41
+    assert not installed_capture.exists()
 
 
 def test_wrapper_rejects_spoofed_active_root_without_handoff(tmp_path: Path) -> None:

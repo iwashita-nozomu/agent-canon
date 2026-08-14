@@ -77,8 +77,8 @@ BOOTSTRAP_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run
 TASK_CLOSE_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "task_close.py"
 WORKTREE_START_SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "worktree_start.py"
 SETUP_WORKTREE_SCRIPT = PROJECT_ROOT / "tools" / "setup_worktree.sh"
-TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
-TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
+TEST_TEMP_ROOT = Path(tempfile.gettempdir())
+TEST_PARENT_ROOT = Path(os.path.commonpath((PROJECT_ROOT, TEST_TEMP_ROOT))).resolve()
 
 
 def seed_workspace_config(workspace_root: Path) -> None:

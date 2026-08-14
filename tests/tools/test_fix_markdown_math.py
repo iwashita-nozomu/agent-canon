@@ -86,8 +86,14 @@ class FixMarkdownMathTest(unittest.TestCase):
 
             result = self.run_cli(root, "doc.md")
 
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("DOCS_CHECK=pass", result.stdout)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("DOCS_FIX_MATH=unchanged", result.stdout)
+            self.assertIn("DOCS_CHECK=fail", result.stderr)
+            self.assertIn(
+                "mathematical notation must use standalone `$$` display math, "
+                "not a `text` fenced block",
+                result.stderr,
+            )
             rewritten = doc.read_text(encoding="utf-8")
             self.assertIn("\\(x + y\\)", rewritten)
             self.assertIn("\\[", rewritten)

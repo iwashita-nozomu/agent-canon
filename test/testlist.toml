@@ -1,0 +1,65 @@
+# @dependency-start
+# contract configuration
+# responsibility Declares the source-owned standard test commands and their route/ownership metadata.
+# upstream design ../CONTAINER_OPERATIONS.md public standalone test boundary
+# upstream design ../responsibility-scope.toml source responsibility scopes
+# downstream implementation ./testrunner.sh validates and executes these token arrays
+# downstream implementation ../tests/tools/test_testrunner_schema.py validates this schema
+# downstream implementation ../tests/tools/test_testrunner.py validates route receipts
+# @dependency-end
+
+[[tests]]
+id = "shared-surface-manifest"
+environment = "tooling"
+require = "docker"
+code_owner = "tools/agent_tools/surface_manifest.py"
+responsibility_scope = "shared-tooling"
+command = ["python3", "tools/agent_tools/surface_manifest.py", "--root", ".", "--prefix", ".", "--manifest", "documents/runtime/shared-runtime-surfaces.toml", "check-doc"]
+
+[[tests]]
+id = "standalone-structure-contract"
+environment = "product"
+require = "docker"
+code_owner = "documents/structure/repo-structure-contract.toml"
+responsibility_scope = "shared-policy-documents"
+command = ["python3", "tools/agent_tools/repo_structure_contract.py", "--root", ".", "--contract", "documents/structure/repo-structure-contract.toml", "--profile", "agent_canon_standalone"]
+
+[[tests]]
+id = "responsibility-scope-contract"
+environment = "tooling"
+require = "docker"
+code_owner = "responsibility-scope.toml"
+responsibility_scope = "shared-policy-documents"
+command = ["python3", "tools/agent_tools/responsibility_scope.py", "--root", "."]
+
+[[tests]]
+id = "container-config-contract"
+environment = "product"
+require = "docker"
+code_owner = "tools/ci/container_config.py"
+responsibility_scope = "shared-tooling"
+command = ["python3", "tools/ci/container_config.py", "--root", "."]
+
+[[tests]]
+id = "python-agent-tools-suite"
+environment = "tooling"
+require = "docker"
+code_owner = "tools/agent_tools"
+responsibility_scope = "shared-tooling"
+command = ["python3", "-m", "pytest", "tests/agent_tools", "-q", "--tb=short"]
+
+[[tests]]
+id = "python-tools-suite"
+environment = "product"
+require = "docker"
+code_owner = "tools"
+responsibility_scope = "shared-tooling"
+command = ["python3", "-m", "pytest", "tests/tools", "-q", "--tb=short"]
+
+[[tests]]
+id = "rust-cli-suite"
+environment = "product"
+require = "docker"
+code_owner = "rust/agent-canon"
+responsibility_scope = "shared-tooling"
+command = ["env", "CARGO_HOME=/usr/local/cargo", "cargo", "test", "--locked", "--offline", "--target-dir", "/opt/agent-canon-parent/.agent-canon/image-runtime/cargo-target", "--manifest-path", "rust/agent-canon/Cargo.toml"]

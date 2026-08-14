@@ -5,6 +5,9 @@
 # responsibility Tests repo structure contract comparison from filesystem and tree JSON input.
 # upstream implementation ../../tools/agent_tools/repo_structure_contract.py compares repo trees with contract profiles
 # upstream design ../../documents/structure/repo-structure-contract.toml defines expected repository structure profiles
+# upstream design ../../CONTAINER_OPERATIONS.md standalone public Docker test boundary
+# downstream implementation ../../docker/Dockerfile publishes the required source image paths
+# downstream implementation ../../test/testlist.toml registers structure validation
 # @dependency-end
 
 from __future__ import annotations
@@ -217,6 +220,9 @@ class RepoStructureContractTest(unittest.TestCase):
             "tools/catalog.yaml",
             "rust/agent-canon/Cargo.toml",
             "tools/agent_tools/update_lifecycle_contract.py",
+            "docker/Dockerfile",
+            "test/testrunner.sh",
+            "test/testlist.toml",
         ]:
             self.write_file(root, file_path, f"{file_path}\n")
         for dir_path in [
@@ -231,6 +237,8 @@ class RepoStructureContractTest(unittest.TestCase):
             "tools/internal",
             "tools/ci",
             "tests/agent_tools",
+            "docker",
+            "test",
             "memory",
             "notes",
             "issues",
@@ -357,6 +365,19 @@ class RepoStructureContractTest(unittest.TestCase):
                     "type": "directory",
                     "name": "tests",
                     "contents": [{"type": "directory", "name": "agent_tools"}],
+                },
+                {
+                    "type": "directory",
+                    "name": "docker",
+                    "contents": [{"type": "file", "name": "Dockerfile"}],
+                },
+                {
+                    "type": "directory",
+                    "name": "test",
+                    "contents": [
+                        {"type": "file", "name": "testrunner.sh"},
+                        {"type": "file", "name": "testlist.toml"},
+                    ],
                 },
                 {"type": "directory", "name": "memory"},
                 {"type": "directory", "name": "notes"},

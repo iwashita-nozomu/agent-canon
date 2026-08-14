@@ -5,6 +5,9 @@
 # responsibility Tests responsibility scope validation.
 # upstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope manifest
 # upstream design ../../responsibility-scope.toml scope fixture contract
+# upstream design ../../CONTAINER_OPERATIONS.md standalone public Docker/test ownership boundary
+# downstream implementation ../../test/testlist.toml consumes declared scope identifiers
+# downstream implementation ../../test/testrunner.sh validates scope ownership before execution
 # @dependency-end
 
 from __future__ import annotations

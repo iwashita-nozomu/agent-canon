@@ -3,6 +3,8 @@
 # responsibility Tests test update agent canon behavior.
 # upstream design ../../documents/agent-canon/agent-canon-update-route.md owns update materialization acceptance
 # upstream design ../../tools/README.md validated automation surface
+# upstream design ../../documents/runtime/shared-runtime-surfaces.toml typed retired descendant paths
+# downstream implementation ../../test/testrunner.sh runs this migration regression from the source Git root
 # @dependency-end
 
 """Tests for the derived-repo agent-canon update wrapper."""
@@ -21,6 +23,11 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib
 
 
 def resolve_repo_root() -> Path:
@@ -292,6 +299,86 @@ def run_fresh_clone_check(
         "".join(stdout_prefix) + stdout,
         stderr,
     )
+
+
+class SharedSurfaceRetirementContractTest(unittest.TestCase):
+    """Keep the retired descendant inventory and source reader boundary typed."""
+
+    EXPECTED_NOTE_DESCENDANTS = frozenset(
+        {
+            "notes/branches/BRANCH_NOTE_TEMPLATE.md",
+            "notes/branches/README.md",
+            "notes/experiments/README.md",
+            "notes/experiments/REPORT_TEMPLATE.md",
+            "notes/experiments/results/README.md",
+            "notes/failures/FAILURE_NOTE_TEMPLATE.md",
+            "notes/failures/README.md",
+            "notes/github-mirror-procedure.md",
+            "notes/guardrails/README.md",
+            "notes/guardrails/engineering_avoidances.md",
+            "notes/knowledge/KNOWLEDGE_NOTE_TEMPLATE.md",
+            "notes/knowledge/README.md",
+            "notes/knowledge/benchmark_levels_analysis.md",
+            "notes/knowledge/benchmark_vs_experiment.md",
+            "notes/knowledge/coding_decision_methods.md",
+            "notes/knowledge/environment_setup.md",
+            "notes/knowledge/experiment_directory_planning.md",
+            "notes/knowledge/experiment_operations.md",
+            "notes/knowledge/git_mirroring.md",
+            "notes/knowledge/literature_intake.md",
+            "notes/knowledge/path_resolution.md",
+            "notes/knowledge/pyright_operations.md",
+            "notes/themes/README.md",
+            "notes/themes/THEME_NOTE_TEMPLATE.md",
+            "notes/themes/from_another_agent.md",
+            "notes/worktrees/README.md",
+            "notes/worktrees/WORKTREE_LOG_TEMPLATE.md",
+        }
+    )
+
+    def retired_paths(self) -> frozenset[str]:
+        """Read the source manifest's removed descendant paths."""
+        manifest_path = AGENT_CANON_SOURCE_ROOT / "documents/runtime/shared-runtime-surfaces.toml"
+        manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+        paths: set[str] = set()
+        for group in manifest.get("group", []):
+            if group.get("mode") == "removed_legacy":
+                paths.update(group.get("paths", []))
+        return frozenset(paths)
+
+    def test_removed_descendant_inventory_preserves_source_ownership(self) -> None:
+        """The manifest retires exactly 56 test/fixture and 27 note descendants."""
+        retired = self.retired_paths()
+        tests = frozenset(
+            path
+            for path in retired
+            if path.startswith("tests/agent_tools/")
+            or path.startswith("tests/tools/")
+            or path == "tests/fixtures/python_algorithm_contract"
+        )
+        notes = frozenset(path for path in retired if path.startswith("notes/"))
+
+        self.assertEqual(len(tests), 56)
+        self.assertEqual(sum(path.startswith("tests/agent_tools/") for path in tests), 42)
+        self.assertEqual(sum(path.startswith("tests/tools/") for path in tests), 13)
+        self.assertIn("tests/fixtures/python_algorithm_contract", tests)
+        self.assertEqual(notes, self.EXPECTED_NOTE_DESCENDANTS)
+        self.assertNotIn("notes/README.md", notes)
+
+    def test_source_reader_contract_keeps_notes_and_public_tools_non_projected(self) -> None:
+        """Reader docs state source-note ownership, preservation, and no regeneration."""
+        surface_doc = (
+            AGENT_CANON_SOURCE_ROOT / "documents/runtime/SHARED_RUNTIME_SURFACES.md"
+        ).read_text(encoding="utf-8")
+        container_doc = (AGENT_CANON_SOURCE_ROOT / "CONTAINER_OPERATIONS.md").read_text(
+            encoding="utf-8"
+        )
+        for document in (surface_doc, container_doc):
+            document = " ".join(document.split())
+            self.assertIn("notes/README.md", document)
+            self.assertIn("never regenerated", document)
+        self.assertIn("tools/agent-canon", surface_doc)
+        self.assertIn("tools/agent-canon", container_doc)
 
 
 class CommitProvenanceStaticContractTest(unittest.TestCase):

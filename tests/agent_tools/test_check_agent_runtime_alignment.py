@@ -25,6 +25,8 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "check_agent_runtime_alignment.py"
+TEST_TEMP_ROOT = Path(tempfile.gettempdir())
+TEST_PARENT_ROOT = Path(os.path.commonpath((PROJECT_ROOT, TEST_TEMP_ROOT))).resolve()
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
 import check_agent_runtime_alignment as runtime_alignment  # noqa: E402
@@ -142,8 +144,8 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
     def test_alignment_script_passes(self) -> None:
         """The runtime alignment checker should succeed without findings."""
         environment = os.environ.copy()
-        environment["AGENT_CANON_PARENT_ROOT"] = str(PROJECT_ROOT.parents[2])
-        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(PROJECT_ROOT.parents[2])
+        environment["AGENT_CANON_PARENT_ROOT"] = str(TEST_PARENT_ROOT)
+        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(TEST_PARENT_ROOT)
         result = subprocess.run(
             [sys.executable, str(SCRIPT_PATH)],
             cwd=PROJECT_ROOT,
@@ -152,7 +154,6 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
             capture_output=True,
             text=True,
         )
-
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
 

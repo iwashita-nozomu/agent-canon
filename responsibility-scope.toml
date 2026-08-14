@@ -35,6 +35,7 @@ required_coverage = [
   ".agents",
   ".codex",
   ".devcontainer",
+  "docker",
   ".vscode",
   ".github",
   "agents",
@@ -47,6 +48,7 @@ required_coverage = [
   "references",
   "rust",
   "tests",
+  "test",
   "tools",
   "vendor",
   "AGENTS.md",
@@ -132,12 +134,22 @@ targets = [
 source = "test-surfaces"
 targets = [
   "test-surfaces",
+  "container-test-route",
   "runtime-entrypoints",
   "eval-and-hook-evidence",
   "shared-tooling",
   "shared-policy-documents",
   "github-automation",
   "external-skill-vendor",
+]
+
+[[import_rule]]
+source = "container-test-route"
+targets = [
+  "container-test-route",
+  "shared-tooling",
+  "shared-policy-documents",
+  "test-surfaces",
 ]
 
 [[scope]]
@@ -244,6 +256,24 @@ protecting_tools = [
   "tools/agent_tools/import_responsibility.py",
   "tools/agent_tools/responsibility_scope.py",
   "tools/ci/run_all_checks.sh",
+]
+issues = [
+  "issues/closed/AC-20260517-responsibility-scope-management.md",
+]
+
+[[scope]]
+id = "container-test-route"
+owner = "agent-canon"
+class = "active_contract"
+description = "Standalone Docker and Dev Container public test image, typed runner, and route-aware test list."
+paths = [
+  "docker/**",
+  "test/**",
+]
+protecting_tools = [
+  "tools/ci/container_config.py",
+  "tools/agent_tools/repo_structure_contract.py",
+  "tools/agent_tools/responsibility_scope.py",
 ]
 issues = [
   "issues/closed/AC-20260517-responsibility-scope-management.md",

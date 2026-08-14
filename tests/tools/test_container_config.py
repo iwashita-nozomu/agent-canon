@@ -7,6 +7,8 @@
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission selector and scenario validation
 # upstream implementation ../../tools/ci/container_config.py semantic devcontainer checker
 # upstream implementation ../../.devcontainer/devcontainer.json selects the exact-repository Compose generator
+# upstream implementation ../../docker/Dockerfile provides the standalone public test image
+# upstream implementation ../../test/testrunner.sh provides the route-aware source test entrypoint
 # @dependency-end
 
 from __future__ import annotations
@@ -25,6 +27,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "container_config.py"
 GENERATOR = PROJECT_ROOT / ".devcontainer" / "generate-runtime-compose.sh"
 DOCKERFILE = PROJECT_ROOT / ".devcontainer" / "Dockerfile"
+PUBLIC_DOCKERFILE = PROJECT_ROOT / "docker" / "Dockerfile"
 POST_CREATE_ENTRYPOINT = PROJECT_ROOT / ".devcontainer" / "post-create-entrypoint.sh"
 GPU_ADMISSION_SELECTOR = (
     PROJECT_ROOT / ".devcontainer" / "gpu-admission" / "devcontainer.json"
@@ -360,17 +363,110 @@ def test_gpu_admission_selector_isolated_from_default_selector() -> None:
     assert load_container_config_module().validate_gpu_admission_selector(PROJECT_ROOT) == []
 
 
-def test_standalone_image_context_is_explicit_and_source_owned() -> None:
-    """The standalone build admits only the dependency manifest and engine."""
+def test_public_standalone_docker_route_requires_no_runtime_packs() -> None:
+    """The standalone public Docker route is recognized without parent packs."""
     module = load_container_config_module()
 
-    assert module.validate_standalone_docker_context(PROJECT_ROOT) == []
-    dockerfile = DOCKERFILE.read_text(encoding="utf-8")
-    assert "COPY . /opt/agent-canon" not in dockerfile
-    assert "vendor/agent-canon" not in dockerfile
-    assert "--workspace /opt/agent-canon --vendor-root /opt/agent-canon" in " ".join(
-        dockerfile.split()
+    assert module.validate_public_test_git_context(PROJECT_ROOT) == []
+    report = module.validate(PROJECT_ROOT)
+    assert report.status == "pass"
+    assert "docker/Dockerfile" in report.checked
+    assert "docker/packs" not in report.checked
+    assert report.packs == ()
+
+
+def test_public_docker_image_prebuilds_rust_runtime_and_test_target() -> None:
+    """The parent/vendor image owns the prebuilt CLI and cargo test target."""
+    dockerfile = PUBLIC_DOCKERFILE.read_text(encoding="utf-8")
+    wrapper = (PROJECT_ROOT / "tools" / "bin" / "agent-canon").read_text(
+        encoding="utf-8"
     )
+
+    assert "agent-canon-parent/vendor/agent-canon" in dockerfile
+    assert "git -C \"${parent_root}\" add .gitignore .gitmodules vendor/agent-canon" in dockerfile
+    assert "160000:commit:" in dockerfile
+    assert "cargo install --locked --path \"${source_root}/rust/agent-canon\"" in dockerfile
+    assert "cargo test --locked --offline --no-run" in dockerfile
+    assert 'CARGO_TARGET_DIR="${runtime_root}/cargo-target"' in dockerfile
+    assert "cargo fetch" not in dockerfile
+    assert '--root "${runtime_root}/tools/agent-canon"' in dockerfile
+    assert "/opt/agent-canon-runtime" not in wrapper
+    assert "AGENT_CANON_TEST_PARENT_ROOT" not in dockerfile
+
+
+@pytest.mark.parametrize(
+    ("dockerignore_mutation", "dockerfile_mutation", "expected_detail"),
+    (
+        (
+            lambda text: text + "\n!.git/config\n",
+            lambda text: text,
+            "public-git-context-unsafe-allow:!.git/config",
+        ),
+        (
+            lambda text: text.replace(".git/objects/info/**\n", ""),
+            lambda text: text,
+            "public-git-context-rule-missing:.git/objects/info/**",
+        ),
+        (
+            lambda text: text,
+            lambda text: text.replace("refs/remotes", "refs/elsewhere"),
+            "remote-ref-readback-required",
+        ),
+        (
+            lambda text: text,
+            lambda text: text.replace(
+                'symbolic-ref HEAD)" = "refs/heads/main"',
+                'symbolic-ref HEAD)" = "refs/heads/container-test-snapshot"',
+                1,
+            ),
+            "main-head-readback-required",
+        ),
+        (
+            lambda text: text,
+            lambda text: text.replace(
+                '= \'https://github.com/iwashita-nozomu/agent-canon.git\'',
+                '= \'https://example.invalid/agent-canon.git\'',
+                1,
+            ),
+            "source-origin-url-readback-required",
+        ),
+        (
+            lambda text: text,
+            lambda text: text.replace(
+                'remote)" = "origin"', 'remote)" = "unexpected"', 1
+            ),
+            "source-origin-name-readback-required",
+        ),
+        (
+            lambda text: text,
+            lambda text: text.replace("'^credential\\.'", "'^other\\.'"),
+            "credential-readback-required",
+        ),
+    ),
+)
+def test_public_git_context_rejects_identity_or_history_boundary_drift(
+    tmp_path: Path,
+    dockerignore_mutation: object,
+    dockerfile_mutation: object,
+    expected_detail: str,
+) -> None:
+    """Only history objects and normalized local refs cross into the image."""
+    root = tmp_path / "source"
+    dockerignore = (PROJECT_ROOT / ".dockerignore").read_text(encoding="utf-8")
+    dockerfile = (PROJECT_ROOT / "docker/Dockerfile").read_text(encoding="utf-8")
+    assert callable(dockerignore_mutation)
+    assert callable(dockerfile_mutation)
+    write_file(root, ".dockerignore", dockerignore_mutation(dockerignore))
+    write_file(root, "docker/Dockerfile", dockerfile_mutation(dockerfile))
+
+    details = {
+        finding.detail
+        for finding in load_container_config_module().validate_public_test_git_context(
+            root
+        )
+    }
+
+    assert expected_detail in details
 
 
 def test_dockerfile_materializes_project_with_existing_gid_reuse() -> None:

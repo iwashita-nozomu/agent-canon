@@ -25,8 +25,13 @@ config bundle `.codex/config.toml` and `.codex/agents`, and the shared CLI/tool
 namespace `tools/agent-canon`. The role directory is part of the config bundle:
 Codex resolves every `[agents.<name>].config_file` relative to the declaring
 config path. The update lifecycle may create optional transaction state under
-`.agent-canon/`. Tests, notes, memory, evidence, editor, and GitHub paths are
-not mirrored shared surfaces. Parent `.devcontainer/` content is likewise
+`.agent-canon/`. Tests are source-owned and are exercised through the public
+source-Git-root test route; they are not mirrored as parent test paths. Standalone
+AgentCanon `notes/**` remains canonical in the source Git root. Parent regular
+`notes/README.md` and any other parent project note content remain parent-owned;
+the listed AgentCanon-targeting note descendants are retired once and never
+regenerated. Memory, evidence, editor, and GitHub paths are not mirrored shared
+surfaces. Parent `.devcontainer/` content is likewise
 never projected: `devcontainer.json`, `rootless/`, and `gpu-admission/` are
 retired/non-projecting paths. A parent may own regular files at those paths;
 only a stale symlink that still resolves into AgentCanon is eligible for removal
@@ -74,9 +79,10 @@ Each `[[surface]]` in `shared-runtime-surfaces.toml` declares projection metadat
 - `source`: optional AgentCanon-relative source path; and
 - `optional`: whether the path is materialized only by an explicit lifecycle.
 
-The `removed_legacy` group records paths that must not be materialized. The
-manifest contains no general path-owner fallback and no full-tree or
-all-tracked entry. `projection_producer` and `projection_kind` describe only
+The `removed_legacy` group records paths that must not be materialized, including
+the explicit retired test/fixture and standalone-note descendants. The manifest
+contains no general path-owner fallback and no full-tree or all-tracked entry.
+`projection_producer` and `projection_kind` describe only
 root synchronization mechanics; they are not path ownership or responsibility
 classes. `responsibility-scope.toml` is the sole general owner/class source.
 `surface_manifest.py` checks this document against the manifest before the

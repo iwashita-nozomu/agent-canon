@@ -26,6 +26,22 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PR_CHECK = PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_pr.sh"
 SELECTOR = PROJECT_ROOT / "tools" / "ci" / "agent_canon_pr_graph_selector.py"
 REPO_PATHS = PROJECT_ROOT / "tools" / "lib" / "repo_paths.sh"
+# The copied PR checker is a public shell entrypoint.  Keep this explicit
+# bundle synchronized with every source/test surface that its standalone
+# static-gate route invokes directly; do not replace it with a production
+# gate bypass or a fixture-only special case.
+STANDALONE_STATIC_GATE_FIXTURE_FILES = (
+    "tools/ci/run_standalone_static_gate_unit.sh",
+    "tools/ci/check_github_workflows.py",
+    "tools/agent_tools/classify_path_risk.py",
+    "tools/agent_tools/visualization_contract.py",
+    "tools/agent_tools/render_dependency_manifest_graph.py",
+    "tests/agent_tools/__init__.py",
+    "tests/agent_tools/test_visualization_contract.py",
+    "tests/agent_tools/test_render_dependency_manifest_graph.py",
+    "tests/tools/test_standalone_static_gate_units.py",
+    ".github/workflows/agent-canon-static-gates.yml",
+)
 PARENT_PATH_ENV_KEYS = {
     "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
     "AGENT_CANON_ROOT",
@@ -482,6 +498,10 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             PROJECT_ROOT / "tools" / "agent_tools" / "pydocstyle_review.py",
             source / "tools" / "agent_tools" / "pydocstyle_review.py",
         )
+        for relative in STANDALONE_STATIC_GATE_FIXTURE_FILES:
+            target = source / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(PROJECT_ROOT / relative, target)
         generic_python = "raise SystemExit(0)\n"
         eval_python = textwrap.dedent(
             """
@@ -545,6 +565,18 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         run(source, "git", "add", ".")
         run(source, "git", "commit", "-m", "fixture source")
         return source
+
+    def test_standalone_fixture_copies_static_gate_public_bundle(self) -> None:
+        """The fixture includes every direct source/test dependency of the public gate route."""
+        fixture_root = Path(tempfile.mkdtemp(prefix="graph-gate-bundle-"))
+        self.addCleanup(shutil.rmtree, fixture_root)
+        source = self.create_source_repo(fixture_root)
+        missing = [
+            relative
+            for relative in STANDALONE_STATIC_GATE_FIXTURE_FILES
+            if not (source / relative).is_file()
+        ]
+        self.assertEqual(missing, [])
 
     def create_parent_repo(
         self,
@@ -916,6 +948,13 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             """
             #!/usr/bin/env bash
             exit 1
+            """,
+        )
+        write_executable(
+            fake_bin / "node",
+            """
+            #!/usr/bin/env bash
+            echo "vfixture"
             """,
         )
         temp_root = source / ".agent-canon" / "standalone-pr-check-state"

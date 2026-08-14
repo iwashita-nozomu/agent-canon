@@ -14,6 +14,10 @@ downstream environment agent-canon-environment.toml machine-readable AgentCanon 
 downstream implementation .devcontainer/devcontainer.json standalone AgentCanon devcontainer entrypoint.
 downstream implementation .devcontainer/post-create.sh standalone AgentCanon image verification and runtime readback.
 downstream implementation .vscode/settings.json standalone AgentCanon source editor defaults.
+downstream implementation docker/Dockerfile standalone public full-test image.
+downstream implementation test/testrunner.sh source-owned typed test runner.
+downstream implementation test/testlist.toml route-aware test command contract.
+downstream implementation tests/tools/test_testrunner.py runner receipt regression tests.
 downstream implementation tools/ci/container_config.py container and devcontainer configuration validator.
 downstream implementation tools/ci/check_github_workflows.py GitHub workflow checkout and AgentCanon-surface validator.
 @dependency-end
@@ -49,6 +53,41 @@ Read this file when a task touches any of these surfaces:
 - `tools/ci/check_github_workflows.py`
 - `documents/contracts/github-first-module-and-devcontainer-policy.md`
 - `documents/design/rust-agent-tool-migration.md`
+- `test/testrunner.sh`
+- `test/testlist.toml`
+- `docker/Dockerfile`
+
+## Public source test route
+
+The standalone AgentCanon Git root owns the public standard-test boundary.
+From that Git root, the canonical Docker route is:
+
+```bash
+docker build -f docker/Dockerfile -t agent-canon .
+docker run --rm agent-canon testrunner.sh
+```
+
+The image copies the source tree, source tests, typed test list, and runner into
+an immutable image layer. It installs the standard Python and native test
+dependencies while building; the runner does not mount a workspace, install
+dependencies at runtime, discover host tests, or ask a parent repository to
+interpret the list. `test/testlist.toml` uses `[[tests]]` records with ordered
+token-array commands and typed `environment`, `require`, `code_owner`, and
+`responsibility_scope` fields. `require = "docker"` selects the canonical
+Docker route. A standalone Dev Container caller sets
+`AGENT_CANON_ACTIVE_ROUTE=devcontainer` and selects only
+`require = "devcontainer"` records. Nonmatching records emit an explicit
+`not_selected` receipt; selected records emit `start` and `pass` or `fail`.
+Malformed, duplicate, or unsupported records fail before any command starts,
+and a started route succeeds only when at least one record is selected and all
+selected records pass.
+
+Parent repositories delegate to this source-Git-root command. They do not
+mirror, wrap, or parse AgentCanon test files. Standalone AgentCanon `notes/**`
+also remains source-owned; a parent keeps its regular `notes/README.md` and
+project note content, while only the explicit AgentCanon-targeting descendants
+are retired and never regenerated. The parent `tools/agent-canon` symlink remains
+the public non-test tool namespace.
 
 ## Canonical Source Contract
 
@@ -86,7 +125,7 @@ The ownership boundary covers these primary surfaces.
 | `.devcontainer/`       | Template or derived repository | Parent-owned regular environment directory. Standalone AgentCanon owns only its own source checkout; parent regular files are preserved.                   |
 | `.vscode/`             | Template or derived repository | Parent-owned regular editor directory. Standalone AgentCanon may validate its four source files; no parent mirror is required.                              |
 | `Dockerfile`           | Template or derived repository | Project image contract. Do not add generic Codex, GitHub CLI, Rust toolchain, or agent convenience tooling here.                                               |
-| `docker/`              | Template or derived repository | Project-local image/runtime contract. `docker/Dockerfile` may stand alone; packs and Python execution rules are optional project overrides.                      |
+| `docker/`              | AgentCanon standalone source; template or derived repository for project images | The standalone source `docker/Dockerfile` owns the public full-test image. Parent `docker/` remains project-local; packs and Python execution rules are optional project overrides. |
 | `tools/ci/codex-container-profiles.toml` | AgentCanon | Default nested-Codex profile configuration, resolved from the AgentCanon source tree. A parent may select an explicit profile file without owning the default. |
 | GitHub Docker workflow | Template or derived repository | Parent-owned workflow. Its Docker behavior follows this rulebook; any AgentCanon source use is selected by the workflow rather than materialized as a root copy. |
 
@@ -96,11 +135,16 @@ AgentCanon owns Codex-specific profiles and shared tools.
 
 ## Product Image And Mounted Tool Boundary
 
-`Dockerfile` and `docker/` describe the product image build/runtime contract:
+In a template or derived repository, `Dockerfile` and `docker/` describe the
+product image build/runtime contract:
 project libraries, compilers, native build inputs, service processes, and
 workspace Python dependency policy. They must not acquire Codex, GitHub CLI,
 Node/npm, Rust, Lean, Playwright, or other shared agent tooling solely for
 developer convenience.
+
+The standalone AgentCanon source `docker/Dockerfile` is the separate public
+full-test image contract described above. It intentionally contains the source
+tests and their standard test dependencies; it is not a parent product image.
 
 The mounted workspace devcontainer contract is separate. The standalone image
 installs fixed OS/Python capabilities directly in its Dockerfile and imports

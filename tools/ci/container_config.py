@@ -4,6 +4,7 @@
 # responsibility Validates Dockerfile, runtime pack, host-identity devcontainer, and retired VS Code projection paths.
 # upstream design ../../documents/conventions/coding-conventions-project.md environment configuration policy
 # upstream design ../../documents/contracts/github-first-module-and-devcontainer-policy.md Dockerfile/devcontainer ownership boundary
+# upstream design ../../CONTAINER_OPERATIONS.md standalone public Docker test route
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md parent layout and runtime shell boundary
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md default startup profile boundary
 # upstream design ../../documents/design/devcontainer/parent-devcontainer-policy.md explicit GPU-admission selector and scenario validation
@@ -18,6 +19,8 @@
 # upstream implementation ./run_container_pack.py builds and smokes runtime packs
 # downstream implementation ./run_all_checks.sh runs container configuration validation
 # downstream implementation ../../tests/tools/test_container_config.py tests validator
+# downstream implementation ../../docker/Dockerfile public source test image
+# downstream implementation ../../test/testrunner.sh public source test runner
 # downstream implementation ../../.devcontainer/gpu-admission/devcontainer.json selects the opt-in Compose scenario
 # downstream implementation ../../.devcontainer/gpu-admission.sh owns the opt-in lifecycle scenario
 # @dependency-end
@@ -587,13 +590,149 @@ def validate_dockerignore(root: Path) -> list[Finding]:
         return [Finding("missing_file", relative, "missing")]
     text = path.read_text(encoding="utf-8")
     findings: list[Finding] = []
-    for ignored_path in (".git", ".state", "vendor/agent-canon"):
+    public_test_image = all(
+        (root / relative).is_file()
+        for relative in (
+            "docker/Dockerfile",
+            "test/testrunner.sh",
+            "test/testlist.toml",
+        )
+    )
+    ignored_paths = (".state", "vendor/agent-canon")
+    if not public_test_image:
+        ignored_paths = (".git", *ignored_paths)
+    for ignored_path in ignored_paths:
         if not re.search(rf"(^|\n){re.escape(ignored_path)}(\n|$)", text):
             findings.append(
                 Finding(
                     "dependency_contract_violation",
                     relative,
                     f"missing-ignore:{ignored_path}",
+                )
+            )
+    if public_test_image:
+        findings.extend(validate_public_test_git_context(root))
+    return findings
+
+
+def validate_public_test_git_context(root: Path) -> list[Finding]:
+    """Admit Git history while excluding host identity and mutable Git state."""
+    dockerignore = root / ".dockerignore"
+    dockerfile = root / "docker" / "Dockerfile"
+    findings: list[Finding] = []
+    if not dockerignore.is_file():
+        return [Finding("missing_file", ".dockerignore", "missing")]
+    if not dockerfile.is_file():
+        return [Finding("missing_file", "docker/Dockerfile", "missing")]
+
+    patterns = tuple(
+        line.strip()
+        for line in dockerignore.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    )
+    required_sequence = (
+        ".git/*",
+        "!.git/HEAD",
+        "!.git/objects/",
+        "!.git/objects/**",
+        ".git/objects/info/",
+        ".git/objects/info/**",
+        "!.git/refs/",
+        ".git/refs/*",
+        "!.git/refs/heads/",
+        "!.git/refs/heads/**",
+        "!.git/packed-refs",
+        ".git/config",
+        ".git/index",
+        ".git/logs/",
+        ".git/logs/**",
+        ".git/hooks/",
+        ".git/hooks/**",
+        ".git/worktrees/",
+        ".git/worktrees/**",
+    )
+    previous = -1
+    for pattern in required_sequence:
+        try:
+            position = patterns.index(pattern)
+        except ValueError:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".dockerignore",
+                    f"public-git-context-rule-missing:{pattern}",
+                )
+            )
+            continue
+        if position <= previous:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".dockerignore",
+                    f"public-git-context-rule-order:{pattern}",
+                )
+            )
+        previous = position
+
+    allowed_git_negations = frozenset(
+        {
+            "!.git/HEAD",
+            "!.git/objects/",
+            "!.git/objects/**",
+            "!.git/refs/",
+            "!.git/refs/heads/",
+            "!.git/refs/heads/**",
+            "!.git/packed-refs",
+        }
+    )
+    for pattern in patterns:
+        if pattern.startswith("!.git") and pattern not in allowed_git_negations:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    ".dockerignore",
+                    f"public-git-context-unsafe-allow:{pattern}",
+                )
+            )
+
+    dockerfile_text = dockerfile.read_text(encoding="utf-8")
+    logical_lines = re.sub(r"\\\r?\n", " ", dockerfile_text)
+    normalized = re.sub(r"\s+", " ", logical_lines)
+    # Keep this static oracle aligned with the immutable Git state read back
+    # by docker/Dockerfile.  Each positive rule is intentionally paired with
+    # one command shape so a removed readback cannot hide behind the setup
+    # command that created the state.
+    dockerfile_rules = {
+        "history-head-required": r"rev-parse --verify HEAD\^\{commit\}",
+        "ref-normalization-required": r"for-each-ref .* refs .*update-ref -d",
+        "main-head-readback-required": (
+            r'test "\$\(git -C "\$\{source_root\}" symbolic-ref HEAD\)" '
+            r'= "refs/heads/main"'
+        ),
+        "main-commit-readback-required": (
+            r'test "\$\(git -C "\$\{source_root\}" rev-parse HEAD\)" '
+            r'= "\$\(git -C "\$\{source_root\}" rev-parse refs/heads/main\)"'
+        ),
+        "source-origin-name-readback-required": r'git -C "\$\{source_root\}" remote\)" = "origin"',
+        "parent-origin-name-readback-required": r'git -C "\$\{parent_root\}" remote\)" = "origin"',
+        "source-origin-url-readback-required": (
+            r'test "\$\(git -C "\$\{source_root\}" remote get-url origin\)" '
+            r"= 'https://github\.com/iwashita-nozomu/agent-canon\.git'"
+        ),
+        "parent-origin-url-readback-required": (
+            r'test "\$\(git -C "\$\{parent_root\}" remote get-url origin\)" '
+            r"= 'https://github\.com/iwashita-nozomu/project_template\.git'"
+        ),
+        "remote-ref-readback-required": r'git -C "\$\{source_root\}" for-each-ref .* refs/remotes.*git -C "\$\{parent_root\}" for-each-ref .* refs/remotes',
+        "credential-readback-required": r'git -C "\$\{source_root\}" config --get-regexp.*credential.*git -C "\$\{parent_root\}" config --get-regexp.*credential',
+    }
+    for detail, pattern in dockerfile_rules.items():
+        if re.search(pattern, normalized) is None:
+            findings.append(
+                Finding(
+                    "dependency_contract_violation",
+                    "docker/Dockerfile",
+                    detail,
                 )
             )
     return findings
@@ -2206,7 +2345,7 @@ def validate(root: Path) -> ValidationReport:
                 findings.extend(pack_findings)
                 if pack is not None:
                     packs.append(pack)
-        elif not parent_layout:
+        elif not parent_layout and not (docker_dir / "Dockerfile").is_file():
             checked.append("docker/packs")
             findings.append(Finding("missing_file", "docker/packs", "missing"))
 
@@ -2219,6 +2358,7 @@ def validate(root: Path) -> ValidationReport:
         if (
             is_standalone_source(root)
             and (devcontainer_dir / "Dockerfile").is_file()
+            and not (docker_dir / "Dockerfile").is_file()
         ):
             checked.append(".dockerignore")
             findings.extend(validate_standalone_docker_context(root))

@@ -8,18 +8,18 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
-import os
 from pathlib import Path
 from unittest import mock
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_SCRIPT_PATH = PROJECT_ROOT / "tools" / "agent_tools" / "bootstrap_agent_run.py"
-TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
-TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
+TEST_TEMP_ROOT = Path(tempfile.gettempdir())
+TEST_PARENT_ROOT = Path(os.path.commonpath((PROJECT_ROOT, TEST_TEMP_ROOT))).resolve()
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import smoke_test_research_perspective_pack as smoke  # noqa: E402
 from parent_root_side_effects import (  # noqa: E402

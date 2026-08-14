@@ -26,8 +26,8 @@ from unittest.mock import patch
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-import capacity_handshake  # noqa: E402
 import bootstrap_agent_run  # noqa: E402
+import capacity_handshake  # noqa: E402
 import task_close  # noqa: E402
 import update_lifecycle_contract  # noqa: E402
 from agent_team import (  # noqa: E402
@@ -41,17 +41,17 @@ from manifest_rendering import (  # noqa: E402
     suggested_public_skills,
 )
 from packets import (  # noqa: E402
+    _spec_source_root,
     iter_artifacts,
     resolve_active_design_packet_config,
     resolve_cross_cutting_document_packet,
     resolve_role_document_packet,
-    _spec_source_root,
 )
-from team_config import load_task_catalog, load_team_config, resolve_role  # noqa: E402
 from task_authority import hash_baseline_bytes  # noqa: E402
+from team_config import load_task_catalog, load_team_config, resolve_role  # noqa: E402
 
-TEST_PARENT_ROOT = PROJECT_ROOT.parents[2]
-TEST_TEMP_ROOT = TEST_PARENT_ROOT / ".agent-canon" / "tmp"
+TEST_TEMP_ROOT = Path(tempfile.gettempdir())
+TEST_PARENT_ROOT = Path(os.path.commonpath((PROJECT_ROOT, TEST_TEMP_ROOT))).resolve()
 
 
 class AgentTeamTemplateTest(unittest.TestCase):

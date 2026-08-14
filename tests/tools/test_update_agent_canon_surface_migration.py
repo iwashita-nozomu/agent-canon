@@ -6,6 +6,8 @@
 # upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared surface ownership policy
 # upstream implementation ../../tools/sync_agent_canon.sh root-surface synchronization
 # upstream implementation ../../tools/agent_tools/agent_canon_source_root.py RootResolution contract
+# upstream design ../../documents/runtime/shared-runtime-surfaces.toml typed retired descendant paths
+# downstream implementation ../../test/testrunner.sh runs this migration regression from the source Git root
 # @dependency-end
 
 from __future__ import annotations
@@ -19,6 +21,11 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import ModuleType
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python < 3.11 compatibility.
+    import tomli as tomllib
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 ROOT_RESOLUTION = PROJECT_ROOT / "tools" / "agent_tools" / "agent_canon_source_root.py"
@@ -185,15 +192,47 @@ class SurfaceMigrationTest(unittest.TestCase):
         env_overrides: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Run one sync command in the fixture root."""
-        environment = {
-            **os.environ,
-            "AGENT_CANON_COMMIT_REQUEST_EVIDENCE": "evidence:" + ("0" * 64),
-            "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
-            "AGENT_CANON_BRANCH_WORKTREE_REASON": "AgentCanon root surface repair requested by user",
-            "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
-            "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "Fixture-only legacy surface pruning",
-            "AGENT_CANON_FORCE_RELINK": "1",
-        }
+        environment = dict(os.environ)
+        for name in tuple(environment):
+            if name.startswith("AGENT_CANON_") or name in {
+                "TMPDIR",
+                "TEMP",
+                "TMP",
+                "HOME",
+                "XDG_CACHE_HOME",
+                "PYTHONPYCACHEPREFIX",
+                "CARGO_HOME",
+                "CARGO_TARGET_DIR",
+            }:
+                environment.pop(name)
+        state_root = root / ".agent-canon" / "surface-test-state"
+        tmp_root = state_root / "tmp"
+        cache_root = state_root / "cache"
+        home_root = state_root / "home"
+        tools_root = state_root / "tools"
+        for path in (tmp_root, cache_root, home_root, tools_root):
+            path.mkdir(parents=True, exist_ok=True)
+        environment.update(
+            {
+                "AGENT_CANON_COMMIT_REQUEST_EVIDENCE": "evidence:" + ("0" * 64),
+                "AGENT_CANON_BRANCH_WORKTREE_AUTHORITY": "user_request",
+                "AGENT_CANON_BRANCH_WORKTREE_REASON": "AgentCanon root surface repair requested by user",
+                "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY": "explicit_user_approval",
+                "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "Fixture-only legacy surface pruning",
+                "AGENT_CANON_FORCE_RELINK": "1",
+                "TMPDIR": str(tmp_root),
+                "TEMP": str(tmp_root),
+                "TMP": str(tmp_root),
+                "HOME": str(home_root),
+                "XDG_CACHE_HOME": str(cache_root / "xdg"),
+                "PYTHONPYCACHEPREFIX": str(cache_root / "pycache"),
+                "PYTHONDONTWRITEBYTECODE": "1",
+                "CARGO_HOME": str(cache_root / "cargo-home"),
+                "CARGO_TARGET_DIR": str(cache_root / "cargo-target"),
+                "AGENT_CANON_TOOLS_HOME": str(tools_root),
+                "AGENT_CANON_CLI_TARGET_DIR": str(cache_root / "cargo-target"),
+            }
+        )
         environment.update(env_overrides or {})
         return subprocess.run(
             [
@@ -233,6 +272,24 @@ class SurfaceMigrationTest(unittest.TestCase):
         """Write a file for the fixture."""
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
+
+    def retired_descendant_paths(self) -> tuple[str, ...]:
+        """Return all manifest-listed test/fixture and note descendants."""
+        manifest_path = PROJECT_ROOT / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+        manifest = tomllib.loads(manifest_path.read_text(encoding="utf-8"))
+        paths: set[str] = set()
+        for group in manifest.get("group", []):
+            if group.get("mode") != "removed_legacy":
+                continue
+            paths.update(
+                path
+                for path in group.get("paths", [])
+                if path.startswith("tests/agent_tools/")
+                or path.startswith("tests/tools/")
+                or path == "tests/fixtures/python_algorithm_contract"
+                or path.startswith("notes/")
+            )
+        return tuple(sorted(paths))
 
     def test_parent_root_resolution_and_devcontainer_migration(self) -> None:
         """RootResolution and the minimal projection preserve parent content."""
@@ -439,23 +496,59 @@ class SurfaceMigrationTest(unittest.TestCase):
     def test_removed_legacy_surface_preserves_unknown_mirror(self) -> None:
         """Known retired mirrors are removed while unknown mirrors remain untouched."""
         root = self.clone_parent_fixture()
-        retired = root / "tests" / "tools" / "test_fix_markdown_math.py"
+        retired = root / "tests" / "tools" / "test_check_markdown_math.py"
         retired.parent.mkdir(parents=True, exist_ok=True)
         retired.symlink_to(
-            root / "vendor" / "agent-canon" / "tests" / "tools" / "test_fix_markdown_math.py"
+            root / "vendor" / "agent-canon" / "tests" / "tools" / "test_check_markdown_math.py"
         )
         unknown = root / "tests" / "tools" / "test_unknown_mirror.py"
         unknown.symlink_to(
-            root / "vendor" / "agent-canon" / "tests" / "tools" / "test_fix_markdown_math.py"
+            root / "vendor" / "agent-canon" / "tests" / "tools" / "test_check_markdown_math.py"
         )
+        regular = root / "tests" / "tools" / "parent-owned.txt"
+        regular.write_text("keep parent file\n", encoding="utf-8")
 
         result = self.run_sync(root, "link-root")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        # The retired group names a parent directory.  A regular parent-owned
-        # directory is preserved as a unit, including nested symlinks.
-        self.assertTrue(retired.is_symlink(), "nested parent content must be preserved")
+        self.assertFalse(retired.exists(), "exact retired symlink must be removed")
+        self.assertFalse(retired.is_symlink(), "exact retired symlink must be removed")
         self.assertTrue(unknown.is_symlink(), "unknown mirror must not be removed")
+        self.assertEqual(regular.read_text(encoding="utf-8"), "keep parent file\n")
 
+        check = self.run_sync(root, "check")
+        self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
+
+    def test_all_retired_test_fixture_and_note_descendants_are_pruned(self) -> None:
+        """Prune the 83 known descendants while preserving parent notes and tools."""
+        root = self.clone_parent_fixture()
+        retired_paths = self.retired_descendant_paths()
+        self.assertEqual(len(retired_paths), 83)
+        self.assertIn("tests/fixtures/python_algorithm_contract", retired_paths)
+        self.assertEqual(
+            sum(path.startswith("notes/") for path in retired_paths),
+            27,
+        )
+
+        notes_hub = root / "notes" / "README.md"
+        project_note = root / "notes" / "project-note.md"
+        self.write_file(notes_hub, "parent note hub\n")
+        self.write_file(project_note, "parent project note\n")
+        for relative_path in retired_paths:
+            destination = root / relative_path
+            source = root / "vendor" / "agent-canon" / relative_path
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.symlink_to(os.path.relpath(source, destination.parent))
+
+        result = self.run_sync(root, "link-root")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        for relative_path in retired_paths:
+            self.assertFalse(os.path.lexists(root / relative_path), relative_path)
+        self.assertEqual(notes_hub.read_text(encoding="utf-8"), "parent note hub\n")
+        self.assertEqual(project_note.read_text(encoding="utf-8"), "parent project note\n")
+
+        public_tools = root / "tools" / "agent-canon"
+        self.assertTrue(public_tools.is_symlink())
+        self.assertEqual(os.readlink(public_tools), "../vendor/agent-canon/tools")
         check = self.run_sync(root, "check")
         self.assertEqual(check.returncode, 0, check.stdout + check.stderr)
 

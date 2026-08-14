@@ -10,6 +10,7 @@
 # upstream implementation ./agent_tools/surface_manifest.py renders projection and update-transition specs
 # downstream implementation ../tests/tools/test_update_agent_canon.py verifies sync/update behavior
 # downstream implementation ../tests/tools/test_update_agent_canon_surface_migration.py verifies bounded migration
+# downstream implementation ../test/testrunner.sh exposes the source-owned public test route
 # @dependency-end
 set -euo pipefail
 export GIT_TERMINAL_PROMPT="${GIT_TERMINAL_PROMPT:-0}"
@@ -1816,7 +1817,6 @@ project_copy_source() {
       s{vendor/agent-canon/templates/}{__CANON_TEMPLATES__/}g;
       s{vendor/agent-canon/issues/}{__CANON_ISSUES__/}g;
       s{documents/tools/}{__DOCUMENTS_TOOLS__/}g;
-      s{tests/tools/}{__TESTS_TOOLS__/}g;
       s{tools/agent-canon/}{__PARENT_TOOLS__/}g;
       s{((?:\.\./)+)documents/}{$1vendor/agent-canon/documents/}g;
       s{((?:\.\./)+)issues/}{$1vendor/agent-canon/issues/}g;
@@ -1828,7 +1828,6 @@ project_copy_source() {
       s{__CANON_TEMPLATES__/}{vendor/agent-canon/templates/}g;
       s{__CANON_ISSUES__/}{vendor/agent-canon/issues/}g;
       s{__DOCUMENTS_TOOLS__/}{documents/tools/}g;
-      s{__TESTS_TOOLS__/}{tests/tools/}g;
       s{__PARENT_TOOLS__/}{tools/agent-canon/}g;
       print;
     ' "$source")"
