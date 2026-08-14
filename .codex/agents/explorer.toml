@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical explorer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 0ad4a6fbec489c28a33fb83799bfd50e02511d8010dc93124822c098599233db
+# source canonical digest: 26ff95a4c31397e8498a1793e5f1b67982a05f90e7b5ae7c55b51c6eaf41ed3d
 
 name = "explorer"
 description = "Read-only agent for tracing code paths, docs, and workflow state."

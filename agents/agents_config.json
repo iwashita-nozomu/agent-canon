@@ -1904,7 +1904,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "86581acfd72ae8a74bdf040e66034148d079dda215a0eae37ba57164be6a5a70"
+      "projection_digest": "3827d26022d989847d292c4ae9ae47587d5cebce0d56111029e730e7adfb8aca"
     },
     "benchmark_reviewer": {
       "name": "benchmark_reviewer",
@@ -1938,7 +1938,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "d686af8563334e5559e65c6819e7f342a0f13bb8accb849b12b785ff6fe8d55a"
+      "projection_digest": "e61ce371dc956805af95b9cd4c489cadac8f56ce469514f0eddaf5c2846f7d58"
     },
     "citation_evidence_reviewer": {
       "name": "citation_evidence_reviewer",
@@ -1972,7 +1972,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "003e21b87184802b1ff63ae3f46c5a6295e3e3a0ae84ef375f6d0a6d50e37ef3"
+      "projection_digest": "3bf6e1085ed4f15ae1fd21695684ef9fd5f868894a35f2273927829fa545b720"
     },
     "cpp_reviewer": {
       "name": "cpp_reviewer",
@@ -2006,7 +2006,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "3834527592934e4b60efc546e3e8eac2de19d153015d86f61abc8073f94caab4"
+      "projection_digest": "08cb4f2c7e836084cf262740b84e30614a7ce045aaa5d9ed6436f445e17210dc"
     },
     "detailed_design_reviewer": {
       "name": "detailed_design_reviewer",
@@ -2040,7 +2040,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "42f8ee47eda7a2049008ca98759a0ea40424116eade758579dbf69f5adaf82ce"
+      "projection_digest": "d39777852f75eb311a7cbdcb3cf92b6135eccacf693d5cefcfcbfcc9305b6608"
     },
     "detailed_designer": {
       "name": "detailed_designer",
@@ -2074,7 +2074,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "3d7e48f58a4c647656dac1a6781cab05d2b9ca5a5ae540739d59e49c97007188"
+      "projection_digest": "e510b3dae82d950566f218b95a4bfd7f0297c0bbdda61b1c44d951f7d3d7fb0a"
     },
     "diff_triage_reviewer": {
       "name": "diff_triage_reviewer",
@@ -2108,7 +2108,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "543fb2137053883a9b3789a5b5ce2eb112a9b2109e1e21039d29219656819e53"
+      "projection_digest": "d5dfc37871027602cf5d1b92d1fede77ea09b9c1293d1d304995b9a93296e3e3"
     },
     "docs_workflow_steward": {
       "name": "docs_workflow_steward",
@@ -2142,7 +2142,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "5a0323be001cad9e8acc493cdf9026475d58d3e1be005c6e493566dd8eaaf151"
+      "projection_digest": "576c8ab2e14bec6ebc46a39f85834b3a21ec136e7600777cfe9e116ea6b1dca6"
     },
     "document_flow_reviewer": {
       "name": "document_flow_reviewer",
@@ -2176,7 +2176,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "231c36f33aac9d61e64c32edabf324520e8832dcc0ddb36d03c56b1458daceba"
+      "projection_digest": "d4ce86c377fc208e2dc99533afb8d7e446ed9e0c819ab88bcda1eb625cf1258c"
     },
     "execution_planner": {
       "name": "execution_planner",
@@ -2210,7 +2210,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "55f4fbe0c9119b52342922d01fa83798696936236a2e34f333932ee2dc52c771"
+      "projection_digest": "66c98d2a2b13f33505534be0b53fd5a5e93b87aa0826ff03c4237af5375df27c"
     },
     "experiment_runner": {
       "name": "experiment_runner",
@@ -2244,7 +2244,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "16cb978da4ad9c2a786b41b325eae99b170933108ba15c248cc6acc394240f06"
+      "projection_digest": "ef46e727576126425bb66f3f1c37a509e1c0c38314f123ae738b43bcb1fb3ad1"
     },
     "explorer": {
       "name": "explorer",
@@ -2278,7 +2278,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "0ad4a6fbec489c28a33fb83799bfd50e02511d8010dc93124822c098599233db"
+      "projection_digest": "26ff95a4c31397e8498a1793e5f1b67982a05f90e7b5ae7c55b51c6eaf41ed3d"
     },
     "fair_data_reviewer": {
       "name": "fair_data_reviewer",
@@ -2312,7 +2312,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "8a1a72f2db2e6b82b1d5ef55a4a0bd1ec392341b4835b9a6d369a7aa39bd8f76"
+      "projection_digest": "b9d7f643ab6230ee5cbabd3f55a49cd494a347399770359bc62b704ecd556440"
     },
     "literature_researcher": {
       "name": "literature_researcher",
@@ -2346,7 +2346,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "7cff6ad79b30828241c26ab5bbaff9aab7c7a2def1a3817d0f1e13e6b575b1f5"
+      "projection_digest": "ea38bbb1255a9a4b7d4baf2a6b03159fbe2d668ba45e3e4b684dd590e54b0033"
     },
     "logic_gap_reviewer": {
       "name": "logic_gap_reviewer",
@@ -2380,7 +2380,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "cdff30f7f541025f45629f93c4402a0db5119993bbd2510eab0ef750b3257b84"
+      "projection_digest": "ded3e4f88a36dece3796bc119d3f760ccd1d50a1bf48a96e56352e55359716d5"
     },
     "long_form_writer": {
       "name": "long_form_writer",
@@ -2414,7 +2414,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "f8c0d306e98286c6a639b0227518b1de544de91b40cd16a211cb1c6da9302fb9"
+      "projection_digest": "5f07b3a93b0448f4fd644e6f7956d2f4f8000743852c683556629d7f28ea06be"
     },
     "manager_reviewer": {
       "name": "manager_reviewer",
@@ -2448,7 +2448,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "efaf6059b12fc6ea1d4e4d0aaf1a963150568d3f27993418a9eedf36f42f1452"
+      "projection_digest": "de3abc4187832ec96fc933696e6b936fc81d90733356c0959fa48537378f17d0"
     },
     "ml_science_reviewer": {
       "name": "ml_science_reviewer",
@@ -2482,7 +2482,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "8676c475903f950e66c5966b59562b83761070a1fcb6928565ed17cd4101c5d2"
+      "projection_digest": "e6241fa54886e3493c538260cee429d6e0b91dffbba6576cfb6bbe1527808bf3"
     },
     "notation_definition_reviewer": {
       "name": "notation_definition_reviewer",
@@ -2516,7 +2516,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "782b9259f35489b2e335463031258d6e47a9300f8f349c79d73f0c4d34221dd8"
+      "projection_digest": "54b701a02f49347a06636ac597e7a93ba38a7a9590a06eb503e00f85396cbc88"
     },
     "oop_readability_reviewer": {
       "name": "oop_readability_reviewer",
@@ -2550,7 +2550,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "ccf10c750058f6f1ae2a3b5ac23b1a10502bad1cd9f5aae4154477860c5db2a5"
+      "projection_digest": "334ac75d773923d229e48217c5499431d1412662dfb1c615db99da5f41aed9de"
     },
     "plan_reviewer": {
       "name": "plan_reviewer",
@@ -2584,7 +2584,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "8a02de81412e0048f0af30c7d1677d916868b3b82e14681ebbfb0b7ec6bd32b0"
+      "projection_digest": "6ac62db6fdf4554cc38a647bdb8c656fde3e89eba721e64c61ba99b9595377a1"
     },
     "project_reviewer": {
       "name": "project_reviewer",
@@ -2618,7 +2618,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "a23ab45717e395548b3e426ca925f585d1d43708935d333ea05acc060004c3ae"
+      "projection_digest": "4e03dc49156cb1bafa71b8351ba5a1f37ae6a0916a17c63afd4fc134c0bf4020"
     },
     "prompt_config_reviewer": {
       "name": "prompt_config_reviewer",
@@ -2652,7 +2652,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "07853e06d549ad0a021208668bdeb6342c1e4eec59fda994c71373e77c0f3786"
+      "projection_digest": "f0b9f15f3972c135e36583440eae3d99c33fe9ba5b1a4ddb68ba61623095a787"
     },
     "python_reviewer": {
       "name": "python_reviewer",
@@ -2664,7 +2664,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not add validation outside that route. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route.",
+      "developer_instructions": "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route. follow the parent-selected closed validation route act only on the parent packet and assigned scope",
       "logical_role_id": "change_reviewer+python_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/21",
       "profile_id": "luna_reasoning_high",
@@ -2686,7 +2686,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "24ad0b6c58be25bd244aca83288b0ad98d013d5a50e0d7f57505ed4cc740e646"
+      "projection_digest": "9a4a336613685a4c060d655bd089542e086d3b983042df932c4d5dd662aa8fed"
     },
     "report_reviewer": {
       "name": "report_reviewer",
@@ -2720,7 +2720,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "99264cc9e3333524cf695ea370a89225a4952427a9fc08e55f328d9c9c060abe"
+      "projection_digest": "0e3a499a86b6e5f4bce274d9f50e391b7aed88c316aa8e4248013b01217ae5e8"
     },
     "reproducibility_reviewer": {
       "name": "reproducibility_reviewer",
@@ -2754,7 +2754,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e505e11a2740cb1bf7fe637d838c356d3306fac3c442a1b973446b17f3439a82"
+      "projection_digest": "b4b0518ca22ef08565f32c5a9d6936d4654d9184fb30820bbb5dd9d99cd71b7b"
     },
     "requirements_organizer": {
       "name": "requirements_organizer",
@@ -2788,7 +2788,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e65090393567b50c5a4d214a3b1ee9c00504fb2e664ca8fdb3ad3b2bc266e28c"
+      "projection_digest": "7314b3aabbccfdca89443f706f9ae271eeb8014e47bc1036ba2f0ecebd86b0f4"
     },
     "reviewer": {
       "name": "reviewer",
@@ -2822,7 +2822,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "be182cb6606ad0919f194fbc1eb3d7c516c525ad6bd116d36884f2be6678d634"
+      "projection_digest": "e9b7c5e65c2fda433cb32677308c34ff806528311e6489804f74def3b03b7721"
     },
     "scientific_computing_reviewer": {
       "name": "scientific_computing_reviewer",
@@ -2856,7 +2856,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "0ddd9a811fabd32aee09919fd3222f332635fa203471c03e6c61092bb072c273"
+      "projection_digest": "f8edd9eef4b799b62ba9dd76a0ce6a19800c08bee0ebfdfc2535cf3e3604738e"
     },
     "ship_reviewer": {
       "name": "ship_reviewer",
@@ -2890,7 +2890,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "single_owner_gate",
       "continuation_policy": "terminal_after_gate",
-      "projection_digest": "02afc64ea65a70464500a94d66540421c3f8bd162b34159818be698f3fcab5fd"
+      "projection_digest": "1f4cb8eb9ee61edd4ace6aff2857c8d726a1f5a3a3794e5f05d653157fb17fa2"
     },
     "skill_evaluator": {
       "name": "skill_evaluator",
@@ -2923,7 +2923,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "terminal_evaluation",
       "continuation_policy": "fresh_only_no_continuation",
-      "projection_digest": "fee704fc8391b129c128f07a8c8c39f757b02947cabe32d5f24a4317e9965281"
+      "projection_digest": "a781601e71471ad15d380d6cc4c57afebc58cbb82be62f1cf4869fae2a1b0e80"
     },
     "spark_worker": {
       "name": "spark_worker",
@@ -2935,7 +2935,7 @@
       "approval_policy": "never",
       "model": "gpt-5.3-codex-spark",
       "model_reasoning_effort": "low",
-      "developer_instructions": "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.",
+      "developer_instructions": "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Execute only implement, commit, and push actions within assigned authority; parent owns pull-request, admin-override, base-integration, and final editorial decisions. follow the parent-selected closed validation route act only on the parent packet and assigned scope do not perform parent-only integration or final decisions return branch/head/check evidence or the role result and stop",
       "logical_role_id": "implementer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/6",
       "profile_id": "spark_implementation_low",
@@ -2959,7 +2959,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation_only",
       "continuation_policy": "same_spark_after_one_repaired_structural_gap",
-      "projection_digest": "2c1caf7f71eb452c46f951630094588f8407957e7232852d02e051e8f49315e3"
+      "projection_digest": "9185a102939919aa42fbcf919fd9f80b585bb7bad4e290df83db12c18c670c79"
     },
     "terra": {
       "name": "terra",
@@ -2995,7 +2995,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "1c16d8ac47e435bda16b03b176229ddfadf198ad786e7ad553f75676d08e810c"
+      "projection_digest": "b6e48b66355677d73129cf0e8233efba787535161d293acf7343509e0cf68028"
     },
     "test_designer": {
       "name": "test_designer",
@@ -3029,7 +3029,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "b8f308a403e83481bb8128367fa08403ce7b3ffca249f9ea1ca45757070233b0"
+      "projection_digest": "04208a0f63875c6428ed4e70f11998530ef5de53e516745d92eb837ec0064cc7"
     },
     "worker": {
       "name": "worker",
@@ -3041,7 +3041,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "xhigh",
-      "developer_instructions": "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.",
+      "developer_instructions": "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Execute only implement, commit, and push actions within assigned authority; parent owns pull-request, admin-override, base-integration, and final editorial decisions. follow the parent-selected closed validation route act only on the parent packet and assigned scope do not perform parent-only integration or final decisions return branch/head/check evidence or the role result and stop",
       "logical_role_id": "implementer+experimenter+infra_steward",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/6+agents/agents_config.json#/specialist_roles/2+agents/agents_config.json#/specialist_roles/9",
       "profile_id": "luna_implementation_xhigh",
@@ -3064,7 +3064,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "f7d386a8ac4f36f5e2e1b75662d2cbd7c4cfd462394e55d7930a615ce255a329"
+      "projection_digest": "b27d089e5a19edf68f913e74a5b95e1ece5d48c1d14362b9d74e2bd33538c39d"
     }
   },
   "roles": [
@@ -3089,7 +3089,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "86581acfd72ae8a74bdf040e66034148d079dda215a0eae37ba57164be6a5a70"
+      "projection_digest": "3827d26022d989847d292c4ae9ae47587d5cebce0d56111029e730e7adfb8aca"
     },
     {
       "id": "benchmark_reviewer",
@@ -3112,7 +3112,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "d686af8563334e5559e65c6819e7f342a0f13bb8accb849b12b785ff6fe8d55a"
+      "projection_digest": "e61ce371dc956805af95b9cd4c489cadac8f56ce469514f0eddaf5c2846f7d58"
     },
     {
       "id": "citation_evidence_reviewer",
@@ -3135,7 +3135,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "003e21b87184802b1ff63ae3f46c5a6295e3e3a0ae84ef375f6d0a6d50e37ef3"
+      "projection_digest": "3bf6e1085ed4f15ae1fd21695684ef9fd5f868894a35f2273927829fa545b720"
     },
     {
       "id": "cpp_reviewer",
@@ -3158,7 +3158,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "3834527592934e4b60efc546e3e8eac2de19d153015d86f61abc8073f94caab4"
+      "projection_digest": "08cb4f2c7e836084cf262740b84e30614a7ce045aaa5d9ed6436f445e17210dc"
     },
     {
       "id": "detailed_design_reviewer",
@@ -3181,7 +3181,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "42f8ee47eda7a2049008ca98759a0ea40424116eade758579dbf69f5adaf82ce"
+      "projection_digest": "d39777852f75eb311a7cbdcb3cf92b6135eccacf693d5cefcfcbfcc9305b6608"
     },
     {
       "id": "detailed_designer",
@@ -3204,7 +3204,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "3d7e48f58a4c647656dac1a6781cab05d2b9ca5a5ae540739d59e49c97007188"
+      "projection_digest": "e510b3dae82d950566f218b95a4bfd7f0297c0bbdda61b1c44d951f7d3d7fb0a"
     },
     {
       "id": "diff_triage_reviewer",
@@ -3227,7 +3227,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "543fb2137053883a9b3789a5b5ce2eb112a9b2109e1e21039d29219656819e53"
+      "projection_digest": "d5dfc37871027602cf5d1b92d1fede77ea09b9c1293d1d304995b9a93296e3e3"
     },
     {
       "id": "docs_workflow_steward",
@@ -3250,7 +3250,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "5a0323be001cad9e8acc493cdf9026475d58d3e1be005c6e493566dd8eaaf151"
+      "projection_digest": "576c8ab2e14bec6ebc46a39f85834b3a21ec136e7600777cfe9e116ea6b1dca6"
     },
     {
       "id": "document_flow_reviewer",
@@ -3273,7 +3273,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "231c36f33aac9d61e64c32edabf324520e8832dcc0ddb36d03c56b1458daceba"
+      "projection_digest": "d4ce86c377fc208e2dc99533afb8d7e446ed9e0c819ab88bcda1eb625cf1258c"
     },
     {
       "id": "execution_planner",
@@ -3296,7 +3296,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "55f4fbe0c9119b52342922d01fa83798696936236a2e34f333932ee2dc52c771"
+      "projection_digest": "66c98d2a2b13f33505534be0b53fd5a5e93b87aa0826ff03c4237af5375df27c"
     },
     {
       "id": "experiment_runner",
@@ -3319,7 +3319,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "16cb978da4ad9c2a786b41b325eae99b170933108ba15c248cc6acc394240f06"
+      "projection_digest": "ef46e727576126425bb66f3f1c37a509e1c0c38314f123ae738b43bcb1fb3ad1"
     },
     {
       "id": "explorer",
@@ -3342,7 +3342,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "0ad4a6fbec489c28a33fb83799bfd50e02511d8010dc93124822c098599233db"
+      "projection_digest": "26ff95a4c31397e8498a1793e5f1b67982a05f90e7b5ae7c55b51c6eaf41ed3d"
     },
     {
       "id": "fair_data_reviewer",
@@ -3365,7 +3365,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "8a1a72f2db2e6b82b1d5ef55a4a0bd1ec392341b4835b9a6d369a7aa39bd8f76"
+      "projection_digest": "b9d7f643ab6230ee5cbabd3f55a49cd494a347399770359bc62b704ecd556440"
     },
     {
       "id": "literature_researcher",
@@ -3388,7 +3388,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "7cff6ad79b30828241c26ab5bbaff9aab7c7a2def1a3817d0f1e13e6b575b1f5"
+      "projection_digest": "ea38bbb1255a9a4b7d4baf2a6b03159fbe2d668ba45e3e4b684dd590e54b0033"
     },
     {
       "id": "logic_gap_reviewer",
@@ -3411,7 +3411,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "cdff30f7f541025f45629f93c4402a0db5119993bbd2510eab0ef750b3257b84"
+      "projection_digest": "ded3e4f88a36dece3796bc119d3f760ccd1d50a1bf48a96e56352e55359716d5"
     },
     {
       "id": "long_form_writer",
@@ -3434,7 +3434,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "f8c0d306e98286c6a639b0227518b1de544de91b40cd16a211cb1c6da9302fb9"
+      "projection_digest": "5f07b3a93b0448f4fd644e6f7956d2f4f8000743852c683556629d7f28ea06be"
     },
     {
       "id": "manager_reviewer",
@@ -3457,7 +3457,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "efaf6059b12fc6ea1d4e4d0aaf1a963150568d3f27993418a9eedf36f42f1452"
+      "projection_digest": "de3abc4187832ec96fc933696e6b936fc81d90733356c0959fa48537378f17d0"
     },
     {
       "id": "ml_science_reviewer",
@@ -3480,7 +3480,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "8676c475903f950e66c5966b59562b83761070a1fcb6928565ed17cd4101c5d2"
+      "projection_digest": "e6241fa54886e3493c538260cee429d6e0b91dffbba6576cfb6bbe1527808bf3"
     },
     {
       "id": "notation_definition_reviewer",
@@ -3503,7 +3503,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "782b9259f35489b2e335463031258d6e47a9300f8f349c79d73f0c4d34221dd8"
+      "projection_digest": "54b701a02f49347a06636ac597e7a93ba38a7a9590a06eb503e00f85396cbc88"
     },
     {
       "id": "oop_readability_reviewer",
@@ -3526,7 +3526,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "ccf10c750058f6f1ae2a3b5ac23b1a10502bad1cd9f5aae4154477860c5db2a5"
+      "projection_digest": "334ac75d773923d229e48217c5499431d1412662dfb1c615db99da5f41aed9de"
     },
     {
       "id": "plan_reviewer",
@@ -3549,7 +3549,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "8a02de81412e0048f0af30c7d1677d916868b3b82e14681ebbfb0b7ec6bd32b0"
+      "projection_digest": "6ac62db6fdf4554cc38a647bdb8c656fde3e89eba721e64c61ba99b9595377a1"
     },
     {
       "id": "project_reviewer",
@@ -3572,7 +3572,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "a23ab45717e395548b3e426ca925f585d1d43708935d333ea05acc060004c3ae"
+      "projection_digest": "4e03dc49156cb1bafa71b8351ba5a1f37ae6a0916a17c63afd4fc134c0bf4020"
     },
     {
       "id": "prompt_config_reviewer",
@@ -3595,7 +3595,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "07853e06d549ad0a021208668bdeb6342c1e4eec59fda994c71373e77c0f3786"
+      "projection_digest": "f0b9f15f3972c135e36583440eae3d99c33fe9ba5b1a4ddb68ba61623095a787"
     },
     {
       "id": "python_reviewer",
@@ -3618,7 +3618,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "24ad0b6c58be25bd244aca83288b0ad98d013d5a50e0d7f57505ed4cc740e646"
+      "projection_digest": "9a4a336613685a4c060d655bd089542e086d3b983042df932c4d5dd662aa8fed"
     },
     {
       "id": "report_reviewer",
@@ -3641,7 +3641,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "99264cc9e3333524cf695ea370a89225a4952427a9fc08e55f328d9c9c060abe"
+      "projection_digest": "0e3a499a86b6e5f4bce274d9f50e391b7aed88c316aa8e4248013b01217ae5e8"
     },
     {
       "id": "reproducibility_reviewer",
@@ -3664,7 +3664,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e505e11a2740cb1bf7fe637d838c356d3306fac3c442a1b973446b17f3439a82"
+      "projection_digest": "b4b0518ca22ef08565f32c5a9d6936d4654d9184fb30820bbb5dd9d99cd71b7b"
     },
     {
       "id": "requirements_organizer",
@@ -3687,7 +3687,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e65090393567b50c5a4d214a3b1ee9c00504fb2e664ca8fdb3ad3b2bc266e28c"
+      "projection_digest": "7314b3aabbccfdca89443f706f9ae271eeb8014e47bc1036ba2f0ecebd86b0f4"
     },
     {
       "id": "reviewer",
@@ -3710,7 +3710,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "be182cb6606ad0919f194fbc1eb3d7c516c525ad6bd116d36884f2be6678d634"
+      "projection_digest": "e9b7c5e65c2fda433cb32677308c34ff806528311e6489804f74def3b03b7721"
     },
     {
       "id": "scientific_computing_reviewer",
@@ -3733,7 +3733,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "0ddd9a811fabd32aee09919fd3222f332635fa203471c03e6c61092bb072c273"
+      "projection_digest": "f8edd9eef4b799b62ba9dd76a0ce6a19800c08bee0ebfdfc2535cf3e3604738e"
     },
     {
       "id": "ship_reviewer",
@@ -3756,7 +3756,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "single_owner_gate",
       "continuation_policy": "terminal_after_gate",
-      "projection_digest": "02afc64ea65a70464500a94d66540421c3f8bd162b34159818be698f3fcab5fd"
+      "projection_digest": "1f4cb8eb9ee61edd4ace6aff2857c8d726a1f5a3a3794e5f05d653157fb17fa2"
     },
     {
       "id": "skill_evaluator",
@@ -3778,7 +3778,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "terminal_evaluation",
       "continuation_policy": "fresh_only_no_continuation",
-      "projection_digest": "fee704fc8391b129c128f07a8c8c39f757b02947cabe32d5f24a4317e9965281"
+      "projection_digest": "a781601e71471ad15d380d6cc4c57afebc58cbb82be62f1cf4869fae2a1b0e80"
     },
     {
       "id": "spark_worker",
@@ -3803,7 +3803,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation_only",
       "continuation_policy": "same_spark_after_one_repaired_structural_gap",
-      "projection_digest": "2c1caf7f71eb452c46f951630094588f8407957e7232852d02e051e8f49315e3"
+      "projection_digest": "9185a102939919aa42fbcf919fd9f80b585bb7bad4e290df83db12c18c670c79"
     },
     {
       "id": "terra",
@@ -3828,7 +3828,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "1c16d8ac47e435bda16b03b176229ddfadf198ad786e7ad553f75676d08e810c"
+      "projection_digest": "b6e48b66355677d73129cf0e8233efba787535161d293acf7343509e0cf68028"
     },
     {
       "id": "test_designer",
@@ -3851,7 +3851,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "b8f308a403e83481bb8128367fa08403ce7b3ffca249f9ea1ca45757070233b0"
+      "projection_digest": "04208a0f63875c6428ed4e70f11998530ef5de53e516745d92eb837ec0064cc7"
     },
     {
       "id": "worker",
@@ -3875,7 +3875,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "f7d386a8ac4f36f5e2e1b75662d2cbd7c4cfd462394e55d7930a615ce255a329"
+      "projection_digest": "b27d089e5a19edf68f913e74a5b95e1ece5d48c1d14362b9d74e2bd33538c39d"
     }
   ],
   "generated_profile_projection": {
@@ -3883,6 +3883,6 @@
     "materializer": "tools/agent_tools/model_profile_registry.py",
     "registry_ref": "agents/model_profiles.toml",
     "role_count": 35,
-    "projection_digest": "bd2288be0c127f12f3abfeba8180fe2843cacf0bbb239f9b80046e96684cf45f"
+    "projection_digest": "b2f6dba9186cb7de9d4712165eb8c6896e7c9f265d15036cb315a44b321555ce"
   }
 }

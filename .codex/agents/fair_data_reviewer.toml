@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical fair_data_reviewer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 8a1a72f2db2e6b82b1d5ef55a4a0bd1ec392341b4835b9a6d369a7aa39bd8f76
+# source canonical digest: b9d7f643ab6230ee5cbabd3f55a49cd494a347399770359bc62b704ecd556440
 
 name = "fair_data_reviewer"
 description = "Read-only reviewer for metadata quality, naming, reuse, and FAIR-style data organization."

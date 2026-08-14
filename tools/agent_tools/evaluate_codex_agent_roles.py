@@ -292,7 +292,11 @@ def evaluate_generated_role_projection(
         registry = model_profile_registry.load_model_profile_registry(root)
         generated = {
             view.role_id: view
-            for view in model_profile_registry.generate_role_views(registry, root=root)
+            for view in model_profile_registry.generate_role_views(
+                registry,
+                root=root,
+                projection="consumer-static",
+            )
         }
     except (OSError, ValueError, model_profile_registry.ImplementationFeedback) as exc:
         return [Finding("generated-view", "canonical", f"materializer-error-{type(exc).__name__}")]

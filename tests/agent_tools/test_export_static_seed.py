@@ -137,6 +137,25 @@ def _make_fixture(root: Path) -> Path:
     return repo
 
 
+def _make_canonical_35_role_fixture(root: Path) -> Path:
+    """Create a committed source snapshot from the canonical static role set."""
+    repo = root / "canonical-source"
+    repo.mkdir()
+    _git(repo, "init", "-q", "-b", "main")
+    allowlist = tomllib.loads(
+        (PROJECT_ROOT / ALLOWLIST_PATH).read_text(encoding="utf-8")
+    )
+    paths = list(allowlist["files"])
+    for relative in paths:
+        source = PROJECT_ROOT / relative
+        target = repo / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source, target)
+    _write_allowlist(repo, paths)
+    _commit(repo, "canonical 35-role static fixture")
+    return repo
+
+
 def _run_export(repo: Path, output: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         (
@@ -242,6 +261,50 @@ class ExportStaticSeedTest(unittest.TestCase):
             hidden = root / "source.hidden"
             repo.rename(hidden)
             _assert_source_free_seed(self, output)
+
+    def test_canonical_35_role_fixture_is_deterministic_closed_and_source_hidden(self) -> None:
+        """The real canonical role set exports as one closed source-free snapshot."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            repo = _make_canonical_35_role_fixture(root)
+            first = root / "first"
+            second = root / "second"
+            first_result = _run_export(repo, first)
+            second_result = _run_export(repo, second)
+            self.assertEqual(first_result.returncode, 0, first_result.stderr)
+            self.assertEqual(second_result.returncode, 0, second_result.stderr)
+            self.assertEqual(_tree_snapshot(first), _tree_snapshot(second))
+            role_files = sorted(first.glob(".codex/agents/*.toml"))
+            self.assertEqual(len(role_files), 35)
+            config = tomllib.loads((first / ".codex" / "config.toml").read_text(encoding="utf-8"))
+            self.assertEqual(
+                {
+                    f".codex/{value['config_file']}"
+                    for value in config["agents"].values()
+                    if isinstance(value, dict) and "config_file" in value
+                },
+                {path.relative_to(first).as_posix() for path in role_files},
+            )
+            checker = subprocess.run(
+                (
+                    sys.executable,
+                    str(PROJECT_ROOT / "tools" / "docs" / "check_bootstrap_docs.py"),
+                    "--root",
+                    str(first),
+                    "--static-seed-consumer",
+                ),
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(checker.returncode, 0, checker.stdout + checker.stderr)
+            repo.rename(root / "canonical-source.hidden")
+            self.assertFalse((root / "canonical-source").exists())
+            self.assertFalse((first / "vendor").exists())
+            for path in first.rglob("*"):
+                self.assertFalse(path.is_symlink(), path)
+                if path.is_file():
+                    self.assertEqual(stat.S_IMODE(path.stat().st_mode), 0o644)
 
     def test_forbidden_paths_and_out_of_root_entries_are_rejected(self) -> None:
         cases = (
@@ -350,6 +413,30 @@ class ExportStaticSeedTest(unittest.TestCase):
 
                 self.assertNotEqual(result.returncode, 0)
                 self.assertIn("AGENT_CANON_STATIC_SEED=fail", result.stderr)
+                self.assertFalse((root / "seed").exists())
+
+    def test_exact_case_normalized_producer_prefixes_are_rejected_before_output(self) -> None:
+        """Every exact forbidden producer prefix is rejected case-insensitively."""
+        prefixes = (
+            "AgEnTs/SkIlLs/",
+            "AgEnTs/MoDeL_PrOfIlEs.ToMl",
+            "ToOlS/AgEnT_ToOlS/",
+            "../../AgEnTs/",
+            "../../ToOlS/",
+        )
+        for prefix in prefixes:
+            with self.subTest(prefix=prefix), tempfile.TemporaryDirectory() as tmp_dir:
+                root = Path(tmp_dir)
+                repo = _make_fixture(root)
+                (repo / ".codex" / "agents" / "worker.toml").write_text(
+                    'name = "worker"\n'
+                    f'developer_instructions = "prefix {prefix}payload"\n',
+                    encoding="utf-8",
+                )
+                _commit(repo, "forbidden producer prefix")
+                result = _run_export(repo, root / "seed")
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("forbidden producer prefix", result.stderr)
                 self.assertFalse((root / "seed").exists())
 
     def test_unlisted_role_and_unknown_allowlist_control_are_rejected(self) -> None:

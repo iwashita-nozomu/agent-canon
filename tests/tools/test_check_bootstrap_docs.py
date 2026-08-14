@@ -262,6 +262,38 @@ class CheckBootstrapDocsTest(unittest.TestCase):
                 result.stdout,
             )
 
+    def test_static_seed_consumer_scans_every_config_and_role_payload_for_exact_prefixes(self) -> None:
+        """The source-free gate applies the case-normalized prefix set to every payload."""
+        prefixes = (
+            "AgEnTs/SkIlLs/",
+            "AgEnTs/MoDeL_PrOfIlEs.ToMl",
+            "ToOlS/AgEnT_ToOlS/",
+            "../../AgEnTs/",
+            "../../ToOlS/",
+        )
+        payloads = (
+            Path("agent-canon-static-seed.json"),
+            Path(".codex/config.toml"),
+            Path(".codex/agents/worker.toml"),
+            Path(".codex/agents/rogue.toml"),
+        )
+        for prefix in prefixes:
+            for payload in payloads:
+                with self.subTest(prefix=prefix, payload=payload), tempfile.TemporaryDirectory() as tmp_dir:
+                    root = Path(tmp_dir)
+                    self.write_static_seed_consumer(root)
+                    path = root / payload
+                    if payload.name == "rogue.toml":
+                        self.write_file(path, 'name = "rogue"\n')
+                    original = path.read_text(encoding="utf-8")
+                    if path.suffix == ".json":
+                        path.write_text(original + f"\n/* {prefix}payload */\n", encoding="utf-8")
+                    else:
+                        path.write_text(original + f"\n# {prefix}payload\n", encoding="utf-8")
+                    result = self.run_cli(root, "--static-seed-consumer")
+                    self.assertEqual(result.returncode, 1, result.stdout)
+                    self.assertIn("static seed contains forbidden runtime marker", result.stdout)
+
     def test_live_runtime_manifest_is_explicit_opt_in(self) -> None:
         """The legacy projection manifest must identify itself as non-default."""
         manifest = tomllib.loads(

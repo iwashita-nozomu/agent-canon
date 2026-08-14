@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical oop_readability_reviewer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: ccf10c750058f6f1ae2a3b5ac23b1a10502bad1cd9f5aae4154477860c5db2a5
+# source canonical digest: 334ac75d773923d229e48217c5499431d1412662dfb1c615db99da5f41aed9de
 
 name = "oop_readability_reviewer"
 description = "Read-only reviewer that documents mechanical OOP readability reports without changing their verdicts."

@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical requirements_organizer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: e65090393567b50c5a4d214a3b1ee9c00504fb2e664ca8fdb3ad3b2bc266e28c
+# source canonical digest: 7314b3aabbccfdca89443f706f9ae271eeb8014e47bc1036ba2f0ecebd86b0f4
 
 name = "requirements_organizer"
 description = "Requirements-organizing agent for turning user intent and local precedent into concrete scope, acceptance criteria, and reuse targets."

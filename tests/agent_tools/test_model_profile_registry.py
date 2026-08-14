@@ -9,12 +9,15 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
 
 from tools.agent_tools import model_profile_registry as registry_module
 from tools.agent_tools.model_profile_registry import (
+    REQUIRED_STATIC_OBLIGATION_SETS,
+    STATIC_OBLIGATION_TABLE,
     ContextItem,
     ModelProfileRegistryError,
     PromptMaterializationRequest,
@@ -210,3 +213,117 @@ def test_generator_rejects_unbound_registered_role(workspace: Path) -> None:
     registry = load_model_profile_registry(workspace)
     with pytest.raises(ModelProfileRegistryError, match="binding_registration_set_mismatch"):
         generate_role_views(registry, workspace)
+
+
+def test_canonical_consumer_static_projection_is_typed_closed_and_mode_invariant() -> None:
+    """All canonical roles have source-free static clauses and one digest."""
+    root = Path(__file__).resolve().parents[2]
+    registry = load_model_profile_registry(root)
+    live = {view.role_id: view for view in generate_role_views(registry, root, projection="live")}
+    static = {
+        view.role_id: view
+        for view in generate_role_views(registry, root, projection="consumer-static")
+    }
+    assert len(live) == len(static) == 35
+    assert set(live) == set(registry.role_profile_bindings)
+    assert [item.obligation_id for item in STATIC_OBLIGATION_TABLE] == [
+        "validation_owner",
+        "parent_assignment",
+        "parent_authority",
+        "stop_handback",
+    ]
+    clauses = {
+        clause.clause_id: clause
+        for role_id in registry.role_profile_bindings
+        for clause in registry.instruction_clauses_for_role(role_id)
+    }
+    for clause_id, required in REQUIRED_STATIC_OBLIGATION_SETS.items():
+        projection = clauses[clause_id].consumer_static_projection
+        assert projection is not None
+        assert set(projection.static_obligations) == required
+    for role_id in live:
+        before, after = live[role_id], static[role_id]
+        for field in (
+            "name",
+            "description",
+            "nickname_candidates",
+            "sandbox_mode",
+            "approval_policy",
+            "model",
+            "reasoning_effort",
+        ):
+            assert getattr(before, field) == getattr(after, field)
+        assert before.source_canonical_digest == after.source_canonical_digest
+        assert all(
+            prefix not in after.rendered_instructions.casefold()
+            for prefix in (
+                "agents/skills/",
+                "agents/model_profiles.toml",
+                "tools/agent_tools/",
+                "../../agents/",
+                "../../tools/",
+            )
+        )
+    for role_id in ("python_reviewer", "spark_worker", "worker"):
+        assert live[role_id].rendered_instructions != static[role_id].rendered_instructions
+    generated_config = json.loads(
+        (root / "agents" / "agents_config.json").read_text(encoding="utf-8")
+    )
+    for role_id, view in static.items():
+        assert generated_config["agent_views"][role_id]["developer_instructions"] == (
+            view.rendered_instructions
+        )
+    assert len(generated_config["agent_views"]) == len(generated_config["roles"]) == 35
+
+
+def test_missing_projection_for_path_bearing_clause_is_rejected(workspace: Path) -> None:
+    """A producer path cannot silently enter a consumer-static render."""
+    path = workspace / "agents" / "model_profiles.toml"
+    text = path.read_text(encoding="utf-8").replace(
+        'text = "Use closed contracts."',
+        'text = "Use agents/skills/not-a-consumer-path."',
+    )
+    path.write_text(text, encoding="utf-8")
+    with pytest.raises(ModelProfileRegistryError, match="consumer_static_projection_required"):
+        load_model_profile_registry(workspace)
+
+
+@pytest.mark.parametrize(
+    ("clause_id", "replacement"),
+    (
+        ("python_solid_boundary", 'static_obligations = ["validation_owner"]'),
+        (
+            "luna_impl",
+            'static_obligations = ["validation_owner", "parent_assignment", "parent_authority"]',
+        ),
+    ),
+)
+def test_canonical_clause_obligation_omission_or_wrong_set_is_rejected(
+    clause_id: str,
+    replacement: str,
+    tmp_path: Path,
+) -> None:
+    """Canonical path-bearing clauses require their exact closed obligation sets."""
+    root = tmp_path / "canonical-root"
+    path = root / "agents" / "model_profiles.toml"
+    path.parent.mkdir(parents=True)
+    shutil.copyfile(
+        Path(__file__).resolve().parents[2] / "agents" / "model_profiles.toml",
+        path,
+    )
+    original = path.read_text(encoding="utf-8")
+    if clause_id == "python_solid_boundary":
+        needle = 'static_obligations = ["validation_owner", "parent_assignment"]'
+    else:
+        needle = (
+            'static_obligations = ["validation_owner", "parent_assignment", '
+            '"parent_authority", "stop_handback"]'
+        )
+    assert needle in original
+    mutated = original.replace(needle, replacement, 1)
+    path.write_text(mutated, encoding="utf-8")
+    try:
+        with pytest.raises(ModelProfileRegistryError, match="required_static_obligations_mismatch"):
+            load_model_profile_registry(root)
+    finally:
+        path.write_text(original, encoding="utf-8")

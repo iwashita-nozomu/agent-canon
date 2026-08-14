@@ -29,6 +29,16 @@ command は local Git object database だけを読み、fetch、clone、HTTP、S
 allowlist と payload は同じ commit から読みます。worktree file を直接 copy しないため、未 commit の
 変更は出力へ混入しません。
 
+role view は export 前に canonical materializer の static mode で生成します。
+
+```bash
+python3 tools/agent_tools/model_profile_registry.py \
+  --root . --generate-role-views --projection consumer-static
+```
+
+この mode は invocation 時だけ存在し、生成 schema や `projection_digest` の field set を変更しません。
+exporter は committed tree の exact bytes を検証してコピーするだけです。
+
 成功時は `AGENT_CANON_STATIC_SEED=exported`、失敗時は
 `AGENT_CANON_STATIC_SEED=fail` を出力します。allowlist 外の file、symlink、gitlink、実行可能 file、
 runtime/updater surface、network/secret marker、未解決 Codex role reference は、出力を作る前に
