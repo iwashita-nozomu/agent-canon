@@ -56,6 +56,31 @@ def test_parent_remote_readback_uses_declared_submodule_remote() -> None:
     assert 'ensure_remote_commit_object "$AGENT_CANON_DIR" origin "$source_main_sha"' in function
 
 
+def test_parent_lifecycle_uses_only_boundary_reads_and_noreplace_publication() -> None:
+    script = update_text()
+    start = script.index("emit_queue_receipt() {")
+    end = script.index("\nrequire_accepted_dependency_frontier()", start)
+    lifecycle = script[start:end]
+    assert "Path.read_text" not in lifecycle
+    assert "Path.read_bytes" not in lifecycle
+    assert ".is_file()" not in lifecycle
+    assert "open(path" not in lifecycle
+    assert "[ -f \"$UPDATE" not in script
+    assert "[ -f \"$SOURCE_PROJECTION_PACKET" not in script
+    assert lifecycle.count("publish_parent_owned_file_noreplace") == 5
+    assert lifecycle.count("write_parent_owned_file") == 0
+
+
+def test_parent_lifecycle_readback_is_bytes_before_parser() -> None:
+    script = update_text()
+    start = script.index("emit_queue_receipt() {")
+    end = script.index("\nrequire_accepted_dependency_frontier()", start)
+    lifecycle = script[start:end]
+    assert lifecycle.count("read_parent_owned_bytes") >= 10
+    assert "raw.decode(\"utf-8\")" in lifecycle
+    assert "object_pairs_hook=reject_duplicate_pairs" in lifecycle
+
+
 def test_fresh_clone_hands_off_only_packet_and_derives_parent_receipts() -> None:
     script = fresh_clone_text()
     assert 'packet_path="${target_namespace}/state/source-publication-ready.json"' in script
