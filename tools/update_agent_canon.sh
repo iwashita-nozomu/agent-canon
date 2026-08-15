@@ -10,6 +10,7 @@
 # upstream implementation ./sync_agent_canon.sh performs low-level submodule freshness and root-view synchronization.
 # upstream implementation ./agent_tools/attach_clean_detached_submodule.py safely attaches a reconstructible detached parent submodule before planning/apply.
 # upstream implementation ./agent_tools/update_lifecycle_contract.py owns queue/frontier receipt mechanics and guards.
+# upstream implementation ./agent_tools/source_projection_handoff.py materializes the sole source-publication packet in the parent owner namespace.
 # upstream implementation ./rebuild_agent_tools.sh rebuilds compiled AgentCanon tools after safe updates.
 # downstream implementation ./agent_tools/agent_canon_update_todos.py advances parent-repo AgentCanon update TODO state after safe updates.
 # downstream implementation ../tests/tools/test_update_agent_canon.py validates update wrapper behavior.
@@ -117,11 +118,12 @@ else
   AGENT_CANON_SOURCE_MODE="standalone_source"
   AGENT_CANON_DIR="$ROOT_DIR"
 fi
-UPDATE_OWNER_NAMESPACE="$ROOT_DIR/.agent-canon/update-lifecycle"
+UPDATE_OWNER_NAMESPACE="$PARENT_ROOT_DIR/.agent-canon/update-lifecycle"
 UPDATE_STATE_DIR="$UPDATE_OWNER_NAMESPACE/state"
 UPDATE_EVIDENCE_DIR="$UPDATE_OWNER_NAMESPACE/evidence"
 UPDATE_PROJECTION_DIR="$UPDATE_OWNER_NAMESPACE/projection-queue"
 SOURCE_PROJECTION_PACKET="$UPDATE_STATE_DIR/source-publication-ready.json"
+SOURCE_PROJECTION_HANDOFF="${AGENT_CANON_SOURCE_PROJECTION_HANDOFF:-}"
 
 usage() {
   cat <<EOF
@@ -421,6 +423,44 @@ rebuild_agent_tools_if_available() {
       -- bash "$rebuild_tool"
 }
 
+source_projection_lifecycle_complete() {
+  [ -f "$UPDATE_STATE_DIR/current-transaction" ] \
+    && [ -f "$UPDATE_PROJECTION_DIR/queue.accepted.json" ] \
+    && [ -f "$UPDATE_PROJECTION_DIR/frontier.accepted.json" ] \
+    && [ -f "$UPDATE_EVIDENCE_DIR/g4.parent-projection-integrity.json" ]
+}
+
+materialize_source_projection_handoff() {
+  local handoff="${SOURCE_PROJECTION_HANDOFF:-}"
+  if [ -z "$handoff" ]; then
+    return 0
+  fi
+  [ -f "$handoff" ] \
+    || die "source projection handoff input is missing: $handoff"
+  PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
+    python3 "$CANON_TOOLS_ROOT/agent_tools/source_projection_handoff.py" publish \
+      --root "$PARENT_ROOT_DIR" \
+      --input "$handoff" \
+      --output "$SOURCE_PROJECTION_PACKET"
+}
+
+ensure_source_projection_lifecycle() {
+  if source_projection_lifecycle_complete; then
+    return 0
+  fi
+  materialize_source_projection_handoff
+  if [ -f "$SOURCE_PROJECTION_PACKET" ]; then
+    advance_source_projection
+  fi
+  if source_projection_lifecycle_complete; then
+    return 0
+  fi
+  echo "AGENT_CANON_PARENT_PROJECTION_BLOCKER=source_publication_handoff_missing" >&2
+  echo "AGENT_CANON_SOURCE_PROJECTION_PACKET=$SOURCE_PROJECTION_PACKET" >&2
+  echo "NEXT_ACTION=publish_source_projection_packet_via_canonical_source_front_door;manual_gitlink_or_receipt_copy_forbidden" >&2
+  die "parent projection blocked: source publication handoff is missing"
+}
+
 emit_queue_receipt() {
   local binding_file="$1"
   local rebind_receipt_file="$2"
@@ -714,10 +754,16 @@ advance_source_projection() {
   local rebind_file="$UPDATE_STATE_DIR/source-projection.rebind.json"
   local source_main_sha=""
   local source_main_tree=""
+  local source_remote="origin"
   local projection_values=()
 
   [ -f "$packet" ] || die "source projection packet is missing"
-  source_main_sha="$(resolve_remote_branch_sha origin main)"
+  if [ "$AGENT_CANON_SOURCE_MODE" = "parent_projection" ]; then
+    source_remote="$(submodule_remote_url)"
+    [ -n "$source_remote" ] \
+      || die "parent projection source remote is missing"
+  fi
+  source_main_sha="$(resolve_remote_branch_sha "$source_remote" main)"
   ensure_remote_commit_object "$AGENT_CANON_DIR" origin "$source_main_sha"
   source_main_tree="$(git -C "$AGENT_CANON_DIR" rev-parse "$source_main_sha^{tree}")"
   parent_ensure_dir "$UPDATE_STATE_DIR"
@@ -802,6 +848,9 @@ PY
 }
 
 require_accepted_dependency_frontier() {
+  if [ "$AGENT_CANON_SOURCE_MODE" = "parent_projection" ]; then
+    ensure_source_projection_lifecycle
+  fi
   local current_marker="$UPDATE_STATE_DIR/current-transaction"
   local accepted_queue="$UPDATE_PROJECTION_DIR/queue.accepted.json"
   local accepted_frontier="$UPDATE_PROJECTION_DIR/frontier.accepted.json"
@@ -889,6 +938,7 @@ cmd_latest() {
   local todo_rc=0
 
   if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
+    materialize_source_projection_handoff
     if [ -f "$SOURCE_PROJECTION_PACKET" ]; then
       advance_source_projection
       return
