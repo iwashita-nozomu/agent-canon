@@ -30,13 +30,17 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertIn("AGENT_CANON_PR_DEPENDENCY_SOURCE", text)
         self.assertIn("dependency source completeness", text)
 
-    def test_pr_gate_does_not_build_or_query_persisted_dependency_graph(self) -> None:
-        """Normal PR validation must not invoke graph build/status/query commands."""
+    def test_pr_gate_does_not_execute_persisted_dependency_graph_commands(self) -> None:
+        """Comments may name graph operations, but no executable command may remain."""
         text = PR_CHECK.read_text(encoding="utf-8")
 
-        self.assertNotIn("graph build", text)
-        self.assertNotIn("graph status", text)
-        self.assertNotIn("graph query", text)
+        for command_fragment in (
+            "graph build --root",
+            "graph status --root",
+            "graph query --root",
+            "graph context --root",
+        ):
+            self.assertNotIn(command_fragment, text)
         self.assertNotIn("changed-responsibility-acceptance.json", text)
 
     def test_source_gate_has_no_graph_runtime_or_database_dependency(self) -> None:
@@ -46,9 +50,13 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         self.assertIn("run_repo_dependency_review.sh", text)
         self.assertIn("tool_drift.py", text)
         self.assertIn("render_dependency_manifest_graph.py", text)
-        self.assertNotIn("graph build", text)
-        self.assertNotIn("graph status", text)
-        self.assertNotIn("graph query", text)
+        for command_fragment in (
+            "graph build --root",
+            "graph status --root",
+            "graph query --root",
+            "graph context --root",
+        ):
+            self.assertNotIn(command_fragment, text)
         self.assertNotIn("knowledge-graph", text)
         self.assertNotIn("graph.sqlite", text)
 
