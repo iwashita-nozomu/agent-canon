@@ -15,9 +15,13 @@ downstream implementation ../../tools/agent_tools/vector_search.py consumes sour
 downstream implementation ../../tools/agent_tools/run_repo_dependency_review.sh owns source review and opt-in graph preparation
 downstream implementation ../../tools/ci/run_pr_dependency_source_gate.sh owns PR source dependency completeness
 downstream implementation ../../tools/ci/check_agent_canon_pr.sh selects trusted source review scope
+downstream implementation ../../tools/ci/pr_gate_receipt.py owns the executable source/skipped receipt schema
+downstream implementation ../../tools/ci/run_all_checks.sh consumes one validated source/skipped receipt status
 downstream implementation ../../tests/agent_tools/test_graph_client_source_projection.py verifies source projection invariants
 downstream implementation ../../tests/tools/test_agent_canon_pr_dependency_source_gate.py verifies the no-runtime PR route
 downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py prevents persisted graph orchestration from returning
+downstream implementation ../../tests/tools/test_pr_gate_receipt.py verifies receipt schema and binding rejection
+downstream implementation ../../tests/tools/test_pr_gate_receipt_round_trip.py verifies writer/parser/consumer execution
 downstream implementation ../../issues/open/AC-20260815-decouple-graph-runtime.md tracks Issue 723 implementation and validation
 @dependency-end
 -->
@@ -145,17 +149,28 @@ When the selected change is outside declared dependency surfaces, the same gate
 runs the trusted changed-path header scan only. The receipt records `source` or
 `skipped`; it does not record graph freshness as source correctness evidence.
 
+`tools/ci/pr_gate_receipt.py` is the sole receipt schema owner. Its status enum
+contains exactly `source` and `skipped`; `strict_dependency` and `graph` are
+compatibility fields that must carry the same one of those two values. The
+writer serializes and validates the complete owner/root/PID/status/selector
+record before the parent-boundary write. `run_all_checks.sh` invokes the same
+module once for read-back and consumes only its `status=...` output. `prepared`
+and `scoped` are retired persisted-graph states and fail closed at writer,
+parser, and consumer boundaries.
+
 The PR gate must not invoke `graph build`, `graph status`, `graph query`, inspect
 `graph.sqlite`, or evaluate persisted incomplete-graph diagnostics. Explicit
 graph-analysis workflows may still do so outside this correctness path.
 
 ## Repository Review Contract
 
-`run_repo_dependency_review.sh` is source-owned by default. `--ensure-graph` is a
-separate opt-in operation that performs persisted graph status/build preparation
-and exits before source review. It is mutually exclusive with
-`--header-scan-only`, preventing one invocation from presenting optional graph
-preparation as dependency correctness evidence.
+`run_repo_dependency_review.sh` is source-owned by default. Its normal route
+uses source scan, format, relation/cycle, TSV/DOT, and edit-scope projections;
+it does not require a graph executable, persisted database, or graph status
+read-back. `--ensure-graph` is a separate opt-in operation that performs
+persisted graph status/build preparation and exits before source review. It is
+mutually exclusive with `--header-scan-only`, preventing one invocation from
+presenting optional graph preparation as dependency correctness evidence.
 
 ## Compatibility Boundary
 

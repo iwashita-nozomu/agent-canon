@@ -4,6 +4,7 @@
 @dependency-start
 contract design
 responsibility Defines the repository-wide dependency manifest DSL and validation model.
+upstream design source-owned-dependency-validation.md source authority, PR receipt, and source/runtime boundary
 downstream design dependency-contract-kinds.toml registered dependency header contract kinds
 downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates changed-file manifests
 downstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans manifest marker coverage
@@ -14,12 +15,15 @@ downstream implementation ../../tools/agent_tools/scan_code_dependencies.sh extr
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design claims against manifest evidence
 downstream implementation ../../tools/agent_tools/render_dependency_manifest_graph.py renders dependency graph review artifacts
 downstream implementation ../../tools/ci/agent_canon_pr_graph_selector.py selects parent strict graph gating from this canonical dependency surface manifest
-downstream implementation ../../tools/ci/check_agent_canon_pr.sh executes selected full or changed-responsibility graph acceptance
-downstream implementation ../../tools/ci/run_all_checks.sh consumes the owner/root/PID/status-bound graph receipt
+downstream implementation ../../tools/ci/check_agent_canon_pr.sh executes selected source review and writes the source/skipped receipt
+downstream implementation ../../tools/ci/pr_gate_receipt.py owns the owner/root/PID/status-bound receipt schema
+downstream implementation ../../tools/ci/run_all_checks.sh consumes the validated source/skipped receipt
 downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies manifest checker
 downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies manifest shell tools
 downstream implementation ../../tests/tools/test_agent_canon_pr_graph_selector.py verifies parent gate selection from canonical profiles, surfaces, and diff evidence
-downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py verifies real parent gate orchestration for incomplete graph acceptance
+downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py verifies the source/runtime boundary and receipt owner
+downstream implementation ../../tests/tools/test_pr_gate_receipt.py verifies receipt schema and binding rejection
+downstream implementation ../../tests/tools/test_pr_gate_receipt_round_trip.py verifies writer/parser/consumer execution
 downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs owns the sole complete-file manifest parser and source snapshot
 downstream implementation ../../rust/agent-canon/src/graph.rs owns canonical graph materialization and queries
 downstream implementation ../../rust/agent-canon/src/structured_analysis.rs owns the shared graph storage schema
@@ -133,129 +137,29 @@ a second fact authority.
 
 ## Parent PR Gate Selection Contract
 
-Dependency-manifest completeness is a conditional parent-repository PR gate,
-not an unconditional prerequisite for publishing an AgentCanon gitlink. Every
-parent pin publication still requires the gitlink to resolve to a reachable
-commit, the staged gitlink to equal the checked-out `vendor/agent-canon` HEAD,
-and the changed shared/root projection to pass its existing materialization
-check. An actual materialization collision remains a blocker. A local parent
-branch being ahead, behind, diverged, or dirty is preserved as repository state
-and is not a failure predicate on its own.
+Dependency-manifest correctness is source-owned and does not require a
+persisted graph runtime. The authority, receipt meaning, and source/graph
+boundary are defined by
+[`source-owned-dependency-validation.md`](source-owned-dependency-validation.md).
+This document owns only the manifest DSL, relation semantics, contract kinds,
+changed-scope selection, and source-derived projections.
 
-The parent strict graph-completeness gate is selected only when at least one of
-these conditions is true:
+The PR selector still selects trusted base/head evidence and the changed-path
+packet. `run_pr_dependency_source_gate.sh` then runs source scan, format,
+relation/cycle, and source-derived TSV/DOT projections. It records a receipt
+with exactly `source` or `skipped`; it never creates or reads persisted graph
+state. `tools/ci/pr_gate_receipt.py` is the sole receipt schema/parser owner,
+and `run_all_checks.sh` consumes its single validated status output. The
+retired `prepared` and `scoped` graph states are not compatibility values.
 
-- the caller declares a parent graph migration;
-- the change touches a dependency manifest/header or a downstream surface
-  declared by this design document's canonical dependency manifest;
-- the selected runtime validation profile explicitly requires dependency graph
-  completeness through its
-  `strict_dependency_graph_required` field in
-  `documents/runtime/runtime-profiles-and-check-matrix.json`.
-
-Profile selection uses one canonical ID in
-`AGENT_CANON_PR_VALIDATION_PROFILE` or comma-separated canonical IDs in
-`AGENT_CANON_PR_VALIDATION_PROFILES`. Supplying both inputs, an empty list
-element, a duplicate, or an unknown ID is a typed selector failure.
-
-When none of these conditions holds, the PR gate emits a typed skipped receipt
-with non-empty selector reason/evidence, and its quick-CI consumer does not
-rebuild the parent graph or promote repository-wide missing-header diagnostics
-into a blocker. Standalone AgentCanon source PRs retain the strict source graph
-gate. This separation keeps manifest migration debt visible without making
-unrelated parent pin-only changes satisfy a repository-wide completeness
-baseline.
-
-When the gate is selected, graph construction still covers the complete parent
-repository. A complete graph produces the existing `prepared` receipt and
-retains the full strict review. If construction publishes an incomplete graph,
-the gate first builds an equivalent graph from the exact trusted base SHA in an
-isolated checkout. The base build must publish a valid graph result and bound
-SQLite database; missing, stale, malformed, unavailable, or concurrently
-replaced base evidence fails closed. For a derived parent, every `160000`
-submodule gitlink recorded by the exact base tree is recursively materialized
-and verified at that commit before the builder runs. The builder process exit
-code must exactly equal the JSON result `exit_code`; only matching `0` or `1`
-results are admissible. The graph builder receives the current AgentCanon
-source's surface-manifest producer and the unique surface-manifest path found
-inside that exact base gitlink. The producer runs with the isolated base root,
-so dependency target existence is evaluated against base content while parser
-semantics remain those of the current producer; no base-pinned helper is used
-as a compatibility fallback. The head gate then classifies every unique
-persisted diagnostic identity against the exact validated PR diff, the head
-graph's dependency/surface edges, and the trusted base diagnostics.
-
-The canonical diagnostic identity is the normalized tuple
-`(code, source, target, declaration)`. Line numbers, diagnostic counts, and
-message formatting that does not change the declaration are not identity. Changed
-paths are responsibility seeds, reachability is traversed in both directions,
-and a diagnostic is related when its source, target, or required closure is
-changed. A related diagnostic blocks when its identity is absent from the
-trusted base or its severity is worse than the trusted-base instance. A related
-diagnostic with the same non-worsened identity is retained as baseline evidence.
-A changed target that makes an unchanged declaration unresolved is therefore a
-new related blocker even when the source file is unchanged. Invalid
-`manifest-grammar` in a changed declaration cannot be hidden by baseline state.
-
-The `ManifestParser` owns the normalized declaration components: direction,
-kind, canonical repository-relative target, and reason. Every source diagnostic
-persists those components, the canonical declaration, and its source span in
-the strict `agent-canon.source-diagnostic.v1` `payload_json` object, together
-with the producer-resolved source and target. Non-source layers retain the
-shared diagnostics table through a valid generic/default payload object; they do
-not require the source identity schema. The graph fingerprint binds each
-typed diagnostic payload and severity, so a semantic identity change cannot
-reuse result or database identity.
-
-Before evaluating the changed-responsibility predicate $S(d)$ or the base
-identity/severity predicates $N(d)$ or $W(d)$, the selector validates the
-current diagnostics columns and typed payload field-for-field. Missing,
-malformed, empty, wrongly typed, span-inconsistent, target-node-inconsistent,
-or declaration-component-inconsistent identity data fails closed. This
-consumer validation does not replace the #513 current-producer and exact
-trusted-base authority: the current producer remains authoritative for head
-semantics, the exact base snapshot remains authoritative for comparison, and
-no base-pinned, message-derived, legacy-schema, or parser fallback is allowed.
-
-The report contains a duplicate-free, lossless partition of all head diagnostic
-identities into `blocking_diagnostics` and `baseline_diagnostics`, together with
-the base graph identity and diagnostic-set fingerprint. If a source identity
-outside the changed responsibility cannot be confirmed, the gate fails closed.
-This accepted incomplete state produces a `scoped` receipt; `scoped` is not a
-complete graph and its quick-CI consumer does not run graph-query consumers. An
-explicit parent graph migration owns the full graph, so every diagnostic remains
-in scope. Standalone AgentCanon source PRs also retain full completeness.
-
-The selector reads dependency surfaces from this document's downstream
-manifest instead of maintaining a second path list. The manifest therefore
-owns the complete bootstrap surface, including scanners, format and changed-file
-checkers, graph parser/storage and client adapters, report rendering, and the
-selector itself. Strict graph validation remains the semantic authority after
-selection; the bootstrap read only decides whether that authority is required.
-
-CI comparison uses the pull request base SHA from the trusted GitHub event.
-The PR entrypoint first runs the selector's `--prepare-ci-base` mode. An existing
-exact base object with usable merge-base history skips fetch without requiring a
-credential. If the checkout is shallow or incomplete, only the static-gate step
-receives `AGENT_CANON_PR_READ_TOKEN: ${{ github.token }}`; the selector uses it as
-process-local Git configuration while fetching the exact event SHA and connected
-history. It does not persist the credential in checkout or repository Git config,
-and `actions/checkout` keeps `persist-credentials: false`. Public, private, and
-fork PRs all use that same trusted event-SHA route. The emitted SHA is passed back
-through `--trusted-base-sha`, and normal selection accepts the argument only when
-it exactly matches the event SHA. The normal local `check_agent_canon_pr.sh` owner
-reads the verified `origin` `refs/heads/main` SHA and passes that immutable value
-through `--trusted-base-sha`; the lower selector consumes that value without
-selecting or re-reading a comparison base. Equal-to-HEAD, unresolved,
-history-unreachable, missing-fetch-credential, fetch, or diff failures do not
-become an empty change set. Unknown profile IDs and malformed canonical
-profile/surface owners fail by the same rule.
-
-The receipt's owner/root/PID/status binding and required skipped
-reason/evidence are sufficient for the checker-to-quick-CI handoff. A
-cryptographic nonce against a hostile local caller is outside this trust
-boundary: such a caller can omit the checker entirely, so cryptography would
-not add evidence that the required gate ran.
+The normal repository review route remains independent of graph executables and
+databases. `--ensure-graph` and `tools/bin/agent-canon graph
+build|status|query|context` are explicit analysis capabilities with their own
+runtime contract. They are mutually exclusive with source review where the
+wrapper promises an ensure-only route; no normal scan, format, review, or PR
+receipt path invokes them. Trusted base/head selection remains a selector
+responsibility and is not reimplemented by the source parser or receipt
+consumer.
 
 ## Manifest Block
 
@@ -412,19 +316,20 @@ The downstream graph answers: after editing this file, what affected files must 
 This separation exists for human and agent context management.
 An agent can load upstream closure before editing, then load downstream closure after the diff exists.
 
-## Machine-Readable Graph Artifact
+## Explicit Graph Analysis Artifact
 
 `rust/agent-canon/src/dependency_manifest.rs::ManifestParser` is the sole
 complete-file parser. `agent-canon graph build` captures its parent-profile
 source snapshot and atomically publishes the parent-owned SQLite database at
 `.agent-canon/knowledge-graph/graph.sqlite`. Source facts and their typed
-completeness diagnostics are always required. A prepared runtime-event plus
-latest committed receipt is an optional producer snapshot: when
+completeness diagnostics are required for this explicit graph artifact. A
+captured runtime event plus latest committed receipt is an optional producer
+snapshot: when
 `reports/agents/.active_run` is absent, or the pointed active run has no
-prepared runtime-event certificate, the same Rust builder publishes a
+captured runtime-event certificate, the same Rust builder publishes a
 source-only graph with explicit `runtime_evidence=null`. The empty-run case is
 an observability closeout condition, not a semantic graph prerequisite. Once a
-prepared certificate is present, duplicate, malformed, missing, uncertain, or
+captured certificate is present, duplicate, malformed, missing, uncertain, or
 source-mismatched runtime evidence remains a fail-closed runtime boundary.
 `status`, `query`, and `context` are read-only; they never rebuild or fall back
 to a header scan.
@@ -436,16 +341,14 @@ base snapshot, and compares the resulting HEAD/source/input fingerprints with
 the persisted integration record; a missing, changed, or substituted input
 fails before diagnostic classification.
 
-Freshness recovery remains outside the read-only Graph operations.
-`run_repo_dependency_review.sh` owns the consumer transition: fresh status
-skips production. Exactly the typed canonical status tuple `status=stale`,
-`reason=source_changed`, and `probe_reason=source_changed`, with matching process
-and record exit code `2`, permits one canonical build followed by status
-readback. Every other stale reason, typed-unavailable status, persisted readback
-corruption, runtime receipt or evidence failure, producer mismatch, incomplete
-or invalid status, build failure, and non-fresh readback fails closed without
-admitting a build. The producer continues to own its existing lock, staging,
-atomic rename, and durability readback.
+Explicit graph freshness recovery belongs only to the `--ensure-graph` route.
+That route may admit one canonical build followed by status read-back under its
+own typed status contract; every other stale reason, typed-unavailable status,
+persisted read-back corruption, producer mismatch, incomplete or invalid
+status, build failure, and non-fresh read-back fails closed. The normal source
+review wrapper does not perform this recovery or treat its result as a receipt
+prerequisite. The graph producer continues to own its existing lock, staging,
+atomic rename, and durability read-back.
 
 The standalone runtime dashboard workflow is the periodic producer authority,
 not an ordinary graph consumer. Only its scheduled event invokes the
@@ -726,10 +629,9 @@ Responsibilities:
 
 Responsibilities:
 
-- invoke graph status, then one all-dependency query
+- parse tracked `@dependency-start` / `@dependency-end` source blocks
 - select caller-requested, changed, or tracked paths without deriving facts
-- report source nodes whose parser-owned `manifest_present` value is false
-- with `--explain-missing`, print typed graph owner and producer evidence
+- report missing manifests and source-owned owner classification
 - run in report-only mode during migration
 - later become a CI fail gate
 - accept a selector-owned `--changed-path-packet` containing the trusted PR
@@ -742,29 +644,25 @@ Responsibilities:
   deleted paths and existing root-view, symlink, and submodule skip rules stay
   owned by this scanner
 - remain independent of graph-selection activation: a valid trusted PR packet
-  is sufficient to run this header gate even when a derived-parent graph is
-  not required; standalone AgentCanon still owns unconditional full graph
-  completeness separately
+  is sufficient to run this header gate without a graph executable or database
 
 ### `check_dependency_header_format.sh`
 
 Responsibilities:
 
-- invoke graph status once and graph context once per sorted selected path
-- require one parser-owned `manifest.present` item
-- when present, require exactly one `manifest.contract` and one
-  `manifest.responsibility` item from `source-snapshot`/`ManifestParser`
-- map missing or malformed graph evidence to the existing pass/fail output
+- parse each selected source block and validate one registered contract and one
+  responsibility line
+- map missing or malformed source evidence to the existing pass/fail output
 - accept `--allow-frontmatter` as a compatibility flag without interpreting text
 
-The Rust parser and graph build own syntax, registry, target, and completeness
-validation. This shell owns no tokenizer or target normalizer.
+The source parser and contract registry own syntax, target, and completeness
+validation. This shell owns no persisted graph state or runtime status.
 
 ### `check_dependency_graph.sh`
 
 Responsibilities:
 
-- invoke graph status and one all-relation query with direction `both`
+- consume source-derived dependency projections from `source_dependency_graph.py`
 - filter explicit dependency facts and project their typed detail
 - fail manifest files that are isolated from the edge graph
 - validate self reference
@@ -785,8 +683,8 @@ cannot read source headers, rebuild graph facts, or open SQLite.
 
 Responsibilities:
 
-- invoke graph status followed by all-dependency and all-owner queries
-- run the graph-backed scan, format, and graph projections over selected files
+- run source scan, format, relation/cycle, TSV/DOT, and edit-scope projections
+- keep the normal route independent of graph executable and persisted database
 - keep missing manifests report-only by default while repository-wide migration is incomplete
 - offer `--fail-missing` for strict checkpoint runs after a subtree or repo has been migrated
 - offer `--explain-missing` for owner-classified missing-header repair output
@@ -805,22 +703,24 @@ Responsibilities:
 
 Template repos expose `make dependency-review-surfaces` to run an explicit
 strict review against both the parent root view and `vendor/agent-canon` source
-tree. The AgentCanon parent PR gate invokes this wrapper only when its
-migration, touched-manifest, or selected-profile condition is active.
+tree. Persisted graph preparation is available only through the explicit
+`--ensure-graph` route; it exits before source review and is never a normal
+receipt prerequisite.
 
 ## Migration Plan
 
 Phase 1: add this design and make changed-file validation require `@dependency-start` / `@dependency-end`.
 
-Phase 2: provide the shell entrypoints as graph consumers:
+Phase 2: provide the shell entrypoints as source-derived consumers:
 
 - `scan_dependency_headers.sh`
 - `check_dependency_header_format.sh`
 - `check_dependency_graph.sh`
 
 `scan_dependency_headers.sh` starts as full-repo report-only so it can list
-missing manifests without blocking unrelated work. Both changed-file checkers
-consume parser-owned graph context; neither parses source text or the registry.
+missing manifests without blocking unrelated work. The scan and format tools
+consume the tracked source projection and contract registry directly; neither
+requires persisted graph state.
 The parent PR gate supplies a selector-owned changed-path packet rather than a
 local branch diff. The scanner verifies the packet against the trusted
 base/head snapshot, blocks missing manifests only for changed/new paths, and
@@ -833,18 +733,12 @@ and is valid only when paired with a durable graph report artifact.
 Phase 3: migrate files one by one from checker findings.
 Each touched file must be converted from `Dependency Files:` to `@dependency-start` in the same change that touches it.
 
-Phase 4: enable CI fail gate for changed files.
+Phase 4: enable the source-owned CI fail gate for changed files.
 Full-repo missing-header scan remains report-only until the repository is migrated.
-この repository では full-repo migration、touched dependency-manifest change、または
-canonical profile owner が graph-required と宣言する validation profile のときだけ
-graph gate を起動します。full-repo migration と standalone source は
-`bash tools/agent_tools/run_repo_dependency_review.sh --fail-missing` の strict
-baseline を維持します。parent PR の incomplete graph は changed responsibility
-closure を gate し、base と同一で非到達な `target-unresolved` や
-`manifest-grammar` は個別 evidence として残します。pin-only parent changes は
-skipped receipt で表現します。Goal-driven cleanup or shared-surface migration
-closeout repeats the strict baseline and records stable
-`DEPENDENCY_HEADER_SCAN_MISSING=0` and `REPO_DEPENDENCY_REVIEW=pass` evidence.
+The PR gate records `source` when the full source review is selected and
+`skipped` when only the trusted header scan is selected. Neither status claims
+persisted graph completeness. `--ensure-graph` remains explicit analysis and
+is validated by its own status/build read-back contract.
 
 Phase 5: remove legacy `Dependency Files:` wording from remaining docs after all checkable files use dependency manifest blocks.
 

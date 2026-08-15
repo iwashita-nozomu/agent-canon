@@ -1133,7 +1133,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             entrypoint,
         )
         self.assertIn(
-            'graph_acceptance_args+=(--trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}")',
+            '--trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}"',
             entrypoint,
         )
 
@@ -1658,17 +1658,17 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         self.assertEqual(acceptance.status, "fail")
         self.assertTrue(acceptance.report["full_scope"])
 
-    def test_pr_entrypoint_records_scoped_graph_receipt(self) -> None:
-        """The parent entrypoint and receipt consumer preserve scoped acceptance."""
+    def test_pr_entrypoint_keeps_graph_analysis_outside_source_receipt(self) -> None:
+        """The selector supplies scope; the source receipt owns two statuses."""
         entrypoint = CHECKER_PATH.read_text(encoding="utf-8")
         quick_ci = (PROJECT_ROOT / "tools" / "ci" / "run_all_checks.sh").read_text(
             encoding="utf-8"
         )
 
-        self.assertIn("--evaluate-built-graph", entrypoint)
-        self.assertIn("PR_GATE_DEPENDENCY_GRAPH_STATUS=scoped", entrypoint)
-        self.assertIn('!= "scoped"', quick_ci)
-        self.assertIn("validated_changed_responsibility_graph_receipt", quick_ci)
+        self.assertNotIn("PR_GATE_DEPENDENCY_GRAPH_STATUS", entrypoint)
+        self.assertNotIn("PR_GATE_DEPENDENCY_GRAPH_STATUS", quick_ci)
+        self.assertIn("pr_gate_receipt.py", quick_ci)
+        self.assertIn("validated_source_receipt_consumed", quick_ci)
 
     def test_base_equal_to_head_is_typed_failure(self) -> None:
         """An equal base cannot masquerade as an empty PR diff."""

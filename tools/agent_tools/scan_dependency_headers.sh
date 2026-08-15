@@ -2,6 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Provides scan dependency headers agent workflow automation.
+# upstream design ../../documents/design/source-owned-dependency-validation.md tracked-source authority
 # upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL design
 # downstream implementation ./check_dependency_header_format.sh validates manifest syntax
 # downstream implementation ./check_dependency_graph.sh consumes manifest edges

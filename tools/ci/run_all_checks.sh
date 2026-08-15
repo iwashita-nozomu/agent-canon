@@ -2,8 +2,10 @@
 # @dependency-start
 # contract tool
 # responsibility Runs all checks CI automation.
-# upstream design ../../documents/design/dependency-manifest-design.md scoped parent graph receipt contract
-# upstream implementation ./check_agent_canon_pr.sh writes owner/root/PID/status-bound parent graph receipts
+# upstream design ../../documents/design/source-owned-dependency-validation.md source-owned PR receipt contract
+# upstream design ../../documents/design/dependency-manifest-design.md manifest DSL and explicit graph analysis projection
+# upstream implementation ./check_agent_canon_pr.sh writes owner/root/PID/status-bound source receipts
+# upstream implementation ./pr_gate_receipt.py owns receipt parsing and binding validation
 # upstream implementation ../agent_tools/parent_root_side_effects.py owns parent-local child state and exact cleanup
 # upstream implementation ../agent_tools/check_dependency_headers.py validates changed-file dependency manifests
 # upstream implementation ../agent_tools/check_dependency_header_format.sh validates changed-file manifest syntax
@@ -201,7 +203,7 @@ SKIP_GITHUB_WORKFLOWS=0
 SKIP_EXPERIMENTS=0
 PR_GATE_RECEIPT=""
 PR_GATE_RECEIPT_VALID=0
-PR_GATE_DEPENDENCY_GRAPH_STATUS="not_applicable"
+PR_GATE_DEPENDENCY_SOURCE_STATUS="not_applicable"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick)
@@ -236,49 +238,26 @@ while [[ $# -gt 0 ]]; do
 done
 
 validate_pr_gate_receipt() {
-  local root_identity=""
-  local strict_dependency_status=""
-  local graph_status=""
-  local selector_reason=""
-  local selector_evidence=""
   if [[ ! -f "${PR_GATE_RECEIPT}" ]]; then
     echo "Invalid PR gate receipt: missing file" >&2
     return 1
   fi
-  if ! root_identity="$(realpath -e "${WORKSPACE_ROOT}")"; then
-    echo "Invalid PR gate receipt: workspace root identity unavailable" >&2
+  local validated_status=""
+  if ! validated_status="$(python3 "${CANON_CI_ROOT}/pr_gate_receipt.py" validate \
+    --receipt "${PR_GATE_RECEIPT}" \
+    --root "${WORKSPACE_ROOT}" \
+    --parent-pid "${PPID}")"; then
+    echo "Invalid PR gate receipt: source-owned receipt validation failed" >&2
     return 1
   fi
-  for marker in \
-    "owner=check_agent_canon_pr.sh" \
-    "root_identity=${root_identity}" \
-    "parent_pid=${PPID}"; do
-    if ! grep -Fqx -- "${marker}" "${PR_GATE_RECEIPT}"; then
-      echo "Invalid PR gate receipt: missing marker ${marker%%=*}" >&2
+  case "${validated_status}" in
+    status=source) PR_GATE_DEPENDENCY_SOURCE_STATUS=source ;;
+    status=skipped) PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped ;;
+    *)
+      echo "Invalid PR gate receipt: validator returned unexpected status" >&2
       return 1
-    fi
-  done
-  strict_dependency_status="$(awk -F= '$1 == "strict_dependency" {print $2}' "${PR_GATE_RECEIPT}")"
-  graph_status="$(awk -F= '$1 == "graph" {print $2}' "${PR_GATE_RECEIPT}")"
-  selector_reason="$(awk -F= '$1 == "selector_reason" {sub(/^[^=]*=/, ""); print}' "${PR_GATE_RECEIPT}")"
-  selector_evidence="$(awk -F= '$1 == "selector_evidence" {sub(/^[^=]*=/, ""); print}' "${PR_GATE_RECEIPT}")"
-  if [[ "${strict_dependency_status}" != "prepared" \
-    && "${strict_dependency_status}" != "scoped" \
-    && "${strict_dependency_status}" != "skipped" ]] \
-    || [[ "${graph_status}" != "prepared" \
-      && "${graph_status}" != "scoped" \
-      && "${graph_status}" != "skipped" ]] \
-    || [[ "${strict_dependency_status}" != "${graph_status}" ]]; then
-    echo "Invalid PR gate receipt: dependency graph status mismatch" >&2
-    return 1
-  fi
-  if [[ "${strict_dependency_status}" == "skipped" ]] \
-    && [[ -z "${selector_reason}" || -z "${selector_evidence}" \
-      || "${selector_reason}" == *$'\n'* || "${selector_evidence}" == *$'\n'* ]]; then
-    echo "Invalid PR gate receipt: skipped graph selector reason/evidence missing" >&2
-    return 1
-  fi
-  PR_GATE_DEPENDENCY_GRAPH_STATUS="${strict_dependency_status}"
+      ;;
+  esac
   return 0
 }
 
@@ -287,7 +266,7 @@ if [[ -n "${PR_GATE_RECEIPT}" ]]; then
     exit 1
   fi
   PR_GATE_RECEIPT_VALID=1
-  echo "PR_GATE_RECEIPT=accepted dependency_graph=${PR_GATE_DEPENDENCY_GRAPH_STATUS}"
+  echo "PR_GATE_RECEIPT=accepted dependency_source=${PR_GATE_DEPENDENCY_SOURCE_STATUS}"
 fi
 
 resolve_agent_canon_cli() {
@@ -412,14 +391,7 @@ fi
 echo "0️⃣  agent/runtime sync checks を実行中..."
 CANON_GRAPH_READY=0
 if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
-  if [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "prepared" ]]; then
-    echo "✅ canonical graph build consumed from validated PR gate receipt"
-    CANON_GRAPH_READY=1
-  elif [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "scoped" ]]; then
-    echo "✅ changed-responsibility graph gate consumed; unrelated baseline incompleteness remains reported"
-  else
-    echo "⏭️ canonical graph build skipped: parent PR graph completeness not required"
-  fi
+  echo "⏭️ canonical graph build skipped: validated source receipt consumed"
 elif run_agent_canon graph build --root "$WORKSPACE_ROOT" --profile default --format json; then
   CANON_GRAPH_READY=1
 else
@@ -432,14 +404,8 @@ else
   echo "❌ research perspective pack smoke test 失敗"
   EXIT_CODE=1
 fi
-if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ] \
-  && [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "prepared" ]]; then
-  echo "DEPENDENCY_HEADER_CHECKS=skip reason=validated_strict_pr_gate_receipt"
-elif [ "$PR_GATE_RECEIPT_VALID" -eq 1 ] \
-  && [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "scoped" ]]; then
-  echo "DEPENDENCY_HEADER_CHECKS=skip reason=validated_changed_responsibility_graph_receipt"
-elif [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
-  echo "DEPENDENCY_HEADER_CHECKS=skip reason=parent_pr_graph_completeness_not_required"
+if [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
+  echo "DEPENDENCY_HEADER_CHECKS=skip reason=validated_source_receipt_consumed"
 elif [ "$CANON_GRAPH_READY" -eq 1 ]; then
   if "$PYTHON_BIN" "${CANON_TOOLS_ROOT}/agent_tools/check_dependency_headers.py" --changed 2>&1; then
     echo "✅ dependency header checks 成功"
@@ -527,12 +493,8 @@ if [ "$CANON_GRAPH_READY" -eq 1 ]; then
     echo "❌ tool/convention drift checks 失敗"
     EXIT_CODE=1
   fi
-elif [ "$PR_GATE_RECEIPT_VALID" -eq 1 ] \
-  && [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "skipped" ]]; then
-  echo "⏭️ tool/convention drift checks skipped: parent PR graph completeness not required"
-elif [ "$PR_GATE_RECEIPT_VALID" -eq 1 ] \
-  && [[ "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" == "scoped" ]]; then
-  echo "⏭️ tool/convention drift checks skipped: graph is incomplete outside changed responsibility"
+elif [ "$PR_GATE_RECEIPT_VALID" -eq 1 ]; then
+  echo "⏭️ tool/convention drift checks skipped: validated source receipt consumed"
 else
   echo "⏭️ tool/convention drift checks skipped: canonical graph build failed"
 fi

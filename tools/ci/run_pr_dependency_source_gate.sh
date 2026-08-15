@@ -2,7 +2,9 @@
 # @dependency-start
 # contract tool
 # responsibility Runs PR dependency completeness from trusted changed paths and tracked source manifests.
-# upstream design ../../documents/design/dependency-manifest-design.md source-owned dependency validation contract
+# upstream design ../../documents/design/source-owned-dependency-validation.md source-owned dependency validation contract
+# upstream design ../../documents/design/dependency-manifest-design.md manifest DSL and source projection semantics
+# upstream implementation ./pr_gate_receipt.py owns the producer/consumer receipt schema
 # upstream implementation ../agent_tools/run_repo_dependency_review.sh validates source headers, relations, and cycles
 # upstream implementation ../agent_tools/tool_drift.py validates standalone tool links from source facts
 # upstream implementation ../agent_tools/render_dependency_manifest_graph.py renders optional source projections

@@ -2,7 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Runs source-owned repo dependency review and optional persisted graph preparation.
-# upstream design ../../documents/design/dependency-manifest-design.md dependency review policy
+# upstream design ../../documents/design/source-owned-dependency-validation.md source-owned review authority and explicit graph boundary
+# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL and review projections
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md closeout requires dependency evidence
 # upstream design ../../templates/agents/closeout_gate.md closeout dependency evidence gate
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone PR dependency checklist

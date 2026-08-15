@@ -4,12 +4,14 @@
 # responsibility Checks AgentCanon PR readiness including source-owned dependency completeness.
 # upstream design ../../tools/README.md shared automation index
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md shared canon PR workflow
-# upstream design ../../documents/design/dependency-manifest-design.md changed-responsibility source acceptance contract
+# upstream design ../../documents/design/source-owned-dependency-validation.md source-owned PR acceptance contract
+# upstream design ../../documents/design/dependency-manifest-design.md manifest DSL projection
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE.md standalone AgentCanon PR checklist
 # upstream design ../../.github/PULL_REQUEST_TEMPLATE/agent_canon.md template AgentCanon PR checklist
 # upstream design ../../templates/documents/github/pull-request/agent_canon.md canonical template-side AgentCanon PR checklist
 # upstream implementation ../agent_tools/run_repo_dependency_review.sh strict source dependency review
 # upstream implementation ./run_pr_dependency_source_gate.sh owns no-runtime PR dependency completeness
+# upstream implementation ./pr_gate_receipt.py owns source/skipped receipt schema and binding validation
 # upstream implementation ../agent_tools/parent_root_side_effects.py owns PR scratch, archive, and child execution boundaries
 # upstream implementation ./agent_canon_pr_graph_selector.py selects trusted changed-path evidence for source review scope
 # upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py skill/workflow prompt parity eval
@@ -93,7 +95,7 @@ AGENT_CANON_PR_TEMP_ROOT="$(
 )"
 # Keep static-gate unit scratch under the authenticated parent-owned lifecycle.
 export TMPDIR="${AGENT_CANON_PR_TEMP_ROOT}"
-PR_GATE_RECEIPT="${AGENT_CANON_PR_TEMP_ROOT}/pr-gate-prepared.receipt"
+PR_GATE_RECEIPT="${AGENT_CANON_PR_TEMP_ROOT}/pr-gate-source.receipt"
 cleanup_agent_canon_pr_temp_root() {
   local status=$?
   local cleanup_status=0
@@ -192,8 +194,8 @@ run_agent_canon() {
   return $?
 }
 
-PR_GATE_DEPENDENCY_GRAPH_REASON=""
-PR_GATE_DEPENDENCY_GRAPH_EVIDENCE=""
+PR_GATE_DEPENDENCY_SOURCE_REASON=""
+PR_GATE_DEPENDENCY_SOURCE_EVIDENCE=""
 PR_GATE_DEPENDENCY_GRAPH_BASE_SHA=""
 PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET=""
 AGENT_CANON_PR_SUBMODULE_SNAPSHOT_READY=0
@@ -239,8 +241,8 @@ agentcanon_pr_dependency_graph_required() {
 
   if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
     echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=required reason=standalone_source"
-    PR_GATE_DEPENDENCY_GRAPH_REASON="standalone_source"
-    PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="source_root=${AGENT_CANON_SOURCE_ROOT}"
+    PR_GATE_DEPENDENCY_SOURCE_REASON="standalone_source"
+    PR_GATE_DEPENDENCY_SOURCE_EVIDENCE="source_root=${AGENT_CANON_SOURCE_ROOT}"
   fi
   if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
     if base_fetch_output="$(python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py" \
@@ -255,11 +257,11 @@ agentcanon_pr_dependency_graph_required() {
     base_fetch_status="$(awk -F= '$1 == "AGENT_CANON_PR_BASE_FETCH" {print $2}' <<<"${base_fetch_output}")"
     trusted_base_sha="$(awk -F= '$1 == "AGENT_CANON_PR_TRUSTED_BASE_SHA" {print $2}' <<<"${base_fetch_output}")"
     if [[ "${base_fetch_rc}:${base_fetch_status}" != "0:pass" || -z "${trusted_base_sha}" ]]; then
-      PR_GATE_DEPENDENCY_GRAPH_REASON="$(awk -F= '$1 == "AGENT_CANON_PR_BASE_FETCH_REASON" {sub(/^[^=]*=/, ""); print}' <<<"${base_fetch_output}")"
-      PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="$(awk -F= '$1 == "AGENT_CANON_PR_BASE_FETCH_EVIDENCE" {sub(/^[^=]*=/, ""); print}' <<<"${base_fetch_output}")"
+      PR_GATE_DEPENDENCY_SOURCE_REASON="$(awk -F= '$1 == "AGENT_CANON_PR_BASE_FETCH_REASON" {sub(/^[^=]*=/, ""); print}' <<<"${base_fetch_output}")"
+      PR_GATE_DEPENDENCY_SOURCE_EVIDENCE="$(awk -F= '$1 == "AGENT_CANON_PR_BASE_FETCH_EVIDENCE" {sub(/^[^=]*=/, ""); print}' <<<"${base_fetch_output}")"
       echo "AGENT_CANON_PR_DEPENDENCY_GRAPH=fail"
-      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON=${PR_GATE_DEPENDENCY_GRAPH_REASON:-pr_base_fetch_failed}"
-      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE=${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE:-base_fetch_status_missing}"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON=${PR_GATE_DEPENDENCY_SOURCE_REASON:-pr_base_fetch_failed}"
+      echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE=${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE:-base_fetch_status_missing}"
       echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_SELECTOR=fail rc=${base_fetch_rc} status=${base_fetch_status:-missing}" >&2
       return 2
     fi
@@ -289,9 +291,9 @@ agentcanon_pr_dependency_graph_required() {
   fi
   printf '%s\n' "${selector_output}"
   selector_status="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH" {print $2}' <<<"${selector_output}")"
-  PR_GATE_DEPENDENCY_GRAPH_REASON="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON" {sub(/^[^=]*=/, ""); print}' <<<"${selector_output}")"
-  PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE" {sub(/^[^=]*=/, ""); print}' <<<"${selector_output}")"
-  PR_GATE_DEPENDENCY_GRAPH_BASE_SHA="$(awk -v RS=';' -F= '$1 == "base" {print $2}' <<<"${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE}")"
+  PR_GATE_DEPENDENCY_SOURCE_REASON="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH_REASON" {sub(/^[^=]*=/, ""); print}' <<<"${selector_output}")"
+  PR_GATE_DEPENDENCY_SOURCE_EVIDENCE="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_GRAPH_EVIDENCE" {sub(/^[^=]*=/, ""); print}' <<<"${selector_output}")"
+  PR_GATE_DEPENDENCY_GRAPH_BASE_SHA="$(awk -v RS=';' -F= '$1 == "base" {print $2}' <<<"${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE}")"
   case "${selector_rc}:${selector_status}" in
     0:required)
       if [[ ! "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" =~ ^[0-9a-fA-F]{40}$ ]]; then
@@ -306,8 +308,8 @@ agentcanon_pr_dependency_graph_required() {
       ;;
     10:skipped)
       if [[ "${AGENT_CANON_REPOSITORY_MODE}" == "standalone_source" ]]; then
-        PR_GATE_DEPENDENCY_GRAPH_REASON="standalone_source"
-        PR_GATE_DEPENDENCY_GRAPH_EVIDENCE="${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE};standalone_full_graph=yes"
+        PR_GATE_DEPENDENCY_SOURCE_REASON="standalone_source"
+        PR_GATE_DEPENDENCY_SOURCE_EVIDENCE="${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE};standalone_full_graph=yes"
         return 0
       fi
       return 1
@@ -354,35 +356,16 @@ run_pr_project_quality_boundary() {
 }
 
 write_pr_gate_receipt() {
-  local root_identity=""
-  local dependency_graph_status="${1:-}"
+  local source_status="${1:-}"
   local selector_reason="${2:-}"
   local selector_evidence="${3:-}"
-  if ! root_identity="$(realpath -e "${WORKSPACE_ROOT}")"; then
-    echo "Unable to record PR gate root identity" >&2
-    return 1
-  fi
-  case "${dependency_graph_status}" in
-    prepared|scoped|source|skipped) ;;
-    *)
-      echo "Invalid PR gate dependency graph status: ${dependency_graph_status}" >&2
-      return 1
-      ;;
-  esac
-  if [[ -z "${selector_reason}" || -z "${selector_evidence}" \
-    || "${selector_reason}" == *$'\n'* || "${selector_evidence}" == *$'\n'* ]]; then
-    echo "Invalid PR gate dependency graph selector reason/evidence" >&2
-    return 1
-  fi
-  {
-    printf 'owner=check_agent_canon_pr.sh\n'
-    printf 'root_identity=%s\n' "${root_identity}"
-    printf 'parent_pid=%s\n' "$$"
-    printf 'strict_dependency=%s\n' "${dependency_graph_status}"
-    printf 'graph=%s\n' "${dependency_graph_status}"
-    printf 'selector_reason=%s\n' "${selector_reason}"
-    printf 'selector_evidence=%s\n' "${selector_evidence}"
-  } | python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" write \
+  python3 "${CANON_TOOLS_ROOT}/ci/pr_gate_receipt.py" write \
+    --root "${WORKSPACE_ROOT}" \
+    --parent-pid "$$" \
+    --status "${source_status}" \
+    --selector-reason "${selector_reason}" \
+    --selector-evidence "${selector_evidence}" \
+    | python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" write \
     --root "${WORKSPACE_ROOT}" \
     --candidate "${PR_GATE_RECEIPT}" \
     --purpose agent-canon-pr-receipt >/dev/null
@@ -536,7 +519,7 @@ run_pr_agent_checks
 echo ""
 
 echo "6️⃣  dependency source completeness"
-PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped
+PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped
 PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=0
 PR_GATE_DEPENDENCY_GRAPH_REQUIRED=0
 if agentcanon_pr_dependency_graph_required; then
@@ -544,7 +527,7 @@ if agentcanon_pr_dependency_graph_required; then
 else
   PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC=$?
   if [[ "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}" -ne 1 ]]; then
-    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=selector_failed"
+    echo "AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE=selector_failed"
     exit "${PR_GATE_DEPENDENCY_GRAPH_SELECTOR_RC}"
   fi
 fi
@@ -567,15 +550,15 @@ printf '%s\n' "${source_gate_output}"
 source_gate_status="$(awk -F= '$1 == "AGENT_CANON_PR_DEPENDENCY_SOURCE" {print $2}' <<<"${source_gate_output}")"
 case "${source_gate_rc}:${source_gate_status}" in
   0:source)
-    PR_GATE_DEPENDENCY_GRAPH_STATUS=source
-    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=source_validated"
+    PR_GATE_DEPENDENCY_SOURCE_STATUS=source
+    echo "AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE=source_validated"
     ;;
   0:skipped)
-    PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped
-    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required"
+    PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped
+    echo "AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE=not_required"
     ;;
   *)
-    echo "AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=source_gate_failed rc=${source_gate_rc} status=${source_gate_status:-missing}"
+    echo "AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE=source_gate_failed rc=${source_gate_rc} status=${source_gate_status:-missing}"
     if [[ "${source_gate_rc}" -eq 0 ]]; then
       exit 2
     fi
@@ -583,9 +566,9 @@ case "${source_gate_rc}:${source_gate_status}" in
     ;;
 esac
 write_pr_gate_receipt \
-  "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" \
-  "${PR_GATE_DEPENDENCY_GRAPH_REASON}" \
-  "${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE}"
+  "${PR_GATE_DEPENDENCY_SOURCE_STATUS}" \
+  "${PR_GATE_DEPENDENCY_SOURCE_REASON}" \
+  "${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE}"
 echo ""
 
 echo "7️⃣  documentation checks"

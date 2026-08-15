@@ -330,14 +330,14 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                 result.stdout,
             )
 
-    def test_pr_check_requires_optional_dependency_graph_receipt_status(self) -> None:
-        """The PR check must carry an explicit prepared-or-skipped graph receipt."""
+    def test_pr_check_requires_optional_dependency_source_receipt_status(self) -> None:
+        """The PR check must carry an explicit source-or-skipped receipt."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             self.write_agent_canon_pr_contract(root)
             script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
             text = script.read_text(encoding="utf-8").replace(
-                "PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped\n", ""
+                "PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped\n", ""
             )
             script.write_text(text, encoding="utf-8")
 
@@ -347,16 +347,16 @@ class CheckToolConventionDriftTest(unittest.TestCase):
             self.assertIn(
                 "missing-required-text:agent_canon_pr_check:"
                 "tools/ci/check_agent_canon_pr.sh:"
-                "missing-optional-dependency-graph-receipt-status",
+                "missing-optional-dependency-source-receipt-status",
                 result.stdout,
             )
 
     def test_pr_check_requires_selector_reason_and_evidence_receipt(self) -> None:
-        """Skipped graph receipts retain the selector's reason and evidence."""
+        """Source receipts retain the selector's reason and evidence."""
         for marker, detail in (
-            ("selector_reason=%s", "missing-dependency-graph-selector-reason-receipt"),
+            ("--selector-reason", "missing-dependency-graph-selector-reason-receipt"),
             (
-                "selector_evidence=%s",
+                "--selector-evidence",
                 "missing-dependency-graph-selector-evidence-receipt",
             ),
         ):
@@ -1026,18 +1026,19 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "# upstream implementation ../agent_tools/check_agent_runtime_alignment.py runtime alignment",
                     "# upstream implementation ../agent_tools/check_convention_compliance.py convention gate",
                     "# upstream implementation ./agent_canon_pr_graph_selector.py graph selector",
+                    "# upstream implementation ./pr_gate_receipt.py receipt schema",
                     "# upstream implementation ./check_github_workflows.py github checks",
                     "# @dependency-end",
                     "agentcanon_pr_dependency_graph_required() { return 0; }",
                     'python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py"',
-                    "PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped",
+                    "PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped",
                     "if agentcanon_pr_dependency_graph_required; then",
                     '  bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
-                    "  PR_GATE_DEPENDENCY_GRAPH_STATUS=prepared",
+                    "  PR_GATE_DEPENDENCY_SOURCE_STATUS=source",
                     "fi",
-                    "printf 'selector_reason=%s\\n' \"${PR_GATE_DEPENDENCY_GRAPH_REASON}\"",
-                    "printf 'selector_evidence=%s\\n' \"${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE}\"",
-                    'write_pr_gate_receipt "${PR_GATE_DEPENDENCY_GRAPH_STATUS}" "${PR_GATE_DEPENDENCY_GRAPH_REASON}" "${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE}"',
+                    "--selector-reason \"${PR_GATE_DEPENDENCY_SOURCE_REASON}\"",
+                    "--selector-evidence \"${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE}\"",
+                    'write_pr_gate_receipt "${PR_GATE_DEPENDENCY_SOURCE_STATUS}" "${PR_GATE_DEPENDENCY_SOURCE_REASON}" "${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE}"',
                     'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \\',
                     'python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"',
                     'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
@@ -1060,6 +1061,13 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     "",
                 ]
             ),
+        )
+        self.write_file(
+            root,
+            "tools/ci/pr_gate_receipt.py",
+            "# @dependency-start\n"
+            "# responsibility Owns source/skipped receipt schema.\n"
+            "# @dependency-end\n",
         )
         for relative in [
             "agents/workflows/agent-canon-pr-workflow.md",

@@ -60,6 +60,10 @@ downstream implementation ../../tools/agent_tools/check_design_doc_claims.py val
   - AgentCanon-log #4 と AgentCanon #461 の runtime-log repository owner split
 - [request-intent-and-update-relation.md](request-intent-and-update-relation.md)
   - 質問回答、明示 write clause、sparse update、既存 cleanup route の compact flow
+- [source-owned-dependency-validation.md](source-owned-dependency-validation.md)
+  - tracked source を dependency correctness の正本とし、PR receipt を `source` / `skipped` の二値で writer/parser/consumer 間に渡す境界
+- [dependency-manifest-design.md](dependency-manifest-design.md)
+  - manifest DSL、relation semantics、source-derived projection、および明示 graph analysis の reader route
 - [parent-repository-audit.md](parent-repository-audit.md)
   - AgentCanon を利用する親 repository 全体の責務別 audit unit、legacy checklist 移行、
     finding 修正と close の設計

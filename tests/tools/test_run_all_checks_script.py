@@ -199,34 +199,26 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertNotIn(legacy_flag, pr_text)
         self.assertNotIn(legacy_profile, pr_text)
 
-    def test_pr_gate_receipt_accepts_prepared_or_skipped_dependency_graph(self) -> None:
-        """Parent PRs may skip graph completeness when its profile does not require it."""
+    def test_pr_gate_receipt_uses_source_owned_binary_status(self) -> None:
+        """The producer and consumer accept only source or skipped receipts."""
         ci_text = SCRIPT.read_text(encoding="utf-8")
         pr_text = PR_SCRIPT.read_text(encoding="utf-8")
         selector_text = PR_SELECTOR.read_text(encoding="utf-8")
 
-        self.assertIn('PR_GATE_DEPENDENCY_GRAPH_STATUS="not_applicable"', ci_text)
-        self.assertIn('strict_dependency_status}" != "prepared"', ci_text)
-        self.assertIn('strict_dependency_status}" != "skipped"', ci_text)
-        self.assertIn(
-            'PR_GATE_DEPENDENCY_GRAPH_STATUS="${strict_dependency_status}"',
-            ci_text,
-        )
-        self.assertIn("PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped", pr_text)
+        self.assertIn('PR_GATE_DEPENDENCY_SOURCE_STATUS="not_applicable"', ci_text)
+        self.assertIn('status=source)', ci_text)
+        self.assertIn('status=skipped)', ci_text)
+        self.assertIn('pr_gate_receipt.py" validate', ci_text)
+        self.assertIn("PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped", pr_text)
         self.assertIn("parent_graph_completeness_not_selected", selector_text)
         self.assertIn("write_pr_gate_receipt \\", pr_text)
-        self.assertIn('"${PR_GATE_DEPENDENCY_GRAPH_REASON}"', pr_text)
-        self.assertIn('"${PR_GATE_DEPENDENCY_GRAPH_EVIDENCE}"', pr_text)
-        self.assertIn("selector_reason=%s", pr_text)
-        self.assertIn("selector_evidence=%s", pr_text)
-        self.assertIn(
-            "skipped graph selector reason/evidence missing",
-            ci_text,
-        )
-        self.assertIn(
-            "parent PR graph completeness not required",
-            ci_text,
-        )
+        self.assertIn('"${PR_GATE_DEPENDENCY_SOURCE_REASON}"', pr_text)
+        self.assertIn('"${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE}"', pr_text)
+        self.assertIn("--selector-reason", pr_text)
+        self.assertIn("--selector-evidence", pr_text)
+        self.assertIn("validated_source_receipt_consumed", ci_text)
+        self.assertNotIn("strict_dependency_status", ci_text)
+        self.assertNotIn("PR_GATE_DEPENDENCY_GRAPH_STATUS", ci_text)
 
     def test_pr_gate_keeps_structure_and_projection_checks_without_pin_integrity(self) -> None:
         """Pin freshness is not a parent gate, while structure/projection checks remain."""
@@ -243,7 +235,7 @@ class RunAllChecksScriptTest(unittest.TestCase):
         self.assertIn("agentcanon_pr_submodule_snapshot", pr_text)
         self.assertIn("AGENT_CANON_SUBMODULE_EVIDENCE=pass", pr_text)
         self.assertIn("run_shared_surface_check", pr_text)
-        self.assertIn("AGENT_CANON_PR_DEPENDENCY_GRAPH_GATE=not_required", pr_text)
+        self.assertIn("AGENT_CANON_PR_DEPENDENCY_SOURCE_GATE=not_required", pr_text)
         self.assertIn("agentcanon_pr_branch_dirty", pr_text)
         self.assertIn("AGENT_CANON_PR_LATEST_DIRTY_AGENTCANON_WORKTREE=yes", pr_text)
         self.assertNotIn("deferred_branch_pr", pr_text)

@@ -2,6 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Validates dependency manifest syntax, contract kind metadata, and responsibility metadata.
+# upstream design ../../documents/design/source-owned-dependency-validation.md source parser authority
 # upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL design
 # upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
 # upstream implementation ./scan_dependency_headers.sh finds files with manifests

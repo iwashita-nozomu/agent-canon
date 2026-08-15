@@ -2,6 +2,7 @@
 # @dependency-start
 # contract tool
 # responsibility Projects and validates dependency relations directly from tracked source manifests.
+# upstream design ../../documents/design/source-owned-dependency-validation.md source-derived graph projection authority
 # upstream design ../../documents/design/dependency-manifest-design.md dependency graph semantics
 # upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
 # upstream implementation ./source_dependency_graph.py owns source parsing, canonical binding, and review export

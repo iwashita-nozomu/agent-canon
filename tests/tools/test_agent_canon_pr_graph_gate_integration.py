@@ -5,7 +5,9 @@
 # responsibility Verifies the PR gate no longer orchestrates persisted dependency graph runtime state.
 # upstream implementation ../../tools/ci/check_agent_canon_pr.sh owns PR dependency routing
 # upstream implementation ../../tools/ci/run_pr_dependency_source_gate.sh owns source-only dependency validation
-# upstream design ../../documents/design/dependency-manifest-design.md owns dependency validation semantics
+# upstream implementation ../../tools/ci/pr_gate_receipt.py owns source/skipped receipt semantics
+# upstream design ../../documents/design/source-owned-dependency-validation.md owns dependency validation semantics
+# upstream design ../../documents/design/dependency-manifest-design.md projects manifest semantics
 # downstream implementation ./test_agent_canon_pr_dependency_source_gate.py exercises source-only fixture execution
 # @dependency-end
 
@@ -17,6 +19,8 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PR_CHECK = PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_pr.sh"
 SOURCE_GATE = PROJECT_ROOT / "tools" / "ci" / "run_pr_dependency_source_gate.sh"
+RECEIPT = PROJECT_ROOT / "tools" / "ci" / "pr_gate_receipt.py"
+RUN_ALL_CHECKS = PROJECT_ROOT / "tools" / "ci" / "run_all_checks.sh"
 
 
 class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
@@ -59,6 +63,33 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
             self.assertNotIn(command_fragment, text)
         self.assertNotIn("knowledge-graph", text)
         self.assertNotIn("graph.sqlite", text)
+
+    def test_receipt_schema_is_the_single_status_boundary(self) -> None:
+        """The producer and consumer share the executable receipt owner."""
+        producer = PR_CHECK.read_text(encoding="utf-8")
+        consumer = RUN_ALL_CHECKS.read_text(encoding="utf-8")
+        receipt = RECEIPT.read_text(encoding="utf-8")
+
+        self.assertIn('pr_gate_receipt.py" write', producer)
+        self.assertIn('pr_gate_receipt.py" validate', consumer)
+        self.assertIn("class PrGateDependencyStatus", receipt)
+        self.assertIn('SOURCE = "source"', receipt)
+        self.assertIn('SKIPPED = "skipped"', receipt)
+        self.assertNotIn("prepared", receipt)
+        self.assertNotIn("scoped", receipt)
+
+    def test_normal_pr_source_route_does_not_execute_graph_runtime(self) -> None:
+        """Graph commands remain explicit analysis capabilities, not PR receipt work."""
+        for path in (PR_CHECK, SOURCE_GATE):
+            text = path.read_text(encoding="utf-8")
+            for command_fragment in (
+                "graph build --root",
+                "graph status --root",
+                "graph query --root",
+                "graph context --root",
+                "graph.sqlite",
+            ):
+                self.assertNotIn(command_fragment, text)
 
 
 if __name__ == "__main__":
