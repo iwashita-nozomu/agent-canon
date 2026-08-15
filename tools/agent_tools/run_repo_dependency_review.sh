@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract tool
-# responsibility Runs repo dependency review agent workflow automation.
+# responsibility Runs source-owned repo dependency review and optional persisted graph preparation.
 # upstream design ../../documents/design/dependency-manifest-design.md dependency review policy
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md closeout requires dependency evidence
 # upstream design ../../templates/agents/closeout_gate.md closeout dependency evidence gate
@@ -10,7 +10,7 @@
 # upstream design ../../templates/documents/github/pull-request/agent_canon.md canonical template-side AgentCanon PR checklist
 # upstream implementation ./scan_dependency_headers.sh scans repo-wide manifest coverage
 # upstream implementation ./check_dependency_header_format.sh validates repo-wide manifest syntax
-# upstream implementation ./check_dependency_graph.sh validates repo-wide dependency graph
+# upstream implementation ./check_dependency_graph.sh validates source-derived dependency relations
 # upstream implementation ./check_design_doc_claims.py validates design claims against dependency evidence
 # downstream implementation ../../tools/ci/check_agent_canon_pr.sh runs strict dependency review
 # downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies wrapper behavior
@@ -63,27 +63,27 @@ declare -a DESIGN_DOC_CLAIM_PATHS=()
 usage() {
   cat <<'EOF'
 Usage:
-  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--changed-path-packet FILE] [--trusted-base-sha SHA] [--header-scan-only] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH] [--check-design-doc-claims] [--design-doc-claim-path PATH]
+  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--changed-path-packet FILE] [--trusted-base-sha SHA] [--header-scan-only] [--ensure-graph] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH] [--check-design-doc-claims] [--design-doc-claim-path PATH]
 
 Runs dependency manifest review against all tracked, checkable text files in the repo.
 This is intended for checkpoint and final review, not just changed-file closeout.
 Missing manifests are report-only by default until the repository-wide migration is complete.
-With --list-changed-dependencies, the graph checker also prints every dependency
+With --list-changed-dependencies, the source graph checker also prints every dependency
 edge declared by, or pointing at, each changed file.
 When --report-dir is set, a stable dependency_graph.tsv artifact is generated
-from dependency headers. With --search-hits-file, text-search hit paths are
+directly from dependency headers. With --search-hits-file, text-search hit paths are
 expanded into dependency edit-scope candidates and saved beside the graph when
 --report-dir is set. Without --search-hits-file, the report directory still
 receives changed-file dependency edit-scope evidence.
 With --cycle-report-only, dependency cycles stay visible but do not block the
-wrapper. Use this only with a durable graph report artifact.
+wrapper. Use this only with a durable source-derived graph report artifact.
 With --changed-path-packet, selector-owned trusted base/head path evidence is
 passed to the canonical scan; unchanged missing headers remain baseline evidence.
 With --trusted-base-sha, the packet base is bound to an independent caller authority.
-With --header-scan-only, graph status/query and graph projections are skipped while
-the strict canonical header scan and format check still run.
-With --ensure-graph, the canonical graph status/build/readback operation runs once
-and exits before dependency-header review.
+With --header-scan-only, source relation/cycle validation and graph projections are
+skipped while the strict canonical header scan and format check still run.
+With --ensure-graph, the opt-in persisted graph status/build operation runs once
+and exits before source-owned dependency-header review.
 With --check-design-doc-claims, changed design documents are compared with
 dependency header evidence and implementation-backed claim tokens. Repeat
 --design-doc-claim-path to check explicit design documents instead of changed
@@ -179,6 +179,10 @@ ROOT_DIR="$(realpath -e "$ROOT_DIR")" || {
 SCRIPT_TOOLS_ROOT="$(dirname "$(realpath -m "$script_dir")")"
 cd "$ROOT_DIR"
 
+if [[ "$HEADER_SCAN_ONLY" -eq 1 && "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
+  echo "REPO_DEPENDENCY_REVIEW=fail reason=header_scan_and_ensure_graph_are_mutually_exclusive"
+  exit 2
+fi
 if [[ "$HEADER_SCAN_ONLY" -eq 1 && ( -z "$CHANGED_PATH_PACKET" || -z "$TRUSTED_BASE_SHA" ) ]]; then
   echo "REPO_DEPENDENCY_REVIEW=fail reason=header_scan_trusted_packet_required"
   exit 2
@@ -206,7 +210,7 @@ else
   CHECK_DESIGN_DOC_CLAIMS_TOOL="${SCRIPT_TOOLS_ROOT}/agent_tools/check_design_doc_claims.py"
 fi
 
-if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
+if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
   if [[ ! -x "$GRAPH_CLI" ]]; then
     echo "canonical graph executable is missing for root: $ROOT_DIR" >&2
     exit 1
@@ -214,8 +218,6 @@ if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
 
   tmp_base="$(parent_temp_base)"
   status_file="$(mktemp "$tmp_base/status.XXXXXX")"
-  dependency_query_file="$(mktemp "$tmp_base/dependency-query.XXXXXX")"
-  owner_query_file="$(mktemp "$tmp_base/owner-query.XXXXXX")"
   cleanup_review_tmp() {
     local primary_status=$?
     local cleanup_status=0
@@ -261,12 +263,9 @@ if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
   fi
   status_binding="${status_exit}:${status_schema}:${status_command}:${status_name}:${status_record_exit}:${status_reason}:${status_probe_reason}"
   fresh_binding="0:agent-canon.graph.status.v1:status:fresh:0:null:null"
-  incomplete_binding="2:agent-canon.graph.status.v1:status:incomplete:2:source_completeness_incomplete:null"
   source_changed_binding="2:agent-canon.graph.status.v1:status:stale:2:source_changed:source_changed"
   if [[ "$status_binding" == "$fresh_binding" ]]; then
     echo "GRAPH_REBUILD=not_needed"
-  elif [[ "$status_binding" == "$incomplete_binding" ]]; then
-    echo "GRAPH_REBUILD=not_needed status=incomplete"
   elif [[ "$status_binding" == "$source_changed_binding" ]]; then
     echo "GRAPH_REBUILD=required status=stale reason=source_changed probe_reason=source_changed"
     set +e
@@ -293,25 +292,8 @@ if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
     cat "$status_file"
     exit 1
   fi
-  if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
-    echo "GRAPH_ENSURE=pass status=fresh"
-    exit 0
-  fi
-
-  set +e
-  "$GRAPH_CLI" graph query --root "$ROOT_DIR" --profile default --format json --all --relation dependency --direction both --depth 0 >"$dependency_query_file"
-  dependency_exit=$?
-  "$GRAPH_CLI" graph query --root "$ROOT_DIR" --profile default --format json --all --relation owner --direction both --depth 0 >"$owner_query_file"
-  owner_exit=$?
-  set -e
-  if [[ "$dependency_exit" -ne 0 || "$owner_exit" -ne 0 ]] \
-    || [[ "$(jq -r '.status // "invalid"' "$dependency_query_file" 2>/dev/null)" != "fresh" ]] \
-    || [[ "$(jq -r '.status // "invalid"' "$owner_query_file" 2>/dev/null)" != "fresh" ]]; then
-    echo "REPO_DEPENDENCY_REVIEW=fail"
-    cat "$dependency_query_file"
-    cat "$owner_query_file"
-    exit 1
-  fi
+  echo "GRAPH_ENSURE=pass status=fresh"
+  exit 0
 fi
 
 mapfile -t checkable_paths < <(
