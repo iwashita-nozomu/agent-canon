@@ -413,8 +413,9 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name>
-        --branch experiment-results/<topic>
+      - python3 -m tools.experiments.publish_result_branch --result-dir experiments/<topic>/result/<variant>/<run_name>
+        --variant <variant>
+        --branch experiment-results/<topic>/<variant>
       - python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir
         reports/agents/<run-id>
       - python3 tools/agent_tools/runtime_log_archive_git.py push
@@ -1524,12 +1525,13 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/experiments/create_experiment_topic.py <topic>
-      - python3 tools/ci/check_experiment_registry.py
-      - python3 tools/experiments/run_managed_experiment.py --topic <topic> --variant
-        formal -- python3 experiments/<topic>/run.py
-      - python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name>
-        --branch experiment-results/<topic>
+      - python3 -m tools.experiments.create_experiment_topic <topic>
+      - python3 -m tools.ci.check_experiment_registry
+      - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant
+        <variant> -- python3 experiments/<topic>/run.py
+      - python3 -m tools.experiments.publish_result_branch --result-dir experiments/<topic>/result/<variant>/<run_name>
+        --variant <variant>
+        --branch experiment-results/<topic>/<variant>
       - python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
       - python3 -m pytest tests/tools/test_run_managed_experiment.py -q
       - agent-canon semantic-index discourse-relations --profile experiment-report
@@ -1563,8 +1565,8 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/experiments/run_managed_experiment.py --topic <topic> --variant
-        formal -- python3 experiments/<topic>/run.py
+      - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant
+        <variant> -- python3 experiments/<topic>/run.py
       - git grep -n -E "ExperimentRunner|EXPERIMENT_RUN_DIR|JAX_|XLA_|CUDA_VISIBLE|PREALLOC|prealloc|gpu_max_slots|max_workers|subprocess|ProcessPool|multiprocessing|env="
         --
       maintenance:

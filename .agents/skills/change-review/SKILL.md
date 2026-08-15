@@ -2,7 +2,7 @@
 name: change-review
 description: "Use for code review, doc review, or AI-generated diff review when you need findings-first output focused on bugs, regressions, missing tests, and broken assumptions."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"b7521700d44f0660e204cae173cdce06b8fcf3d6bba612676bf1bc8afbd5458c"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"d47e52e51ebc4f2ecab9d92ceb52d1a655c88ea46bd4f63c06e32fc4227e644e"} -->
 
 <!--
 @dependency-start

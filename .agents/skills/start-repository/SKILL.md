@@ -2,7 +2,7 @@
 name: start-repository
 description: "Use when starting a repository from this template after clone, including project identity setup, source-free static-seed validation, and destination-remote setup without live AgentCanon integration."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"5c3d9d164425104ff2a47c56835c38440ce048eac08c7f4f52a0a8a08f62d46e"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"3a208539abaa31e3274fa8f5c0a0986194cc52093101af4e9b240691b092be60"} -->
 
 <!--
 @dependency-start

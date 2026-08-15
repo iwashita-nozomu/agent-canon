@@ -70,9 +70,9 @@ Use report-writing only when reader-facing interpretation, claims, limitations, 
 - accumulated skill / workflow eval: `.agent-canon/log-archive/eval-results/<eval-family>/<unique-id>.md`
 - hook result chronology:
   `.agent-canon/log-archive/hook-runs/<stable-source-repository-id>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl`
-- experiment result artifacts: `experiments/<topic>/result/<run_name>/`; persist only producer-selected files that actually exist, with role/checksum/readback evidence.
-- experiment reader report: `experiments/report/<run_name>.md`; create it only when the request activates `report-writing`.
-- formal experiment result branch: `experiment-results/<topic>` or the topic-specific branch fixed by the explicit publication plan. Publish only with `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>` after lifecycle and artifact evidence are complete.
+- experiment result artifacts: `experiments/<topic>/result/<variant>/<run_name>/`; persist only producer-selected files that actually exist, with role/checksum/readback evidence.
+- experiment reader report: `experiments/report/<topic>/<variant>/<run_name>.md`; create it only when the request activates `report-writing`.
+- formal experiment result branch: `experiment-results/<topic>/<variant>`. Publish only with `python3 -m tools.experiments.publish_result_branch --variant <variant> --result-dir experiments/<topic>/result/<variant>/<run_name> --branch experiment-results/<topic>/<variant>` after lifecycle and artifact evidence are complete.
 - generated triage report: `reports/<tool-or-task>/`
 
 Do not store generated reports as policy truth. If a report changes a rule, edit
@@ -164,8 +164,8 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Write failed, skipped, blocked, and partial runs too; they are routing evidence, not disposable noise.
 1. Use append-only JSONL or a unique file path for repeated hook, skill eval, prompt eval, checker, or experiment runs; do not overwrite detailed results.
 1. Include stable grouping fields such as payload/input fingerprint, hook/tool name, status, exit code, branch, commit, and runtime namespace when available.
-1. For experiment outputs, persist only producer-selected files that actually exist under `experiments/<topic>/result/<run_name>/`; bind them to the lifecycle run reference and record semantic role, checksum, no-overwrite result, and readback. Create `experiments/report/<run_name>.md` only when `$report-writing` is selected.
-1. For formal experiment retention, `$experiment-lifecycle` owns run identity, terminal status, and the explicit publication decision. Publish with `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>` only when requested; add `--push` only when remote publication is authorized.
+1. For experiment outputs, persist only producer-selected files that actually exist under `experiments/<topic>/result/<variant>/<run_name>/`; bind them to the lifecycle run reference and record semantic role, checksum, no-overwrite result, and readback. Create `experiments/report/<topic>/<variant>/<run_name>.md` only when `$report-writing` is selected.
+1. For formal experiment retention, `$experiment-lifecycle` owns run identity, terminal status, and the explicit publication decision. Publish with `python3 -m tools.experiments.publish_result_branch --variant <variant> --result-dir experiments/<topic>/result/<variant>/<run_name> --branch experiment-results/<topic>/<variant>` only when requested; add `--push` only when remote publication is authorized.
 1. For run-local task evidence, write under `reports/agents/<run-id>/` and include the artifact path in the final response or handoff.
 1. To find the exact report placement for the current repo, run `python3 tools/agent_tools/runtime_log_archive_git.py status` and read `RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL`, `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH`, and `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR`.
 1. For normal cross-run retention of run-local agent reports, do not hand-generate an archive report. Use `python3 tools/agent_tools/runtime_log_archive_git.py sync`; it copies `reports/agents/` into `.agent-canon/log-archive/agent-reports/<repo-key>/` on `logs/<repo-key>`.
