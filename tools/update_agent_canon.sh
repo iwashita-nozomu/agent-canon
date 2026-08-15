@@ -90,6 +90,11 @@ parent_symlink() {
   python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
     symlink --root "$PARENT_ROOT_DIR" --target "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
 }
+parent_read_presence() {
+  local candidate="$1" purpose="${2:-agent-canon-update}"
+  python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
+    read-presence --root "$PARENT_ROOT_DIR" --candidate "$candidate" --purpose "$purpose"
+}
 run_parent_bound_sync() {
   AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${PARENT_ROOT_DIR}" \
     python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
@@ -387,7 +392,7 @@ acknowledge_update_todos_if_available() {
   fi
 
   python3 "$todo_tool" acknowledge
-  if [ -f "$state_path" ]; then
+  if parent_read_presence "$state_path" agent-canon-update-state >/dev/null; then
     git -C "$ROOT_DIR" add "$state_path"
     if ! git -C "$ROOT_DIR" diff --cached --quiet -- "$state_path"; then
       GIT_AUTHOR_NAME="$COMMIT_AUTOMATION_AUTHOR_NAME" \
@@ -424,10 +429,10 @@ rebuild_agent_tools_if_available() {
 }
 
 source_projection_lifecycle_complete() {
-  [ -f "$UPDATE_STATE_DIR/current-transaction" ] \
-    && [ -f "$UPDATE_PROJECTION_DIR/queue.accepted.json" ] \
-    && [ -f "$UPDATE_PROJECTION_DIR/frontier.accepted.json" ] \
-    && [ -f "$UPDATE_EVIDENCE_DIR/g4.parent-projection-integrity.json" ]
+  parent_read_presence "$UPDATE_STATE_DIR/current-transaction" update-lifecycle >/dev/null \
+    && parent_read_presence "$UPDATE_PROJECTION_DIR/queue.accepted.json" update-lifecycle >/dev/null \
+    && parent_read_presence "$UPDATE_PROJECTION_DIR/frontier.accepted.json" update-lifecycle >/dev/null \
+    && parent_read_presence "$UPDATE_EVIDENCE_DIR/g4.parent-projection-integrity.json" update-lifecycle >/dev/null
 }
 
 materialize_source_projection_handoff() {
@@ -449,7 +454,7 @@ ensure_source_projection_lifecycle() {
     return 0
   fi
   materialize_source_projection_handoff
-  if [ -f "$SOURCE_PROJECTION_PACKET" ]; then
+  if parent_read_presence "$SOURCE_PROJECTION_PACKET" source-projection >/dev/null; then
     advance_source_projection
   fi
   if source_projection_lifecycle_complete; then
@@ -487,6 +492,8 @@ from pathlib import Path
 
 from parent_root_side_effects import (
     ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectError,
     ParentRootSideEffectBoundary,
 )
 
@@ -516,9 +523,26 @@ boundary = ParentRootSideEffectBoundary()
 attestation = boundary.attest(
     ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="update-lifecycle")
 )
-binding = json.loads(Path(binding_path).read_text(encoding="utf-8"))
-rebind = json.loads(Path(rebind_path).read_text(encoding="utf-8"))
-packet = json.loads(Path(packet_path).read_text(encoding="utf-8"))
+
+def reject_duplicate_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+def read_json(path_text, *, optional=False):
+    raw = boundary.read_parent_owned_bytes(
+        attestation, Path(path_text), "update-lifecycle", allow_missing=optional
+    )
+    if raw is None:
+        return None
+    return json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
+
+binding = read_json(binding_path)
+rebind = read_json(rebind_path)
+packet = read_json(packet_path)
 queue = materialize_queue_receipt(
     binding=binding,
     source_namespace=str(Path(source_namespace).resolve()),
@@ -550,15 +574,47 @@ frontier = materialize_dependency_frontier(
 
 def persist_once(path_text, record, validator, identity_field):
     path = Path(path_text)
-    if path.is_file():
-        existing = validator(json.loads(path.read_text(encoding="utf-8")))
-        validate_immutable_replay(existing, record, field=str(path))
+    existing_raw = boundary.read_parent_owned_bytes(
+        attestation, path, "update-lifecycle", allow_missing=True
+    )
+    if existing_raw is not None:
+        existing = validator(json.loads(
+            existing_raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs
+        ))
+        try:
+            validate_immutable_replay(existing, record, field=str(path))
+        except Exception as exc:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH,
+                f"parent-owned replay conflict: {path}",
+            ) from exc
         replay = json.loads(json.dumps(existing))
         replay["binding"]["timing"]["replayed"] = True
         return replay
     rendered = (json.dumps(record, indent=2, sort_keys=True) + "\n").encode("utf-8")
-    boundary.write_parent_owned_file(attestation, path, rendered, "update-lifecycle")
-    return record
+    status, detail = boundary.publish_parent_owned_file_noreplace(
+        attestation, path, rendered, "update-lifecycle"
+    )
+    winner_raw = boundary.read_parent_owned_bytes(
+        attestation, path, "update-lifecycle", allow_missing=False
+    )
+    assert winner_raw is not None
+    winner = validator(json.loads(
+        winner_raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs
+    ))
+    try:
+        validate_immutable_replay(winner, record, field=str(path))
+    except Exception as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {path}:{detail}",
+        ) from exc
+    if status == "failed":
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {path}:{detail}",
+        )
+    return winner
 
 queue_result = persist_once(
     queue_path, queue, validate_queue_receipt, "queue_receipt_id"
@@ -573,17 +629,27 @@ marker = {
     "frontier_id": frontier_result["frontier_id"],
 }
 marker_path = Path(current_marker_path)
-if marker_path.is_file():
-    existing_marker = json.loads(marker_path.read_text(encoding="utf-8"))
+existing_marker = read_json(marker_path, optional=True)
+if existing_marker is not None:
     if existing_marker != marker:
-        raise SystemExit(f"input_identity_mismatch:{marker_path}")
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned replay conflict: {marker_path}",
+        )
 else:
-    boundary.write_parent_owned_file(
+    rendered_marker = (json.dumps(marker, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    status, detail = boundary.publish_parent_owned_file_noreplace(
         attestation,
         marker_path,
-        (json.dumps(marker, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        rendered_marker,
         "update-lifecycle",
     )
+    winner_marker = read_json(marker_path)
+    if winner_marker != marker or status == "failed":
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {marker_path}:{detail}",
+        )
 print(f"AGENT_CANON_QUEUE_RECEIPT_ID={queue_result['queue_receipt_id']}")
 print(f"AGENT_CANON_QUEUE_REPLAYED={str(queue_result['binding']['timing']['replayed']).lower()}")
 print(f"AGENT_CANON_FRONTIER_ID={frontier_result['frontier_id']}")
@@ -621,6 +687,8 @@ from pathlib import Path
 
 from parent_root_side_effects import (
     ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectError,
     ParentRootSideEffectBoundary,
 )
 
@@ -653,9 +721,26 @@ boundary = ParentRootSideEffectBoundary()
 attestation = boundary.attest(
     ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="update-frontier")
 )
-pending = json.loads(Path(pending_path).read_text(encoding="utf-8"))
-queue = json.loads(Path(queue_path).read_text(encoding="utf-8"))
-rebind = json.loads(Path(rebind_path).read_text(encoding="utf-8"))
+
+def reject_duplicate_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+def read_json(path_text, *, optional=False):
+    raw = boundary.read_parent_owned_bytes(
+        attestation, Path(path_text), "update-frontier", allow_missing=optional
+    )
+    if raw is None:
+        return None
+    return json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
+
+pending = read_json(pending_path)
+queue = read_json(queue_path)
+rebind = read_json(rebind_path)
 accepted = json.loads(json.dumps(pending))
 accepted["frontier_state"] = "accepted"
 accepted["preceding_frontier_evidence_id"] = pending["binding"]["evidence_ref"]
@@ -677,23 +762,50 @@ accepted = validate_dependency_frontier_transition(
     ],
 )
 path = Path(output_path)
-if path.is_file():
+existing_raw = boundary.read_parent_owned_bytes(
+    attestation, path, "update-frontier", allow_missing=True
+)
+if existing_raw is not None:
     existing = validate_dependency_frontier(
-        json.loads(path.read_text(encoding="utf-8"))
+        json.loads(existing_raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
     )
-    validate_immutable_replay(existing, accepted, field=str(path))
+    try:
+        validate_immutable_replay(existing, accepted, field=str(path))
+    except Exception as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned replay conflict: {path}",
+        ) from exc
     result = json.loads(json.dumps(existing))
     result["binding"]["timing"]["replayed"] = True
 else:
-    boundary.write_parent_owned_file(
+    rendered = (json.dumps(accepted, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    status, detail = boundary.publish_parent_owned_file_noreplace(
         attestation,
         path,
-        (json.dumps(accepted, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        rendered,
         "update-frontier",
     )
-    result = accepted
+    winner_raw = boundary.read_parent_owned_bytes(attestation, path, "update-frontier")
+    assert winner_raw is not None
+    winner = validate_dependency_frontier(
+        json.loads(winner_raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
+    )
+    try:
+        validate_immutable_replay(winner, accepted, field=str(path))
+    except Exception as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {path}:{detail}",
+        ) from exc
+    if status == "failed":
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {path}:{detail}",
+        )
+    result = winner
 packet = validate_source_projection_packet(
-    json.loads(Path(packet_path).read_text(encoding="utf-8"))
+    read_json(packet_path)
 )
 g3 = packet["source_gate_verdicts"][2]
 
@@ -725,21 +837,48 @@ g4 = materialize_gate_verdict(
     verdict="pass",
 )
 g4_output = Path(g4_path)
-if g4_output.is_file():
+existing_g4_raw = boundary.read_parent_owned_bytes(
+    attestation, g4_output, "update-frontier", allow_missing=True
+)
+if existing_g4_raw is not None:
     existing_g4 = validate_gate_verdict(
-        json.loads(g4_output.read_text(encoding="utf-8"))
+        json.loads(existing_g4_raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
     )
-    validate_immutable_replay(existing_g4, g4, field=str(g4_output))
+    try:
+        validate_immutable_replay(existing_g4, g4, field=str(g4_output))
+    except Exception as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned replay conflict: {g4_output}",
+        ) from exc
     g4_result = json.loads(json.dumps(existing_g4))
     g4_result["binding"]["timing"]["replayed"] = True
 else:
-    boundary.write_parent_owned_file(
+    rendered_g4 = (json.dumps(g4, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    status, detail = boundary.publish_parent_owned_file_noreplace(
         attestation,
         g4_output,
-        (json.dumps(g4, indent=2, sort_keys=True) + "\n").encode("utf-8"),
+        rendered_g4,
         "update-frontier",
     )
-    g4_result = g4
+    winner_g4_raw = boundary.read_parent_owned_bytes(attestation, g4_output, "update-frontier")
+    assert winner_g4_raw is not None
+    winner_g4 = validate_gate_verdict(
+        json.loads(winner_g4_raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
+    )
+    try:
+        validate_immutable_replay(winner_g4, g4, field=str(g4_output))
+    except Exception as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {g4_output}:{detail}",
+        ) from exc
+    if status == "failed":
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {g4_output}:{detail}",
+        )
+    g4_result = winner_g4
 print(f"AGENT_CANON_FRONTIER_ID={result['frontier_id']}")
 print(f"AGENT_CANON_FRONTIER_STATE={result['frontier_state']}")
 print(f"AGENT_CANON_FRONTIER_REPLAYED={str(result['binding']['timing']['replayed']).lower()}")
@@ -757,7 +896,8 @@ advance_source_projection() {
   local source_remote="origin"
   local projection_values=()
 
-  [ -f "$packet" ] || die "source projection packet is missing"
+  parent_read_presence "$packet" source-projection >/dev/null \
+    || die "source projection packet is missing"
   if [ "$AGENT_CANON_SOURCE_MODE" = "parent_projection" ]; then
     source_remote="$(submodule_remote_url)"
     [ -n "$source_remote" ] \
@@ -779,6 +919,8 @@ from pathlib import Path
 
 from parent_root_side_effects import (
     ParentRootAttestationRequest,
+    ParentRootReject,
+    ParentRootSideEffectError,
     ParentRootSideEffectBoundary,
 )
 
@@ -797,9 +939,24 @@ boundary = ParentRootSideEffectBoundary()
 attestation = boundary.attest(
     ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="source-projection")
 )
-packet = validate_source_projection_packet(
-    json.loads(Path(packet_path).read_text(encoding="utf-8"))
-)
+
+def reject_duplicate_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+def read_json(path_text, *, optional=False):
+    raw = boundary.read_parent_owned_bytes(
+        attestation, Path(path_text), "source-projection", allow_missing=optional
+    )
+    if raw is None:
+        return None
+    return json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
+
+packet = validate_source_projection_packet(read_json(packet_path))
 binding = packet["binding"]
 publication = packet["publication_readback_receipt"]["pr_identity"]
 if (
@@ -810,14 +967,26 @@ if (
 
 def persist_projection(path_text, value):
     path = Path(path_text)
-    rendered = json.dumps(value, indent=2, sort_keys=True) + "\n"
-    if path.is_file():
-        if path.read_text(encoding="utf-8") != rendered:
-            raise SystemExit(f"input_identity_mismatch:{path}")
-        return
-    boundary.write_parent_owned_file(
-        attestation, path, rendered.encode("utf-8"), "source-projection"
+    rendered = (json.dumps(value, indent=2, sort_keys=True) + "\n").encode("utf-8")
+    existing = boundary.read_parent_owned_bytes(
+        attestation, path, "source-projection", allow_missing=True
     )
+    if existing is not None:
+        if existing != rendered:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH,
+                f"parent-owned replay conflict: {path}",
+            )
+        return
+    status, detail = boundary.publish_parent_owned_file_noreplace(
+        attestation, path, rendered, "source-projection"
+    )
+    winner = boundary.read_parent_owned_bytes(attestation, path, "source-projection")
+    if winner != rendered or status == "failed":
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_MISMATCH,
+            f"parent-owned no-replace conflict: {path}:{detail}",
+        )
 
 persist_projection(binding_path, binding)
 persist_projection(rebind_path, packet["source_main_rebind_receipt"])
@@ -855,20 +1024,16 @@ require_accepted_dependency_frontier() {
   local accepted_queue="$UPDATE_PROJECTION_DIR/queue.accepted.json"
   local accepted_frontier="$UPDATE_PROJECTION_DIR/frontier.accepted.json"
   local g4_receipt="$UPDATE_EVIDENCE_DIR/g4.parent-projection-integrity.json"
-  [ -f "$current_marker" ] \
-    || die "parent projection blocked: current transaction marker is missing"
-  [ -f "$accepted_queue" ] \
-    || die "parent projection blocked until queue acceptance"
-  [ -f "$accepted_frontier" ] \
-    || die "parent projection blocked until dependency frontier acceptance"
-  [ -f "$g4_receipt" ] \
-    || die "parent projection blocked until G4 integrity evidence"
   PYTHONPATH="$CANON_TOOLS_ROOT/agent_tools${PYTHONPATH:+:$PYTHONPATH}" \
     python3 - "$accepted_frontier" "$accepted_queue" "$current_marker" \
-      "$g4_receipt" <<'PY'
+      "$g4_receipt" "$PARENT_ROOT_DIR" <<'PY'
 import json
 import sys
 from pathlib import Path
+from parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
 from update_lifecycle_contract import (
     binding_identity,
     validate_dependency_frontier,
@@ -876,16 +1041,30 @@ from update_lifecycle_contract import (
     validate_queue_receipt,
 )
 
-frontier = validate_dependency_frontier(
-    json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+root = Path(sys.argv[5])
+boundary = ParentRootSideEffectBoundary()
+attestation = boundary.attest(
+    ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="update-lifecycle")
 )
-queue = validate_queue_receipt(
-    json.loads(Path(sys.argv[2]).read_text(encoding="utf-8"))
-)
-marker = json.loads(Path(sys.argv[3]).read_text(encoding="utf-8"))
-g4 = validate_gate_verdict(
-    json.loads(Path(sys.argv[4]).read_text(encoding="utf-8"))
-)
+
+def reject_duplicate_pairs(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError(f"duplicate JSON key: {key}")
+        result[key] = value
+    return result
+
+def read_json(path_text):
+    raw = boundary.read_parent_owned_bytes(
+        attestation, Path(path_text), "update-lifecycle", allow_missing=False
+    )
+    return json.loads(raw.decode("utf-8"), object_pairs_hook=reject_duplicate_pairs)
+
+frontier = validate_dependency_frontier(read_json(sys.argv[1]))
+queue = validate_queue_receipt(read_json(sys.argv[2]))
+marker = read_json(sys.argv[3])
+g4 = validate_gate_verdict(read_json(sys.argv[4]))
 if set(marker) != {"schema", "transaction_id", "queue_receipt_id", "frontier_id"}:
     raise SystemExit("frontier:current_transaction_marker_invalid")
 if marker["schema"] != "agent-canon.update-lifecycle-current-transaction.v1":
@@ -939,7 +1118,7 @@ cmd_latest() {
 
   if [ "$AGENT_CANON_SOURCE_MODE" = "standalone_source" ]; then
     materialize_source_projection_handoff
-    if [ -f "$SOURCE_PROJECTION_PACKET" ]; then
+    if parent_read_presence "$SOURCE_PROJECTION_PACKET" source-projection >/dev/null; then
       advance_source_projection
       return
     fi
