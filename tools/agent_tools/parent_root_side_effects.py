@@ -7,6 +7,7 @@
 # downstream implementation ../ci/run_all_checks.sh bounds integrated CI child state and scratch
 # downstream implementation ../ci/check_agent_canon_pr.sh bounds PR gate child state and scratch
 # downstream implementation ../ci/agent_canon_pr_graph_selector.py bounds selector publication and graph children
+# downstream implementation ./fixture_spawn.py owns the public nested-fixture facade
 # downstream implementation ../../tests/agent_tools/test_parent_root_side_effects.py verifies capabilities and authenticated child environments
 # @dependency-end
 
@@ -5928,6 +5929,31 @@ def fixture_direct_command(
     )
 
 
+def validate_fixture_root(
+    record: SessionResolutionResult,
+    fixture_cwd: Path,
+    *,
+    require_lease: bool = True,
+    now_mono_ns: int | None = None,
+) -> tuple[Path, int, int]:
+    """Validate a nested physical Git root for a fixture boundary caller."""
+    identity = _fixture_direct_identity(
+        record,
+        fixture_cwd,
+        require_lease=require_lease,
+        now_mono_ns=now_mono_ns,
+    )
+    return identity.realpath, identity.dev, identity.ino
+
+
+def fixture_child_environment(
+    record: SessionResolutionResult,
+    local_root: Path,
+) -> dict[str, str]:
+    """Build the scrubbed fixture child environment for a validated record."""
+    return _fixture_direct_child_environment(record, local_root)
+
+
 _DEFAULT_BOUNDARY = ParentRootSideEffectBoundary()
 def _public_input_path(value: Path | str, name: str) -> Path:
     """Normalize public path arguments without exposing arbitrary values."""
@@ -6166,6 +6192,8 @@ def public_session(
     *,
     invocation_script: Path | str,
     purpose: str,
+    independent: bool = False,
+    cleanup_state: bool = False,
 ) -> Iterator[SessionResolutionResult]:
     """Enter one direct or inherited authenticated side-effect session.
 
@@ -6176,7 +6204,17 @@ def public_session(
     purpose_object: object = cast(object, purpose)
     if not isinstance(purpose_object, str) or not purpose_object or purpose_object != purpose_object.strip():
         raise ParentRootSideEffectError(ParentRootReject.INPUT_INVALID, "purpose is invalid")
+    if type(independent) is not bool:
+        raise ParentRootSideEffectError(ParentRootReject.INPUT_INVALID, "independent is invalid")
+    if type(cleanup_state) is not bool:
+        raise ParentRootSideEffectError(ParentRootReject.INPUT_INVALID, "cleanup_state is invalid")
     env = os.environ
+    if independent and (
+        env.get(SIDE_EFFECT_PARENT_ROOT_ENV)
+        or env.get(SIDE_EFFECT_HANDOFF_ENV)
+        or env.get(SIDE_EFFECT_REQUIRED_ENV) == "1"
+    ):
+        raise _v2_error("independent_session_requires_clean_environment")
     has_side_effect_channel = bool(env.get(SIDE_EFFECT_PARENT_ROOT_ENV) or env.get(SIDE_EFFECT_HANDOFF_ENV))
     if env.get(SIDE_EFFECT_REQUIRED_ENV) == "1" and not (
         env.get(SIDE_EFFECT_PARENT_ROOT_ENV) and env.get(SIDE_EFFECT_HANDOFF_ENV)
@@ -6186,7 +6224,13 @@ def public_session(
     issuer = _V2_ISSUER_CONTEXT.get()
     owns_session = False
     result: SessionResolutionResult
-    if has_side_effect_channel:
+    if independent:
+        _cwd, parent_root, source_root = _public_invocation_owner(invocation_script)
+        result, issuer = _v2_public_bootstrap(
+            parent_root=parent_root, purpose=purpose, source_root=source_root
+        )
+        owns_session = True
+    elif has_side_effect_channel:
         cwd = _physical(Path.cwd(), strict=True)
         result = resolve_parent_side_effect_session_v2(env=env, observed_cwd=cwd)
         _public_invocation_path(invocation_script, cwd)
@@ -6228,6 +6272,12 @@ def public_session(
         except BaseException as exc:
             if cleanup_error is None:
                 cleanup_error = exc
+        if cleanup_state and owns_session:
+            try:
+                _v2_abort_session(result.record)
+            except BaseException as exc:
+                if cleanup_error is None:
+                    cleanup_error = exc
         if cleanup_error is not None and not body_failed:
             raise cleanup_error
 

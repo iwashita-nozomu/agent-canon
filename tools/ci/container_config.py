@@ -728,17 +728,6 @@ def validate_public_test_git_context(root: Path) -> list[Finding]:
             r'git clone --bare --no-local "\$\{source_root\}" '
             r'"\$\{clone_probe\}/agent-canon\.git"'
         ),
-        "canonical-graph-build-required": (
-            r'"\$\{runtime_root\}/tools/agent-canon/bin/agent-canon" graph build '
-            r'--root "\$\{source_root\}" --profile default --format json'
-        ),
-        "canonical-graph-artifact-readback-required": (
-            r'test -s "\$\{source_root\}/\.agent-canon/knowledge-graph/graph\.sqlite"'
-        ),
-        "canonical-graph-status-readback-required": (
-            r'"\$\{runtime_root\}/tools/agent-canon/bin/agent-canon" graph status '
-            r'--root "\$\{source_root\}" --profile default --format json'
-        ),
     }
     for detail, pattern in dockerfile_rules.items():
         if re.search(pattern, normalized) is None:

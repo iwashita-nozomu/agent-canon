@@ -148,17 +148,6 @@ RUN source_root=/opt/agent-canon-parent/vendor/agent-canon \
     && CARGO_TARGET_DIR="${runtime_root}/cargo-target" \
       cargo test --locked --offline --no-run \
       --manifest-path "${source_root}/rust/agent-canon/Cargo.toml" \
-    && graph_build_output="${runtime_root}/graph-build.json" \
-    && "${runtime_root}/tools/agent-canon/bin/agent-canon" graph build \
-      --root "${source_root}" --profile default --format json \
-      > "${graph_build_output}" \
-    && test "$(jq -r '.status // "invalid"' "${graph_build_output}")" = "fresh" \
-    && test -s "${source_root}/.agent-canon/knowledge-graph/graph.sqlite" \
-    && graph_status_output="${runtime_root}/graph-status.json" \
-    && "${runtime_root}/tools/agent-canon/bin/agent-canon" graph status \
-      --root "${source_root}" --profile default --format json \
-      > "${graph_status_output}" \
-    && test "$(jq -r '.status // "invalid"' "${graph_status_output}")" = "fresh" \
     && python3 -m py_compile \
       "${source_root}/tools/agent_tools/surface_manifest.py" \
       "${source_root}/tools/agent_tools/repo_structure_contract.py" \

@@ -378,8 +378,8 @@ def test_public_standalone_docker_route_requires_no_runtime_packs() -> None:
     assert report.packs == ()
 
 
-def test_public_docker_image_prebuilds_rust_runtime_test_target_and_graph() -> None:
-    """The parent/vendor image owns the CLI, cargo target, and fresh graph."""
+def test_public_docker_image_prebuilds_rust_runtime_test_target() -> None:
+    """The parent/vendor image owns the CLI and offline Rust test target."""
     dockerfile = PUBLIC_DOCKERFILE.read_text(encoding="utf-8")
     wrapper = (PROJECT_ROOT / "tools" / "bin" / "agent-canon").read_text(
         encoding="utf-8"
@@ -394,40 +394,24 @@ def test_public_docker_image_prebuilds_rust_runtime_test_target_and_graph() -> N
     assert 'CARGO_TARGET_DIR="${runtime_root}/cargo-target"' in dockerfile
     assert "cargo fetch" not in dockerfile
     assert '--root "${runtime_root}/tools/agent-canon"' in dockerfile
-    assert '"${runtime_root}/tools/agent-canon/bin/agent-canon" graph build' in dockerfile
-    assert '"${source_root}/.agent-canon/knowledge-graph/graph.sqlite"' in dockerfile
-    assert '"${runtime_root}/tools/agent-canon/bin/agent-canon" graph status' in dockerfile
+    assert '"${runtime_root}/tools/agent-canon/bin/agent-canon" graph build' not in dockerfile
+    assert '"${source_root}/.agent-canon/knowledge-graph/graph.sqlite"' not in dockerfile
+    assert '"${runtime_root}/tools/agent-canon/bin/agent-canon" graph status' not in dockerfile
     assert "/opt/agent-canon-runtime" not in wrapper
     assert "AGENT_CANON_TEST_PARENT_ROOT" not in dockerfile
 
 
-def test_public_docker_image_requires_fresh_graph_staging(tmp_path: Path) -> None:
-    """The public image validator rejects removal of the graph precondition."""
-    module = load_container_config_module()
-    root = tmp_path / "source"
-    write_file(
-        root,
-        ".dockerignore",
-        (PROJECT_ROOT / ".dockerignore").read_text(encoding="utf-8"),
-    )
-    dockerfile = (PROJECT_ROOT / "docker/Dockerfile").read_text(encoding="utf-8")
-    write_file(root, "docker/Dockerfile", dockerfile)
+def test_public_docker_route_leaves_graph_analysis_explicit() -> None:
+    """Standard image acceptance does not remove the explicit graph route."""
+    dockerfile = PUBLIC_DOCKERFILE.read_text(encoding="utf-8")
+    graph_tests = (
+        PROJECT_ROOT / "tests" / "agent_tools" / "test_dependency_manifest_tools.py"
+    ).read_text(encoding="utf-8")
 
-    assert module.validate_public_test_git_context(root) == []
-
-    write_file(
-        root,
-        "docker/Dockerfile",
-        dockerfile.replace(
-            '"${runtime_root}/tools/agent-canon/bin/agent-canon" graph build',
-            '"${runtime_root}/tools/agent-canon/bin/agent-canon" graph removed',
-            1,
-        ),
-    )
-    details = {
-        finding.detail for finding in module.validate_public_test_git_context(root)
-    }
-    assert "canonical-graph-build-required" in details
+    assert "graph build" not in dockerfile
+    assert "graph status" not in dockerfile
+    assert "--ensure-graph" in graph_tests
+    assert "graph.sqlite" in graph_tests
 
 
 @pytest.mark.parametrize(

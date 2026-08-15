@@ -2,6 +2,7 @@
 # contract test
 # responsibility Verifies authenticated parent capabilities, child state, publication, and exact cleanup.
 # upstream implementation ../../tools/agent_tools/parent_root_side_effects.py owns parent-local filesystem effects
+# downstream implementation ../../tools/agent_tools/fixture_spawn.py owns nested fixture mode selection
 # @dependency-end
 
 """Focused tests for the parent-root side-effect boundary."""
@@ -25,7 +26,11 @@ from pathlib import Path
 import pytest
 import tools.agent_tools.parent_root_side_effects as side_effects
 from tools.agent_tools import work_log, workflow_monitor
-from tools.agent_tools.fixture_spawn import run_fixture_command
+from tools.agent_tools.fixture_spawn import (
+    bootstrap_fixture_public_environment,
+    record_environment,
+    run_fixture_command,
+)
 from tools.agent_tools.parent_root_side_effects import (
     SCHEMA_SESSION_RECORD_V2,
     ParentRootAttestationRequest,
@@ -443,6 +448,53 @@ def test_fixture_direct_adapter_scrubs_identity_and_cleans_owned_paths(
         assert receipt.returncode == 0
         assert receipt.cleanup.status == "clean"
         assert receipt.cleanup.created_paths == receipt.cleanup.removed_paths
+
+
+def test_fixture_bootstrap_modes_preserve_enclosing_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One record survives ordinary, product, and independent synthetic modes."""
+    git_repo(tmp_path, remote="https://example.invalid/mode-parent.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/mode-source.git")
+    git_repo(fixture, remote="https://example.invalid/mode-fixture.git")
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        source_cwd = Path.cwd()
+        with bootstrap_fixture_public_environment(
+            mode="ordinary_tool", record=record, fixture_cwd=fixture
+        ) as ordinary:
+            assert Path.cwd() == source_cwd
+            assert ordinary.mode == "ordinary_tool"
+            assert ordinary[side_effects.SIDE_EFFECT_HANDOFF_ENV]
+        with bootstrap_fixture_public_environment(
+            mode="product_fixture",
+            record=record,
+            fixture_cwd=fixture,
+            argv=(
+                sys.executable,
+                "-c",
+                "import os; assert not any(k.startswith('AGENT_CANON_SIDE_EFFECT_') for k in os.environ); assert 'PYTHONPATH' not in os.environ",
+            ),
+        ) as product:
+            assert Path.cwd() == source_cwd
+            assert product.receipt is not None
+            assert product.receipt.returncode == 0
+        with bootstrap_fixture_public_environment(
+            mode="synthetic_tool", record=record, fixture_cwd=fixture
+        ) as synthetic:
+            assert Path.cwd() == source_cwd
+            assert synthetic.session is not None
+            assert synthetic[side_effects.SIDE_EFFECT_HANDOFF_ENV]
+            child = subprocess.run(
+                [sys.executable, "-c", "import os; assert os.environ['AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED'] == '1'"],
+                cwd=fixture,
+                env=dict(synthetic),
+                check=False,
+            )
+            assert child.returncode == 0
+        with record_environment(cwd=source_cwd) as environment:
+            assert environment[side_effects.SIDE_EFFECT_HANDOFF_ENV]
 
 
 def test_fixture_direct_adapter_rejects_missing_record_before_spawn(

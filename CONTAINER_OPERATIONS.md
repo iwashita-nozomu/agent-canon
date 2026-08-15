@@ -69,10 +69,11 @@ docker run --rm agent-canon testrunner.sh
 
 The image copies the source tree, source tests, typed test list, and runner into
 an immutable image layer. It installs the standard Python and native test
-dependencies while building and materializes one source-root dependency graph
-with the prebuilt Rust CLI, then reads its status back as `fresh`. The runner
-does not mount a workspace, install dependencies at runtime, discover host
-tests, or ask a parent repository to interpret the list. `test/testlist.toml`
+dependencies while building and prebuilds the Rust CLI and offline test target.
+Normal dependency validation is source-owned; persisted graph state is an
+explicit graph-analysis capability and is not an image-build prerequisite. The
+runner does not mount a workspace, install dependencies at runtime, discover
+host tests, or ask a parent repository to interpret the list. `test/testlist.toml`
 uses `[[tests]]` records with ordered token-array commands and typed
 `environment`, `require`, `code_owner`, and `responsibility_scope` fields.
 `require = "docker"` selects the canonical
@@ -84,10 +85,10 @@ Malformed, duplicate, or unsupported records fail before any command starts,
 and a started route succeeds only when at least one record is selected and all
 selected records pass.
 
-The image-build graph is test bootstrap state for this immutable source
-snapshot. Production graph readers retain their independent fail-closed
-precondition: a status or query that is not `fresh` remains an error and never
-rebuilds the graph implicitly.
+Explicit graph readers retain their independent fail-closed precondition: a
+status or query that is not `fresh` remains an error and never rebuilds the
+graph implicitly. Fixture-local graph-analysis tests may still create and read
+their own graph state; that route is separate from standard image acceptance.
 
 Parent repositories delegate to this source-Git-root command. They do not
 mirror, wrap, or parse AgentCanon test files. Standalone AgentCanon `notes/**`

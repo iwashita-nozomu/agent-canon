@@ -515,42 +515,61 @@ print(json.dumps({"paths": sys.path, "managed": managed}))
 
 import os
 import subprocess
-import time
+import sys
 from pathlib import Path
 
 fixture = Path(os.environ["TMPDIR"]) / "nested-fixture"
 fixture.mkdir()
 subprocess.run(["git", "init", "--quiet", str(fixture)], check=True)
-os.chdir(fixture)
-from tools.agent_tools.parent_root_side_effects import resolve_parent_side_effect_session_v2
-from tools.agent_tools.fixture_spawn import run_fixture_command
-record = resolve_parent_side_effect_session_v2(
-    env=os.environ,
-    observed_cwd=Path.cwd().resolve(),
+from tools.agent_tools.fixture_spawn import (
+    bootstrap_fixture_public_environment,
+    record_session_from_environment,
 )
-assert record.record.role == "record"
-assert record.record.role != "supervisor"
-identity_keys = (
-    "AGENT_CANON_PARENT_ROOT",
-    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
-    "AGENT_CANON_SOURCE_ROOT",
-    "AGENT_CANON_ROOT",
-    "AGENT_CANON_CHILD_HANDOFF",
-)
-for key in identity_keys:
-    assert key not in os.environ
-receipt = run_fixture_command(
-    record=record,
-    fixture_cwd=fixture,
-    now_mono_ns=time.monotonic_ns(),
-    argv=(
-        "python3",
-        "-c",
-        "import os, subprocess; assert not any(key.startswith('AGENT_CANON_SIDE_EFFECT_') for key in os.environ); assert all(key not in os.environ for key in ('AGENT_CANON_PARENT_ROOT', 'AGENT_CANON_ACTIVE_REPOSITORY_ROOT', 'AGENT_CANON_SOURCE_ROOT', 'AGENT_CANON_ROOT', 'AGENT_CANON_CHILD_HANDOFF')); print(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip())",
-    ),
-)
-assert receipt.returncode == 0
-assert receipt.cleanup.status == "clean"
+
+source = Path.cwd()
+with record_session_from_environment() as record:
+    with bootstrap_fixture_public_environment(
+        mode="ordinary_tool", record=record, fixture_cwd=fixture
+    ) as ordinary:
+        ordinary_result = subprocess.run(
+            [sys.executable, "-c", "import os; assert os.environ['AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED'] == '1'"],
+            cwd=source,
+            env=dict(ordinary),
+            check=False,
+        )
+        assert ordinary_result.returncode == 0
+    with bootstrap_fixture_public_environment(
+        mode="product_fixture",
+        record=record,
+        fixture_cwd=fixture,
+        argv=(
+            sys.executable,
+            "-c",
+            "import os, subprocess; assert not any(key.startswith('AGENT_CANON_SIDE_EFFECT_') for key in os.environ); assert 'PYTHONPATH' not in os.environ; print(subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], text=True).strip())",
+        ),
+    ) as product:
+        assert product.receipt is not None
+        assert product.receipt.returncode == 0
+    with bootstrap_fixture_public_environment(
+        mode="synthetic_tool", record=record, fixture_cwd=fixture
+    ) as synthetic:
+        synthetic_result = subprocess.run(
+            [sys.executable, "-c", "import os; assert os.environ['AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED'] == '1'"],
+            cwd=fixture,
+            env=dict(synthetic),
+            check=False,
+        )
+        assert synthetic_result.returncode == 0
+    with bootstrap_fixture_public_environment(
+        mode="ordinary_tool", record=record, fixture_cwd=fixture
+    ) as final_ordinary:
+        final_result = subprocess.run(
+            [sys.executable, "-c", "import os; assert os.environ['AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED'] == '1'"],
+            cwd=source,
+            env=dict(final_ordinary),
+            check=False,
+        )
+        assert final_result.returncode == 0
 """,
             encoding="utf-8",
         )

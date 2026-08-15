@@ -35,10 +35,9 @@ def test_image_sources_define_real_parent_vendor_topology() -> None:
     assert "WORKDIR /opt/agent-canon-parent/vendor/agent-canon" in dockerfile
     assert "cargo test --locked --offline --no-run" in dockerfile
     assert 'git clone --bare --no-local "${source_root}" "${clone_probe}/agent-canon.git"' in dockerfile
-    assert "graph build" in dockerfile
-    assert "graph status" in dockerfile
-    assert '--root "${source_root}" --profile default --format json' in dockerfile
-    assert 'test -s "${source_root}/.agent-canon/knowledge-graph/graph.sqlite"' in dockerfile
+    assert "graph build" not in dockerfile
+    assert "graph status" not in dockerfile
+    assert 'test -s "${source_root}/.agent-canon/knowledge-graph/graph.sqlite"' not in dockerfile
     assert "AGENT_CANON_TEST_PARENT_ROOT" not in runner
     assert "child_process_environment" not in runner
 
@@ -64,6 +63,23 @@ def test_runner_source_has_explicit_session_and_immutable_import_closure() -> No
     assert "SOURCE_ROOT / \"tools\"" in entrypoint
     assert "SOURCE_ROOT / \"tools\" / \"agent_tools\"" in entrypoint
     assert "sys.path[-len(repository_origins):]" in entrypoint
+
+
+def test_fixture_facade_centralizes_positive_nested_environment_modes() -> None:
+    """Positive nested helpers use one facade; capability negatives stay typed."""
+    facade = (
+        PROJECT_ROOT / "tools" / "agent_tools" / "fixture_spawn.py"
+    ).read_text(encoding="utf-8")
+
+    assert "def bootstrap_fixture_public_environment(" in facade
+    assert '"ordinary_tool"' in facade
+    assert '"product_fixture"' in facade
+    assert '"synthetic_tool"' in facade
+    assert "run_fixture_command(" in facade
+    assert "independent=True" in facade
+    assert "cleanup_state=True" in facade
+    assert "os.environ.clear()" in facade
+    assert "issue_child(" not in facade
 
 
 def test_built_image_exposes_exact_gitlink_and_is_removed_after_probe() -> None:
@@ -128,25 +144,6 @@ runtime = parent / '.agent-canon' / 'image-runtime'
 assert (runtime / 'tools' / 'agent-canon' / 'bin' / 'agent-canon').is_file()
 assert os.access(runtime / 'tools' / 'agent-canon' / 'bin' / 'agent-canon', os.X_OK)
 assert (runtime / 'cargo-target').is_dir()
-graph = source / '.agent-canon' / 'knowledge-graph' / 'graph.sqlite'
-assert graph.is_file()
-graph_status = subprocess.run(
-    [
-        str(runtime / 'tools' / 'agent-canon' / 'bin' / 'agent-canon'),
-        'graph',
-        'status',
-        '--root',
-        str(source),
-        '--profile',
-        'default',
-        '--format',
-        'json',
-    ],
-    check=True,
-    capture_output=True,
-    text=True,
-)
-assert json.loads(graph_status.stdout)['status'] == 'fresh'
 clone_probe = source / '.agent-canon' / 'topology-clone'
 subprocess.run(
     ['git', 'clone', '--bare', '--no-local', str(source), str(clone_probe)],
