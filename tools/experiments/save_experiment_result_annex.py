@@ -26,6 +26,17 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 
+# A direct filesystem invocation places ``tools/experiments`` on ``sys.path``;
+# add the repository root so the same public module imports as ``python -m``.
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from tools.experiments.experiment_identity import (
+    ExperimentIdentity,
+    report_relative_path,
+    result_relative_path,
+)
+
 EXPERIMENTS = "experiments"
 REPORT = "report"
 RESULT = "result"
@@ -68,6 +79,7 @@ class ResultIdentity:
     result_dir: Path
     result_relative: Path
     topic: str
+    variant: str
     run_name: str
     report_path: Path | None
     source_branch: str
@@ -215,6 +227,8 @@ def _validate_source_components(source_root: Path, relative: Path) -> None:
     current = source_root
     for component in relative.parts:
         current = current / component
+        if not os.path.lexists(current):
+            break
         info = _lstat(current)
         if stat.S_ISLNK(info.st_mode):
             raise RetentionError(f"source path contains a symlink: {current}")
@@ -226,17 +240,18 @@ def _parse_result_identity(source_root: Path, result_dir: Path) -> ResultIdentit
         raise RetentionError(f"result-dir must be an existing directory: {result_dir}")
     result_relative = result_dir.relative_to(source_root)
     parts = result_relative.parts
-    if len(parts) != 4 or parts[0] != EXPERIMENTS or parts[2] != RESULT:
+    if len(parts) != 5 or parts[0] != EXPERIMENTS or parts[2] != RESULT:
         raise RetentionError(
-            "result-dir must be experiments/<topic>/result/<run_name>: "
+            "result-dir must be experiments/<topic>/result/<variant>/<run_name>: "
             f"{result_relative}"
         )
-    if any(not part or part in {".", ".."} for part in (parts[1], parts[3])):
-        raise RetentionError(f"result-dir has an invalid topic or run name: {result_relative}")
+    run_identity = ExperimentIdentity(parts[1], parts[3], parts[4])
+    if result_relative != result_relative_path(run_identity):
+        raise RetentionError(f"result-dir has an invalid identity: {result_relative}")
     _validate_source_components(source_root, result_relative)
-    report_path = source_root / EXPERIMENTS / REPORT / f"{parts[3]}.md"
+    report_path = source_root / report_relative_path(run_identity)
+    _validate_source_components(source_root, report_path.relative_to(source_root))
     if os.path.lexists(report_path):
-        _validate_source_components(source_root, report_path.relative_to(source_root))
         _ensure_regular(report_path, label="report")
     else:
         report_path = None
@@ -251,8 +266,9 @@ def _parse_result_identity(source_root: Path, result_dir: Path) -> ResultIdentit
         source_root=source_root,
         result_dir=result_dir,
         result_relative=result_relative,
-        topic=parts[1],
-        run_name=parts[3],
+        topic=run_identity.topic,
+        variant=run_identity.variant,
+        run_name=run_identity.run_name,
         report_path=report_path,
         source_branch=source_branch,
         source_commit=source_commit,
@@ -311,15 +327,29 @@ def _scan_source_tree(identity: ResultIdentity) -> tuple[tuple[ArchiveEntry, ...
         identity.source_root / EXPERIMENTS / identity.topic / RESULT,
         True,
     )
+    variant_parent = f"{EXPERIMENTS}/{identity.topic}/{RESULT}/{identity.variant}"
+    entries[variant_parent] = ArchiveEntry(
+        variant_parent,
+        identity.source_root / EXPERIMENTS / identity.topic / RESULT / identity.variant,
+        True,
+    )
 
     if identity.report_path is not None:
-        report_archive = f"{EXPERIMENTS}/{REPORT}/{identity.run_name}.md"
-        report_parent = f"{EXPERIMENTS}/{REPORT}"
-        entries[report_parent] = ArchiveEntry(
-            report_parent,
-            identity.source_root / EXPERIMENTS / REPORT,
-            True,
+        report_archive = report_relative_path(
+            ExperimentIdentity(identity.topic, identity.variant, identity.run_name)
+        ).as_posix()
+        report_parents = (
+            Path(EXPERIMENTS) / REPORT,
+            Path(EXPERIMENTS) / REPORT / identity.topic,
+            Path(EXPERIMENTS) / REPORT / identity.topic / identity.variant,
         )
+        for report_parent_path in report_parents:
+            report_parent = report_parent_path.as_posix()
+            entries[report_parent] = ArchiveEntry(
+                report_parent,
+                identity.source_root / report_parent_path,
+                True,
+            )
         _ensure_regular(identity.report_path, label="report")
         size, digest = _sha256_file(identity.report_path)
         entries[report_archive] = ArchiveEntry(report_archive, identity.report_path, False)
@@ -361,11 +391,7 @@ def _manifest_bytes(
         }
         for item in sorted(source_files, key=lambda item: item.archive_path)
     ]
-    report_path = (
-        f"{EXPERIMENTS}/{REPORT}/{identity.run_name}.md"
-        if identity.report_path is not None
-        else None
-    )
+    report_path = identity.report_path.relative_to(identity.source_root).as_posix() if identity.report_path else None
     return _canonical_json(
         {
             "append_only": True,
@@ -387,6 +413,7 @@ def _manifest_bytes(
                 "name": identity.run_name,
                 "result_dir": identity.result_relative.as_posix(),
                 "topic": identity.topic,
+                "variant": identity.variant,
             },
             "schema": "git-annex-result-retention/v1",
             "source": {
@@ -595,6 +622,10 @@ def _validate_visible_paths(annex_root: Path) -> None:
                 len(relative_root) == 3
                 and relative_root[0] == EXPERIMENTS
                 and relative_root[2] == RESULT
+            ) or (
+                len(relative_root) == 4
+                and relative_root[0] == EXPERIMENTS
+                and relative_root[2] == RESULT
             )
             if not valid_directory:
                 raise RetentionError(
@@ -608,11 +639,11 @@ def _validate_visible_paths(annex_root: Path) -> None:
                 continue
             parts = relative.split("/")
             if (
-                len(parts) == 4
+                len(parts) == 5
                 and parts[0] == EXPERIMENTS
                 and parts[2] == RESULT
-                and parts[3].endswith(".tar.gz")
-                and parts[3] != ".tar.gz"
+                and parts[4].endswith(".tar.gz")
+                and parts[4] != ".tar.gz"
             ):
                 continue
             raise RetentionError(f"annex repo contains an unexpected visible path: {relative}")
@@ -760,7 +791,10 @@ def _commit_archive(
     include_gitattributes: bool,
 ) -> str:
     """Create exactly one normal-branch commit for this archive."""
-    message = f"Retain experiment result archive: {identity.topic}/{identity.run_name}"
+    message = (
+        "Retain experiment result archive: "
+        f"{identity.topic}/{identity.variant}/{identity.run_name}"
+    )
     paths = [archive_relative.as_posix()]
     if include_gitattributes:
         paths.append(".gitattributes")
@@ -775,7 +809,13 @@ def save_result(identity: ResultIdentity, annex_root: Path) -> ArchiveResult:
     """Create, verify, annex, and commit one result archive."""
     _validate_source_and_annex_roots(identity.source_root, annex_root)
     state = _validate_annex_repo(annex_root)
-    archive_relative = Path(EXPERIMENTS) / identity.topic / RESULT / f"{identity.run_name}.tar.gz"
+    archive_relative = (
+        Path(EXPERIMENTS)
+        / identity.topic
+        / RESULT
+        / identity.variant
+        / f"{identity.run_name}.tar.gz"
+    )
     archive_path = annex_root / archive_relative
     if os.path.lexists(archive_path):
         raise RetentionError(f"archive target already exists: {archive_path}")
@@ -884,7 +924,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="append",
         required=True,
         type=Path,
-        help="Exactly one experiments/<topic>/result/<run_name> directory.",
+        help="Exactly one experiments/<topic>/result/<variant>/<run_name> directory.",
     )
     parser.add_argument(
         "--annex-repo",

@@ -15,11 +15,15 @@
 
 from __future__ import annotations
 
-import os
 import json
+import os
 import subprocess
 import sys
+from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
 
@@ -27,12 +31,6 @@ try:
     import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
-from pathlib import Path
-
-from tests.tools.resource_plan_test_evidence import (
-    SnapshotResourceProbe,
-    discover_test_resources,
-)
 
 from tools.experiments.execution_resource_plan import (
     GPUDevice,
@@ -46,31 +44,28 @@ from tools.experiments.execution_resource_plan import (
     managed_run_adapter_integration_contract,
     plan_gpu_allocation,
 )
+from tools.experiments.experiment_identity import ExperimentIdentity
+from tools.experiments.run_managed_experiment import (
+    ReservationReceipt,
+    RunContext,
+    build_run_paths,
+    reserve_run_paths,
+    rollback_empty_reservation,
+)
 
-CHECK_SCRIPT = (
-    Path(__file__).resolve().parents[2]
-    / "tools"
-    / "ci"
-    / "check_experiment_registry.py"
+from tests.tools.resource_plan_test_evidence import (
+    SnapshotResourceProbe,
+    discover_test_resources,
 )
-CREATE_TOPIC_SCRIPT = (
-    Path(__file__).resolve().parents[2]
-    / "tools"
-    / "experiments"
-    / "create_experiment_topic.py"
-)
-SCRIPT = (
-    Path(__file__).resolve().parents[2]
-    / "tools"
-    / "experiments"
-    / "run_managed_experiment.py"
-)
+
 SYNC_CONTEXT_SCRIPT = (
     Path(__file__).resolve().parents[2]
     / "tools"
     / "experiments"
     / "sync_experiment_registry_context.py"
 )
+SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "experiments" / "run_managed_experiment.py"
+CHECK_SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "ci" / "check_experiment_registry.py"
 CANONICAL_ENTRYPOINT = "experiments/demo_topic/run.py"
 DEFAULT_INNER_COMMAND = (
     f"python3 {CANONICAL_ENTRYPOINT} --run-dir {{run_dir}} "
@@ -81,7 +76,8 @@ FORMAL_INNER_COMMAND = (
     "--config {config_path} --mode formal"
 )
 RECURSIVE_RUNNER_COMMAND = (
-    "python3 tools/experiments/run_managed_experiment.py --topic demo_topic"
+    "python3 -m tools.experiments.run_managed_experiment "
+    "--topic demo_topic --variant default"
 )
 
 
@@ -106,8 +102,9 @@ def write_template_topic(repo_root: Path) -> None:
     template_dir = repo_root / "vendor" / "agent-canon" / "templates" / "experiments" / "_template"
     (template_dir / "README.md").write_text(
         "# Experiment Topic Template\n\n"
-        "registered command: `python3 tools/experiments/run_managed_experiment.py "
-        "--topic <topic> --use-registered-command <registered-command>`\n",
+        "registered command: `python3 -m tools.experiments.run_managed_experiment "
+        "--topic <topic> --variant <variant> "
+        "--use-registered-command <registered-command>`\n",
         encoding="utf-8",
     )
     (template_dir / "cases.py").write_text(
@@ -200,11 +197,345 @@ def write_demo_registry(repo_root: Path) -> None:
     )
 
 
+def reservation_context(repo_root: Path, run_name: str = "run.a") -> RunContext:
+    """Build the smallest real context needed by reservation tests."""
+    identity = ExperimentIdentity("demo_topic", "smoke.v1", run_name)
+    topic_dir = repo_root / "experiments" / identity.topic
+    paths = build_run_paths(
+        topic_dir,
+        identity,
+        repo_root
+        / "experiments"
+        / "report"
+        / identity.topic
+        / identity.variant
+        / f"{identity.run_name}.md",
+    )
+    return RunContext(
+        repo_root=repo_root,
+        identity=identity,
+        topic_dir=topic_dir,
+        paths=paths,
+        registry=SimpleNamespace(  # type: ignore[arg-type]
+            path=repo_root / "experiments" / "registry.toml",
+            entry={},
+            defaults={},
+            available=False,
+        ),
+        command=SimpleNamespace(command=[]),  # type: ignore[arg-type]
+        created_at="2026-01-01T00:00:00Z",
+        git=SimpleNamespace(branch="main", commit="commit", status_short=[]),  # type: ignore[arg-type]
+    )
+
+
 def init_fake_git_repo(repo_root: Path) -> None:
     """Initialize git metadata for the fake repo."""
     subprocess.run(
         ["git", "init"], cwd=repo_root, check=True, capture_output=True, text=True
     )
+
+
+def test_managed_runner_requires_variant_at_cli_boundary(tmp_path: Path) -> None:
+    """Omitting variant fails before topic or result filesystem mutation."""
+    result = subprocess.run(
+        [sys.executable, "-m", "tools.experiments.run_managed_experiment", "--topic", "demo_topic", "--", "true"],
+        cwd=Path(__file__).resolve().parents[2],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 2
+    assert "--variant" in result.stderr
+    assert not (tmp_path / "experiments").exists()
+
+
+def test_existing_report_fails_before_result_reservation(tmp_path: Path) -> None:
+    """An existing report blocks the run without creating a result directory."""
+    repo_root = build_repo(tmp_path)
+    context = reservation_context(repo_root)
+    context.paths.report_path.parent.mkdir(parents=True)
+    context.paths.report_path.write_text("existing\n", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="report already exists"):
+        reserve_run_paths(context, skip_report_init=False)
+
+    assert not context.paths.result_dir.exists()
+    assert context.paths.report_path.read_text(encoding="utf-8") == "existing\n"
+
+
+def test_owned_empty_reservation_rolls_back_without_residue(tmp_path: Path) -> None:
+    """An owned empty reservation removes only its own result and report paths."""
+    repo_root = build_repo(tmp_path)
+    context = reservation_context(repo_root)
+    receipt = reserve_run_paths(context, skip_report_init=False)
+
+    assert context.paths.result_dir.is_dir()
+    assert context.paths.report_path.is_file()
+    assert rollback_empty_reservation(receipt)
+    assert not context.paths.result_dir.exists()
+    assert not context.paths.report_path.exists()
+
+
+def test_skip_report_init_rolls_back_result_without_report_parent(
+    tmp_path: Path,
+) -> None:
+    """An uncreated report parent is neutral during result-only rollback."""
+    repo_root = build_repo(tmp_path)
+    context = reservation_context(repo_root)
+    report_parent = context.paths.report_path.parent
+    assert not report_parent.exists()
+
+    receipt = reserve_run_paths(context, skip_report_init=True)
+
+    assert context.paths.result_dir.is_dir()
+    assert not report_parent.exists()
+    assert rollback_empty_reservation(receipt)
+    assert not context.paths.result_dir.exists()
+    assert not report_parent.exists()
+    assert (repo_root / "experiments" / "report").is_dir()
+
+
+@pytest.mark.parametrize("escaped_component", ("result", "variant"))
+def test_build_run_paths_rejects_symlinked_result_components(
+    tmp_path: Path, escaped_component: str
+) -> None:
+    """Reject a result or variant root that would redirect reservation writes."""
+    repo_root = build_repo(tmp_path)
+    identity = ExperimentIdentity("demo_topic", "smoke.v1", "run.a")
+    topic_dir = repo_root / "experiments" / identity.topic
+    result_root = topic_dir / "result"
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    if escaped_component == "result":
+        result_root.rename(topic_dir / "result-real")
+        result_root.symlink_to(outside, target_is_directory=True)
+    else:
+        variant_root = result_root / identity.variant
+        variant_root.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="symlink"):
+        build_run_paths(
+            topic_dir,
+            identity,
+            repo_root
+            / "experiments"
+            / "report"
+            / identity.topic
+            / identity.variant
+            / f"{identity.run_name}.md",
+        )
+    assert not list(outside.iterdir())
+
+
+def test_rollback_rejects_replaced_result_parent_inode(tmp_path: Path) -> None:
+    """Do not remove a reservation when its newly-created result parent changed."""
+    repo_root = build_repo(tmp_path)
+    context = reservation_context(repo_root)
+    receipt = reserve_run_paths(context, skip_report_init=False)
+    assert not receipt.result_parent_preexisted
+
+    replaced = replace(
+        receipt,
+        result_parent_inode=receipt.result_parent_inode + 1,
+    )
+    assert not rollback_empty_reservation(replaced)
+    assert context.paths.result_dir.is_dir()
+    assert context.paths.report_path.is_file()
+
+
+def test_rollback_rejects_replaced_report_parent_inode(tmp_path: Path) -> None:
+    """Do not remove a reservation when its newly-created report parent changed."""
+    repo_root = build_repo(tmp_path)
+    context = reservation_context(repo_root)
+    receipt = reserve_run_paths(context, skip_report_init=False)
+    assert not receipt.report_parent_preexisted
+    assert receipt.report_parent_inode is not None
+
+    replaced = replace(
+        receipt,
+        report_parent_inode=cast(int, receipt.report_parent_inode) + 1,
+    )
+    assert not rollback_empty_reservation(replaced)
+    assert context.paths.result_dir.is_dir()
+    assert context.paths.report_path.is_file()
+
+
+@pytest.mark.parametrize(
+    ("script_path", "module_name"),
+    (
+        (
+            "tools/experiments/run_managed_experiment.py",
+            "tools.experiments.run_managed_experiment",
+        ),
+        (
+            "tools/experiments/save_experiment_result_annex.py",
+            "tools.experiments.save_experiment_result_annex",
+        ),
+        (
+            "tools/experiments/update_latest_result.py",
+            "tools.experiments.update_latest_result",
+        ),
+        (
+            "tools/experiments/create_experiment_topic.py",
+            "tools.experiments.create_experiment_topic",
+        ),
+        (
+            "tools/ci/check_experiment_registry.py",
+            "tools.ci.check_experiment_registry",
+        ),
+    ),
+)
+def test_public_experiment_entrypoints_support_direct_and_module_forms(
+    script_path: str, module_name: str
+) -> None:
+    """Both documented invocation forms work without PYTHONPATH setup."""
+    repo_root = Path(__file__).resolve().parents[2]
+    environment = os.environ.copy()
+    environment.pop("PYTHONPATH", None)
+    direct = subprocess.run(
+        [sys.executable, script_path, "--help"],
+        cwd=repo_root,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    module = subprocess.run(
+        [sys.executable, "-m", module_name, "--help"],
+        cwd=repo_root,
+        env=environment,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert direct.returncode == 0, direct.stderr
+    assert module.returncode == 0, module.stderr
+    assert "usage:" in direct.stdout
+    assert "usage:" in module.stdout
+
+
+def test_nonempty_reservation_is_never_rolled_back(tmp_path: Path) -> None:
+    """Rollback preserves a result once any artifact has been written."""
+    repo_root = build_repo(tmp_path)
+    context = reservation_context(repo_root)
+    receipt = reserve_run_paths(context, skip_report_init=False)
+    artifact = context.paths.result_dir / "partial.json"
+    artifact.write_text("{}\n", encoding="utf-8")
+
+    assert not rollback_empty_reservation(receipt)
+    assert artifact.is_file()
+    assert context.paths.report_path.is_file()
+
+
+def test_rollback_preserves_same_bytes_replacement(tmp_path: Path) -> None:
+    """Rollback does not unlink a replacement report with identical bytes."""
+    repo_root = build_repo(tmp_path)
+    context = reservation_context(repo_root)
+    receipt = reserve_run_paths(context, skip_report_init=False)
+    original = context.paths.report_path.read_bytes()
+    replacement = context.paths.report_path.with_name("replacement-report.md")
+    replacement.write_bytes(original)
+    replacement.replace(context.paths.report_path)
+
+    assert context.paths.report_path.stat().st_ino != receipt.report_inode
+    assert not rollback_empty_reservation(receipt)
+    assert context.paths.result_dir.is_dir()
+    assert context.paths.report_path.read_bytes() == original
+
+
+def test_rollback_preserves_reused_empty_result_directory(tmp_path: Path) -> None:
+    """Rollback does not remove a replacement empty directory at the same path."""
+    repo_root = build_repo(tmp_path)
+    context = reservation_context(repo_root)
+    receipt = reserve_run_paths(context, skip_report_init=True)
+    receipt.marker_path.unlink()
+    receipt.result_dir.rmdir()
+    replacement_sibling = receipt.result_dir.with_name("replacement-sibling")
+    replacement_sibling.mkdir()
+    receipt.result_dir.mkdir()
+
+    assert context.paths.result_dir.stat().st_ino != receipt.result_inode
+    assert not rollback_empty_reservation(receipt)
+    assert context.paths.result_dir.is_dir()
+
+
+def test_rollback_preserves_same_bytes_replacement_marker(tmp_path: Path) -> None:
+    """Rollback requires the exclusive marker inode, not merely equal bytes."""
+    repo_root = build_repo(tmp_path)
+    context = reservation_context(repo_root)
+    receipt = reserve_run_paths(context, skip_report_init=True)
+    marker_bytes = receipt.marker_path.read_bytes()
+    replacement = receipt.marker_path.with_name("replacement-marker.json")
+    replacement.write_bytes(marker_bytes)
+    replacement.replace(receipt.marker_path)
+
+    assert receipt.marker_path.stat().st_ino != receipt.marker_inode
+    assert not rollback_empty_reservation(receipt)
+    assert context.paths.result_dir.is_dir()
+
+
+def test_reservation_race_has_one_winner_and_no_loser_residue(tmp_path: Path) -> None:
+    """Exclusive result reservation leaves no directory from the losing call."""
+    repo_root = build_repo(tmp_path)
+    contexts = [reservation_context(repo_root), reservation_context(repo_root)]
+
+    def reserve(context: RunContext) -> tuple[str, ReservationReceipt | None]:
+        try:
+            return "winner", reserve_run_paths(context, skip_report_init=False)
+        except (FileExistsError, ValueError) as exc:
+            del exc
+            return "loser", None
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(reserve, contexts))
+
+    assert [kind for kind, _ in outcomes].count("winner") == 1
+    assert [kind for kind, _ in outcomes].count("loser") == 1
+    winner = cast(
+        ReservationReceipt,
+        next(value for kind, value in outcomes if kind == "winner"),
+    )
+    assert rollback_empty_reservation(winner)
+    assert not contexts[0].paths.result_dir.exists()
+    assert not contexts[0].paths.report_path.exists()
+
+
+def test_report_reservation_race_has_one_winner_and_no_loser_residue(
+    tmp_path: Path,
+) -> None:
+    """Exclusive report creation cleans the losing result directory only."""
+    repo_root = build_repo(tmp_path)
+    shared_report = repo_root / "experiments" / "report" / "shared.md"
+    contexts = [
+        reservation_context(repo_root, "run.a"),
+        reservation_context(repo_root, "run.b"),
+    ]
+    contexts = [
+        replace(context, paths=replace(context.paths, report_path=shared_report))
+        for context in contexts
+    ]
+
+    def reserve(context: RunContext) -> tuple[str, ReservationReceipt | None]:
+        try:
+            return "winner", reserve_run_paths(context, skip_report_init=False)
+        except (FileExistsError, ValueError) as exc:
+            del exc
+            return "loser", None
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(reserve, contexts))
+
+    assert [kind for kind, _ in outcomes].count("winner") == 1
+    assert [kind for kind, _ in outcomes].count("loser") == 1
+    winner = cast(
+        ReservationReceipt,
+        next(value for kind, value in outcomes if kind == "winner"),
+    )
+    assert rollback_empty_reservation(winner)
+    assert not shared_report.exists()
+    assert not contexts[0].paths.result_dir.exists()
+    assert not contexts[1].paths.result_dir.exists()
 
 
 def build_repo(tmp_path: Path) -> Path:
@@ -412,6 +743,7 @@ def test_r5_admitted_environment_missing_composite_fails_closed() -> None:
 def test_r5_runner_lifecycle_fingerprint_uses_protocol_projection() -> None:
     """The terminal reducer fingerprints the admitted CLI lifecycle projection."""
     import hashlib
+
     from tools.experiments.execution_resource_plan import ManagedGpuOutcomeReducer
     from tools.experiments.run_managed_experiment import ManagedRunLifecycleEvidence
 
@@ -479,6 +811,7 @@ def test_r5_admitted_runner_fake_cli_protocol(tmp_path: Path, monkeypatch: pytes
         " 'requested_case_coverage_complete': True, 'quiescence_complete': True,\n"
         " 'completion_coverage_complete': True}\n"
         "result = {'schema': 'agentcanon-managed-run-result/v1',\n"
+        " 'identity': request['identity'],\n"
         " 'request_fingerprint': request['fingerprint'], 'run_id': request['run_id'],\n"
         " 'status': 'ok', 'worker_pid': pid, 'worker_pids': [pid],\n"
         " 'lifecycle': lifecycle, 'descendant_quiescence': 'proved',\n"
@@ -504,6 +837,7 @@ def test_r5_admitted_runner_fake_cli_protocol(tmp_path: Path, monkeypatch: pytes
     request_path.write_text(
         json.dumps(
             {
+                "identity": ExperimentIdentity("demo", "smoke", "run-1").to_dict()["identity"],
                 "run_id": "run-1",
                 "schema": "agentcanon-managed-run/v1",
                 "fingerprint": "a" * 64,
@@ -528,6 +862,7 @@ def test_r5_admitted_runner_fake_cli_protocol(tmp_path: Path, monkeypatch: pytes
         result_path=tmp_path / "result.json",
         lifecycle_path=tmp_path / "lifecycle.json",
         request_payload={
+            "identity": ExperimentIdentity("demo", "smoke", "run-1").to_dict()["identity"],
             "run_id": "run-1",
             "schema": "agentcanon-managed-run/v1",
             "fingerprint": "a" * 64,
@@ -615,6 +950,7 @@ def _valid_provider_result(request_fingerprint: str) -> dict[str, object]:
     }
     return {
         "schema": "agentcanon-managed-run-result/v1",
+        "identity": ExperimentIdentity("demo", "smoke", "run-mismatch").to_dict()["identity"],
         "request_fingerprint": request_fingerprint,
         "run_id": "run-mismatch",
         "status": "ok",
@@ -672,10 +1008,53 @@ def test_r5_provider_result_mismatches_fail_closed(
     with pytest.raises(Exception) as raised:
         _validate_admitted_result(
             result_path,
-            {"schema": "agentcanon-managed-run/v1", "run_id": "run-mismatch", "fingerprint": request_fingerprint},
+            {
+                "identity": ExperimentIdentity("demo", "smoke", "run-mismatch").to_dict()["identity"],
+                "schema": "agentcanon-managed-run/v1",
+                "run_id": "run-mismatch",
+                "fingerprint": request_fingerprint,
+            },
             0,
         )
     assert getattr(raised.value, "code", None) == expected_code
+
+
+@pytest.mark.parametrize("remove_identity", (False, True))
+def test_r5_provider_result_identity_is_required_and_matches_request(
+    tmp_path: Path,
+    remove_identity: bool,
+) -> None:
+    """Provider results must preserve the request's complete nested identity."""
+    from tools.experiments.run_managed_experiment import _validate_admitted_result
+
+    request_identity = ExperimentIdentity("demo", "smoke", "run-mismatch")
+    result = _valid_provider_result("a" * 64)
+    if remove_identity:
+        result.pop("identity")
+    else:
+        result["identity"] = ExperimentIdentity(
+            "demo", "formal", "run-mismatch"
+        ).to_dict()["identity"]
+    result_path = tmp_path / "provider-result.json"
+    result_path.write_text(json.dumps(result), encoding="utf-8")
+
+    with pytest.raises(Exception) as raised:
+        _validate_admitted_result(
+            result_path,
+            {
+                **request_identity.to_dict(),
+                "schema": "agentcanon-managed-run/v1",
+                "run_id": request_identity.run_name,
+                "fingerprint": "a" * 64,
+            },
+            0,
+        )
+
+    assert getattr(raised.value, "code", None) == (
+        "admitted_runner_result_identity_invalid"
+        if remove_identity
+        else "admitted_runner_result_identity_mismatch"
+    )
 
 
 def test_r5_provider_quiescence_and_completion_cover_lock_release() -> None:
@@ -902,7 +1281,7 @@ def test_check_experiment_registry_accepts_valid_registry(tmp_path: Path) -> Non
     result = subprocess.run(
         [
             sys.executable,
-            str(CHECK_SCRIPT),
+            "-m", "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -929,7 +1308,7 @@ def test_check_experiment_registry_reports_missing_required_field(
     result = subprocess.run(
         [
             sys.executable,
-            str(CHECK_SCRIPT),
+            "-m", "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -959,7 +1338,7 @@ def test_check_experiment_registry_reports_invalid_eval_artifact_item(
     result = subprocess.run(
         [
             sys.executable,
-            str(CHECK_SCRIPT),
+            "-m", "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1023,7 +1402,7 @@ def test_check_experiment_registry_accepts_valid_branch_topic(tmp_path: Path) ->
     result = subprocess.run(
         [
             sys.executable,
-            str(CHECK_SCRIPT),
+            "-m", "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1065,7 +1444,7 @@ def test_check_experiment_registry_rejects_duplicate_branch_topic_name(
     result = subprocess.run(
         [
             sys.executable,
-            str(CHECK_SCRIPT),
+            "-m", "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1096,6 +1475,7 @@ def test_check_experiment_registry_defaults_to_repo_root_via_symlink(
         check=False,
         capture_output=True,
         text=True,
+        env={**os.environ, "PYTHONPATH": str(CHECK_SCRIPT.parents[2])},
     )
 
     assert result.returncode == 0
@@ -1118,7 +1498,7 @@ def test_check_experiment_registry_rejects_recursive_runner_command(
     result = subprocess.run(
         [
             sys.executable,
-            str(CHECK_SCRIPT),
+            "-m", "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1149,7 +1529,7 @@ def test_check_experiment_registry_accepts_command_without_run_dir(
     result = subprocess.run(
         [
             sys.executable,
-            str(CHECK_SCRIPT),
+            "-m", "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1177,7 +1557,7 @@ def test_check_experiment_registry_rejects_command_without_config_path(
     result = subprocess.run(
         [
             sys.executable,
-            str(CHECK_SCRIPT),
+            "-m", "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1208,7 +1588,7 @@ def test_check_experiment_registry_rejects_non_topic_local_entrypoint(
     result = subprocess.run(
         [
             sys.executable,
-            str(CHECK_SCRIPT),
+            "-m", "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1239,7 +1619,7 @@ def test_check_experiment_registry_rejects_reserved_eval_artifact_pattern(
     result = subprocess.run(
         [
             sys.executable,
-            str(CHECK_SCRIPT),
+            "-m", "tools.ci.check_experiment_registry",
             "--repo-root",
             str(repo_root),
         ],
@@ -1261,7 +1641,7 @@ def test_create_experiment_topic_scaffolds_directory_and_registry(
     result = subprocess.run(
         [
             sys.executable,
-            str(CREATE_TOPIC_SCRIPT),
+            "-m", "tools.experiments.create_experiment_topic",
             "--repo-root",
             str(repo_root),
             "--active-branch",

@@ -918,7 +918,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/semantic_provider_html_report.md
-      - agents/skills/html-experiment-report.md
+      - agents/skills/html-output.md
       - documents/tools/semantic_index.md
       - documents/prose-reasoning-graph/dsl-spec.md
     tests:
@@ -1589,7 +1589,7 @@ entries:
     family: ci
     role: checker
     status: canonical
-    command: python3 tools/ci/check_experiment_registry.py
+    command: python3 -m tools.ci.check_experiment_registry
     writes: false
     default_wiring:
       ci: true
@@ -2178,7 +2178,7 @@ entries:
     family: experiments
     role: experiment
     status: canonical
-    command: python3 tools/experiments/run_managed_experiment.py
+    command: python3 -m tools.experiments.run_managed_experiment
     writes: true
     default_wiring:
       ci: false
@@ -2215,7 +2215,7 @@ entries:
     family: experiments
     role: experiment
     status: canonical
-    command: python3 tools/experiments/update_latest_result.py
+    command: python3 -m tools.experiments.update_latest_result
     writes: true
     default_wiring:
       ci: false
@@ -2233,7 +2233,7 @@ entries:
     family: experiments
     role: experiment
     status: canonical
-    command: python3 tools/experiments/save_experiment_result_annex.py
+    command: python3 -m tools.experiments.save_experiment_result_annex
     writes: true
     default_wiring:
       ci: false

@@ -8,12 +8,14 @@
 # upstream design ../../agents/skills/academic-writing.md Academic Writing TeX routing contract
 # upstream design ../../agents/skills/structure-planning.md reusable structure planning skill contract
 # upstream design ../../agents/skills/html-output.md explicit HTML output and browser publication skill contract
-# upstream design ../../agents/skills/save-experiment-results.md experiment result saving skill contract
+# upstream design ../../agents/skills/experiment-lifecycle.md experiment run identity and publication decision contract
+# upstream design ../../agents/skills/result-artifact-writeout.md concrete artifact persistence contract
 # upstream design ../../agents/internal-routines/README.md internal routine document owner surface
 # downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py runs these evals
 # @dependency-end
 
 version = 1
+
 [[evals]]
 id = "all-discoverable-skill-shims"
 target_glob = ".agents/skills/*/SKILL.md"
@@ -136,68 +138,6 @@ id = "WORKFLOW-GENERIC-2"
 critical = true
 description = "Includes a top-level Markdown title."
 required_regex = ["(?m)^#\\s+"]
-
-[[evals]]
-id = "result-artifact-writeout-skill"
-target = ".agents/skills/result-artifact-writeout/SKILL.md"
-canonical_target = "agents/skills/result-artifact-writeout.md"
-kind = "skill"
-description = "Result writeout must preserve raw evidence, summary artifacts, manifests, unique paths, and no-overwrite policy."
-
-[[evals.checklist]]
-id = "RESULT-WRITEOUT-1"
-critical = true
-description = "Requires raw source result and summary artifact separation."
-required_regex = ["raw", "summary", "source result"]
-
-[[evals.checklist]]
-id = "RESULT-WRITEOUT-2"
-critical = true
-description = "Requires manifest, unique artifact path, and overwrite policy."
-required_regex = ["manifest", "unique", "overwrite"]
-
-[[evals.checklist]]
-id = "RESULT-WRITEOUT-3"
-critical = true
-description = "Requires failed or partial runs to remain durable routing evidence with status and exit code."
-required_regex = ["failed", "partial", "status", "exit code"]
-
-[[evals.checklist]]
-id = "RESULT-WRITEOUT-4"
-critical = true
-description = "Routes reader-facing tool or JSON result reports to report-writing instead of treating writeout as the narrative report skill."
-required_regex = ["reader-facing report", "\\$report-writing", "source packet", "limitations", "quality checklist"]
-
-[[evals]]
-id = "save-experiment-results-skill"
-target = ".agents/skills/save-experiment-results/SKILL.md"
-canonical_target = "agents/skills/save-experiment-results.md"
-kind = "skill"
-description = "Experiment result saving must preserve raw run artifacts through one deterministic git-annex archive without overwrite or provenance loopholes."
-
-[[evals.checklist]]
-id = "SAVE-EXPERIMENT-RESULTS-1"
-critical = true
-description = "Requires source provenance, internal manifest evidence, and append-only archive policy."
-required_regex = ["source provenance", "annex_retention_manifest", "append-only"]
-
-[[evals.checklist]]
-id = "SAVE-EXPERIMENT-RESULTS-2"
-critical = true
-description = "Requires deterministic git-annex, SHA256E, and full fsck verification."
-required_regex = ["git-annex", "SHA256E", "fsck", "EXPERIMENT_RESULT_"]
-
-[[evals.checklist]]
-id = "SAVE-EXPERIMENT-RESULTS-3"
-critical = true
-description = "Prevents overwrite and preserves failed or partial runs."
-required_regex = ["never overwritten", "failed", "partial", "existing archive"]
-
-[[evals.checklist]]
-id = "SAVE-EXPERIMENT-RESULTS-4"
-critical = true
-description = "Source dirty paths remain explicit provenance rather than hidden state."
-required_regex = ["dirty paths", "source", "provenance"]
 
 [[evals]]
 id = "tool-finding-report-skill"
@@ -711,44 +651,6 @@ description = "Requires durable provenance for external sources and rejects tran
 required_regex = ["URL / DOI", "access date", "browser tab", "download cache"]
 
 [[evals]]
-id = "html-experiment-report-structure-planning"
-target = ".agents/skills/html-experiment-report/SKILL.md"
-canonical_target = "agents/skills/html-experiment-report.md"
-kind = "skill"
-description = "HTML experiment report skill must delegate reusable structure creation to structure-planning."
-
-[[evals.checklist]]
-id = "HTML-STRUCTURE-1"
-critical = true
-description = "Requires structure-planning before renderer or experiment implementation."
-required_regex = ["\\$structure-planning", "before renderer or experiment implementation", "first figure", "source-to-structure map", "metric contract", "invalid interpretations"]
-
-[[evals.checklist]]
-id = "HTML-OUTPUT-EXPERIMENT-1"
-critical = true
-description = "Routes experiment HTML delivery through html-output for layout, ImageGen, server publication, and URL validation."
-required_regex = ["\\$html-output", "\\$imagegen", "python3 -m http\\.server", "--bind 0\\.0\\.0\\.0", "curl -fsS", "local/external browser URLs"]
-
-[[evals]]
-id = "experiment-lifecycle-structure-planning"
-target = ".agents/skills/experiment-lifecycle/SKILL.md"
-canonical_target = "agents/skills/experiment-lifecycle.md"
-kind = "skill"
-description = "Experiment lifecycle skill must use structure-planning for experiment plans, rerun plans, reports, and HTML views."
-
-[[evals.checklist]]
-id = "EXPERIMENT-STRUCTURE-1"
-critical = true
-description = "Requires structure-planning before nontrivial experiment planning or report generation."
-required_regex = ["\\$structure-planning", "experiment planning", "rerun planning", "result report generation", "HTML view generation", "validation gate"]
-
-[[evals.checklist]]
-id = "EXPERIMENT-STRUCTURE-2"
-critical = true
-description = "Connects experiment planning/reporting to discourse-relations profiles when causal or evidence transitions are nontrivial."
-required_regex = ["discourse-relations", "experiment-report", "methods-protocol", "advisory edge evidence"]
-
-[[evals]]
 id = "test-design-numerical-admission-gate-shim"
 target = ".agents/skills/test-design/SKILL.md"
 canonical_target = "agents/skills/test-design.md"
@@ -1007,8 +909,9 @@ description = "Every Codex subagent prompt must be dependency-linked and declare
 [[evals.checklist]]
 id = "CODEX-AGENT-GENERIC-1"
 critical = true
-description = "Includes generated-view provenance for the canonical closed projection."
-required_regex = ["generated role view: generated_role_view_v1", "generated from agents/model_profiles.toml plus canonical team/runtime role metadata", "materializer: tools/agent_tools/model_profile_registry.py"]
+description = "Includes path-free consumer-static generated-view provenance with the exact canonical source digest."
+required_regex = ["generated role view: generated_role_view_v1", "(?m)^# source canonical digest: [0-9a-f]{64}$"]
+forbidden_regex = ["agents/skills/", "agents/model_profiles\\.toml", "tools/agent_tools/", "\\.\\./\\.\\./agents/", "\\.\\./\\.\\./tools/"]
 
 [[evals.checklist]]
 id = "CODEX-AGENT-GENERIC-2"
@@ -1149,129 +1052,6 @@ id = "ORCH-SHIM-DISCOVERY-1"
 critical = true
 description = "Keeps the generated skill-tool command block as discovery while route execution stays token-owned."
 required_regex = ["## Tool Commands", "skill-tool-commands:start", "skill_tool_commands\\.py show --skill agent-orchestration"]
-
-[[evals]]
-id = "agent-orchestration-canonical-report-routing"
-target = "agents/skills/agent-orchestration.md"
-kind = "skill"
-description = "The canonical agent-orchestration skill must route reader-facing result reports to report-writing."
-
-[[evals.checklist]]
-id = "REPORT-ROUTING-CANONICAL-1"
-critical = true
-description = "Routes PR text, reader-facing reports, and evidence-backed document sections to report-writing and adds result-artifact-writeout when raw machine results are stored."
-required_regex = ["PR body", "reader-facing report", "report-writing", "JSON / JSONL", "result-artifact-writeout", "evidence-backed"]
-
-[[evals.checklist]]
-id = "DSV-ZERO-VALUE-1"
-critical = true
-description = "Rejects zero-value reads, searches, reviews, and checks when they cannot change the next decision."
-required_regex = [
-  "same owner, unit, mechanism, and validation\\s+route",
-  "Additional reads, searches, reviews, and checks are justified only\\s+when they can change",
-  "otherwise return to the selected work",
-  "do not manufacture a zero-value investigation, packet, or review stage",
-]
-
-[[evals.checklist]]
-id = "OWNER-BOUNDED-PUBLIC-SURFACE-HUMAN-1"
-critical = true
-description = "The canonical owner-bounded route requires public-surface invariance and escalates every public delta with full consumer closure."
-required_regex = [
-  "design / OOP boundary と ownership clarity",
-  "owner boundary",
-  "public API/behavior/schema の追加、縮小、\\s*削除、rename、restriction、deprecation、意味変更",
-  "`scoped_change` または broader route",
-  "dependency/consumer/migration/docs closure",
-]
-
-[[evals.checklist]]
-id = "DSV-BRANCH-NAMING-1"
-critical = true
-description = "Requires only unresolved branches that can change the owner, unit, mechanism, or validation route."
-required_regex = [
-  "each unresolved branch that could change the owner, unit, mechanism, or route",
-  "changes_next_decision",
-  "unresolved owner/edit/validation\\s+branch",
-]
-
-[[evals.checklist]]
-id = "DSV-SPARK-FAST-PATH-1"
-critical = true
-description = "Keeps Spark scoped to explicit typed selection and routes one owner gate without broad review or test stages."
-required_regex = [
-  "固定 Spark implementation route",
-  "parent packet が.*--select-agent-type implementer=spark_worker:<evidence>",
-  "one owning review gate",
-  "Do not materialize empty reviewer or template artifacts",
-  "Validation is static/targeted first",
-  "Full suites, full dependency review, and\\s+remote CI are selected once for the final candidate only",
-]
-
-[[evals.checklist]]
-id = "DSV-IRRELEVANT-UNKNOWN-POSITIVE-1"
-critical = true
-description = "An irrelevant unknown may be serialized while remaining non-blocking and non-decision-changing."
-required_regex = [
-  "affects_owner_edit_validation",
-  "\\\"blocking\\\": false",
-  "\\\"serialized_in_decision_packet\\\": true",
-  "Unknowns that cannot change the next decision are non-blocking\\s+and may remain in local context",
-]
-
-[[evals.checklist]]
-id = "DSV-IRRELEVANT-UNKNOWN-NEGATIVE-1"
-critical = true
-description = "The owner prevents irrelevant unknowns and missing evidence fields from becoming blocking gates."
-required_regex = [
-  "Unknowns that cannot change the next decision are non-blocking",
-  "Do not convert missing artifact fields, counts, or digests into\\s+a new mandatory gate",
-  "affects_owner_edit_validation",
-]
-
-[[evals.checklist]]
-id = "DSV-NO-THRESHOLD-1"
-critical = true
-description = "Rejects fixed thresholds and zero-value repeat reads when they cannot change the owner decision."
-required_regex = [
-  "\\\"threshold_policy\\\": \\\"none\\\"",
-  "No artifact shape, digest, count, or fixed stage sequence is a substitute",
-  "no hypothesis-space or read-count form is\\s+required",
-  "Additional reads, searches, reviews, and checks are justified only\\s+when they can change",
-]
-
-[[evals.checklist]]
-id = "VERTICAL-WAVE-POLICY-3"
-critical = true
-description = "Requires launchable owner-bounded waves, one owning gate, and targeted-final validation without default review or test waves."
-required_regex = [
-  "ready dependency-DAG frontier",
-  "stage owner",
-  "vertical dynamic wave",
-  "Select one owning review gate for the claims in one replaceable responsibility",
-  "Activate a specialist only when a distinct unresolved claim or risk cannot be\\s+judged by that gate",
-  "Validation is static/targeted first",
-  "Full suites, full dependency review, and\\s+remote CI are selected once for the final candidate only",
-  "Do not materialize empty reviewer or template artifacts",
-]
-
-[[evals.checklist]]
-id = "HTML-OUTPUT-ROUTING-CANONICAL-1"
-critical = true
-description = "Routes explicit HTML/browser output to html-output while keeping report output Markdown by default."
-required_regex = ["html-output", "html-experiment-report", "Markdown", "HTML", "external browser publication"]
-
-[[evals.checklist]]
-id = "STRUCTURE-ROUTING-CANONICAL-1"
-critical = true
-description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning; substantive document edits include prose graph routing and format-only skip evidence."
-required_regex = ["structure-planning", "prose-reasoning-graph", "experiment plan / report", "document", "paper", "refactor", "source map", "format-only", "structure_contract=skipped"]
-
-[[evals.checklist]]
-id = "TOOL-FINDING-ROUTING-CANONICAL-1"
-critical = true
-description = "Routes tool/checker discovery and before/after impact work to tool-finding-report."
-required_regex = ["tool、checker、hook、static analysis", "tool-finding-report", "before / after impact"]
 
 [[evals]]
 id = "codex-task-workflow-convention-gate"
@@ -2432,17 +2212,6 @@ critical = true
 required_regex = ["single-candidate fast path", "base/head/diff/check/authority", "dependency evidence"]
 
 [[evals]]
-id = "html-output-artifact-delivery-boundary"
-target = "agents/skills/html-output.md"
-kind = "skill"
-description = "HTML artifact correctness is distinct from optional serving and publication."
-
-[[evals.checklist]]
-id = "HTML-OPS-SEMANTIC-1"
-critical = true
-required_regex = ["generation and validation", "explicitly requested", "separate delivery operations", "only.*explicitly requests", "source/provenance"]
-
-[[evals]]
 id = "task-routing-canonical-state"
 target = "agents/skills/task-routing.md"
 kind = "skill"
@@ -2484,3 +2253,247 @@ required_regex = ["external references", "URL/DOI", "access date", "adoption/exc
 id = "REPORT-PROVENANCE-READER-GUIDE-2"
 critical = true
 required_regex = ["reader guide", "denominator", "directionality", "valid and invalid", "what result would change the next action"]
+
+[[evals]]
+id = "agent-orchestration-canonical-report-routing"
+target = "agents/skills/agent-orchestration.md"
+kind = "skill"
+description = "The canonical agent-orchestration skill must route reader-facing result reports to report-writing."
+
+[[evals.checklist]]
+id = "REPORT-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes PR text, reader-facing reports, and evidence-backed document sections to report-writing and adds result-artifact-writeout when raw machine results are stored."
+required_regex = ["PR body", "reader-facing report", "report-writing", "JSON / JSONL", "result-artifact-writeout", "evidence-backed"]
+
+[[evals.checklist]]
+id = "DSV-ZERO-VALUE-1"
+critical = true
+description = "Rejects zero-value reads, searches, reviews, and checks when they cannot change the next decision."
+required_regex = [
+  "same owner, unit, mechanism, and validation\\s+route",
+  "Additional reads, searches, reviews, and checks are justified only\\s+when they can change",
+  "otherwise return to the selected work",
+  "do not manufacture a zero-value investigation, packet, or review stage",
+]
+
+[[evals.checklist]]
+id = "OWNER-BOUNDED-PUBLIC-SURFACE-HUMAN-1"
+critical = true
+description = "The canonical owner-bounded route requires public-surface invariance and escalates every public delta with full consumer closure."
+required_regex = [
+  "design / OOP boundary と ownership clarity",
+  "owner boundary",
+  "public API/behavior/schema の追加、縮小、\\s*削除、rename、restriction、deprecation、意味変更",
+  "`scoped_change` または broader route",
+  "dependency/consumer/migration/docs closure",
+]
+
+[[evals.checklist]]
+id = "DSV-BRANCH-NAMING-1"
+critical = true
+description = "Requires only unresolved branches that can change the owner, unit, mechanism, or validation route."
+required_regex = [
+  "each unresolved branch that could change the owner, unit, mechanism, or route",
+  "changes_next_decision",
+  "unresolved owner/edit/validation\\s+branch",
+]
+
+[[evals.checklist]]
+id = "DSV-SPARK-FAST-PATH-1"
+critical = true
+description = "Keeps Spark scoped to explicit typed selection and routes one owner gate without broad review or test stages."
+required_regex = [
+  "固定 Spark implementation route",
+  "parent packet が.*--select-agent-type implementer=spark_worker:<evidence>",
+  "one owning review gate",
+  "Do not materialize empty reviewer or template artifacts",
+  "Validation is static/targeted first",
+  "Full suites, full dependency review, and\\s+remote CI are selected once for the final candidate only",
+]
+
+[[evals.checklist]]
+id = "DSV-IRRELEVANT-UNKNOWN-POSITIVE-1"
+critical = true
+description = "An irrelevant unknown may be serialized while remaining non-blocking and non-decision-changing."
+required_regex = [
+  "affects_owner_edit_validation",
+  "\\\"blocking\\\": false",
+  "\\\"serialized_in_decision_packet\\\": true",
+  "Unknowns that cannot change the next decision are non-blocking\\s+and may remain in local context",
+]
+
+[[evals.checklist]]
+id = "DSV-IRRELEVANT-UNKNOWN-NEGATIVE-1"
+critical = true
+description = "The owner prevents irrelevant unknowns and missing evidence fields from becoming blocking gates."
+required_regex = [
+  "Unknowns that cannot change the next decision are non-blocking",
+  "Do not convert missing artifact fields, counts, or digests into\\s+a new mandatory gate",
+  "affects_owner_edit_validation",
+]
+
+[[evals.checklist]]
+id = "DSV-NO-THRESHOLD-1"
+critical = true
+description = "Rejects fixed thresholds and zero-value repeat reads when they cannot change the owner decision."
+required_regex = [
+  "\\\"threshold_policy\\\": \\\"none\\\"",
+  "No artifact shape, digest, count, or fixed stage sequence is a substitute",
+  "no hypothesis-space or read-count form is\\s+required",
+  "Additional reads, searches, reviews, and checks are justified only\\s+when they can change",
+]
+
+[[evals.checklist]]
+id = "VERTICAL-WAVE-POLICY-3"
+critical = true
+description = "Requires launchable owner-bounded waves, one owning gate, and targeted-final validation without default review or test waves."
+required_regex = [
+  "ready dependency-DAG frontier",
+  "stage owner",
+  "vertical dynamic wave",
+  "Select one owning review gate for the claims in one replaceable responsibility",
+  "Activate a specialist only when a distinct unresolved claim or risk cannot be\\s+judged by that gate",
+  "Validation is static/targeted first",
+  "Full suites, full dependency review, and\\s+remote CI are selected once for the final candidate only",
+  "Do not materialize empty reviewer or template artifacts",
+]
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes explicit HTML/browser output to html-output while keeping report output Markdown by default."
+required_regex = ["html-output", "Markdown", "HTML", "external browser publication", "experiment / Eval artifact"]
+
+[[evals.checklist]]
+id = "STRUCTURE-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes nontrivial report, experiment, document, paper, HTML, or refactor structure to structure-planning; substantive document edits include prose graph routing and format-only skip evidence."
+required_regex = ["structure-planning", "prose-reasoning-graph", "experiment plan / report", "document", "paper", "refactor", "source map", "format-only", "structure_contract=skipped"]
+
+[[evals.checklist]]
+id = "TOOL-FINDING-ROUTING-CANONICAL-1"
+critical = true
+description = "Routes tool/checker discovery and before/after impact work to tool-finding-report."
+required_regex = ["tool、checker、hook、static analysis", "tool-finding-report", "before / after impact"]
+
+[[evals]]
+id = "experiment-lifecycle-owner-contract"
+target = ".agents/skills/experiment-lifecycle/SKILL.md"
+canonical_target = "agents/skills/experiment-lifecycle.md"
+kind = "skill"
+description = "Experiment lifecycle is the sole run-state owner; artifact, report, HTML, and annex retention work remain explicit owners."
+
+[[evals.checklist]]
+id = "EXPERIMENT-LIFECYCLE-OWNER-1"
+critical = true
+required_regex = ["Own one experiment run", "Run identity/state", "reproducibility core", "terminal status"]
+
+[[evals.checklist]]
+id = "EXPERIMENT-LIFECYCLE-OWNER-2"
+critical = true
+required_regex = ["result-artifact-writeout", "report-writing", "html-output", "save_experiment_result_annex.py", "explicit"]
+forbidden_regex = ["html-experiment-report", "save-experiment-results"]
+
+[[evals.checklist]]
+id = "EXPERIMENT-LIFECYCLE-OWNER-3"
+critical = true
+required_regex = ["No universal filename inventory", "actually exist", "producer-specific"]
+forbidden_regex = ["requires a synthetic missing-artifact limitation"]
+
+
+[[evals.checklist]]
+id = "EXPERIMENT-STRUCTURE-1"
+critical = true
+description = "Requires structure-planning before nontrivial experiment planning or report generation."
+required_regex = ["structure-planning", "experiment planning", "rerun planning", "result report generation", "HTML view generation", "validation gate"]
+
+[[evals.checklist]]
+id = "EXPERIMENT-STRUCTURE-2"
+critical = true
+description = "Connects experiment planning/reporting to discourse-relations profiles when causal or evidence transitions are nontrivial."
+required_regex = ["discourse-relations", "experiment-report", "methods-protocol", "advisory edge evidence"]
+
+[[evals]]
+id = "result-artifact-writeout-owner-contract"
+target = ".agents/skills/result-artifact-writeout/SKILL.md"
+canonical_target = "agents/skills/result-artifact-writeout.md"
+kind = "skill"
+description = "Result artifact writeout owns only concrete file identity, role, checksum, durable readback, and no-overwrite behavior."
+
+[[evals.checklist]]
+id = "RESULT-ARTIFACT-OWNER-1"
+critical = true
+required_regex = ["Persist concrete outputs", "semantic role", "content checksum", "Do not overwrite", "readback"]
+
+[[evals.checklist]]
+id = "RESULT-ARTIFACT-OWNER-2"
+critical = true
+required_regex = ["No fixed artifact inventory", "actually generated", "does not imply a Git branch", "explicit operation"]
+forbidden_regex = ["save-experiment-results"]
+
+[[evals.checklist]]
+id = "RESULT-ARTIFACT-OWNER-3"
+critical = true
+required_regex = ["report-writing only when", "html-output", "experiment-lifecycle"]
+forbidden_regex = ["requires a fixed number of manifest entries"]
+
+
+[[evals.checklist]]
+id = "RESULT-ARTIFACT-OWNER-4"
+critical = true
+description = "Retains failed and partial run evidence with status and exit-code identity."
+required_regex = ["failed", "partial", "status", "exit code"]
+
+[[evals]]
+id = "html-output-owner-contract"
+target = ".agents/skills/html-output/SKILL.md"
+canonical_target = "agents/skills/html-output.md"
+kind = "skill"
+description = "HTML output owns artifact generation and validation; preview, serving, and publication are explicit delivery operations."
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-OWNER-1"
+critical = true
+required_regex = ["generation and validation", "A listen socket is not required", "only.*explicitly requests"]
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-OWNER-2"
+critical = true
+required_regex = ["artifact identity/path", "source/provenance", "validation actually selected"]
+forbidden_regex = ["html-experiment-report"]
+
+[[evals.checklist]]
+id = "HTML-OUTPUT-OWNER-3"
+critical = true
+required_regex = ["Do not emit `not_requested`", "fixed token count/field presence"]
+
+
+[[evals.checklist]]
+id = "HTML-OPS-SEMANTIC-1"
+critical = true
+description = "HTML artifact correctness remains distinct from optional serving and publication."
+required_regex = ["generation and validation", "explicitly requested", "separate delivery operations", "only.*explicitly requests", "source/provenance"]
+
+[[evals]]
+id = "experiment-wrapper-public-surface-removal"
+target = "agents/skills/catalog.yaml"
+kind = "skill"
+description = "Removed experiment wrapper identities cannot re-enter the public catalog."
+
+[[evals.checklist]]
+id = "EXPERIMENT-WRAPPER-CATALOG-1"
+critical = true
+forbidden_regex = ["html-experiment-report", "save-experiment-results"]
+
+[[evals]]
+id = "experiment-wrapper-classifier-removal"
+target = "tools/agent_tools/prompt_classifier.py"
+kind = "skill"
+description = "Prompt classification composes direct owners instead of selecting a removed wrapper."
+
+[[evals.checklist]]
+id = "EXPERIMENT-WRAPPER-CLASSIFIER-1"
+critical = true
+required_regex = ["experiment-lifecycle", "html-output", "result-artifact-writeout"]
+forbidden_regex = ["html-experiment-report", "save-experiment-results"]

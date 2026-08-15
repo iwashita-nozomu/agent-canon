@@ -403,7 +403,7 @@ EXPERIMENT_EXECUTION_SURFACE_GATE_TEMPLATES = (
         gate="experiment_execution_surface_guard",
         command_template=(
             "if [ -e experiments/registry.toml ]; then "
-            "python3 tools/ci/check_experiment_registry.py; "
+            "python3 -m tools.ci.check_experiment_registry; "
             "else echo EXPERIMENT_REGISTRY_CHECK=skipped_no_project_registry; "
             "fi && "
             "python3 -m pytest tests/tools/test_run_managed_experiment.py -q"

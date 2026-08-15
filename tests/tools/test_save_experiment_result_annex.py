@@ -40,7 +40,7 @@ def run_git(repo: Path, *args: str, check: bool = True) -> subprocess.CompletedP
 
 def init_source(root: Path, *, report: bool = True) -> Path:
     """Create a committed source repository with a non-empty result."""
-    result = root / "experiments" / "demo" / "result" / "run-a"
+    result = root / "experiments" / "demo" / "result" / "formal" / "run-a"
     (result / "logs").mkdir(parents=True)
     (result / "run_manifest.json").write_text('{"status":"ok"}\n', encoding="utf-8")
     (result / "summary.json").write_text('{"value":1}\n', encoding="utf-8")
@@ -49,7 +49,7 @@ def init_source(root: Path, *, report: bool = True) -> Path:
     script.chmod(0o755)
     (result / "logs" / "events.jsonl").write_text('{"event":1}\n', encoding="utf-8")
     if report:
-        report_path = root / "experiments" / "report" / "run-a.md"
+        report_path = root / "experiments" / "report" / "demo" / "formal" / "run-a.md"
         report_path.parent.mkdir(parents=True)
         report_path.write_text("# run-a\n", encoding="utf-8")
     run_git(root, "init", "-q")
@@ -95,7 +95,7 @@ def run_save(source: Path, annex: Path, result_dir: Path) -> subprocess.Complete
 
 def archive_path(annex: Path) -> Path:
     """Return the expected external archive path."""
-    return annex / "experiments" / "demo" / "result" / "run-a.tar.gz"
+    return annex / "experiments" / "demo" / "result" / "formal" / "run-a.tar.gz"
 
 
 def archive_members(path: Path) -> list[tarfile.TarInfo]:
@@ -106,7 +106,7 @@ def archive_members(path: Path) -> list[tarfile.TarInfo]:
 
 def archive_manifest(path: Path) -> dict[str, object]:
     """Read the internal canonical manifest."""
-    manifest_path = "experiments/demo/result/run-a/annex_retention_manifest.json"
+    manifest_path = "experiments/demo/result/formal/run-a/annex_retention_manifest.json"
     with tarfile.open(path, "r:gz") as archive:
         payload = archive.extractfile(manifest_path)
         assert payload is not None
@@ -129,20 +129,20 @@ def test_retains_layout_manifest_hashes_modes_and_clean_single_commit(tmp_path: 
     target = archive_path(annex)
     assert target.is_symlink()
     names = [member.name for member in archive_members(target)]
-    assert "experiments/demo/result/run-a/run_manifest.json" in names
-    assert "experiments/demo/result/run-a/logs/events.jsonl" in names
-    assert "experiments/report/run-a.md" in names
-    assert "experiments/demo/result/run-a/annex_retention_manifest.json" in names
+    assert "experiments/demo/result/formal/run-a/run_manifest.json" in names
+    assert "experiments/demo/result/formal/run-a/logs/events.jsonl" in names
+    assert "experiments/report/demo/formal/run-a.md" in names
+    assert "experiments/demo/result/formal/run-a/annex_retention_manifest.json" in names
     manifest = archive_manifest(target)
     assert manifest["append_only"] is True
-    assert manifest["report"] == "experiments/report/run-a.md"
+    assert manifest["report"] == "experiments/report/demo/formal/run-a.md"
     assert manifest["report_present"] is True
     assert manifest["source"]["branch"] == "main"  # type: ignore[index]
     assert manifest["source"]["dirty_paths"] == ["source-dirty.txt"]  # type: ignore[index]
     assert manifest["source"]["run_manifest_sha256"]  # type: ignore[index]
     records = {item["path"]: item for item in manifest["files"]}  # type: ignore[index]
-    assert records["experiments/demo/result/run-a/run.sh"]["mode"] == "executable"
-    assert records["experiments/demo/result/run-a/summary.json"]["sha256"] == hashlib.sha256(
+    assert records["experiments/demo/result/formal/run-a/run.sh"]["mode"] == "executable"
+    assert records["experiments/demo/result/formal/run-a/summary.json"]["sha256"] == hashlib.sha256(
         (result / "summary.json").read_bytes()
     ).hexdigest()
     assert run_git(annex, "status", "--porcelain=v1", "--untracked-files=all").stdout == ""
@@ -155,7 +155,13 @@ def test_retains_layout_manifest_hashes_modes_and_clean_single_commit(tmp_path: 
         "experiment-results/" in line
         for line in run_git(annex, "for-each-ref", "--format=%(refname)", "refs/").stdout.splitlines()
     )
-    fsck = run_git(annex, "annex", "fsck", "--", "experiments/demo/result/run-a.tar.gz")
+    fsck = run_git(
+        annex,
+        "annex",
+        "fsck",
+        "--",
+        "experiments/demo/result/formal/run-a.tar.gz",
+    )
     assert fsck.returncode == 0, fsck.stderr
 
 
@@ -174,7 +180,9 @@ def test_report_absent_and_determinism(tmp_path: Path) -> None:
     manifest = archive_manifest(archive_path(annex_one))
     assert manifest["report"] is None
     assert manifest["report_present"] is False
-    assert "experiments/report/run-a.md" not in [m.name for m in archive_members(archive_path(annex_one))]
+    assert "experiments/report/demo/formal/run-a.md" not in [
+        member.name for member in archive_members(archive_path(annex_one))
+    ]
 
 
 @pytest.mark.parametrize("kind", ["reserved", "lfs", "symlink"])
@@ -229,7 +237,7 @@ def test_rejects_symlinked_input_components(tmp_path: Path, kind: str) -> None:
 def test_rejects_effectively_empty_result(tmp_path: Path) -> None:
     """A report cannot substitute for a result file."""
     source = tmp_path / "source"
-    result = source / "experiments" / "demo" / "result" / "run-a"
+    result = source / "experiments" / "demo" / "result" / "formal" / "run-a"
     result.mkdir(parents=True)
     report = source / "experiments" / "report"
     report.mkdir(parents=True)
@@ -267,7 +275,7 @@ def test_no_replace_race_keeps_existing_target_and_rolls_back(tmp_path: Path, mo
     result = init_source(source)
     annex = init_annex(tmp_path / "annex")
     identity = retention._parse_result_identity(source, result)
-    target = annex / "experiments" / "demo" / "result" / "run-a.tar.gz"
+    target = annex / "experiments" / "demo" / "result" / "formal" / "run-a.tar.gz"
 
     def race(_temporary: Path, final: Path) -> None:
         final.parent.mkdir(parents=True, exist_ok=True)
@@ -387,7 +395,7 @@ def test_rejects_non_regular_report_and_unexpected_store_directory(
     """The conventional report and existing store topology remain bounded."""
     source = tmp_path / "source"
     result_dir = init_source(source, report=False)
-    report = source / "experiments" / "report" / "run-a.md"
+    report = source / "experiments" / "report" / "demo" / "formal" / "run-a.md"
     report.parent.mkdir(parents=True, exist_ok=True)
     report.symlink_to(result_dir / "summary.json")
     annex = init_annex(tmp_path / "annex")

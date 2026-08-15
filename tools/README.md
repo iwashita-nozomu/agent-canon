@@ -474,7 +474,7 @@ Current promoted helpers:
 
 - `tools/data/jsonl_to_md.py`
 - `tools/hlo/summarize_hlo_jsonl.py`
-- `tools/experiments/update_latest_result.py`
+- `tools/experiments/update_latest_result.py <result-root> --variant <variant>`
 - `tools/audit/audit_log_schema.py`
 - `tools/audit/audit_logger.py`
 - `tools/docs/create_design_template.py`
