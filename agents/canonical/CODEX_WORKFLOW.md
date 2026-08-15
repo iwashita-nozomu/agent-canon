@@ -208,6 +208,8 @@ local repo state 確認、file edit、validation、PR / issue mutation、local C
 切り替えをユーザー向け update で明示してから通常の workflow gate に入り
 ます。
 
+LCPの全文規則は [`agent-orchestration.md#Local Capability Priority`](../skills/agent-orchestration.md#local-capability-priority) が所有します。このworkflowは、LCPが選択された場合に、そのownerが選んだ既存canonical recordのlocatorだけを参照します。
+
 ### ユーザー向け言語
 
 ユーザー向けの作業更新、最終報告、レビュー要約、handoff guidance、
@@ -427,6 +429,7 @@ closeout 前に reviewer と auditor は次を明示的に確認します。
 
 - 各 must-do clause と completion-evidence clause が、実装、文書、test、command、artifact、または明示された deferred / rejected clause に対応している
 - request に含まれる仕様と実際の product surface の間に未実装の gap が残っていない
+- LCPが選択された場合は、[`agent-orchestration.md#Local Capability Priority`](../skills/agent-orchestration.md#local-capability-priority) の既存canonical record locatorを完了証拠として引用する
 - validation は `necessary_presence`、`forbidden_presence`、`sufficient_behavior` を区別する。必要なpath・linkの存在や禁止された旧経路の不在をbehavior成立の十分条件へ昇格させず、behaviorの十分条件が要求されない作業に実行テスト・完全一致比較・網羅レビューを追加しない
 - schedule、review、validation、commit / push、shared canon sync、follow-up 判断を含む今回 scope の task が 1 つも未完了で残っていない
 - task が数式、擬似コード、仕様、method contract を持つ場合、runtime success ではなく

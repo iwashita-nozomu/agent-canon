@@ -138,7 +138,7 @@ class CheckToolCatalogTest(unittest.TestCase):
         )
         self.assertEqual(
             managed["command"],
-            "python3 tools/experiments/run_managed_experiment.py",
+            "python3 -m tools.experiments.run_managed_experiment",
         )
         self.assertIn(
             "tests/tools/test_run_managed_experiment.py",

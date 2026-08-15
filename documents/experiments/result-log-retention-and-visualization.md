@@ -43,16 +43,26 @@ JSONL and accumulated eval archive branch policy belong to
   and archived agent run reports live under
   `.agent-canon/log-archive/...` as defined by
   `documents/runtime/runtime-log-archive.md`.
-- `experiments/<topic>/result/<run-id>/` stores raw experiment outputs, JSONL,
+- `experiments/<topic>/result/<variant>/<run-id>/` stores raw experiment outputs, JSONL,
   generated plots, HTML, SVG, HLO dumps, and machine-readable summaries.
-- `experiments/<topic>/result/<run-id>/logs/` stores per-run stdout/stderr,
+- `experiments/<topic>/result/<variant>/<run-id>/logs/` stores per-run stdout/stderr,
   tool, checker, and diagnostic logs that are not the managed wrapper `run.log`.
-- `experiment-results/<topic>` or a topic-specific result branch stores the
+- `experiment-results/<topic>/<variant>` stores the
   Git-retained copy of formal experiment result/report artifacts produced from
   the source checkout.
 - `experiments/<topic>/visualize.ipynb` stores the Jupyter notebook used to visualize
-  run artifacts and regenerate figures/tables from `result/<run-id>/`.
-- `experiments/report/<run-id>.md` stores the human-readable experiment report.
+  run artifacts and regenerate figures/tables from `result/<variant>/<run-id>/`.
+- `experiments/report/<topic>/<variant>/<run-id>.md` stores the human-readable experiment report.
+- `topic`, `variant`, and `run_name` form the immutable
+  `agentcanon.experiment-run-identity/v2` nested identity in every manifest.
+- `experiments/<topic>/result/<variant>/LATEST.json` and `LATEST.md` are the
+  only latest-result pointers; they never compare or merge runs from another
+  variant.
+- Latest selection and the JSON/Markdown pair publication execute under one
+  per-variant directory lock with a generation check. An explicit older run
+  cannot overwrite a newer pointer, and a failed second replacement restores
+  the first file so the pair is never left with mixed identities or temporary
+  files.
 - `tests/logs/[YYYYMMDD]-[HHMMSS]/` stores test-run raw logs, JSONL extracts,
   and exit-code records.
 
@@ -79,7 +89,7 @@ point to a `summary.json`, `*.jsonl`, or reader-facing Markdown summary.
 - Prefer text-first summaries for closeout gates, then link plots or HTML.
 - Store graph/plot outputs beside the data that generated them.
 - For experiment visualization, keep the Jupyter notebook at
-  `experiments/<topic>/visualize.ipynb` and read data from `result/<run-id>/`.
+  `experiments/<topic>/visualize.ipynb` and read data from `result/<variant>/<run-id>/`.
   Do not use notebooks as the formal run launcher or config source of truth.
 - Use deterministic formats (`svg`, `png`, `html`, `json`) and record the
   generation command in the manifest.
@@ -93,7 +103,8 @@ Canonical helper commands:
 python3 tools/data/jsonl_to_md.py <input.jsonl> <output.md>
 python3 tools/hlo/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
 python3 tools/experiments/html_artifact_access.py <report.html>
-python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>
+python3 -m tools.experiments.publish_result_branch --variant <variant> --result-dir experiments/<topic>/result/<variant>/<run_name> --branch experiment-results/<topic>/<variant>
+python3 -m tools.experiments.update_latest_result experiments/<topic>/result --variant <variant>
 dot -V
 ```
 
@@ -118,8 +129,8 @@ directly from inside a container and tunneling to the container IP.
   archive-agent-report`; do not create a hand-written duplicate report in the
   source tree.
 - For formal experiments, run from the source checkout and publish the generated
-  `experiments/<topic>/result/<run_name>/` plus
-  `experiments/report/<run_name>.md` with
+  `experiments/<topic>/result/<variant>/<run_name>/` plus
+  `experiments/report/<topic>/<variant>/<run_name>.md` with
   `tools/experiments/publish_result_branch.py`. Use `--push` when the retention
   decision is remote result-branch storage.
 

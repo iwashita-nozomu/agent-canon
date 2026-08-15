@@ -43,28 +43,25 @@ abstraction admission は `documents/conventions/software-engineering-principles
 ## Software Engineering Principle Route
 
 refactor は、[ソフトウェア工学原則](../../documents/conventions/software-engineering-principles.md)
-の優先順位に従います。`Behavior Contract`、semantic invariant、state / lifecycle owner、
-public compatibility、root mechanism を先に固定し、responsibility boundary、validation、
-simplicity、style はその後で判断します。
+の選択された clause を消費します。原則の意味、優先順位、誤用防止、抽象化の admission、
+変更範囲の境界は canonical owner に委譲し、この skill や refactor packet で再定義しません。
+抽象化や scope の判断では、canonical policy の
+[`SEP-06`](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)、
+[`SEP-07`](../../documents/conventions/software-engineering-principles.md#sep-07-yagni)、
+[`SEP-08`](../../documents/conventions/software-engineering-principles.md#sep-08-dry-and-abstraction-admission)、
+[`SEP-09`](../../documents/conventions/software-engineering-principles.md#sep-09-evidence-bounded-complete-owning-unit)
+を直接参照します。
 
-- DRY は同じ knowledge / policy / invariant / state owner の複数正本を統合します。
-  control flow や syntax が似ていても、数理意味、unit、停止条件、failure semantics、
-  change reason が異なる対象は共通化しません。
-- KISS は behavior、migration、failure handling、cleanup を完全に閉じた候補の中で、
-  owner、surface、state、branch、invariant の総数が少ない形を選びます。minimum diff、
-  shortest code、wrapper による symptom suppression は目的にしません。
-- YAGNI は concrete caller、current requirement、reachable failure、stable external
-  boundary のない speculative abstraction を追加しない原則です。要求済み migration、
-  caller repair、legacy removal、validation を未完にする理由には使いません。
-- 新しい helper、base、`Protocol`、registry、adapter、wrapper、tool、checker は、
-  `SEP-08` の同一意味・同一 contract・同一 change reason・実在 consumer・明確な owner
-  の evidence を満たす場合だけ admission します。
-- scope は `SEP-09` の evidence-bounded complete owning unit で決めます。symptom file
-  だけに閉じず、unrelated repository cleanup へも広げません。
+refactor 固有の実行契約は、挙動保存を次の順で閉じます。
 
-refactor packet と reviewer handoff には、全原則の checklist ではなく、判断へ影響した
-`SEP-*` clause、task-specific evidence、forbidden interpretation だけを含めます。
-`not applicable`、negative receipt、原則別 checker は追加しません。
+1. `Behavior Contract`、semantic invariant、state / lifecycle owner、public compatibility、
+   root mechanism を実装前に固定します。
+2. dependency-expanded scope から、root mechanism と evidence-linked consumer、failure handling、
+   cleanup、migration、docs、tests、validation を含む replaceable unit を選びます。
+3. `Allowed Structural Delta` と `Forbidden Semantic Delta` を分け、move、rename、split、
+   abstraction変更の各差分が contract、failure semantics、lifecycle を保存することを確認します。
+4. 判断へ影響した `SEP-*` clause と task-specific evidence だけを packet / handoff に記録し、
+   canonical policy の checklist、negative receipt、原則別 checker は追加しません。
 
 ## Validation route
 

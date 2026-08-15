@@ -7,7 +7,6 @@ upstream design ../canonical/ARTIFACT_PLACEMENT.md raw/summary artifact boundary
 upstream design catalog.yaml upstream registry for this public skill
 upstream design report-writing.md interpretation and narrative projection
 upstream design html-output.md reader-facing rendering and viewport constraints
-upstream design html-experiment-report.md first-figure report plan
 upstream design structure-planning.md first-figure and section planning
 upstream design result-artifact-writeout.md artifact placement and manifest discipline
 upstream design ../../documents/experiments/experiment-report-style.md reader-facing evidence quality
@@ -19,7 +18,7 @@ downstream implementation ../../.agents/skills/result-visualize/SKILL.md exposes
 
 - Scope: Reusable Figure Contracts for indexed result artifacts, independent of any specific domain.
 - Use When: Figure-level contracts are needed for plotting, status summaries, or visual comparison planning.
-- Boundary: Raw persistence belongs to `result-artifact-writeout`, interpretation belongs to `report-writing`, rendering belongs to `html-output`/`html-experiment-report`, execution belongs to `experiment-lifecycle`.
+- Boundary: Raw persistence belongs to `result-artifact-writeout`, interpretation belongs to `report-writing`, rendering belongs to `html-output`, execution belongs to `experiment-lifecycle`.
 - Section Path: Use `Purpose`, `Use When`, `Figure Contract`, `Coverage`, `Required Calculation Patterns`, `Workflow`, `Chart Families`, `Output Schema`.
 
 ## Purpose
@@ -146,8 +145,7 @@ contains one resolved geometry, axis mapping, scale, grouping, and facet plan.
 ## Relationship To Other Skills
 
 - `report-writing`: convert figure contracts into reader-facing narrative, limitations, and interpretation.
-- `html-output`: render optional static or browser-ready outputs from the same source artifacts.
-- `html-experiment-report`: map the first figure and report structure when HTML outputs are requested.
+- `html-output`: render optional static or browser-ready outputs from the same source artifacts and consume any selected first-figure/report structure.
 - `experiment-review`: evaluate experiment-specific adequacy, fairness, or comparison validity.
 - `experiment-lifecycle`: govern experiment execution, run metadata, and status reporting assumptions.
 - `result-artifact-writeout`: persist raw results, summaries, and manifests.
