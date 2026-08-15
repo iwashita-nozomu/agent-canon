@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import sys
 import unittest
@@ -82,23 +83,32 @@ class TaskRoutingFastPathTest(unittest.TestCase):
     def test_contract_defers_decision_sufficiency_until_implementation(self) -> None:
         """The skill contract must not reintroduce a pre-routing packet."""
         text = TASK_ROUTING.read_text(encoding="utf-8")
-        command = text.split("## Standard Command", 1)[1].split("## Outputs", 1)[0]
-        outputs = text.split("## Outputs", 1)[1].split("## Activation Boundary", 1)[0]
-        normalized = " ".join(command.split())
+
+        def section_body(title: str) -> str:
+            match = re.search(
+                rf"(?ms)^## {re.escape(title)}\n(.*?)(?=^## |\Z)", text
+            )
+            if match is None:
+                self.fail(f"missing canonical section: {title}")
+            return " ".join(match.group(1).split())
+
+        purpose = section_body("Purpose")
+        canonical_output = section_body("Canonical output")
 
         self.assertIn(
             "Ordinary routing does not require a Decision Sufficiency packet",
-            normalized,
+            purpose,
         )
         self.assertIn(
-            "high-risk or genuinely ambiguous implementation work", normalized
+            "later high-risk or genuinely ambiguous implementation owners may invoke",
+            purpose,
         )
         self.assertNotIn(
             "Consume the semantic decision-sufficiency record before selecting a route",
-            normalized,
+            purpose,
         )
-        self.assertNotIn("DECISION_SUFFICIENCY_PACKET_REF", outputs)
-        self.assertNotIn("owner-produced semantic sufficiency fields", outputs)
+        self.assertNotIn("DECISION_SUFFICIENCY_PACKET_REF", canonical_output)
+        self.assertNotIn("owner-produced semantic sufficiency fields", canonical_output)
 
 
 if __name__ == "__main__":
