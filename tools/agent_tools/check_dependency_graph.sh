@@ -43,16 +43,16 @@ while [[ $# -gt 0 ]]; do
     --print-edges) PRINT_EDGES=1; shift ;;
     --graph-tsv) GRAPH_TSV_OUTPUT="$2"; shift 2 ;;
     --list-related) LIST_RELATED=1; shift ;;
-    --focus) FOCUS_PATHS+=("${2#./}"); shift 2 ;;
+    --focus) FOCUS_PATHS+=("$2"); shift 2 ;;
     --focus-changed) FOCUS_CHANGED=1; shift ;;
-    --edit-scope) EDIT_SCOPE=1; EDIT_SCOPE_PATHS+=("${2#./}"); shift 2 ;;
+    --edit-scope) EDIT_SCOPE=1; EDIT_SCOPE_PATHS+=("$2"); shift 2 ;;
     --edit-scope-changed) EDIT_SCOPE=1; EDIT_SCOPE_CHANGED=1; shift ;;
     --search-hits-file) EDIT_SCOPE=1; EDIT_SCOPE_HITS_FILE="$2"; shift 2 ;;
     --check-bidirectional) CHECK_BIDIRECTIONAL=1; shift ;;
     --cycle-report-only) CYCLE_REPORT_ONLY=1; shift ;;
     --allow-frontmatter) shift ;;
     -h|--help) usage; exit 0 ;;
-    *) INPUT_PATHS+=("${1#./}"); shift ;;
+    *) INPUT_PATHS+=("$1"); shift ;;
   esac
 done
 
@@ -60,6 +60,40 @@ ROOT_DIR="$(realpath -e "$ROOT_DIR")" || {
   echo "DEPENDENCY_GRAPH=fail reason=root-missing" >&2
   exit 1
 }
+
+normalize_repo_path() {
+  local raw="$1"
+  local absolute=""
+  if [[ "$raw" = /* ]]; then
+    absolute="$(realpath -m "$raw")"
+  else
+    absolute="$(realpath -m "$ROOT_DIR/${raw#./}")"
+  fi
+  case "$absolute" in
+    "$ROOT_DIR") printf '.\n' ;;
+    "$ROOT_DIR"/*) printf '%s\n' "${absolute#"$ROOT_DIR"/}" ;;
+    *)
+      echo "DEPENDENCY_GRAPH=fail reason=path-outside-root path=$raw" >&2
+      return 1
+      ;;
+  esac
+}
+
+normalize_path_array() {
+  local array_name="$1"
+  local -n values="$array_name"
+  local -a normalized=()
+  local value=""
+  for value in "${values[@]}"; do
+    normalized+=("$(normalize_repo_path "$value")")
+  done
+  values=("${normalized[@]}")
+}
+
+normalize_path_array INPUT_PATHS
+normalize_path_array FOCUS_PATHS
+normalize_path_array EDIT_SCOPE_PATHS
+
 PARENT_ROOT="${AGENT_CANON_PARENT_ROOT:-$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)}"
 if [[ -z "$PARENT_ROOT" ]]; then
   echo "DEPENDENCY_GRAPH=fail reason=missing-parent-root" >&2
@@ -181,7 +215,7 @@ if [[ "$LIST_RELATED" -eq 1 ]]; then
   related_count=0
   while IFS= read -r focus; do
     [[ -n "$focus" ]] || continue
-    emit_related "${focus#./}"
+    emit_related "$(normalize_repo_path "$focus")"
     related_count=$((related_count + 1))
   done < <(focus_paths | sort -u)
   echo "DEPENDENCY_RELATED_SURFACES=$related_count"
@@ -198,7 +232,7 @@ scope_paths() {
 if [[ "$EDIT_SCOPE" -eq 1 ]]; then
   while IFS= read -r raw_focus; do
     [[ -n "$raw_focus" ]] || continue
-    focus="${raw_focus#./}"
+    focus="$(normalize_repo_path "$raw_focus")"
     printf 'DEPENDENCY_EDIT_SCOPE_PATH role=search_hit path=%s\n' "$focus"
     awk -F '\t' -v file="$focus" '
       $3 == file { printf "DEPENDENCY_EDIT_SCOPE_PATH role=declared_%s kind=%s path=%s source=%s target=%s\n", $1, $2, $4, $3, $4 }
