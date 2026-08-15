@@ -56,10 +56,10 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
 - 標準 run artifact は `summary.json`、`cases.jsonl`、topic config snapshot、case artifacts、`visualize_executed.ipynb` を含みます。これらが無い run は再現性が不足した run として扱い、正式結果には使う前に managed runner route で rerun または明示的な limitation を残します。
 - smoke / formal の入口は project `Makefile` に置く場合も、内側では同じ managed runner が topic `run.py` を inner command として呼びます。
 - formal run は source checkout、既定では `main` で実行し、run 完了後に
-  `save-experiment-results` で retention plan、dirty-source formal-status、
-  overwrite policy、branch reason を固定してから
-  `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>`
-  で結果と report を専用 result branch へ保存します。
+  `save-experiment-results` で source provenance、report presence、manifest、
+  append-only collision policy を固定してから
+  `python3 tools/experiments/save_experiment_result_annex.py --result-dir experiments/<topic>/result/<run_name> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"`
+  で結果と optional report を一つの deterministic git-annex archive に保存します。
 - experiment execution surface を変更する task は、patch 前に
   `python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>`
   を実行し、`experiment_execution_surface_guard` の handoff を解決します。
@@ -73,7 +73,7 @@ downstream implementation ../../tools/agent_tools/tool_rejection_preflight.py pr
   formal experiment run は明示された run plan の実行段階で扱います。
 - result / report 生成では `save-experiment-results` と
   `result-artifact-writeout` を使い、raw run output、summary report、manifest、
-  unique run_name、overwrite policy、result branch reason、formal-status を分けます。
+  unique run_name、append-only collision policy、source provenance、formal-status を分けます。
 - experiment plan、rerun plan、result report、HTML view の構造が非自明な場合は、run や report 生成の前に `structure-planning` を使い、first artifact、source-to-structure map、metric contract、invalid interpretation、validation gate を固定します。
 - experiment plan / report の structure contract には OOP 観点を入れます。
   再利用する module / class / function / protocol、各 step が作る object、
@@ -94,10 +94,10 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. When a project registry exists, validate registry schema and registered command placeholders with `python3 tools/ci/check_experiment_registry.py` before formal execution.
 1. Treat `python3 tools/experiments/run_managed_experiment.py --topic <topic> --variant formal -- python3 experiments/<topic>/run.py` as the user-facing run route. The topic `run.py` is an inner entrypoint called by the managed runner and owns run directory creation, config snapshotting, artifact writing, and notebook execution.
 1. After a canonical run from the source checkout, usually `main`, use
-   `$save-experiment-results` before publishing generated result/report
-   artifacts. The dedicated save skill owns retention plan, dirty-source
-   formal-status, overwrite policy, and result-branch evidence before
-   `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>` runs, adding `--push` only when remote result-branch retention is part of the run plan.
+   `$save-experiment-results` before retaining generated result/report artifacts.
+   The dedicated save skill owns source provenance, report presence, manifest,
+   append-only collision policy, and formal-status before
+   `python3 tools/experiments/save_experiment_result_annex.py --result-dir experiments/<topic>/result/<run_name> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"` runs.
 1. Keep GPU/JAX execution-environment ownership in the scheduler or caller environment. Experiment topic code and checked-in configs stay free of hard-coded per-run environment assignment such as GPU visibility, JAX platform, allocator, or preallocation overrides unless the task is explicitly an environment-contract change.
 1. Preserve available GPU parallelism by default. Do not force a topic to single-GPU or serial execution by adding `max_workers: 1`, GPU visibility filters, single-device JAX platform settings, or equivalent throttles unless the user explicitly requests serial debugging or the run plan records a concrete environment limit. `gpu_max_slots: 1` means one worker slot per GPU; it must not be used as a substitute for reducing the visible GPU set.
 1. When a Python process remains after an interrupted or failed experiment, identify the parent `run.py`, child worker, process group, and elapsed time before calling it residual. Treat active parent/worker processes as a still-running experiment and stop them only when the user asks for abort or cleanup.
@@ -117,6 +117,6 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. If a prose graph handoff is present, use hypothesis, metric, baseline, and expected-result diagnostics as advisory input to the experiment plan or rerun plan.
 1. Use `$save-experiment-results` with `$result-artifact-writeout` for
    experiment result/report generation so raw run output, Markdown summary,
-   manifest, run name, overwrite policy, branch reason, and formal-status are
-   recorded separately.
+   manifest, run name, append-only collision policy, source provenance, and
+   formal-status are recorded separately.
 1. If code changes must iterate with explicit decision states, also use `experiment-change-loop`.

@@ -95,7 +95,7 @@ write set）、`validation`（その判断を読み戻す検証）を記録す�
 | `RDC-RESULT-RETENTION` | `logical:documents/experiments/result-log-retention-and-visualization.md`: `Storage Classes`, `Required Bundle Shape`, `Visualization Rules`, `Retention Rules`, `Closeout Evidence` | result storage → run evidence and retention | result directory remains `experiments/<topic>/result/<run_name>/`; native target emits domain outputs, lifecycle/save owner emits manifests/report/retention evidence | native runner arguments, result bundle, save-results publish | bundle shape, artifact/eval manifests, report/retention evidence |
 | `RDC-CONTAINER` | `logical:CONTAINER_OPERATIONS.md`: `Canonical Source Contract`, `Ownership Boundary`, `Manifest Source Roles And Cardinality`, `Dockerfile Rules`, `GitHub Workflow Rules`, `Required Validation` | container source/pack → CMake smoke projection | Docker pack/check owns container build and smoke; its CMake command changes to the parent anchor without moving C++ ownership into Docker | `docker/README.md`, `docker/check_build.sh`, `docker/packs/default.toml`, CI | `docker_dependency_validator.sh`, pack print/smoke, Docker workflow checker |
 | `RDC-EXPERIMENT-LIFECYCLE` | `logical:agents/skills/experiment-lifecycle.md`: `Purpose`, `Use When`, `Core References`, `Boundary`; `logical:agents/workflows/experiment-workflow.md`: `1. この文書の役割`, `2. 段階別手順` (`準備`, `静的チェック`, `実験実行`, `結果レポート`) | lifecycle skill/workflow → run protocol | build target creation and native execution are two events; lifecycle owns `run_name`, config snapshot, result root, command/environment/source evidence | `cpp-experiment-<name>` build target plus managed adapter/direct run contract | lifecycle run manifest, command/env/source snapshot, exit status; build/run separation gate |
-| `RDC-SAVE-RESULTS` | `logical:agents/skills/save-experiment-results.md`: `Required Contract`, `Branch-Safe Retention`, `Closeout Tokens` | save owner → publication/retention | C++ target never publishes directly; save owner controls artifact manifest, report linkage, overwrite/branch policy | `experiments/<topic>/result/<run_name>/`, publish adapter | save-results closeout tokens, result branch/retention readback |
+| `RDC-SAVE-RESULTS` | `logical:agents/skills/save-experiment-results.md`: `Required Contract`, `Annex Transaction`, `Closeout Tokens` | save owner → archive retention | C++ target never archives directly; save owner controls artifact manifest, report linkage, append-only policy, and git-annex verification | `experiments/<topic>/result/<run_name>/`, annex archive adapter | `EXPERIMENT_RESULT_*` closeout tokens, archive/fsck/readback evidence |
 | `RDC-ARTIFACT-WRITEOUT` | `logical:agents/skills/result-artifact-writeout.md`: `Output Contract`, `Destination Rules`, `Required Shape`, `Closeout Tokens` | artifact writer → evidence shape | native result output is written below lifecycle-selected run directory and is not a build-tree artifact | runner result arguments and artifact manifest | result-artifact checker/manifest shape |
 | `RDC-EXPERIMENT-REVIEW` | `logical:agents/skills/experiment-review.md`: `Review Checklist`, `Findings Policy` | experiment review → executable/config/result review | review checks target source, registry adapter, config, evidence, and report as one trace without changing experiment protocol in design pass | `P-EXPERIMENT-*`, native source packet | experiment review findings and managed run evidence |
 | `RDC-CPP-REVIEW` | `logical:agents/skills/cpp-review.md`: `Use When`, `Required Checks`, `Core References`, `Expected Outcome`, `Mandatory Checklist` | C++ reviewer → native build/header/CTest evidence | project-native configure/build/test is implementation-phase evidence; this design phase records the route and does not claim execution | `cpp/CMakeLists.txt`, `cpp/include`, `cpp/tests`, target graph | configure/build/CTest, header/link/ownership review; `not_run` until implementation |
@@ -378,7 +378,7 @@ Build and run are separate lifecycle events (`D-EXPERIMENT-LIFECYCLE`). The CMak
 and target dependency evidence; `experiment-lifecycle` owns run planning,
 `run_name`, config selection, result-root selection, and execution evidence;
 `save-experiment-results` owns raw artifact retention, report linkage,
-overwrite policy, and result-branch publication.
+append-only policy, and git-annex archive publication.
 
 | lifecycle field | canonical value/owner |
 | --- | --- |
@@ -391,7 +391,7 @@ overwrite policy, and result-branch publication.
 | result directory | `$ROOT/experiments/<topic>/result/<run_name>/` |
 | raw domain outputs | `summary.json`, `cases.jsonl`, case artifacts under the result directory |
 | lifecycle evidence | `run_manifest.json`, `command.json`, `environment.json`, `source_snapshot.json`, config snapshot, logs, exit status |
-| save/report evidence | `artifact_manifest.json`, `eval_manifest.json`, report path, retention plan, result branch status |
+| save/report evidence | `artifact_manifest.json`, `eval_manifest.json`, report path, retention manifest, archive/fsck status |
 
 Build command:
 
@@ -428,16 +428,16 @@ python3 tools/experiments/run_managed_experiment.py --topic "$TOPIC" --variant f
 After a run, the save owner validates and retains the same result directory (`RDC-SAVE-RESULTS`):
 
 ```bash
-python3 tools/experiments/publish_result_branch.py \
+python3 tools/experiments/save_experiment_result_annex.py \
   --result-dir "$ROOT/experiments/$TOPIC/result/$RUN_NAME" \
-  --branch "experiment-results/$TOPIC"
+  --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
 ```
 
 The retention evidence records `experiment_topic`, `experiment_run_name`, `D-EXPERIMENT-LIFECYCLE`,
-`experiment_result_dir`, `experiment_source_commit`, dirty-source status,
-formal-status, raw manifests, report path, and unique-run-name/append-only (`D-EXPERIMENT-LIFECYCLE`)
-overwrite policy (`D-EXPERIMENT-LIFECYCLE`). This keeps CMake build evidence, lifecycle run evidence, and
-save-result evidence separately traceable (`D-EXPERIMENT-LIFECYCLE`).
+`experiment_result_dir`, `experiment_source_commit`, dirty-source paths,
+formal-status, raw manifests, report presence, and unique-run-name/append-only (`D-EXPERIMENT-LIFECYCLE`)
+collision policy (`D-EXPERIMENT-LIFECYCLE`). This keeps CMake build evidence, lifecycle run evidence, and
+save-result archive evidence separately traceable (`D-EXPERIMENT-LIFECYCLE`).
 
 ## Dependency ownership
 

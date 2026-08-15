@@ -1,6 +1,6 @@
 ---
 name: save-experiment-results
-description: "Save and publish experiment run results with branch-safe retention. Use when Codex needs to preserve experiments/<topic>/result/<run_name>, create or verify experiment result manifests, write experiment reader reports, publish to experiment-results/<topic>, prevent overwrites, or keep failed/partial experiment runs as durable evidence."
+description: "Retain one experiment result as one deterministic git-annex archive. Use when Codex needs to preserve experiments/<topic>/result/<run_name>, verify its manifest/report, prevent overwrites, or retain failed/partial artifacts."
 ---
 <!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"a849d6edac8dad67f9858a7718479705061dd0f582be8bd07cf3276210a28271"} -->
 

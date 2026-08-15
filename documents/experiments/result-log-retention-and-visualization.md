@@ -47,9 +47,8 @@ JSONL and accumulated eval archive branch policy belong to
   generated plots, HTML, SVG, HLO dumps, and machine-readable summaries.
 - `experiments/<topic>/result/<run-id>/logs/` stores per-run stdout/stderr,
   tool, checker, and diagnostic logs that are not the managed wrapper `run.log`.
-- `experiment-results/<topic>` or a topic-specific result branch stores the
-  Git-retained copy of formal experiment result/report artifacts produced from
-  the source checkout.
+- A configured git-annex worktree stores one deterministic
+  `experiments/<topic>/result/<run_name>.tar.gz` for each formal experiment run.
 - `experiments/<topic>/visualize.ipynb` stores the Jupyter notebook used to visualize
   run artifacts and regenerate figures/tables from `result/<run-id>/`.
 - `experiments/report/<run-id>.md` stores the human-readable experiment report.
@@ -93,7 +92,9 @@ Canonical helper commands:
 python3 tools/data/jsonl_to_md.py <input.jsonl> <output.md>
 python3 tools/hlo/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
 python3 tools/experiments/html_artifact_access.py <report.html>
-python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>
+python3 tools/experiments/save_experiment_result_annex.py \
+  --result-dir experiments/<topic>/result/<run_name> \
+  --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
 dot -V
 ```
 
@@ -117,11 +118,12 @@ directly from inside a container and tunneling to the container IP.
   task, archive it mechanically with `runtime_log_archive_git.py
   archive-agent-report`; do not create a hand-written duplicate report in the
   source tree.
-- For formal experiments, run from the source checkout and publish the generated
-  `experiments/<topic>/result/<run_name>/` plus
-  `experiments/report/<run_name>.md` with
-  `tools/experiments/publish_result_branch.py`. Use `--push` when the retention
-  decision is remote result-branch storage.
+- For formal experiments, run from the source checkout and retain the generated
+  `experiments/<topic>/result/<run_name>/` plus optional
+  `experiments/report/<run_name>.md` as one deterministic archive with
+  `tools/experiments/save_experiment_result_annex.py`. The archive's internal
+  `annex_retention_manifest.json` records source provenance, file hashes, report
+  presence, archive configuration, and append-only policy.
 
 ## Closeout Evidence
 

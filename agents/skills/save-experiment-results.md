@@ -1,159 +1,107 @@
 # save-experiment-results
+
 <!--
 @dependency-start
 contract skill
-responsibility Documents Save Experiment Results for this repository.
+responsibility Documents deterministic git-annex retention for one experiment result.
 upstream design ../canonical/skills.md skill canon registry
 upstream design experiment-lifecycle.md experiment lifecycle workflow
 upstream design result-artifact-writeout.md durable raw/result/report artifact writeout
-upstream design ../../documents/experiments/experiment-report-style.md experiment report artifact policy
-downstream implementation ../../.agents/skills/save-experiment-results/SKILL.md exposes this workflow as a runtime skill
-downstream implementation ../../tools/experiments/publish_result_branch.py publishes formal result branches
+upstream design ../../documents/experiments/result-log-retention-and-visualization.md experiment result retention policy
+downstream implementation ../../tools/experiments/save_experiment_result_annex.py saves one archive
 @dependency-end
 -->
 
 ## Reader Map
 
-- Purpose: save experiment outputs as durable, reproducible artifacts with a
-  branch-safe retention route.
-- Use when: experiment results, run directories, reports, or result branches
-  need to be preserved after a run or reviewed before publication.
-- Section path: Purpose and Use When define the entry; Required Contract fixes
-  raw/report/manifest shape; Branch-Safe Retention defines source branch versus
-  result branch behavior; Closeout Tokens names evidence.
-- Boundary: this skill saves existing experiment results. Starting or changing
-  experiments belongs to `experiment-lifecycle`; interpreting reports belongs
-  to `report-writing`.
+- Purpose: retain one existing experiment result as one reproducible git-annex archive.
+- Use when: one `experiments/<topic>/result/<run_name>/` tree and its optional report
+  need append-only external retention.
+- Boundary: this skill retains result artifacts. Experiment execution belongs to
+  `experiment-lifecycle`; report interpretation belongs to `report-writing`.
 
 ## Purpose
 
-実験結果を chat-only summary や source branch のついでではなく、あとから再利用できる
-raw artifact、reader report、manifest、result branch として保存します。
-保存先と branch 操作を先に固定し、結果の上書き、source change の隠蔽、失敗 run の
-破棄を防ぎます。
-
-## Use When
-
-- user が実験結果の保存、保存 skill、result branch、formal retention、publish、
-  run artifact の保全を求める
-- `experiments/<topic>/result/<run_name>/` を source checkout から保存する
-- raw result と `experiments/report/<run_name>.md` を同じ source run に結び付ける
-- failed、skipped、blocked、partial run を routing evidence として残す
-- 保存済み result を overwrite せず、unique run_name か append-only 証跡にする
+実験結果を source checkout に混ぜず、同じ run の raw files と optional report を
+一つの deterministic `tar.gz` として git-annex worktree に保存します。source は
+読み取り専用であり、保存先の衝突、symlink、special file、Git-LFS pointer、途中の
+commit 失敗による部分状態を許しません。
 
 ## Required Contract
 
-1. 結果保存の前に retention plan を書く:
-   - `topic`
-   - `run_name`
-   - `result_dir`
-   - `source_branch`
-   - `source_commit`
-   - `source_dirty_state`
-   - `result_branch`
-   - `remote_publish`
-   - `overwrite_policy`
-   - `report_path`
-1. 正本 source は既存の `experiments/<topic>/result/<run_name>/` です。
-   result directory が無い場合は結果を作ったことにせず、`experiment-lifecycle`
-   へ戻して run plan を作ります。
-1. Raw machine-readable artifact を先に保存し、その同じ raw result から
-   summary/report を作ります。標準 artifact は `run_manifest.json`、
-   `eval_manifest.json`、`artifact_manifest.json`、`command.json`、
-   `environment.json`、`source_snapshot.json`、`config.json`、
-   `config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、
-   `logs/stderr.log`、`summary.json`、`cases.jsonl`、case artifacts、
-   `visualize_executed.ipynb` です。
-1. 欠けている標準 artifact は limitation として manifest / report に記録します。
-   欠落を report prose で埋めたり、別 run の artifact で混ぜたりしません。
-1. Failed、skipped、blocked、partial run も保存対象です。`status`、`exit_code`、
-   blocker、partial artifact list、次 action を manifest に残します。
-1. 同じ `run_name` の detailed result を上書きしません。再実行は新しい
-   `run_name`、または append-only manifest entry として扱います。cleanup が必要な
-   場合は、削除対象、理由、owner、代替保存先を retention plan に書きます。
-1. Reader-facing report を作る場合は `report-writing` を使い、観測、解釈、
-   limitation、next action、artifact list を分けます。Markdown 正本 report は
-   `experiments/report/<run_name>.md` です。
+1. Start from exactly one existing `experiments/<topic>/result/<run_name>/` directory.
+   A result directory with no regular result file is rejected; a report alone is not
+   a result.
+1. Invoke the public route with only these inputs:
 
-## Branch-Safe Retention
+   ```bash
+   python3 tools/experiments/save_experiment_result_annex.py \
+     --result-dir experiments/<topic>/result/<run_name> \
+     --annex-repo /path/to/git-annex-worktree \
+     [--source-repo-root /path/to/source]
+   ```
 
-1. Source branch / PR は code、config、protocol、report generator 変更を運びます。
-   Raw experiment result を source branch や `main` に混ぜて保存しません。
-1. Formal result retention は専用 branch に出します:
+   `--annex-repo` may be supplied by `EXPERIMENT_RESULT_ANNEX_REPO`. There is no
+   report-path, publication target, push, remote, overwrite, batch, all-run, or
+   migration option.
+1. The source tree is archived under its repository-relative paths. The optional
+   `experiments/report/<run_name>.md` is included when present. The external target is
+   exactly `experiments/<topic>/result/<run_name>.tar.gz` in the annex worktree.
+1. The archive contains directory entries, all regular result files, the optional
+   report, and `experiments/<topic>/result/<run_name>/annex_retention_manifest.json`.
+   The manifest records schema, run identity, source branch/commit/dirty paths,
+   `run_manifest.json` SHA256 when present, nullable report path and presence, archive
+   configuration/path, `append_only`, sorted directories, and every source file's
+   path, size, SHA256, and normalized executable mode.
+1. Archive bytes use stdlib gzip (`filename=''`, mtime `0`, level `9`) and sorted PAX
+   tar entries. All uid/gid/name and mtime fields are normalized; regular files use
+   normalized executable or non-executable modes. JSON is sorted, compact, UTF-8, and
+   ends with one final newline.
+1. Reject symlink or special source entries, Git-LFS pointer files, reserved manifest
+   collisions, source/annex root equality or containment, existing target collisions,
+   and any archive worktree path outside `.gitattributes` and the archive layout.
 
-```bash
-python3 tools/experiments/publish_result_branch.py \
-  --result-dir experiments/<topic>/result/<run_name> \
-  --branch experiment-results/<topic>
-```
+## Annex Transaction
 
-Remote 保全が run plan に含まれる場合だけ `--push` を付けます。
-
-1. Result branch を作成または更新する前に、run bundle、manifest、PR body、または
-   report に `branch_creation_reason=<reason>` と `result_branch=<branch>` を
-   記録します。理由は result retention であり、source diff の隔離ではありません。
-1. Result branch には result/report artifacts だけを置きます。code、config、
-   protocol、skill、tool、workflow の変更を result branch に隠しません。
-1. Formal result は clean な canonical source checkout、通常は `main`、または
-   merged / approved source PR commit から作ります。source checkout が dirty の
-   run は保存対象ですが、`source_dirty_state` と affected paths を manifest に残し、
-   `experiment_formal_status=not_formal_dirty_source` とします。formal success
-   evidence にするには source diff を commit / PR route に通し、その commit から
-   rerun します。
-1. Source PR を直した後は、古い result branch を成功 evidence として使い回しません。
-   protocol、config、code、metric、report generator が変わった場合は、再実行するか
-   `experiment_formal_status=not_formal_stale_source` として保持だけにします。
+1. Require an existing clean, non-bare git-annex worktree on a normal branch, with a
+   clean index/worktree and no legacy result-retention refs. Source and annex are
+   distinct non-containing roots; the source is never modified. The temporary archive
+   is created beside its final annex path so no-replace installation stays on one
+   filesystem.
+1. Build in a temp file beside the final target, fsync it, reread and verify every
+   archive member, then publish with atomic no-replace `os.link(temp, final)` and
+   unlink the temp name. A collision or race fails without replacing the existing
+   target.
+1. Run `git annex add --backend=SHA256E -- <archive>`, verify staged/worktree paths,
+   run full `git annex fsck -- <archive>` before commit, verify the SHA256E lookup key
+   and real contentlocation size/SHA256, then make exactly one normal-branch commit.
+   Run full fsck and a complete archive reread after commit, and require clean status.
+1. Before commit, rollback is limited to this task's archive/index entries,
+   operation-owned `.gitattributes`, and task-created empty directories. Use bounded
+   `git update-index --force-remove`; unreferenced annex objects may remain. After a
+   commit, never rewind it: return the retained commit SHA with an unverified error.
 
 ## Closeout Tokens
 
-Record these in the run bundle, manifest, PR body, or final handoff:
+The successful command emits:
 
 ```text
-experiment_result_save=complete
-experiment_topic=<topic>
-experiment_run_name=<run_name>
-experiment_result_dir=<path>
-experiment_result_branch=<branch-or-not_published>
-experiment_source_commit=<sha>
-experiment_source_dirty_state=<clean|dirty_with_paths>
-experiment_formal_status=<formal|not_formal_dirty_source|not_formal_stale_source|not_formal_partial>
-experiment_raw_manifest=<path>
-experiment_report=<path-or-not_requested>
-experiment_overwrite_policy=<unique-run-name|append-only|cleanup-with-record>
+EXPERIMENT_RESULT_STATUS=complete
+EXPERIMENT_RESULT_ARCHIVE_PATH=<path>
+EXPERIMENT_RESULT_COMMIT=<sha>
+EXPERIMENT_RESULT_ANNEX_KEY=SHA256E-...
+EXPERIMENT_RESULT_ARCHIVE_SIZE=<bytes>
+EXPERIMENT_RESULT_ARCHIVE_SHA256=<sha256>
 ```
+
+Record these tokens with the source result path, source provenance, report presence,
+manifest path, and append-only collision policy. A failed postcommit verification
+records the retained commit and does not claim completion.
 
 ## Runtime Contract Clauses
 
-The runtime discovery adapter delegates these required operating clauses to this canonical owner.
-
-1. Read `agents/skills/save-experiment-results.md`.
-1. Start from an existing `experiments/<topic>/result/<run_name>/`. If it is
-   missing, return to `$experiment-lifecycle`; do not invent a saved result from
-   chat notes or report prose.
-1. Write a retention plan before touching a result branch: topic, run name,
-   result directory, source branch, source commit, source dirty state, result
-   branch, remote publish decision, overwrite policy, and report path.
-1. Preserve raw machine-readable run artifacts before deriving Markdown,
-   tables, or HTML. Missing standard artifacts become explicit limitations.
-1. Save failed, skipped, blocked, and partial runs with status, exit code,
-   blocker, partial artifact list, and next action. They are not disposable.
-1. Do not overwrite a detailed result directory. Use a new run name,
-   append-only manifest entry, or a recorded cleanup task with owner and reason.
-1. Keep source changes and result retention on separate branch lanes. Code,
-   config, protocol, skill, tool, workflow, or report-generator changes stay on
-   source branches/PRs; formal result artifacts go to
-   `experiment-results/<topic>` via `publish_result_branch.py`.
-1. Treat dirty-source runs as retainable but not formal success evidence. Record
-   affected paths and `experiment_formal_status=not_formal_dirty_source`; rerun
-   from a committed source branch or merged commit before marking the result
-   formal.
-1. Before creating or updating the result branch, record
-   `branch_creation_reason=<reason>` and `result_branch=<branch>` in the run
-   bundle, manifest, report, or PR body.
-1. Add `--push` only when the retention plan calls for remote storage.
-1. If a reader-facing report is requested, also use `$report-writing`; this
-   skill owns raw retention and branch-safe publication, not scientific
-   interpretation quality.
-1. Close out with `experiment_result_save=complete`, result paths, source commit,
-   dirty-state evidence, formal status, result branch, raw manifest, report
-   path, and overwrite policy.
+1. Read this canonical owner before applying the runtime shim.
+1. Preserve raw result files before deriving any reader-facing interpretation.
+1. Keep failed, skipped, blocked, and partial runs in their source result directory;
+   this route records only existing artifacts and never invents missing output.
+1. Use a new run name for a new result; an existing archive is never overwritten.

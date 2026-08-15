@@ -2227,13 +2227,13 @@ entries:
     tests:
       - tests/tools/test_update_latest_result.py
 
-  - id: publish-result-branch
-    summary: Publishes experiment result artifacts to a dedicated Git branch.
-    path: tools/experiments/publish_result_branch.py
+  - id: save-experiment-result-annex
+    summary: Saves one experiment result as one deterministic git-annex archive.
+    path: tools/experiments/save_experiment_result_annex.py
     family: experiments
     role: experiment
     status: canonical
-    command: python3 tools/experiments/publish_result_branch.py
+    command: python3 tools/experiments/save_experiment_result_annex.py
     writes: true
     default_wiring:
       ci: false
@@ -2244,7 +2244,7 @@ entries:
       - documents/experiments/result-log-retention-and-visualization.md
       - agents/workflows/experiment-workflow.md
     tests:
-      - tests/tools/test_publish_result_branch.py
+      - tests/tools/test_save_experiment_result_annex.py
 
   - id: triplet-validator
     summary: Validates source, document, and test triplets.

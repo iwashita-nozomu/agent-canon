@@ -173,31 +173,31 @@ id = "save-experiment-results-skill"
 target = ".agents/skills/save-experiment-results/SKILL.md"
 canonical_target = "agents/skills/save-experiment-results.md"
 kind = "skill"
-description = "Experiment result saving must preserve raw run artifacts through branch-safe result retention without overwrite or dirty-source formal loopholes."
+description = "Experiment result saving must preserve raw run artifacts through one deterministic git-annex archive without overwrite or provenance loopholes."
 
 [[evals.checklist]]
 id = "SAVE-EXPERIMENT-RESULTS-1"
 critical = true
-description = "Requires a retention plan and result branch evidence before publishing."
-required_regex = ["retention plan", "branch_creation_reason", "result_branch"]
+description = "Requires source provenance, internal manifest evidence, and append-only archive policy."
+required_regex = ["source provenance", "annex_retention_manifest", "append-only"]
 
 [[evals.checklist]]
 id = "SAVE-EXPERIMENT-RESULTS-2"
 critical = true
-description = "Separates source branches from experiment result branches."
-required_regex = ["source branches/PRs", "experiment-results/<topic>", "publish_result_branch\\.py"]
+description = "Requires deterministic git-annex, SHA256E, and full fsck verification."
+required_regex = ["git-annex", "SHA256E", "fsck", "EXPERIMENT_RESULT_"]
 
 [[evals.checklist]]
 id = "SAVE-EXPERIMENT-RESULTS-3"
 critical = true
 description = "Prevents overwrite and preserves failed or partial runs."
-required_regex = ["Do not overwrite", "failed", "partial", "not disposable"]
+required_regex = ["never overwritten", "failed", "partial", "existing archive"]
 
 [[evals.checklist]]
 id = "SAVE-EXPERIMENT-RESULTS-4"
 critical = true
-description = "Dirty-source runs cannot become formal success evidence."
-required_regex = ["dirty-source", "not formal success evidence", "not_formal_dirty_source"]
+description = "Source dirty paths remain explicit provenance rather than hidden state."
+required_regex = ["dirty paths", "source", "provenance"]
 
 [[evals]]
 id = "tool-finding-report-skill"

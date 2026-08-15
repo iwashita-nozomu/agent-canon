@@ -61,8 +61,8 @@ chat 要約だけで閉じず、raw result、human summary、manifest、report p
 - hook result chronology:
   `.agent-canon/log-archive/hook-runs/<stable-source-repository-id>/<runtime-namespace>/<hook-name>-<agent-canon-commit>.jsonl`
 - experiment raw result: `experiments/<topic>/result/<run_name>/`; use
-  `save-experiment-results` for retention plan, dirty-source formal-status,
-  overwrite policy, and result branch evidence
+  `save-experiment-results` for source provenance, manifest, report presence,
+  append-only collision policy, and git-annex archive retention
 - experiment reader report: `experiments/report/<run_name>.md`; use
   `save-experiment-results` when the report is tied to an experiment run
 - managed experiment reproducibility artifacts:
@@ -70,10 +70,10 @@ chat 要約だけで閉じず、raw result、human summary、manifest、report p
   `command.json`, `environment.json`, `source_snapshot.json`, `config.json`,
   `config_source.yaml`, `run.log`, `logs/startup.jsonl`, `logs/stdout.log`,
   and `logs/stderr.log` under the same `result/<run_name>/`
-- formal experiment result branch: `experiment-results/<topic>` or the
-  topic-specific branch fixed in the experiment plan. Route through
-  `save-experiment-results` first, then publish with
-  `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>`.
+- formal experiment archive: `experiments/<topic>/result/<run_name>.tar.gz` in
+  the configured git-annex worktree. Route through `save-experiment-results`
+  first, then retain with
+  `python3 tools/experiments/save_experiment_result_annex.py --result-dir experiments/<topic>/result/<run_name> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"`.
 - generated triage report: `reports/<tool-or-task>/`
 
 Do not store generated reports as policy truth. If a report changes a rule, edit
@@ -168,7 +168,11 @@ The runtime discovery adapter delegates these required operating clauses to this
 1. Use append-only JSONL or a unique file path for repeated hook, skill eval, prompt eval, checker, or experiment runs; do not overwrite detailed results.
 1. Include stable grouping fields such as payload/input fingerprint, hook/tool name, status, exit code, branch, commit, and runtime namespace when available.
 1. For experiment outputs, use `$save-experiment-results` with this skill. Keep raw run artifacts under `experiments/<topic>/result/<run_name>/` and reader-facing reports under `experiments/report/<run_name>.md`. Raw run artifacts include `run_manifest.json`, `eval_manifest.json`, `artifact_manifest.json`, `command.json`, `environment.json`, `source_snapshot.json`, `config.json`, `config_source.yaml`, `run.log`, `logs/startup.jsonl`, `logs/stdout.log`, and `logs/stderr.log`.
-1. For formal experiment retention, `$save-experiment-results` owns the retention plan, dirty-source formal-status, overwrite policy, and result branch evidence before publishing raw/report artifacts with `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>`; add `--push` when the retention plan includes remote storage.
+1. For formal experiment retention, `$save-experiment-results` owns source provenance,
+   report presence, append-only collision policy, and archive evidence before retaining
+   raw/report artifacts with `python3 tools/experiments/save_experiment_result_annex.py
+   --result-dir experiments/<topic>/result/<run_name> --annex-repo
+   "$EXPERIMENT_RESULT_ANNEX_REPO"`.
 1. For run-local task evidence, write under `reports/agents/<run-id>/` and include the artifact path in the final response or handoff.
 1. To find the exact report placement for the current repo, run `python3 tools/agent_tools/runtime_log_archive_git.py status` and read `RUNTIME_LOG_ARCHIVE_REPORTS_RUN_LOCAL`, `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_BRANCH`, and `RUNTIME_LOG_ARCHIVE_REPORTS_ARCHIVE_DIR`.
 1. For normal cross-run retention of run-local agent reports, do not hand-generate an archive report. Use `python3 tools/agent_tools/runtime_log_archive_git.py sync`; it copies `reports/agents/` into `.agent-canon/log-archive/agent-reports/<repo-key>/` on `logs/<repo-key>`.
