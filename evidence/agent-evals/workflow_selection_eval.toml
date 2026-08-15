@@ -246,9 +246,9 @@ subjects = [
 
 [[case_groups]]
 id = "experiment-html-report"
-description = "Experiment report tasks with HTML output should route to experiment and HTML report skills."
+description = "Existing experiment/Eval artifacts rendered as HTML should route directly to the HTML output owner."
 expected_workflows = ["research-driven-change"]
-expected_skills = ["experiment-lifecycle", "html-output"]
+expected_skills = ["html-output"]
 limit = 25
 prompt_templates = [
   "{subject} の experiment result を browser-readable HTML eval report にして",

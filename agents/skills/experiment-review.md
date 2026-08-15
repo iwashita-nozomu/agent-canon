@@ -24,8 +24,8 @@ GPU/JAX 環境の所有境界、artifact / notebook / README の契約が崩れ�
 
 - `experiments/registry.toml` に topic があり、registered command は managed runner
   が呼ぶ topic `run.py` inner command になっている
-- README の standard command は `python3 tools/experiments/run_managed_experiment.py
-  --topic <topic> --variant formal -- python3 experiments/<topic>/run.py` と一致している
+- README の standard command は `python3 -m tools.experiments.run_managed_experiment
+  --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py` と一致している
 - managed run は既定 run directory を作り、topic `run.py` は必要に応じて
   `EXPERIMENT_RUN_DIR` を尊重して同じ artifact schema を書く
 - topic code と checked-in config は GPU visibility、JAX platform、allocator、

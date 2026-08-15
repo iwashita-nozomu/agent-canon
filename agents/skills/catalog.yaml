@@ -413,8 +413,9 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name>
-        --branch experiment-results/<topic>
+      - python3 -m tools.experiments.publish_result_branch --result-dir experiments/<topic>/result/<variant>/<run_name>
+        --variant <variant>
+        --branch experiment-results/<topic>/<variant>
       - python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir
         reports/agents/<run-id>
       - python3 tools/agent_tools/runtime_log_archive_git.py push
@@ -1016,22 +1017,6 @@ skill_families:
         - ["browser-readable"]
         - ["browser", "readable"]
         - ["ブラウザ"]
-  - id: html-experiment-report
-    purpose: Produce browser-readable HTML experiment or Eval reports by choosing the primary figure, planning from it, reusing existing artifacts, and rendering bounded evidence.
-    canonical_doc: agents/skills/html-experiment-report.md
-    shim: .agents/skills/html-experiment-report/SKILL.md
-    discovery:
-      name: html-experiment-report
-      description: "Use when producing a browser-readable HTML experiment or Eval report; first decide the primary figure, then plan and run an evidence-backed report renderer while keeping domain authority in the original tool."
-    tool_commands:
-      required: []
-      conditional:
-      - python3 -m http.server --bind 0.0.0.0
-      - agent-canon semantic-index compare-providers
-      - python3 tools/agent_tools/semantic_provider_html_report.py
-      maintenance:
-      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
-      - python3 tools/agent_tools/skill_tool_commands.py check
   - id: test-design
     purpose: After the owning implementation mechanism exists, classify explicit unresolved oracle, specification, regression, or failure-mode risk beyond static analysis, existing checkers, and targeted validation.
     canonical_doc: agents/skills/test-design.md
@@ -1540,12 +1525,13 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/experiments/create_experiment_topic.py <topic>
-      - python3 tools/ci/check_experiment_registry.py
-      - python3 tools/experiments/run_managed_experiment.py --topic <topic> --variant
-        formal -- python3 experiments/<topic>/run.py
-      - python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name>
-        --branch experiment-results/<topic>
+      - python3 -m tools.experiments.create_experiment_topic <topic>
+      - python3 -m tools.ci.check_experiment_registry
+      - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant
+        <variant> -- python3 experiments/<topic>/run.py
+      - python3 -m tools.experiments.publish_result_branch --result-dir experiments/<topic>/result/<variant>/<run_name>
+        --variant <variant>
+        --branch experiment-results/<topic>/<variant>
       - python3 tools/agent_tools/tool_rejection_preflight.py --root . <planned-edit-paths>
       - python3 -m pytest tests/tools/test_run_managed_experiment.py -q
       - agent-canon semantic-index discourse-relations --profile experiment-report
@@ -1569,34 +1555,6 @@ skill_families:
         - ["実験", "実行"]
         - ["実験結果"]
         - ["実験", "結果"]
-  - id: save-experiment-results
-    purpose: Save experiment run results with raw artifacts, manifests, reports, and branch-safe publication to dedicated experiment result branches.
-    canonical_doc: agents/skills/save-experiment-results.md
-    shim: .agents/skills/save-experiment-results/SKILL.md
-    discovery:
-      name: save-experiment-results
-      description: "Save and publish experiment run results with branch-safe retention. Use when Codex needs to preserve experiments/<topic>/result/<run_name>, create or verify experiment result manifests, write experiment reader reports, publish to experiment-results/<topic>, prevent overwrites, or keep failed/partial experiment runs as durable evidence."
-    tool_commands:
-      required: []
-      conditional:
-      - python3 tools/experiments/publish_result_branch.py
-      maintenance:
-      - python3 tools/agent_tools/check_skill_frontmatter.py --root .
-      - python3 tools/agent_tools/skill_tool_commands.py check
-    routing:
-      stage_policy: active
-      reason: experiment result retention, manifest writeout, overwrite prevention, or result-branch publication is in scope
-      triggers:
-        - ["実験結果", "保存"]
-        - ["実験", "結果", "保存"]
-        - ["実験結果", "残"]
-        - ["実験", "result", "保存"]
-        - ["experiment", "result", "save"]
-        - ["experiment", "result", "publish"]
-        - ["experiment", "result", "branch"]
-        - ["publish", "result", "branch"]
-        - ["formal", "result", "retention"]
-        - ["run", "artifact", "preserve"]
   - id: experiment-review
     purpose: Review experiment topics for the managed runner route and run.py inner entrypoint, GPU/JAX environment ownership, artifact schemas, notebook explanations, and README run contracts.
     canonical_doc: agents/skills/experiment-review.md
@@ -1607,8 +1565,8 @@ skill_families:
     tool_commands:
       required: []
       conditional:
-      - python3 tools/experiments/run_managed_experiment.py --topic <topic> --variant
-        formal -- python3 experiments/<topic>/run.py
+      - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant
+        <variant> -- python3 experiments/<topic>/run.py
       - git grep -n -E "ExperimentRunner|EXPERIMENT_RUN_DIR|JAX_|XLA_|CUDA_VISIBLE|PREALLOC|prealloc|gpu_max_slots|max_workers|subprocess|ProcessPool|multiprocessing|env="
         --
       maintenance:
