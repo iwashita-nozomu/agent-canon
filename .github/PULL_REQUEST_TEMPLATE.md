@@ -6,6 +6,8 @@ upstream design ../agents/workflows/agent-canon-pr-workflow.md AgentCanon PR ide
 upstream design AGENTS.md GitHub subtree boundary
 upstream design ../templates/documents/github/README.md canonical GitHub template source
 downstream implementation ../tools/ci/check_github_workflows.py validates the evidence fields and workflow conventions
+downstream implementation ../tools/agent_tools/surface_manifest.py resolves parent-view source bindings for dependency review
+downstream implementation ../tools/ci/run_pr_dependency_source_gate.sh validates dependency completeness from tracked source
 @dependency-end
 -->
 

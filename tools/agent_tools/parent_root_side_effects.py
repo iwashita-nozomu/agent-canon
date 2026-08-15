@@ -979,6 +979,92 @@ def _parent_directory(root: Path, physical: Path, *, create: bool) -> tuple[int,
     return parent_fd, relative[-1], parent_path
 
 
+def _open_receipt_parent_chain(
+    receipt: ParentOwnedPathReceipt,
+    parent_path: Path,
+    expected_components: tuple[tuple[str, int, int], ...],
+    purpose: str,
+) -> list[int]:
+    """Open and retain a receipt's complete root-to-parent directory chain.
+
+    The receipt is the capability snapshot.  This helper deliberately does
+    not resolve ``parent_path`` or reopen it through a pathname helper: every
+    component is opened relative to the already pinned directory fd and is
+    checked immediately against the captured inode identity.
+    """
+    root = receipt.parent_root
+    try:
+        relative = tuple(parent_path.relative_to(root).parts)
+    except ValueError as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.SYMLINK_ESCAPE,
+            f"{purpose}: parent path escapes parent root: {parent_path}",
+        ) from exc
+    if len(expected_components) != len(relative) + 1:
+        raise ParentRootSideEffectError(
+            ParentRootReject.ROOT_RACE_DETECTED,
+            f"{purpose}: parent component shape changed",
+        )
+
+    fds: list[int] = []
+    try:
+        try:
+            fd = _open_root(root)
+        except ParentRootSideEffectError as exc:
+            if exc.reject is ParentRootReject.ROOT_MISSING:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"{purpose}: attested parent root disappeared",
+                ) from exc
+            raise
+        fds.append(fd)
+        root_info = os.fstat(fd)
+        expected_root = expected_components[0]
+        if expected_root[0] != "." or (root_info.st_dev, root_info.st_ino) != expected_root[1:]:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"{purpose}: parent root identity changed",
+            )
+        if (root_info.st_dev, root_info.st_ino) != (receipt.parent_dev, receipt.parent_ino):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"{purpose}: attested parent root identity changed",
+            )
+
+        for component, expected in zip(relative, expected_components[1:]):
+            if component in {"", ".", ".."} or component != expected[0]:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.SYMLINK_ESCAPE,
+                    f"{purpose}: invalid parent component: {component!r}",
+                )
+            try:
+                child = os.open(
+                    component,
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                    dir_fd=fds[-1],
+                )
+            except OSError as exc:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"{purpose}: parent component changed: {component}: {exc}",
+                ) from exc
+            fds.append(child)
+            info = os.fstat(child)
+            if (info.st_dev, info.st_ino) != expected[1:]:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"{purpose}: parent directory identity changed: {component}",
+                )
+        return fds
+    except Exception:
+        for opened in reversed(fds):
+            try:
+                os.close(opened)
+            except OSError:
+                pass
+        raise
+
+
 def _read_json_exact(path: Path, reject: ParentRootReject, required: frozenset[str], schema: str) -> Mapping[str, object]:
     def reject_duplicate_pairs(pairs: list[tuple[str, object]]) -> dict[str, object]:
         result: dict[str, object] = {}
@@ -3780,31 +3866,113 @@ class ParentRootSideEffectBoundary:
                                             "parent identity changed during removal")
 
     def read_parent_owned_file(self, receipt: ParentOwnedPathReceipt) -> bytes:
-        """Read a capability target through its parent directory fd."""
+        """Read a capability target through retained directory descriptors."""
         receipt = self._revalidate_path_session(receipt, "read-parent-owned-file")
-        root = receipt.parent_root
+        if receipt.target_dev is None or receipt.target_ino is None:
+            self._release_operation_lease(receipt.session_lease)
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "parent-owned read requires an existing target identity",
+            )
+        if not receipt.lexical_entry_exists:
+            self._release_operation_lease(receipt.session_lease)
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                "parent-owned read requires a lexical entry identity",
+            )
+
+        physical_parent = receipt.physical_path.parent
+        physical_parts = receipt.parent_components
         try:
-            _verify_parent_components(receipt)
-            physical, _ = _physical_in_root(root, receipt.physical_path, allow_missing=False)
-            parent_fd, name, _ = _parent_directory(root, physical, create=False)
+            directory_fds = _open_receipt_parent_chain(
+                receipt, physical_parent, physical_parts, receipt.purpose
+            )
         except Exception:
             self._release_operation_lease(receipt.session_lease)
             raise
+        lexical_fds: list[int] = []
         fd = -1
         try:
-            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=parent_fd)
+            parent_fd = directory_fds[-1]
+            try:
+                fd = os.open(
+                    receipt.physical_path.name,
+                    os.O_RDONLY
+                    | os.O_NOFOLLOW
+                    | os.O_CLOEXEC
+                    | os.O_NONBLOCK,
+                    dir_fd=parent_fd,
+                )
+            except OSError as exc:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"cannot open parent-owned file: {exc}",
+                ) from exc
             observed = os.fstat(fd)
-            if (observed.st_dev, observed.st_ino) == (0, 0):
-                raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED,
-                                                "file identity is invalid")
-            if receipt.target_dev is not None and (
-                observed.st_dev,
-                observed.st_ino,
-            ) != (receipt.target_dev, receipt.target_ino):
+            if not stat.S_ISREG(observed.st_mode):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "parent-owned read target is not a regular file",
+                )
+            observed_identity = (observed.st_dev, observed.st_ino)
+            if observed_identity != (receipt.target_dev, receipt.target_ino):
                 raise ParentRootSideEffectError(
                     ParentRootReject.ROOT_RACE_DETECTED,
                     "file identity changed before read",
                 )
+
+            lexical_parent = receipt.lexical_parent_path
+            if lexical_parent is None or not receipt.lexical_name:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "path receipt has no lexical parent identity",
+                )
+            if lexical_parent == physical_parent:
+                lexical_fds = directory_fds
+            else:
+                lexical_fds = _open_receipt_parent_chain(
+                    receipt,
+                    lexical_parent,
+                    receipt.lexical_parent_components,
+                    receipt.purpose,
+                )
+            lexical_fd = lexical_fds[-1]
+            try:
+                lexical_entry = os.stat(
+                    receipt.lexical_name,
+                    dir_fd=lexical_fd,
+                    follow_symlinks=False,
+                )
+            except OSError as exc:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"cannot inspect lexical parent-owned entry: {exc}",
+                ) from exc
+            if (
+                (lexical_entry.st_dev, lexical_entry.st_ino)
+                != (receipt.lexical_entry_dev, receipt.lexical_entry_ino)
+                or stat.S_IFMT(lexical_entry.st_mode) != receipt.lexical_entry_type
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "lexical entry identity changed before read",
+                )
+            if stat.S_ISLNK(lexical_entry.st_mode):
+                link_target = os.readlink(
+                    receipt.lexical_name,
+                    dir_fd=lexical_fd,
+                )
+                if link_target != receipt.lexical_link_target:
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_RACE_DETECTED,
+                        "lexical symlink target changed before read",
+                    )
+            elif (lexical_entry.st_dev, lexical_entry.st_ino) != observed_identity:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "lexical entry target identity differs before read",
+                )
+
             chunks: list[bytes] = []
             while True:
                 try:
@@ -3815,14 +3983,48 @@ class ParentRootSideEffectBoundary:
                     break
                 chunks.append(chunk)
             return b"".join(chunks)
+        except ParentRootSideEffectError:
+            raise
         except OSError as exc:
-            raise ParentRootSideEffectError(ParentRootReject.ROOT_RACE_DETECTED,
-                                            f"cannot read parent-owned file: {exc}") from exc
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"cannot read parent-owned file: {exc}",
+            ) from exc
         finally:
             if fd >= 0:
                 os.close(fd)
-            os.close(parent_fd)
+            if lexical_fds is not directory_fds:
+                for opened in reversed(lexical_fds):
+                    os.close(opened)
+            for opened in reversed(directory_fds):
+                os.close(opened)
             self._release_operation_lease(receipt.session_lease)
+
+    def read_parent_owned_bytes(
+        self,
+        attestation: ParentRootAttestationReceipt,
+        candidate: Path | str,
+        purpose: str,
+        *,
+        allow_missing: bool = False,
+    ) -> bytes | None:
+        """Resolve and read one parent-owned file as authenticated bytes."""
+        receipt = self.resolve_parent_owned_path(
+            attestation, candidate, purpose, create=False
+        )
+        if receipt.target_dev is None or receipt.target_ino is None:
+            if not receipt.lexical_entry_exists and allow_missing:
+                return None
+            if not receipt.lexical_entry_exists:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISSING,
+                    f"parent-owned file does not exist: {receipt.physical_path}",
+                )
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"parent-owned entry has no stable target: {receipt.physical_path}",
+            )
+        return self.read_parent_owned_file(receipt)
 
     def remove_empty_parent_owned_directory(
         self,
@@ -6258,6 +6460,19 @@ def write_parent_owned_file(attestation: ParentRootAttestationReceipt, candidate
     return _DEFAULT_BOUNDARY.write_parent_owned_file(attestation, candidate, data, purpose)
 
 
+def read_parent_owned_bytes(
+    attestation: ParentRootAttestationReceipt,
+    candidate: Path | str,
+    purpose: str,
+    *,
+    allow_missing: bool = False,
+) -> bytes | None:
+    """Read authenticated parent-owned bytes through the default boundary."""
+    return _DEFAULT_BOUNDARY.read_parent_owned_bytes(
+        attestation, candidate, purpose, allow_missing=allow_missing
+    )
+
+
 def capture_subprocess(
     attestation: ParentRootAttestationReceipt,
     candidate: Path | str,
@@ -6373,6 +6588,10 @@ def _run_cli(argv: Sequence[str] | None = None) -> int:
     resolve.add_argument("--root", required=True, type=Path)
     resolve.add_argument("--candidate", required=True, type=Path)
     resolve.add_argument("--purpose", default="shell-side-effect")
+    read_presence = sub.add_parser("read-presence")
+    read_presence.add_argument("--root", required=True, type=Path)
+    read_presence.add_argument("--candidate", required=True, type=Path)
+    read_presence.add_argument("--purpose", default="shell-side-effect")
     ensure_dir = sub.add_parser("ensure-dir")
     ensure_dir.add_argument("--root", required=True, type=Path)
     ensure_dir.add_argument("--candidate", required=True, type=Path)
@@ -6488,6 +6707,33 @@ def _run_cli(argv: Sequence[str] | None = None) -> int:
                 print(str(physical))
             finally:
                 _close_cli_attestation(receipt)
+        elif args.command == "read-presence":
+            if (
+                not os.environ.get(SIDE_EFFECT_PARENT_ROOT_ENV)
+                and not os.environ.get(SIDE_EFFECT_HANDOFF_ENV)
+                and _V2_SESSION_CONTEXT.get() is None
+                and not _public_legacy_variables(os.environ)
+            ):
+                receipt = _DEFAULT_BOUNDARY.attest(
+                    ParentRootAttestationRequest(
+                        cwd=args.root,
+                        explicit_root=args.root,
+                        purpose=args.purpose,
+                    )
+                )
+            else:
+                receipt = _cli_attestation(args.root, purpose=args.purpose)
+            try:
+                raw = _DEFAULT_BOUNDARY.read_parent_owned_bytes(
+                    receipt, args.candidate, args.purpose, allow_missing=True
+                )
+            finally:
+                _close_cli_attestation(receipt)
+            if raw is None:
+                print("missing")
+                return 1
+            print("present")
+            return 0
         elif args.command == "ensure-dir":
             receipt = _cli_attestation(args.root, purpose=args.purpose)
             directory = _DEFAULT_BOUNDARY.ensure_parent_owned_directory(receipt, args.candidate, args.purpose)
@@ -6658,6 +6904,8 @@ def _main(argv: Sequence[str] | None = None) -> int:
             return _run_cli(raw_argv)
         command = next((item for item in raw_argv if not item.startswith("-")), "effect-cli")
         if os.environ.get(SIDE_EFFECT_PARENT_ROOT_ENV) or os.environ.get(SIDE_EFFECT_HANDOFF_ENV):
+            return _run_cli(raw_argv)
+        if command == "read-presence":
             return _run_cli(raw_argv)
         with public_session(
             invocation_script=Path(__file__),

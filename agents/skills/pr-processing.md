@@ -9,6 +9,7 @@ upstream design agent-orchestration.md execution-time-aware work-conservation co
 upstream design ../workflows/pr-queue-cleanup-workflow.md dependency-queue workflow
 upstream design ../workflows/agent-canon-pr-workflow.md AgentCanon source PR workflow
 upstream design ../../documents/agent-canon/agent-canon-update-route.md source PR versus parent pin route
+upstream design ../internal-routines/github-status-lifecycle.md deterministic GitHub Issue status-label reconciliation and evidence contract
 upstream implementation ../../tools/agent_tools/github_publish.py publishes PRs and writes summary artifacts
 downstream implementation ../../.agents/skills/pr-processing/SKILL.md exposes this workflow as a runtime skill
 @dependency-end
@@ -43,6 +44,26 @@ Code/doc repair remains owned by the changed surface. This skill consumes the re
 ## Publication boundary
 
 Before merge/ready/close/update, read fresh remote state and confirm authority. After the write, read back the PR/issue state. These write controls apply in both single and queue modes.
+
+## GitHub Issue status lifecycle delegation
+
+When an explicit request or repository policy requires status label mutation on a linked Issue, invoke the private `_github-status-lifecycle` runtime skill inside this publication boundary.
+
+`pr-processing` owns target Issue/PR resolution, the initial fresh remote snapshot,
+write authority, transport invocation, and final publication readback. Load the
+repository's `documents/operations/issue-label-taxonomy.toml` mapping and pass it,
+the lifecycle facts, trace evidence, and PR identity to the private routine. The
+routine owns lifecycle classification, evidence admission/retry identity, ordered
+single-label operations, observable concurrency stops, and the final predicate.
+
+The caller consumes the typed adapter result and does not duplicate its transition
+table, evidence protocol, or success predicate. It does not use full-label
+replacement, create labels, edit/delete historical evidence, close Issues, approve
+PRs, or merge as a status side effect. Concurrent drift, partial API failure, or
+readback mismatch leaves publication incomplete and is reported with the exact
+typed state returned by the routine.
+
+Status reconciliation is conditional. Read-only inspection, ordinary review, and PR processing without an explicit Issue status requirement do not activate it.
 
 ## Completion
 

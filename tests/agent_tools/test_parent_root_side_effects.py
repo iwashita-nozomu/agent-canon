@@ -12,6 +12,7 @@ import ast
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -1399,6 +1400,156 @@ def test_read_parent_owned_file_reads_exact_large_payload(tmp_path: Path) -> Non
     published = boundary.atomic_publish(target, payload)
 
     assert boundary.read_parent_owned_file(published) == payload
+
+
+def test_read_parent_owned_bytes_returns_exact_capability_payload(tmp_path: Path) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    payload = b"authenticated-parent-payload\x00\xff\n"
+    target = boundary.resolve_parent_owned_path(receipt, "reports/result.bin", "bytes-read")
+    boundary.atomic_publish(target, payload)
+
+    assert boundary.read_parent_owned_bytes(
+        receipt, target.physical_path, "bytes-read"
+    ) == payload
+
+
+def test_read_presence_cli_has_typed_present_missing_and_reject_results(
+    tmp_path: Path,
+) -> None:
+    attest(tmp_path)
+    target = tmp_path / "reports" / "present.json"
+    target.parent.mkdir()
+    target.write_bytes(b"{}\n")
+    cli = Path(side_effects.__file__).resolve()
+    base = [sys.executable, str(cli), "read-presence", "--root", str(tmp_path)]
+    env = _build_clean_env()
+
+    present = subprocess.run(
+        [*base, "--candidate", str(target), "--purpose", "presence-test"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert (present.returncode, present.stdout, present.stderr) == (0, "present\n", "")
+
+    missing = subprocess.run(
+        [*base, "--candidate", str(tmp_path / "reports" / "missing.json"), "--purpose", "presence-test"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert (missing.returncode, missing.stdout, missing.stderr) == (1, "missing\n", "")
+
+    outside = tmp_path.parent / "presence-outside.json"
+    outside.write_bytes(b"outside\n")
+    escaping = tmp_path / "reports" / "escaping.json"
+    escaping.symlink_to(outside)
+    rejected = subprocess.run(
+        [*base, "--candidate", str(escaping), "--purpose", "presence-test"],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=env,
+    )
+    assert rejected.returncode == 2
+    assert rejected.stdout == ""
+    assert "PARENT_ROOT_SIDE_EFFECT_ERROR=" in rejected.stderr
+
+
+def test_read_parent_owned_file_rejects_in_root_inode_replacement(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    target = boundary.resolve_parent_owned_path(receipt, "reports/result.txt", "inode-race")
+    published = boundary.atomic_publish(target, b"original\n")
+    replacement = target.physical_path.with_name("replacement.txt")
+    replacement.write_bytes(b"replacement\n")
+    target.physical_path.unlink()
+    replacement.rename(target.physical_path)
+
+    with pytest.raises(ParentRootSideEffectError) as rejected:
+        boundary.read_parent_owned_file(published)
+    assert rejected.value.reject is ParentRootReject.ROOT_RACE_DETECTED
+
+
+def test_read_parent_owned_file_rejects_intermediate_and_root_replacement(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    target = boundary.resolve_parent_owned_path(receipt, "reports/nested/result.txt", "component-race")
+    published = boundary.atomic_publish(target, b"original\n")
+    reports = tmp_path / "reports"
+    moved_reports = tmp_path / "reports-moved"
+    reports.rename(moved_reports)
+    reports.mkdir()
+    with pytest.raises(ParentRootSideEffectError) as intermediate_rejected:
+        boundary.read_parent_owned_file(published)
+    assert intermediate_rejected.value.reject is ParentRootReject.ROOT_RACE_DETECTED
+    shutil.rmtree(reports)
+    moved_reports.rename(reports)
+
+    replacement_root = tmp_path.with_name(f"{tmp_path.name}-root-replaced")
+    tmp_path.rename(replacement_root)
+    tmp_path.mkdir()
+    try:
+        with pytest.raises(ParentRootSideEffectError) as root_rejected:
+            boundary.read_parent_owned_file(published)
+        assert root_rejected.value.reject is ParentRootReject.ROOT_RACE_DETECTED
+    finally:
+        shutil.rmtree(tmp_path)
+        replacement_root.rename(tmp_path)
+
+
+@pytest.mark.parametrize("replacement_kind", ["fifo", "directory"])
+def test_read_parent_owned_file_rejects_nonregular_replacement_without_blocking(
+    tmp_path: Path,
+    replacement_kind: str,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    target = boundary.resolve_parent_owned_path(receipt, "reports/result.txt", "nonregular-race")
+    published = boundary.atomic_publish(target, b"original\n")
+    target.physical_path.unlink()
+    if replacement_kind == "fifo":
+        os.mkfifo(target.physical_path)
+    else:
+        target.physical_path.mkdir()
+
+    started = time.monotonic()
+    try:
+        with pytest.raises(ParentRootSideEffectError) as rejected:
+            boundary.read_parent_owned_file(published)
+    finally:
+        if target.physical_path.is_dir() and not target.physical_path.is_symlink():
+            target.physical_path.rmdir()
+        else:
+            target.physical_path.unlink()
+    assert time.monotonic() - started < 1.0
+    assert rejected.value.reject is ParentRootReject.ROOT_RACE_DETECTED
+
+
+def test_optional_missing_then_concurrent_create_preserves_winner_bytes(
+    tmp_path: Path,
+) -> None:
+    boundary = ParentRootSideEffectBoundary()
+    receipt = attest(tmp_path)
+    target = tmp_path / "reports" / "winner.json"
+    assert boundary.read_parent_owned_bytes(
+        receipt, target, "concurrent-create", allow_missing=True
+    ) is None
+    target.parent.mkdir()
+    target.write_bytes(b"winner\n")
+
+    outcome, detail = boundary.publish_parent_owned_file_noreplace(
+        receipt, target, b"loser\n", "concurrent-create"
+    )
+    assert (outcome, detail) == ("failed", "spool_conflict")
+    assert boundary.read_parent_owned_bytes(receipt, target, "concurrent-create") == b"winner\n"
 
 
 def test_child_environment_rejects_target_alias_mismatch_before_creating_directories(

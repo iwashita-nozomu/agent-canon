@@ -6,6 +6,7 @@
 # upstream design ../../documents/agent-canon/agent-canon-update-route.md owns update materialization acceptance
 # upstream environment ../../documents/contracts/linux-wsl-host-requirements.md documents host tool requirements for fresh clone checks
 # upstream implementation ../agent_tools/update_lifecycle_contract.py owns source projection aggregation and validation.
+# upstream implementation ../agent_tools/source_projection_handoff.py owns the sole cross-namespace packet handoff.
 # upstream implementation ./check_agent_canon_pr.py owns the authoritative G2 materializer API.
 # upstream implementation ../agent_tools/github_publish.py owns the authoritative G3 materializer API.
 # @dependency-end
@@ -63,6 +64,19 @@ run_parent_bound_update() {
     --issue-handoff \
     -- bash "${update_script}" "$@"
 }
+run_update_for_parent_root() {
+  local parent_root="$1" source_root="$2" update_script="$3"
+  local boundary_script="${source_root}/tools/agent_tools/parent_root_side_effects.py"
+  shift 3
+  AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${parent_root}" \
+    python3 "${boundary_script}" exec-parent-bound \
+    --root "${parent_root}" \
+    --source-root "${source_root}" \
+    --purpose agent-canon-update-script \
+    --issue-handoff \
+    -- bash "${update_script}" "$@"
+}
+
 run_parent_bound_sync() {
   local source_root="$1" sync_script="$2"
   shift 2
@@ -397,9 +411,8 @@ materialize_current_lifecycle_projection() {
   local candidate_tree_sha=""
   local publication_sha=""
   local publication_tree_sha=""
-  local packet_path="${AGENT_CANON_TEST_WORK}/.agent-canon/update-lifecycle/state/source-publication-ready.json"
-  local source_namespace="${AGENT_CANON_TEST_WORK}/.agent-canon/update-lifecycle"
   local target_namespace="${PWD}/.agent-canon/update-lifecycle"
+  local packet_path="${target_namespace}/state/source-publication-ready.json"
 
   candidate_sha="$(git -C vendor/agent-canon rev-parse HEAD)"
   candidate_tree_sha="$(git -C vendor/agent-canon rev-parse HEAD^{tree})"
@@ -408,7 +421,7 @@ materialize_current_lifecycle_projection() {
 
   PYTHONPATH="${AGENT_CANON_TEST_WORK}/tools/agent_tools:${AGENT_CANON_TEST_WORK}/tools/ci" \
     python3 - "${packet_path}" "${candidate_sha}" "${candidate_tree_sha}" \
-      "${publication_sha}" "${publication_tree_sha}" "${ROOT_DIR}" <<'PY'
+      "${publication_sha}" "${publication_tree_sha}" "${CLONE_DIR}" <<'PY'
 import json
 import sys
 from pathlib import Path
@@ -460,21 +473,16 @@ PY
   AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
   AGENT_CANON_DESTRUCTIVE_GIT_REASON="fresh clone acceptance uses a disposable temporary repository" \
   AGENT_CANON_COMMIT_REQUEST_EVIDENCE="${AGENT_CANON_COMMIT_REQUEST_EVIDENCE}" \
-    run_parent_bound_update \
+  AGENT_CANON_SOURCE_PROJECTION_HANDOFF="${packet_path}" \
+    run_update_for_parent_root \
+      "${CLONE_DIR}" \
       "${AGENT_CANON_TEST_WORK}" \
       "${AGENT_CANON_TEST_WORK}/tools/update_agent_canon.sh" \
       latest
 )
 
-for lifecycle_path in \
-  state/current-transaction \
-  projection-queue/queue.accepted.json \
-  projection-queue/frontier.accepted.json \
-  evidence/g4.parent-projection-integrity.json; do
-  test -f "${source_namespace}/${lifecycle_path}"
-  parent_ensure_dir "${target_namespace}/$(dirname "${lifecycle_path}")"
-  parent_copy_file "${source_namespace}/${lifecycle_path}" "${target_namespace}/${lifecycle_path}"
-done
+echo "AGENT_CANON_FRESH_CLONE_DERIVED_RECEIPT_COPY=forbidden"
+test ! -e "${AGENT_CANON_TEST_WORK}/.agent-canon/update-lifecycle/projection-queue"
 
 PYTHONPATH="${CLONE_TOOLS_ROOT}/agent_tools" \
   python3 - "${target_namespace}" <<'PY'
