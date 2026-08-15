@@ -297,3 +297,7 @@ registry during the template smoke check.
   or cleanup before G5: G6 failure.
 - Cleanup deletes only enumerated task-owned paths after readback. Unknown
   shared state must have equal before/after digests and unchanged evidence.
+
+## Source-Publication Parent Handoff
+
+The sole cross-namespace artifact is the validated source-projection packet. `tools/agent_tools/source_projection_handoff.py` materializes or validates it and writes it through the attested parent boundary. `tools/update_agent_canon.sh` binds lifecycle state to the explicit parent root and derives QueueReceipt, DependencyFrontier, the current transaction marker, and G4 there. A current standalone source checkout may execute that same front door against an older parent root, so repair does not require manual gitlink staging. Fresh-clone acceptance passes only the packet and forbids copying derived receipts. The complete state machine, replay rules, command route, and failure semantics are owned by [Source Publication to Parent Projection Handoff](source-publication-parent-handoff.md).

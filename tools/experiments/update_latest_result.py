@@ -1,86 +1,402 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Updates latest experiment result pointers.
+# responsibility Updates variant-scoped latest experiment result pointers.
 # upstream design ../../documents/experiments/result-log-retention-and-visualization.md defines latest-result pointer policy.
-# upstream design ../../documents/experiments/experiment-report-style.md defines experiment report artifact layout.
+# upstream implementation ./experiment_identity.py owns the identity grammar.
 # downstream implementation ../../tests/tools/test_update_latest_result.py validates latest result pointer updates.
 # @dependency-end
-"""Update LATEST.json and LATEST.md for experiment result roots."""
+"""Update the variant-scoped LATEST.json and LATEST.md pointers."""
 
 from __future__ import annotations
 
 import argparse
+import fcntl
+import hashlib
 import json
+import os
+import sys
+import tempfile
+from collections.abc import Mapping
+from contextlib import contextmanager
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+if __package__:
+    from tools.experiments.experiment_identity import (
+        DuplicateJSONKeyError,
+        ExperimentIdentity,
+        contained_path,
+        load_json_file,
+        load_json_text,
+        report_relative_path,
+        validate_segment,
+    )
+else:
+    from experiment_identity import (  # type: ignore[no-redef]
+        DuplicateJSONKeyError,
+        ExperimentIdentity,
+        contained_path,
+        load_json_file,
+        load_json_text,
+        report_relative_path,
+        validate_segment,
+    )
 
-def _manifest_path(result_dir: Path) -> Path:
-    for name in ("result_manifest.json", "run_manifest.json"):
-        candidate = result_dir / name
-        if candidate.exists():
-            return candidate
-    return result_dir / "result_manifest.json"
+LATEST_JSON_NAME = "LATEST.json"
+LATEST_MD_NAME = "LATEST.md"
+PointerGeneration = tuple[
+    tuple[int, int, str] | None,
+    tuple[int, int, str] | None,
+]
 
 
-def _visual_report_path(result_dir: Path) -> Path:
-    candidates = (result_dir / "visual_diagnostics" / "report.html", result_dir / "report.html")
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return candidates[0]
+def _root_topic(result_root: Path) -> str:
+    parts = result_root.resolve().parts
+    if len(parts) < 3 or parts[-3:] != ("experiments", parts[-2], "result"):
+        raise ValueError(
+            "result-root must be experiments/<topic>/result (or its absolute path)"
+        )
+    return validate_segment(parts[-2], "topic")
 
 
-def _existing_path_text(path: Path) -> str | None:
-    if path.exists():
-        return str(path)
-    return None
+def _manifest_candidates(result_dir: Path) -> list[Path]:
+    return [
+        result_dir / name
+        for name in ("run_manifest.json", "result_manifest.json")
+        if os.path.lexists(result_dir / name)
+    ]
 
 
-def _result_timestamp(result_dir: Path) -> float:
-    manifest_path = _manifest_path(result_dir)
-    if manifest_path.exists():
-        return manifest_path.stat().st_mtime
-    return result_dir.stat().st_mtime
+def _parse_created_at_utc(value: object, manifest_path: Path) -> datetime:
+    """Parse a timezone-aware UTC timestamp from one result manifest."""
+    if not isinstance(value, str):
+        raise ValueError(f"manifest must contain created_at_utc: {manifest_path}")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ValueError("manifest created_at_utc is not parseable") from exc
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("manifest created_at_utc must be timezone-aware UTC")
+    if parsed.utcoffset() != timedelta(0):
+        raise ValueError("manifest created_at_utc must use UTC (+00:00 or Z)")
+    return parsed.astimezone(UTC)
 
 
-def latest_result_dir(result_root: Path) -> Path:
-    """Return the newest result directory under a result root."""
-    candidates = [path for path in result_root.iterdir() if path.is_dir()]
+def _load_result_identity(result_dir: Path, topic: str, variant: str) -> tuple[ExperimentIdentity, dict[str, object], Path]:
+    if result_dir.is_symlink() or not result_dir.is_dir():
+        raise ValueError(f"result directory must be a real directory: {result_dir}")
+    resolved_dir = result_dir.resolve()
+    if resolved_dir != result_dir:
+        raise ValueError(f"result directory realpath differs: {result_dir}")
+    candidates = _manifest_candidates(result_dir)
+    if len(candidates) != 1:
+        raise ValueError(
+            f"exactly one run_manifest.json or result_manifest.json is required: {result_dir}"
+        )
+    manifest_path = candidates[0]
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise ValueError(f"manifest must be a regular non-symlink file: {manifest_path}")
+    try:
+        manifest_path.resolve().relative_to(result_dir.resolve())
+    except ValueError as exc:
+        raise ValueError(f"manifest is outside result directory: {manifest_path}") from exc
+    try:
+        payload = load_json_file(manifest_path)
+    except (json.JSONDecodeError, DuplicateJSONKeyError) as exc:
+        raise ValueError(f"manifest is not valid JSON: {manifest_path}") from exc
+    if not isinstance(payload, Mapping):
+        raise ValueError(f"manifest must be an object: {manifest_path}")
+    identity = ExperimentIdentity.from_dict(payload)
+    if identity.topic != topic or identity.variant != variant:
+        raise ValueError("manifest identity does not match the selected result variant")
+    expected_dir = result_dir.parent / identity.run_name
+    if result_dir != expected_dir:
+        raise ValueError("result directory name does not match manifest run identity")
+    _parse_created_at_utc(payload.get("created_at_utc"), manifest_path)
+    return identity, dict(payload), manifest_path
+
+
+def _result_timestamp(result_dir: Path, topic: str, variant: str) -> tuple[datetime, str]:
+    identity, manifest, manifest_path = _load_result_identity(result_dir, topic, variant)
+    return (
+        _parse_created_at_utc(manifest["created_at_utc"], manifest_path),
+        identity.run_name,
+    )
+
+
+def _prepare_variant_root(result_root: Path, variant: str) -> tuple[Path, str]:
+    """Validate and return one real result root and its variant directory."""
+    result_root = result_root.absolute()
+    if len(result_root.parts) < 3 or result_root.parts[-1] != "result":
+        raise ValueError(
+            "result-root must be experiments/<topic>/result (or its absolute path)"
+        )
+    repo_root = result_root.parents[2]
+    experiments_root = repo_root / "experiments"
+    topic_dir = experiments_root / result_root.parts[-2]
+    expected_result_root = topic_dir / "result"
+    if result_root != expected_result_root:
+        raise ValueError(
+            "result-root must be experiments/<topic>/result without path traversal"
+        )
+    topic = validate_segment(result_root.parts[-2], "topic")
+    for ancestor in (repo_root, experiments_root, topic_dir, result_root):
+        try:
+            resolved = contained_path(repo_root, ancestor)
+        except ValueError as exc:
+            raise ValueError(
+                f"result tree path escapes repository: {ancestor}"
+            ) from exc
+        if ancestor.is_symlink() or resolved != ancestor:
+            raise ValueError(
+                f"result tree path must not use a symlinked ancestor: {ancestor}"
+            )
+    variant = validate_segment(variant, "variant")
+    variant_root = result_root / variant
+    try:
+        variant_resolved = contained_path(repo_root, variant_root)
+    except ValueError as exc:
+        raise ValueError(f"variant result root escapes repository: {variant_root}") from exc
+    if (
+        not variant_root.is_dir()
+        or variant_root.is_symlink()
+        or variant_resolved != variant_root
+    ):
+        raise ValueError(f"variant result root does not exist: {variant_root}")
+    return variant_root, topic
+
+
+@contextmanager
+def _variant_lock(variant_root: Path):
+    """Hold the per-variant latest-pointer lock without creating a file."""
+    directory_fd = os.open(variant_root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        fcntl.flock(directory_fd, fcntl.LOCK_EX)
+        try:
+            yield
+        finally:
+            fcntl.flock(directory_fd, fcntl.LOCK_UN)
+    finally:
+        os.close(directory_fd)
+
+
+def _latest_result_dir_unlocked(
+    result_root: Path, variant_root: Path, topic: str, variant: str
+) -> Path:
+    """Return the newest valid result while the variant lock is held."""
+    candidates: list[tuple[tuple[datetime, str], Path]] = []
+    for path in sorted(variant_root.iterdir()):
+        if path.name in {LATEST_JSON_NAME, LATEST_MD_NAME}:
+            continue
+        if path.is_symlink() or not path.is_dir():
+            raise ValueError(f"variant result root contains a non-directory entry: {path}")
+        validate_segment(path.name, "run_name")
+        candidates.append((_result_timestamp(path, topic, variant), path))
     if not candidates:
-        raise SystemExit(f"no result directories under {result_root}")
-    return max(candidates, key=_result_timestamp)
+        raise ValueError(f"no result directories under {variant_root}")
+    return max(candidates, key=lambda item: item[0])[1]
 
 
-def _latest_payload(result_root: Path, result_dir: Path) -> dict[str, object]:
-    manifest_path = _manifest_path(result_dir)
+def latest_result_dir(result_root: Path, variant: str) -> Path:
+    """Return the newest valid result directory below one variant root."""
+    variant_root, topic = _prepare_variant_root(result_root, variant)
+    result_root = variant_root.parent
+    with _variant_lock(variant_root):
+        return _latest_result_dir_unlocked(result_root, variant_root, topic, variant)
+
+
+def _canonical_text(path: Path, result_root: Path) -> str:
+    """Return the canonical repository-relative path for a pointer payload."""
+    resolved = path.resolve()
+    root = result_root.parents[2]
+    try:
+        return resolved.relative_to(root).as_posix()
+    except ValueError as exc:
+        raise ValueError(f"pointer path is outside repository root: {path}") from exc
+
+
+def _latest_payload(result_root: Path, result_dir: Path, variant: str) -> dict[str, object]:
+    topic = _root_topic(result_root)
+    identity, _, manifest_path = _load_result_identity(result_dir, topic, variant)
+    report_path = result_root.parents[2] / report_relative_path(identity)
     summary_path = result_dir / "summary.json"
-    report_path = _visual_report_path(result_dir)
+    visual_candidates = (
+        result_dir / "visual_diagnostics" / "report.html",
+        result_dir / "report.html",
+    )
+    visual_report = next((path for path in visual_candidates if path.is_file()), None)
     return {
-        "result_root": str(result_root),
-        "latest_result": str(result_dir),
-        "latest_result_name": str(result_dir.relative_to(result_root)),
-        "result_manifest": _existing_path_text(manifest_path),
-        "summary_json": _existing_path_text(summary_path),
-        "visual_report_html": _existing_path_text(report_path),
+        "schema": "agentcanon.experiment-latest/v2",
+        **identity.to_dict(),
+        "result_root": _canonical_text(result_root, result_root),
+        "variant_root": _canonical_text(result_dir.parent, result_root),
+        "latest_result": _canonical_text(result_dir, result_root),
+        "latest_result_name": identity.run_name,
+        "result_manifest": _canonical_text(manifest_path, result_root),
+        "summary_json": _canonical_text(summary_path, result_root) if summary_path.is_file() else None,
+        "visual_report_html": _canonical_text(visual_report, result_root) if visual_report else None,
+        "experiment_report": _canonical_text(report_path, result_root),
     }
 
 
-def _write_latest_result_files(result_root: Path, payload: dict[str, object]) -> None:
-    latest_json = result_root / "LATEST.json"
-    latest_markdown = result_root / "LATEST.md"
-    markdown = _latest_markdown(payload)
-    latest_json.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    latest_markdown.write_text(markdown, encoding="utf-8")
+def _write_atomic_bytes(path: Path, content: bytes) -> None:
+    """Write one pointer file atomically in its owning variant directory."""
+    fd, temporary_name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(fd, "wb") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_name, path)
+    finally:
+        try:
+            os.unlink(temporary_name)
+        except FileNotFoundError:
+            pass
 
 
-def _latest_markdown(payload: dict[str, object]) -> str:
+def _pointer_snapshot(path: Path) -> tuple[bytes | None, tuple[int, int, str] | None]:
+    """Read one pointer and its inode/content generation token."""
+    if not os.path.lexists(path):
+        return None, None
+    if path.is_symlink() or not path.is_file():
+        raise ValueError(f"latest pointer must be a regular file: {path}")
+    content = path.read_bytes()
+    stat_result = path.stat()
+    digest = hashlib.sha256(content).hexdigest()
+    return content, (stat_result.st_ino, stat_result.st_size, digest)
+
+
+def _pointer_generation(variant_root: Path) -> PointerGeneration:
+    """Return the inode/content generation for both latest pointers."""
+    _, json_generation = _pointer_snapshot(variant_root / LATEST_JSON_NAME)
+    _, markdown_generation = _pointer_snapshot(variant_root / LATEST_MD_NAME)
+    return json_generation, markdown_generation
+
+
+def _read_current_pointer(
+    result_root: Path,
+    variant_root: Path,
+    topic: str,
+    variant: str,
+) -> tuple[tuple[datetime, str], Path, PointerGeneration] | None:
+    """Read and validate one existing JSON/Markdown pointer pair."""
+    json_path = variant_root / LATEST_JSON_NAME
+    markdown_path = variant_root / LATEST_MD_NAME
+    json_bytes, json_generation = _pointer_snapshot(json_path)
+    markdown_bytes, markdown_generation = _pointer_snapshot(markdown_path)
+    if (json_bytes is None) != (markdown_bytes is None):
+        raise ValueError("LATEST.json and LATEST.md must be published together")
+    if json_bytes is None or markdown_bytes is None:
+        return None
+    try:
+        payload = load_json_text(json_bytes)
+    except (json.JSONDecodeError, DuplicateJSONKeyError) as exc:
+        raise ValueError("LATEST.json is not valid strict JSON") from exc
+    if not isinstance(payload, Mapping):
+        raise ValueError("LATEST.json must contain an object")
+    if payload.get("schema") != "agentcanon.experiment-latest/v2":
+        raise ValueError("LATEST.json has an unsupported schema")
+    identity = ExperimentIdentity.from_dict(payload)
+    if identity.topic != topic or identity.variant != variant:
+        raise ValueError("LATEST.json identity does not match its variant root")
+    expected_result = result_root / variant / identity.run_name
+    expected_latest = expected_result.relative_to(result_root.parents[2]).as_posix()
+    if payload.get("latest_result") != expected_latest:
+        raise ValueError("LATEST.json latest_result does not match its identity")
+    if payload.get("latest_result_name") != identity.run_name:
+        raise ValueError("LATEST.json latest_result_name does not match its identity")
+    try:
+        markdown = markdown_bytes.decode("utf-8")
+    except UnicodeDecodeError as exc:
+        raise ValueError("LATEST.md is not valid UTF-8") from exc
+    if markdown != _latest_markdown(payload):
+        raise ValueError("LATEST.json and LATEST.md identities are inconsistent")
+    timestamp = _result_timestamp(expected_result, topic, variant)
+    return (
+        timestamp,
+        expected_result,
+        (json_generation, markdown_generation),
+    )
+
+
+def _restore_pointer(path: Path, content: bytes | None) -> None:
+    """Restore one pointer path without following a replacement symlink."""
+    if content is None:
+        if os.path.lexists(path):
+            if path.is_symlink() or not path.is_file():
+                raise ValueError(f"cannot remove replaced latest pointer: {path}")
+            path.unlink()
+        return
+    _write_atomic_bytes(path, content)
+
+
+def _publish_pointer_pair(
+    variant_root: Path,
+    payload: Mapping[str, object],
+    expected_generation: PointerGeneration,
+) -> None:
+    """CAS-check and publish JSON/Markdown as one locked pair."""
+    json_path = variant_root / LATEST_JSON_NAME
+    markdown_path = variant_root / LATEST_MD_NAME
+    json_before, _ = _pointer_snapshot(json_path)
+    markdown_before, _ = _pointer_snapshot(markdown_path)
+    if _pointer_generation(variant_root) != expected_generation:
+        raise ValueError("LATEST pointer generation changed during selection")
+    json_content = (json.dumps(payload, indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
+    markdown_content = _latest_markdown(payload).encode("utf-8")
+    json_fd, json_temp = tempfile.mkstemp(
+        prefix=f".{LATEST_JSON_NAME}.", dir=variant_root
+    )
+    markdown_fd, markdown_temp = tempfile.mkstemp(
+        prefix=f".{LATEST_MD_NAME}.", dir=variant_root
+    )
+    json_temp_path = Path(json_temp)
+    markdown_temp_path = Path(markdown_temp)
+    json_replaced = False
+    try:
+        with os.fdopen(json_fd, "wb") as handle:
+            handle.write(json_content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        with os.fdopen(markdown_fd, "wb") as handle:
+            handle.write(markdown_content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(json_temp_path, json_path)
+        json_replaced = True
+        os.replace(markdown_temp_path, markdown_path)
+    except BaseException:
+        if json_replaced:
+            _restore_pointer(json_path, json_before)
+        raise
+    finally:
+        for temporary_path in (json_temp_path, markdown_temp_path):
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def _latest_markdown(payload: Mapping[str, object]) -> str:
+    identity_payload = payload.get("identity")
+    if isinstance(identity_payload, Mapping):
+        identity_text = json.dumps(
+            dict(identity_payload), sort_keys=True, separators=(",", ":")
+        )
+    else:
+        identity_text = str(identity_payload)
     return "\n".join(
         [
             "# Latest Experiment Result",
             "",
+            f"- identity: `{identity_text}`",
             f"- result: `{payload['latest_result']}`",
             f"- manifest: `{payload['result_manifest']}`",
+            f"- report: `{payload['experiment_report']}`",
             f"- summary: `{payload['summary_json']}`",
             f"- visual report: `{payload['visual_report_html']}`",
             "",
@@ -88,28 +404,74 @@ def _latest_markdown(payload: dict[str, object]) -> str:
     )
 
 
-def update_latest_result(result_root: Path, result_dir: Path) -> None:
-    """Write latest-result pointers for an explicit result directory."""
-    payload = _latest_payload(result_root, result_dir)
-    _write_latest_result_files(result_root, payload)
+def update_latest_result(result_root: Path, result_dir: Path | None, variant: str) -> Path:
+    """Select and publish one deterministic latest pointer pair under one lock."""
+    if result_dir is not None:
+        if result_root.is_symlink():
+            raise ValueError(f"result root must not be a symlink: {result_root}")
+        preliminary_root = result_root.resolve()
+        validate_segment(variant, "variant")
+        if result_dir.is_symlink():
+            raise ValueError(f"result directory must not be a symlink: {result_dir}")
+        preliminary_result_dir = result_dir.resolve()
+        if preliminary_result_dir.parent != preliminary_root / variant:
+            raise ValueError("explicit result directory belongs to another variant")
+    variant_root, topic = _prepare_variant_root(result_root, variant)
+    result_root = variant_root.parent
+    with _variant_lock(variant_root):
+        generation = _pointer_generation(variant_root)
+        if result_dir is None:
+            selected_result_dir = _latest_result_dir_unlocked(
+                result_root, variant_root, topic, variant
+            )
+        else:
+            if result_dir.is_symlink():
+                raise ValueError(f"result directory must not be a symlink: {result_dir}")
+            original_result_dir = result_dir
+            selected_result_dir = result_dir.resolve()
+            if selected_result_dir != original_result_dir:
+                raise ValueError(
+                    f"result directory realpath differs: {original_result_dir}"
+                )
+            expected_parent = result_root / variant
+            if selected_result_dir.parent != expected_parent:
+                raise ValueError("explicit result directory belongs to another variant")
+            if not selected_result_dir.is_dir():
+                raise ValueError(
+                    f"result directory does not exist: {selected_result_dir}"
+                )
+        selected_timestamp = _result_timestamp(
+            selected_result_dir, topic, variant
+        )
+        current = _read_current_pointer(result_root, variant_root, topic, variant)
+        if current is not None:
+            current_timestamp, current_result_dir, current_generation = current
+            if current_generation != generation:
+                raise ValueError("LATEST pointer generation changed during selection")
+            if selected_timestamp <= current_timestamp:
+                return current_result_dir
+        payload = _latest_payload(result_root, selected_result_dir, variant)
+        _publish_pointer_pair(variant_root, payload, generation)
+        return selected_result_dir
 
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("result_root", type=Path)
+    parser.add_argument("--variant", required=True)
     parser.add_argument("--result-dir", type=Path, dest="result_dir")
     return parser.parse_args()
 
 
 def main() -> None:
-    """Run the latest-result pointer updater."""
+    """Run the per-variant LATEST pointer CLI."""
     args = _parse_args()
-    result_root = args.result_root
-    result_dir = args.result_dir
-    if result_dir is None:
-        result_dir = latest_result_dir(result_root)
-    update_latest_result(result_root, result_dir)
-    print(f"latest_result_dir={result_dir}")
+    try:
+        selected = update_latest_result(args.result_root, args.result_dir, args.variant)
+    except (OSError, ValueError, json.JSONDecodeError) as exc:
+        print(str(exc), file=sys.stderr)
+        raise SystemExit(2) from exc
+    print(f"latest_result_dir={selected}")
 
 
 if __name__ == "__main__":

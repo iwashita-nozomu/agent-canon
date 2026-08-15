@@ -24,72 +24,137 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import AbstractContextManager
 import hashlib
 import json
 import os
 import platform
+import secrets
 import shlex
 import shutil
 import socket
 import subprocess
 import sys
 import time
+from collections.abc import Callable, Mapping
+from contextlib import AbstractContextManager
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 from dataclasses import dataclass, replace
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable, Literal, Mapping, cast
+from typing import TYPE_CHECKING, Literal, TypeAlias, cast
 
-from tools.experiments.execution_resource_plan import (
-    AdmittedEnvironment,
-    CALLER_ALLOCATION_PROVENANCE,
-    COMPLETION_COVERAGE_FILENAME,
-    CompletionCoverageAdapter,
-    ConcurrentRunEvidence,
-    DiscoveredResources,
-    DescendantRetentionEvidence,
-    EvidenceAbsenceField,
-    EvidenceDisposition,
-    EvidenceAbsence,
-    GPUAllocation,
-    GpuProcessOccupancyProbe,
-    GpuReservationTransaction,
-    LockPlacementEvidence,
-    LockReadback,
-    MigEvidence,
-    ProcessOccupancyEvidence,
-    FailureRecord,
-    FdReleaseEvidence,
-    GpuRunRequest,
-    HOST_RUNTIME_ROOT,
-    ManagedGpuOutcomeReducer,
-    PostToolUseProjectionReducer,
-    ResourceRequest,
-    ResourcePlanError,
-    ExecutionResourcePlan,
-    RuntimeIdentityReceipt,
-    TypedPreflightFailure,
-    NvidiaSMIResourceProbe,
-    freeze_resource_plan,
-    managed_run_adapter_integration_contract,
-    read_shared_runtime_provision,
-    read_shared_runtime_readback,
-    RuntimeIdentityReader,
-    RunGpuAdmissionReceipt,
-    SourceFreezeOwner,
-    UuidVisibilityEvidence,
-    build_completion_coverage_input,
-    build_lock_bound_admission_receipt,
-    build_source_path_set,
-    _normalize_failure,
-)
-UTC = timezone.utc
+if __package__:
+    from tools.experiments.execution_resource_plan import (
+        CALLER_ALLOCATION_PROVENANCE,
+        COMPLETION_COVERAGE_FILENAME,
+        HOST_RUNTIME_ROOT,
+        AdmittedEnvironment,
+        CompletionCoverageAdapter,
+        ConcurrentRunEvidence,
+        DescendantRetentionEvidence,
+        DiscoveredResources,
+        EvidenceAbsence,
+        EvidenceAbsenceField,
+        EvidenceDisposition,
+        ExecutionResourcePlan,
+        FailureRecord,
+        FdReleaseEvidence,
+        GPUAllocation,
+        GpuProcessOccupancyProbe,
+        GpuReservationTransaction,
+        GpuRunRequest,
+        LockPlacementEvidence,
+        LockReadback,
+        ManagedGpuOutcomeReducer,
+        MigEvidence,
+        NvidiaSMIResourceProbe,
+        PostToolUseProjectionReducer,
+        ProcessOccupancyEvidence,
+        ResourcePlanError,
+        ResourceRequest,
+        RunGpuAdmissionReceipt,
+        RuntimeIdentityReader,
+        RuntimeIdentityReceipt,
+        SourceFreezeOwner,
+        TypedPreflightFailure,
+        UuidVisibilityEvidence,
+        _normalize_failure,
+        build_completion_coverage_input,
+        build_lock_bound_admission_receipt,
+        build_source_path_set,
+        freeze_resource_plan,
+        managed_run_adapter_integration_contract,
+        read_shared_runtime_provision,
+        read_shared_runtime_readback,
+    )
+    from tools.experiments.experiment_identity import (
+        ExperimentIdentity,
+        ExperimentIdentityError,
+        contained_path,
+        identity_from_manifest,
+        load_json_file,
+        load_json_text,
+        report_relative_path,
+        validate_segment,
+    )
+else:
+    from execution_resource_plan import (  # type: ignore[no-redef]
+        CALLER_ALLOCATION_PROVENANCE,
+        COMPLETION_COVERAGE_FILENAME,
+        HOST_RUNTIME_ROOT,
+        AdmittedEnvironment,
+        CompletionCoverageAdapter,
+        ConcurrentRunEvidence,
+        DescendantRetentionEvidence,
+        DiscoveredResources,
+        EvidenceAbsence,
+        EvidenceAbsenceField,
+        EvidenceDisposition,
+        ExecutionResourcePlan,
+        FailureRecord,
+        FdReleaseEvidence,
+        GPUAllocation,
+        GpuProcessOccupancyProbe,
+        GpuReservationTransaction,
+        GpuRunRequest,
+        LockPlacementEvidence,
+        LockReadback,
+        ManagedGpuOutcomeReducer,
+        MigEvidence,
+        NvidiaSMIResourceProbe,
+        PostToolUseProjectionReducer,
+        ProcessOccupancyEvidence,
+        ResourcePlanError,
+        ResourceRequest,
+        RunGpuAdmissionReceipt,
+        RuntimeIdentityReader,
+        RuntimeIdentityReceipt,
+        SourceFreezeOwner,
+        TypedPreflightFailure,
+        UuidVisibilityEvidence,
+        _normalize_failure,
+        build_completion_coverage_input,
+        build_lock_bound_admission_receipt,
+        build_source_path_set,
+        freeze_resource_plan,
+        managed_run_adapter_integration_contract,
+        read_shared_runtime_provision,
+        read_shared_runtime_readback,
+    )
+    from experiment_identity import (  # type: ignore[no-redef]
+        ExperimentIdentity,
+        ExperimentIdentityError,
+        contained_path,
+        identity_from_manifest,
+        load_json_file,
+        load_json_text,
+        report_relative_path,
+        validate_segment,
+    )
 
 DEFAULT_REQUIRED_EVAL_ARTIFACTS = ("summary.json", "cases.jsonl", "config.json")
 CONFIG_SOURCE_SNAPSHOT_NAME = "config_source.yaml"
@@ -131,6 +196,8 @@ MANAGED_RUN_ARTIFACTS = frozenset(
         f"logs/{STDERR_LOG_NAME}",
     }
 )
+RESERVATION_MARKER_NAME = ".agentcanon-reservation.json"
+RESERVATION_MARKER_SCHEMA = "agentcanon.experiment-reservation/v1"
 FILE_READ_CHUNK_BYTES = 1024 * 1024
 PREFLIGHT_FAILURE_EXIT_CODE = 2
 DURATION_ROUND_DIGITS = 3
@@ -180,13 +247,12 @@ class RegistryContext:
     available: bool
 
 
-@dataclass(frozen=True)
-class RunIdentity:
-    """Stable identifiers for one managed experiment run."""
-
-    topic: str
-    run_name: str
-    variant: str
+# Compatibility name for imports in downstream adapters.  The canonical owner
+# is ExperimentIdentity; no second identity schema is maintained here.
+if TYPE_CHECKING:
+    RunIdentity: TypeAlias = ExperimentIdentity
+else:
+    RunIdentity = ExperimentIdentity
 
 
 @dataclass(frozen=True)
@@ -248,6 +314,28 @@ class RunContext:
     command: CommandSelection
     created_at: str
     git: GitSnapshot
+
+
+@dataclass(frozen=True)
+class ReservationReceipt:
+    """Record the exact empty paths reserved by one runner invocation."""
+
+    result_dir: Path
+    report_path: Path
+    report_content: str | None
+    result_parent: Path
+    result_parent_preexisted: bool
+    report_parent: Path
+    report_parent_preexisted: bool
+    token: str
+    marker_path: Path
+    result_inode: int
+    marker_inode: int
+    report_reserved: bool
+    report_inode: int | None
+    result_parent_inode: int
+    report_parent_inode: int | None
+    identity: ExperimentIdentity
 
 
 @dataclass(frozen=True)
@@ -585,6 +673,7 @@ def _build_managed_run_request(
     selected_uuids = tuple(plan.gpu_allocation.selected_ids)
     selected_gpu_ids = _provider_gpu_ids(selected_uuids)
     payload: dict[str, object] = {
+        **context.identity.to_dict(),
         "schema": MANAGED_RUN_REQUEST_SCHEMA,
         "run_id": context.identity.run_name,
         "task": {
@@ -676,8 +765,8 @@ def _validate_admitted_result(
     process_returncode: int,
 ) -> tuple[ManagedRunExecutionResult, ManagedRunLifecycleEvidence, Mapping[str, object]]:
     try:
-        result = json.loads(result_path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError) as exc:
+        result = load_json_file(result_path)
+    except (FileNotFoundError, OSError, UnicodeError, json.JSONDecodeError, ValueError) as exc:
         raise TypedPreflightFailure(
             "admitted_runner_result_corrupt",
             "experiment-runner-admitted result artifact is missing or invalid JSON",
@@ -692,6 +781,19 @@ def _validate_admitted_result(
             "admitted_runner_result_schema_mismatch",
             "experiment-runner-admitted result schema is not the reviewed version",
             observed_schema=result.get("schema"),
+        )
+    try:
+        request_identity = identity_from_manifest(request_payload)
+        result_identity = identity_from_manifest(result)
+    except (ExperimentIdentityError, TypeError) as exc:
+        raise TypedPreflightFailure(
+            "admitted_runner_result_identity_invalid",
+            "request and result must contain the canonical nested experiment identity",
+        ) from exc
+    if result_identity != request_identity:
+        raise TypedPreflightFailure(
+            "admitted_runner_result_identity_mismatch",
+            "provider result identity does not match the managed request identity",
         )
     request_fingerprint = request_payload.get("fingerprint")
     if result.get("request_fingerprint") != request_fingerprint:
@@ -986,8 +1088,17 @@ def _run_admitted_runner(
         process_returncode,
     )
     lifecycle_path.parent.mkdir(parents=True, exist_ok=True)
+    lifecycle_payload = lifecycle.to_dict()
+    context_identity = cast(
+        ExperimentIdentity | None,
+        getattr(context, "identity", None),
+    )
+    if context_identity is None:
+        context_identity = identity_from_manifest(request_payload)
+    if isinstance(context_identity, ExperimentIdentity):
+        lifecycle_payload.update(context_identity.to_dict())
     lifecycle_path.write_text(
-        json.dumps(lifecycle.to_dict(), sort_keys=True, indent=2),
+        json.dumps(lifecycle_payload, sort_keys=True, indent=2),
         encoding="utf-8",
     )
     receipt = {
@@ -1008,6 +1119,8 @@ def _run_admitted_runner(
         "process_returncode": process_returncode,
         "worker_pid": lifecycle.child_process_ids[0] if lifecycle.child_process_ids else None,
     }
+    if isinstance(context_identity, ExperimentIdentity):
+        receipt.update(context_identity.to_dict())
     receipt_path = context.paths.result_dir.joinpath("runtime", MANAGED_RUN_RECEIPT_FILENAME)
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     receipt_path.write_text(
@@ -1056,8 +1169,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--variant",
-        default="formal",
-        help="Variant label used when --run-name is omitted.",
+        required=True,
+        help="Required variant label used in the result/report/branch identity.",
     )
     parser.add_argument(
         "--registry",
@@ -1072,7 +1185,7 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--report-path",
-        help="Optional report path. Defaults to experiments/report/<run_name>.md.",
+        help="Optional report path. Defaults to experiments/report/<topic>/<variant>/<run_name>.md.",
     )
     parser.add_argument(
         "--skip-report-init",
@@ -1082,7 +1195,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--config-json",
         help=(
-            "Optional JSON object file to merge into result/<run_name>/config.json. "
+            "Optional JSON object file to merge into result/<variant>/<run_name>/config.json. "
             "The file must decode to a dictionary."
         ),
     )
@@ -1092,7 +1205,7 @@ def parse_args() -> argparse.Namespace:
         default=[],
         metavar="KEY=JSON",
         help=(
-            "Add one JSON-encoded config value to result/<run_name>/config.json. "
+            "Add one JSON-encoded config value to result/<variant>/<run_name>/config.json. "
             "Example: --config seed=0 --config enabled=true."
         ),
     )
@@ -1101,6 +1214,7 @@ def parse_args() -> argparse.Namespace:
         nargs=argparse.REMAINDER,
         help=(
             "Command to run. Tokens may use {run_dir}, {run_name}, {report_path}, "
+            "{topic}, {variant}, "
             "{manifest_path}, {eval_manifest_path}, {config_path}, "
             "{config_source_path}, {startup_log_path}, {stdout_log_path}, "
             "or {stderr_log_path}."
@@ -1199,7 +1313,7 @@ def load_command_version(name: str) -> str | None:
 
 def load_config_json(path: Path) -> dict[str, object]:
     """Load one experiment config JSON object."""
-    data = json.loads(path.read_text(encoding="utf-8"))
+    data = load_json_file(path)
     if not isinstance(data, dict):
         raise ValueError(f"--config-json must decode to a JSON object: {path}")
     config: dict[str, object] = {}
@@ -1221,7 +1335,7 @@ def parse_config_pairs(pairs: list[str]) -> dict[str, object]:
         if not key:
             raise ValueError(f"--config has an empty key: {pair}")
         try:
-            config[key] = json.loads(raw_value)
+            config[key] = load_json_text(raw_value)
         except json.JSONDecodeError as exc:
             raise ValueError(
                 f"--config value for {key!r} is not valid JSON: {exc}"
@@ -1248,9 +1362,7 @@ def build_run_config(
 ) -> dict[str, object]:
     """Build one JSON-serializable experiment run configuration dictionary."""
     run_config: dict[str, object] = {
-        "topic": context.identity.topic,
-        "run_name": context.identity.run_name,
-        "variant": context.identity.variant,
+        **context.identity.to_dict(),
         "paths": {
             "result_dir": str(context.paths.result_dir),
             "log_dir": str(context.paths.log_dir),
@@ -1322,6 +1434,7 @@ def render_report_stub(context: RunContext) -> str:
     return f"""# {context.identity.run_name}
 
 - Topic: {context.identity.topic}
+- Variant: {context.identity.variant}
 - Created At (UTC): {context.created_at}
 - Result Dir: {context.paths.result_dir}
 - Log Dir: {context.paths.log_dir}
@@ -1378,8 +1491,7 @@ def render_report_stub(context: RunContext) -> str:
 def build_manifest(context: RunContext, status: str) -> dict[str, object]:
     """Build one manifest dictionary."""
     manifest: dict[str, object] = {
-        "topic": context.identity.topic,
-        "run_name": context.identity.run_name,
+        **context.identity.to_dict(),
         "status": status,
         "created_at_utc": context.created_at,
         "repo_root": str(context.repo_root),
@@ -1574,10 +1686,9 @@ def build_source_snapshot(context: RunContext) -> dict[str, object]:
         external_file_record(path) for path in unique_paths(external_files)
     ]
     return {
+        **context.identity.to_dict(),
         "schema_version": 1,
         "captured_at_utc": utc_now(),
-        "topic": context.identity.topic,
-        "run_name": context.identity.run_name,
         "base_dir": str(context.repo_root),
         "excluded_topic_dirs": sorted(EXCLUDED_SOURCE_SNAPSHOT_DIRS),
         "git": {
@@ -1622,10 +1733,9 @@ def copy_source_config_snapshot(context: RunContext) -> dict[str, object]:
 def build_command_manifest(context: RunContext) -> dict[str, object]:
     """Build the resolved-command manifest for one run."""
     return {
+        **context.identity.to_dict(),
         "schema_version": 1,
         "created_at_utc": utc_now(),
-        "topic": context.identity.topic,
-        "run_name": context.identity.run_name,
         "command": context.command.command,
         "command_text": shlex.join(context.command.command),
         "command_source": context.command.source,
@@ -1650,10 +1760,9 @@ def append_startup_event(
     """Append one startup chronology event."""
     context.paths.startup_log_path.parent.mkdir(parents=True, exist_ok=True)
     entry: dict[str, object] = {
+        **context.identity.to_dict(),
         "timestamp_utc": utc_now(),
         "event": event,
-        "topic": context.identity.topic,
-        "run_name": context.identity.run_name,
     }
     entry.update(payload)
     with context.paths.startup_log_path.open("a", encoding="utf-8") as handle:
@@ -1669,10 +1778,9 @@ def build_artifact_manifest(context: RunContext) -> dict[str, object]:
         if path.is_file() and path != context.paths.artifact_manifest_path
     ]
     return {
+        **context.identity.to_dict(),
         "schema_version": 1,
         "captured_at_utc": utc_now(),
-        "topic": context.identity.topic,
-        "run_name": context.identity.run_name,
         "result_dir": str(context.paths.result_dir),
         "self_excluded": str(context.paths.artifact_manifest_path),
         "artifact_count": len(files),
@@ -1691,10 +1799,10 @@ def validate_eval_artifact_patterns(patterns: list[str], key: str) -> list[str]:
         pattern_path = Path(pattern)
         if pattern_path.is_absolute():
             raise ValueError(
-                f"{key} must stay relative to result/<run_name>: {pattern}"
+                f"{key} must stay relative to result/<variant>/<run_name>: {pattern}"
             )
         if ".." in pattern_path.parts:
-            raise ValueError(f"{key} must not escape result/<run_name>: {pattern}")
+            raise ValueError(f"{key} must not escape result/<variant>/<run_name>: {pattern}")
     return patterns
 
 
@@ -1803,6 +1911,7 @@ def load_eval_artifacts(
     result_dir: Path,
     *,
     topic: str,
+    variant: str,
     run_name: str,
     patterns: EvalArtifactPatterns,
 ) -> dict[str, object]:
@@ -1840,8 +1949,7 @@ def load_eval_artifacts(
         )
 
     return {
-        "topic": topic,
-        "run_name": run_name,
+        **ExperimentIdentity(topic=topic, variant=variant, run_name=run_name).to_dict(),
         "result_dir": str(result_dir),
         "collected_at_utc": utc_now(),
         "required_patterns": patterns.required,
@@ -1929,23 +2037,81 @@ def resolve_topic_dir(
 
 
 def resolve_report_path(
-    repo_root: Path, registry: RegistryContext, run_name: str, report_arg: str
+    repo_root: Path,
+    registry: RegistryContext,
+    identity: RunIdentity,
+    report_arg: str,
 ) -> Path:
     """Resolve the report path for one run."""
     if report_arg:
-        return Path(report_arg).resolve()
+        candidate = Path(report_arg)
+        if not candidate.is_absolute():
+            candidate = repo_root / candidate
+        return contained_path(repo_root, candidate)
     if registry.available:
         registry_report_root = registry.entry.get(
             "report_root"
         ) or registry.defaults.get("report_root")
         if isinstance(registry_report_root, str):
-            return (repo_root / registry_report_root / f"{run_name}.md").resolve()
-    return (repo_root / "experiments" / "report" / f"{run_name}.md").resolve()
+            return contained_path(
+                repo_root,
+                repo_root
+                / registry_report_root
+                / identity.topic
+                / identity.variant
+                / f"{identity.run_name}.md",
+            )
+    return contained_path(repo_root, repo_root / report_relative_path(identity))
 
 
-def build_run_paths(topic_dir: Path, run_name: str, report_path: Path) -> RunPaths:
-    """Build filesystem paths owned by one run."""
-    result_dir = topic_dir / "result" / run_name
+def build_run_paths(
+    topic_dir: Path, identity: RunIdentity, report_path: Path
+) -> RunPaths:
+    """Build filesystem paths after proving the canonical realpath boundary."""
+    topic_dir = topic_dir.absolute()
+    if topic_dir.name != identity.topic or topic_dir.parent.name != "experiments":
+        raise ExperimentIdentityError(
+            "topic directory must be experiments/<topic> for the identity"
+        )
+    if topic_dir.is_symlink() or topic_dir.resolve() != topic_dir:
+        raise ExperimentIdentityError(f"topic directory must not escape by symlink: {topic_dir}")
+    if not topic_dir.is_dir():
+        raise ExperimentIdentityError(f"topic directory does not exist: {topic_dir}")
+
+    result_root = topic_dir / "result"
+    for label, directory in (("result root", result_root),):
+        if directory.is_symlink() or directory.resolve() != directory:
+            raise ExperimentIdentityError(f"{label} must not escape by symlink: {directory}")
+        if directory.exists() and not directory.is_dir():
+            raise ExperimentIdentityError(f"{label} must be a directory: {directory}")
+
+    variant_root = result_root / identity.variant
+    if variant_root.is_symlink() or variant_root.resolve() != variant_root:
+        raise ExperimentIdentityError(
+            f"variant result root must not escape by symlink: {variant_root}"
+        )
+    if variant_root.exists() and not variant_root.is_dir():
+        raise ExperimentIdentityError(
+            f"variant result root must be a directory: {variant_root}"
+        )
+
+    result_dir = topic_dir / "result" / identity.variant / identity.run_name
+    if result_dir.is_symlink() or result_dir.resolve() != result_dir:
+        raise ExperimentIdentityError(
+            f"result directory must not escape by symlink: {result_dir}"
+        )
+    expected_report_path = (
+        topic_dir.parent.parent / report_relative_path(identity)
+    ).absolute()
+    report_path = report_path.absolute()
+    if report_path != expected_report_path:
+        raise ExperimentIdentityError(
+            "report path must match complete identity: "
+            f"expected {expected_report_path}, got {report_path}"
+        )
+    if report_path.is_symlink() or report_path.resolve() != report_path:
+        raise ExperimentIdentityError(f"report path must not escape by symlink: {report_path}")
+
     log_dir = result_dir / "logs"
     return RunPaths(
         result_dir=result_dir,
@@ -1973,6 +2139,7 @@ def build_placeholders(
     return {
         "repo_root": str(repo_root),
         "topic_dir": str(topic_dir),
+        "variant": identity.variant,
         "run_name": identity.run_name,
         "run_dir": str(paths.result_dir),
         "log_dir": str(paths.log_dir),
@@ -2041,25 +2208,41 @@ def select_command(
 def build_run_context(args: argparse.Namespace) -> RunContext:
     """Build setup context for one managed run."""
     repo_root = Path(args.repo_root).resolve()
-    identity = RunIdentity(
-        topic=args.topic,
-        run_name=args.run_name or f"{args.topic}_{args.variant}_{compact_timestamp()}",
-        variant=args.variant,
+    topic = validate_segment(args.topic, "topic")
+    variant = validate_segment(args.variant, "variant")
+    run_name = validate_segment(
+        args.run_name or f"{topic}_{variant}_{compact_timestamp()}", "run_name"
     )
+    identity = RunIdentity(topic=topic, variant=variant, run_name=run_name)
     registry = load_registry_context(
         resolve_registry_path(repo_root, args.registry or ""),
         identity.topic,
     )
     topic_dir = resolve_topic_dir(repo_root, identity, registry)
+    topic_dir = contained_path(repo_root, topic_dir)
+    canonical_topic_dir = contained_path(
+        repo_root, repo_root / "experiments" / identity.topic
+    )
+    if topic_dir != canonical_topic_dir:
+        raise ValueError(
+            "topic directory must match canonical identity path: "
+            f"expected {canonical_topic_dir}, got {topic_dir}"
+        )
     if not topic_dir.is_dir():
         raise ValueError(f"topic directory does not exist: {topic_dir}")
     report_path = resolve_report_path(
         repo_root,
         registry,
-        identity.run_name,
+        identity,
         args.report_path or "",
     )
-    paths = build_run_paths(topic_dir, identity.run_name, report_path)
+    expected_report_path = contained_path(repo_root, repo_root / report_relative_path(identity))
+    if report_path != expected_report_path:
+        raise ValueError(
+            "report path must match complete identity: "
+            f"expected {expected_report_path}, got {report_path}"
+        )
+    paths = build_run_paths(topic_dir, identity, report_path)
     placeholders = build_placeholders(repo_root, identity, topic_dir, paths)
     command = select_command(
         args.use_registered_command or "",
@@ -2086,9 +2269,7 @@ def write_initial_artifacts(
     skip_report_init: bool,
 ) -> dict[str, object]:
     """Write run directories, initial JSON files, and optional report stub."""
-    context.paths.result_dir.mkdir(parents=True, exist_ok=True)
     context.paths.log_dir.mkdir(parents=True, exist_ok=True)
-    context.paths.report_path.parent.mkdir(parents=True, exist_ok=True)
     source_config = copy_source_config_snapshot(context)
     run_config["source_config"] = source_config
     manifest["source_config"] = source_config
@@ -2111,12 +2292,238 @@ def write_initial_artifacts(
         },
     )
 
-    if not skip_report_init and not context.paths.report_path.exists():
-        context.paths.report_path.write_text(
-            render_report_stub(context),
-            encoding="utf-8",
-        )
     return source_config
+
+
+def reserve_run_paths(
+    context: RunContext, skip_report_init: bool
+) -> ReservationReceipt:
+    """Reserve the complete identity before writing any run artifacts.
+
+    The report existence check is intentionally before result-directory
+    reservation.  The later exclusive report create is the race gate; if it
+    loses, only this invocation's still-empty result directory is removed.
+    """
+    if context.paths.report_path.exists():
+        raise ValueError(f"report already exists for identity: {context.paths.report_path}")
+    result_parent = context.paths.result_dir.parent
+    result_parent_existed = result_parent.exists()
+    result_parent.mkdir(parents=True, exist_ok=True)
+    try:
+        context.paths.result_dir.mkdir(exist_ok=False)
+    except FileExistsError as exc:
+        if not result_parent_existed:
+            try:
+                result_parent.rmdir()
+            except OSError:
+                pass
+        raise ValueError(
+            f"result directory already exists for identity: {context.paths.result_dir}"
+        ) from exc
+    result_inode = context.paths.result_dir.stat().st_ino
+    token = secrets.token_hex(24)
+    marker_path = context.paths.result_dir / RESERVATION_MARKER_NAME
+    marker_payload = {
+        "schema": RESERVATION_MARKER_SCHEMA,
+        "state": "reserved",
+        "token": token,
+        "result_inode": result_inode,
+        **context.identity.to_dict(),
+    }
+    try:
+        with marker_path.open("x", encoding="utf-8") as marker_file:
+            marker_file.write(json.dumps(marker_payload, sort_keys=True))
+            marker_file.write("\n")
+            marker_file.flush()
+            os.fsync(marker_file.fileno())
+        marker_inode = marker_path.stat().st_ino
+    except BaseException:
+        _remove_owned_empty_dir(context.paths.result_dir, result_inode)
+        raise
+
+    report_parent = context.paths.report_path.parent
+    report_parent_existed = report_parent.exists()
+    report_content: str | None = None
+    receipt = ReservationReceipt(
+        result_dir=context.paths.result_dir,
+        report_path=context.paths.report_path,
+        report_content=None,
+        result_parent=result_parent,
+        result_parent_preexisted=result_parent_existed,
+        report_parent=report_parent,
+        report_parent_preexisted=report_parent_existed,
+        token=token,
+        marker_path=marker_path,
+        result_inode=result_inode,
+        marker_inode=marker_inode,
+        report_reserved=False,
+        report_inode=None,
+        result_parent_inode=result_parent.stat().st_ino,
+        report_parent_inode=None,
+        identity=context.identity,
+    )
+    try:
+        if not skip_report_init:
+            report_parent.mkdir(parents=True, exist_ok=True)
+            report_parent_inode = report_parent.stat().st_ino
+            receipt = replace(receipt, report_parent_inode=report_parent_inode)
+            report_content = render_report_stub(context)
+            with context.paths.report_path.open("x", encoding="utf-8") as handle:
+                report_inode = os.fstat(handle.fileno()).st_ino
+                receipt = replace(
+                    receipt,
+                    report_content=report_content,
+                    report_reserved=True,
+                    report_inode=report_inode,
+                    report_parent_inode=report_parent_inode,
+                )
+                handle.write(report_content)
+                handle.flush()
+                os.fsync(handle.fileno())
+    except BaseException:
+        rollback_empty_reservation(receipt)
+        raise
+    return receipt
+
+
+def _remove_owned_empty_dir(path: Path, inode: int) -> bool:
+    """Remove a directory only when its current inode is the recorded one."""
+    try:
+        stat_result = path.stat()
+        if path.is_symlink() or stat_result.st_ino != inode:
+            return False
+        if any(path.iterdir()):
+            return False
+        path.rmdir()
+        return True
+    except OSError:
+        return False
+
+
+def _reservation_parent_matches(
+    path: Path, preexisted: bool, inode: int | None
+) -> bool:
+    """Prove ownership of an observed parent before attempting cleanup."""
+    if preexisted or inode is None:
+        return True
+    try:
+        stat_result = path.stat()
+    except OSError:
+        return False
+    return path.is_dir() and not path.is_symlink() and stat_result.st_ino == inode
+
+
+def _reservation_owner_matches(receipt: ReservationReceipt) -> bool:
+    """Verify token, identity, state, and inode ownership before cleanup."""
+    try:
+        result_stat = receipt.result_dir.stat()
+        marker_stat = receipt.marker_path.stat()
+        if receipt.result_dir.is_symlink() or receipt.marker_path.is_symlink():
+            return False
+        if result_stat.st_ino != receipt.result_inode:
+            return False
+        if marker_stat.st_ino != receipt.marker_inode:
+            return False
+        marker = load_json_file(receipt.marker_path)
+        if not isinstance(marker, Mapping):
+            return False
+        if set(marker) != {
+            "schema",
+            "state",
+            "token",
+            "result_inode",
+            "identity",
+        }:
+            return False
+        if marker.get("schema") != RESERVATION_MARKER_SCHEMA:
+            return False
+        if marker.get("state") != "reserved":
+            return False
+        if marker.get("token") != receipt.token:
+            return False
+        if marker.get("result_inode") != receipt.result_inode:
+            return False
+        if identity_from_manifest(marker) != receipt.identity:
+            return False
+    except (OSError, TypeError, ValueError, json.JSONDecodeError):
+        return False
+    return True
+
+
+def rollback_empty_reservation(receipt: ReservationReceipt) -> bool:
+    """Remove only a receipt-owned empty result/report reservation."""
+    if not _reservation_owner_matches(receipt):
+        return False
+    if not _reservation_parent_matches(
+        receipt.result_parent,
+        receipt.result_parent_preexisted,
+        receipt.result_parent_inode,
+    ):
+        return False
+    if not _reservation_parent_matches(
+        receipt.report_parent,
+        receipt.report_parent_preexisted,
+        receipt.report_parent_inode,
+    ):
+        return False
+    try:
+        children = list(receipt.result_dir.iterdir())
+    except OSError:
+        return False
+    if children != [receipt.marker_path]:
+        return False
+
+    if receipt.report_reserved:
+        if receipt.report_inode is None or receipt.report_parent_inode is None:
+            return False
+        try:
+            report_stat = receipt.report_path.stat()
+            report_parent_stat = receipt.report_parent.stat()
+        except OSError:
+            return False
+        if (
+            receipt.report_path.is_symlink()
+            or report_stat.st_ino != receipt.report_inode
+            or report_parent_stat.st_ino != receipt.report_parent_inode
+        ):
+            return False
+    try:
+        receipt.marker_path.unlink()
+        receipt.result_dir.rmdir()
+    except OSError:
+        return False
+    if receipt.report_reserved:
+        try:
+            receipt.report_path.unlink()
+        except OSError:
+            return False
+    for parent, preexisted, inode in (
+        (
+            receipt.report_parent,
+            receipt.report_parent_preexisted,
+            receipt.report_parent_inode,
+        ),
+        (
+            receipt.result_parent,
+            receipt.result_parent_preexisted,
+            receipt.result_parent_inode,
+        ),
+    ):
+        if not preexisted:
+            if inode is not None:
+                _remove_owned_empty_dir(parent, inode)
+    return True
+
+
+def release_reservation_marker(receipt: ReservationReceipt) -> bool:
+    """Remove a receipt-owned marker after initial artifacts are durable."""
+    if not _reservation_owner_matches(receipt):
+        return False
+    try:
+        receipt.marker_path.unlink()
+    except OSError:
+        return False
+    return True
 
 
 def source_config_error(source_config: dict[str, object]) -> str | None:
@@ -2137,6 +2544,7 @@ def build_run_environment(context: RunContext) -> dict[str, str]:
         {
             "EXPERIMENT_RUN_NAME": context.identity.run_name,
             "EXPERIMENT_TOPIC": context.identity.topic,
+            "EXPERIMENT_VARIANT": context.identity.variant,
             "EXPERIMENT_RUN_DIR": str(context.paths.result_dir),
             "EXPERIMENT_LOG_DIR": str(context.paths.log_dir),
             "EXPERIMENT_REPORT_PATH": str(context.paths.report_path),
@@ -2167,6 +2575,7 @@ def finalize_run_manifest(
     eval_collection = load_eval_artifacts(
         context.paths.result_dir,
         topic=context.identity.topic,
+        variant=context.identity.variant,
         run_name=context.identity.run_name,
         patterns=patterns,
     )
@@ -2953,17 +3362,29 @@ def run_cli(
     if not context.command.command:
         raise ValueError("a command is required")
 
+    reservation = reserve_run_paths(context, args.skip_report_init)
     manifest = build_manifest(context, "running")
     run_config = build_run_config(context, explicit_config)
     manifest["config_path"] = str(context.paths.config_path)
     manifest["config"] = run_config
     start_monotonic = time.monotonic()
-    source_config = write_initial_artifacts(
-        context,
-        manifest,
-        run_config,
-        args.skip_report_init,
-    )
+    try:
+        source_config = write_initial_artifacts(
+            context,
+            manifest,
+            run_config,
+            args.skip_report_init,
+        )
+        if not release_reservation_marker(reservation):
+            raise ResourcePlanError(
+                "reservation marker ownership changed before initial artifacts completed"
+            )
+    except BaseException:
+        # A setup failure before any artifact exists may clean only the
+        # receipt-owned empty reservation.  Once an artifact is present, the
+        # failed run remains available for diagnosis and operator cleanup.
+        rollback_empty_reservation(reservation)
+        raise
     preflight_error = source_config_error(source_config)
     if preflight_error:
         print(preflight_error, file=sys.stderr)

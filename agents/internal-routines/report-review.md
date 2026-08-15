@@ -10,7 +10,9 @@ upstream design ../canonical/skills.md skill canon registry
 
 ## Purpose
 
-`experiments/report/<run_name>.md` の reader-facing quality と evidence traceability を確認します。
+`experiments/report/<topic>/<variant>/<run_name>.md` の reader-facing quality と evidence traceability を確認します。
+report path は `agentcanon.experiment-run-identity/v2` の topic/variant/run_name と一致させ、
+別 variant の同名 run や旧 topic-only path を参照しません。
 
 ## Use When
 

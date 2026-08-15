@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import subprocess
 import sys
 
@@ -22,6 +23,20 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 from dataclasses import dataclass
 from pathlib import Path
 from typing import cast
+
+if __package__:
+    from tools.experiments.experiment_identity import validate_segment
+else:
+    _IDENTITY_PATH = Path(__file__).resolve().parents[1] / "experiments" / "experiment_identity.py"
+    _IDENTITY_SPEC = importlib.util.spec_from_file_location(
+        "agentcanon_experiment_identity", _IDENTITY_PATH
+    )
+    if _IDENTITY_SPEC is None or _IDENTITY_SPEC.loader is None:
+        raise ImportError(f"experiment identity source is unavailable: {_IDENTITY_PATH}")
+    _IDENTITY_MODULE = importlib.util.module_from_spec(_IDENTITY_SPEC)
+    sys.modules[_IDENTITY_SPEC.name] = _IDENTITY_MODULE
+    _IDENTITY_SPEC.loader.exec_module(_IDENTITY_MODULE)
+    validate_segment = _IDENTITY_MODULE.validate_segment
 
 MANAGED_RUN_ARTIFACTS = frozenset(
     {
@@ -278,14 +293,14 @@ def validate_eval_patterns(
             findings.append(
                 Finding(
                     "error",
-                    f"{scope_name}: {key} must stay relative to result/<run_name>: {pattern}",
+                    f"{scope_name}: {key} must stay relative to result/<variant>/<run_name>: {pattern}",
                 )
             )
         if ".." in pattern_path.parts:
             findings.append(
                 Finding(
                     "error",
-                    f"{scope_name}: {key} must not escape result/<run_name>: {pattern}",
+                    f"{scope_name}: {key} must not escape result/<variant>/<run_name>: {pattern}",
                 )
             )
         if pattern in MANAGED_RUN_ARTIFACTS:
@@ -312,6 +327,14 @@ def validate_topic_layout(
     entrypoint_raw = fields["canonical_entrypoint"]
     result_root_raw = fields["result_root"]
     report_root_raw = fields["report_root"]
+    for field, value in (
+        ("topic", topic_name),
+        ("default_variant", fields["default_variant"]),
+    ):
+        try:
+            validate_segment(value, field)
+        except ValueError as exc:
+            findings.append(Finding("error", f"{topic_name}: {exc}"))
     allowed_status = {"template", "draft", "active", "paused", "archived"}
     if status not in allowed_status:
         findings.append(
@@ -334,6 +357,7 @@ def validate_topic_layout(
     expected_topic_dir = repo_root / expected_topic_dir_raw
     expected_entrypoint_raw = f"{expected_topic_dir_raw}/run.py"
     expected_config_raw = f"{expected_topic_dir_raw}/config.yaml"
+    expected_result_root_raw = f"{expected_topic_dir_raw}/result"
     expected_entrypoint = repo_root / expected_entrypoint_raw
     expected_config = repo_root / expected_config_raw
 
@@ -351,6 +375,14 @@ def validate_topic_layout(
                 "error",
                 f"{topic_name}: canonical_entrypoint must be the topic-local run.py "
                 f"({expected_entrypoint_raw}), got {entrypoint_raw}",
+            )
+        )
+    if result_root_raw != expected_result_root_raw:
+        findings.append(
+            Finding(
+                "error",
+                f"{topic_name}: result_root must be {expected_result_root_raw} "
+                f"(variant/run names are appended by the lifecycle owner), got {result_root_raw}",
             )
         )
     if not topic_dir.is_dir():
@@ -408,10 +440,18 @@ def validate_topic_commands(
                     "{config_path} so managed runs consume the saved config snapshot",
                 )
             )
+        managed_runner_module = None
+        if isinstance(managed_runner, str) and managed_runner.endswith(".py"):
+            managed_runner_module = managed_runner[:-3].replace("/", ".")
         if (
-            managed_runner is not None
-            and isinstance(managed_runner, str)
-            and managed_runner in command_text
+            isinstance(managed_runner, str)
+            and (
+                managed_runner in command_text
+                or (
+                    managed_runner_module is not None
+                    and managed_runner_module in command_text
+                )
+            )
         ):
             findings.append(
                 Finding(
@@ -430,14 +470,10 @@ def validate_topic_variant(
 ) -> None:
     """Validate the selected topic command variant."""
     formal_command = maybe_string(topic, "formal_inner_command")
-    if default_variant not in {"default", "formal", "manual", "smoke"}:
-        findings.append(
-            Finding(
-                "error",
-                f"{topic_name}: default_variant must be default, formal, or manual; "
-                f"got {default_variant!r}",
-            )
-        )
+    try:
+        validate_segment(default_variant, "default_variant")
+    except ValueError as exc:
+        findings.append(Finding("error", f"{topic_name}: {exc}"))
     if default_variant == "formal" and formal_command is None:
         findings.append(
             Finding(

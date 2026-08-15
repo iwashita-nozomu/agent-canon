@@ -23,7 +23,7 @@ upstream design ../README.md convention index
 
 - 再利用できる汎用 runtime は pip installed `experiment_runner` package に置きます。
 - topic 固有のケース生成と実験本体は `experiments/` 配下に置きます。
-- 長時間実行の生成物は topic ごとの `result/<run_name>/` に集約し、ライブラリ本体へ混ぜません。
+- 長時間実行の生成物は topic ごとの `result/<variant>/<run_name>/` に集約し、ライブラリ本体へ混ぜません。
 - experiment run は 1 回の fresh 実行で完走させ、途中停止 run を継ぎ足して完了扱いにしません。
 
 ## 規約
@@ -67,24 +67,24 @@ experiments/report/
 - `cases.py` には case 列の展開と `resource_estimate(case)` を置きます。
 - `run.py` には `main::main`、runner 起動、final summary 生成を置きます。
 - `visualize.ipynb` には run artifact を読む図表化 cell を置きます。
-- 可視化や report 用の生成物は `result/<run_name>/` にまとめます。
+- 可視化や report 用の生成物は `result/<variant>/<run_name>/` にまとめます。
 - topic 固有ディレクトリの README や note から、定式化と比較対象を必ず辿れるようにします。
-- 長時間実行で生成される JSON、JSONL、HTML、SVG、ログは `result/<run_name>/` に集約します。
-- 人が読む experiment report は `experiments/report/<run_name>.md` に置きます。
+- 長時間実行で生成される JSON、JSONL、HTML、SVG、ログは `result/<variant>/<run_name>/` に集約します。
+- 人が読む experiment report は `experiments/report/<topic>/<variant>/<run_name>.md` に置きます。
 - 複数 run をまたぐ要約は `notes/experiments/<topic>.md` に置きます。
 - top-level `reports/` は topic ごとの experiment report の正本にしません。
 - JSONL は run 中の progress 記録として扱い、resume 用の canonical input にはしません。
-- 生成物は `.gitignore` と `result/<run_name>/` 運用で管理し、安定ライブラリやテストディレクトリへ混ぜません。
+- 生成物は `.gitignore` と `result/<variant>/<run_name>/` 運用で管理し、安定ライブラリやテストディレクトリへ混ぜません。
 
 ### 4.5 naming
 
 - run_name は `<topic>_<variant>_<YYYYMMDDTHHMMSSZ>` に固定します。
 - `result/` の主要生成物は次でそろえます。
-  - `result/<run_name>/run_manifest.json`
-  - `result/<run_name>/eval_manifest.json`
-  - `result/<run_name>/summary.json`
-  - `result/<run_name>/cases.jsonl`
-  - `result/<run_name>/run.log`
+  - `result/<variant>/<run_name>/run_manifest.json`
+  - `result/<variant>/<run_name>/eval_manifest.json`
+  - `result/<variant>/<run_name>/summary.json`
+  - `result/<variant>/<run_name>/cases.jsonl`
+  - `result/<variant>/<run_name>/run.log`
 - topic README には、run_name 形式、report パス、result ディレクトリ構成を明記します。
 - topic の canonical entrypoint と smoke / formal command は `experiments/registry.toml` にも書きます。
 - server 実行では、`tools/experiments/run_managed_experiment.py` のような wrapper で host / command / commit metadata を残すことを推奨します。
@@ -102,7 +102,7 @@ experiments/report/
 - `main` へ統合するときは、コードだけでなく test と document を同時にそろえます。
 - 隔離環境で削除した冗長ファイルは、`main` 側でも不要なら削除します。
 - 実行結果そのものは raw のまま全部を `main` へ戻さず、必要な最終 JSON と note を残します。
-- `main` へ持ち帰るのは完走 run の `result/<run_name>/` と report だけにします。partial run は診断用に留めます。
+- `main` へ持ち帰るのは完走 run の `result/<variant>/<run_name>/` と report だけにします。partial run は診断用に留めます。
 
 ## 補足
 
