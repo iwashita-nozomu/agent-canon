@@ -215,8 +215,8 @@ bash tools/agent-canon/agent_tools/run_repo_dependency_review.sh \
 ```
 
 `--ensure-graph` is an explicit, mutually separate preparation mode. It runs
-persisted graph status/build and exits; it is not dependency-correctness
-evidence.
+persisted snapshot status/build preparation and exits; it is not
+dependency-correctness evidence.
 
 ### Explicit persisted graph operations
 
