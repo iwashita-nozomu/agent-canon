@@ -1,19 +1,23 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Derives dependency graph query and context projections directly from tracked source manifests.
+# responsibility Derives dependency graph query, review, and context projections directly from tracked source manifests.
 # upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL and path semantics
+# upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
 # upstream implementation ./surface_manifest.py resolves canonical parent projection bindings
 # downstream implementation ./graph_client.py exposes source-derived dependency query and context compatibility
+# downstream implementation ./check_dependency_graph.sh validates source-derived relations and writes review artifacts
 # downstream implementation ../../tests/agent_tools/test_graph_client_source_projection.py validates no-runtime projections
 # @dependency-end
 """Pure tracked-source dependency projection without persisted graph runtime state."""
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import subprocess
+import sys
 from collections import defaultdict, deque
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -81,6 +85,15 @@ class SourceDependencyEdge:
     target: str
     reason: str
     line: int
+
+
+@dataclass(frozen=True, order=True)
+class SourceDependencyDocument:
+    """One canonical source document and its dependency-manifest projection."""
+
+    path: str
+    manifest_present: bool
+    edges: tuple[SourceDependencyEdge, ...]
 
 
 @dataclass(frozen=True)
@@ -274,12 +287,12 @@ def _normalize_target(root: Path, source: Path, raw_target: str) -> str:
     return repo_relative(root, target)
 
 
-def parse_manifest_edges(
+def parse_manifest_document(
     root: Path,
     relative: str,
     bindings: Sequence[tuple[str, str]],
-) -> tuple[SourceDependencyEdge, ...]:
-    """Parse one source manifest with the repository's strict dependency DSL."""
+) -> SourceDependencyDocument:
+    """Parse one canonical source document with the strict dependency DSL."""
     canonical, source = resolve_source_path(root, relative, bindings)
     text = _read_text(source, canonical)
     in_manifest = False
@@ -341,14 +354,23 @@ def parse_manifest_edges(
         )
     if saw_start != saw_end:
         raise SourceDependencyError(f"{canonical}: incomplete dependency manifest markers")
-    return tuple(edges)
+    return SourceDependencyDocument(canonical, saw_start and saw_end, tuple(edges))
 
 
-def dependency_edges(root: Path) -> tuple[SourceDependencyEdge, ...]:
-    """Return every unique source-declared dependency edge."""
+def parse_manifest_edges(
+    root: Path,
+    relative: str,
+    bindings: Sequence[tuple[str, str]],
+) -> tuple[SourceDependencyEdge, ...]:
+    """Return the normalized dependency edges for one source document."""
+    return parse_manifest_document(root, relative, bindings).edges
+
+
+def dependency_documents(root: Path) -> tuple[SourceDependencyDocument, ...]:
+    """Return every unique canonical text document and manifest projection."""
     root = root.resolve()
     bindings = _surface_bindings(root)
-    edges: set[SourceDependencyEdge] = set()
+    documents: list[SourceDependencyDocument] = []
     canonical_sources: set[str] = set()
     for relative in source_paths(root):
         if not is_text_source(relative):
@@ -361,11 +383,24 @@ def dependency_edges(root: Path) -> tuple[SourceDependencyEdge, ...]:
         except SourceDependencyError:
             # Git links, deleted paths, and unavailable generated views are not text sources.
             continue
-        canonical_sources.add(canonical_relative)
-        if source.is_symlink():
+        if canonical_relative in canonical_sources or source.is_symlink():
             continue
-        edges.update(parse_manifest_edges(root, canonical_relative, ()))
+        canonical_sources.add(canonical_relative)
+        documents.append(parse_manifest_document(root, canonical_relative, ()))
+    return tuple(sorted(documents))
+
+
+def dependency_edges(root: Path) -> tuple[SourceDependencyEdge, ...]:
+    """Return every unique source-declared dependency edge."""
+    edges = {edge for document in dependency_documents(root) for edge in document.edges}
     return tuple(sorted(edges))
+
+
+def dependency_manifest_paths(root: Path) -> tuple[str, ...]:
+    """Return every canonical text source containing a complete manifest block."""
+    return tuple(
+        document.path for document in dependency_documents(root) if document.manifest_present
+    )
 
 
 def _stable_id(prefix: str, *values: object) -> str:
@@ -508,3 +543,57 @@ def build_context_projection(
         parent_paths=tuple(sorted(parents)),
         fingerprint=projection.fingerprint,
     )
+
+
+def write_review_projection(root: Path, edges_out: Path, manifests_out: Path) -> None:
+    """Write deterministic review inputs into caller-owned scratch paths."""
+    documents = dependency_documents(root)
+    edges = sorted({edge for document in documents for edge in document.edges})
+    manifests = sorted(
+        document.path for document in documents if document.manifest_present
+    )
+    edge_lines = [
+        "\t".join((edge.direction, edge.kind, edge.source, edge.target))
+        for edge in edges
+    ]
+    edges_out.parent.mkdir(parents=True, exist_ok=True)
+    manifests_out.parent.mkdir(parents=True, exist_ok=True)
+    edges_out.write_text(
+        "\n".join(edge_lines) + ("\n" if edge_lines else ""),
+        encoding="utf-8",
+    )
+    manifests_out.write_text(
+        "\n".join(manifests) + ("\n" if manifests else ""),
+        encoding="utf-8",
+    )
+
+
+def build_cli_parser() -> argparse.ArgumentParser:
+    """Create the source dependency projection CLI."""
+    parser = argparse.ArgumentParser(
+        description="Export source-derived dependency review inputs without graph runtime state."
+    )
+    parser.add_argument("--root", required=True, type=Path)
+    parser.add_argument("--edges-out", required=True, type=Path)
+    parser.add_argument("--manifests-out", required=True, type=Path)
+    return parser
+
+
+def main() -> int:
+    """Export source-derived review inputs for shell validators."""
+    args = build_cli_parser().parse_args()
+    try:
+        write_review_projection(
+            args.root.resolve(),
+            args.edges_out.resolve(strict=False),
+            args.manifests_out.resolve(strict=False),
+        )
+    except SourceDependencyError as error:
+        print(f"SOURCE_DEPENDENCY_EXPORT=fail reason={error}", file=sys.stderr)
+        return 1
+    print("SOURCE_DEPENDENCY_EXPORT=pass authority=tracked-source")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
