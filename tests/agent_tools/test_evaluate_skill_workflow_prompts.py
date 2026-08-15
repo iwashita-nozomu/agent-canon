@@ -173,6 +173,36 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         ):
             self.assertIn(required_glob, target_globs)
 
+    def test_codex_agent_generic_provenance_is_consumer_static_and_path_free(self) -> None:
+        """The generic Codex prompt check owns only static marker/digest provenance."""
+        manifest = PROJECT_ROOT / "evidence" / "agent-evals" / "skill_workflow_prompt_eval.toml"
+        data = load_toml_document(manifest)
+        evals = cast(list[dict[str, object]], data["evals"])
+        role_eval = next(entry for entry in evals if entry.get("id") == "all-codex-subagent-prompts")
+        checklist = next(
+            item
+            for item in cast(list[dict[str, object]], role_eval["checklist"])
+            if item.get("id") == "CODEX-AGENT-GENERIC-1"
+        )
+
+        self.assertEqual(
+            set(cast(list[str], checklist["required_regex"])),
+            {
+                "generated role view: generated_role_view_v1",
+                "(?m)^# source canonical digest: [0-9a-f]{64}$",
+            },
+        )
+        self.assertEqual(
+            set(cast(list[str], checklist["forbidden_regex"])),
+            {
+                "agents/skills/",
+                "agents/model_profiles\\.toml",
+                "tools/agent_tools/",
+                "\\.\\./\\.\\./agents/",
+                "\\.\\./\\.\\./tools/",
+            },
+        )
+
     def test_default_manifest_routes_convention_and_toolcall_eval_coverage(
         self,
     ) -> None:
