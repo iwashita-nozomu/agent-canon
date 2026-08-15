@@ -35,17 +35,14 @@ class TestRunnerSchemaTest(unittest.TestCase):
         route: str = "docker",
     ) -> subprocess.CompletedProcess[str]:
         """Run the public runner against a temporary source root/list."""
-        parent_root = root.parent.parent
         env = {
             **os.environ,
-            "AGENT_CANON_PARENT_ROOT": str(parent_root),
-            "AGENT_CANON_SOURCE_ROOT": str(root),
             "AGENT_CANON_TESTLIST": str(list_path),
             "AGENT_CANON_ACTIVE_ROUTE": route,
         }
         return subprocess.run(
-            ["bash", str(RUNNER)],
-            cwd=PROJECT_ROOT,
+            ["bash", str(root / "test" / "testrunner.sh")],
+            cwd=root,
             env=env,
             check=False,
             capture_output=True,
@@ -58,6 +55,8 @@ class TestRunnerSchemaTest(unittest.TestCase):
         parent_root = Path(temp_dir.name)
         root = parent_root / "vendor" / "agent-canon"
         root.mkdir(parents=True)
+        (root / "test").mkdir()
+        shutil.copy(RUNNER, root / "test" / "testrunner.sh")
         (root / "owner.py").write_text("# owner\n", encoding="utf-8")
         subprocess.run(["git", "init", "--quiet", str(parent_root)], check=True)
         subprocess.run(["git", "init", "--quiet", str(root)], check=True)

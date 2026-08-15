@@ -25,33 +25,24 @@ source "${SCRIPT_DIR}/lib/git_authority.sh"
 ROOT_DIR="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")"
 AGENT_CANON_SOURCE_ROOT="$(git -C "${CANON_TOOLS_ROOT}" rev-parse --show-toplevel)"
-PARENT_ROOT_DIR="${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}"
-PARENT_ROOT_DIR="$(cd "${PARENT_ROOT_DIR}" && pwd -P)"
 AGENT_CANON_BOUNDARY_SCRIPT="${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py"
-
-if [[ "${PARENT_ROOT_DIR}" != "${ROOT_DIR}" \
-  && "${AGENT_CANON_CHILD_PURPOSE:-}" != "agent-canon-update-script" ]]; then
-  echo "AGENT_CANON_UPDATE_PARENT_HANDOFF=missing" >&2
-  echo "AGENT_CANON_UPDATE_PARENT_ROOT=${PARENT_ROOT_DIR}" >&2
-  echo "AGENT_CANON_UPDATE_SOURCE_ROOT=${AGENT_CANON_SOURCE_ROOT}" >&2
+if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
+  invocation_script="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
+  if [[ -z "${invocation_script}" || ! -f "${invocation_script}" ]]; then
+    echo "AGENT_CANON_UPDATE=fail reason=invocation_script_missing" >&2
+    exit 2
+  fi
+  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" public-exec \
+    --invocation-script "${invocation_script}" \
+    --purpose agent-canon-update-script \
+    -- bash "${invocation_script}" "$@"
+fi
+PARENT_ROOT_DIR="${AGENT_CANON_SIDE_EFFECT_PARENT_ROOT:-}"
+if [[ -z "${PARENT_ROOT_DIR}" ]]; then
+  echo "AGENT_CANON_UPDATE=fail reason=side_effect_session_missing" >&2
   exit 2
 fi
-if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "agent-canon-update-script" ]]; then
-  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
-    --root "${PARENT_ROOT_DIR}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
-    --purpose agent-canon-update-script \
-    --consume >/dev/null
-else
-  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
-    --root "${PARENT_ROOT_DIR}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
-    --purpose agent-canon-update-script \
-    --rebase-inherited-temp \
-    --issue-handoff \
-    -- bash "${BASH_SOURCE[0]}" "$@"
-fi
-unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
+PARENT_ROOT_DIR="$(cd "${PARENT_ROOT_DIR}" && pwd -P)"
 
 CANON_PARENT_TMP_CANDIDATE="${AGENT_CANON_PARENT_TMPDIR:-$PARENT_ROOT_DIR/.agent-canon/tmp/update}"
 CANON_PARENT_TMPDIR="$(python3 "${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" \
@@ -91,8 +82,7 @@ parent_symlink() {
     symlink --root "$PARENT_ROOT_DIR" --target "$1" --candidate "$2" --purpose "${3:-agent-canon-update}" >/dev/null
 }
 run_parent_bound_sync() {
-  AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${PARENT_ROOT_DIR}" \
-    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
     --root "${PARENT_ROOT_DIR}" \
     --source-root "${AGENT_CANON_SOURCE_ROOT}" \
     --purpose agent-canon-sync-script \
@@ -413,8 +403,7 @@ rebuild_agent_tools_if_available() {
     echo "AGENT_CANON_TOOL_REBUILD=skipped_missing_tool"
     return
   fi
-  AGENT_CANON_ACTIVE_REPOSITORY_ROOT="${PARENT_ROOT_DIR}" \
-    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
       --root "${PARENT_ROOT_DIR}" \
       --source-root "${AGENT_CANON_SOURCE_ROOT}" \
       --purpose agent-canon-rebuild-script \

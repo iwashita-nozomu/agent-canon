@@ -435,27 +435,9 @@ def source_diagnostic_fixture(
 
 
 def isolated_parent_environment(parent_root: Path) -> dict[str, str]:
-    """Drop ambient authority/state before binding one fixture parent."""
-    environment = os.environ.copy()
-    for name in (
-        "TMPDIR",
-        "TEMP",
-        "TMP",
-        "XDG_CACHE_HOME",
-        "PYTHONPYCACHEPREFIX",
-        "AGENT_CANON_TOOLS_HOME",
-        "CARGO_HOME",
-        "CARGO_TARGET_DIR",
-        "AGENT_CANON_CLI_TARGET_DIR",
-        "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
-        "AGENT_CANON_SOURCE_ROOT",
-        "AGENT_CANON_ROOT",
-        "AGENT_CANON_CHILD_HANDOFF",
-        "AGENT_CANON_HANDOFF_AUDIENCE",
-    ):
-        environment.pop(name, None)
-    environment["AGENT_CANON_PARENT_ROOT"] = str(parent_root)
-    return environment
+    """Return the complete runner environment; ``parent_root`` is data only."""
+    del parent_root
+    return os.environ.copy()
 
 
 def isolated_current_builder_environment(_root: Path) -> dict[str, str]:

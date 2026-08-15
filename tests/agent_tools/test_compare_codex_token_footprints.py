@@ -15,11 +15,13 @@ import sys
 import tempfile
 import time
 import unittest
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 
 from tools.agent_tools.parent_root_side_effects import (
-    ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
+    public_session,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -91,8 +93,9 @@ def write_two_event_session(path: Path, total_tokens: int) -> None:
         stream.write("\n")
 
 
-def writer_environment(root: Path) -> dict[str, str]:
-    """Issue a fixture-local parent capability for the monitoring writer."""
+@contextmanager
+def writer_environment(root: Path) -> Iterator[dict[str, str]]:
+    """Issue and deterministically release a fixture-local writer session."""
     subprocess.run(
         ["git", "init", "--quiet", "--initial-branch=main", str(root)],
         check=True,
@@ -117,40 +120,46 @@ def writer_environment(root: Path) -> dict[str, str]:
             "AGENT_CANON_CLI_TARGET_DIR",
         }
     }
-    boundary = ParentRootSideEffectBoundary()
-    purpose = "token-footprint-test"
-    attestation = boundary.attest(
-        ParentRootAttestationRequest(
-            cwd=root,
-            explicit_root=root,
-            purpose=purpose,
-        )
-    )
-    child = boundary.child_environment(
-        attestation,
-        base_env=environment,
-        issue_handoff=True,
-    )
-    for key, relative, purpose in (
-        ("HOME", ".agent-canon-test-home", "token-footprint-test-HOME"),
-        (
-            "XDG_CONFIG_HOME",
-            ".agent-canon-test-config",
-            "token-footprint-test-XDG-CONFIG-HOME",
-        ),
-        (
-            "XDG_DATA_HOME",
-            ".agent-canon-test-data",
-            "token-footprint-test-XDG-DATA-HOME",
-        ),
-    ):
-        directory = boundary.ensure_parent_owned_directory(
-            attestation,
-            root / relative,
-            purpose,
-        )
-        child[key] = str(directory.physical_path)
-    return child
+    previous_cwd = Path.cwd()
+    os.chdir(root)
+    try:
+        invocation_script = root / ".agent-canon-test-runner.py"
+        invocation_script.write_text("# authenticated fixture runner\n", encoding="utf-8")
+        with public_session(
+            invocation_script=invocation_script,
+            purpose="token-footprint-test",
+        ) as session:
+            boundary = ParentRootSideEffectBoundary()
+            child = boundary.child_environment(
+                session.attestation,
+                base_env=environment,
+                issue_handoff=False,
+            )
+            for key, relative, purpose in (
+                ("HOME", ".agent-canon-test-home", "token-footprint-test-HOME"),
+                (
+                    "XDG_CONFIG_HOME",
+                    ".agent-canon-test-config",
+                    "token-footprint-test-XDG-CONFIG-HOME",
+                ),
+                (
+                    "XDG_DATA_HOME",
+                    ".agent-canon-test-data",
+                    "token-footprint-test-XDG-DATA-HOME",
+                ),
+            ):
+                directory = boundary.ensure_parent_owned_directory(
+                    session.attestation,
+                    root / relative,
+                    purpose,
+                )
+                try:
+                    child[key] = str(directory.physical_path)
+                finally:
+                    boundary.release_parent_owned_path(directory)
+            yield child
+    finally:
+        os.chdir(previous_cwd)
 
 
 class CompareCodexTokenFootprintsTest(unittest.TestCase):
@@ -167,25 +176,26 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
             write_session(baseline, total_tokens=200)
             write_session(candidate, total_tokens=80)
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--baseline-session",
-                    str(baseline),
-                    "--candidate-session",
-                    str(candidate),
-                    "--report-out",
-                    str(report),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=root,
-                env=writer_environment(root),
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            with writer_environment(root) as environment:
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--baseline-session",
+                        str(baseline),
+                        "--candidate-session",
+                        str(candidate),
+                        "--report-out",
+                        str(report),
+                        "--report-dir",
+                        str(report_dir),
+                    ],
+                    cwd=root,
+                    env=environment,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("TOKEN_FOOTPRINT_COMPARISON=pass", result.stdout)
@@ -237,25 +247,26 @@ class CompareCodexTokenFootprintsTest(unittest.TestCase):
             report_dir = root / "reports" / "agents" / "run-1"
             report = root / "token-summary.md"
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--session-glob",
-                    str(sessions / "*.jsonl"),
-                    "--moving-average-window",
-                    "2",
-                    "--report-out",
-                    str(report),
-                    "--report-dir",
-                    str(report_dir),
-                ],
-                cwd=root,
-                env=writer_environment(root),
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            with writer_environment(root) as environment:
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--session-glob",
+                        str(sessions / "*.jsonl"),
+                        "--moving-average-window",
+                        "2",
+                        "--report-out",
+                        str(report),
+                        "--report-dir",
+                        str(report_dir),
+                    ],
+                    cwd=root,
+                    env=environment,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("TOKEN_USAGE_SUMMARY=pass", result.stdout)

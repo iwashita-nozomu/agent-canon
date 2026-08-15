@@ -19,9 +19,20 @@ scan_current=1
 trufflehog_results="${AGENT_CANON_TRUFFLEHOG_RESULTS:-verified,unknown}"
 detect_secrets_only_verified="${AGENT_CANON_DETECT_SECRETS_ONLY_VERIFIED:-1}"
 invocation_root="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)"
-parent_root="${AGENT_CANON_PARENT_ROOT:-$invocation_root}"
 script_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 boundary_script="${script_root}/tools/agent_tools/parent_root_side_effects.py"
+if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
+  invocation_script="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
+  if [[ -z "${invocation_script}" || ! -f "${invocation_script}" ]]; then
+    echo "SECRET_SCAN=fail reason=invocation_script_missing" >&2
+    exit 2
+  fi
+  exec python3 "$boundary_script" public-exec \
+    --invocation-script "$invocation_script" \
+    --purpose secret-scan-script \
+    -- bash "$invocation_script" "${original_args[@]}"
+fi
+parent_root="${AGENT_CANON_SIDE_EFFECT_PARENT_ROOT:-}"
 parent_temp_paths=()
 created_parent_temp_dir=""
 
@@ -78,19 +89,6 @@ if [ -z "$parent_root" ]; then
 fi
 parent_root="$(cd "$parent_root" && pwd -P)"
 cd "$root"
-if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "secret-scan-script" ]]; then
-  python3 "$boundary_script" verify-child \
-    --root "$parent_root" \
-    --purpose secret-scan-script \
-    --consume >/dev/null
-else
-  exec python3 "$boundary_script" exec-parent-bound \
-    --root "$parent_root" \
-    --purpose secret-scan-script \
-    --issue-handoff \
-    -- bash "${BASH_SOURCE[0]}" "${original_args[@]}"
-fi
-unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
 
 require_command() {
   local command_name="$1"

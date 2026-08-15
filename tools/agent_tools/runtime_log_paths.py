@@ -26,15 +26,13 @@ from pathlib import Path
 
 try:
     from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
         ParentRootSideEffectBoundary,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
         ParentRootSideEffectBoundary,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 
 try:
@@ -82,24 +80,18 @@ def _parent_path(active_root: Path, candidate: Path, purpose: str) -> Path:
     The caller's candidate remains the logical path returned by this resolver;
     the boundary is used only to authenticate and containment-check it.
     """
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
     if not configured:
         return candidate
-    parent = Path(configured)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(
-            cwd=parent,
-            explicit_root=parent,
-            purpose=purpose,
-        )
-    )
+    attestation = resolve_parent_writer_attestation(purpose=purpose)
     boundary = ParentRootSideEffectBoundary()
-    boundary.resolve_parent_owned_path(
+    receipt = boundary.resolve_parent_owned_path(
         attestation,
         candidate,
         purpose,
         create=False,
     )
+    boundary.release_parent_owned_path(receipt)
     return candidate
 
 

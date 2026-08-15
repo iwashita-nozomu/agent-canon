@@ -24,6 +24,8 @@ import time
 import unittest
 from pathlib import Path
 
+from tools.agent_tools.fixture_spawn import record_environment
+
 try:
     import tomllib
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
@@ -162,21 +164,23 @@ class GitAuthorityPredicateTest(unittest.TestCase):
                     "AGENT_CANON_DESTRUCTIVE_GIT_REASON": "test-destructive",
                 }
             )
-        return subprocess.run(
-            [
-                "bash",
-                "-c",
-                "source tools/lib/git_authority.sh; "
-                "git_authority_check_protected_git_authority \"$1\"",
-                "git-authority-test",
-                mode,
-            ],
-            cwd=REPO_ROOT,
-            check=False,
-            capture_output=True,
-            text=True,
-            env=env,
-        )
+        command = [
+            "bash",
+            "-c",
+            "source tools/lib/git_authority.sh; "
+            "git_authority_check_protected_git_authority \"$1\"",
+            "git-authority-test",
+            mode,
+        ]
+        with record_environment(cwd=REPO_ROOT, base_env=env) as signed_env:
+            return subprocess.run(
+                command,
+                cwd=REPO_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=signed_env,
+            )
 
     def test_mode_aware_authority_matrix(self) -> None:
         """Update modes are destructive-only; creation and force routes are scoped."""
@@ -260,45 +264,49 @@ def run_fresh_clone_check(
     signal_name: str | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run fresh-clone check once, optionally signaling the process once."""
-    if signal_name is None:
-        return subprocess.run(
+    with record_environment(cwd=root, base_env=env) as signed_env:
+        if signal_name is None:
+            return subprocess.run(
+                ["bash", check_script],
+                cwd=str(root),
+                check=False,
+                capture_output=True,
+                text=True,
+                env=signed_env,
+            )
+
+        process = subprocess.Popen(
             ["bash", check_script],
             cwd=str(root),
-            check=False,
-            capture_output=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             text=True,
-            env=env,
+            env=signed_env,
+            start_new_session=True,
         )
-
-    process = subprocess.Popen(
-        ["bash", check_script],
-        cwd=str(root),
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        env=env,
-        start_new_session=True,
-    )
-    stdout_prefix: list[str] = []
-    start = time.time()
-    while time.time() - start < 5 and process.poll() is None:
-        readable, _, _ = select.select([process.stdout], [], [], 0.02)
-        if not readable:
-            continue
-        line = process.stdout.readline()
-        if not line:
-            break
-        stdout_prefix.append(line)
-        if line.startswith("fresh-clone source:"):
-            break
-    os.killpg(process.pid, {"INT": signal.SIGINT, "TERM": signal.SIGTERM, "HUP": signal.SIGHUP}[signal_name])
-    stdout, stderr = process.communicate(timeout=120)
-    return subprocess.CompletedProcess(
-        process.args,
-        process.returncode,
-        "".join(stdout_prefix) + stdout,
-        stderr,
-    )
+        stdout_prefix: list[str] = []
+        start = time.time()
+        while time.time() - start < 5 and process.poll() is None:
+            readable, _, _ = select.select([process.stdout], [], [], 0.02)
+            if not readable:
+                continue
+            line = process.stdout.readline()
+            if not line:
+                break
+            stdout_prefix.append(line)
+            if line.startswith("fresh-clone source:"):
+                break
+        os.killpg(
+            process.pid,
+            {"INT": signal.SIGINT, "TERM": signal.SIGTERM, "HUP": signal.SIGHUP}[signal_name],
+        )
+        stdout, stderr = process.communicate(timeout=120)
+        return subprocess.CompletedProcess(
+            process.args,
+            process.returncode,
+            "".join(stdout_prefix) + stdout,
+            stderr,
+        )
 
 
 class SharedSurfaceRetirementContractTest(unittest.TestCase):

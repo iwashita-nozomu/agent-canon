@@ -17,10 +17,13 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Iterator
+from contextlib import contextmanager
 from copy import deepcopy
 from pathlib import Path
 from typing import cast
@@ -50,6 +53,9 @@ from packets import (  # noqa: E402
     active_design_packet_mapping,
     resolve_active_design_packet_config,
 )
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootSideEffectBoundary,
+)
 from report_artifact_checks import (  # noqa: E402
     RUNTIME_PROFILE_TAXONOMY_PATH,
     write_completion_coverage_artifact,
@@ -65,6 +71,9 @@ from team_config import (  # noqa: E402
 from tool_calls import (  # noqa: E402
     CloseAgentLifecycleEvidence,
     materialize_close_agent_tool_call,
+)
+from tools.agent_tools.fixture_spawn import (
+    record_session_from_environment,  # noqa: E402
 )
 from update_lifecycle_contract import (  # noqa: E402
     materialize_descendant_close_receipt,
@@ -84,11 +93,49 @@ TEST_TEMP_ROOT = Path(tempfile.gettempdir())
 TEST_PARENT_ROOT = Path(os.path.commonpath((PROJECT_ROOT, TEST_TEMP_ROOT))).resolve()
 
 
+@contextmanager
+def fixture_environment(parent_root: Path) -> Iterator[dict[str, str]]:
+    """Bind fixture subprocesses to the current runner record capability."""
+    previous_cwd = Path.cwd()
+    try:
+        os.chdir(parent_root)
+        with record_session_from_environment() as session:
+            authenticated_environment = ParentRootSideEffectBoundary().session_environment(
+                session, os.environ
+            )
+            with patch.dict(os.environ, authenticated_environment, clear=True):
+                yield authenticated_environment
+    finally:
+        os.chdir(previous_cwd)
+
+
 def seed_workspace_config(workspace_root: Path) -> None:
     """Seed parent state only; AgentCanon source stays outside the fixture."""
     config_path = workspace_root / ".codex" / "config.toml"
     config_path.parent.mkdir(parents=True, exist_ok=True)
     config_path.write_bytes((PROJECT_ROOT / ".codex" / "config.toml").read_bytes())
+
+
+def materialize_derived_public_tool_view(workspace_root: Path) -> None:
+    """Expose the vendored source tools through the canonical parent prefix."""
+    public_tool_root = workspace_root / "tools" / "agent-canon"
+    public_tool_root.parent.mkdir(parents=True, exist_ok=True)
+    public_tool_root.symlink_to(
+        "../vendor/agent-canon/tools",
+        target_is_directory=True,
+    )
+
+
+def materialize_derived_source_tool_unit(source_root: Path) -> Path:
+    """Copy the complete source-owned tool unit for a derived fixture."""
+    source_tools = source_root / "tools" / "agent_tools"
+    shutil.copytree(
+        PROJECT_ROOT / "tools" / "agent_tools",
+        source_tools,
+        symlinks=True,
+        ignore=shutil.ignore_patterns("__pycache__", ".pytest_cache", ".ruff_cache"),
+    )
+    return source_tools
 
 
 def expected_workflow_spawn_budget(family_id: str) -> tuple[int, int]:
@@ -319,7 +366,7 @@ def current_diff_ref(workspace: Path = PROJECT_ROOT) -> str:
     diff_bytes = unstaged.stdout + staged.stdout
     if untracked.returncode == 0 and untracked.stdout:
         for raw_path in sorted(path for path in untracked.stdout.split(b"\0") if path):
-            if raw_path.startswith(b"reports/agents/"):
+            if raw_path.startswith((b"reports/agents/", b".agent-canon/")):
                 continue
             path = workspace / raw_path.decode("utf-8", errors="surrogateescape")
             diff_bytes += b"\0UNTRACKED\0" + raw_path + b"\0"
@@ -934,15 +981,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
         self.assertTrue(RUNTIME_PROFILE_TAXONOMY_PATH.is_file())
 
     def setUp(self) -> None:
-        """Place isolated fixtures under one authenticated parent checkout."""
-        parent_env = patch.dict(
-            os.environ,
-            {
-                "AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT),
-            },
-        )
-        parent_env.start()
-        self.addCleanup(parent_env.stop)
+        """Keep subprocesses free of retired ambient parent authority."""
 
     def test_retired_tool_names_are_not_permanent_update_surfaces(self) -> None:
         """One-time transition candidates do not reserve future parent paths."""
@@ -1595,33 +1634,10 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             source_root = workspace_root / "vendor" / "agent-canon"
-            source_agent_tools = source_root / "tools" / "agent_tools"
-            source_agent_tools.mkdir(parents=True)
+            materialize_derived_source_tool_unit(source_root)
             (source_root / "agents" / "skills").mkdir(parents=True)
             (source_root / "agents" / "skills" / "catalog.yaml").write_text(
                 "skills: []\n",
-                encoding="utf-8",
-            )
-            (source_agent_tools / "agent_canon_source_root.py").write_text(
-                (
-                    PROJECT_ROOT
-                    / "tools"
-                    / "agent_tools"
-                    / "agent_canon_source_root.py"
-                ).read_text(encoding="utf-8"),
-                encoding="utf-8",
-            )
-            (source_agent_tools / "parent_root_side_effects.py").write_text(
-                (
-                    PROJECT_ROOT
-                    / "tools"
-                    / "agent_tools"
-                    / "parent_root_side_effects.py"
-                ).read_text(encoding="utf-8"),
-                encoding="utf-8",
-            )
-            (source_agent_tools / "surface_manifest.py").write_text(
-                "#!/usr/bin/env python3\n",
                 encoding="utf-8",
             )
             (source_root / "tools" / "sync_agent_canon.sh").write_text(
@@ -1629,6 +1645,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 encoding="utf-8",
             )
             (source_root / "tools" / "sync_agent_canon.sh").chmod(0o755)
+            materialize_derived_public_tool_view(workspace_root)
             subprocess.run(["git", "init"], cwd=source_root, check=True)
             subprocess.run(["git", "add", "."], cwd=source_root, check=True)
             subprocess.run(
@@ -1653,6 +1670,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                     "git",
                     "add",
                     "Makefile",
+                    ".codex/config.toml",
                     "vendor/agent-canon",
                 ],
                 cwd=workspace_root,
@@ -1677,30 +1695,28 @@ class BootstrapAndCloseTest(unittest.TestCase):
             (workspace_root / "local-note.md").write_text(
                 "unrelated\n", encoding="utf-8"
             )
-            environment = dict(os.environ)
-            environment["AGENT_CANON_PARENT_ROOT"] = str(workspace_root)
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(BOOTSTRAP_SCRIPT),
-                    "--task",
-                    "parent dirty unrelated smoke",
-                    "--owner",
-                    "codex",
-                    "--run-id",
-                    "parent-dirty-unrelated",
-                    "--workspace-root",
-                    str(workspace_root),
-                    "--report-root",
-                    str(report_root),
-                ],
-                cwd=PROJECT_ROOT,
-                env=environment,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            with fixture_environment(workspace_root) as environment:
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(BOOTSTRAP_SCRIPT),
+                        "--task",
+                        "parent dirty unrelated smoke",
+                        "--owner",
+                        "codex",
+                        "--run-id",
+                        "parent-dirty-unrelated",
+                        "--workspace-root",
+                        str(workspace_root),
+                        "--report-root",
+                        str(report_root),
+                    ],
+                    cwd=workspace_root,
+                    env=environment,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
 
             self.assertEqual(result.returncode, 0, result.stderr)
             assert result.returncode == 0
@@ -1749,15 +1765,15 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "#!/usr/bin/env bash\nset -eu\n[ \"${1:-}\" = check ]\n",
                 encoding="utf-8",
             )
+            source_root = workspace_root / "vendor" / "agent-canon"
+            materialize_derived_source_tool_unit(source_root)
             source_root_entrypoint = (
-                workspace_root
-                / "vendor"
-                / "agent-canon"
+                source_root
                 / "tools"
                 / "agent_tools"
                 / "agent_canon_source_root.py"
             )
-            source_root_entrypoint.parent.mkdir(parents=True)
+            source_root_entrypoint.parent.mkdir(parents=True, exist_ok=True)
             source_root_entrypoint.write_text(
                 "#!/usr/bin/env python3\n"
                 "import subprocess\n"
@@ -1765,6 +1781,7 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 "raise SystemExit(subprocess.run(['bash', *sys.argv[2:]], check=False).returncode)\n",
                 encoding="utf-8",
             )
+            materialize_derived_public_tool_view(workspace_root)
             subprocess.run(["git", "init"], cwd=workspace_root, check=True)
             subprocess.run(
                 ["git", "add", "."],
@@ -3315,31 +3332,32 @@ class BootstrapAndCloseTest(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            write_ready_schedule(report_dir)
-            _log_ready_work(report_dir)
-            write_ready_workflow_monitoring(report_dir)
-            write_ready_agent_evaluation(report_dir)
-            write_ready_final_review(report_dir)
-            write_ready_completion_coverage(report_dir, run_id)
-            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
-            write_ready_closeout_bundle(
-                report_dir,
-                run_id,
-                workspace=workspace_root,
-            )
-
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--run-id",
+            with fixture_environment(workspace_root):
+                write_ready_schedule(report_dir)
+                _log_ready_work(report_dir)
+                write_ready_workflow_monitoring(report_dir)
+                write_ready_agent_evaluation(report_dir)
+                write_ready_final_review(report_dir)
+                write_ready_completion_coverage(report_dir, run_id)
+                write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+                write_ready_closeout_bundle(
+                    report_dir,
                     run_id,
-                ],
-                cwd=workspace_root,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+                    workspace=workspace_root,
+                )
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(TASK_CLOSE_SCRIPT),
+                        "--run-id",
+                        run_id,
+                    ],
+                    cwd=workspace_root,
+                    env=os.environ.copy(),
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
 
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
@@ -3998,37 +4016,38 @@ class BootstrapAndCloseTest(unittest.TestCase):
             run_id = "test-task-close-doc-existing-topology"
             report_dir = workspace_root / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
-            environment = {**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)}
-            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}):
-                write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
-            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
-            closeout_path = report_dir / "closeout_gate.md"
-            text = closeout_path.read_text(encoding="utf-8")
-            replacements = {
-                "- document_structure_status: skipped": "- document_structure_status: complete",
-                "- structure_activation: format_only": "- structure_activation: not_required",
-                "- document_split_decision: not_applicable:format-only: fixture closeout bundle": "- document_split_decision: keep:existing-topology:README.md",
-                "- structure_planning: not_applicable": "- structure_planning: not_required",
-                "- prose_graph: not_applicable": "- prose_graph: not_selected",
-                "- structure_contract: skipped: fixture format-only route": "- structure_contract: not_required:existing-topology:README.md",
-                "- structure_owner: not_applicable": "- structure_owner: README.md owner",
-                "- structure_source: not_applicable": "- structure_source: README.md canonical source",
-                "- structure_reader: not_applicable": "- structure_reader: repository entry reader",
-                "- structure_layout: not_applicable": "- structure_layout: existing README layout",
-                "- structure_validation_topology: not_applicable": "- structure_validation_topology: targeted Markdown check",
-            }
-            for old, new in replacements.items():
-                text = text.replace(old, new)
-            closeout_path.write_text(text, encoding="utf-8")
+            with fixture_environment(workspace_root) as environment:
+                write_ready_closeout_bundle(
+                    report_dir, run_id, workspace=workspace_root
+                )
+                write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+                closeout_path = report_dir / "closeout_gate.md"
+                text = closeout_path.read_text(encoding="utf-8")
+                replacements = {
+                    "- document_structure_status: skipped": "- document_structure_status: complete",
+                    "- structure_activation: format_only": "- structure_activation: not_required",
+                    "- document_split_decision: not_applicable:format-only: fixture closeout bundle": "- document_split_decision: keep:existing-topology:README.md",
+                    "- structure_planning: not_applicable": "- structure_planning: not_required",
+                    "- prose_graph: not_applicable": "- prose_graph: not_selected",
+                    "- structure_contract: skipped: fixture format-only route": "- structure_contract: not_required:existing-topology:README.md",
+                    "- structure_owner: not_applicable": "- structure_owner: README.md owner",
+                    "- structure_source: not_applicable": "- structure_source: README.md canonical source",
+                    "- structure_reader: not_applicable": "- structure_reader: repository entry reader",
+                    "- structure_layout: not_applicable": "- structure_layout: existing README layout",
+                    "- structure_validation_topology: not_applicable": "- structure_validation_topology: targeted Markdown check",
+                }
+                for old, new in replacements.items():
+                    text = text.replace(old, new)
+                closeout_path.write_text(text, encoding="utf-8")
 
-            result = subprocess.run(
-                [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
-                cwd=workspace_root,
-                env=environment,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+                result = subprocess.run(
+                    [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
+                    cwd=workspace_root,
+                    env=environment,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=yes", result.stdout)
@@ -4063,32 +4082,33 @@ class BootstrapAndCloseTest(unittest.TestCase):
             run_id = "test-task-close-doc-required-identity"
             report_dir = workspace_root / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
-            environment = {**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)}
-            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}):
-                write_ready_closeout_bundle(report_dir, run_id, workspace=workspace_root)
-            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
-            closeout_path = report_dir / "closeout_gate.md"
-            text = closeout_path.read_text(encoding="utf-8")
-            replacements = {
-                "- document_structure_status: skipped": "- document_structure_status: complete",
-                "- structure_activation: format_only": "- structure_activation: required",
-                "- document_split_decision: not_applicable:format-only: fixture closeout bundle": "- document_split_decision: keep:README topology",
-                "- structure_planning: not_applicable": "- structure_planning: complete",
-                "- prose_graph: not_applicable": "- prose_graph: not_selected",
-                "- structure_contract: skipped: fixture format-only route": "- structure_contract: required:README topology",
-            }
-            for old, new in replacements.items():
-                text = text.replace(old, new)
-            closeout_path.write_text(text, encoding="utf-8")
+            with fixture_environment(workspace_root) as environment:
+                write_ready_closeout_bundle(
+                    report_dir, run_id, workspace=workspace_root
+                )
+                write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+                closeout_path = report_dir / "closeout_gate.md"
+                text = closeout_path.read_text(encoding="utf-8")
+                replacements = {
+                    "- document_structure_status: skipped": "- document_structure_status: complete",
+                    "- structure_activation: format_only": "- structure_activation: required",
+                    "- document_split_decision: not_applicable:format-only: fixture closeout bundle": "- document_split_decision: keep:README topology",
+                    "- structure_planning: not_applicable": "- structure_planning: complete",
+                    "- prose_graph: not_applicable": "- prose_graph: not_selected",
+                    "- structure_contract: skipped: fixture format-only route": "- structure_contract: required:README topology",
+                }
+                for old, new in replacements.items():
+                    text = text.replace(old, new)
+                closeout_path.write_text(text, encoding="utf-8")
 
-            result = subprocess.run(
-                [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
-                cwd=workspace_root,
-                env=environment,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+                result = subprocess.run(
+                    [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
+                    cwd=workspace_root,
+                    env=environment,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
 
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("DOCUMENT_STRUCTURE_EVIDENCE=no", result.stdout)
@@ -4140,26 +4160,22 @@ class BootstrapAndCloseTest(unittest.TestCase):
             run_id = "parent-owned-nested-closeout"
             report_dir = workspace_root / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
-            with patch.dict(
-                os.environ, {"AGENT_CANON_PARENT_ROOT": str(parent_root)}
-            ):
+            with fixture_environment(parent_root) as environment:
                 write_ready_closeout_bundle(
                     report_dir, run_id, workspace=workspace_root
                 )
-            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+                write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
 
-            environment = dict(os.environ)
-            environment["AGENT_CANON_PARENT_ROOT"] = str(parent_root)
-            outer_head = current_git_head(parent_root)
-            expected_outer_diff_ref = current_diff_ref(workspace_root)
-            result = subprocess.run(
-                [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
-                cwd=workspace_root,
-                env=environment,
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+                outer_head = current_git_head(parent_root)
+                expected_outer_diff_ref = current_diff_ref(workspace_root)
+                result = subprocess.run(
+                    [sys.executable, str(TASK_CLOSE_SCRIPT), "--run-id", run_id],
+                    cwd=workspace_root,
+                    env=environment,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("CLOSEOUT_READY=yes", result.stdout)
@@ -4441,27 +4457,25 @@ class BootstrapAndCloseTest(unittest.TestCase):
             run_id = "test-task-close-tracked-old-agent-run"
             report_dir = workspace_root / "reports" / "agents" / run_id
             report_dir.mkdir(parents=True, exist_ok=True)
-            with patch.dict(
-                os.environ, {"AGENT_CANON_PARENT_ROOT": str(workspace_root)}
-            ):
+            with fixture_environment(workspace_root) as environment:
                 write_ready_closeout_bundle(
                     report_dir, run_id, workspace=workspace_root
                 )
-            write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
+                write_ready_diff_check_artifact(report_dir, workspace=workspace_root)
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(TASK_CLOSE_SCRIPT),
-                    "--run-id",
-                    run_id,
-                ],
-                cwd=workspace_root,
-                env={**os.environ, "AGENT_CANON_PARENT_ROOT": str(workspace_root)},
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(TASK_CLOSE_SCRIPT),
+                        "--run-id",
+                        run_id,
+                    ],
+                    cwd=workspace_root,
+                    env=environment,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertIn("REPORT_ARTIFACT_PLACEMENT_CLEAN=yes", result.stdout)

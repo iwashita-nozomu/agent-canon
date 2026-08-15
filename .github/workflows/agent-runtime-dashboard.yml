@@ -27,9 +27,6 @@ concurrency:
 jobs:
   dashboard:
     runs-on: ubuntu-latest
-    env:
-      AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
-      AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
     steps:
       - name: PR required-check compatibility
         if: github.event_name == 'pull_request'
@@ -70,13 +67,21 @@ jobs:
       - name: Run accumulated eval producers
         if: github.event_name != 'pull_request'
         run: |
-          python3 tools/agent_tools/run_accumulated_agent_evals.py \
+          python3 tools/agent_tools/parent_root_side_effects.py public-exec \
+            --invocation-script tools/agent_tools/run_accumulated_agent_evals.py \
+            --purpose agent-runtime-dashboard-evals \
+            -- python3 tools/agent_tools/run_accumulated_agent_evals.py \
             --root "${GITHUB_WORKSPACE}" \
             --run-id "agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
 
       - name: Validate accumulated evidence
         if: github.event_name != 'pull_request'
-        run: python3 tools/agent_tools/eval_accumulation_check.py --root "${GITHUB_WORKSPACE}"
+        run: |
+          python3 tools/agent_tools/parent_root_side_effects.py public-exec \
+            --invocation-script tools/agent_tools/eval_accumulation_check.py \
+            --purpose agent-runtime-dashboard-check \
+            -- python3 tools/agent_tools/eval_accumulation_check.py \
+            --root "${GITHUB_WORKSPACE}"
 
       - name: Generate runtime dashboard
         if: github.event_name != 'pull_request'
@@ -85,7 +90,10 @@ jobs:
           report_dir="${GITHUB_WORKSPACE}/reports/agent-runtime-dashboard"
           mkdir -p "${report_dir}"
           dashboard_path="${report_dir}/agent-runtime-dashboard-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.md"
-          python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
+          python3 tools/agent_tools/parent_root_side_effects.py public-exec \
+            --invocation-script tools/agent_tools/generate_agent_runtime_dashboard.py \
+            --purpose agent-runtime-dashboard-report \
+            -- python3 tools/agent_tools/generate_agent_runtime_dashboard.py \
             --root "${GITHUB_WORKSPACE}" \
             --out "${dashboard_path}"
           cat "${dashboard_path}" >> "${GITHUB_STEP_SUMMARY}"

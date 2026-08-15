@@ -19,31 +19,10 @@ canon_root="$(cd "$(dirname "$script_path")/../.." && pwd)"
 boundary_script="${canon_root}/tools/agent_tools/parent_root_side_effects.py"
 
 resolve_roots() {
-  local active_root="${AGENT_CANON_ACTIVE_REPOSITORY_ROOT:-}"
-  local child_handoff="${AGENT_CANON_CHILD_HANDOFF:-}"
-  if [ -n "${child_handoff}" ]; then
-    if [ -z "${active_root}" ] || [ -z "${AGENT_CANON_SOURCE_ROOT:-}" ]; then
-      echo "agent-canon child handoff is missing its authenticated roots" >&2
-      return 2
-    fi
-    parent_root="$(cd "${active_root}" && pwd -P)" || return 2
-    source_root="$(cd "${AGENT_CANON_SOURCE_ROOT}" && pwd -P)" || return 2
-    boundary_script="${source_root}/tools/agent_tools/parent_root_side_effects.py"
-    return 0
-  fi
-
-  # Normal invocations use the canonical resolver with the explicit current
-  # cwd and wrapper-owned source root.  Environment identity claims are not a
-  # root-selection mechanism; the parent boundary authenticates the result.
+  # The wrapper's physical source path is the invocation owner.  The public
+  # session bootstrap derives the side-effect parent from physical cwd; no
+  # ambient root/child-handoff variable is a selector.
   local resolver_root="${canon_root}"
-  if [ ! -f "${resolver_root}/agents/skills/catalog.yaml" ]; then
-    local cwd_root="$(pwd -P)"
-    if [ -f "${cwd_root}/agents/skills/catalog.yaml" ]; then
-      resolver_root="${cwd_root}"
-    elif [ -f "${cwd_root}/vendor/agent-canon/agents/skills/catalog.yaml" ]; then
-      resolver_root="${cwd_root}/vendor/agent-canon"
-    fi
-  fi
   local resolution
   local -a resolution_lines
   resolution="$(
@@ -73,11 +52,6 @@ PY
   parent_root="${resolution_lines[0]}"
   source_root="${resolution_lines[1]}"
   boundary_script="${source_root}/tools/agent_tools/parent_root_side_effects.py"
-  if [ -n "${active_root}" ] \
-    && [ "$(cd "${active_root}" && pwd -P)" != "${parent_root}" ]; then
-    echo "agent-canon active repository root is not authoritative without a child handoff" >&2
-    return 2
-  fi
 }
 
 run_parent_bound() {
@@ -87,14 +61,10 @@ run_parent_bound() {
     --root "${parent_root}"
     --source-root "${source_root}"
   )
-  if [ -n "${AGENT_CANON_CHILD_HANDOFF:-}" ]; then
-    if [ -z "${AGENT_CANON_HANDOFF_AUDIENCE:-}" ]; then
-      echo "agent-canon child handoff audience is missing" >&2
-      return 2
-    fi
+  if [ -n "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ] \
+    || [ -n "${AGENT_CANON_SIDE_EFFECT_PARENT_ROOT:-}" ]; then
     boundary_args+=(
-      --consume-inherited-handoff
-      --purpose "${AGENT_CANON_HANDOFF_AUDIENCE}"
+      --purpose "agent-canon-inherited-session"
     )
   fi
   python3 "${boundary_script}" "${boundary_args[@]}" -- "${command[@]}"
@@ -107,10 +77,8 @@ manifest="${source_root}/rust/agent-canon/Cargo.toml"
 
 if [ "${1:-}" = "pydocstyle-review" ]; then
   shift
-  AGENT_CANON_SOURCE_ROOT="${source_root}" \
-    AGENT_CANON_ROOT="${source_root}" \
-    run_parent_bound python3 \
-      "${source_root}/tools/agent_tools/pydocstyle_review.py" "$@"
+  run_parent_bound python3 \
+    "${source_root}/tools/agent_tools/pydocstyle_review.py" "$@"
   exit $?
 fi
 

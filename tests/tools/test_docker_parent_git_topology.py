@@ -43,6 +43,29 @@ def test_image_sources_define_real_parent_vendor_topology() -> None:
     assert "child_process_environment" not in runner
 
 
+def test_runner_source_has_explicit_session_and_immutable_import_closure() -> None:
+    """The immutable image runner has no stale resolver or ambient import path."""
+    runner = RUNNER.read_text(encoding="utf-8")
+    fixture_facade = (PROJECT_ROOT / "tools" / "agent_tools" / "fixture_spawn.py").read_text(encoding="utf-8")
+    entrypoint = (PROJECT_ROOT / "test" / "pytest_entrypoint.py").read_text(encoding="utf-8")
+
+    assert "resolve_parent_side_effect_session" not in runner
+    assert "with parent_side_effects._open_runner_session(" in runner
+    assert "parent_side_effects._RUNNER_CALLER_MARKER" in runner
+    assert "return _run(source_root, list_path, active_route, session, horizon)" in runner
+    assert "import inspect" not in runner
+    assert "getattr(" not in runner
+    assert '"PYTHONPATH",' in runner
+    assert "RECORD_SCRUB_KEYS" in runner
+    assert '"AGENT_CANON_SIDE_EFFECT_PARENT_ROOT"' not in runner.split("RECORD_SCRUB_KEYS", 1)[1].split(")", 1)[0]
+    assert "run_fixture_command" in fixture_facade
+    assert "fixture_direct_command" in fixture_facade
+    assert "REPOSITORY_ORIGINS = (" in entrypoint
+    assert "SOURCE_ROOT / \"tools\"" in entrypoint
+    assert "SOURCE_ROOT / \"tools\" / \"agent_tools\"" in entrypoint
+    assert "sys.path[-len(repository_origins):]" in entrypoint
+
+
 def test_built_image_exposes_exact_gitlink_and_is_removed_after_probe() -> None:
     """A no-mount probe sees exact identities and leaves no container behind."""
     docker = shutil.which("docker")

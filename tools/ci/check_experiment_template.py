@@ -30,8 +30,9 @@ if str(AGENT_TOOLS_ROOT) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_ROOT))
 
 from parent_root_side_effects import (  # noqa: E402
-    ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
+    SessionResolutionResult,
+    public_session,
 )
 
 TOPIC = "template-smoke"
@@ -278,6 +279,15 @@ def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
 
 
 def main() -> int:
+    """Enter the public source-root session before running the smoke check."""
+    with public_session(
+        invocation_script=Path(__file__),
+        purpose="experiment-template-smoke",
+    ) as session:
+        return _main_authenticated(session)
+
+
+def _main_authenticated(session: SessionResolutionResult) -> int:
     """分離した parent-shaped fixture を作成、検証、削除します."""
     args = build_parser().parse_args()
     source_root = Path(args.source_root).resolve()
@@ -286,18 +296,9 @@ def main() -> int:
     if not source_root.is_dir() or not create_tool.is_file() or not registry_checker.is_file():
         raise SystemExit("AgentCanon source root or canonical experiment tools are missing")
 
-    selected_parent = Path(
-        os.environ.get("AGENT_CANON_PARENT_ROOT", str(source_root))
-    ).resolve()
+    selected_parent = session.parent_root
     boundary = ParentRootSideEffectBoundary()
-    attestation = boundary.attest(
-        ParentRootAttestationRequest(
-            cwd=selected_parent,
-            explicit_root=selected_parent,
-            source_root=source_root,
-            purpose="experiment-template-smoke",
-        )
-    )
+    attestation = session.attestation
     temporary = boundary.create_parent_owned_temp_directory(
         attestation,
         selected_parent / ".agent-canon" / "tmp",
@@ -311,10 +312,13 @@ def main() -> int:
         runtime_pycache = runtime_cache / "pycache"
         runtime_tmp.mkdir(parents=True)
         runtime_pycache.mkdir(parents=True)
-        run_env = dict(os.environ)
+        run_env = boundary.child_environment(
+            session.attestation,
+            os.environ,
+            issue_handoff=False,
+        )
         run_env.update(
             {
-                "AGENT_CANON_PARENT_ROOT": str(selected_parent),
                 "PYTHONPYCACHEPREFIX": str(runtime_pycache),
                 "TEMP": str(runtime_tmp),
                 "TMP": str(runtime_tmp),

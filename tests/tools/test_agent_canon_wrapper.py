@@ -13,44 +13,28 @@ import json
 import os
 import shutil
 import subprocess
+from contextlib import AbstractContextManager
 from pathlib import Path
 
-from tools.agent_tools.parent_root_side_effects import (
-    ParentRootAttestationRequest,
-    ParentRootSideEffectBoundary,
-)
+import pytest
+from tools.agent_tools.fixture_spawn import record_environment
+from tools.agent_tools.parent_root_side_effects import ParentRootSideEffectError
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 WRAPPER = PROJECT_ROOT / "tools" / "bin" / "agent-canon"
-_PARENT_BOUNDARY_PATH_KEYS = (
-    "TMPDIR",
-    "TEMP",
-    "TMP",
-    "XDG_CACHE_HOME",
-    "PYTHONPYCACHEPREFIX",
-    "AGENT_CANON_TOOLS_HOME",
-    "CARGO_HOME",
-    "CARGO_TARGET_DIR",
-    "AGENT_CANON_CLI_TARGET_DIR",
-    "AGENT_CANON_PARENT_ROOT",
-    "AGENT_CANON_PARENT_ROOT_DEV",
-    "AGENT_CANON_PARENT_ROOT_INO",
-    "AGENT_CANON_CHILD_HANDOFF",
-    "AGENT_CANON_CHILD_PURPOSE",
-    "AGENT_CANON_HANDOFF_AUDIENCE",
-    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
-    "AGENT_CANON_ROOT",
-    "AGENT_CANON_SOURCE_ROOT",
-)
-
-
 def _build_clean_env(overrides: dict[str, str] | None = None) -> dict[str, str]:
     env = os.environ.copy()
-    for key in _PARENT_BOUNDARY_PATH_KEYS:
-        env.pop(key, None)
     if overrides:
         env.update(overrides)
     return env
+
+
+def _authenticated_parent_env(
+    parent_root: Path,
+    base_env: dict[str, str],
+) -> AbstractContextManager[dict[str, str]]:
+    """Build a complete signed record environment from the physical CWD."""
+    return record_environment(cwd=parent_root, base_env=base_env)
 
 
 def _pending_handoff_nonces(root: Path) -> dict[str, object]:
@@ -276,7 +260,7 @@ def _prepare_nested_vendor_layout(tmp_path: Path) -> tuple[Path, Path, Path]:
 def _run_with_fake_cargo(
     tmp_path: Path, *, cargo_target_dir: Path | None = None
 ) -> tuple[subprocess.CompletedProcess[str], Path]:
-    wrapper, tools_home, _ = _prepare_canon_layout(tmp_path)
+    wrapper, tools_home, canon_root = _prepare_canon_layout(tmp_path)
     capture = tmp_path / "cargo-target.txt"
 
     installed_binary = tools_home / "agent-canon" / "bin" / "agent-canon"
@@ -291,25 +275,26 @@ def _run_with_fake_cargo(
     for source_path in ((wrapper.parents[2] / "rust" / "agent-canon" / "Cargo.toml"), (wrapper.parents[2] / "rust" / "agent-canon" / "src" / "main.rs")):
         os.utime(source_path, ns=(1_000_000_000, 1_000_000_000))
 
-    env = _build_clean_env(
+    base_env = _build_clean_env(
         {
             "AGENT_CANON_TOOLS_HOME": str(tools_home),
             "WRAPPER_CAPTURE": str(capture),
-        },
+        }
     )
     if cargo_target_dir is None:
-        env.pop("CARGO_TARGET_DIR", None)
+        base_env.pop("CARGO_TARGET_DIR", None)
     else:
-        env["CARGO_TARGET_DIR"] = str(cargo_target_dir)
+        base_env["CARGO_TARGET_DIR"] = str(cargo_target_dir)
 
-    result = subprocess.run(
-        [str(wrapper), "--version"],
-        cwd=wrapper.parents[2],
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    with _authenticated_parent_env(canon_root, base_env) as env:
+        result = subprocess.run(
+            [str(wrapper), "--version"],
+            cwd=wrapper.parents[2],
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
     return result, capture
 
 
@@ -319,7 +304,7 @@ def _run_with_fake_installed(
     preserve_home: Path | None = None,
     exit_code: int = 0,
 ) -> tuple[subprocess.CompletedProcess[str], Path]:
-    wrapper, tools_home, _ = _prepare_canon_layout(tmp_path)
+    wrapper, tools_home, canon_root = _prepare_canon_layout(tmp_path)
     capture = tmp_path / "installed-target.txt"
     installed_binary = tools_home / "agent-canon" / "bin" / "agent-canon"
     installed_binary.write_text(
@@ -347,19 +332,20 @@ def _run_with_fake_installed(
         {
             "AGENT_CANON_TOOLS_HOME": str(tools_home),
             "WRAPPER_CAPTURE": str(capture),
-        },
+        }
     )
     if preserve_home is not None:
         env["HOME"] = str(preserve_home)
 
-    result = subprocess.run(
-        [str(wrapper), "--version"],
-        cwd=wrapper.parents[2],
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    with _authenticated_parent_env(canon_root, env) as env:
+        result = subprocess.run(
+            [str(wrapper), "--version"],
+            cwd=wrapper.parents[2],
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
     return result, capture
 
 
@@ -388,30 +374,18 @@ def test_wrapper_uses_active_repository_root_for_parent_bound_paths(
     os.utime(source_root, ns=(source_time, source_time))
     os.utime(manifest, ns=(source_time, source_time))
 
-    canon_root = wrapper.parents[2]
-    boundary = ParentRootSideEffectBoundary()
-    attestation = boundary.attest(
-        ParentRootAttestationRequest(
-            cwd=outer_root,
-            explicit_root=outer_root,
-            source_root=canon_root,
-            purpose="agent-canon-source-root",
-        )
-    )
-    env = boundary.child_environment(
-        attestation,
+    with _authenticated_parent_env(
+        outer_root,
         _build_clean_env({"WRAPPER_CAPTURE": str(capture)}),
-    )
-    env["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(outer_root)
-
-    result = subprocess.run(
-        [str(wrapper), "--version"],
-        cwd=outer_root,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    ) as env:
+        result = subprocess.run(
+            [str(wrapper), "--version"],
+            cwd=outer_root,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
 
     assert result.returncode == 0, result.stderr
     lines = dict(line.split("=", 1) for line in capture.read_text(encoding="utf-8").splitlines())
@@ -450,26 +424,28 @@ def test_wrapper_nested_scrubbed_env_selects_prebuilt_without_cargo(
         encoding="utf-8",
     )
     fake_cargo.chmod(0o755)
-    env = _build_clean_env(
-        {
-            "AGENT_CANON_TOOLS_HOME": str(tools_home),
-            "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
-        }
-    )
-
-    result = subprocess.run(
-        [str(wrapper), "--version"],
-        cwd=canon_root,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    with _authenticated_parent_env(
+        outer_root,
+        _build_clean_env(
+            {
+                "AGENT_CANON_TOOLS_HOME": str(tools_home),
+                "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+            }
+        ),
+    ) as env:
+        result = subprocess.run(
+            [str(wrapper), "--version"],
+            cwd=canon_root,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
 
     assert result.returncode == 37, result.stderr
     assert capture.is_file()
     assert not cargo_capture.exists()
-    assert not any(key in env for key in _PARENT_BOUNDARY_PATH_KEYS[-8:])
+    assert "AGENT_CANON_PARENT_ROOT" not in env
     assert outer_root.joinpath(".agent-canon").is_dir()
 
 
@@ -496,12 +472,20 @@ def test_wrapper_preserves_explicit_cargo_target_dir(tmp_path: Path) -> None:
 
 def test_wrapper_rejects_explicit_external_cargo_target_before_side_effects(tmp_path: Path) -> None:
     """External Cargo targets must be rejected before any parent-local writes."""
-    result, capture = _run_with_fake_cargo(
-        tmp_path,
-        cargo_target_dir=tmp_path.parent / "external-target",
-    )
-
-    assert result.returncode == 2
+    wrapper, tools_home, canon_root = _prepare_canon_layout(tmp_path)
+    capture = tmp_path / "cargo-target.txt"
+    with pytest.raises(ParentRootSideEffectError, match="outside parent root"):
+        with _authenticated_parent_env(
+            canon_root,
+            _build_clean_env(
+                {
+                    "AGENT_CANON_TOOLS_HOME": str(tools_home),
+                    "WRAPPER_CAPTURE": str(capture),
+                    "CARGO_TARGET_DIR": str(tmp_path.parent / "external-target"),
+                }
+            ),
+        ):
+            pass
     assert not capture.exists()
 
 
@@ -565,14 +549,15 @@ def test_wrapper_preserves_selected_cargo_exit_code_without_installed_fallback(
         }
     )
 
-    result = subprocess.run(
-        [str(wrapper), "--version"],
-        cwd=canon_root,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    with _authenticated_parent_env(canon_root, env) as env:
+        result = subprocess.run(
+            [str(wrapper), "--version"],
+            cwd=canon_root,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
 
     assert result.returncode == 41
     assert not installed_capture.exists()
@@ -613,5 +598,5 @@ def test_wrapper_rejects_spoofed_active_root_without_handoff(tmp_path: Path) -> 
     )
 
     assert result.returncode == 2
-    assert "not authoritative without a child handoff" in result.stderr
+    assert "legacy_authority_forbidden" in result.stderr
     assert not capture.exists()

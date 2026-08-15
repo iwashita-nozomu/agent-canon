@@ -46,7 +46,7 @@ environment = "tooling"
 require = "docker"
 code_owner = "tools/agent_tools"
 responsibility_scope = "shared-tooling"
-command = ["python3", "-m", "pytest", "tests/agent_tools", "-q", "--tb=short"]
+command = ["python3", "test/pytest_entrypoint.py", "tests/agent_tools", "-q", "--tb=short"]
 
 [[tests]]
 id = "python-tools-suite"
@@ -54,7 +54,7 @@ environment = "product"
 require = "docker"
 code_owner = "tools"
 responsibility_scope = "shared-tooling"
-command = ["python3", "-m", "pytest", "tests/tools", "-q", "--tb=short"]
+command = ["python3", "test/pytest_entrypoint.py", "tests/tools", "-q", "--tb=short"]
 
 [[tests]]
 id = "rust-cli-suite"

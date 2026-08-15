@@ -14,10 +14,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tempfile
-import os
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -26,19 +26,17 @@ from typing import TypeAlias, cast
 
 try:
     from .parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 
 SCHEMA = "agent_canon.git_dependency_diff_summary.v1"
@@ -393,12 +391,9 @@ def code_scan_paths(root: Path, rows: Sequence[ChangedPath]) -> list[str]:
 
 def write_text(path: Path, text: str) -> Path:
     """Write UTF-8 text and return the path."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
     if configured:
-        parent = Path(configured).resolve(strict=True)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="dependency-diff")
-        )
+        attestation = resolve_parent_writer_attestation(purpose="dependency-diff")
         ParentRootSideEffectBoundary().write_parent_owned_file(
             attestation, path, text.encode("utf-8"), "dependency-diff"
         )
@@ -703,14 +698,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.report_dir:
             report_dir = Path(args.report_dir)
         else:
-            configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+            configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
             if configured:
-                parent = Path(configured).resolve(strict=True)
-                attestation = attest_parent_root(
-                    ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="dependency-diff-temp")
-                )
+                attestation = resolve_parent_writer_attestation(purpose="dependency-diff-temp")
                 base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-                    attestation, parent / ".agent-canon" / "tmp" / "dependency-diff", "dependency-diff-temp"
+                    attestation,
+                    attestation.parent_root / ".agent-canon" / "tmp" / "dependency-diff",
+                    "dependency-diff-temp",
                 )
                 report_dir = Path(tempfile.mkdtemp(prefix="agent-canon-git-dependency-diff-", dir=base.physical_path))
             else:
@@ -718,20 +712,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                     ParentRootReject.HANDOFF_INVALID,
                     "dependency-diff-temp: explicit parent root is required",
                 )
-        configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+        configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
         if not configured:
             raise ParentRootSideEffectError(
                 ParentRootReject.HANDOFF_INVALID,
                 "dependency-diff-output: explicit parent root is required",
             )
-        parent = Path(configured).resolve(strict=True)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(
-                cwd=parent,
-                explicit_root=parent,
-                purpose="dependency-diff-output",
-            )
-        )
+        attestation = resolve_parent_writer_attestation(purpose="dependency-diff-output")
         report_dir = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
             attestation, report_dir, "dependency-diff-output"
         ).physical_path

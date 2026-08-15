@@ -5,9 +5,23 @@
 # upstream design ../../documents/design/dependency-manifest-design.md dependency graph semantics
 # upstream implementation ../../rust/agent-canon/src/graph.rs owns dependency parsing, binding, and storage
 # upstream implementation ./parent_root_side_effects.py owns graph scratch and TSV publication
+# upstream implementation ../lib/repo_paths.sh resolves the physical analyzer tool root
 # downstream implementation ./render_dependency_manifest_graph.py renders exported dependency TSV
 # @dependency-end
 set -euo pipefail
+
+INVOCATION_SCRIPT="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
+BOUNDARY_SCRIPT="$(dirname "$INVOCATION_SCRIPT")/parent_root_side_effects.py"
+if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
+  if [[ -z "$INVOCATION_SCRIPT" || ! -f "$INVOCATION_SCRIPT" ]]; then
+    echo "DEPENDENCY_GRAPH=fail reason=invocation_script_missing" >&2
+    exit 2
+  fi
+  exec python3 "$BOUNDARY_SCRIPT" public-exec \
+    --invocation-script "$INVOCATION_SCRIPT" \
+    --purpose dependency-graph \
+    -- bash "$INVOCATION_SCRIPT" "$@"
+fi
 
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 PRINT_EDGES=0
@@ -20,6 +34,8 @@ EDIT_SCOPE=0
 EDIT_SCOPE_CHANGED=0
 GRAPH_TSV_OUTPUT=""
 EDIT_SCOPE_HITS_FILE=""
+ENSURE_GRAPH=0
+ANALYZER_TOOLS_ROOT_OVERRIDE=""
 declare -a INPUT_PATHS=()
 declare -a FOCUS_PATHS=()
 declare -a EDIT_SCOPE_PATHS=()
@@ -27,15 +43,19 @@ declare -a EDIT_SCOPE_PATHS=()
 usage() {
   cat <<'EOF'
 Usage:
-  check_dependency_graph.sh [--root DIR] [--changed] [--print-edges] [--graph-tsv PATH] [--list-related] [--focus PATH] [--focus-changed] [--edit-scope PATH] [--edit-scope-changed] [--search-hits-file PATH] [--check-bidirectional] [--cycle-report-only] [paths...]
+  check_dependency_graph.sh [--root DIR] [--analyzer-tools-root DIR] [--ensure-graph] [--changed] [--print-edges] [--graph-tsv PATH] [--list-related] [--focus PATH] [--focus-changed] [--edit-scope PATH] [--edit-scope-changed] [--search-hits-file PATH] [--check-bidirectional] [--cycle-report-only] [paths...]
 
-Consumes one canonical graph query; it does not parse source manifests.
+  Consumes one canonical graph query; it does not parse source manifests.
+  --ensure-graph owns the explicit status/build/status readiness route and
+  exits before querying or projecting dependency relations.
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --root) ROOT_DIR="$2"; shift 2 ;;
+    --analyzer-tools-root) ANALYZER_TOOLS_ROOT_OVERRIDE="$2"; shift 2 ;;
+    --ensure-graph) ENSURE_GRAPH=1; shift ;;
     --changed) CHANGED=1; shift ;;
     --print-edges) PRINT_EDGES=1; shift ;;
     --graph-tsv) GRAPH_TSV_OUTPUT="$2"; shift 2 ;;
@@ -53,24 +73,39 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-ROOT_DIR="$(realpath -m "$ROOT_DIR")"
-PARENT_ROOT="${AGENT_CANON_PARENT_ROOT:-$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)}"
+ROOT_DIR="$(realpath -e "$ROOT_DIR")" || {
+  echo "DEPENDENCY_GRAPH=fail reason=target_root_missing" >&2
+  exit 2
+}
+PARENT_ROOT="${AGENT_CANON_SIDE_EFFECT_PARENT_ROOT:-$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)}"
 if [[ -z "$PARENT_ROOT" ]]; then
   echo "DEPENDENCY_GRAPH=fail reason=missing-parent-root" >&2
   exit 1
 fi
-PARENT_ROOT="$(cd "$PARENT_ROOT" && pwd -P)"
-CANON_SCRIPT_PATH="$(realpath -m "${BASH_SOURCE[0]}")"
-BOUNDARY_SCRIPT="$(dirname "$CANON_SCRIPT_PATH")/parent_root_side_effects.py"
-if [[ -x "$ROOT_DIR/vendor/agent-canon/tools/bin/agent-canon" ]]; then
-  GRAPH_CLI="$ROOT_DIR/vendor/agent-canon/tools/bin/agent-canon"
-elif [[ -x "$ROOT_DIR/tools/bin/agent-canon" ]]; then
-  GRAPH_CLI="$ROOT_DIR/tools/bin/agent-canon"
-elif [[ -x "$PARENT_ROOT/vendor/agent-canon/tools/bin/agent-canon" ]]; then
-  GRAPH_CLI="$PARENT_ROOT/vendor/agent-canon/tools/bin/agent-canon"
-else
-  GRAPH_CLI="$PARENT_ROOT/tools/bin/agent-canon"
+if [[ -n "${AGENT_CANON_SIDE_EFFECT_PARENT_ROOT:-}" && -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
+  echo "DEPENDENCY_GRAPH=fail reason=side_effect_session_missing" >&2
+  exit 2
 fi
+PARENT_ROOT="$(realpath -e "$PARENT_ROOT")" || {
+  echo "DEPENDENCY_GRAPH=fail reason=parent_root_missing" >&2
+  exit 2
+}
+CANON_SCRIPT_PATH="$INVOCATION_SCRIPT"
+if [[ -z "$CANON_SCRIPT_PATH" || ! -f "$CANON_SCRIPT_PATH" ]]; then
+  echo "DEPENDENCY_GRAPH=fail reason=invocation_script_missing" >&2
+  exit 2
+fi
+source "$(dirname "$CANON_SCRIPT_PATH")/../lib/repo_paths.sh"
+ANALYZER_TOOLS_ROOT="$(agent_canon_analyzer_tools_root \
+  "$CANON_SCRIPT_PATH" "$ANALYZER_TOOLS_ROOT_OVERRIDE" "$PARENT_ROOT" \
+  "${AGENT_CANON_ANALYZER_TOOLS_ROOT_PHYSICAL_DEFAULT:-0}" \
+  bin/agent-canon)" || {
+  echo "DEPENDENCY_GRAPH=fail reason=analyzer_tools_root_invalid" >&2
+  exit 2
+}
+GRAPH_CLI="$ANALYZER_TOOLS_ROOT/bin/agent-canon"
+export PYTHONDONTWRITEBYTECODE=1
+echo "DEPENDENCY_GRAPH_ANALYZER_TOOLS_ROOT=$ANALYZER_TOOLS_ROOT"
 TEMP_ROOT="$(
   python3 "$BOUNDARY_SCRIPT" temp-dir \
     --root "$PARENT_ROOT" \
@@ -102,15 +137,72 @@ cleanup_dependency_graph_temp() {
 }
 trap cleanup_dependency_graph_temp EXIT
 
-set +e
-"$GRAPH_CLI" graph status --root "$ROOT_DIR" --profile default --format json >"$status_file"
-status_exit=$?
-set -e
-if [[ "$status_exit" -ne 0 || "$(jq -r '.status // "invalid"' "$status_file" 2>/dev/null)" != "fresh" ]]; then
+run_graph_status() {
+  local status_rc=0
+  if "$GRAPH_CLI" graph status --root "$ROOT_DIR" --profile default --format json >"$status_file"; then
+    status_rc=0
+  else
+    status_rc=$?
+  fi
+  status_schema="$(jq -r 'if (.schema | type) == "string" then .schema else "invalid" end' "$status_file" 2>/dev/null || true)"
+  status_command="$(jq -r 'if (.command | type) == "string" then .command else "invalid" end' "$status_file" 2>/dev/null || true)"
+  status_name="$(jq -r 'if (.status | type) == "string" then .status else "invalid" end' "$status_file" 2>/dev/null || true)"
+  status_record_exit="$(jq -r 'if ((.exit_code | type) == "number" and .exit_code == (.exit_code | floor)) then (.exit_code | tostring) else "invalid" end' "$status_file" 2>/dev/null || true)"
+  status_reason="$(jq -r 'if .reason == null then "null" elif (.reason | type) == "string" then .reason else "invalid" end' "$status_file" 2>/dev/null || true)"
+  status_probe_reason="$(jq -r 'if .probe_reason == null then "null" elif (.probe_reason | type) == "string" then .probe_reason else "invalid" end' "$status_file" 2>/dev/null || true)"
+  status_schema="${status_schema:-invalid}"
+  status_command="${status_command:-invalid}"
+  status_name="${status_name:-invalid}"
+  status_record_exit="${status_record_exit:-invalid}"
+  status_reason="${status_reason:-invalid}"
+  status_probe_reason="${status_probe_reason:-invalid}"
+  printf '%s\n' "GRAPH_STATUS_RC=${status_rc}"
+  cat "$status_file"
+  return "$status_rc"
+}
+
+if run_graph_status; then
+  status_exit=0
+else
+  status_exit=$?
+fi
+status_binding="${status_exit}:${status_schema}:${status_command}:${status_name}:${status_record_exit}:${status_reason}:${status_probe_reason}"
+fresh_binding="0:agent-canon.graph.status.v1:status:fresh:0:null:null"
+source_changed_binding="2:agent-canon.graph.status.v1:status:stale:2:source_changed:source_changed"
+if [[ "$status_binding" == "$fresh_binding" ]]; then
+  echo "GRAPH_REBUILD=not_needed"
+elif [[ "$ENSURE_GRAPH" -eq 1 && "$status_binding" == "$source_changed_binding" ]]; then
+  echo "GRAPH_REBUILD=required status=stale reason=source_changed probe_reason=source_changed"
+  set +e
+  "$GRAPH_CLI" graph build --root "$ROOT_DIR" --profile default --format json
+  build_exit=$?
+  set -e
+  if [[ "$build_exit" -ne 0 && "$build_exit" -ne 1 ]]; then
+    echo "DEPENDENCY_GRAPH=fail"
+    echo "REPO_DEPENDENCY_REVIEW=fail"
+    echo "GRAPH_REBUILD=failed rc=${build_exit}"
+    exit "$build_exit"
+  fi
+  echo "GRAPH_REBUILD=performed"
+  if run_graph_status; then
+    status_exit=0
+  else
+    status_exit=$?
+  fi
+  status_binding="${status_exit}:${status_schema}:${status_command}:${status_name}:${status_record_exit}:${status_reason}:${status_probe_reason}"
+else
+  echo "GRAPH_REBUILD=not_admitted status=${status_name} reason=${status_reason} probe_reason=${status_probe_reason}"
+fi
+if [[ "$status_binding" != "$fresh_binding" ]]; then
   echo "DEPENDENCY_GRAPH=fail"
+  echo "REPO_DEPENDENCY_REVIEW=fail"
   echo "canonical graph is not fresh"
   cat "$status_file"
   exit 1
+fi
+if [[ "$ENSURE_GRAPH" -eq 1 ]]; then
+  echo "GRAPH_ENSURE=pass status=fresh"
+  exit 0
 fi
 
 set +e
@@ -119,6 +211,7 @@ query_exit=$?
 set -e
 if [[ "$query_exit" -ne 0 || "$(jq -r '.status // "invalid"' "$query_file" 2>/dev/null)" != "fresh" ]]; then
   echo "DEPENDENCY_GRAPH=fail"
+  echo "REPO_DEPENDENCY_REVIEW=fail"
   echo "canonical graph is not fresh"
   cat "$query_file"
   exit 1

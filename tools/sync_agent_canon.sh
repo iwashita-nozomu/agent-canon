@@ -29,32 +29,24 @@ SOURCE_GIT_TOPLEVEL="$(git -C "${AGENT_CANON_SOURCE_ROOT}" rev-parse --show-topl
 if [[ "${SOURCE_GIT_TOPLEVEL}" != "${AGENT_CANON_SOURCE_ROOT}" ]]; then
   AGENT_CANON_SOURCE_ROOT="${ROOT_DIR}"
 fi
-PARENT_ROOT_DIR="${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}"
-PARENT_ROOT_DIR="$(cd "${PARENT_ROOT_DIR}" && pwd -P)"
 AGENT_CANON_BOUNDARY_SCRIPT="${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py"
-if [[ "${PARENT_ROOT_DIR}" != "${ROOT_DIR}" \
-  && "${AGENT_CANON_CHILD_PURPOSE:-}" != "agent-canon-sync-script" ]]; then
-  echo "AGENT_CANON_SYNC_PARENT_HANDOFF=missing" >&2
-  echo "AGENT_CANON_SYNC_PARENT_ROOT=${PARENT_ROOT_DIR}" >&2
-  echo "AGENT_CANON_SYNC_SOURCE_ROOT=${AGENT_CANON_SOURCE_ROOT}" >&2
+if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
+  invocation_script="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
+  if [[ -z "${invocation_script}" || ! -f "${invocation_script}" ]]; then
+    echo "AGENT_CANON_SYNC=fail reason=invocation_script_missing" >&2
+    exit 2
+  fi
+  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" public-exec \
+    --invocation-script "${invocation_script}" \
+    --purpose agent-canon-sync-script \
+    -- bash "${invocation_script}" "$@"
+fi
+PARENT_ROOT_DIR="${AGENT_CANON_SIDE_EFFECT_PARENT_ROOT:-}"
+if [[ -z "${PARENT_ROOT_DIR}" ]]; then
+  echo "AGENT_CANON_SYNC=fail reason=side_effect_session_missing" >&2
   exit 2
 fi
-if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "agent-canon-sync-script" ]]; then
-  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
-    --root "${PARENT_ROOT_DIR}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
-    --purpose agent-canon-sync-script \
-    --consume >/dev/null
-else
-  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
-    --root "${PARENT_ROOT_DIR}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
-    --purpose agent-canon-sync-script \
-    --rebase-inherited-temp \
-    --issue-handoff \
-    -- bash "${BASH_SOURCE[0]}" "$@"
-fi
-unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
+PARENT_ROOT_DIR="$(cd "${PARENT_ROOT_DIR}" && pwd -P)"
 
 CANON_PARENT_TMP_CANDIDATE="${AGENT_CANON_PARENT_TMPDIR:-$PARENT_ROOT_DIR/.agent-canon/tmp/sync}"
 CANON_PARENT_TMPDIR="$(python3 "${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py" \

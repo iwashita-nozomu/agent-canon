@@ -12,6 +12,17 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 cd "${WORKSPACE_ROOT}"
 BOUNDARY_SCRIPT="${WORKSPACE_ROOT}/tools/agent_tools/parent_root_side_effects.py"
+if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
+  invocation_script="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
+  if [[ -z "${invocation_script}" || ! -f "${invocation_script}" ]]; then
+    echo "PRE_REVIEW=fail reason=invocation_script_missing" >&2
+    exit 2
+  fi
+  exec python3 "${BOUNDARY_SCRIPT}" public-exec \
+    --invocation-script "${invocation_script}" \
+    --purpose pre-review \
+    -- bash "${invocation_script}" "$@"
+fi
 
 REPORT_DIR="${AGENT_REPORT_DIR:-}"
 REPORT_FILE=""

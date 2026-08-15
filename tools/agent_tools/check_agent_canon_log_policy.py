@@ -26,22 +26,20 @@ try:
         ParentOwnedPathReceipt,
         ParentOwnedTargetHandle,
         ParentRootAttestationReceipt,
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
         ParentOwnedPathReceipt,
         ParentOwnedTargetHandle,
         ParentRootAttestationReceipt,
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 
 DEFAULT_REMOTE = "https://github.com/iwashita-nozomu/agent-canon-log.git"
@@ -60,18 +58,13 @@ EXPECTED_BLOCKERS = (
 def _parent_capability() -> tuple[
     ParentRootSideEffectBoundary, ParentRootAttestationReceipt
 ]:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(
             ParentRootReject.HANDOFF_INVALID,
             "policy inventory: explicit parent root is required",
         )
-    parent = Path(configured)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(
-            cwd=parent, explicit_root=parent, purpose="policy-inventory"
-        )
-    )
+    attestation = resolve_parent_writer_attestation(purpose="policy-inventory")
     return ParentRootSideEffectBoundary(), attestation
 
 

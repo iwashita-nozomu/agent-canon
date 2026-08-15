@@ -33,19 +33,13 @@ from task_authority import ACTIVE_RUN_POINTER
 
 try:
     from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootReject,
         ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
         ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 
 LEDGER_SEMANTIC_KINDS = (
@@ -102,16 +96,7 @@ class MaterializerError(ValueError):
 
 
 def _parent_capability(purpose: str):
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            f"{purpose}: explicit parent root is required",
-        )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-    )
+    attestation = resolve_parent_writer_attestation(purpose=purpose)
     return ParentRootSideEffectBoundary(), attestation
 
 
@@ -119,7 +104,11 @@ def _parent_path(path: Path, purpose: str, *, create: bool = False) -> Path:
     boundary, attestation = _parent_capability(purpose)
     if create:
         boundary.ensure_parent_owned_directory(attestation, path.parent, purpose)
-    return boundary.resolve_parent_owned_path(attestation, path, purpose).physical_path
+    receipt = boundary.resolve_parent_owned_path(attestation, path, purpose)
+    try:
+        return receipt.physical_path
+    finally:
+        boundary.release_parent_owned_path(receipt)
 
 
 def _parent_write(path: Path, data: bytes, purpose: str) -> None:

@@ -19,38 +19,33 @@ else
   ROOT_DIR="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 fi
 AGENT_CANON_SOURCE_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
-PARENT_ROOT_DIR="${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}"
+BOUNDARY_SCRIPT="${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py"
+if [ ! -f "$BOUNDARY_SCRIPT" ]; then
+  echo "AGENT_CANON_TOOL_REBUILD=fail reason=missing-parent-boundary" >&2
+  exit 1
+fi
+if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
+  invocation_script="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
+  if [[ -z "${invocation_script}" || ! -f "${invocation_script}" ]]; then
+    echo "AGENT_CANON_TOOL_REBUILD=fail reason=invocation_script_missing" >&2
+    exit 2
+  fi
+  exec python3 "${BOUNDARY_SCRIPT}" public-exec \
+    --invocation-script "${invocation_script}" \
+    --purpose agent-canon-rebuild-script \
+    -- bash "${invocation_script}" "$@"
+fi
+PARENT_ROOT_DIR="${AGENT_CANON_SIDE_EFFECT_PARENT_ROOT:-}"
+if [[ -z "${PARENT_ROOT_DIR}" ]]; then
+  echo "AGENT_CANON_TOOL_REBUILD=fail reason=side_effect_session_missing" >&2
+  exit 2
+fi
 PARENT_ROOT_DIR="$(cd "${PARENT_ROOT_DIR}" && pwd -P)"
 PREFIX="${AGENT_CANON_PREFIX:-vendor/agent-canon}"
 TOOLS_HOME="${AGENT_CANON_TOOLS_HOME:-${PARENT_ROOT_DIR}/.agent-canon/tools}"
 CARGO_HOME="${AGENT_CANON_CARGO_HOME:-${CARGO_HOME:-${PARENT_ROOT_DIR}/.agent-canon/cache/cargo-home}}"
 BUILD_TARGET_DIR="${CARGO_TARGET_DIR:-${AGENT_CANON_CLI_TARGET_DIR:-${PARENT_ROOT_DIR}/.agent-canon/cache/cargo-target}}"
 FORCE_REBUILD="${AGENT_CANON_FORCE_TOOL_REBUILD:-0}"
-BOUNDARY_SCRIPT="${SCRIPT_DIR}/agent_tools/parent_root_side_effects.py"
-if [ ! -f "$BOUNDARY_SCRIPT" ]; then
-  echo "AGENT_CANON_TOOL_REBUILD=fail reason=missing-parent-boundary" >&2
-  exit 1
-fi
-if [[ "${PARENT_ROOT_DIR}" != "${ROOT_DIR}" \
-  && "${AGENT_CANON_CHILD_PURPOSE:-}" != "agent-canon-rebuild-script" ]]; then
-  echo "AGENT_CANON_REBUILD_PARENT_HANDOFF=missing" >&2
-  exit 2
-fi
-if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "agent-canon-rebuild-script" ]]; then
-  python3 "${BOUNDARY_SCRIPT}" verify-child \
-    --root "${PARENT_ROOT_DIR}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
-    --purpose agent-canon-rebuild-script \
-    --consume >/dev/null
-else
-  exec python3 "${BOUNDARY_SCRIPT}" exec-parent-bound \
-    --root "${PARENT_ROOT_DIR}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
-    --purpose agent-canon-rebuild-script \
-    --issue-handoff \
-    -- bash "${BASH_SOURCE[0]}" "$@"
-fi
-unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
 
 resolve_parent_path() {
   python3 "$BOUNDARY_SCRIPT" resolve \

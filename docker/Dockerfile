@@ -103,8 +103,7 @@ RUN source_root=/opt/agent-canon-parent/vendor/agent-canon \
     && GIT_AUTHOR_DATE=2026-08-14T00:00:00Z \
        GIT_COMMITTER_DATE=2026-08-14T00:00:00Z \
        git -C "${parent_root}" commit -m "Initialize parent image test snapshot" \
-    && AGENT_CANON_PARENT_ROOT="${parent_root}" \
-       AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:bbde708b7b3bb2a893da85652df55ea7337b1908c2e74cf3a9e0b2e054289593 \
+    && AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:bbde708b7b3bb2a893da85652df55ea7337b1908c2e74cf3a9e0b2e054289593 \
        AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
        AGENT_CANON_DESTRUCTIVE_GIT_REASON=materialize-public-parent-runtime-views-in-image-fixture \
        HOME="${parent_root}/.agent-canon/home" \

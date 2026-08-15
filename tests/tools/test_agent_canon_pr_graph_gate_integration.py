@@ -22,6 +22,8 @@ import textwrap
 import unittest
 from pathlib import Path
 
+from tools.agent_tools.fixture_spawn import record_environment
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PR_CHECK = PROJECT_ROOT / "tools" / "ci" / "check_agent_canon_pr.sh"
 SELECTOR = PROJECT_ROOT / "tools" / "ci" / "agent_canon_pr_graph_selector.py"
@@ -42,28 +44,6 @@ STANDALONE_STATIC_GATE_FIXTURE_FILES = (
     "tests/tools/test_standalone_static_gate_units.py",
     ".github/workflows/agent-canon-static-gates.yml",
 )
-PARENT_PATH_ENV_KEYS = {
-    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
-    "AGENT_CANON_ROOT",
-    "AGENT_CANON_SOURCE_ROOT",
-    "AGENT_CANON_CHILD_HANDOFF",
-    "AGENT_CANON_CHILD_PURPOSE",
-    "AGENT_CANON_CLI_TARGET_DIR",
-    "AGENT_CANON_PARENT_ROOT",
-    "AGENT_CANON_PARENT_ROOT_DEV",
-    "AGENT_CANON_PARENT_ROOT_INO",
-    "AGENT_CANON_TOOLS_HOME",
-    "CARGO_HOME",
-    "CARGO_TARGET_DIR",
-    "PYTHONPYCACHEPREFIX",
-    "TEMP",
-    "TMP",
-    "TMPDIR",
-    "XDG_CACHE_HOME",
-    "PYTHONPATH",
-}
-
-
 def run(
     root: Path,
     *args: str,
@@ -72,19 +52,26 @@ def run(
 ) -> subprocess.CompletedProcess[str]:
     """Run one fixture command."""
     if environment is None:
-        environment = {
-            key: value
-            for key, value in os.environ.items()
-            if key not in PARENT_PATH_ENV_KEYS
-        }
-    result = subprocess.run(
-        list(args),
-        cwd=root,
-        check=False,
-        capture_output=True,
-        text=True,
-        env=environment,
-    )
+        environment = os.environ.copy()
+    if args and args[0] == "git":
+        result = subprocess.run(
+            list(args),
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+    else:
+        with record_environment(cwd=root, base_env=environment) as signed_environment:
+            result = subprocess.run(
+                list(args),
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=signed_environment,
+            )
     if check and result.returncode != 0:
         raise AssertionError(result.stdout + result.stderr)
     return result
@@ -759,11 +746,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
                 exec {real_git} \"$@\"
                 """,
             )
-        environment = {
-            key: value
-            for key, value in os.environ.items()
-            if key not in PARENT_PATH_ENV_KEYS
-        }
+        environment = os.environ.copy()
         environment.update(
             {
                 "PATH": f"{fake_bin}:{environment['PATH']}",
@@ -961,11 +944,7 @@ class AgentCanonPrGraphGateIntegrationTest(unittest.TestCase):
         temp_root = source / ".agent-canon" / "standalone-pr-check-state"
         temp_root.mkdir(parents=True)
         (temp_root / "preexisting.txt").write_text("preserve\n", encoding="utf-8")
-        environment = {
-            key: value
-            for key, value in os.environ.items()
-            if key not in PARENT_PATH_ENV_KEYS
-        }
+        environment = os.environ.copy()
         environment.update(
             {
                 "PATH": f"{fake_bin}:{environment['PATH']}",

@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 
 import pytest
+from tools.agent_tools.fixture_spawn import record_environment
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "container_config.py"
@@ -43,13 +44,15 @@ PARENT_POST_CREATE_COMMAND = POST_CREATE_COMMAND
 
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
     """Run the semantic container configuration checker."""
-    return subprocess.run(
-        [sys.executable, str(SCRIPT), "--root", str(root)],
-        cwd=PROJECT_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    with record_environment(cwd=PROJECT_ROOT) as environment:
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), "--root", str(root)],
+            cwd=PROJECT_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
 
 
 def write_file(root: Path, relative: str, content: str) -> None:

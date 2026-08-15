@@ -22,6 +22,8 @@ from pathlib import Path
 from typing import Iterator, Protocol, cast
 from unittest import mock
 
+from tools.agent_tools.fixture_spawn import record_environment
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 from parent_root_side_effects import (  # noqa: E402
@@ -74,11 +76,10 @@ def enclosing_repository_root() -> Path:
 @contextmanager
 def authenticated_tempdir() -> Iterator[str]:
     """Create a per-test temp directory inside the authenticated source root."""
-    with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as tmp_dir, mock.patch.dict(
-        os.environ,
-        {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)},
-    ):
-        yield tmp_dir
+    with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as tmp_dir:
+        with record_environment(cwd=PROJECT_ROOT) as environment:
+            with mock.patch.dict(os.environ, environment, clear=True):
+                yield tmp_dir
 
 
 class WorkflowMonitorModule(Protocol):
@@ -173,8 +174,8 @@ class WorkflowMonitorTest(unittest.TestCase):
             (report_dir / "workflow_monitoring.md").write_text(
                 prepared, encoding="utf-8"
             )
-            with mock.patch.dict(
-                os.environ, {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
+            with record_environment(cwd=PROJECT_ROOT) as environment, mock.patch.dict(
+                os.environ, environment, clear=True
             ):
                 append_monitoring(
                     report_dir,
@@ -449,10 +450,7 @@ class WorkflowMonitorTest(unittest.TestCase):
     def test_monitor_replaces_initial_blocker_with_actual_subagent_wave(self) -> None:
         """A real parent wave should replace the bootstrap authority blocker."""
         parent_root = enclosing_repository_root()
-        with tempfile.TemporaryDirectory(dir=parent_root) as tmp_dir, mock.patch.dict(
-            os.environ,
-            {"AGENT_CANON_PARENT_ROOT": str(parent_root)},
-        ):
+        with tempfile.TemporaryDirectory(dir=parent_root) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True)
@@ -1175,10 +1173,7 @@ class WorkflowMonitorTest(unittest.TestCase):
     def test_bootstrap_seeds_monitoring_with_routing_evidence(self) -> None:
         """bootstrap_agent_run should seed workflow monitoring without manual edits."""
         parent_root = enclosing_repository_root()
-        with tempfile.TemporaryDirectory(dir=parent_root) as tmp_dir, mock.patch.dict(
-            os.environ,
-            {"AGENT_CANON_PARENT_ROOT": str(parent_root)},
-        ):
+        with tempfile.TemporaryDirectory(dir=parent_root) as tmp_dir:
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True)
@@ -1225,7 +1220,9 @@ def test_monitor_atomic_open_rejects_parent_path_replacement() -> None:
         replaced.symlink_to(outside, target_is_directory=True)
         module = load_monitor_module()
         target = replaced / "workflow_monitoring.md"
-        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}):
+        with record_environment(cwd=PROJECT_ROOT) as environment, mock.patch.dict(
+            os.environ, environment, clear=True
+        ):
             with unittest.TestCase().assertRaises(ParentRootSideEffectError) as rejected:
                 with module.locked_monitoring_artifact(target):
                     pass

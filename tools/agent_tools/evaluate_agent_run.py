@@ -32,11 +32,10 @@ else:
     from workspace_scope import resolve_report_root
 from eval_manifest_paths import eval_manifest_path, resolve_eval_manifest
 from parent_root_side_effects import (
-    ParentRootAttestationRequest,
     ParentRootReject,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    attest_parent_root,
+    resolve_parent_writer_attestation,
 )
 from report_artifact_checks import (
     check_final_review_artifact,
@@ -51,11 +50,10 @@ DEFAULT_MIN_SCORE = 85
 
 
 def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
+    attestation = resolve_parent_writer_attestation(purpose=purpose)
     ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, data, purpose)
 DEFAULT_BEHAVIOR_CRITERION_MAX_SCORE = 5
 ARTIFACT_COMPLETENESS_SCORE = 8

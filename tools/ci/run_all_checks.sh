@@ -84,21 +84,17 @@ fi
 AGENT_CANON_CARGO_MANIFEST="${AGENT_CANON_SOURCE_ROOT}/rust/agent-canon/Cargo.toml"
 AGENT_CANON_CLI_TARGET_DIR="${AGENT_CANON_CLI_TARGET_DIR:-${WORKSPACE_ROOT}/.agent-canon/cache/cargo-target}"
 AGENT_CANON_BOUNDARY_SCRIPT="${CANON_TOOLS_ROOT}/agent_tools/parent_root_side_effects.py"
-if [[ "${AGENT_CANON_CHILD_PURPOSE:-}" == "run-all-checks-script" ]]; then
-  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" verify-child \
-    --root "${WORKSPACE_ROOT}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
+  invocation_script="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
+  if [[ -z "${invocation_script}" || ! -f "${invocation_script}" ]]; then
+    echo "RUN_ALL_CHECKS=fail reason=invocation_script_missing" >&2
+    exit 2
+  fi
+  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" public-exec \
+    --invocation-script "${invocation_script}" \
     --purpose run-all-checks-script \
-    --consume >/dev/null
-else
-  exec python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
-    --root "${WORKSPACE_ROOT}" \
-    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
-    --purpose run-all-checks-script \
-    --issue-handoff \
-    -- bash "${BASH_SOURCE[0]}" "$@"
+    -- bash "${invocation_script}" "$@"
 fi
-unset AGENT_CANON_CHILD_HANDOFF AGENT_CANON_HANDOFF_AUDIENCE AGENT_CANON_CHILD_PURPOSE
 
 AGENT_CANON_CI_EVAL_LOG_TEMP_CREATED=0
 AGENT_CANON_CI_HOOK_ARCHIVE_CREATED=0

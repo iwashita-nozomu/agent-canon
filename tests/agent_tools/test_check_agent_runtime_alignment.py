@@ -44,6 +44,12 @@ from packets import (  # noqa: E402
     resolve_role_document_packet,
 )
 from team_config import TaskCatalog, load_team_config, resolve_role  # noqa: E402
+from tools.agent_tools.fixture_spawn import (
+    record_session_from_environment,  # noqa: E402
+)
+from tools.agent_tools.parent_root_side_effects import (
+    ParentRootSideEffectBoundary,  # noqa: E402
+)
 from workspace_scope import resolve_report_bundle_artifact_path  # noqa: E402
 
 
@@ -143,34 +149,36 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
     def test_alignment_script_passes(self) -> None:
         """The runtime alignment checker should succeed without findings."""
-        environment = os.environ.copy()
-        environment["AGENT_CANON_PARENT_ROOT"] = str(TEST_PARENT_ROOT)
-        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(TEST_PARENT_ROOT)
-        result = subprocess.run(
-            [sys.executable, str(SCRIPT_PATH)],
-            cwd=PROJECT_ROOT,
-            env=environment,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        with record_session_from_environment() as session:
+            environment = ParentRootSideEffectBoundary().session_environment(
+                session, os.environ
+            )
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT_PATH)],
+                cwd=PROJECT_ROOT,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)
 
     def test_alignment_script_standalone_parent_uses_external_fixture_parent(self) -> None:
         """Standalone parent-bound checks keep derived reports outside source."""
-        environment = os.environ.copy()
-        environment["AGENT_CANON_PARENT_ROOT"] = str(PROJECT_ROOT)
-        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(PROJECT_ROOT)
         before = set(PROJECT_ROOT.parent.glob(".agent-canon-runtime-parent-*"))
-        result = subprocess.run(
-            [sys.executable, str(SCRIPT_PATH)],
-            cwd=PROJECT_ROOT,
-            env=environment,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        with record_session_from_environment() as session:
+            environment = ParentRootSideEffectBoundary().session_environment(
+                session, os.environ
+            )
+            result = subprocess.run(
+                [sys.executable, str(SCRIPT_PATH)],
+                cwd=PROJECT_ROOT,
+                env=environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
         after = set(PROJECT_ROOT.parent.glob(".agent-canon-runtime-parent-*"))
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("AGENT_RUNTIME_ALIGNMENT=pass", result.stdout)

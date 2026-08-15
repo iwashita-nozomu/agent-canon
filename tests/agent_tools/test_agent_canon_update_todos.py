@@ -18,6 +18,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tools.agent_tools.fixture_spawn import record_session_from_environment
+from tools.agent_tools.parent_root_side_effects import ParentRootSideEffectBoundary
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "agent_canon_update_todos.py"
 TASK_ID = "ACUT-test-parent-state"
@@ -92,6 +95,7 @@ def write_manifest(canon_root: Path, boundary: str) -> None:
 def create_canon_repo(root: Path) -> tuple[Path, str, str]:
     """Create a parent Git root with one tiny vendored AgentCanon repository."""
     run_git(root, "init", "-b", "main")
+    run_git(root, "remote", "add", "origin", "https://example.invalid/parent.git")
     (root / ".parent-fixture").write_text("fixture parent\n", encoding="utf-8")
     commit_all(root, "seed parent")
     canon_root = root / "vendor" / "agent-canon"
@@ -109,23 +113,23 @@ class AgentCanonUpdateTodosTest(unittest.TestCase):
 
     def run_tool(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the update TODO tool in a fixture root."""
-        environment = os.environ.copy()
-        for name in (
-            "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
-            "AGENT_CANON_CHILD_HANDOFF",
-            "AGENT_CANON_HANDOFF_AUDIENCE",
-            "AGENT_CANON_SOURCE_ROOT",
-            "AGENT_CANON_ROOT",
-        ):
-            environment.pop(name, None)
-        environment["AGENT_CANON_PARENT_ROOT"] = str(root)
-        return subprocess.run(
-            [sys.executable, str(TOOL), "--root", str(root), *args],
-            check=False,
-            capture_output=True,
-            text=True,
-            env=environment,
-        )
+        previous_cwd = Path.cwd()
+        try:
+            os.chdir(root)
+            with record_session_from_environment() as session:
+                environment = ParentRootSideEffectBoundary().session_environment(
+                    session, os.environ
+                )
+                return subprocess.run(
+                    [sys.executable, str(TOOL), "--root", str(root), *args],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    cwd=root,
+                    env=environment,
+                )
+        finally:
+            os.chdir(previous_cwd)
 
     def test_init_creates_parent_state_and_ignored_generated_surface(self) -> None:
         """Initialization records a parent-local boundary and scoped ignore file."""

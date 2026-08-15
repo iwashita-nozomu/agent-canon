@@ -23,8 +23,8 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import secrets
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -43,6 +43,13 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from log_repository_identity import source_repository_id_for_write  # noqa: E402
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationReceipt,
+    ParentRootReject,
+    ParentRootSideEffectBoundary,
+    ParentRootSideEffectError,
+    resolve_parent_writer_attestation,
+)
 from report_artifact_checks import (  # noqa: E402
     MECHANICALLY_REGENERATED_REPORT_FILE_PATTERNS,
     check_final_review_artifact,
@@ -51,6 +58,7 @@ from report_artifact_checks import (  # noqa: E402
 )
 from runtime_log_paths import (  # noqa: E402
     LOG_ARCHIVE_REMOTE,
+    RUNTIME_EVENT_PUBLICATION_OUTCOME_SPOOL_RELATIVE,
     agent_canon_git_commit_key,
     agent_report_archive_dir,
     codex_trace_key,
@@ -58,17 +66,8 @@ from runtime_log_paths import (  # noqa: E402
     log_environment_key,
     mounted_log_archive_root,
     repo_log_key,
-    RUNTIME_EVENT_PUBLICATION_OUTCOME_SPOOL_RELATIVE,
     runtime_event_publication_outcome_spool_root,
     source_git_head,
-)
-from parent_root_side_effects import (  # noqa: E402
-    ParentRootAttestationRequest,
-    ParentRootAttestationReceipt,
-    ParentRootReject,
-    ParentRootSideEffectBoundary,
-    ParentRootSideEffectError,
-    attest_parent_root,
 )
 from task_authority import ACTIVE_RUN_POINTER  # noqa: E402
 
@@ -936,17 +935,10 @@ def default_source_root(canon_root: Path) -> Path:
 
 def _parent_boundary() -> tuple[ParentRootSideEffectBoundary, ParentRootAttestationReceipt] | None:
     """Return the parent capability for a bounded child invocation."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
     if not configured:
         return None
-    parent = Path(configured).resolve(strict=True)
-    receipt = attest_parent_root(
-        ParentRootAttestationRequest(
-            cwd=parent,
-            explicit_root=parent,
-            purpose="runtime-log-archive",
-        )
-    )
+    receipt = resolve_parent_writer_attestation(purpose="runtime-log-archive")
     return ParentRootSideEffectBoundary(), receipt
 
 
@@ -956,9 +948,13 @@ def _parent_archive_path(path: Path, purpose: str) -> Path:
     if bound is None:
         return path
     boundary, attestation = bound
-    return boundary.resolve_parent_owned_path(
+    receipt = boundary.resolve_parent_owned_path(
         attestation, path, purpose, create=False
-    ).physical_path
+    )
+    try:
+        return receipt.physical_path
+    finally:
+        boundary.release_parent_owned_path(receipt)
 
 
 def _parent_ensure_directory(path: Path, purpose: str) -> Path:
@@ -2205,11 +2201,7 @@ def _open_secure_publication_parent(
                 "parent_boundary_invalid",
                 "publication requires an attested Git parent root",
             )
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(
-                cwd=root, explicit_root=root, purpose=purpose
-            )
-        )
+        attestation = resolve_parent_writer_attestation(purpose=purpose)
         boundary = ParentRootSideEffectBoundary()
     else:
         boundary, attestation = bound

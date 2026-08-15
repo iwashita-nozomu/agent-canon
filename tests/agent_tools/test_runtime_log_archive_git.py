@@ -77,8 +77,8 @@ for _module_name in (
     if not _module_belongs_to_current_checkout(_module_name):
         sys.modules.pop(_module_name, None)
 
-from tools.agent_tools.graph_client import GraphClient
 from tools.agent_tools import github_publish
+from tools.agent_tools.graph_client import GraphClient
 from tools.agent_tools.log_repository_identity import stable_source_repository_id
 from tools.agent_tools.runtime_log_paths import (
     mounted_log_archive_root,
@@ -101,6 +101,7 @@ LIFECYCLE_REVERSE_COVERAGE = {
     "tools/ci/run_codex_in_repo_container.py": {"RL-002", "RL-004"},
 }
 import runtime_log_archive_git  # noqa: E402
+from tools.agent_tools.fixture_spawn import record_environment  # noqa: E402
 
 
 @dataclass(frozen=True)
@@ -130,7 +131,6 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
     def setUp(self) -> None:
         """Set the stable source remote used by archive command fixtures."""
         self._old_source_remote = os.environ.get("AGENT_CANON_SOURCE_REPOSITORY_REMOTE")
-        self._old_parent_root = os.environ.get("AGENT_CANON_PARENT_ROOT")
         self._old_hook_archive_dir = os.environ.get("AGENT_CANON_HOOK_ARCHIVE_DIR")
         self._old_hook_event_spool_dir = os.environ.get(
             "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"
@@ -141,11 +141,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         # Git from walking through the managed checkout when a fixture is
         # intentionally an empty/non-Git source or canon root.
         os.environ["GIT_CEILING_DIRECTORIES"] = tempfile.gettempdir()
-        for env_name in (
-            "AGENT_CANON_PARENT_ROOT",
-            "AGENT_CANON_HOOK_ARCHIVE_DIR",
-            "AGENT_CANON_HOOK_EVENT_SPOOL_DIR",
-        ):
+        for env_name in ("AGENT_CANON_HOOK_ARCHIVE_DIR", "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"):
             os.environ.pop(env_name, None)
 
     def tearDown(self) -> None:
@@ -155,7 +151,6 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         else:
             os.environ["AGENT_CANON_SOURCE_REPOSITORY_REMOTE"] = self._old_source_remote
         for env_name, old_value in (
-            ("AGENT_CANON_PARENT_ROOT", self._old_parent_root),
             ("AGENT_CANON_HOOK_ARCHIVE_DIR", self._old_hook_archive_dir),
             ("AGENT_CANON_HOOK_EVENT_SPOOL_DIR", self._old_hook_event_spool_dir),
             ("GIT_CEILING_DIRECTORIES", self._old_git_ceiling),
@@ -289,23 +284,13 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             ).encode("utf-8")
             context_target = root / "context" / "certificate.json"
             runtime_target = root / "runtime" / "runtime-event.json"
-            with (
-                patch.dict(
-                    os.environ,
-                    {"AGENT_CANON_PARENT_ROOT": str(root)},
-                    clear=False,
-                ),
-                patch.object(os, "fstat", new=projected_fstat),
-                patch.object(Path, "lstat", new=projected_lstat),
-                patch.object(
-                    runtime_log_archive_git,
-                    "validate_context_discovery_certificate",
-                ),
-                patch.object(
-                    runtime_log_archive_git,
-                    "validate_runtime_event_schema",
-                ),
-            ):
+            with record_environment(cwd=root) as environment, patch.dict(
+                os.environ, environment, clear=True
+            ), patch.object(os, "fstat", new=projected_fstat), patch.object(
+                Path, "lstat", new=projected_lstat
+            ), patch.object(
+                runtime_log_archive_git, "validate_context_discovery_certificate"
+            ), patch.object(runtime_log_archive_git, "validate_runtime_event_schema"):
                 with runtime_log_archive_git.acquire_publication_attempt_lock(
                     source, "a" * 64
                 ) as attempt_lock:
@@ -336,7 +321,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             source.mkdir()
             subprocess.run(["git", "init", "-q", str(outer)], check=True)
 
-            with patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": str(outer)}):
+            with record_environment(cwd=outer) as environment, patch.dict(
+                os.environ, environment, clear=True
+            ):
                 spool_root = runtime_event_publication_outcome_spool_root(source)
                 with runtime_log_archive_git.acquire_publication_attempt_lock(
                     source, "c" * 64
@@ -434,18 +421,13 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                         )
                         return os.stat_result(values)
 
-                    with (
-                        patch.dict(
-                            os.environ,
-                            {"AGENT_CANON_PARENT_ROOT": tmp_dir},
-                            clear=False,
-                        ),
-                        patch.object(os, "fstat", new=projected_fstat),
-                        patch.object(Path, "lstat", new=projected_lstat),
-                        self.assertRaises(
-                            runtime_log_archive_git.RuntimeEventMaterializationError
-                        ) as raised,
-                    ):
+                    with record_environment(cwd=Path(tmp_dir)) as environment, patch.dict(
+                        os.environ, environment, clear=True
+                    ), patch.object(os, "fstat", new=projected_fstat), patch.object(
+                        Path, "lstat", new=projected_lstat
+                    ), self.assertRaises(
+                        runtime_log_archive_git.RuntimeEventMaterializationError
+                    ) as raised:
                         publisher(target, bytes_)
                     self.assertEqual(raised.exception.code, expected_code)
                     self.assertFalse(target.exists())
@@ -558,23 +540,25 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             env.pop(env_name, None)
         if extra_env:
             env.update(extra_env)
-        return subprocess.run(
-            [
-                sys.executable,
-                str(SCRIPT),
-                "--source-root",
-                str(source_root),
-                "--canon-root",
-                str(canon_root),
-                "--remote",
-                str(remote),
-                *args,
-            ],
-            check=False,
-            capture_output=True,
-            env=env,
-            text=True,
-        )
+        with record_environment(cwd=source_root, base_env=env) as record_env:
+            return subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--source-root",
+                    str(source_root),
+                    "--canon-root",
+                    str(canon_root),
+                    "--remote",
+                    str(remote),
+                    *args,
+                ],
+                check=False,
+                capture_output=True,
+                cwd=source_root,
+                env=record_env,
+                text=True,
+            )
 
     def expected_branch(self, source: Path, chat_key: str | None = None) -> str:
         """Return the stable source branch expected by run_tool."""
@@ -950,22 +934,23 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             for env_name in ("CODEX_THREAD_ID", "CODEX_SESSION_ID", "CODEX_CONVERSATION_ID"):
                 env.pop(env_name, None)
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--canon-root",
-                    str(canon),
-                    "--remote",
-                    str(remote),
-                    "repo-key",
-                ],
-                check=False,
-                capture_output=True,
-                cwd=canon,
-                env=env,
-                text=True,
-            )
+            with record_environment(cwd=canon, base_env=env) as record_env:
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--canon-root",
+                        str(canon),
+                        "--remote",
+                        str(remote),
+                        "repo-key",
+                    ],
+                    check=False,
+                    capture_output=True,
+                    cwd=canon,
+                    env=record_env,
+                    text=True,
+                )
 
         key = repo_log_key(canon)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

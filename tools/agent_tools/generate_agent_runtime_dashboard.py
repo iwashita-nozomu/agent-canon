@@ -42,11 +42,10 @@ from generate_agent_improvement_guide import (  # noqa: E402
     known_skill_ids,
 )
 from parent_root_side_effects import (  # noqa: E402
-    ParentRootAttestationRequest,
     ParentRootReject,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    attest_parent_root,
+    resolve_parent_writer_attestation,
 )
 from report_artifact_checks import (  # noqa: E402
     actual_wave_event_fields,
@@ -58,16 +57,13 @@ STATUS_RE = re.compile(r"\b[A-Z_]*STATUS=(pass|fail|skip)\b")
 
 
 def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(
             ParentRootReject.HANDOFF_INVALID,
             f"{purpose}: explicit parent root is required",
         )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-    )
+    attestation = resolve_parent_writer_attestation(purpose=purpose)
     ParentRootSideEffectBoundary().write_parent_owned_file(
         attestation, path, data, purpose
     )

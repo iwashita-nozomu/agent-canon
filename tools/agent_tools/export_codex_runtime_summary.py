@@ -31,19 +31,17 @@ from typing import cast
 
 try:
     from .parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 
 if __package__ in (None, ""):
@@ -579,21 +577,21 @@ def summary_index_payload(
 def _append_parent_jsonl(path: Path, record: dict[str, object], purpose: str) -> None:
     """Append one record using parent-local atomic publication when attested."""
     line = (json.dumps(record, sort_keys=True, separators=(",", ":")) + "\n").encode("utf-8")
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
     if configured:
-        parent = Path(configured).resolve(strict=True)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-        )
+        attestation = resolve_parent_writer_attestation(purpose=purpose)
         boundary = ParentRootSideEffectBoundary()
         existing = b""
+        receipt = None
         try:
-            existing = boundary.read_parent_owned_file(
-                boundary.resolve_parent_owned_path(attestation, path, purpose, create=False)
-            )
+            receipt = boundary.resolve_parent_owned_path(attestation, path, purpose, create=False)
+            existing = boundary.read_parent_owned_file(receipt)
         except ParentRootSideEffectError as exc:
             if exc.reject is not ParentRootReject.ROOT_MISSING:
                 raise
+        finally:
+            if receipt is not None:
+                boundary.release_parent_owned_path(receipt)
         boundary.write_parent_owned_file(attestation, path, existing + line, purpose)
         return
     raise ParentRootSideEffectError(

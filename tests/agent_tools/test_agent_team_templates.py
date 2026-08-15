@@ -17,6 +17,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
@@ -49,9 +50,52 @@ from packets import (  # noqa: E402
 )
 from task_authority import hash_baseline_bytes  # noqa: E402
 from team_config import load_task_catalog, load_team_config, resolve_role  # noqa: E402
+from tools.agent_tools.fixture_spawn import (
+    record_session_from_environment,  # noqa: E402
+)
 
 TEST_TEMP_ROOT = Path(tempfile.gettempdir())
-TEST_PARENT_ROOT = Path(os.path.commonpath((PROJECT_ROOT, TEST_TEMP_ROOT))).resolve()
+
+
+@contextmanager
+def fixture_record_session(root: Path):
+    """Borrow the runner record while executing in the fixture CWD."""
+    previous_cwd = Path.cwd()
+    os.chdir(root)
+    try:
+        with record_session_from_environment():
+            yield
+    finally:
+        os.chdir(previous_cwd)
+
+
+def initialize_fixture_parent(root: Path) -> None:
+    """Create the selected temporary parent Git checkout with an origin."""
+    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "remote", "add", "origin", "https://example.invalid/parent.git"],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git", "-C", str(root), "-c", "user.name=AgentCanon Test", "-c",
+            "user.email=agentcanon-test@example.invalid", "commit", "--allow-empty",
+            "-m", "fixture parent",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+
+@contextmanager
+def fixture_temp_parent():
+    """Own temporary-parent cleanup after the public session has revoked."""
+    with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
+        root = Path(tmp_dir)
+        initialize_fixture_parent(root)
+        with fixture_record_session(root):
+            yield root
 
 
 class AgentTeamTemplateTest(unittest.TestCase):
@@ -93,9 +137,9 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 )
             )
 
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            workspace_root = Path(tmp_dir) / "workspace"
-            report_dir = Path(tmp_dir) / "reports" / "packet-test"
+        with fixture_temp_parent() as fixture_root:
+            workspace_root = fixture_root / "workspace"
+            report_dir = fixture_root / "reports" / "packet-test"
             workspace_root.mkdir(parents=True)
             cross_cutting = resolve_cross_cutting_document_packet(
                 workspace_root,
@@ -146,8 +190,8 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 task_catalog=task_catalog,
             )
 
-        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
-            report_root = Path(tmp_dir) / "reports"
+        with fixture_temp_parent() as fixture_root:
+            report_root = fixture_root / "reports"
             report_root.mkdir(parents=True)
             prior_run = report_root / "prior-run"
             prior_run.mkdir()
@@ -164,16 +208,11 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 build_spec(report_root, "destination-mismatch"),
                 report_dir=report_root / "wrong-destination",
             )
-            with patch.dict(
-                os.environ,
-                {"AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
-                clear=False,
+            with self.assertRaisesRegex(
+                RuntimeError,
+                r"^runtime_roots_invalid:report_dir_mismatch$",
             ):
-                with self.assertRaisesRegex(
-                    RuntimeError,
-                    r"^runtime_roots_invalid:report_dir_mismatch$",
-                ):
-                    create_run_bundle(mismatch_spec)
+                create_run_bundle(mismatch_spec)
             self.assertFalse(mismatch_spec.report_dir.exists())
             self.assertEqual(pointer.read_bytes(), pointer_bytes)
             self.assertEqual(pointer_baseline.read_bytes(), pointer_baseline_bytes)
@@ -205,16 +244,11 @@ class AgentTeamTemplateTest(unittest.TestCase):
                 "write_parent_owned_file",
                 new=fail_second_stage_write,
             ):
-                with patch.dict(
-                    os.environ,
-                    {"AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
-                    clear=False,
+                with self.assertRaisesRegex(
+                    RuntimeError,
+                    r"^injected-stage-write-failure$",
                 ):
-                    with self.assertRaisesRegex(
-                        RuntimeError,
-                        r"^injected-stage-write-failure$",
-                    ):
-                        create_run_bundle(spec)
+                    create_run_bundle(spec)
 
             self.assertEqual(stage_writes, 2)
             self.assertFalse(spec.report_dir.exists())
@@ -224,12 +258,7 @@ class AgentTeamTemplateTest(unittest.TestCase):
             self.assertEqual(tuple(report_root.glob(".stage-run.*")), ())
 
             success_spec = build_spec(report_root, "successful-run")
-            with patch.dict(
-                os.environ,
-                {"AGENT_CANON_PARENT_ROOT": str(TEST_PARENT_ROOT)},
-                clear=False,
-            ):
-                created_files = create_run_bundle(success_spec)
+            created_files = create_run_bundle(success_spec)
             self.assertEqual(
                 tuple(path for path in created_files if path),
                 created_files,

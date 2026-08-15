@@ -98,7 +98,7 @@ def make_parent_with_plan_failure(tmp_path: Path) -> Path:
     """Create a parent projection whose configured remote cannot be resolved."""
     source_clone = tmp_path / "source-clone"
     subprocess.run(
-        ["git", "clone", "--quiet", str(ROOT), str(source_clone)],
+        ["git", "clone", "--quiet", "--no-local", str(ROOT), str(source_clone)],
         check=True,
         capture_output=True,
         text=True,

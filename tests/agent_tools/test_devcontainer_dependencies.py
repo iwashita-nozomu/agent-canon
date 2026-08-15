@@ -61,28 +61,6 @@ from tools.agent_tools.devcontainer_dependencies import (
 
 ROOT = Path(__file__).resolve().parents[2]
 ENGINE = ROOT / "tools" / "agent_tools" / "devcontainer_dependencies.py"
-_PARENT_BOUNDARY_PATH_KEYS = (
-    "TMPDIR",
-    "TEMP",
-    "TMP",
-    "XDG_CACHE_HOME",
-    "PYTHONPYCACHEPREFIX",
-    "AGENT_CANON_TOOLS_HOME",
-    "CARGO_HOME",
-    "CARGO_TARGET_DIR",
-    "AGENT_CANON_CLI_TARGET_DIR",
-    "AGENT_CANON_PARENT_ROOT",
-    "AGENT_CANON_PARENT_ROOT_DEV",
-    "AGENT_CANON_PARENT_ROOT_INO",
-    "AGENT_CANON_CHILD_HANDOFF",
-    "AGENT_CANON_CHILD_PURPOSE",
-    "AGENT_CANON_HANDOFF_AUDIENCE",
-    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
-    "AGENT_CANON_ROOT",
-    "AGENT_CANON_SOURCE_ROOT",
-)
-
-
 def init_authentic_git(root: Path, *, remote: str = "https://example.invalid/fixture.git") -> None:
     """Create the minimal authenticated Git parent used by side-effect fixtures."""
     root.mkdir(parents=True, exist_ok=True)
@@ -498,20 +476,8 @@ class LeanToolchainRetryRunner(FakeRunner):
 
 class DependencyModelTests(unittest.TestCase):
     def setUp(self) -> None:
-        """Keep synthetic repository boundaries independent of the outer test runner."""
+        """Keep dependency-model tests independent of unrelated unittest state."""
         super().setUp()
-        saved = {key: os.environ.get(key) for key in _PARENT_BOUNDARY_PATH_KEYS}
-        for key in _PARENT_BOUNDARY_PATH_KEYS:
-            os.environ.pop(key, None)
-
-        def restore_environment() -> None:
-            for key, value in saved.items():
-                if value is None:
-                    os.environ.pop(key, None)
-                else:
-                    os.environ[key] = value
-
-        self.addCleanup(restore_environment)
 
     def test_base_capabilities_include_gnupg_for_repository_bootstrap(self) -> None:
         """A fixed image capability satisfies apt-repository gpg prerequisites."""

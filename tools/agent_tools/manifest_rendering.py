@@ -14,7 +14,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import shlex
 from collections.abc import Mapping
@@ -25,19 +24,13 @@ import yaml
 
 if __package__:
     from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootReject,
         ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 else:
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
         ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 
 if __package__:
@@ -1159,19 +1152,9 @@ def append_markdown_section_line(path: Path, heading: str, line: str) -> None:
             insert_at -= 1
         lines.insert(insert_at, line)
     rendered = ("\n".join(lines) + "\n").encode("utf-8")
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if configured:
-        parent = Path(configured).resolve(strict=True)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="manifest-rendering")
-        )
-        ParentRootSideEffectBoundary().write_parent_owned_file(
-            attestation, path, rendered, "manifest-rendering"
-        )
-        return
-    raise ParentRootSideEffectError(
-        ParentRootReject.HANDOFF_INVALID,
-        "manifest-rendering: explicit parent root is required",
+    attestation = resolve_parent_writer_attestation(purpose="manifest-rendering")
+    ParentRootSideEffectBoundary().write_parent_owned_file(
+        attestation, path, rendered, "manifest-rendering"
     )
 
 

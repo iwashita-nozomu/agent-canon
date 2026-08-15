@@ -24,6 +24,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import yaml
+from tools.agent_tools.fixture_spawn import record_environment
 from tools.ci.check_github_workflows import check_root_copy_headers
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -31,28 +32,6 @@ SCRIPT = REPO_ROOT / "tools" / "ci" / "check_github_workflows.py"
 RUNTIME_DASHBOARD_WORKFLOW = (
     REPO_ROOT / ".github" / "workflows" / "agent-runtime-dashboard.yml"
 )
-_PARENT_BOUNDARY_PATH_KEYS = (
-    "TMPDIR",
-    "TEMP",
-    "TMP",
-    "XDG_CACHE_HOME",
-    "PYTHONPYCACHEPREFIX",
-    "AGENT_CANON_TOOLS_HOME",
-    "CARGO_HOME",
-    "CARGO_TARGET_DIR",
-    "AGENT_CANON_CLI_TARGET_DIR",
-    "AGENT_CANON_PARENT_ROOT",
-    "AGENT_CANON_PARENT_ROOT_DEV",
-    "AGENT_CANON_PARENT_ROOT_INO",
-    "AGENT_CANON_CHILD_HANDOFF",
-    "AGENT_CANON_CHILD_PURPOSE",
-    "AGENT_CANON_HANDOFF_AUDIENCE",
-    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
-    "AGENT_CANON_ROOT",
-    "AGENT_CANON_SOURCE_ROOT",
-)
-
-
 class GitHubWorkflowCheckTest(unittest.TestCase):
     """Exercise the GitHub workflow checker."""
 
@@ -222,22 +201,21 @@ raise SystemExit(2)
         """Execute the workflow-owned runtime command in a fresh root."""
         _condition, command = self.runtime_graph_command()
         environment = os.environ.copy()
-        for key in _PARENT_BOUNDARY_PATH_KEYS:
-            environment.pop(key, None)
         environment.update(
             {
                 "GITHUB_WORKSPACE": str(root),
                 "GRAPH_BUILD_MODE": build_mode,
             }
         )
-        return subprocess.run(
-            ["bash", "-c", command],
-            cwd=root,
-            env=environment,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+        with record_environment(cwd=root, base_env=environment) as signed_environment:
+            return subprocess.run(
+                ["bash", "-c", command],
+                cwd=root,
+                env=signed_environment,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
 
     def test_runtime_graph_bootstraps_absent_db_and_reads_fresh(self) -> None:
         """The non-PR runtime route builds once before fresh identity readback."""
@@ -1223,21 +1201,19 @@ raise SystemExit(2)
 
     def test_parent_bounded_workflow_writers_use_repo_owned_outputs(self) -> None:
         """Workflow writers authenticate the repo before publishing evidence."""
-        expected = {
-            "AGENT_CANON_PARENT_ROOT": "${{ github.workspace }}",
-            "AGENT_CANON_ACTIVE_REPOSITORY_ROOT": "${{ github.workspace }}",
-        }
         dashboard_path = (
             REPO_ROOT / ".github" / "workflows" / "agent-runtime-dashboard.yml"
         )
         dashboard = yaml.safe_load(dashboard_path.read_text(encoding="utf-8"))
-        self.assertEqual(dashboard["jobs"]["dashboard"]["env"], expected)
+        self.assertNotIn("env", dashboard["jobs"]["dashboard"])
+        self.assertIn("parent_root_side_effects.py public-exec", dashboard_path.read_text(encoding="utf-8"))
 
         issue_path = REPO_ROOT / ".github" / "workflows" / "issue-mirror.yml"
         issue = yaml.safe_load(issue_path.read_text(encoding="utf-8"))
         for job_name in ("issue-mirror-sync", "issue-mirror-check"):
-            self.assertEqual(issue["jobs"][job_name]["env"], expected)
+            self.assertNotIn("env", issue["jobs"][job_name])
         source = issue_path.read_text(encoding="utf-8")
+        self.assertIn("parent_root_side_effects.py public-exec", source)
         self.assertIn(
             'summary_file="${GITHUB_WORKSPACE}/.agent-canon/'
             'issue-mirror-${GITHUB_JOB}.md"',

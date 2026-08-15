@@ -17,48 +17,20 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from tools.agent_tools.fixture_spawn import record_session_from_environment
+from tools.agent_tools.parent_root_side_effects import ParentRootSideEffectBoundary
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "issue_sync.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import issue_sync  # noqa: E402
 
-_PARENT_BOUNDARY_PATH_KEYS = (
-    "TMPDIR",
-    "TEMP",
-    "TMP",
-    "XDG_CACHE_HOME",
-    "PYTHONPYCACHEPREFIX",
-    "AGENT_CANON_TOOLS_HOME",
-    "CARGO_HOME",
-    "CARGO_TARGET_DIR",
-    "AGENT_CANON_CLI_TARGET_DIR",
-    "AGENT_CANON_PARENT_ROOT",
-    "AGENT_CANON_PARENT_ROOT_DEV",
-    "AGENT_CANON_PARENT_ROOT_INO",
-    "AGENT_CANON_CHILD_HANDOFF",
-    "AGENT_CANON_CHILD_PURPOSE",
-    "AGENT_CANON_HANDOFF_AUDIENCE",
-    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
-    "AGENT_CANON_ROOT",
-    "AGENT_CANON_SOURCE_ROOT",
-    "AGENT_CANON_TASK_ID",
-    "AGENT_CANON_REPOSITORY_ID",
-    "AGENT_CANON_TASK_REPOSITORY",
-    "AGENT_CANON_LIFECYCLE_ID",
-    "AGENT_CANON_EXPECTED_IMAGE_TAG",
-    "AGENT_CANON_CONTAINER_LIFECYCLE_RECEIPT",
-)
-
 
 class IssueSyncTest(unittest.TestCase):
     """Exercise local issue validation and sync planning."""
 
-    def parent_bound_environment(
-        self,
-        root: Path,
-        base: dict[str, str] | None = None,
-    ) -> dict[str, str]:
-        """Return a clean environment bound to one real fixture repository."""
+    def prepare_fixture_repository(self, root: Path) -> None:
+        """Create the data-only fixture repository used by issue checks."""
         if not (root / ".git").exists():
             subprocess.run(
                 ["git", "init", "-q", "-b", "main", str(root)],
@@ -94,23 +66,9 @@ class IssueSyncTest(unittest.TestCase):
                 capture_output=True,
                 text=True,
             )
-        environment = (os.environ if base is None else base).copy()
-        for key in _PARENT_BOUNDARY_PATH_KEYS:
-            environment.pop(key, None)
-        fixture_root = str(root.resolve())
-        environment["AGENT_CANON_PARENT_ROOT"] = fixture_root
-        environment["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = fixture_root
-        return environment
-
     def run_checker(self, root: Path, *args: str) -> subprocess.CompletedProcess[str]:
         """Run the issue sync checker in its authenticated fixture root."""
-        return subprocess.run(
-            [sys.executable, str(SCRIPT), "--root", str(root), *args],
-            check=False,
-            capture_output=True,
-            text=True,
-            env=self.parent_bound_environment(root),
-        )
+        return self.run_checker_with_env(root, os.environ.copy(), *args)
 
     def run_checker_with_env(
         self,
@@ -119,13 +77,24 @@ class IssueSyncTest(unittest.TestCase):
         *args: str,
     ) -> subprocess.CompletedProcess[str]:
         """Run issue sync with fake tools inside its authenticated root."""
-        return subprocess.run(
-            [sys.executable, str(SCRIPT), "--root", str(root), *args],
-            check=False,
-            capture_output=True,
-            text=True,
-            env=self.parent_bound_environment(root, env),
-        )
+        self.prepare_fixture_repository(root)
+        previous_cwd = Path.cwd()
+        try:
+            os.chdir(root)
+            with record_session_from_environment() as session:
+                environment = ParentRootSideEffectBoundary().session_environment(
+                    session, env
+                )
+                return subprocess.run(
+                    [sys.executable, str(SCRIPT), "--root", str(root), *args],
+                    cwd=root,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    env=environment,
+                )
+        finally:
+            os.chdir(previous_cwd)
 
     def test_missing_required_field_fails(self) -> None:
         """Local issue files must keep required fields."""

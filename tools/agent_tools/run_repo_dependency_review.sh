@@ -12,10 +12,24 @@
 # upstream implementation ./check_dependency_header_format.sh validates repo-wide manifest syntax
 # upstream implementation ./check_dependency_graph.sh validates repo-wide dependency graph
 # upstream implementation ./check_design_doc_claims.py validates design claims against dependency evidence
+# upstream implementation ../lib/repo_paths.sh separates target data from analyzer tools
 # downstream implementation ../../tools/ci/check_agent_canon_pr.sh runs strict dependency review
 # downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies wrapper behavior
 # @dependency-end
 set -euo pipefail
+
+INVOCATION_SCRIPT="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
+BOUNDARY_SCRIPT="$(dirname "$INVOCATION_SCRIPT")/parent_root_side_effects.py"
+if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
+  if [[ -z "$INVOCATION_SCRIPT" || ! -f "$INVOCATION_SCRIPT" ]]; then
+    echo "REPO_DEPENDENCY_REVIEW=fail reason=invocation_script_missing" >&2
+    exit 2
+  fi
+  exec python3 "$BOUNDARY_SCRIPT" public-exec \
+    --invocation-script "$INVOCATION_SCRIPT" \
+    --purpose dependency-review \
+    -- bash "$INVOCATION_SCRIPT" "$@"
+fi
 
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
@@ -23,22 +37,18 @@ REVIEW_PARENT_ROOT=""
 # shellcheck source=../lib/repo_paths.sh
 source "${script_dir}/../lib/repo_paths.sh"
 
-parent_temp_base() {
-  REVIEW_PARENT_ROOT="$(realpath -e "${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}")" || {
+resolve_review_parent_root() {
+  if [[ -n "${AGENT_CANON_SIDE_EFFECT_PARENT_ROOT:-}" && -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
+    echo "REPO_DEPENDENCY_REVIEW=fail reason=side_effect_session_missing" >&2
+    return 2
+  fi
+  REVIEW_PARENT_ROOT="$(realpath -e "${AGENT_CANON_SIDE_EFFECT_PARENT_ROOT:-$ROOT_DIR}")" || {
     echo "REPO_DEPENDENCY_REVIEW=fail reason=parent_root_missing" >&2
     return 2
   }
-  ROOT_PHYSICAL="$(realpath -e "$ROOT_DIR")" || {
-    echo "REPO_DEPENDENCY_REVIEW=fail reason=root_missing" >&2
-    return 2
-  }
-  case "$ROOT_PHYSICAL" in
-    "$REVIEW_PARENT_ROOT"|"$REVIEW_PARENT_ROOT"/*) ;;
-    *)
-      echo "REPO_DEPENDENCY_REVIEW=fail reason=parent_root_not_ancestor" >&2
-      return 2
-      ;;
-  esac
+}
+
+parent_temp_base() {
   python3 "${script_dir}/parent_root_side_effects.py" temp-dir \
     --root "$REVIEW_PARENT_ROOT" \
     --candidate "$REVIEW_PARENT_ROOT/.agent-canon/tmp/dependency-review" \
@@ -58,12 +68,14 @@ TRUSTED_BASE_SHA=""
 HEADER_SCAN_ONLY=0
 CHECK_DESIGN_DOC_CLAIMS=0
 ENSURE_GRAPH_ONLY=0
+ANALYZER_TOOLS_ROOT_OVERRIDE=""
+declare -a ANALYZER_REQUIRED_ENTRIES=()
 declare -a DESIGN_DOC_CLAIM_PATHS=()
 
 usage() {
   cat <<'EOF'
 Usage:
-  run_repo_dependency_review.sh [--root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--changed-path-packet FILE] [--trusted-base-sha SHA] [--header-scan-only] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH] [--check-design-doc-claims] [--design-doc-claim-path PATH]
+  run_repo_dependency_review.sh [--root DIR] [--analyzer-tools-root DIR] [--check-bidirectional] [--cycle-report-only] [--fail-missing] [--allow-frontmatter] [--explain-missing] [--changed-path-packet FILE] [--trusted-base-sha SHA] [--header-scan-only] [--ensure-graph] [--list-changed-dependencies] [--report-dir DIR] [--graph-tsv PATH] [--search-hits-file PATH] [--check-design-doc-claims] [--design-doc-claim-path PATH]
 
 Runs dependency manifest review against all tracked, checkable text files in the repo.
 This is intended for checkpoint and final review, not just changed-file closeout.
@@ -84,6 +96,8 @@ With --header-scan-only, graph status/query and graph projections are skipped wh
 the strict canonical header scan and format check still run.
 With --ensure-graph, the canonical graph status/build/readback operation runs once
 and exits before dependency-header review.
+With --analyzer-tools-root, the physical analyzer tools tree is selected explicitly;
+otherwise AGENT_CANON_ANALYZER_TOOLS_ROOT or the invocation-source tools tree wins.
 With --check-design-doc-claims, changed design documents are compared with
 dependency header evidence and implementation-backed claim tokens. Repeat
 --design-doc-claim-path to check explicit design documents instead of changed
@@ -135,6 +149,11 @@ while [[ $# -gt 0 ]]; do
       ENSURE_GRAPH_ONLY=1
       shift
       ;;
+    --analyzer-tools-root)
+      [[ $# -ge 2 ]] || { echo "REPO_DEPENDENCY_REVIEW=fail reason=analyzer_tools_root_argument_missing"; exit 2; }
+      ANALYZER_TOOLS_ROOT_OVERRIDE="$2"
+      shift 2
+      ;;
     --list-changed-dependencies)
       LIST_CHANGED_DEPENDENCIES=1
       shift
@@ -176,46 +195,24 @@ ROOT_DIR="$(realpath -e "$ROOT_DIR")" || {
   echo "REPO_DEPENDENCY_REVIEW=fail reason=root_missing"
   exit 2
 }
-SCRIPT_TOOLS_ROOT="$(dirname "$(realpath -m "$script_dir")")"
-cd "$ROOT_DIR"
-
+if [[ -n "$INVOCATION_SCRIPT" ]]; then
+  SCRIPT_TOOLS_ROOT="$(realpath -e "$(dirname "$INVOCATION_SCRIPT")/..")"
+else
+  SCRIPT_TOOLS_ROOT="$(realpath -e "$script_dir/..")"
+fi
 if [[ "$HEADER_SCAN_ONLY" -eq 1 && ( -z "$CHANGED_PATH_PACKET" || -z "$TRUSTED_BASE_SHA" ) ]]; then
   echo "REPO_DEPENDENCY_REVIEW=fail reason=header_scan_trusted_packet_required"
   exit 2
 fi
 
-SCRIPT_TOOLS_ROOT="$(realpath -m "$SCRIPT_TOOLS_ROOT")"
+SCRIPT_TOOLS_ROOT="$(realpath -e "$SCRIPT_TOOLS_ROOT")"
+export PYTHONDONTWRITEBYTECODE=1
 
 if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
-  CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")" || {
-    echo "canonical AgentCanon source tools root is unavailable for root: $ROOT_DIR" >&2
-    exit 1
-  }
-  CANON_TOOLS_ROOT="$(realpath -m "$CANON_TOOLS_ROOT")"
-  SCAN_DEPENDENCY_HEADERS="${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh"
-  CHECK_DEPENDENCY_HEADER_FORMAT="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh"
-  CHECK_DEPENDENCY_GRAPH="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_graph.sh"
-  CHECK_DESIGN_DOC_CLAIMS_TOOL="${CANON_TOOLS_ROOT}/agent_tools/check_design_doc_claims.py"
-  GRAPH_CLI="${CANON_TOOLS_ROOT}/bin/agent-canon"
-  WORKFLOW_MONITOR="${CANON_TOOLS_ROOT}/agent_tools/workflow_monitor.py"
-else
-  SCAN_DEPENDENCY_HEADERS="${SCRIPT_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh"
-  CHECK_DEPENDENCY_HEADER_FORMAT="${SCRIPT_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh"
-  WORKFLOW_MONITOR="${SCRIPT_TOOLS_ROOT}/agent_tools/workflow_monitor.py"
-  CHECK_DEPENDENCY_GRAPH="${SCRIPT_TOOLS_ROOT}/agent_tools/check_dependency_graph.sh"
-  CHECK_DESIGN_DOC_CLAIMS_TOOL="${SCRIPT_TOOLS_ROOT}/agent_tools/check_design_doc_claims.py"
-fi
-
-if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
-  if [[ ! -x "$GRAPH_CLI" ]]; then
-    echo "canonical graph executable is missing for root: $ROOT_DIR" >&2
-    exit 1
-  fi
-
+  # Authenticate the side-effect parent once.  Analyzer source selection is
+  # independent from target repository identity and is validated below.
+  resolve_review_parent_root
   tmp_base="$(parent_temp_base)"
-  status_file="$(mktemp "$tmp_base/status.XXXXXX")"
-  dependency_query_file="$(mktemp "$tmp_base/dependency-query.XXXXXX")"
-  owner_query_file="$(mktemp "$tmp_base/owner-query.XXXXXX")"
   cleanup_review_tmp() {
     local primary_status=$?
     local cleanup_status=0
@@ -230,92 +227,80 @@ if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
   }
   trap cleanup_review_tmp EXIT
 
-  run_graph_status() {
-    local status_rc=0
-    if "$GRAPH_CLI" graph status --root "$ROOT_DIR" --profile default --format json >"$status_file"; then
-      status_rc=0
-    else
-      status_rc=$?
-    fi
-    status_schema="$(jq -r 'if (.schema | type) == "string" then .schema else "invalid" end' "$status_file" 2>/dev/null || true)"
-    status_command="$(jq -r 'if (.command | type) == "string" then .command else "invalid" end' "$status_file" 2>/dev/null || true)"
-    status_name="$(jq -r 'if (.status | type) == "string" then .status else "invalid" end' "$status_file" 2>/dev/null || true)"
-    status_record_exit="$(jq -r 'if ((.exit_code | type) == "number" and .exit_code == (.exit_code | floor)) then (.exit_code | tostring) else "invalid" end' "$status_file" 2>/dev/null || true)"
-    status_reason="$(jq -r 'if .reason == null then "null" elif (.reason | type) == "string" then .reason else "invalid" end' "$status_file" 2>/dev/null || true)"
-    status_probe_reason="$(jq -r 'if .probe_reason == null then "null" elif (.probe_reason | type) == "string" then .probe_reason else "invalid" end' "$status_file" 2>/dev/null || true)"
-    status_schema="${status_schema:-invalid}"
-    status_command="${status_command:-invalid}"
-    status_name="${status_name:-invalid}"
-    status_record_exit="${status_record_exit:-invalid}"
-    status_reason="${status_reason:-invalid}"
-    status_probe_reason="${status_probe_reason:-invalid}"
-    printf '%s\n' "GRAPH_STATUS_RC=${status_rc}"
-    cat "$status_file"
-    return "$status_rc"
-  }
-
-  if run_graph_status; then
-    status_exit=0
-  else
-    status_exit=$?
-  fi
-  status_binding="${status_exit}:${status_schema}:${status_command}:${status_name}:${status_record_exit}:${status_reason}:${status_probe_reason}"
-  fresh_binding="0:agent-canon.graph.status.v1:status:fresh:0:null:null"
-  incomplete_binding="2:agent-canon.graph.status.v1:status:incomplete:2:source_completeness_incomplete:null"
-  source_changed_binding="2:agent-canon.graph.status.v1:status:stale:2:source_changed:source_changed"
-  if [[ "$status_binding" == "$fresh_binding" ]]; then
-    echo "GRAPH_REBUILD=not_needed"
-  elif [[ "$status_binding" == "$incomplete_binding" ]]; then
-    echo "GRAPH_REBUILD=not_needed status=incomplete"
-  elif [[ "$status_binding" == "$source_changed_binding" ]]; then
-    echo "GRAPH_REBUILD=required status=stale reason=source_changed probe_reason=source_changed"
-    set +e
-    "$GRAPH_CLI" graph build --root "$ROOT_DIR" --profile default --format json
-    build_exit=$?
-    set -e
-    if [[ "$build_exit" -ne 0 && "$build_exit" -ne 1 ]]; then
-      echo "REPO_DEPENDENCY_REVIEW=fail"
-      echo "GRAPH_REBUILD=failed rc=${build_exit}"
-      exit "$build_exit"
-    fi
-    echo "GRAPH_REBUILD=performed"
-    if run_graph_status; then
-      status_exit=0
-    else
-      status_exit=$?
-    fi
-    status_binding="${status_exit}:${status_schema}:${status_command}:${status_name}:${status_record_exit}:${status_reason}:${status_probe_reason}"
-  else
-    echo "GRAPH_REBUILD=not_admitted status=${status_name} reason=${status_reason} probe_reason=${status_probe_reason}"
-  fi
-  if [[ "$status_binding" != "$fresh_binding" ]]; then
-    echo "REPO_DEPENDENCY_REVIEW=fail"
-    cat "$status_file"
-    exit 1
-  fi
   if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
-    echo "GRAPH_ENSURE=pass status=fresh"
-    exit 0
+    ANALYZER_REQUIRED_ENTRIES=(
+      "agent_tools/check_dependency_graph.sh"
+      "bin/agent-canon"
+    )
+  else
+    ANALYZER_REQUIRED_ENTRIES=(
+      "agent_tools/scan_dependency_headers.sh"
+      "agent_tools/check_dependency_header_format.sh"
+      "agent_tools/check_dependency_graph.sh"
+      "bin/agent-canon"
+    )
+    if [[ "$CHECK_DESIGN_DOC_CLAIMS" -eq 1 ]]; then
+      ANALYZER_REQUIRED_ENTRIES+=("agent_tools/check_design_doc_claims.py")
+    fi
+    if [[ -n "$REPORT_DIR" ]]; then
+      ANALYZER_REQUIRED_ENTRIES+=("agent_tools/workflow_monitor.py")
+    fi
   fi
-
-  set +e
-  "$GRAPH_CLI" graph query --root "$ROOT_DIR" --profile default --format json --all --relation dependency --direction both --depth 0 >"$dependency_query_file"
-  dependency_exit=$?
-  "$GRAPH_CLI" graph query --root "$ROOT_DIR" --profile default --format json --all --relation owner --direction both --depth 0 >"$owner_query_file"
-  owner_exit=$?
-  set -e
-  if [[ "$dependency_exit" -ne 0 || "$owner_exit" -ne 0 ]] \
-    || [[ "$(jq -r '.status // "invalid"' "$dependency_query_file" 2>/dev/null)" != "fresh" ]] \
-    || [[ "$(jq -r '.status // "invalid"' "$owner_query_file" 2>/dev/null)" != "fresh" ]]; then
-    echo "REPO_DEPENDENCY_REVIEW=fail"
-    cat "$dependency_query_file"
-    cat "$owner_query_file"
-    exit 1
+else
+  # Header-only mode still resolves analyzer source identity, while remaining
+  # independent of graph readiness and graph-specific side effects.
+  if [[ -n "$ANALYZER_TOOLS_ROOT_OVERRIDE" \
+    || -n "${AGENT_CANON_ANALYZER_TOOLS_ROOT:-}" \
+    || -n "$REPORT_DIR" ]]; then
+    resolve_review_parent_root
+  fi
+  ANALYZER_REQUIRED_ENTRIES=(
+    "agent_tools/scan_dependency_headers.sh"
+    "agent_tools/check_dependency_header_format.sh"
+  )
+  if [[ -n "$REPORT_DIR" ]]; then
+    ANALYZER_REQUIRED_ENTRIES+=("agent_tools/workflow_monitor.py")
   fi
 fi
 
+ANALYZER_PHYSICAL_DEFAULT=0
+if [[ -z "$ANALYZER_TOOLS_ROOT_OVERRIDE" \
+  && -z "${AGENT_CANON_ANALYZER_TOOLS_ROOT:-}" ]]; then
+  ANALYZER_PHYSICAL_DEFAULT=1
+fi
+ANALYZER_TOOLS_ROOT="$(agent_canon_analyzer_tools_root \
+  "$INVOCATION_SCRIPT" "$ANALYZER_TOOLS_ROOT_OVERRIDE" "$REVIEW_PARENT_ROOT" \
+  "$ANALYZER_PHYSICAL_DEFAULT" "${ANALYZER_REQUIRED_ENTRIES[@]}")" || {
+  echo "REPO_DEPENDENCY_REVIEW=fail reason=analyzer_tools_root_invalid" >&2
+  exit 2
+}
+SCAN_DEPENDENCY_HEADERS="${ANALYZER_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh"
+CHECK_DEPENDENCY_HEADER_FORMAT="${ANALYZER_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh"
+CHECK_DEPENDENCY_GRAPH="${ANALYZER_TOOLS_ROOT}/agent_tools/check_dependency_graph.sh"
+CHECK_DESIGN_DOC_CLAIMS_TOOL="${ANALYZER_TOOLS_ROOT}/agent_tools/check_design_doc_claims.py"
+WORKFLOW_MONITOR="${ANALYZER_TOOLS_ROOT}/agent_tools/workflow_monitor.py"
+export AGENT_CANON_ANALYZER_TOOLS_ROOT_PHYSICAL_DEFAULT="$ANALYZER_PHYSICAL_DEFAULT"
+
+if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
+  bash "$CHECK_DEPENDENCY_GRAPH" \
+    --root "$ROOT_DIR" \
+    --ensure-graph \
+    --analyzer-tools-root "$ANALYZER_TOOLS_ROOT"
+  exit $?
+fi
+
+if [[ -n "$REPORT_DIR" ]]; then
+  parent_root_real="$REVIEW_PARENT_ROOT"
+  report_real="$(realpath -m "$REPORT_DIR")"
+  case "$report_real" in
+    "$parent_root_real"|"$parent_root_real"/*) ;;
+    *) echo "REPO_DEPENDENCY_REVIEW=fail reason=report_dir_outside_parent"; exit 2 ;;
+  esac
+  mkdir -p "$REPORT_DIR"
+fi
+
 mapfile -t checkable_paths < <(
-  git ls-files | awk '
+  git -C "$ROOT_DIR" ls-files | awk '
     /^reports\/agents\// { next }
     /^reports\/dependency-review\// { next }
     /\.(bash|cfg|css|h|hpp|html|c|cc|cpp|json|md|py|rst|sh|toml|txt|yaml|yml|zsh)$/ { print }
@@ -326,6 +311,8 @@ echo "REPO_DEPENDENCY_REVIEW_PATHS=${#checkable_paths[@]}"
 
 scan_args=("$SCAN_DEPENDENCY_HEADERS")
 format_args=("$CHECK_DEPENDENCY_HEADER_FORMAT")
+scan_args+=(--root "$ROOT_DIR")
+format_args+=(--root "$ROOT_DIR")
 if [[ -n "$CHANGED_PATH_PACKET" ]]; then
   scan_args+=(--changed-path-packet "$CHANGED_PATH_PACKET")
   scan_args+=(--trusted-base-sha "$TRUSTED_BASE_SHA")
@@ -362,22 +349,11 @@ if [[ "$HEADER_SCAN_ONLY" -eq 1 ]]; then
   exit 0
 fi
 
-if [[ -n "$REPORT_DIR" ]]; then
-  if [[ -n "${AGENT_CANON_PARENT_ROOT:-}" ]]; then
-    parent_root_real="$(realpath -m "$AGENT_CANON_PARENT_ROOT")"
-    report_real="$(realpath -m "$REPORT_DIR")"
-    case "$report_real" in
-      "$parent_root_real"|"$parent_root_real"/*) ;;
-      *) echo "REPO_DEPENDENCY_REVIEW=fail reason=report_dir_outside_parent"; exit 2 ;;
-    esac
-  fi
-  mkdir -p "$REPORT_DIR"
-fi
 if [[ -z "$GRAPH_TSV_OUTPUT" && -n "$REPORT_DIR" ]]; then
   GRAPH_TSV_OUTPUT="$REPORT_DIR/dependency_graph.tsv"
 fi
 
-graph_args=("$CHECK_DEPENDENCY_GRAPH")
+graph_args=("$CHECK_DEPENDENCY_GRAPH" --root "$ROOT_DIR" --analyzer-tools-root "$ANALYZER_TOOLS_ROOT")
 if [[ "$CHECK_BIDIRECTIONAL" -eq 1 ]]; then
   graph_args+=(--check-bidirectional)
 fi
@@ -390,17 +366,19 @@ fi
 if [[ -n "$GRAPH_TSV_OUTPUT" ]]; then
   graph_args+=(--graph-tsv "$GRAPH_TSV_OUTPUT")
 fi
-bash "${graph_args[@]}" "${checkable_paths[@]}"
-
 if [[ "$LIST_CHANGED_DEPENDENCIES" -eq 1 ]]; then
-  related_args=("$CHECK_DEPENDENCY_GRAPH" --list-related --focus-changed)
-  if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
-    related_args+=(--cycle-report-only)
-  fi
-  if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
-    related_args+=(--allow-frontmatter)
-  fi
-  bash "${related_args[@]}" "${checkable_paths[@]}"
+  graph_args+=(--list-related --focus-changed)
+fi
+if [[ -n "$SEARCH_HITS_FILE" ]]; then
+  graph_args+=(--search-hits-file "$SEARCH_HITS_FILE")
+elif [[ -n "$REPORT_DIR" ]]; then
+  graph_args+=(--edit-scope-changed)
+fi
+
+if [[ -n "$REPORT_DIR" ]]; then
+  bash "${graph_args[@]}" "${checkable_paths[@]}" | tee "$REPORT_DIR/dependency_edit_scope.txt"
+else
+  bash "${graph_args[@]}" "${checkable_paths[@]}"
 fi
 
 if [[ "$CHECK_DESIGN_DOC_CLAIMS" -eq 1 ]]; then
@@ -411,30 +389,6 @@ if [[ "$CHECK_DESIGN_DOC_CLAIMS" -eq 1 ]]; then
     design_claim_args+=(--changed)
   fi
   python3 "${design_claim_args[@]}"
-fi
-
-if [[ -n "$SEARCH_HITS_FILE" ]]; then
-  edit_scope_args=("$CHECK_DEPENDENCY_GRAPH" --search-hits-file "$SEARCH_HITS_FILE")
-  if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
-    edit_scope_args+=(--cycle-report-only)
-  fi
-  if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
-    edit_scope_args+=(--allow-frontmatter)
-  fi
-  if [[ -n "$REPORT_DIR" ]]; then
-    bash "${edit_scope_args[@]}" "${checkable_paths[@]}" | tee "$REPORT_DIR/dependency_edit_scope.txt"
-  else
-    bash "${edit_scope_args[@]}" "${checkable_paths[@]}"
-  fi
-elif [[ -n "$REPORT_DIR" ]]; then
-  edit_scope_args=("$CHECK_DEPENDENCY_GRAPH" --edit-scope-changed)
-  if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
-    edit_scope_args+=(--cycle-report-only)
-  fi
-  if [[ "$ALLOW_FRONTMATTER" -eq 1 ]]; then
-    edit_scope_args+=(--allow-frontmatter)
-  fi
-  bash "${edit_scope_args[@]}" "${checkable_paths[@]}" | tee "$REPORT_DIR/dependency_edit_scope.txt"
 fi
 
 echo "REPO_DEPENDENCY_REVIEW=pass"

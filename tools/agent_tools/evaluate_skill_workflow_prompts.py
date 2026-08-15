@@ -37,11 +37,10 @@ from eval_manifest_paths import (
     resolve_eval_manifest,
 )
 from parent_root_side_effects import (
-    ParentRootAttestationRequest,
     ParentRootReject,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    attest_parent_root,
+    resolve_parent_writer_attestation,
 )
 from runtime_log_paths import agent_canon_root, eval_results_dir
 from workflow_monitor import MonitoringEntries, append_monitoring
@@ -57,11 +56,10 @@ COMPACT_FAILED_CHECK_SAMPLE_LIMIT = 25
 
 
 def _parent_capability(purpose: str):
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
-    parent = Path(configured)
-    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
+    attestation = resolve_parent_writer_attestation(purpose=purpose)
     return ParentRootSideEffectBoundary(), attestation
 
 

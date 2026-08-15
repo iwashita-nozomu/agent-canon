@@ -30,19 +30,17 @@ import yaml
 
 try:
     from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 
 if __package__ in (None, ""):
@@ -63,16 +61,13 @@ TOKEN_RE = re.compile(r"[0-9A-Za-z_\u0080-\uFFFF]+")
 
 
 def _parent_write(path: Path, data: bytes, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(
             ParentRootReject.HANDOFF_INVALID,
             f"{purpose}: explicit parent root is required",
         )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-    )
+    attestation = resolve_parent_writer_attestation(purpose=purpose)
     ParentRootSideEffectBoundary().write_parent_owned_file(
         attestation, path, data, purpose
     )

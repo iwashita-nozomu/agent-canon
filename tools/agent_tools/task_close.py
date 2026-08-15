@@ -30,21 +30,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import capacity_handshake
 from parent_root_side_effects import (
-    ParentRootAttestationRequest,
     ParentRootReject,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    attest_parent_root,
+    resolve_parent_writer_attestation,
 )
 
 
 def _parent_validate(path: Path, purpose: str) -> None:
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, f"{purpose}: explicit parent root is required")
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose))
-    ParentRootSideEffectBoundary().resolve_parent_owned_path(attestation, path, purpose, create=False)
+    attestation = resolve_parent_writer_attestation(purpose=purpose)
+    boundary = ParentRootSideEffectBoundary()
+    receipt = boundary.resolve_parent_owned_path(attestation, path, purpose, create=False)
+    boundary.release_parent_owned_path(receipt)
 
 if __package__:
     from .tool_calls import (
@@ -500,7 +500,7 @@ def current_diff_ref(workspace: Path) -> str:
     diff_bytes = unstaged.stdout + staged.stdout
     if untracked.returncode == 0 and untracked.stdout:
         for raw_path in sorted(path for path in untracked.stdout.split(b"\0") if path):
-            if raw_path.startswith(b"reports/agents/"):
+            if raw_path.startswith((b"reports/agents/", b".agent-canon/")):
                 continue
             path = workspace / raw_path.decode("utf-8", errors="surrogateescape")
             diff_bytes += b"\0UNTRACKED\0" + raw_path + b"\0"

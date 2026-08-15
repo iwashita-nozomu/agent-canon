@@ -50,11 +50,17 @@ class DependencyModuleChangeError(RuntimeError):
 def _attested_workspace_root(root: Path) -> Path:
     """Resolve the selected parent through the shared side-effect boundary."""
     try:
-        return _parent_boundary.attest_parent_root(
-            _parent_boundary.ParentRootAttestationRequest(
-                cwd=root, explicit_root=root, purpose="dependency-module-change"
-            )
-        ).parent_root
+        attestation = _parent_boundary.resolve_parent_writer_attestation(
+            purpose="dependency-module-change"
+        )
+        boundary = _parent_boundary.ParentRootSideEffectBoundary()
+        receipt = boundary.resolve_parent_owned_path(
+            attestation, root, "dependency-module-change-root", create=False
+        )
+        try:
+            return receipt.physical_path
+        finally:
+            boundary.release_parent_owned_path(receipt)
     except Exception as exc:
         reject = getattr(getattr(exc, "reject", None), "value", "boundary")
         detail = getattr(exc, "detail", str(exc))

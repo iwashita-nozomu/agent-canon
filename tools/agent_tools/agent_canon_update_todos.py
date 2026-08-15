@@ -13,8 +13,8 @@ from __future__ import annotations
 
 import argparse
 import json
-import subprocess
 import os
+import subprocess
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -30,19 +30,19 @@ from typing import cast
 
 try:
     from .parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        public_session,
+        resolve_parent_writer_attestation,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        public_session,
+        resolve_parent_writer_attestation,
     )
 
 DEFAULT_MANIFEST = Path("documents/agent-canon/agent-canon-update-tasks.toml")
@@ -55,12 +55,9 @@ STATE_TABLE = "agent_canon_update"
 
 def _write_parent_path(path: Path, payload: bytes, purpose: str) -> None:
     """Publish TODO state/artifacts through the outer parent capability."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
     if configured:
-        parent = Path(configured).resolve(strict=True)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose=purpose)
-        )
+        attestation = resolve_parent_writer_attestation(purpose=purpose)
         ParentRootSideEffectBoundary().write_parent_owned_file(attestation, path, payload, purpose)
         return
     raise ParentRootSideEffectError(
@@ -768,64 +765,73 @@ def run_plan(paths: Paths, target_commit: str, *, write: bool) -> int:
     return 0
 
 
-def main() -> int:
-    """Run the update TODO command."""
-    args = build_parser().parse_args()
+def _run_authenticated(args: argparse.Namespace) -> int:
+    """Run one update TODO command inside its signed public session."""
     paths = Paths.from_args(args)
+    target_commit = parent_target_commit(paths, args.target_commit or "")
+    if args.command == "init":
+        result = write_initial_state(paths, target_commit, force=args.force)
+        print(f"AGENT_CANON_UPDATE_TODO_INIT={result}")
+        print(f"AGENT_CANON_UPDATE_TODO_STATE={paths.relative(paths.state_path).as_posix()}")
+        print(f"AGENT_CANON_UPDATE_TODO_TARGET_COMMIT={target_commit}")
+        return 0
+    if args.command in {"plan", "status"}:
+        return run_plan(paths, target_commit, write=getattr(args, "write", False))
+    if args.command == "complete":
+        update_task_state(
+            paths,
+            args.task_id,
+            status="done",
+            note=args.note,
+            owner=args.owner,
+            target_commit=target_commit,
+        )
+        return 0
+    if args.command == "defer":
+        update_task_state(
+            paths,
+            args.task_id,
+            status="deferred",
+            note=args.reason,
+            owner=args.owner,
+            target_commit=target_commit,
+        )
+        return 0
+    if args.command == "not-applicable":
+        update_task_state(
+            paths,
+            args.task_id,
+            status="not_applicable",
+            note=args.reason,
+            owner=args.owner,
+            target_commit=target_commit,
+        )
+        return 0
+    if args.command == "acknowledge":
+        decision = acknowledge_decision(paths, target_commit)
+        print_plan(decision.plan)
+        if not decision.can_acknowledge() or decision.state is None:
+            return 1
+        write_acknowledged_state(paths, decision.state, target_commit)
+        print("AGENT_CANON_UPDATE_TODO_ACKNOWLEDGED=yes")
+        return 0
+    raise RuntimeError(f"unsupported command: {args.command}")
+
+
+def main() -> int:
+    """Run the update TODO command under a signed public session."""
+    args = build_parser().parse_args()
     try:
-        target_commit = parent_target_commit(paths, args.target_commit or "")
-        if args.command == "init":
-            result = write_initial_state(paths, target_commit, force=args.force)
-            print(f"AGENT_CANON_UPDATE_TODO_INIT={result}")
-            print(f"AGENT_CANON_UPDATE_TODO_STATE={paths.relative(paths.state_path).as_posix()}")
-            print(f"AGENT_CANON_UPDATE_TODO_TARGET_COMMIT={target_commit}")
-            return 0
-        if args.command in {"plan", "status"}:
-            return run_plan(paths, target_commit, write=getattr(args, "write", False))
-        if args.command == "complete":
-            update_task_state(
-                paths,
-                args.task_id,
-                status="done",
-                note=args.note,
-                owner=args.owner,
-                target_commit=target_commit,
-            )
-            return 0
-        if args.command == "defer":
-            update_task_state(
-                paths,
-                args.task_id,
-                status="deferred",
-                note=args.reason,
-                owner=args.owner,
-                target_commit=target_commit,
-            )
-            return 0
-        if args.command == "not-applicable":
-            update_task_state(
-                paths,
-                args.task_id,
-                status="not_applicable",
-                note=args.reason,
-                owner=args.owner,
-                target_commit=target_commit,
-            )
-            return 0
-        if args.command == "acknowledge":
-            decision = acknowledge_decision(paths, target_commit)
-            print_plan(decision.plan)
-            if not decision.can_acknowledge() or decision.state is None:
-                return 1
-            write_acknowledged_state(paths, decision.state, target_commit)
-            print("AGENT_CANON_UPDATE_TODO_ACKNOWLEDGED=yes")
-            return 0
+        with public_session(
+            invocation_script=Path(__file__),
+            purpose="agent-canon-update-todos",
+        ):
+            return _run_authenticated(args)
     except RuntimeError as exc:
         print("AGENT_CANON_UPDATE_TODO_STATUS=error")
         print(f"AGENT_CANON_UPDATE_TODO_REASON={exc}")
         print("AGENT_CANON_UPDATE_TODO_NEXT=repair_update_todo_state")
         return 1
-    raise RuntimeError(f"unsupported command: {args.command}")
 
 
 if __name__ == "__main__":

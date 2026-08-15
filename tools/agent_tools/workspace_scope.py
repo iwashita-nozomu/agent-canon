@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
 import subprocess
 from dataclasses import dataclass
@@ -22,21 +21,19 @@ from pathlib import Path
 
 try:
     from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
         ensure_parent_owned_directory,
         resolve_parent_owned_path,
+        resolve_parent_writer_attestation,
     )
 except ImportError:  # direct script/module execution
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
         ensure_parent_owned_directory,
         resolve_parent_owned_path,
+        resolve_parent_writer_attestation,
     )
 from typing import TYPE_CHECKING
 
@@ -164,35 +161,18 @@ def resolve_report_root(
         workspace_root.resolve() if workspace_root is not None else Path.cwd().resolve()
     )
     try:
-        # A caller may run from a nested checkout while its report bundle is
-        # intentionally owned by the already-authenticated outer repository.
-        # Authenticate that explicit parent through Git before accepting the
-        # capability; the environment variable is only a path selector and is
-        # never trusted as identity evidence on its own.  Attesting with the
-        # parent as cwd avoids replacing the selected outer boundary with the
-        # nested checkout's Git toplevel.
-        configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-        if configured_parent:
-            parent_root = Path(configured_parent).resolve(strict=True)
-            attestation = attest_parent_root(
-                ParentRootAttestationRequest(
-                    cwd=parent_root,
-                    explicit_root=parent_root,
-                    purpose="report-root",
-                )
-            )
-        else:
-            attestation = attest_parent_root(
-                ParentRootAttestationRequest(
-                    cwd=base_root, explicit_root=None, purpose="report-root"
-                )
-            )
+        # The signed channel owns authority; report_root remains a data path.
+        attestation = resolve_parent_writer_attestation(purpose="report-root")
         candidate = DEFAULT_REPORT_ROOT if report_root is None else Path(report_root)
         if not candidate.is_absolute():
             candidate = base_root / candidate
-        return resolve_parent_owned_path(
+        receipt = resolve_parent_owned_path(
             attestation, candidate, "report-root", create=False
-        ).physical_path
+        )
+        try:
+            return receipt.physical_path
+        finally:
+            ParentRootSideEffectBoundary().release_parent_owned_path(receipt)
     except ParentRootSideEffectError as exc:
         raise ReportBundleArtifactPathError(
             str(report_root or DEFAULT_REPORT_ROOT), exc.reject.value
@@ -229,35 +209,13 @@ def resolve_report_bundle_artifact_path(
             raise ReportBundleArtifactPathError(declared_path, "outside_bundle")
     report_root = report_dir.resolve()
     try:
-        configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-        if configured_parent:
-            attestation_root = Path(configured_parent).resolve()
-            attestation = attest_parent_root(
-                ParentRootAttestationRequest(
-                    cwd=attestation_root,
-                    explicit_root=attestation_root,
-                    purpose="report-artifact",
-                )
-            )
-        else:
-            attestation_cwd = report_root
-            while not attestation_cwd.exists():
-                parent = attestation_cwd.parent
-                if parent == attestation_cwd:
-                    break
-                attestation_cwd = parent
-            attestation = attest_parent_root(
-                ParentRootAttestationRequest(
-                    cwd=attestation_cwd,
-                    explicit_root=None,
-                    purpose="report-artifact",
-                )
-            )
+        attestation = resolve_parent_writer_attestation(purpose="report-artifact")
         # This is a non-creating capability check; the lexical checks below
         # continue to provide the stable report-specific error taxonomy.
-        resolve_parent_owned_path(
+        receipt = resolve_parent_owned_path(
             attestation, report_root / Path(declared_path), "report-artifact"
         )
+        ParentRootSideEffectBoundary().release_parent_owned_path(receipt)
     except ParentRootSideEffectError as exc:
         raise ReportBundleArtifactPathError(declared_path, exc.reject.value) from exc
     lexical_path = report_root
@@ -555,9 +513,7 @@ def load_directory_snapshot(path: Path) -> dict[str, str]:
 def write_directory_snapshot(root: Path, output_path: Path) -> None:
     """Write the current directory snapshot to json."""
     try:
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=root.resolve(), explicit_root=None, purpose="directory-snapshot")
-        )
+        attestation = resolve_parent_writer_attestation(purpose="directory-snapshot")
         ensure_parent_owned_directory(attestation, output_path.parent, "directory-snapshot-parent")
         receipt = resolve_parent_owned_path(attestation, output_path, "directory-snapshot")
         ParentRootSideEffectBoundary().atomic_publish(
@@ -595,9 +551,7 @@ def write_workspace_change_snapshot(
 ) -> None:
     """Write the current git-visible workspace change snapshot to json."""
     try:
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=workspace_root.resolve(), explicit_root=None, purpose="workspace-snapshot")
-        )
+        attestation = resolve_parent_writer_attestation(purpose="workspace-snapshot")
         ensure_parent_owned_directory(attestation, output_path.parent, "workspace-snapshot-parent")
         receipt = resolve_parent_owned_path(attestation, output_path, "workspace-snapshot")
         ParentRootSideEffectBoundary().atomic_publish(

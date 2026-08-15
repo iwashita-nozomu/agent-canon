@@ -53,10 +53,9 @@ if str(AGENT_TOOLS_DIR) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS_DIR))
 
 from parent_root_side_effects import (  # noqa: E402
-    ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    attest_parent_root,
+    resolve_parent_writer_attestation,
 )
 
 PARENT_ENVIRONMENT_MANIFEST = ".devcontainer/parent-environment.toml"
@@ -2037,11 +2036,7 @@ def validate_generated_compose_scenarios(
     temporary_parent_existed = temporary_parent.is_dir()
     agent_canon_dir_existed = agent_canon_dir.is_dir()
     try:
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(
-                cwd=root, explicit_root=root, purpose="container-config-runtime"
-            )
-        )
+        attestation = resolve_parent_writer_attestation(purpose="container-config-runtime")
         temporary = boundary.create_parent_owned_temp_directory(
             attestation,
             temporary_parent,

@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -15,17 +16,35 @@ import subprocess
 import sys
 import threading
 import time
+from collections.abc import Iterator
+from contextlib import contextmanager
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 import tools.agent_tools.parent_root_side_effects as side_effects
+from tools.agent_tools import work_log, workflow_monitor
+from tools.agent_tools.fixture_spawn import run_fixture_command
 from tools.agent_tools.parent_root_side_effects import (
+    SCHEMA_SESSION_RECORD_V2,
     ParentRootAttestationRequest,
     ParentRootReject,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    child_environment,
+    SessionResolutionError,
+    SessionResolutionResult,
+    attest_parent_root,
+    current_supervisor_issuer,
+    parse_session_record_v2,
+    public_session,
     resolve_parent_owned_path,
+)
+
+_PARENT_ROOT_SIDE_EFFECTS_SCRIPT = (
+    Path(__file__).resolve().parents[2]
+    / "tools"
+    / "agent_tools"
+    / "parent_root_side_effects.py"
 )
 
 _PARENT_BOUNDARY_PATH_KEYS = (
@@ -59,6 +78,37 @@ def _build_clean_env(overrides: dict[str, str] | None = None) -> dict[str, str]:
     return env
 
 
+@contextmanager
+def _authenticated_cli_env(
+    root: Path,
+    *,
+    purpose: str,
+    base_env: dict[str, str] | None = None,
+    rebase_inherited_temp: bool = False,
+) -> Iterator[tuple[ParentRootSideEffectBoundary, SessionResolutionResult, dict[str, str]]]:
+    """Build a session-authenticated child environment without ambient identity."""
+    if not (root / ".git").exists():
+        git_repo(root, remote="https://example.invalid/parent.git")
+    invocation_script = root / ".agent-canon" / "cli-runner.py"
+    invocation_script.parent.mkdir(parents=True, exist_ok=True)
+    invocation_script.write_text("# authenticated CLI runner\n", encoding="utf-8")
+    previous_cwd = Path.cwd()
+    os.chdir(root)
+    try:
+        with public_session(invocation_script=invocation_script, purpose=purpose) as session:
+            boundary = ParentRootSideEffectBoundary()
+            env = boundary.child_environment(
+                session.attestation,
+                base_env if base_env is not None else _build_clean_env(),
+                issue_handoff=False,
+                rebase_inherited_temp=rebase_inherited_temp,
+            )
+            assert "AGENT_CANON_PARENT_ROOT" not in env
+            yield boundary, session, env
+    finally:
+        os.chdir(previous_cwd)
+
+
 def git_repo(path: Path, *, remote: str | None = None) -> None:
     path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init", "-q", "-b", "main", str(path)], check=True)
@@ -67,6 +117,69 @@ def git_repo(path: Path, *, remote: str | None = None) -> None:
     subprocess.run(["git", "-C", str(path), "-c", "user.name=Test", "-c",
                     "user.email=test@example.invalid", "commit", "--allow-empty",
                     "-m", "fixture"], check=True, capture_output=True)
+
+
+@contextmanager
+def _record_fixture_session(
+    parent: Path, fixture: Path, monkeypatch: pytest.MonkeyPatch
+) -> Iterator[SessionResolutionResult]:
+    """Open one record result for the central fixture-direct facade tests."""
+    script = parent / ".agent-canon" / "record-runner.py"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text("# record runner\n", encoding="utf-8")
+    previous_cwd = Path.cwd()
+    monkeypatch.chdir(parent)
+    try:
+        with public_session(invocation_script=script, purpose="fixture-direct-test"):
+            issuer = current_supervisor_issuer()
+            assert issuer is not None
+            child = issuer.issue_child(
+                role="record", record_id=f"fixture-record-{time.monotonic_ns()}",
+                physical_root=parent, now_mono_ns=time.monotonic_ns(),
+            )
+            environment = {
+                side_effects.SIDE_EFFECT_PARENT_ROOT_ENV: str(parent.resolve()),
+                side_effects.SIDE_EFFECT_HANDOFF_ENV: child.handoff,
+                side_effects.SIDE_EFFECT_REQUIRED_ENV: "1",
+            }
+            monkeypatch.chdir(fixture)
+            record = side_effects.resolve_parent_side_effect_session_v2(
+                env=environment, observed_cwd=fixture.resolve(),
+            )
+            try:
+                yield record
+            finally:
+                record.close()
+                issuer.revoke_drain_child(
+                    child=child.child, reason="normal_exit",
+                    now_mono_ns=time.monotonic_ns(),
+                )
+    finally:
+        monkeypatch.chdir(previous_cwd)
+
+
+def unborn_git_repo(path: Path, *, remote: str) -> None:
+    """Create a standalone Git checkout whose owner has no commit yet."""
+    path.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-q", "-b", "main", str(path)], check=True)
+    subprocess.run(["git", "-C", str(path), "remote", "add", "origin", remote], check=True)
+
+
+def commit_gitlink(parent: Path, source: Path, relative: str) -> None:
+    """Commit a .gitmodules entry and an exact source gitlink in parent."""
+    source_commit = subprocess.run(
+        ["git", "-C", str(source), "rev-parse", "HEAD"],
+        check=True, capture_output=True, text=True,
+    ).stdout.strip()
+    subprocess.run(["git", "-C", str(parent), "add", ".gitmodules"], check=True)
+    subprocess.run([
+        "git", "-C", str(parent), "update-index", "--add", "--cacheinfo",
+        f"160000,{source_commit},{relative}",
+    ], check=True)
+    subprocess.run([
+        "git", "-C", str(parent), "-c", "user.name=Test", "-c",
+        "user.email=test@example.invalid", "commit", "-m", "gitlink",
+    ], check=True, capture_output=True)
 
 
 def pending_handoff_nonces(root: Path) -> dict[str, object]:
@@ -78,11 +191,310 @@ def pending_handoff_nonces(root: Path) -> dict[str, object]:
     return value
 
 
+def test_public_session_accepts_unborn_standalone_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unborn standalone checkout remains its own public-session owner."""
+    unborn_git_repo(tmp_path, remote="https://example.invalid/unborn.git")
+    script = tmp_path / "runner.py"
+    script.write_text("# public runner\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    with public_session(invocation_script=script, purpose="unborn-standalone") as session:
+        assert session.parent_root == tmp_path.resolve()
+        assert session.attestation.parent_root == tmp_path.resolve()
+        assert session.attestation.source_root is None
+
+
+def test_public_session_keeps_committed_standalone_owner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A committed standalone checkout is not promoted to an arbitrary ancestor."""
+    git_repo(tmp_path, remote="https://example.invalid/standalone.git")
+    script = tmp_path / "runner.py"
+    script.write_text("# public runner\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+
+    with public_session(invocation_script=script, purpose="committed-standalone") as session:
+        assert session.parent_root == tmp_path.resolve()
+        assert session.attestation.source_root is None
+
+
+def test_public_session_promotes_exact_vendored_gitlink(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only an exact committed .gitmodules/gitlink relation promotes the parent."""
+    parent = tmp_path / "parent"
+    source = parent / "vendor" / "agent-canon"
+    git_repo(parent, remote="https://example.invalid/parent.git")
+    git_repo(source, remote="https://example.invalid/source.git")
+    module = parent / ".gitmodules"
+    module.write_text(
+        '[submodule "vendor/agent-canon"]\n'
+        '\tpath = vendor/agent-canon\n'
+        '\turl = https://example.invalid/source.git\n',
+        encoding="utf-8",
+    )
+    commit_gitlink(parent, source, "vendor/agent-canon")
+    script = source / "runner.py"
+    script.write_text("# public runner\n", encoding="utf-8")
+    monkeypatch.chdir(source)
+
+    with public_session(invocation_script=script, purpose="vendored-exact") as session:
+        assert session.parent_root == parent.resolve()
+        assert session.attestation.parent_root == parent.resolve()
+        assert session.attestation.source_root == source.resolve()
+
+
+def test_public_session_does_not_promote_unrelated_nested_repo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An unrelated nested checkout remains independent of its outer repository."""
+    parent = tmp_path / "parent"
+    nested = parent / "nested"
+    git_repo(parent, remote="https://example.invalid/parent.git")
+    git_repo(nested, remote="https://example.invalid/nested.git")
+    (parent / ".gitmodules").write_text(
+        '[submodule "vendor/other"]\n'
+        '\tpath = vendor/other\n'
+        '\turl = https://example.invalid/other.git\n',
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "-C", str(parent), "add", ".gitmodules"], check=True)
+    subprocess.run([
+        "git", "-C", str(parent), "-c", "user.name=Test", "-c",
+        "user.email=test@example.invalid", "commit", "-m", "manifest",
+    ], check=True, capture_output=True)
+    script = nested / "runner.py"
+    script.write_text("# public runner\n", encoding="utf-8")
+    monkeypatch.chdir(nested)
+
+    with public_session(invocation_script=script, purpose="nested-unrelated") as session:
+        assert session.parent_root == nested.resolve()
+        assert session.attestation.source_root is None
+
+
+def test_v2_session_record_has_canonical_order_and_hmac(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Public bootstrap writes one signed v2 record with exact field order."""
+    git_repo(tmp_path, remote="https://example.invalid/v2.git")
+    script = tmp_path / "runner.py"
+    script.write_text("# public runner\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    with public_session(invocation_script=script, purpose="v2-schema") as session:
+        assert session.record is not None
+        assert session.record.schema == SCHEMA_SESSION_RECORD_V2
+        assert session.record.role == "supervisor"
+        key = tmp_path / ".agent-canon" / "runtime" / "side-effect-sessions-v2" / (
+            f"issuer-{session.record.issuer_id}.key"
+        )
+        record = parse_session_record_v2(session.state_path.read_bytes(), key.read_bytes())
+        assert tuple(record.as_mapping()) == side_effects.SESSION_RECORD_FIELDS
+        assert record.transition_reason is None
+
+
+def test_v2_parser_rejects_historical_v1_payload() -> None:
+    """The superseded v1 transport cannot enter the v2 resolver."""
+    with pytest.raises(SessionResolutionError, match="session_record_fields|v1_session_record_rejected"):
+        parse_session_record_v2(
+            '{"schema":"agent-canon.parent-side-effect-session.v1"}', b"k" * 32
+        )
+
+
+def test_v2_supervisor_horizon_and_nonce_are_immutable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Children inherit one issuer-owned deadline and stable nonce."""
+    git_repo(tmp_path, remote="https://example.invalid/v2-horizon.git")
+    script = tmp_path / "runner.py"
+    script.write_text("# public runner\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    with public_session(invocation_script=script, purpose="v2-horizon") as outer:
+        issuer = current_supervisor_issuer()
+        assert issuer is not None
+        child = issuer.issue_child(
+            role="record", record_id="horizon-record", physical_root=tmp_path,
+            now_mono_ns=outer.record.issued_mono_ns + 1,
+        )
+        assert child.record.expires_mono_ns == outer.record.expires_mono_ns
+        assert child.record.nonce == child.child.nonce
+        with pytest.raises(SessionResolutionError, match="SESSION_HORIZON_MISMATCH"):
+            side_effects._v2_issue_session(
+                tmp_path, role="record", record_id="bad-horizon", root=tmp_path,
+                now_mono_ns=outer.record.issued_mono_ns + 1,
+                expires_mono_ns=outer.record.expires_mono_ns + 1,
+                expected_expires_mono_ns=outer.record.expires_mono_ns,
+                issuer_id=outer.record.issuer_id,
+                issuer_key=side_effects._v2_read_key(outer.record),
+            )
+        issuer.revoke_drain_child(
+            child=child.child, reason="normal_exit",
+            now_mono_ns=child.record.issued_mono_ns + 1,
+        )
+
+
+def test_public_session_keeps_the_short_default_horizon(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The runner-only factory does not change public_session's 900-second TTL."""
+    git_repo(tmp_path, remote="https://example.invalid/public-default-ttl.git")
+    script = tmp_path / "runner.py"
+    script.write_text("# public runner\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    with public_session(invocation_script=script, purpose="public-default-ttl") as session:
+        assert session.record.expires_mono_ns - session.record.issued_mono_ns == side_effects.SESSION_TTL_NS
+
+
+def test_private_runner_factory_requires_marker_and_owns_exact_horizon(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Only the runner marker opens the immutable four-hour supervisor session."""
+    git_repo(tmp_path, remote="https://example.invalid/private-runner.git")
+    script = tmp_path / "runner.py"
+    script.write_text("# runner\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SessionResolutionError) as rejected:
+        with side_effects._open_runner_session(object(), script):
+            pass
+    assert rejected.value.reject is ParentRootReject.INPUT_INVALID
+
+    with side_effects._open_runner_session(side_effects._RUNNER_CALLER_MARKER, script) as (
+        session,
+        horizon,
+    ):
+        assert horizon.run_deadline_mono_ns - horizon.run_started_mono_ns == side_effects._RUNNER_HORIZON_NS
+        assert session.record.expires_mono_ns == horizon.run_deadline_mono_ns
+        issuer = current_supervisor_issuer()
+        assert issuer is not None
+        assert issuer.session.expires_mono_ns == horizon.run_deadline_mono_ns
+
+
+def test_private_runner_factory_rejects_locked_horizon_mismatch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The private factory fails before yielding if its locked record drifts."""
+    git_repo(tmp_path, remote="https://example.invalid/private-runner-mismatch.git")
+    script = tmp_path / "runner.py"
+    script.write_text("# runner\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    real_bootstrap = side_effects._v2_public_bootstrap
+
+    def drifted_bootstrap(**kwargs: object) -> tuple[SessionResolutionResult, object]:
+        result, issuer = real_bootstrap(**kwargs)  # type: ignore[arg-type]
+        current = side_effects._v2_read_record(result.state_path, issuer._key)  # type: ignore[attr-defined]
+        side_effects._v2_write_record(
+            replace(current, expires_mono_ns=current.expires_mono_ns + 1),
+            issuer._key,  # type: ignore[attr-defined]
+        )
+        return result, issuer
+
+    monkeypatch.setattr(side_effects, "_v2_public_bootstrap", drifted_bootstrap)
+    with pytest.raises(SessionResolutionError, match="SESSION_HORIZON_MISMATCH"):
+        with side_effects._open_runner_session(side_effects._RUNNER_CALLER_MARKER, script):
+            pass
+
+
+def test_public_bootstrap_abort_runs_after_result_close_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A failed result close cannot skip removal of the issued session/key."""
+    git_repo(tmp_path, remote="https://example.invalid/bootstrap-cleanup.git")
+    monkeypatch.chdir(tmp_path)
+    primary = SessionResolutionError(ParentRootReject.HANDOFF_INVALID, "injected bootstrap failure")
+
+    def fail_open(**_kwargs: object) -> object:
+        raise primary
+
+    def fail_close(_result: SessionResolutionResult) -> None:
+        raise RuntimeError("injected result close failure")
+
+    monkeypatch.setattr(side_effects, "_open_supervisor_issuer", fail_open)
+    monkeypatch.setattr(SessionResolutionResult, "close", fail_close)
+    with pytest.raises(SessionResolutionError, match="bootstrap_cleanup_failed") as rejected:
+        side_effects._v2_public_bootstrap(
+            parent_root=tmp_path,
+            purpose="bootstrap-cleanup-test",
+            source_root=tmp_path,
+        )
+
+    assert rejected.value.reject is ParentRootReject.ROOT_RACE_DETECTED
+    assert rejected.value.__cause__ is primary
+    assert "injected result close failure" in rejected.value.detail
+    session_root = side_effects._v2_session_root(tmp_path)
+    assert not list(session_root.iterdir())
+
+
+def test_fixture_direct_adapter_scrubs_identity_and_cleans_owned_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The record adapter binds CWD/root and owns fixture-local cleanup."""
+    git_repo(tmp_path, remote="https://example.invalid/outer-v2.git")
+    fixture = tmp_path / "fixture"
+    git_repo(fixture, remote="https://example.invalid/fixture-v2.git")
+    with _record_fixture_session(tmp_path, fixture, monkeypatch) as record:
+        receipt = run_fixture_command(
+            record=record,
+            fixture_cwd=fixture,
+            argv=(sys.executable, "-c", "import os; assert not any(k.startswith('AGENT_CANON_SIDE_EFFECT_') for k in os.environ); assert 'PYTHONPATH' not in os.environ"),
+            now_mono_ns=time.monotonic_ns(),
+        )
+        assert receipt.returncode == 0
+        assert receipt.cleanup.status == "clean"
+        assert receipt.cleanup.created_paths == receipt.cleanup.removed_paths
+
+
+def test_fixture_direct_adapter_rejects_missing_record_before_spawn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A fixture command requires the record capability and physical CWD."""
+    git_repo(tmp_path, remote="https://example.invalid/outer-v2-exception.git")
+    fixture = tmp_path / "fixture"
+    git_repo(fixture, remote="https://example.invalid/fixture-v2-exception.git")
+    with pytest.raises(SessionResolutionError, match="FIXTURE_DIRECT_SESSION_REQUIRED"):
+        run_fixture_command(
+            record=object(),  # type: ignore[arg-type]
+            fixture_cwd=fixture,
+            argv=(sys.executable, "-c", "raise SystemExit(99)"),
+            now_mono_ns=time.monotonic_ns(),
+        )
+
+
 def attest(root: Path, **kwargs: object):
     git_repo(root, remote="https://example.invalid/parent.git")
     return ParentRootSideEffectBoundary().attest(
         ParentRootAttestationRequest(cwd=root, explicit_root=root, purpose="test", **kwargs)
     )
+
+
+@contextmanager
+def session_child_environment(
+    root: Path,
+    *,
+    base_env: dict[str, str] | None = None,
+    purpose: str = "child-test",
+    rebase_inherited_temp: bool = False,
+) -> Iterator[tuple[ParentRootSideEffectBoundary, SessionResolutionResult, dict[str, str]]]:
+    """Bind child environment tests to one v2 session for their full lifetime."""
+    if not (root / ".git").exists():
+        git_repo(root)
+    invocation_script = root / ".agent-canon" / "session-child-runner.py"
+    invocation_script.parent.mkdir(parents=True, exist_ok=True)
+    invocation_script.write_text("# authenticated fixture runner\n", encoding="utf-8")
+    previous_cwd = Path.cwd()
+    os.chdir(root)
+    try:
+        with public_session(invocation_script=invocation_script, purpose=purpose) as session:
+            boundary = ParentRootSideEffectBoundary()
+            environment = boundary.child_environment(
+                session.attestation,
+                base_env if base_env is not None else _build_clean_env(),
+                issue_handoff=False,
+                rebase_inherited_temp=rebase_inherited_temp,
+            )
+            yield boundary, session, environment
+    finally:
+        os.chdir(previous_cwd)
 
 
 def test_attestation_binds_parent_source_and_clone_identities(tmp_path: Path) -> None:
@@ -520,28 +932,388 @@ def test_atomic_publish_and_child_environment_keep_home_unchanged(tmp_path: Path
     assert published.target_ino is not None
     assert published.physical_path.read_text(encoding="utf-8") == "updated\n"
     original_home = os.environ.get("HOME")
-    env = child_environment(
-        receipt,
-        {
-            "HOME": original_home or "",
-        },
-    )
-    assert env["HOME"] == (original_home or "")
-    expected_tmp = (tmp_path / ".agent-canon" / "tmp").resolve()
-    assert env["TMPDIR"] == str(expected_tmp)
-    assert env["TEMP"] == str(expected_tmp)
-    assert env["TMP"] == str(expected_tmp)
-    assert env["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] == str(tmp_path.resolve())
-    assert env["AGENT_CANON_PARENT_ROOT"] == str(tmp_path.resolve())
-    assert env["AGENT_CANON_SOURCE_ROOT"] == str(tmp_path.resolve())
-    assert env["AGENT_CANON_ROOT"] == env["AGENT_CANON_SOURCE_ROOT"]
-    for name in (
-        "TMPDIR", "TEMP", "TMP",
-        "XDG_CACHE_HOME", "PYTHONPYCACHEPREFIX", "AGENT_CANON_TOOLS_HOME",
-        "CARGO_HOME", "CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR",
+    with session_child_environment(
+        tmp_path,
+        base_env={"HOME": original_home or ""},
+        purpose="atomic-child-environment",
+    ) as (_session_boundary, _session, env):
+        assert env["HOME"] == (original_home or "")
+        expected_tmp = (tmp_path / ".agent-canon" / "tmp").resolve()
+        assert env["TMPDIR"] == str(expected_tmp)
+        assert env["TEMP"] == str(expected_tmp)
+        assert env["TMP"] == str(expected_tmp)
+        for name in (
+            "TMPDIR", "TEMP", "TMP",
+            "XDG_CACHE_HOME", "PYTHONPYCACHEPREFIX", "AGENT_CANON_TOOLS_HOME",
+            "CARGO_HOME", "CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR",
+        ):
+            assert Path(env[name]).resolve().is_relative_to(tmp_path.resolve())
+        assert env["CARGO_TARGET_DIR"] == env["AGENT_CANON_CLI_TARGET_DIR"]
+        for name in (
+            "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+            "AGENT_CANON_PARENT_ROOT",
+            "AGENT_CANON_PARENT_ROOT_DEV",
+            "AGENT_CANON_PARENT_ROOT_INO",
+            "AGENT_CANON_SOURCE_ROOT",
+            "AGENT_CANON_ROOT",
+        ):
+            assert name not in env
+        assert env["AGENT_CANON_SIDE_EFFECT_PARENT_ROOT"] == str(tmp_path.resolve())
+        assert env["AGENT_CANON_SIDE_EFFECT_HANDOFF"]
+
+
+def test_path_only_helpers_release_resolution_leases_before_revoke(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Path validation helpers release receipts before the session is revoked."""
+    git_repo(tmp_path, remote="https://example.invalid/v2-path-only.git")
+    script = tmp_path / "runner.py"
+    script.write_text("# runner\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    with public_session(invocation_script=script, purpose="path-only") as session:
+        work_path = work_log._parent_path(
+            tmp_path / "work" / "work_log.md", "work-log", create=True
+        )
+        monitor_path = workflow_monitor._parent_path(
+            tmp_path / "monitor" / "workflow_monitoring.md",
+            "workflow-monitoring",
+            create=True,
+        )
+        assert work_path == tmp_path / "work" / "work_log.md"
+        assert monitor_path == tmp_path / "monitor" / "workflow_monitoring.md"
+        assert not tuple(side_effects._v2_lease_dir(session.record).glob("*.json"))
+
+
+def test_side_effect_session_revoke_drains_held_operation_lease(tmp_path: Path) -> None:
+    git_repo(tmp_path, remote="https://example.invalid/v2-drain.git")
+    script = tmp_path / "runner.py"
+    script.write_text("# runner\n", encoding="utf-8")
+    boundary = ParentRootSideEffectBoundary()
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.chdir(tmp_path)
+    try:
+        with public_session(invocation_script=script, purpose="drain-owner") as session:
+            issuer = current_supervisor_issuer()
+            assert issuer is not None
+            child = issuer.issue_child(
+                role="record", record_id="drain", physical_root=tmp_path,
+                now_mono_ns=session.record.issued_mono_ns + 1,
+            )
+            held = side_effects.resolve_parent_side_effect_session_v2(
+                env={
+                    side_effects.SIDE_EFFECT_PARENT_ROOT_ENV: str(tmp_path),
+                    side_effects.SIDE_EFFECT_HANDOFF_ENV: child.handoff,
+                    side_effects.SIDE_EFFECT_REQUIRED_ENV: "1",
+                },
+                observed_cwd=tmp_path,
+                now_mono_ns=child.record.issued_mono_ns + 1,
+            )
+            path = boundary.resolve_parent_owned_path(
+                held.attestation, "drain-output.txt", "drain-write"
+            )
+            completed = threading.Event()
+
+            def revoke() -> None:
+                issuer.revoke_drain_child(
+                    child=child.child, reason="normal_exit",
+                    now_mono_ns=child.record.issued_mono_ns + 2,
+                )
+                completed.set()
+
+            worker = threading.Thread(target=revoke)
+            worker.start()
+            time.sleep(0.05)
+            assert not completed.is_set()
+            boundary.atomic_publish(path, b"drain\n")
+            worker.join(timeout=2)
+            assert completed.is_set()
+            held.close()
+            assert not tuple(side_effects._v2_lease_dir(child.record).glob("*.json"))
+    finally:
+        monkeypatch.undo()
+
+
+def test_legacy_authority_is_rejected(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    git_repo(tmp_path, remote="https://example.invalid/v2-legacy.git")
+    for key in (
+        "AGENT_CANON_SIDE_EFFECT_PARENT_ROOT",
+        "AGENT_CANON_SIDE_EFFECT_HANDOFF",
+        "AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED",
     ):
-        assert Path(env[name]).resolve().is_relative_to(tmp_path.resolve())
-    assert env["CARGO_TARGET_DIR"] == env["AGENT_CANON_CLI_TARGET_DIR"]
+        monkeypatch.delenv(key, raising=False)
+    monkeypatch.setenv("AGENT_CANON_PARENT_ROOT", str(tmp_path))
+    request = ParentRootAttestationRequest(
+        cwd=tmp_path, explicit_root=tmp_path, purpose="trusted-legacy-test"
+    )
+    with pytest.raises(ParentRootSideEffectError, match="v1_attest_parent_root_rejected"):
+        attest_parent_root(request)
+    child_environment = _build_clean_env({"AGENT_CANON_PARENT_ROOT": str(tmp_path)})
+    child_environment["PYTHONPATH"] = str(Path(__file__).parents[2])
+    rejected_subprocess = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from pathlib import Path; import os; "
+                "from tools.agent_tools.parent_root_side_effects import "
+                "ParentRootAttestationRequest, attest_parent_root; "
+                "attest_parent_root(ParentRootAttestationRequest("
+                "cwd=Path(os.environ['AGENT_CANON_PARENT_ROOT']), "
+                "explicit_root=Path(os.environ['AGENT_CANON_PARENT_ROOT'])))"
+            ),
+        ],
+        cwd=Path(__file__).parents[2],
+        env=child_environment,
+        capture_output=True,
+        text=True,
+    )
+    assert rejected_subprocess.returncode != 0
+    assert "v1_attest_parent_root_rejected" in rejected_subprocess.stderr
+    child_environment.pop("AGENT_CANON_PARENT_ROOT")
+    rejected_explicit_request = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from pathlib import Path; "
+                "from tools.agent_tools.parent_root_side_effects import "
+                "ParentRootAttestationRequest, attest_parent_root; "
+                f"attest_parent_root(ParentRootAttestationRequest(cwd=Path({str(tmp_path)!r}), "
+                f"explicit_root=Path({str(tmp_path)!r})))"
+            ),
+        ],
+        cwd=Path(__file__).parents[2],
+        env=child_environment,
+        capture_output=True,
+        text=True,
+    )
+    assert rejected_explicit_request.returncode != 0
+    assert "v1_attest_parent_root_rejected" in rejected_explicit_request.stderr
+
+
+def test_v2_canonical_channel_ignores_conflicting_legacy_selectors_and_scrubs_them(
+    tmp_path: Path,
+) -> None:
+    """A valid signed channel wins over unsigned selectors and re-emits scrubbed state."""
+    git_repo(tmp_path, remote="https://example.invalid/v2-conflicting-selectors.git")
+    foreign_root = tmp_path / "foreign-root"
+    foreign_root.mkdir()
+    with session_child_environment(tmp_path, purpose="conflicting-selectors") as (
+        _boundary, _session, environment
+    ):
+        environment.update(
+            {
+                "AGENT_CANON_PARENT_ROOT": str(foreign_root),
+                "AGENT_CANON_PARENT_ROOT_DEV": "999",
+                "AGENT_CANON_PARENT_ROOT_INO": "999",
+                "AGENT_CANON_ACTIVE_REPOSITORY_ROOT": str(foreign_root),
+                "AGENT_CANON_SOURCE_ROOT": str(foreign_root),
+                "AGENT_CANON_ROOT": str(foreign_root),
+                "AGENT_CANON_CHILD_HANDOFF": "unsigned-child-handoff",
+                "AGENT_CANON_CHILD_PURPOSE": "unsigned-purpose",
+                "AGENT_CANON_HANDOFF_AUDIENCE": "unsigned-audience",
+            }
+        )
+        resolved = side_effects.resolve_parent_side_effect_session_v2(
+            observed_cwd=tmp_path, env=environment
+        )
+        try:
+            assert resolved.parent_root == tmp_path.resolve()
+            scrubbed = side_effects._v2_session_environment(resolved, environment)
+            assert scrubbed[side_effects.SIDE_EFFECT_PARENT_ROOT_ENV] == str(tmp_path.resolve())
+            for key in (
+                "AGENT_CANON_PARENT_ROOT",
+                "AGENT_CANON_PARENT_ROOT_DEV",
+                "AGENT_CANON_PARENT_ROOT_INO",
+                "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+                "AGENT_CANON_SOURCE_ROOT",
+                "AGENT_CANON_ROOT",
+                "AGENT_CANON_CHILD_HANDOFF",
+                "AGENT_CANON_CHILD_PURPOSE",
+                "AGENT_CANON_HANDOFF_AUDIENCE",
+            ):
+                assert key not in scrubbed
+        finally:
+            resolved.close()
+
+
+def test_v2_unsigned_legacy_and_partial_channels_have_typed_rejections(
+    tmp_path: Path,
+) -> None:
+    """Legacy-only and incomplete canonical inputs never enter v2 auth."""
+    git_repo(tmp_path, remote="https://example.invalid/v2-channel-classification.git")
+    with pytest.raises(SessionResolutionError) as legacy:
+        side_effects.resolve_parent_side_effect_session_v2(
+            observed_cwd=tmp_path,
+            env={"AGENT_CANON_PARENT_ROOT": str(tmp_path)},
+        )
+    assert legacy.value.reject is ParentRootReject.HANDOFF_INVALID
+    assert legacy.value.detail == "legacy_authority_forbidden"
+
+    with pytest.raises(SessionResolutionError) as partial:
+        side_effects.resolve_parent_side_effect_session_v2(
+            observed_cwd=tmp_path,
+            env={
+                side_effects.SIDE_EFFECT_PARENT_ROOT_ENV: str(tmp_path),
+                "AGENT_CANON_PARENT_ROOT": str(tmp_path),
+            },
+        )
+    assert partial.value.reject is ParentRootReject.HANDOFF_INVALID
+    assert partial.value.detail == "session_channel_incomplete"
+
+
+def test_cli_bootstraps_from_physical_cwd_when_channel_is_unset(tmp_path: Path) -> None:
+    """A supported public CLI derives authority from its physical cwd."""
+    git_repo(tmp_path, remote="https://example.invalid/v2-cli.git")
+    target = tmp_path / "chosen-by-untrusted-cli.txt"
+    env = _build_clean_env({"PYTHONPATH": str(Path(__file__).parents[2])})
+    source_script = _PARENT_ROOT_SIDE_EFFECTS_SCRIPT
+    result = subprocess.run(
+            [
+                sys.executable,
+                str(source_script),
+                "public-exec",
+                "--invocation-script",
+                str(source_script),
+                "--purpose",
+                "cli-unset-channel",
+                "--",
+                sys.executable,
+                str(source_script),
+                "write",
+                "--root",
+                str(tmp_path),
+                "--candidate",
+                str(target),
+                "--purpose",
+                "cli-write",
+            ],
+            cwd=tmp_path,
+            input="must-not-write\n",
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+    assert result.returncode == 0, result.stderr
+    assert target.read_text(encoding="utf-8") == "must-not-write\n"
+
+
+def test_stale_recovery_rejects_symlinked_session_directories(tmp_path: Path) -> None:
+    git_repo(tmp_path, remote="https://example.invalid/v2-symlink.git")
+    script = tmp_path / "runner.py"
+    script.write_text("# runner\n", encoding="utf-8")
+    outside = tmp_path.parent / f"{tmp_path.name}-side-effect-recovery-outside"
+    outside.mkdir()
+    marker = outside / "marker.json"
+    marker.write_text("untouched", encoding="utf-8")
+    monkeypatch = pytest.MonkeyPatch()
+    monkeypatch.chdir(tmp_path)
+    with public_session(invocation_script=script, purpose="symlink-recovery") as _session:
+        sessions_root = side_effects._v2_session_root(tmp_path)
+        (sessions_root / "evil").symlink_to(outside, target_is_directory=True)
+        assert side_effects.recover_v2_stale_sessions(tmp_path) == 0
+        assert marker.read_text(encoding="utf-8") == "untouched"
+    monkeypatch.undo()
+    marker.unlink()
+    outside.rmdir()
+
+
+def test_all_inventory_writers_use_the_central_attestation_route() -> None:
+    repo_root = Path(__file__).parents[2]
+    inventory = frozenset(
+        {
+            "tools/agent_tools/agent_canon_update_todos.py",
+            "tools/agent_tools/bootstrap_agent_run.py",
+            "tools/agent_tools/check_agent_canon_log_policy.py",
+            "tools/agent_tools/check_agent_runtime_alignment.py",
+            "tools/agent_tools/dependency_module_change.py",
+            "tools/agent_tools/devcontainer_dependencies.py",
+            "tools/agent_tools/eval_accumulation_check.py",
+            "tools/agent_tools/evaluate_agent_run.py",
+            "tools/agent_tools/evaluate_codex_agent_roles.py",
+            "tools/agent_tools/evaluate_report_quality.py",
+            "tools/agent_tools/evaluate_skill_workflow_prompts.py",
+            "tools/agent_tools/evaluate_workflow_selection.py",
+            "tools/agent_tools/export_codex_runtime_summary.py",
+            "tools/agent_tools/generate_agent_runtime_dashboard.py",
+            "tools/agent_tools/git_dependency_diff_summary.py",
+            "tools/agent_tools/github_publish.py",
+            "tools/agent_tools/issue_sync.py",
+            "tools/agent_tools/log_surface_inventory.py",
+            "tools/agent_tools/manifest_rendering.py",
+            "tools/agent_tools/prose_reasoning_graph.py",
+            "tools/agent_tools/publication_integrator.py",
+            "tools/agent_tools/reference_materializer.py",
+            "tools/agent_tools/report_artifact_checks.py",
+            "tools/agent_tools/repository_topic_clone.py",
+            "tools/agent_tools/run_accumulated_agent_evals.py",
+            "tools/agent_tools/runtime_log_archive_git.py",
+            "tools/agent_tools/runtime_log_paths.py",
+            "tools/agent_tools/search_index.py",
+            "tools/agent_tools/skill_shim_evaluation.py",
+            "tools/agent_tools/skill_shim_materializer.py",
+            "tools/agent_tools/smoke_test_research_perspective_pack.py",
+            "tools/agent_tools/task_authority.py",
+            "tools/agent_tools/task_close.py",
+            "tools/agent_tools/wiki_publish.py",
+            "tools/agent_tools/work_log.py",
+            "tools/agent_tools/workflow_monitor.py",
+            "tools/agent_tools/workspace_scope.py",
+            "tools/ci/agent_canon_pr_graph_selector.py",
+            "tools/ci/check_agent_canon_pr.py",
+            "tools/ci/container_config.py",
+            "tools/ci/container_runtime.py",
+        }
+    )
+
+    def call_name(node: ast.Call) -> str | None:
+        if isinstance(node.func, ast.Name):
+            return node.func.id
+        if isinstance(node.func, ast.Attribute):
+            return node.func.attr
+        return None
+
+    actual: set[str] = set()
+    trees: dict[str, ast.AST] = {}
+    for path in sorted((repo_root / "tools").rglob("*.py")):
+        relative = str(path.relative_to(repo_root))
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=relative)
+        trees[relative] = tree
+        if any(
+            isinstance(node, ast.Call)
+            and call_name(node) == "resolve_parent_writer_attestation"
+            for node in ast.walk(tree)
+        ):
+            actual.add(relative)
+    assert frozenset(actual) == inventory
+
+    forbidden = {
+        "ParentRootAttestationRequest",
+        "attest_parent_root",
+        "issue_record_session",
+        "session_environment",
+        "revoke_record_session",
+        "recover_stale_record_sessions",
+    }
+    for relative in sorted(inventory):
+        tree = trees[relative]
+        resolver_calls = [
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Call)
+            and call_name(node) == "resolve_parent_writer_attestation"
+        ]
+        assert resolver_calls, f"{relative} has no central parent attestation route"
+        for call in resolver_calls:
+            assert not call.args
+            assert {keyword.arg for keyword in call.keywords} == {"purpose"}
+        assert not any(
+            isinstance(node, ast.Call) and call_name(node) in forbidden
+            for node in ast.walk(tree)
+        )
 
 
 @pytest.mark.parametrize(
@@ -562,15 +1334,14 @@ def test_child_environment_rejects_external_override_before_creating_directories
     tmp_path: Path,
     name: str,
 ) -> None:
-    boundary = ParentRootSideEffectBoundary()
-    receipt = attest(tmp_path)
     external = tmp_path.parent / f"external-child-{name.lower()}"
 
-    with pytest.raises(ParentRootSideEffectError) as rejected:
-        boundary.child_environment(
-            receipt,
-            {"HOME": "/unchanged/home", name: str(external)},
-        )
+    with pytest.raises(ParentRootSideEffectError) as rejected, session_child_environment(
+        tmp_path,
+        base_env={"HOME": "/unchanged/home", name: str(external)},
+        purpose="external-child-environment",
+    ):
+        pass
 
     assert rejected.value.reject is ParentRootReject.SYMLINK_ESCAPE
     assert not (tmp_path / ".agent-canon" / "tmp").exists()
@@ -633,16 +1404,15 @@ def test_read_parent_owned_file_reads_exact_large_payload(tmp_path: Path) -> Non
 def test_child_environment_rejects_target_alias_mismatch_before_creating_directories(
     tmp_path: Path,
 ) -> None:
-    boundary = ParentRootSideEffectBoundary()
-    receipt = attest(tmp_path)
-    with pytest.raises(ParentRootSideEffectError) as rejected:
-        boundary.child_environment(
-            receipt,
-            {
-                "CARGO_TARGET_DIR": str(tmp_path / "target-a"),
-                "AGENT_CANON_CLI_TARGET_DIR": str(tmp_path / "target-b"),
-            },
-        )
+    with pytest.raises(ParentRootSideEffectError) as rejected, session_child_environment(
+        tmp_path,
+        base_env={
+            "CARGO_TARGET_DIR": str(tmp_path / "target-a"),
+            "AGENT_CANON_CLI_TARGET_DIR": str(tmp_path / "target-b"),
+        },
+        purpose="target-alias-mismatch",
+    ):
+        pass
 
     assert rejected.value.reject is ParentRootReject.ROOT_MISMATCH
     assert rejected.value.detail == "target_alias_mismatch"
@@ -891,29 +1661,36 @@ def test_handoff_is_single_use_and_rejects_mutation_or_expiry(tmp_path: Path) ->
 
 def test_child_reattest_requires_handoff_even_when_root_env_is_present(tmp_path: Path) -> None:
     """Dropping the handoff token cannot be replaced by ambient root variables."""
-    boundary = ParentRootSideEffectBoundary()
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
-    request = ParentRootAttestationRequest(
-        cwd=tmp_path, explicit_root=tmp_path, purpose="test"
-    )
-    initial = boundary.attest(request)
-    environment = boundary.child_environment(initial, {"HOME": "/unchanged/home"})
-    child = boundary.reattest_child(request, environment)
-    assert child.parent_root == tmp_path.resolve()
-    environment.pop("AGENT_CANON_CHILD_HANDOFF")
-    with pytest.raises(ParentRootSideEffectError) as dropped:
-        boundary.reattest_child(request, environment)
+    with session_child_environment(
+        tmp_path,
+        base_env={"HOME": "/unchanged/home"},
+        purpose="child-reattest",
+    ) as (boundary, _session, environment):
+        resolved = side_effects.resolve_parent_side_effect_session_v2(
+            observed_cwd=tmp_path, env=environment
+        )
+        try:
+            assert resolved.parent_root == tmp_path.resolve()
+        finally:
+            resolved.close()
+        environment.pop("AGENT_CANON_SIDE_EFFECT_HANDOFF")
+        with pytest.raises(ParentRootSideEffectError) as dropped:
+            side_effects.resolve_parent_side_effect_session_v2(
+                observed_cwd=tmp_path, env=environment
+            )
     assert dropped.value.reject is ParentRootReject.HANDOFF_INVALID
 
 
 def test_self_check_cli_reports_no_external_sentinel(tmp_path: Path) -> None:
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
     sentinel = tmp_path.parent / ".pbr-sentinel-not-created"
-    result = subprocess.run(
-        [sys.executable, "tools/agent_tools/parent_root_side_effects.py", "self-check",
-         "--root", str(tmp_path), "--sentinel-outside", str(sentinel)],
-        check=False, capture_output=True, text=True,
-    )
+    with _authenticated_cli_env(tmp_path, purpose="self-check") as (_boundary, _session, env):
+        result = subprocess.run(
+            [sys.executable, str(_PARENT_ROOT_SIDE_EFFECTS_SCRIPT), "self-check",
+             "--root", str(tmp_path), "--sentinel-outside", str(sentinel)],
+            check=False, capture_output=True, text=True, env=env,
+        )
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
     assert payload["status"] == "pass"
@@ -994,27 +1771,28 @@ def test_atomic_publish_surfaces_cleanup_failure_and_keeps_readback_identity(
 def test_capture_subprocess_publishes_and_replays_stdout(tmp_path: Path) -> None:
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
     target = tmp_path / "reports" / "captured.txt"
-    result = subprocess.run(
-        [
-            sys.executable,
-            "tools/agent_tools/parent_root_side_effects.py",
-            "capture-subprocess",
-            "--root",
-            str(tmp_path),
-            "--candidate",
-            str(target),
-            "--purpose",
-            "capture-test",
-            "--",
-            sys.executable,
-            "-c",
-            "print('captured')",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-        env=_build_clean_env(),
-    )
+    with _authenticated_cli_env(tmp_path, purpose="capture-test") as (_boundary, _session, env):
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(_PARENT_ROOT_SIDE_EFFECTS_SCRIPT),
+                "capture-subprocess",
+                "--root",
+                str(tmp_path),
+                "--candidate",
+                str(target),
+                "--purpose",
+                "capture-test",
+                "--",
+                sys.executable,
+                "-c",
+                "print('captured')",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
     assert result.returncode == 0, result.stderr
     assert result.stdout == "captured\n"
     assert target.read_text(encoding="utf-8") == "captured\n"
@@ -1046,30 +1824,35 @@ def test_exec_parent_bound_preserves_home_and_bindings(tmp_path: Path) -> None:
         "\"purpose\": os.environ.get(\"AGENT_CANON_CHILD_PURPOSE\")"
         "}))"
     )
-    result = subprocess.run(
-        [
-            sys.executable,
-            "tools/agent_tools/parent_root_side_effects.py",
-            "exec-parent-bound",
-            "--root",
-            str(tmp_path),
-            "--purpose",
-            "exec-test",
-            "--",
-            sys.executable,
-            "-c",
-            code,
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-        env={
-            **env,
-            "AGENT_CANON_CHILD_HANDOFF": "untrusted-inherited-token",
-            "AGENT_CANON_HANDOFF_AUDIENCE": "untrusted-audience",
-            "AGENT_CANON_CHILD_PURPOSE": "untrusted-purpose",
-        },
-    )
+    with _authenticated_cli_env(
+        tmp_path, purpose="exec-test", base_env=env
+    ) as (_boundary, _session, env):
+        env.update(
+            {
+                "AGENT_CANON_CHILD_HANDOFF": "untrusted-inherited-token",
+                "AGENT_CANON_HANDOFF_AUDIENCE": "untrusted-audience",
+                "AGENT_CANON_CHILD_PURPOSE": "untrusted-purpose",
+            }
+        )
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(_PARENT_ROOT_SIDE_EFFECTS_SCRIPT),
+                "exec-parent-bound",
+                "--root",
+                str(tmp_path),
+                "--purpose",
+                "exec-test",
+                "--",
+                sys.executable,
+                "-c",
+                code,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
     assert result.returncode == 0, result.stderr
     data = json.loads(result.stdout.strip())
     assert data["home"] == str(preserved_home)
@@ -1089,7 +1872,7 @@ def test_exec_parent_bound_rebases_inherited_runner_temp(tmp_path: Path) -> None
     """Update/sync handoffs rebase runner temp variables before path checks."""
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
     inherited_tmp = tmp_path.parent / "outer-runner-tmp"
-    env = _build_clean_env(
+    base_env = _build_clean_env(
         {
             "TMPDIR": str(inherited_tmp),
             "TEMP": str(inherited_tmp),
@@ -1101,26 +1884,32 @@ def test_exec_parent_bound_rebases_inherited_runner_temp(tmp_path: Path) -> None
         "print(json.dumps({name: os.environ.get(name) for name in "
         "('TMPDIR', 'TEMP', 'TMP')}))"
     )
-    result = subprocess.run(
-        [
-            sys.executable,
-            "tools/agent_tools/parent_root_side_effects.py",
-            "exec-parent-bound",
-            "--root",
-            str(tmp_path),
-            "--purpose",
-            "agent-canon-update-script",
-            "--rebase-inherited-temp",
-            "--",
-            sys.executable,
-            "-c",
-            code,
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-        env=env,
-    )
+    with _authenticated_cli_env(
+        tmp_path,
+        purpose="agent-canon-update-script",
+        base_env=base_env,
+        rebase_inherited_temp=True,
+    ) as (_boundary, _session, env):
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(_PARENT_ROOT_SIDE_EFFECTS_SCRIPT),
+                "exec-parent-bound",
+                "--root",
+                str(tmp_path),
+                "--purpose",
+                "agent-canon-update-script",
+                "--rebase-inherited-temp",
+                "--",
+                sys.executable,
+                "-c",
+                code,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
     assert result.returncode == 0, result.stderr
     data = json.loads(result.stdout.strip())
     expected = str((tmp_path / ".agent-canon" / "tmp").resolve())
@@ -1130,25 +1919,28 @@ def test_exec_parent_bound_rebases_inherited_runner_temp(tmp_path: Path) -> None
 
 def test_exec_parent_bound_failure_does_not_leave_pending_handoff(tmp_path: Path) -> None:
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
-    result = subprocess.run(
-        [
-            sys.executable,
-            "tools/agent_tools/parent_root_side_effects.py",
-            "exec-parent-bound",
-            "--root",
-            str(tmp_path),
-            "--purpose",
-            "exec-failure-test",
-            "--",
-            sys.executable,
-            "-c",
-            "raise SystemExit(17)",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-        env=_build_clean_env(),
-    )
+    with _authenticated_cli_env(tmp_path, purpose="exec-failure-test") as (
+        _boundary, _session, env
+    ):
+        result = subprocess.run(
+            [
+                sys.executable,
+                str(_PARENT_ROOT_SIDE_EFFECTS_SCRIPT),
+                "exec-parent-bound",
+                "--root",
+                str(tmp_path),
+                "--purpose",
+                "exec-failure-test",
+                "--",
+                sys.executable,
+                "-c",
+                "raise SystemExit(17)",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
     assert result.returncode == 17
     assert pending_handoff_nonces(tmp_path) == {}
 
@@ -1156,32 +1948,43 @@ def test_exec_parent_bound_failure_does_not_leave_pending_handoff(tmp_path: Path
 def test_exec_parent_bound_rejects_external_target_before_side_effects(tmp_path: Path) -> None:
     git_repo(tmp_path, remote="https://example.invalid/parent.git")
     external = tmp_path.parent / "external-target"
-    result = subprocess.run(
-        [
-            sys.executable,
-            "tools/agent_tools/parent_root_side_effects.py",
-            "exec-parent-bound",
-            "--root",
-            str(tmp_path),
-            "--purpose",
-            "exec-test",
-            "--",
-            "echo",
-            "should-not-run",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-        env=_build_clean_env({"AGENT_CANON_CLI_TARGET_DIR": str(external)}),
-    )
+    script = tmp_path / ".agent-canon" / "cli-runner.py"
+    script.parent.mkdir(parents=True, exist_ok=True)
+    script.write_text("# authenticated CLI runner\n", encoding="utf-8")
+    previous_cwd = Path.cwd()
+    os.chdir(tmp_path)
+    try:
+        with public_session(invocation_script=script, purpose="exec-test") as session:
+            env = side_effects._v2_session_environment(
+                session,
+                _build_clean_env({"AGENT_CANON_CLI_TARGET_DIR": str(external)}),
+            )
+            result = subprocess.run(
+                [
+                    sys.executable,
+                    str(_PARENT_ROOT_SIDE_EFFECTS_SCRIPT),
+                    "exec-parent-bound",
+                    "--root",
+                    str(tmp_path),
+                    "--purpose",
+                    "exec-test",
+                    "--",
+                    "echo",
+                    "should-not-run",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
+    finally:
+        os.chdir(previous_cwd)
     assert result.returncode == 2
     assert external.exists() is False
     assert not (tmp_path / ".agent-canon" / "tmp").exists()
 
 
 def test_child_environment_rejection_preserves_preexisting_entries(tmp_path: Path) -> None:
-    boundary = ParentRootSideEffectBoundary()
-    receipt = attest(tmp_path)
     preexisting_tmp = tmp_path / ".agent-canon" / "tmp"
     preexisting_cache = tmp_path / ".agent-canon" / "cache"
     preexisting_tmp.mkdir(parents=True)
@@ -1190,8 +1993,12 @@ def test_child_environment_rejection_preserves_preexisting_entries(tmp_path: Pat
     token_file = preexisting_tmp / "preexisting.txt"
     token_file.write_text(pre_token, encoding="utf-8")
 
-    with pytest.raises(ParentRootSideEffectError):
-        boundary.child_environment(receipt, {"AGENT_CANON_CLI_TARGET_DIR": str(tmp_path.parent / "external-target")})
+    with pytest.raises(ParentRootSideEffectError), session_child_environment(
+        tmp_path,
+        base_env={"AGENT_CANON_CLI_TARGET_DIR": str(tmp_path.parent / "external-target")},
+        purpose="child-environment-preserve",
+    ):
+        pass
 
     assert token_file.read_text(encoding="utf-8") == pre_token
 
@@ -1241,7 +2048,7 @@ def test_verify_child_rejects_forged_purpose_without_handoff(tmp_path: Path) -> 
     result = subprocess.run(
         [
             sys.executable,
-            "tools/agent_tools/parent_root_side_effects.py",
+            str(_PARENT_ROOT_SIDE_EFFECTS_SCRIPT),
             "verify-child",
             "--root",
             str(tmp_path),

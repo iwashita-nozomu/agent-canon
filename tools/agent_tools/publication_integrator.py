@@ -28,19 +28,17 @@ from typing import cast
 
 try:
     from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 
 from artifact_identity import canonical_body_sha256, canonical_json_bytes
@@ -66,18 +64,17 @@ ALLOWED_MODES = frozenset({"100644", "100755", "120000"})
 
 def _publication_temp_dir() -> str | None:
     """Return an attested parent-local staging directory for Git's index."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
     if not configured:
         raise ParentRootSideEffectError(
             ParentRootReject.HANDOFF_INVALID,
             "publication-staging: explicit parent root is required",
         )
-    parent = Path(configured).resolve(strict=True)
-    attestation = attest_parent_root(
-        ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="publication-integrator")
-    )
+    attestation = resolve_parent_writer_attestation(purpose="publication-integrator")
     directory = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-        attestation, parent / ".agent-canon" / "tmp" / "publication", "publication-staging"
+        attestation,
+        attestation.parent_root / ".agent-canon" / "tmp" / "publication",
+        "publication-staging",
     )
     return str(directory.physical_path)
 

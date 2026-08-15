@@ -20,7 +20,7 @@ import os
 import re
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import cast
@@ -28,19 +28,17 @@ from urllib.parse import urlparse
 
 try:
     from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
-        attest_parent_root,
+        resolve_parent_writer_attestation,
     )
 
 from artifact_identity import canonical_json_bytes
@@ -69,12 +67,9 @@ ACTIVE_PACKET_MATERIALIZATION_SCHEMA = (
 
 def _write_publication_summary(path: Path, payload: bytes) -> None:
     """Write local publication evidence beneath the parent root."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+    configured = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
     if configured:
-        parent = Path(configured).resolve(strict=True)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(cwd=parent, explicit_root=parent, purpose="github-publication-staging")
-        )
+        attestation = resolve_parent_writer_attestation(purpose="github-publication-staging")
         ParentRootSideEffectBoundary().write_parent_owned_file(
             attestation, path, payload, "github-publication-staging"
         )
@@ -206,20 +201,28 @@ class GithubPostPublicationChecksAuthority:
         return packet, gate
 
 
-@dataclass(frozen=True)
 class CommandFailure(Exception):
     """Raised when an external command fails."""
 
     result: CommandResult
     next_action: str
 
+    def __init__(self, result: CommandResult, next_action: str) -> None:
+        self.result = result
+        self.next_action = next_action
+        super().__init__(result, next_action)
 
-@dataclass(frozen=True)
+
 class UserVisibleFailure(Exception):
     """Raised when user-facing tool preconditions are not met."""
 
     message: str
     next_action: str
+
+    def __init__(self, message: str, next_action: str) -> None:
+        self.message = message
+        self.next_action = next_action
+        super().__init__(message, next_action)
 
 
 @dataclass(frozen=True)
@@ -2144,7 +2147,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args is not None:
             emit_summary(args, summary)
         else:
-            print(json.dumps(asdict(exc), sort_keys=True))
+            print(
+                json.dumps(
+                    {"message": exc.message, "next_action": exc.next_action},
+                    sort_keys=True,
+                )
+            )
         return 1
 
 

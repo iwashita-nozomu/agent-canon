@@ -132,6 +132,25 @@ class FakeRunner:
 class GithubPublishTest(unittest.TestCase):
     """Exercise the GitHub publish command planner."""
 
+    def test_failure_wrappers_keep_mutable_fields_and_exception_chaining(self) -> None:
+        """Command and user failures expose typed fields without frozen dataclasses."""
+        result = github_publish.CommandResult(("gh", "pr", "create"), 1, "", "failed")
+        command_failure = github_publish.CommandFailure(result, "retry")
+        self.assertEqual(command_failure.args, (result, "retry"))
+        command_failure.next_action = "inspect"
+        self.assertEqual(command_failure.next_action, "inspect")
+        cause = RuntimeError("cause")
+        try:
+            raise command_failure from cause
+        except github_publish.CommandFailure as raised:
+            self.assertIs(raised.__cause__, cause)
+            self.assertIsNotNone(raised.__traceback__)
+
+        user_failure = github_publish.UserVisibleFailure("message", "next")
+        self.assertEqual(user_failure.args, ("message", "next"))
+        user_failure.message = "updated"
+        self.assertEqual(user_failure.message, "updated")
+
     def lifecycle_fixture(
         self,
         *,

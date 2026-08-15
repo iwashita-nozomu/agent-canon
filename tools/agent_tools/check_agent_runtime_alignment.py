@@ -39,19 +39,15 @@ from pathlib import Path
 
 try:
     from .parent_root_side_effects import (
-        ParentRootAttestationRequest,
-        ParentRootReject,
         ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+        public_session,
+        resolve_parent_writer_attestation,
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentRootAttestationRequest,
-        ParentRootReject,
         ParentRootSideEffectBoundary,
-        ParentRootSideEffectError,
-        attest_parent_root,
+        public_session,
+        resolve_parent_writer_attestation,
     )
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
@@ -257,22 +253,11 @@ def runtime_alignment_parent(source_resolution: RootResolution):
     short-lived Git parent beside the source checkout for this fixture only.
     Managed parent/derived executions retain their caller-provided parent.
     """
-    configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured_parent:
-        raise ParentRootSideEffectError(
-            ParentRootReject.HANDOFF_INVALID,
-            "runtime-alignment-temp: explicit parent root is required",
-        )
-    parent = Path(configured_parent).resolve(strict=True)
     source_root = source_resolution.source_root.resolve()
+    configured_parent = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
+    parent = Path(configured_parent).resolve(strict=True) if configured_parent else source_root
     if parent != source_root:
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(
-                cwd=parent,
-                explicit_root=parent,
-                purpose="runtime-alignment",
-            )
-        )
+        attestation = resolve_parent_writer_attestation(purpose="runtime-alignment")
         base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
             attestation,
             parent / ".agent-canon" / "tmp" / "runtime-alignment",
@@ -297,33 +282,22 @@ def runtime_alignment_parent(source_resolution: RootResolution):
             ["git", "-C", str(fixture_parent), "remote", "add", "origin", source_origin],
             check=True,
         )
-        previous_parent = os.environ.get("AGENT_CANON_PARENT_ROOT")
-        previous_active = os.environ.get("AGENT_CANON_ACTIVE_REPOSITORY_ROOT")
-        os.environ["AGENT_CANON_PARENT_ROOT"] = str(fixture_parent)
-        os.environ["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = str(fixture_parent)
+        boundary = ParentRootSideEffectBoundary()
+        previous_cwd = Path.cwd()
         try:
-            attestation = attest_parent_root(
-                ParentRootAttestationRequest(
-                    cwd=fixture_parent,
-                    explicit_root=fixture_parent,
-                    purpose="runtime-alignment",
+            os.chdir(source_root)
+            with public_session(
+                invocation_script=Path(__file__), purpose="runtime-alignment"
+            ) as outer:
+                os.chdir(fixture_parent)
+                base = boundary.ensure_parent_owned_directory(
+                    outer.attestation,
+                    fixture_parent / ".agent-canon" / "tmp" / "runtime-alignment",
+                    "runtime-alignment-temp",
                 )
-            )
-            base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
-                attestation,
-                fixture_parent / ".agent-canon" / "tmp" / "runtime-alignment",
-                "runtime-alignment-temp",
-            )
-            yield base.physical_path
+                yield base.physical_path
         finally:
-            if previous_parent is None:
-                os.environ.pop("AGENT_CANON_PARENT_ROOT", None)
-            else:
-                os.environ["AGENT_CANON_PARENT_ROOT"] = previous_parent
-            if previous_active is None:
-                os.environ.pop("AGENT_CANON_ACTIVE_REPOSITORY_ROOT", None)
-            else:
-                os.environ["AGENT_CANON_ACTIVE_REPOSITORY_ROOT"] = previous_active
+            os.chdir(previous_cwd)
 
 
 def resolve_packet_probe_workspace() -> Path:
