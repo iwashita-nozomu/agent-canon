@@ -191,7 +191,8 @@ SCAN_DEPENDENCY_HEADERS="${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers
 CHECK_DEPENDENCY_HEADER_FORMAT="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh"
 CHECK_DEPENDENCY_GRAPH="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_graph.sh"
 CHECK_DESIGN_DOC_CLAIMS_TOOL="${CANON_TOOLS_ROOT}/agent_tools/check_design_doc_claims.py"
-GRAPH_CLI="${CANON_TOOLS_ROOT}/bin/agent-canon"
+# Persisted graph operations are repository-scoped; source review tools remain script-owned.
+GRAPH_CLI="${ROOT_DIR}/tools/bin/agent-canon"
 WORKFLOW_MONITOR="${CANON_TOOLS_ROOT}/agent_tools/workflow_monitor.py"
 
 if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
