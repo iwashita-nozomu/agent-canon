@@ -20,8 +20,6 @@ set -euo pipefail
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REVIEW_PARENT_ROOT=""
-# shellcheck source=../lib/repo_paths.sh
-source "${script_dir}/../lib/repo_paths.sh"
 
 parent_temp_base() {
   REVIEW_PARENT_ROOT="$(realpath -e "${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}")" || {
@@ -176,7 +174,7 @@ ROOT_DIR="$(realpath -e "$ROOT_DIR")" || {
   echo "REPO_DEPENDENCY_REVIEW=fail reason=root_missing"
   exit 2
 }
-SCRIPT_TOOLS_ROOT="$(dirname "$(realpath -m "$script_dir")")"
+SCRIPT_TOOLS_ROOT="$(realpath -m "$(dirname "$(realpath -m "$script_dir")")")"
 cd "$ROOT_DIR"
 
 if [[ "$HEADER_SCAN_ONLY" -eq 1 && "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
@@ -188,27 +186,13 @@ if [[ "$HEADER_SCAN_ONLY" -eq 1 && ( -z "$CHANGED_PATH_PACKET" || -z "$TRUSTED_B
   exit 2
 fi
 
-SCRIPT_TOOLS_ROOT="$(realpath -m "$SCRIPT_TOOLS_ROOT")"
-
-if [[ "$HEADER_SCAN_ONLY" -eq 0 ]]; then
-  CANON_TOOLS_ROOT="$(agent_canon_source_tools_root "$ROOT_DIR")" || {
-    echo "canonical AgentCanon source tools root is unavailable for root: $ROOT_DIR" >&2
-    exit 1
-  }
-  CANON_TOOLS_ROOT="$(realpath -m "$CANON_TOOLS_ROOT")"
-  SCAN_DEPENDENCY_HEADERS="${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh"
-  CHECK_DEPENDENCY_HEADER_FORMAT="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh"
-  CHECK_DEPENDENCY_GRAPH="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_graph.sh"
-  CHECK_DESIGN_DOC_CLAIMS_TOOL="${CANON_TOOLS_ROOT}/agent_tools/check_design_doc_claims.py"
-  GRAPH_CLI="${CANON_TOOLS_ROOT}/bin/agent-canon"
-  WORKFLOW_MONITOR="${CANON_TOOLS_ROOT}/agent_tools/workflow_monitor.py"
-else
-  SCAN_DEPENDENCY_HEADERS="${SCRIPT_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh"
-  CHECK_DEPENDENCY_HEADER_FORMAT="${SCRIPT_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh"
-  WORKFLOW_MONITOR="${SCRIPT_TOOLS_ROOT}/agent_tools/workflow_monitor.py"
-  CHECK_DEPENDENCY_GRAPH="${SCRIPT_TOOLS_ROOT}/agent_tools/check_dependency_graph.sh"
-  CHECK_DESIGN_DOC_CLAIMS_TOOL="${SCRIPT_TOOLS_ROOT}/agent_tools/check_design_doc_claims.py"
-fi
+CANON_TOOLS_ROOT="$SCRIPT_TOOLS_ROOT"
+SCAN_DEPENDENCY_HEADERS="${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh"
+CHECK_DEPENDENCY_HEADER_FORMAT="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh"
+CHECK_DEPENDENCY_GRAPH="${CANON_TOOLS_ROOT}/agent_tools/check_dependency_graph.sh"
+CHECK_DESIGN_DOC_CLAIMS_TOOL="${CANON_TOOLS_ROOT}/agent_tools/check_design_doc_claims.py"
+GRAPH_CLI="${CANON_TOOLS_ROOT}/bin/agent-canon"
+WORKFLOW_MONITOR="${CANON_TOOLS_ROOT}/agent_tools/workflow_monitor.py"
 
 if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
   if [[ ! -x "$GRAPH_CLI" ]]; then
@@ -359,7 +343,7 @@ if [[ -z "$GRAPH_TSV_OUTPUT" && -n "$REPORT_DIR" ]]; then
   GRAPH_TSV_OUTPUT="$REPORT_DIR/dependency_graph.tsv"
 fi
 
-graph_args=("$CHECK_DEPENDENCY_GRAPH")
+graph_args=("$CHECK_DEPENDENCY_GRAPH" --root "$ROOT_DIR")
 if [[ "$CHECK_BIDIRECTIONAL" -eq 1 ]]; then
   graph_args+=(--check-bidirectional)
 fi
@@ -375,7 +359,7 @@ fi
 bash "${graph_args[@]}" "${checkable_paths[@]}"
 
 if [[ "$LIST_CHANGED_DEPENDENCIES" -eq 1 ]]; then
-  related_args=("$CHECK_DEPENDENCY_GRAPH" --list-related --focus-changed)
+  related_args=("$CHECK_DEPENDENCY_GRAPH" --root "$ROOT_DIR" --list-related --focus-changed)
   if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
     related_args+=(--cycle-report-only)
   fi
@@ -396,7 +380,7 @@ if [[ "$CHECK_DESIGN_DOC_CLAIMS" -eq 1 ]]; then
 fi
 
 if [[ -n "$SEARCH_HITS_FILE" ]]; then
-  edit_scope_args=("$CHECK_DEPENDENCY_GRAPH" --search-hits-file "$SEARCH_HITS_FILE")
+  edit_scope_args=("$CHECK_DEPENDENCY_GRAPH" --root "$ROOT_DIR" --search-hits-file "$SEARCH_HITS_FILE")
   if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
     edit_scope_args+=(--cycle-report-only)
   fi
@@ -409,7 +393,7 @@ if [[ -n "$SEARCH_HITS_FILE" ]]; then
     bash "${edit_scope_args[@]}" "${checkable_paths[@]}"
   fi
 elif [[ -n "$REPORT_DIR" ]]; then
-  edit_scope_args=("$CHECK_DEPENDENCY_GRAPH" --edit-scope-changed)
+  edit_scope_args=("$CHECK_DEPENDENCY_GRAPH" --root "$ROOT_DIR" --edit-scope-changed)
   if [[ "$CYCLE_REPORT_ONLY" -eq 1 ]]; then
     edit_scope_args+=(--cycle-report-only)
   fi
