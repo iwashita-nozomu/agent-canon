@@ -31,11 +31,16 @@ github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/717
 
 ## Current snapshot
 
-- Baseline: `main@c5fa3a22c8486952dc6dede0cc3a25e5ba7741e5`
-- Active branch: `canon/software-engineering-principles-717`
-- Existing duplicate Issue / PR / branch: none found by bounded search
-- Current canonical gap: general principles exist as fragments, but no language- and
-  paradigm-neutral owner defines their precedence, misuse boundary, or shared evidence model.
+- Historical baseline (pre-#718): `main@c5fa3a22c8486952dc6dede0cc3a25e5ba7741e5`.
+- Integrated main: `main@1ebe6726917d2d3d1edfea466adce602ff5ed60e`, the merge of PR #718
+  (`Canonicalize software engineering principles`).
+- Source branch / PR state: `canon/software-engineering-principles-717` and PR #718 are
+  integrated; no active source branch remains on the remote.
+- Existing duplicate Issue / PR / branch: no duplicate was found by bounded search; this
+  Issue remains the durable requirement and integration record for the open Issue #717.
+- Current canonical state: `documents/conventions/software-engineering-principles.md` owns
+  the general policy, and the listed consumer surfaces route to it. This follow-up removes
+  the remaining durable policy restatement from this Issue and `refactor-loop.md`.
 
 ## Existing responsibility map
 
@@ -82,106 +87,22 @@ validation に共通する言語・paradigm非依存 policy の唯一の正本�
 | Issue / PR | current snapshot、scope reduction、implementation / validation evidence | 長期policyの唯一の根拠 |
 | `notes/knowledge/` | external source / method note | mandatory shared policy |
 
-## Canonical decision precedence
+## Canonical policy references
 
-原則が競合した場合は次の順序を固定する。
+この Issue は現在の要求、証拠、スコープ、統合結果を記録します。一般原則の意味や
+判断順序を第二の durable policy として複製しません。判断の正本は次の節です。
 
-1. 明示された user / domain contract、safety、correctness
-2. semantic invariant、state / lifecycle owner、public compatibility
-3. root-cause closure、reachable failure handling、cleanup / recovery
-4. responsibility / dependency boundary、information hiding、authority boundary
-5. testability、reproducibility、operational observability
-6. simplicity、change locality、reuse、abstraction cost
-7. stylistic consistency
+- [判断の優先順位](../../documents/conventions/software-engineering-principles.md#判断の優先順位)
+- [SEP-01 / SEP-02: contract と invariant](../../documents/conventions/software-engineering-principles.md#1-contractcorrectnessinvariant)
+- [SEP-03 / SEP-05: 責務と依存境界](../../documents/conventions/software-engineering-principles.md#2-責務と依存境界)
+- [SEP-06 / SEP-08: 単純さと抽象化](../../documents/conventions/software-engineering-principles.md#3-単純さと抽象化の-admission)
+- [SEP-09 / SEP-10: 変更単位と完全性](../../documents/conventions/software-engineering-principles.md#4-変更単位と完全性)
+- [SEP-11〜SEP-14: 検証、失敗、観測性、traceability](../../documents/conventions/software-engineering-principles.md#5-verification再現性運用)
 
-下位原則は上位contractを弱めない。
-
-- DRY のために異なる数理意味、unit、停止条件、failure semantics を統合しない。
-- KISS のためにerror、cleanup、migration、root mechanismを落とさない。
-- YAGNI のために要求済みbehaviorやconsumer migrationを未完にしない。
-- locality のためにshared ownerのinvariantをcaller patchで迂回しない。
-- extensibility のためにconcrete callerのないinterface / registry / wrapperを追加しない。
-
-## Principle model
-
-### Contract and invariant
-
-- user / domain contract、precondition、postcondition、invariant、stop condition、failure
-  semantics、compatibility、side effect、cleanup を先に固定する。
-- 同じ state transition、identity、transaction、lifecycle、consistency rule は一つの
-  canonical owner が持つ。
-- test は implementation trace ではなく contract、counterexample、stable oracle を固定する。
-
-### Responsibility and dependency
-
-- separation of concerns は、異なる actor / change reason、invariant、state lifecycle、effect、
-  reader / caller、validation owner を分ける。
-- single responsibility は one-file / one-function 規則ではなく、replaceable responsibility
-  と同じ変更理由を表す。
-- high cohesion は同じ invariant と lifecycle をowner内に集め、low coupling は別ownerの
-  internal representationではなくstable contractへ依存する。
-- information hiding は temporary path、storage、生成順序、diagnostic token をpublic APIへ漏らさない。
-- high-level policyをconcrete detailへ従属させないが、差し替え根拠のないabstractionも作らない。
-
-### Simplicity and abstraction admission
-
-- KISS は完全なcontractを満たす候補の中で、owner、surface、state、branch、invariantの総数が
-  少ない設計を選ぶ。shortest code / minimum diffではない。
-- YAGNI はconcrete caller、current requirement、reachable failure、stable external boundaryの
-  ないspeculative mechanismを追加しない。現在要求された完成条件を省く原則ではない。
-- DRY は同じknowledge、policy、invariant、state ownerの複数正本をなくす。textual similarity
-  だけで異なる意味を統合しない。
-- abstractionは同じ意味、contract、change reason、failure semantics、実在consumer、明確な
-  canonical ownerがある場合だけadmissionする。
-
-### Change and verification
-
-- scopeはsymptom fileやrepo-wide cleanupではなく、evidence-bounded complete owning unitと、
-  到達するconsumer、failure、cleanup、contract、docs、tests、validationで閉じる。
-- public surface変更はcanonical targetとconsumer migrationを一つの完成条件にする。
-- validationはchanged propertyとreachable riskに対応させ、選ばれないfull gateやnegative receipt
-  を追加しない。
-- determinism、idempotency、reproducibilityは、それぞれ必要なsurfaceのowner contractとして定義する。
-
-### Failure and traceability
-
-- implementation defect、invalid input、expected domain/numerical breakdown、environment unavailable、
-  external permission/rate/billing failure、verification unavailable、conflict/stale snapshotを区別する。
-- failureをsilent fallback、ignore、successへ変換しない。
-- observabilityはstate transition、input class、owner、first failure、effect/cleanup resultを追える範囲にする。
-- requirement → Issue → canonical clause → branch/PR/diff → validation → accepted sourceのtraceを保つ。
-
-## Runtime integration
-
-新しいpublic skill、workflow、tool、checker、schema、score、receipt、negative tokenは追加しない。
-既存ownerがcanonical policyのmaterial clauseだけを消費する。
-
-### Design / delivery
-
-`agents/skills/comprehensive-development.md` はcross-surface planで、contract / invariant、canonical
-owner、responsibility/effect boundary、abstraction admission、complete owning unit、validation/recoveryを
-先に固定する。全原則checklistは作らない。
-
-### Refactor
-
-`agents/skills/refactor-loop.md` はbehavior preservationを最優先にし、DRY / KISS / YAGNIを
-canonical policyへ委譲する。異なる意味の統合、minimum-diff symptom patch、speculative abstraction、
-incomplete migrationを拒否する。
-
-### Review
-
-`agents/skills/change-review.md` はprinciple名だけをfindingにせず、具体的なcontract、invariant、
-owner、dependency、reachable failureとselected clauseを結ぶ。OOP-sensitive changeだけを専門ownerへ委譲する。
-
-### OOP specialization
-
-`documents/conventions/object-oriented-design.md` はgeneral policyのspecializationとし、class、state、
-inheritance、composition、`Protocol`、public object modelがmaterialに変わる場合だけ起動する。
-
-### Knowledge note
-
-`notes/knowledge/coding_decision_methods.md` は外部method/source noteとして残し、AgentCanonの
-mandatory policyを所有しないことを明示する。
+Consumer-specific behavior remains in the owning surfaces:
+`comprehensive-development.md`、`refactor-loop.md`、`change-review.md`、
+`object-oriented-design.md`、および外部 method/source note は、それぞれの責務と
+必要な canonical clause への参照だけを持ちます。
 
 ## Implementation scope
 
