@@ -49,6 +49,25 @@ MARKER_RE = re.compile(
 )
 REPO_RE = re.compile(r"^[^/\s]+/[^/\s]+$")
 NUMBER_RE = re.compile(r"^[0-9]+$")
+EVIDENCE_FIELDS = (
+    "baseline",
+    "branch",
+    "head",
+    "scope",
+    "validation",
+    "remaining_verification",
+    "readback_expectation",
+)
+PR_FIELDS = ("repo", "number", "url", "base_sha", "head_sha")
+VERIFICATION_GAP_FIELDS = (
+    "property",
+    "reason",
+    "attempt",
+    "observed_result",
+    "environment",
+    "owner",
+    "next_command",
+)
 
 
 class LifecycleFailure(Exception):
@@ -343,17 +362,30 @@ class GhStatusAdapter:
         if not isinstance(raw_labels, list):
             raise _failure("transport_failure", "Issue labels must be a list", scope=TRANSPORT_SCOPE)
         labels: list[str] = []
+        seen_labels: set[str] = set()
         for item_value in cast(list[object], raw_labels):
             if not isinstance(item_value, Mapping):
                 raise _failure("transport_failure", "Issue label entry is malformed", scope=TRANSPORT_SCOPE)
             item = cast(Mapping[str, object], item_value)
-            if not isinstance(item.get("name"), str):
+            if not isinstance(item.get("name"), str) or not cast(str, item["name"]).strip():
                 raise _failure("transport_failure", "Issue label entry is malformed", scope=TRANSPORT_SCOPE)
-            labels.append(cast(str, item["name"]))
-        number = issue_value.get("number", int(self.issue_number))
-        url = issue_value.get("html_url", issue_value.get("url", ""))
-        state = issue_value.get("state", "")
-        if not isinstance(number, int) or not isinstance(url, str) or not isinstance(state, str):
+            label_name = cast(str, item["name"])
+            if label_name in seen_labels:
+                raise _failure("transport_failure", "Issue label identity is duplicated", scope=TRANSPORT_SCOPE)
+            seen_labels.add(label_name)
+            labels.append(label_name)
+        number = issue_value.get("number")
+        url = issue_value.get("html_url", issue_value.get("url"))
+        state = issue_value.get("state")
+        if (
+            isinstance(number, bool)
+            or not isinstance(number, int)
+            or number != int(self.issue_number)
+            or not isinstance(url, str)
+            or not url.strip()
+            or not isinstance(state, str)
+            or not state.strip()
+        ):
             raise _failure("transport_failure", "Issue identity fields are malformed", scope=TRANSPORT_SCOPE)
         return IssueSnapshot(number, url, state, tuple(labels))
 
@@ -471,6 +503,73 @@ def classify_lifecycle(facts: Mapping[str, object]) -> str:
     return "review-ready-unverified"
 
 
+def _has_evidence_value(value: object) -> bool:
+    """Return whether an evidence field is materially populated."""
+    if value is None or value is False:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, Mapping):
+        return len(cast(Mapping[str, object], value)) > 0
+    if isinstance(value, Sequence):
+        return len(cast(Sequence[object], value)) > 0
+    return True
+
+
+def validate_evidence_inputs(
+    *,
+    lifecycle: str,
+    evidence: Mapping[str, object],
+    pr_identity: Mapping[str, object],
+    repo: str,
+    issue_number: str | int,
+) -> None:
+    """Fail closed on evidence, PR identity, and verification-gap omissions."""
+    if not NUMBER_RE.fullmatch(str(issue_number)):
+        raise _failure("issue_unresolved", "Issue number must be decimal digits")
+    missing = [field for field in EVIDENCE_FIELDS if not _has_evidence_value(evidence.get(field))]
+    if missing:
+        raise _failure(
+            "lifecycle_facts_incomplete",
+            "required evidence fields are missing or empty",
+            missing_fields=missing,
+        )
+    for field in ("branch", "head"):
+        value = evidence.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise _failure("lifecycle_facts_incomplete", f"evidence {field} must be a non-empty string")
+    if pr_identity.get("repo") != repo:
+        raise _failure("lifecycle_facts_incomplete", "PR identity repository does not match Issue repository")
+    missing_pr = [field for field in PR_FIELDS if not _has_evidence_value(pr_identity.get(field))]
+    if missing_pr:
+        raise _failure(
+            "lifecycle_facts_incomplete",
+            "required PR identity fields are missing or empty",
+            missing_fields=missing_pr,
+        )
+    number = pr_identity.get("number")
+    if isinstance(number, bool) or not isinstance(number, int) or number <= 0:
+        raise _failure("lifecycle_facts_incomplete", "PR number must be a positive integer")
+    if not isinstance(pr_identity.get("url"), str) or not cast(str, pr_identity["url"]).strip():
+        raise _failure("lifecycle_facts_incomplete", "PR URL must be non-empty")
+    for field in ("base_sha", "head_sha"):
+        value = pr_identity.get(field)
+        if not isinstance(value, str) or not value.strip():
+            raise _failure("lifecycle_facts_incomplete", f"PR {field} must be a non-empty string")
+    if lifecycle == "review-ready-unverified":
+        raw_gap = evidence.get("verification_gap", evidence.get("remaining_verification"))
+        if not isinstance(raw_gap, Mapping):
+            raise _failure("verification_gap_incomplete", "verification gap owner and evidence are required")
+        gap = cast(Mapping[str, object], raw_gap)
+        missing_gap = [field for field in VERIFICATION_GAP_FIELDS if not _has_evidence_value(gap.get(field))]
+        if missing_gap:
+            raise _failure(
+                "verification_gap_incomplete",
+                "verification gap fields are missing or empty",
+                missing_fields=missing_gap,
+            )
+
+
 def desired_labels(mapping: LabelMapping, state: str) -> frozenset[str]:
     """Return the pure desired set for a lifecycle state."""
     return mapping.desired(state)
@@ -516,13 +615,25 @@ def _payload_digest(payload: Mapping[str, object]) -> str:
     return hashlib.sha256(canonical_json_bytes(payload)).hexdigest()
 
 
+def operation_identity(payload: Mapping[str, object]) -> str:
+    """Hash stable evidence/PR identity while excluding mutable snapshots."""
+    derived = {
+        "evidence_payload_digest",
+        "operation_identity_digest",
+        "source_snapshot_digest",
+        "attempt_key",
+    }
+    stable_payload = {key: value for key, value in payload.items() if key not in derived}
+    return _payload_digest(stable_payload)
+
+
 def attempt_key(payload: Mapping[str, object]) -> str:
-    """Return the canonical retry key bound to the operation identity."""
+    """Return a per-preflight retry key bound to stable operation identity."""
     identity = {
         "repo": payload.get("repo"),
         "issue": payload.get("issue"),
-        "evidence_payload_digest": payload.get("evidence_payload_digest"),
-        "pr_identity": payload.get("pr_identity", {}),
+        "operation_identity_digest": payload.get("operation_identity_digest")
+        or operation_identity(payload),
         "source_snapshot_digest": payload.get("source_snapshot_digest"),
     }
     return _payload_digest(identity)
@@ -546,10 +657,12 @@ def build_evidence_payload(
             "issue": int(issue_number),
             "lifecycle": lifecycle,
             "pr_identity": dict(pr_identity),
+            "pr": dict(pr_identity),
             "taxonomy_mapping_digest": f"sha256:{mapping.digest}",
             "source_snapshot_digest": f"sha256:{_payload_digest(source_snapshot)}",
         }
     )
+    payload["operation_identity_digest"] = f"sha256:{operation_identity(payload)}"
     payload["evidence_payload_digest"] = f"sha256:{_payload_digest(payload)}"
     return payload
 
@@ -560,7 +673,8 @@ def evidence_comment(payload: Mapping[str, object]) -> str:
     return f"{MARKER_PREFIX}{key} -->\n\n```json\n{json.dumps(dict(payload), ensure_ascii=False, sort_keys=True, indent=2)}\n```"
 
 
-def _matching_comments(comments: Sequence[CommentSnapshot], payload: Mapping[str, object]) -> tuple[list[CommentSnapshot], list[CommentSnapshot]]:
+def matching_comments(comments: Sequence[CommentSnapshot], payload: Mapping[str, object]) -> tuple[list[CommentSnapshot], list[CommentSnapshot]]:
+    """Return exact-body comments and same-attempt conflicting comments."""
     body = evidence_comment(payload)
     key = attempt_key(payload)
     exact = [comment for comment in comments if comment.body == body]
@@ -570,6 +684,77 @@ def _matching_comments(comments: Sequence[CommentSnapshot], payload: Mapping[str
         if match and match.group("key") == key and comment not in exact:
             same_key.append(comment)
     return exact, same_key
+
+
+def _comment_payload(comment: CommentSnapshot) -> dict[str, object] | None:
+    """Decode the JSON evidence payload from a canonical comment body."""
+    marker = MARKER_RE.match(comment.body)
+    if marker is None:
+        return None
+    match = re.search(r"\n```json\n(?P<payload>.*?)\n```\s*$", comment.body, re.DOTALL)
+    if match is None:
+        return None
+    try:
+        value = json.loads(match.group("payload"))
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(value, Mapping):
+        return None
+    parsed = cast(Mapping[str, object], value)
+    if parsed.get("operation_identity_digest") != f"sha256:{operation_identity(parsed)}":
+        return None
+    return dict(parsed)
+
+
+def _operation_matches(
+    comments: Sequence[CommentSnapshot], payload: Mapping[str, object]
+) -> list[tuple[CommentSnapshot, dict[str, object]]]:
+    """Find historical exact operation identities across source snapshots."""
+    identity = payload.get("operation_identity_digest") or f"sha256:{operation_identity(payload)}"
+    matches: list[tuple[CommentSnapshot, dict[str, object]]] = []
+    for comment in comments:
+        historical = _comment_payload(comment)
+        if historical is not None and historical.get("operation_identity_digest") == identity:
+            matches.append((comment, historical))
+    return matches
+
+
+def _select_evidence(
+    comments: Sequence[CommentSnapshot], payload: Mapping[str, object]
+) -> tuple[CommentSnapshot, dict[str, object]] | None:
+    """Select one historical payload or raise typed conflict/duplicate stops."""
+    exact, same_attempt_key = matching_comments(comments, payload)
+    if same_attempt_key:
+        raise _failure(
+            "evidence_conflict",
+            "one retry marker has a conflicting payload",
+            comment_ids=[item.comment_id for item in same_attempt_key],
+        )
+    if len(exact) > 1:
+        raise _failure(
+            "evidence_duplicate",
+            "one retry marker has multiple exact comments",
+            comment_ids=[item.comment_id for item in exact],
+            next_action="manual-evidence-dedup-or-new-attempt",
+        )
+    matches = _operation_matches(comments, payload)
+    if len(matches) > 1:
+        unique_payloads = {canonical_json_bytes(item[1]) for item in matches}
+        if len(unique_payloads) > 1:
+            raise _failure(
+                "evidence_conflict",
+                "one operation identity has conflicting historical payloads",
+                comment_ids=[item[0].comment_id for item in matches],
+            )
+        raise _failure(
+            "evidence_duplicate",
+            "one operation identity has multiple historical comments",
+            comment_ids=[item[0].comment_id for item in matches],
+            next_action="manual-evidence-dedup-or-new-attempt",
+        )
+    if matches:
+        return matches[0]
+    return None
 
 
 def reconcile_status(
@@ -583,6 +768,13 @@ def reconcile_status(
     """Run one strict evidence-before-label reconciliation."""
     state = classify_lifecycle(facts)
     desired = desired_labels(mapping, state)
+    validate_evidence_inputs(
+        lifecycle=state,
+        evidence=evidence,
+        pr_identity=pr_identity,
+        repo=adapter.repo,
+        issue_number=adapter.issue_number,
+    )
     catalog = validate_remote_catalog(mapping, adapter.label_catalog())
     before_issue = adapter.issue()
     before_comments = adapter.comments()
@@ -596,27 +788,17 @@ def reconcile_status(
         source_snapshot=source_snapshot,
         mapping=mapping,
     )
-    exact, conflicting = _matching_comments(before_comments, payload)
-    if conflicting:
-        raise _failure(
-            "evidence_conflict", "evidence marker exists with a different payload", comment_ids=[c.comment_id for c in conflicting]
-        )
-    if len(exact) > 1:
-        raise _failure(
-            "evidence_duplicate", "more than one exact evidence comment exists", comment_ids=[c.comment_id for c in exact],
-            next_action="manual-evidence-dedup-or-new-attempt",
-        )
-    if not exact:
+    selected = _select_evidence(before_comments, payload)
+    if selected is None:
         adapter.create_comment(evidence_comment(payload))
         after_comments = adapter.comments()
-        exact, conflicting = _matching_comments(after_comments, payload)
-        if conflicting:
-            raise _failure("evidence_conflict", "evidence readback found a conflicting marker")
-        if len(exact) != 1:
+        selected = _select_evidence(after_comments, payload)
+        if selected is None:
             raise _failure(
-                "evidence_readback_unavailable", "created evidence comment was not uniquely readable", comment_ids=[c.comment_id for c in exact]
+                "evidence_readback_unavailable",
+                "created evidence comment was not uniquely readable",
             )
-    evidence_comment_snapshot = exact[0]
+    evidence_comment_snapshot, selected_payload = selected
     after_evidence_issue = adapter.issue()
     if set(after_evidence_issue.labels) != set(before_issue.labels):
         raise _failure(
@@ -667,15 +849,13 @@ def reconcile_status(
         completed.append(f"{operation}:{label}")
     final_issue = adapter.issue()
     final_comments = adapter.comments()
-    final_exact, _ = _matching_comments(final_comments, payload)
-    if len(final_exact) > 1:
+    final_selected = _select_evidence(final_comments, selected_payload)
+    if final_selected is None:
         raise _failure(
-            "evidence_duplicate",
-            "final readback found duplicate evidence comments",
-            comment_ids=[comment.comment_id for comment in final_exact],
-            next_action="manual-evidence-dedup-or-new-attempt",
+            "evidence_conflict",
+            "final readback no longer contains the selected evidence payload",
         )
-    if not evaluate_final(final_issue.labels, desired, before_issue.labels, mapping, len(final_exact)):
+    if not evaluate_final(final_issue.labels, desired, before_issue.labels, mapping, 1):
         raise _failure(
             "readback_mismatch",
             "final status lifecycle predicate is false",
@@ -706,13 +886,16 @@ __all__ = [
     "LifecycleFailure",
     "build_evidence_payload",
     "attempt_key",
+    "operation_identity",
     "classify_lifecycle",
     "desired_labels",
     "evidence_comment",
     "evaluate_final",
     "load_label_mapping",
+    "matching_comments",
     "mapping_from_data",
     "plan_operations",
     "reconcile_status",
     "validate_remote_catalog",
+    "validate_evidence_inputs",
 ]

@@ -78,9 +78,11 @@ desired set は現在の label toggle から推測しません。
 ## Evidence Comment Contract
 
 final transition の前に、Issue comment は次を含みます: lifecycle、baseline、branch、exact
-head、PR identity、changed scope と non-goals、validation command/result、remaining
-verification の property/reason/attempt/observed result/environment/owner/next command、
-mutation 後の readback expectation。
+head、PR identity（repository、number、URL、base SHA、head SHA）、changed scope と
+non-goals、validation command/result、remaining verification の
+property/reason/attempt/observed result/environment/owner/next command、mutation 後の
+readback expectation。これらの evidence fields と PR identity fields は comment create
+前に型と non-empty を fail-closed 検証します。
 
 Body の marker は次の形式です。
 
@@ -89,23 +91,26 @@ Body の marker は次の形式です。
 ```
 
 Canonical payload は required evidence、exact PR identity、taxonomy mapping digest、fresh
-preflight source snapshot digest を含みます。`evidence_payload_digest` は canonical JSON
-の SHA-256、`attempt_key` は `{repo, issue, evidence_payload_digest, pr_identity,
-source_snapshot_digest}` の canonical JSON の SHA-256 です。read timestamps と pagination
-cursor は digest に含めません。
+preflight source snapshot digest を含みます。stable `operation_identity_digest` は
+`{repo, issue, full evidence payload, PR identity, taxonomy}` から計算し、mutable な source
+snapshot を除外します。`attempt_key` はこの operation identity と current source snapshot
+digest の canonical JSON の SHA-256 です。read timestamps と pagination cursor は digest に
+含めません。
 
-GitHub comment API には create-if-absent/CAS がありません。従って、既存の exact payload
-1件は再利用し、同じ marker key の異なる payload は `evidence_conflict`、同じ payload の
-複数件は `evidence_duplicate` として停止します。未作成なら POST を1回だけ行い、fresh
-comment readback が exactly one になるまで進みません。POST 応答を失った場合に blind retry
-しません。過去のコメントを自動編集・削除しません。
+GitHub comment API には create-if-absent/CAS がありません。従って、全履歴から同じ
+operation identity の exact payload 1件を再利用し、現在の labels/source snapshot が変わって
+いても新しい comment を作りません。同一 identity の異なる payload は
+`evidence_conflict`、複数件は `evidence_duplicate` として停止します。未作成なら POST を
+1回だけ行い、fresh comment readback が exactly one になるまで進みません。POST 応答を失った
+場合に blind retry しません。過去のコメントを自動編集・削除しません。
 
 ## Reconciliation Algorithm
 
 1. `pr-processing` が対象/authority/初期事実を確定し、adapter が Issue snapshot、comments、
    repository label catalog を fresh read する。
 2. taxonomy を parse し canonical labels の catalog presence を確認する。
-3. facts から state と `D` を純粋に計算し、evidence comment を reuse または1回だけ create
+3. facts から state と `D` を純粋に計算し、evidence/PR fields を fail-closed 検証する。
+   全履歴の operation identity に一致する evidence comment を reuse または1回だけ create
    して readback する。
 4. evidence 前の全 labels と直後の全 labels を比較する。不一致は
    `concurrent_status_drift` で、label mutation を開始しない。
@@ -124,7 +129,9 @@ exact_evidence_payload_count == 1
 ```
 
 GitHub に version/CAS token がないため、read-to-write gap と ABA (`A -> B -> A`) は観測
-不能です。Tool はそれを exclusive ownership や CAS success と主張しません。
+不能です。Tool はそれを exclusive ownership や CAS success と主張しません。final readback
+でも同じ marker の conflicting payload、複数の historical payload、または evidence 消失を
+成功扱いにしません。
 
 ## Failure Semantics
 

@@ -74,8 +74,10 @@ pages, deduplicates/sorts comment IDs, and encodes DELETE label paths with
 `issue_sync`.
 
 Evidence is bound to canonical payload, exact PR identity, taxonomy digest, and
-preflight source snapshot digest. One exact marker/payload is reusable. A same
-key with another payload is `evidence_conflict`; multiple exact comments are
+preflight source snapshot digest. A stable operation identity excludes the mutable
+source snapshot, so a retry after label mutation reuses one historical payload
+instead of creating a duplicate. A same marker or operation identity with another
+payload is `evidence_conflict`; multiple matching comments are
 `evidence_duplicate`; a lost POST is reread once and becomes
 `evidence_readback_unavailable` if zero/ambiguous. Historical comments are never
 automatically edited or deleted, and no CAS guarantee is claimed.
