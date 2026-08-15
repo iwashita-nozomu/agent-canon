@@ -34,10 +34,11 @@ if TOOLS_DIR.is_dir():
     sys.path.insert(0, str(TOOLS_DIR))
 
 from parent_root_side_effects import (  # noqa: E402
-    ParentRootAttestationRequest,
+    ParentRootReject,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
-    attest_parent_root,
+    read_parent_owned_bytes,
+    resolve_parent_writer_attestation,
 )
 from runtime_log_paths import (  # noqa: E402
     codex_trace_key,
@@ -150,30 +151,45 @@ def _write_all(descriptor: int, payload: bytes) -> None:
 
 def _publish_parent_owned(path: Path, bytes_: bytes) -> tuple[str, str]:
     """Publish a hook event through the authenticated parent capability."""
-    configured = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
-    if not configured:
-        return "failed", "parent_unattested"
     try:
-        parent = Path(configured)
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(
-                cwd=parent, explicit_root=parent, purpose="hook-event-spool"
-            )
-        )
+        attestation = resolve_parent_writer_attestation(purpose="hook-event-spool")
         boundary = ParentRootSideEffectBoundary()
         receipt = boundary.resolve_parent_owned_path(
-            attestation, path, "hook-event-spool", create=False
+            attestation,
+            path,
+            "hook-event-spool",
+            create=False,
         )
-        if receipt.target_dev is not None:
-            identical = boundary.read_parent_owned_file(receipt) == bytes_
-            return ("duplicate", "") if identical else ("failed", "spool_conflict")
+        if receipt.target_dev is None or receipt.target_ino is None:
+            if receipt.lexical_entry_exists:
+                boundary.release_parent_owned_path(receipt)
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "parent-owned event entry has no stable target",
+                )
+            boundary.release_parent_owned_path(receipt)
+            existing = None
+        else:
+            # Release the probe lease before using the optional-read helper;
+            # the helper acquires and releases its own revalidated receipt.
+            boundary.release_parent_owned_path(receipt)
+            existing = read_parent_owned_bytes(
+                attestation,
+                path,
+                "hook-event-spool",
+                allow_missing=True,
+            )
+        if existing is not None:
+            return ("duplicate", "") if existing == bytes_ else ("failed", "spool_conflict")
         return boundary.publish_parent_owned_file_noreplace(
             attestation, path, bytes_, "hook-event-spool"
         )
-    except ParentRootSideEffectError:
-        return "failed", "parent_unattested"
+    except ParentRootSideEffectError as exc:
+        if exc.detail.endswith("session_missing"):
+            return "failed", "parent_unattested"
+        return "failed", exc.reject.value
     except OSError:
-        return "failed", "spool_io_failure"
+        return "failed", "spool_unavailable"
 
 
 def publish_hook_event_noreplace(path: Path, bytes_: bytes) -> tuple[str, str]:

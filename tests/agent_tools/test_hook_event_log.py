@@ -20,6 +20,7 @@ import sys
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -32,6 +33,7 @@ sys.path.insert(0, str(TOOLS_DIR))
 import hook_dispatcher  # noqa: E402
 import hook_event_log  # noqa: E402
 import runtime_log_archive_git  # noqa: E402
+from parent_root_side_effects import ParentRootSideEffectBoundary, public_session  # noqa: E402
 
 
 def hook_entry(hook_run_id: str, *, status: str = "pass") -> dict[str, object]:
@@ -42,6 +44,61 @@ def hook_entry(hook_run_id: str, *, status: str = "pass") -> dict[str, object]:
         "payload_fingerprint": f"fingerprint-{hook_run_id}",
         "status": status,
     }
+
+
+@contextmanager
+def authenticated_hook_environment(root: Path):
+    """Bootstrap one canonical v2 fixture channel for in-process hook tests."""
+    subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "remote", "add", "origin", "https://example.invalid/hook-parent.git"],
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "--allow-empty",
+            "-m",
+            "fixture",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    previous_cwd = Path.cwd()
+    previous_environment = os.environ.copy()
+    clean_environment = {
+        key: value
+        for key, value in previous_environment.items()
+        if not key.startswith("AGENT_CANON_SIDE_EFFECT_")
+    }
+    os.chdir(root)
+    try:
+        with public_session(
+            invocation_script=HOOKS_DIR / "hook_event_log.py",
+            purpose="hook-event-test",
+            independent=True,
+            cleanup_state=True,
+        ) as session:
+            environment = ParentRootSideEffectBoundary().child_environment(
+                session.attestation,
+                clean_environment,
+                issue_handoff=False,
+                rebase_inherited_temp=True,
+            )
+            os.environ.clear()
+            os.environ.update(environment)
+            yield
+    finally:
+        os.environ.clear()
+        os.environ.update(previous_environment)
+        os.chdir(previous_cwd)
 
 
 class HookEventLogHotPathTest(unittest.TestCase):
@@ -143,30 +200,13 @@ class HookEventLogHotPathTest(unittest.TestCase):
     def test_h02_concurrent_events_use_independent_no_replace_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
-            subprocess.run(
-                ["git", "init", "-q"],
-                cwd=root,
-                check=True,
-                capture_output=True,
-            )
-            subprocess.run(
-                ["git", "remote", "add", "origin", "https://example.invalid/hook-parent.git"],
-                cwd=root,
-                check=True,
-                capture_output=True,
-            )
             context = hook_event_log.HookLogContext(
                 root,
                 "PostToolUse",
                 str(root / "legacy-hook.jsonl"),
             )
-            with patch.dict(
-                os.environ,
-                {
-                    "AGENT_CANON_HOOK_RUN_NAMESPACE": "test-runtime",
-                    "AGENT_CANON_PARENT_ROOT": str(root),
-                },
-                clear=False,
+            with authenticated_hook_environment(root), patch.dict(
+                os.environ, {"AGENT_CANON_HOOK_RUN_NAMESPACE": "test-runtime"}, clear=False
             ):
                 with ThreadPoolExecutor(max_workers=2) as executor:
                     results = tuple(

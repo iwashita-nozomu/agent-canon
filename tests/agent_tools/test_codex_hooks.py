@@ -20,6 +20,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from typing import cast
 from unittest import mock
@@ -32,6 +33,7 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
 import hook_dispatcher  # noqa: E402
 import hook_event_log  # noqa: E402
+from parent_root_side_effects import ParentRootSideEffectBoundary, public_session  # noqa: E402
 from prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
     prompt_intake_signals,
@@ -76,6 +78,65 @@ RETIRED_ROUTE_FIELDS = {
 class CodexHooksTest(unittest.TestCase):
     """Validate active hook behavior without exercising retired hook scripts."""
 
+    @staticmethod
+    def _bootstrap_fixture(root: Path) -> None:
+        """Create the canonical Git fixture owner used by v2 hook sessions."""
+        if (root / ".git").exists():
+            return
+        subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+        subprocess.run(
+            ["git", "-C", str(root), "remote", "add", "origin", "https://example.invalid/hook-fixture.git"],
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "user.name=Test",
+                "-c",
+                "user.email=test@example.invalid",
+                "commit",
+                "--allow-empty",
+                "-m",
+                "fixture",
+            ],
+            check=True,
+            capture_output=True,
+        )
+
+    @contextmanager
+    def _authenticated_fixture(self, root: Path):
+        """Yield one child environment from the canonical signed-session bootstrap."""
+        self._bootstrap_fixture(root)
+        previous_cwd = Path.cwd()
+        previous_environment = os.environ.copy()
+        clean_environment = {
+            key: value
+            for key, value in previous_environment.items()
+            if not key.startswith("AGENT_CANON_SIDE_EFFECT_")
+        }
+        os.chdir(root)
+        try:
+            with public_session(
+                invocation_script=HOOK_DISPATCHER,
+                purpose="codex-hook-test",
+                independent=True,
+                cleanup_state=True,
+            ) as session:
+                environment = ParentRootSideEffectBoundary().child_environment(
+                    session.attestation,
+                    clean_environment,
+                    issue_handoff=False,
+                    rebase_inherited_temp=True,
+                )
+                yield environment
+        finally:
+            os.environ.clear()
+            os.environ.update(previous_environment)
+            os.chdir(previous_cwd)
+
     def _run_hook(
         self,
         event: str,
@@ -86,19 +147,7 @@ class CodexHooksTest(unittest.TestCase):
         """Run the active dispatcher with its bounded telemetry rooted in a temp dir."""
         raw_payload = payload if isinstance(payload, str) else json.dumps(payload)
         with tempfile.TemporaryDirectory() as temp_dir:
-            return subprocess.run(
-                [sys.executable, str(HOOK_DISPATCHER), event],
-                cwd=PROJECT_ROOT,
-                input=raw_payload,
-                check=True,
-                capture_output=True,
-                text=True,
-                env={
-                    **os.environ,
-                    **(extra_env or {}),
-                    "AGENT_CANON_HOOK_SOURCE_ROOT": temp_dir,
-                },
-            )
+            return self._run_hook_in_root(Path(temp_dir), event, payload, extra_env=extra_env)
 
     def _contract(self) -> dict[str, object]:
         result = subprocess.run(
@@ -120,19 +169,18 @@ class CodexHooksTest(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         """Run one hook against an isolated fixture root and return its readback."""
         raw_payload = payload if isinstance(payload, str) else json.dumps(payload)
-        return subprocess.run(
-            [sys.executable, str(HOOK_DISPATCHER), event],
-            cwd=PROJECT_ROOT,
-            input=raw_payload,
-            check=True,
-            capture_output=True,
-            text=True,
-            env={
-                **os.environ,
-                **(extra_env or {}),
-                "AGENT_CANON_HOOK_SOURCE_ROOT": str(root),
-            },
-        )
+        with self._authenticated_fixture(root) as environment:
+            environment.update(extra_env or {})
+            environment["AGENT_CANON_HOOK_SOURCE_ROOT"] = str(root)
+            return subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), event],
+                cwd=root,
+                input=raw_payload,
+                check=True,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
 
     def _run_hook_in_layout(
         self,
