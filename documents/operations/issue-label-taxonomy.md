@@ -11,6 +11,11 @@ downstream implementation ../../templates/documents/github/pull-request/agent_ca
 
 # AgentCanon Issue Label Taxonomy
 
+The machine-readable status lifecycle mapping is owned by
+[`issue-label-taxonomy.toml`](issue-label-taxonomy.toml). Tools load that TOML
+record and verify the canonical labels against the remote repository catalog;
+this Markdown page remains explanatory documentation.
+
 Use labels to make runtime profile, affected surface, and evaluation need visible
 before implementation starts.
 

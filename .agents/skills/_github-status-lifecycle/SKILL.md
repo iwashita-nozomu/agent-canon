@@ -28,14 +28,16 @@ Canonical lifecycle and policy:
 ## Invocation Boundary
 
 1. Invoke only from `pr-processing` after the target Issue, fresh remote state,
-   write authority, repository-defined label mapping, and lifecycle facts are
-   available.
-2. Compute a desired managed-label set; never toggle labels or infer progress
-   from the current label alone.
-3. Publish or reuse the required evidence comment before the final transition.
-4. Preserve unrelated labels and stop on concurrent drift or partial mutation.
-5. Report success only after fresh remote readback matches the exact desired
-   managed-label set.
+   write authority, repository-defined TOML label mapping, and lifecycle facts
+   are available.
+2. Dispatch the canonical routine and its `GhStatusAdapter`; the shim contains
+   no lifecycle state table, label taxonomy, or alternate mutation algorithm.
+3. Reuse or publish the required evidence comment before the final transition,
+   then preserve unrelated labels through per-label operations and readbacks.
+4. Return typed transport, evidence, drift, partial-mutation, and final-readback
+   outcomes with their code owner and responsibility scope.
+5. Report success only after fresh remote readback matches the routine's exact
+   desired managed-label predicate.
 
 This private skill does not create labels, close Issues, approve or merge PRs,
 or replace the public `pr-processing` workflow.
