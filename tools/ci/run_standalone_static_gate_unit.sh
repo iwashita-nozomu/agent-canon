@@ -51,7 +51,15 @@ run_contracts() {
   node --version
   python3 -m unittest \
     tests.agent_tools.test_visualization_contract \
-    tests.agent_tools.test_render_dependency_manifest_graph
+    tests.agent_tools.test_render_dependency_manifest_graph \
+    tests.agent_tools.test_graph_client_source_projection \
+    tests.tools.test_agent_canon_pr_dependency_source_gate \
+    tests.tools.test_agent_canon_pr_graph_gate_integration \
+    tests.agent_tools.test_check_dependency_headers \
+    tests.agent_tools.test_check_design_doc_claims \
+    tests.agent_tools.test_tool_drift \
+    tests.agent_tools.test_vector_search \
+    tests.agent_tools.test_dependency_manifest_tools
   python3 "${TOOLS_ROOT}/agent_tools/tool_catalog.py"
   python3 "${TOOLS_ROOT}/agent_tools/tool_proof_coverage.py"
   python3 "${TOOLS_ROOT}/agent_tools/responsibility_scope.py"
@@ -98,7 +106,10 @@ run_eval() (
   set +e
   AGENT_CANON_HOOK_ARCHIVE_DIR="${hook_archive}" \
     python3 "${TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" \
-      --run-id agent-canon-pr-gate --log-dir "${eval_log_dir}"
+      --run-id agent-canon-pr-gate \
+      --log-dir "${eval_log_dir}" \
+      --skill-used agent-orchestration \
+      --skill-used result-artifact-writeout
   primary_status=$?
   if [[ "${primary_status}" -ne 0 ]]; then
     local eval_log
