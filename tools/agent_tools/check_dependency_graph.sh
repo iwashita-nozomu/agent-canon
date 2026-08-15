@@ -64,10 +64,12 @@ ROOT_DIR="$(realpath -e "$ROOT_DIR")" || {
 normalize_repo_path() {
   local raw="$1"
   local absolute=""
+  # Selector identities are lexical repository paths. Canonical source parsing
+  # owns symlink binding and physical dependency-target containment.
   if [[ "$raw" = /* ]]; then
-    absolute="$(realpath -m "$raw")"
+    absolute="$(realpath -m --no-symlinks "$raw")"
   else
-    absolute="$(realpath -m "$ROOT_DIR/${raw#./}")"
+    absolute="$(realpath -m --no-symlinks "$ROOT_DIR/${raw#./}")"
   fi
   case "$absolute" in
     "$ROOT_DIR") printf '.\n' ;;
