@@ -32,6 +32,10 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 
+from tests.tools.resource_plan_test_evidence import (
+    SnapshotResourceProbe,
+    discover_test_resources,
+)
 from tools.experiments.execution_resource_plan import (
     GPUDevice,
     LockReadback,
@@ -51,11 +55,6 @@ from tools.experiments.run_managed_experiment import (
     build_run_paths,
     reserve_run_paths,
     rollback_empty_reservation,
-)
-
-from tests.tools.resource_plan_test_evidence import (
-    SnapshotResourceProbe,
-    discover_test_resources,
 )
 
 SYNC_CONTEXT_SCRIPT = (
@@ -369,8 +368,8 @@ def test_rollback_rejects_replaced_report_parent_inode(tmp_path: Path) -> None:
             "tools.experiments.run_managed_experiment",
         ),
         (
-            "tools/experiments/publish_result_branch.py",
-            "tools.experiments.publish_result_branch",
+            "tools/experiments/save_experiment_result_annex.py",
+            "tools.experiments.save_experiment_result_annex",
         ),
         (
             "tools/experiments/update_latest_result.py",
