@@ -140,14 +140,25 @@ def _validated_fixture(
             ParentRootReject.INPUT_INVALID, "fixture_cwd is invalid"
         ) from exc
     fixture_path = fixture_path.resolve(strict=True)
+    primary_error: BaseException | None = None
     try:
         os.chdir(fixture_path)
         identity = validate_fixture_root(
             record, fixture_path, require_lease=False, now_mono_ns=now_mono_ns
         )
         yield identity[0], identity[1], identity[2], source
+    except BaseException as exc:
+        primary_error = exc
+        raise
     finally:
-        _restore_source_cwd(source)
+        try:
+            _restore_source_cwd(source)
+        except BaseException as restore_error:
+            if primary_error is None:
+                raise
+            primary_error.add_note(
+                f"fixture source CWD restoration outcome: {restore_error}"
+            )
 
 
 @contextmanager
@@ -193,7 +204,7 @@ def bootstrap_fixture_public_environment(
     now = time.monotonic_ns() if now_mono_ns is None else now_mono_ns
     if type(now) is not int or now < 0:
         raise ParentRootSideEffectError(ParentRootReject.INPUT_INVALID, "now_mono_ns is invalid")
-    previous_cwd = Path.cwd()
+    invocation_cwd = _physical_identity(Path.cwd())
 
     @contextmanager
     def record_scope() -> Iterator[SessionResolutionResult]:
@@ -204,6 +215,10 @@ def bootstrap_fixture_public_environment(
             yield resolved
 
     with record_scope() as resolved_record:
+        safe_cwd = _physical_identity(resolved_record.parent_root)
+        if safe_cwd[0] == invocation_cwd[0]:
+            safe_cwd = _physical_identity(invocation_cwd[0].parent)
+        outer_error: BaseException | None = None
         try:
             with _validated_fixture(resolved_record, fixture_path, now_mono_ns=now) as (
                 fixture_root, _fixture_dev, _fixture_ino, source,
@@ -245,6 +260,10 @@ def bootstrap_fixture_public_environment(
                     "fixture-bootstrap-local",
                     "fixture-bootstrap",
                 )
+                restoration_errors: list[BaseException] = []
+                cleanup_errors: list[BaseException] = []
+                primary_error: BaseException | None = None
+                body_error: BaseException | None = None
                 try:
                     local_root = local_receipt.physical_path
                     clean_environment = _clean_fixture_environment(
@@ -276,18 +295,34 @@ def bootstrap_fixture_public_environment(
                         environment = ParentRootSideEffectBoundary().session_environment(
                             independent_session, clean_environment
                         )
-                        _restore_source_cwd(source)
+                        try:
+                            _restore_source_cwd(source)
+                        except BaseException as exc:
+                            restoration_errors.append(exc)
+                            raise
                         os.environ.clear()
                         os.environ.update(saved_environment)
-                        yield FixturePublicEnvironment(
-                            "synthetic_tool", resolved_record, fixture_root,
-                            environment, session=independent_session,
-                        )
+                        try:
+                            yield FixturePublicEnvironment(
+                                "synthetic_tool", resolved_record, fixture_root,
+                                environment, session=independent_session,
+                            )
+                        except BaseException as exc:
+                            body_error = exc
+                            raise
+                except BaseException as exc:
+                    primary_error = exc
+                    raise
                 finally:
-                    os.environ.clear()
-                    os.environ.update(saved_environment)
-                    _restore_source_cwd(source)
-                    cleanup_error: BaseException | None = None
+                    try:
+                        os.environ.clear()
+                        os.environ.update(saved_environment)
+                    except BaseException as exc:
+                        restoration_errors.append(exc)
+                    try:
+                        _restore_source_cwd(source)
+                    except BaseException as exc:
+                        restoration_errors.append(exc)
                     try:
                         boundary.remove_parent_owned_tree(
                             resolved_record.attestation,
@@ -295,7 +330,7 @@ def bootstrap_fixture_public_environment(
                             "fixture-bootstrap-local-cleanup",
                         )
                     except BaseException as exc:
-                        cleanup_error = exc
+                        cleanup_errors.append(exc)
                     try:
                         boundary.remove_empty_parent_owned_directory(
                             resolved_record.attestation,
@@ -303,12 +338,55 @@ def bootstrap_fixture_public_environment(
                             "fixture-bootstrap-root-cleanup",
                         )
                     except BaseException as exc:
-                        if cleanup_error is None:
-                            cleanup_error = exc
-                    if cleanup_error is not None:
-                        raise cleanup_error
+                        cleanup_errors.append(exc)
+                    errors = restoration_errors + cleanup_errors
+                    if errors:
+                        restoration_detail = (
+                            "clean"
+                            if not restoration_errors
+                            else "; ".join(str(error) for error in restoration_errors)
+                        )
+                        cleanup_detail = (
+                            "clean"
+                            if not cleanup_errors
+                            else "; ".join(str(error) for error in cleanup_errors)
+                        )
+                        detail = "; ".join(
+                            (
+                                f"restoration={restoration_detail}",
+                                f"cleanup={cleanup_detail}",
+                            )
+                        )
+                        combined_error = ParentRootSideEffectError(
+                            ParentRootReject.ROOT_RACE_DETECTED,
+                            f"fixture bootstrap restoration/cleanup outcome: {detail}",
+                        )
+                        if body_error is not None:
+                            body_error.add_note(str(combined_error))
+                        elif primary_error is not None and not restoration_errors:
+                            primary_error.add_note(str(combined_error))
+                        else:
+                            raise combined_error from primary_error
+        except BaseException as exc:
+            outer_error = exc
+            raise
         finally:
-            _restore_source_cwd(_physical_identity(previous_cwd))
+            try:
+                _restore_source_cwd(invocation_cwd)
+            except BaseException as restore_error:
+                try:
+                    _restore_source_cwd(safe_cwd)
+                except BaseException as fallback_error:
+                    restore_error.add_note(
+                        f"safe CWD fallback restoration failed: {fallback_error}"
+                    )
+                if outer_error is not None:
+                    outer_error.add_note(
+                        f"invocation CWD restoration outcome: {restore_error}; "
+                        f"safe fallback={safe_cwd[0]}"
+                    )
+                else:
+                    raise
 
 
 @contextmanager
