@@ -19,6 +19,12 @@ upstream design ../../../agents/skills/pr-processing.md public caller and GitHub
 Canonical lifecycle and policy:
 `agents/internal-routines/github-status-lifecycle.md`.
 
+## Tool Commands
+
+<!-- skill-tool-commands:start -->
+`python3 tools/agent_tools/skill_tool_commands.py show --skill _github-status-lifecycle --format text`
+<!-- skill-tool-commands:end -->
+
 ## Invocation Boundary
 
 1. Invoke only from `pr-processing` after the target Issue, fresh remote state,
