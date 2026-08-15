@@ -11,7 +11,12 @@ import os
 import shutil
 import subprocess
 import sys
+import time
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
 AGENT_TOOLS = ROOT / "tools" / "agent_tools"
@@ -19,6 +24,15 @@ if str(AGENT_TOOLS) not in sys.path:
     sys.path.insert(0, str(AGENT_TOOLS))
 
 from attach_clean_detached_submodule import attach
+from tools.agent_tools.fixture_spawn import bootstrap_fixture_public_environment
+from tools.agent_tools.parent_root_side_effects import (
+    SIDE_EFFECT_HANDOFF_ENV,
+    SIDE_EFFECT_PARENT_ROOT_ENV,
+    SIDE_EFFECT_REQUIRED_ENV,
+    current_supervisor_issuer,
+    public_session,
+    resolve_parent_side_effect_session_v2,
+)
 
 
 def git(root: Path, *args: str) -> str:
@@ -164,6 +178,78 @@ def make_parent_with_plan_failure(tmp_path: Path) -> Path:
     return parent
 
 
+@contextmanager
+def update_product_fixture(
+    parent: Path,
+    environment: dict[str, str],
+) -> Iterator[object]:
+    """Run the update product command through the canonical fixture facade."""
+    saved_environment = os.environ.copy()
+    previous_cwd = Path.cwd()
+    command = ("bash", "tools/update_agent_canon.sh", "latest")
+    invocation_script = parent / "tools" / "update_agent_canon.sh"
+    try:
+        os.environ.clear()
+        os.environ.update(environment)
+        if environment.get(SIDE_EFFECT_HANDOFF_ENV) and environment.get(
+            SIDE_EFFECT_PARENT_ROOT_ENV
+        ):
+            with bootstrap_fixture_public_environment(
+                mode="product_fixture",
+                fixture_cwd=parent,
+                base_env=environment,
+                argv=command,
+                invocation_script=invocation_script,
+            ) as fixture:
+                yield fixture
+            return
+
+        os.chdir(parent)
+        with public_session(
+            invocation_script=invocation_script,
+            purpose="update-product-test-supervisor",
+            independent=True,
+            cleanup_state=True,
+        ):
+            issuer = current_supervisor_issuer()
+            assert issuer is not None
+            child = issuer.issue_child(
+                role="record",
+                record_id=f"update-record-{time.monotonic_ns()}",
+                physical_root=parent,
+                now_mono_ns=time.monotonic_ns(),
+            )
+            record = resolve_parent_side_effect_session_v2(
+                env={
+                    SIDE_EFFECT_PARENT_ROOT_ENV: child.record.parent_root_realpath,
+                    SIDE_EFFECT_HANDOFF_ENV: child.handoff,
+                    SIDE_EFFECT_REQUIRED_ENV: "1",
+                },
+                observed_cwd=parent,
+            )
+            try:
+                with bootstrap_fixture_public_environment(
+                    mode="product_fixture",
+                    fixture_cwd=parent,
+                    record=record,
+                    base_env=environment,
+                    argv=command,
+                    invocation_script=invocation_script,
+                ) as fixture:
+                    yield fixture
+            finally:
+                record.close()
+                issuer.revoke_drain_child(
+                    child=child.child,
+                    reason="normal_exit",
+                    now_mono_ns=time.monotonic_ns(),
+                )
+    finally:
+        os.environ.clear()
+        os.environ.update(saved_environment)
+        os.chdir(previous_cwd)
+
+
 def test_clean_detached_at_parent_pin_attaches_requested_branch(tmp_path: Path) -> None:
     parent, submodule, pinned = make_parent(tmp_path)
     git(submodule, "branch", "-D", "main")
@@ -206,6 +292,7 @@ def test_existing_divergent_local_branch_is_not_rewritten(tmp_path: Path) -> Non
 
 def test_parent_update_prints_nonzero_plan_diagnostics_before_returning(
     tmp_path: Path,
+    capfd: pytest.CaptureFixture[str],
 ) -> None:
     """Plan diagnostics reach stdout before the wrapper returns its plan status."""
     parent = make_parent_with_plan_failure(tmp_path)
@@ -234,18 +321,13 @@ def test_parent_update_prints_nonzero_plan_diagnostics_before_returning(
             ),
         }
     )
-    latest = subprocess.run(
-        ["bash", "tools/update_agent_canon.sh", "latest"],
-        cwd=parent,
-        check=False,
-        capture_output=True,
-        text=True,
-        env=env,
-    )
-
-    assert latest.returncode == 2, latest.stdout + latest.stderr
+    with update_product_fixture(parent, env) as fixture:
+        receipt = fixture.receipt
+        assert receipt is not None
+        assert receipt.returncode == 2
+    output = capfd.readouterr().out
     assert any(
         line.startswith("agent_canon_plan_route=")
-        for line in latest.stdout.splitlines()
+        for line in output.splitlines()
     )
-    assert "agent_canon_plan_status=blocked" in latest.stdout
+    assert "agent_canon_plan_status=blocked" in output

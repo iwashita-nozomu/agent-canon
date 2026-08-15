@@ -533,6 +533,10 @@ def test_fixture_bootstrap_modes_preserve_enclosing_record(
             assert Path.cwd() == source_cwd
             assert synthetic.session is not None
             assert synthetic[side_effects.SIDE_EFFECT_HANDOFF_ENV]
+            assert synthetic["CARGO_TARGET_DIR"] == synthetic["AGENT_CANON_CLI_TARGET_DIR"]
+            assert Path(synthetic["CARGO_TARGET_DIR"]).resolve().is_relative_to(
+                fixture.resolve()
+            )
             child = subprocess.run(
                 [sys.executable, "-c", "import os; assert os.environ['AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED'] == '1'"],
                 cwd=fixture,
@@ -544,6 +548,78 @@ def test_fixture_bootstrap_modes_preserve_enclosing_record(
             mode="ordinary_tool", record=record, fixture_cwd=source_cwd
         ) as environment:
             assert environment[side_effects.SIDE_EFFECT_HANDOFF_ENV]
+
+
+def test_fixture_bootstrap_preserves_contained_explicit_cargo_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A missing explicit Cargo target is accepted only beneath the fixture root."""
+    git_repo(tmp_path, remote="https://example.invalid/explicit-target-parent.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/explicit-target-source.git")
+    git_repo(fixture, remote="https://example.invalid/explicit-target-fixture.git")
+    explicit_target = fixture / ".agent-canon" / "cache" / "cargo-target"
+
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        with bootstrap_fixture_public_environment(
+            mode="synthetic_tool",
+            record=record,
+            fixture_cwd=fixture,
+            base_env={"CARGO_TARGET_DIR": str(explicit_target)},
+        ) as synthetic:
+            assert synthetic["CARGO_TARGET_DIR"] == str(explicit_target)
+            assert synthetic["AGENT_CANON_CLI_TARGET_DIR"] == str(explicit_target)
+            assert not explicit_target.exists()
+
+    assert not explicit_target.exists()
+
+
+def test_fixture_bootstrap_rejects_external_cargo_target_before_synthetic_spawn(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """An external target fails before synthetic publication or child-session spawn."""
+    git_repo(tmp_path, remote="https://example.invalid/external-target-parent.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/external-target-source.git")
+    git_repo(fixture, remote="https://example.invalid/external-target-fixture.git")
+    external_target = tmp_path / "external-cargo-target"
+    write_calls: list[object] = []
+    session_calls: list[object] = []
+    original_write = fixture_spawn.ParentRootSideEffectBoundary.write_parent_owned_file
+    original_session = fixture_spawn.public_session
+
+    def track_write(*args: object, **kwargs: object) -> object:
+        write_calls.append((args, kwargs))
+        return original_write(*args, **kwargs)  # type: ignore[arg-type]
+
+    def track_session(*args: object, **kwargs: object) -> object:
+        session_calls.append((args, kwargs))
+        return original_session(*args, **kwargs)  # type: ignore[arg-type]
+
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        monkeypatch.setattr(
+            fixture_spawn.ParentRootSideEffectBoundary,
+            "write_parent_owned_file",
+            track_write,
+        )
+        monkeypatch.setattr(fixture_spawn, "public_session", track_session)
+        with pytest.raises(ParentRootSideEffectError) as rejected:
+            with bootstrap_fixture_public_environment(
+                mode="synthetic_tool",
+                record=record,
+                fixture_cwd=fixture,
+                base_env={"CARGO_TARGET_DIR": str(external_target)},
+            ):
+                raise AssertionError("external target unexpectedly accepted")
+
+    assert rejected.value.reject is ParentRootReject.ROOT_MISMATCH
+    assert "outside fixture root" in rejected.value.detail
+    assert not external_target.exists()
+    assert not write_calls
+    assert not session_calls
+    assert not (fixture / ".agent-canon" / "fixture-bootstrap").exists()
 
 
 def test_record_environment_reuses_testrunner_record_when_inherited() -> None:
@@ -1880,6 +1956,60 @@ def test_optional_missing_then_concurrent_create_preserves_winner_bytes(
     )
     assert (outcome, detail) == ("failed", "spool_conflict")
     assert boundary.read_parent_owned_bytes(receipt, target, "concurrent-create") == b"winner\n"
+
+
+def test_read_parent_owned_bytes_releases_lease_on_missing_success_and_race(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Every authenticated read branch releases its internally-owned lease."""
+    with session_child_environment(tmp_path) as (boundary, session, _environment):
+        target = tmp_path / "reports" / "optional.json"
+        lease_dir = side_effects._v2_lease_dir(session.record)
+
+        def assert_no_operation_leases() -> None:
+            assert not tuple(lease_dir.glob("*.json"))
+
+        for _ in range(2):
+            assert boundary.read_parent_owned_bytes(
+                session.attestation,
+                target,
+                "optional-read",
+                allow_missing=True,
+            ) is None
+            assert_no_operation_leases()
+
+        with pytest.raises(ParentRootSideEffectError) as missing:
+            boundary.read_parent_owned_bytes(
+                session.attestation, target, "optional-read"
+            )
+        assert missing.value.reject is ParentRootReject.ROOT_MISSING
+        assert_no_operation_leases()
+
+        boundary.write_parent_owned_file(
+            session.attestation, target, b"stable\n", "optional-read"
+        )
+        assert boundary.read_parent_owned_bytes(
+            session.attestation, target, "optional-read"
+        ) == b"stable\n"
+        assert_no_operation_leases()
+
+        replacement = target.with_name("replacement.json")
+        replacement.write_bytes(b"replacement\n")
+
+        def replace_before_read(receipt: object) -> bytes:
+            target.unlink()
+            replacement.rename(target)
+            return original_read(receipt)  # type: ignore[arg-type]
+
+        original_read = boundary.read_parent_owned_file
+        monkeypatch.setattr(boundary, "read_parent_owned_file", replace_before_read)
+        with pytest.raises(ParentRootSideEffectError) as raced:
+            boundary.read_parent_owned_bytes(
+                session.attestation, target, "optional-read"
+            )
+        assert raced.value.reject is ParentRootReject.ROOT_RACE_DETECTED
+        assert_no_operation_leases()
 
 
 def test_child_environment_rejects_target_alias_mismatch_before_creating_directories(

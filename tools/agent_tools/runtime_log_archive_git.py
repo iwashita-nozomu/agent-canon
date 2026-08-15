@@ -5672,14 +5672,13 @@ def write_jsonl_once(path: Path, payload: dict[str, object], key: str) -> bool:
     bound = _parent_boundary()
     if bound is not None:
         boundary, attestation = bound
-        receipt = boundary.resolve_parent_owned_path(
-            attestation, path, "runtime-archive-index", create=False
+        prior = boundary.read_parent_owned_bytes(
+            attestation,
+            path,
+            "runtime-archive-index",
+            allow_missing=True,
         )
-        try:
-            prior = boundary.read_parent_owned_file(receipt)
-        except ParentRootSideEffectError as exc:
-            if exc.reject is not ParentRootReject.ROOT_MISSING:
-                raise
+        if prior is None:
             prior = b""
         for line in prior.decode("utf-8").splitlines():
             if not line.strip():

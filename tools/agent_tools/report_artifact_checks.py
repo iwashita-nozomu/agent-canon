@@ -29,7 +29,6 @@ from typing import cast
 
 try:
     from .parent_root_side_effects import (
-        ParentOwnedPathReceipt,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
@@ -37,7 +36,6 @@ try:
     )
 except ImportError:
     from parent_root_side_effects import (  # type: ignore[no-redef]
-        ParentOwnedPathReceipt,
         ParentRootReject,
         ParentRootSideEffectBoundary,
         ParentRootSideEffectError,
@@ -599,16 +597,12 @@ def _write_validation_leaf(path: Path, data: bytes) -> None:
     if configured:
         attestation = resolve_parent_writer_attestation(purpose="validation-artifact")
         boundary = ParentRootSideEffectBoundary()
-        receipt: ParentOwnedPathReceipt | None = None
-        receipt = boundary.resolve_parent_owned_path(attestation, path, "validation-artifact", create=False)
-        try:
-            existing = boundary.read_parent_owned_file(receipt)
-        except ParentRootSideEffectError as exc:
-            if exc.reject is not ParentRootReject.ROOT_MISSING:
-                raise
-            existing = None
-        finally:
-            boundary.release_parent_owned_path(receipt)
+        existing = boundary.read_parent_owned_bytes(
+            attestation,
+            path,
+            "validation-artifact",
+            allow_missing=True,
+        )
         if existing is not None:
             if existing != data:
                 raise ValidationMaterializerError("validation_artifact:byte_mismatch")

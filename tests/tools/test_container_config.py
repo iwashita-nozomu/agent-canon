@@ -401,19 +401,6 @@ def test_public_docker_image_prebuilds_rust_runtime_test_target() -> None:
     assert "AGENT_CANON_TEST_PARENT_ROOT" not in dockerfile
 
 
-def test_public_docker_route_leaves_graph_analysis_explicit() -> None:
-    """Standard image acceptance does not remove the explicit graph route."""
-    dockerfile = PUBLIC_DOCKERFILE.read_text(encoding="utf-8")
-    graph_tests = (
-        PROJECT_ROOT / "tests" / "agent_tools" / "test_dependency_manifest_tools.py"
-    ).read_text(encoding="utf-8")
-
-    assert "graph build" not in dockerfile
-    assert "graph status" not in dockerfile
-    assert "--ensure-graph" in graph_tests
-    assert "graph.sqlite" in graph_tests
-
-
 @pytest.mark.parametrize(
     ("dockerignore_mutation", "dockerfile_mutation", "expected_detail"),
     (

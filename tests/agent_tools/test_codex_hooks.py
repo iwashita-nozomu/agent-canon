@@ -112,11 +112,7 @@ class CodexHooksTest(unittest.TestCase):
         self._bootstrap_fixture(root)
         previous_cwd = Path.cwd()
         previous_environment = os.environ.copy()
-        clean_environment = {
-            key: value
-            for key, value in previous_environment.items()
-            if not key.startswith("AGENT_CANON_SIDE_EFFECT_")
-        }
+        clean_environment = {"PATH": previous_environment.get("PATH", os.defpath)}
         os.chdir(root)
         try:
             with public_session(
@@ -188,29 +184,31 @@ class CodexHooksTest(unittest.TestCase):
         event: str,
         payload: object,
         *,
+        session_root: Path | None = None,
         extra_env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
         """Run one hook without the source-root test override."""
         raw_payload = payload if isinstance(payload, str) else json.dumps(payload)
-        env = dict(os.environ)
-        for key in (
-            "AGENT_CANON_HOOK_EVENT_SPOOL_DIR",
-            "AGENT_CANON_HOOK_SOURCE_ROOT",
-            "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR",
-            "AGENT_CANON_SOURCE_ROOT",
-            "AGENT_CANON_ROOT",
-        ):
-            env.pop(key, None)
-        env.update(extra_env or {})
-        return subprocess.run(
-            [sys.executable, str(HOOK_DISPATCHER), event],
-            cwd=cwd,
-            input=raw_payload,
-            check=True,
-            capture_output=True,
-            text=True,
-            env=env,
-        )
+        with self._authenticated_fixture(session_root or cwd) as env:
+            for key in (
+                "AGENT_CANON_HOOK_EVENT_SPOOL_DIR",
+                "AGENT_CANON_HOOK_SOURCE_ROOT",
+                "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR",
+                "AGENT_CANON_SOURCE_ROOT",
+                "AGENT_CANON_ROOT",
+            ):
+                env.pop(key, None)
+            env.update(extra_env or {})
+            env.pop("AGENT_CANON_HOOK_SOURCE_ROOT", None)
+            return subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), event],
+                cwd=cwd,
+                input=raw_payload,
+                check=True,
+                capture_output=True,
+                text=True,
+                env=env,
+            )
 
     @staticmethod
     def _spooled_event(root: Path, pattern: str = ".agent-canon/**/*.json") -> dict[str, object]:
@@ -338,15 +336,19 @@ class CodexHooksTest(unittest.TestCase):
         """A failed source-root resolution disables report projection as typed state."""
         payload = {"hookEventName": "UserPromptSubmit", "prompt": "use $task-routing"}
         with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            spool = root / "spool"
-            report = root / "authority-report"
+            parent = Path(tmp_dir) / "parent"
+            self._bootstrap_fixture(parent)
+            root = parent / "unresolved" / "child"
+            root.mkdir(parents=True)
+            spool = parent / "spool"
+            report = parent / "authority-report"
             report.mkdir()
 
             self._run_hook_in_layout(
                 root,
                 "UserPromptSubmit",
                 payload,
+                session_root=parent,
                 extra_env={
                     "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": str(spool),
                     "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": str(report),
@@ -364,7 +366,7 @@ class CodexHooksTest(unittest.TestCase):
             parent = Path(tmp_dir) / "parent"
             source = parent / "vendor" / "agent-canon"
             catalog = source / "agents" / "skills" / "catalog.yaml"
-            (parent / ".git").mkdir(parents=True)
+            self._bootstrap_fixture(parent)
             source.mkdir(parents=True)
             (source / ".git").write_text(
                 "gitdir: ../../.git/modules/vendor/agent-canon\n",
@@ -379,7 +381,12 @@ class CodexHooksTest(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            self._run_hook_in_layout(source, "UserPromptSubmit", payload)
+            self._run_hook_in_layout(
+                source,
+                "UserPromptSubmit",
+                payload,
+                session_root=parent,
+            )
 
             event = self._spooled_event(parent)
             self.assertEqual(event["root"], str(parent))

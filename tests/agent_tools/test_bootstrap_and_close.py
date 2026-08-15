@@ -54,10 +54,12 @@ from packets import (  # noqa: E402
     resolve_active_design_packet_config,
 )
 from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
 )
 from report_artifact_checks import (  # noqa: E402
     RUNTIME_PROFILE_TAXONOMY_PATH,
+    _write_validation_leaf,
     write_completion_coverage_artifact,
 )
 from task_authority import hash_baseline_bytes  # noqa: E402
@@ -979,6 +981,32 @@ class BootstrapAndCloseTest(unittest.TestCase):
         """Completion coverage reads the canonical runtime inventory path."""
         self.assertEqual(RUNTIME_PROFILE_TAXONOMY_PATH, RUNTIME_PROFILE_INVENTORY)
         self.assertTrue(RUNTIME_PROFILE_TAXONOMY_PATH.is_file())
+
+    def test_validation_leaf_first_publication_accepts_missing_parent_target(self) -> None:
+        """Validation artifacts publish successfully when the optional leaf is absent."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+            boundary = ParentRootSideEffectBoundary()
+            attestation = boundary.attest(
+                ParentRootAttestationRequest(
+                    cwd=root, explicit_root=root, purpose="validation-artifact"
+                )
+            )
+            target = root / "reports" / "validation.stdout"
+            with (
+                patch.dict(
+                    os.environ,
+                    {"AGENT_CANON_SIDE_EFFECT_PARENT_ROOT": str(root)},
+                    clear=False,
+                ),
+                patch(
+                    "report_artifact_checks.resolve_parent_writer_attestation",
+                    return_value=attestation,
+                ),
+            ):
+                _write_validation_leaf(target, b"first publication\n")
+            self.assertEqual(target.read_bytes(), b"first publication\n")
 
     def setUp(self) -> None:
         """Keep subprocesses free of retired ambient parent authority."""

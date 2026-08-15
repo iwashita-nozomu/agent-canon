@@ -4013,19 +4013,24 @@ class ParentRootSideEffectBoundary:
         receipt = self.resolve_parent_owned_path(
             attestation, candidate, purpose, create=False
         )
-        if receipt.target_dev is None or receipt.target_ino is None:
-            if not receipt.lexical_entry_exists and allow_missing:
-                return None
-            if not receipt.lexical_entry_exists:
+        try:
+            if receipt.target_dev is None or receipt.target_ino is None:
+                if not receipt.lexical_entry_exists and allow_missing:
+                    return None
+                if not receipt.lexical_entry_exists:
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_MISSING,
+                        f"parent-owned file does not exist: {receipt.physical_path}",
+                    )
                 raise ParentRootSideEffectError(
-                    ParentRootReject.ROOT_MISSING,
-                    f"parent-owned file does not exist: {receipt.physical_path}",
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    f"parent-owned entry has no stable target: {receipt.physical_path}",
                 )
-            raise ParentRootSideEffectError(
-                ParentRootReject.ROOT_RACE_DETECTED,
-                f"parent-owned entry has no stable target: {receipt.physical_path}",
-            )
-        return self.read_parent_owned_file(receipt)
+            return self.read_parent_owned_file(receipt)
+        finally:
+            lease = receipt.session_lease
+            if lease is not None and not lease.closed:
+                self._release_operation_lease(lease)
 
     def remove_empty_parent_owned_directory(
         self,

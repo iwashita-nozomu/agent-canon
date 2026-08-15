@@ -11,6 +11,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import subprocess
 import sys
@@ -18,10 +19,16 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "export_codex_runtime_summary.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+import export_codex_runtime_summary  # noqa: E402
+from parent_root_side_effects import (  # noqa: E402
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
 from runtime_log_paths import (  # noqa: E402
     codex_runtime_index_path,
     codex_runtime_summary_path,
@@ -178,6 +185,38 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("CODEX_RUNTIME_SUMMARY=skip", result.stdout)
+
+    def test_parent_bound_index_first_publication_accepts_missing_target(self) -> None:
+        """Runtime summary index publication creates its optional JSONL target once."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+            boundary = ParentRootSideEffectBoundary()
+            attestation = boundary.attest(
+                ParentRootAttestationRequest(
+                    cwd=root, explicit_root=root, purpose="codex-runtime-summary-index"
+                )
+            )
+            target = root / "codex-runtime" / "index.jsonl"
+            with (
+                patch.dict(
+                    os.environ,
+                    {"AGENT_CANON_SIDE_EFFECT_PARENT_ROOT": str(root)},
+                    clear=False,
+                ),
+                patch.object(
+                    export_codex_runtime_summary,
+                    "resolve_parent_writer_attestation",
+                    return_value=attestation,
+                ),
+            ):
+                export_codex_runtime_summary._append_parent_jsonl(
+                    target, {"conversation_id": "first"}, "codex-runtime-summary-index"
+                )
+            self.assertEqual(
+                target.read_text(encoding="utf-8"),
+                '{"conversation_id":"first"}\n',
+            )
 
 
 def run_exporter(

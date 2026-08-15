@@ -45,10 +45,12 @@ class ClassifyPathRiskTest(unittest.TestCase):
         payload = json.loads(result.stdout)
         profiles = {row["profile"] for row in payload["risks"]}
 
-        self.assertIn("docs-only-or-docs-impact", profiles)
-        self.assertIn("python-tooling", profiles)
-        self.assertIn("github-automation", profiles)
-        self.assertIn("agentcanon-shared-surface", profiles)
+        self.assertEqual(
+            profiles,
+            {"docs-only-or-docs-impact", "python-tooling", "github-automation"},
+        )
+        self.assertNotIn("agentcanon-shared-surface", profiles)
+        self.assertEqual(tuple(payload["units"]), ("contracts", "workflow-container"))
 
 
 if __name__ == "__main__":

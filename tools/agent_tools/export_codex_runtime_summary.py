@@ -581,17 +581,14 @@ def _append_parent_jsonl(path: Path, record: dict[str, object], purpose: str) ->
     if configured:
         attestation = resolve_parent_writer_attestation(purpose=purpose)
         boundary = ParentRootSideEffectBoundary()
-        existing = b""
-        receipt = None
-        try:
-            receipt = boundary.resolve_parent_owned_path(attestation, path, purpose, create=False)
-            existing = boundary.read_parent_owned_file(receipt)
-        except ParentRootSideEffectError as exc:
-            if exc.reject is not ParentRootReject.ROOT_MISSING:
-                raise
-        finally:
-            if receipt is not None:
-                boundary.release_parent_owned_path(receipt)
+        existing = boundary.read_parent_owned_bytes(
+            attestation,
+            path,
+            purpose,
+            allow_missing=True,
+        )
+        if existing is None:
+            existing = b""
         boundary.write_parent_owned_file(attestation, path, existing + line, purpose)
         return
     raise ParentRootSideEffectError(

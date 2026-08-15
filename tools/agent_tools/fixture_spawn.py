@@ -71,7 +71,7 @@ _FIXTURE_PATH_ENV_KEYS = (
     "AGENT_CANON_FIXTURE_ROLE", "AGENT_CANON_REPORT_ROOT",
     "AGENT_CANON_RUN_BUNDLE_ROOT", "AGENT_CANON_CLOSEOUT_ROOT",
     "AGENT_CANON_RECORD_ROOT", "AGENT_CANON_RECORD_ID",
-    "AGENT_CANON_TOOLS_HOME", "AGENT_CANON_CLI_TARGET_DIR",
+    "AGENT_CANON_TOOLS_HOME", "CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR",
     "AGENT_CANON_DATA_REPOSITORY_ROOT", "AGENT_CANON_DATA_REPOSITORY_DEV",
     "AGENT_CANON_DATA_REPOSITORY_INO", "AGENT_CANON_DATA_SOURCE_ROOT",
     "AGENT_CANON_DATA_ROOT", "PYTHONPATH",
@@ -87,6 +87,8 @@ def _clean_fixture_environment(
     record: SessionResolutionResult,
     local_root: Path,
     base_env: Mapping[str, str] | None = None,
+    *,
+    fixture_root: Path,
 ) -> dict[str, str]:
     """Construct the product/synthetic environment without inherited identity."""
     environment = fixture_child_environment(record, local_root)
@@ -99,8 +101,30 @@ def _clean_fixture_environment(
             ):
                 environment[key] = value
     for key in tuple(environment):
-        if key.startswith("AGENT_CANON_SIDE_EFFECT_") or key in _FIXTURE_PATH_ENV_KEYS:
+        if key.startswith("AGENT_CANON_SIDE_EFFECT_"):
             environment.pop(key, None)
+    explicit_target = None if base_env is None else base_env.get("CARGO_TARGET_DIR")
+    if explicit_target:
+        boundary = ParentRootSideEffectBoundary()
+        target_receipt = None
+        try:
+            target_receipt = boundary.resolve_parent_owned_path(
+                record.attestation,
+                explicit_target,
+                "fixture-bootstrap-cargo-target",
+            )
+            target_path = Path(target_receipt.physical_path).resolve(strict=False)
+            if not target_path.is_relative_to(fixture_root):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISMATCH,
+                    f"path resolves outside fixture root: {target_path}",
+                )
+            target = str(target_path)
+        finally:
+            if target_receipt is not None:
+                boundary.release_parent_owned_path(target_receipt)
+        environment["CARGO_TARGET_DIR"] = target
+        environment["AGENT_CANON_CLI_TARGET_DIR"] = target
     environment["PATH"] = os.pathsep.join(_FIXTURE_EXEC_PATH + (str(local_root / "tools"),))
     return environment
 
@@ -236,7 +260,11 @@ def bootstrap_fixture_public_environment(
 
                 if normalized_mode == "product_fixture":
                     os.chdir(fixture_root)
+                    saved_environment = os.environ.copy()
                     try:
+                        if base_env is not None:
+                            os.environ.clear()
+                            os.environ.update(base_env)
                         product_now = time.monotonic_ns() if clock is None else clock()
                         receipt = run_fixture_command(
                             record=resolved_record,
@@ -246,6 +274,8 @@ def bootstrap_fixture_public_environment(
                             clock=clock,
                         )
                     finally:
+                        os.environ.clear()
+                        os.environ.update(saved_environment)
                         _restore_source_cwd(source)
                     yield FixturePublicEnvironment(
                         "product_fixture", resolved_record, fixture_root, {}, receipt=receipt
@@ -267,7 +297,10 @@ def bootstrap_fixture_public_environment(
                 try:
                     local_root = local_receipt.physical_path
                     clean_environment = _clean_fixture_environment(
-                        resolved_record, local_root, base_env
+                        resolved_record,
+                        local_root,
+                        base_env,
+                        fixture_root=fixture_root,
                     )
                     script = invocation_script or (local_root / "synthetic-tool.py")
                     script = script if script.is_absolute() else fixture_root / script

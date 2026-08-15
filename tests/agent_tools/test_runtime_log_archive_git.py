@@ -80,6 +80,10 @@ for _module_name in (
 from tools.agent_tools import github_publish
 from tools.agent_tools.graph_client import GraphClient
 from tools.agent_tools.log_repository_identity import stable_source_repository_id
+from tools.agent_tools.parent_root_side_effects import (
+    ParentRootAttestationRequest,
+    ParentRootSideEffectBoundary,
+)
 from tools.agent_tools.runtime_log_paths import (
     mounted_log_archive_root,
     repo_log_key,
@@ -485,6 +489,40 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
             )
             self.assertFalse(target.exists())
             self.assertEqual(tuple(root.iterdir()), ())
+
+    def test_parent_bound_index_first_publication_accepts_missing_target(self) -> None:
+        """Archive index publication creates its optional JSONL target once."""
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            subprocess.run(["git", "init", "-q", "-b", "main", str(root)], check=True)
+            boundary = ParentRootSideEffectBoundary()
+            attestation = boundary.attest(
+                ParentRootAttestationRequest(
+                    cwd=root, explicit_root=root, purpose="runtime-log-archive"
+                )
+            )
+            target = root / "reports" / "archive-index.jsonl"
+            with (
+                patch.dict(
+                    os.environ,
+                    {"AGENT_CANON_SIDE_EFFECT_PARENT_ROOT": str(root)},
+                    clear=False,
+                ),
+                patch.object(
+                    runtime_log_archive_git,
+                    "resolve_parent_writer_attestation",
+                    return_value=attestation,
+                ),
+            ):
+                self.assertTrue(
+                    runtime_log_archive_git.write_jsonl_once(
+                        target, {"archive_id": "first"}, "first"
+                    )
+                )
+            self.assertEqual(
+                target.read_text(encoding="utf-8"),
+                '{"archive_id": "first"}\n',
+            )
 
     def test_secure_publication_reports_cleanup_failure_without_suppression(self) -> None:
         """A failed temp cleanup is typed and never silently discarded."""
