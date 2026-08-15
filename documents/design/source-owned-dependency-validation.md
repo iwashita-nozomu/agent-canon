@@ -29,8 +29,8 @@ downstream implementation ../../issues/open/AC-20260815-decouple-graph-runtime.m
 -->
 
 This design specializes the dependency-manifest design for authority and runtime
-ownership. It replaces the former assumption that dependency correctness must be
-read from a persisted graph snapshot. The manifest DSL, relation meanings,
+ownership in `tools/agent_tools/source_dependency_graph.py`. It replaces the
+former assumption that dependency correctness must be read from a persisted graph in `tools/agent_tools/graph_client.py`. The manifest DSL, relation meanings,
 bidirectional review, cycle review, and changed-path selection remain owned by
 `dependency-manifest-design.md`.
 
@@ -82,9 +82,8 @@ of $V(S)$.
 
 ### Source is the sole correctness authority
 
-Tracked source plus canonical parent-view bindings owns dependency facts.
-Dependency query/context consumers used by validation, drift checks, and bounded
-search read those bytes directly. A persisted snapshot is never consulted as a
+Tracked source plus canonical parent-view bindings owns dependency facts through `tools/agent_tools/source_dependency_graph.py`. Dependency query/context
+consumers used by validation, drift checks, and bounded search read those bytes directly through `tools/agent_tools/graph_client.py`. A persisted snapshot is never consulted as a
 fallback or tie-breaker.
 
 ### Parsing fails closed
@@ -103,10 +102,11 @@ record tuples, not process-local counters or database row IDs.
 
 ### Canonical path containment
 
-Every relative target is resolved from the canonical source file. The resolved
-path must remain below the selected repository root. Parent views are mapped by
-the existing shared-surface manifest using deterministic longest-prefix
-selection before source bytes are read.
+Every relative target is resolved from the canonical source file in
+`tools/agent_tools/source_dependency_graph.py`. The resolved path must remain
+below the selected repository root. Parent views are mapped by
+`documents/runtime/shared-runtime-surfaces.toml` using deterministic longest-prefix
+selection before source bytes are read from `documents/runtime/shared-runtime-surfaces.toml`.
 
 ### Cache and runtime state are non-authoritative
 
@@ -136,9 +136,10 @@ without making graph runtime state implicit.
 
 ## PR Gate Contract
 
-The PR selector still owns trusted comparison-base acquisition, changed-path
-packet construction, profile validation, and the decision to run full dependency
-review or header scan only. Selection does not authorize a graph build.
+The PR selector `tools/ci/agent_canon_pr_graph_selector.py` still owns trusted
+comparison-base acquisition, changed-path packet construction, profile
+validation in `tools/ci/agent_canon_pr_graph_selector.py`, and the decision to run full dependency review or header scan only.
+Selection does not authorize a graph build in `tools/ci/check_agent_canon_pr.sh`.
 
 When full review is selected, `run_pr_dependency_source_gate.sh` runs:
 
@@ -148,28 +149,29 @@ When full review is selected, `run_pr_dependency_source_gate.sh` runs:
 4. source-derived Markdown, TSV, and DOT projection generation.
 
 When the selected change is outside declared dependency surfaces, the same gate
-runs the trusted changed-path header scan only. The receipt records `source` or
+`tools/ci/run_pr_dependency_source_gate.sh` runs the trusted changed-path header
+scan only. The receipt records `source` or
 `skipped`; it does not record graph freshness as source correctness evidence.
 
 `tools/ci/pr_gate_receipt.py` is the sole receipt schema owner. Its status enum
 contains exactly `source` and `skipped`; `strict_dependency` and `graph` are
-compatibility fields that must carry the same one of those two values. The
-writer serializes and validates the complete owner/root/PID/status/selector
-record before the parent-boundary write. `run_all_checks.sh` invokes the same
-module once for read-back and consumes only its `status=...` output. `prepared`
+compatibility fields that must carry the same one of those two values in `tools/ci/pr_gate_receipt.py`. The
+writer in `tools/ci/check_agent_canon_pr.sh` serializes and validates the
+complete owner/root/PID/status/selector
+record before the parent-boundary write. `tools/ci/run_all_checks.sh` invokes the same
+module once for read-back and consumes only its `status=...` output in `tools/ci/run_all_checks.sh`. `prepared`
 and `scoped` are retired persisted-graph states and fail closed at writer,
 parser, and consumer boundaries.
 
-The PR gate must not invoke `graph build`, `graph status`, `graph query`, inspect
+The PR gate `tools/ci/check_agent_canon_pr.sh` must not invoke `graph build`, `graph status`, `graph query`, inspect
 `graph.sqlite`, or evaluate persisted incomplete-graph diagnostics. Explicit
 graph-analysis workflows may still do so outside this correctness path.
 
 ## Repository Review Contract
 
-`run_repo_dependency_review.sh` is source-owned by default. Its normal route
-uses source scan, format, relation/cycle, TSV/DOT, and edit-scope projections;
-it does not require a graph executable, persisted database, or graph status
-read-back. `--ensure-graph` is a separate opt-in operation that performs
+`tools/agent_tools/run_repo_dependency_review.sh` is source-owned by default. Its normal route
+uses source scan, format, relation/cycle, TSV/DOT, and edit-scope projections in `tools/agent_tools/run_repo_dependency_review.sh`;
+it does not require a graph executable, persisted database, or graph status in `tools/agent_tools/run_repo_dependency_review.sh`. `--ensure-graph` is a separate opt-in operation that performs
 persisted graph status/build preparation and exits before source review. It is
 mutually exclusive with `--header-scan-only`, preventing one invocation from
 presenting optional graph preparation as dependency correctness evidence.
@@ -181,9 +183,8 @@ source consumers do not need a simultaneous rewrite. Compatibility applies only
 to response shape. It does not preserve the previous authority of persisted
 snapshots.
 
-The names `GraphClient` and `agent_canon_pr_graph_selector.py` may remain during
-this focused change because they also own explicit graph operations and trusted
-scope selection. Renaming them is a separate responsibility and must not be
+The names `GraphClient` and `tools/ci/agent_canon_pr_graph_selector.py` may remain during
+this focused change because they also own explicit graph operations and trusted `tools/ci/agent_canon_pr_graph_selector.py` scope selection. Renaming them is a separate responsibility and must not be
 combined with the authority correction.
 
 ## Non-Goals
@@ -196,19 +197,34 @@ combined with the authority correction.
 - adding an alternate fallback parser for persisted graph consumers;
 - renaming every graph-related symbol in the same change.
 
+## Evidence And Assumption Ledger
+
+- `DSL` assumption: relation syntax and registered kinds are owned by
+  `documents/design/dependency-manifest-design.md` and parsed by
+  `tools/agent_tools/source_dependency_graph.py`.
+- `normalization` assumption: canonical path and surface binding normalization
+  is owned by `tools/agent_tools/source_dependency_graph.py` and
+  `documents/runtime/shared-runtime-surfaces.toml`.
+- Evidence sources: source projection, receipt lifecycle, and regression tests
+  are `tools/agent_tools/source_dependency_graph.py`,
+  `tools/ci/pr_gate_receipt.py`, and
+  `tests/tools/test_pr_gate_receipt_round_trip.py`.
+- Parent-doc alignment: relation and runtime authority remain governed by
+  `documents/design/dependency-manifest-design.md`.
+
 ## Validation
 
-The focused validation set must demonstrate both positive and negative
+The focused validation set in `tests/tools/test_pr_gate_receipt_round_trip.py` must demonstrate both positive and negative
 properties:
 
 - dependency query and path context succeed without an executable or
   `.agent-canon` graph state;
 - explicit persisted graph commands still fail when their runtime is absent;
 - malformed and escaping source fails without runtime fallback;
-- PR source-gate required and skipped routes work without graph state;
+- PR source-gate required and skipped routes in `tests/tools/test_agent_canon_pr_dependency_source_gate.py` work without graph state;
 - the production PR shell contains no persisted dependency graph build/status/
   query orchestration;
-- repository dependency review remains stable across repeated source-only runs;
+- repository dependency review in `tools/agent_tools/run_repo_dependency_review.sh` remains stable across repeated source-only runs;
 - full repository static gates and required GitHub checks pass.
 
 ## Migration Result

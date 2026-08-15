@@ -105,6 +105,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
     """Exercise source-owned dependency header checks through the CLI."""
 
     def test_accepts_markdown_dependency_manifest(self) -> None:
+        """Accept a Markdown file with one valid dependency manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "doc.md").write_text("# Doc\n\n" + manifest(), encoding="utf-8")
@@ -115,6 +116,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
     def test_external_provenance_stays_outside_dependency_manifest(self) -> None:
+        """Keep external provenance below, rather than inside, the manifest."""
         path = PROJECT_ROOT / "agents" / "skills" / "agent-log-analysis.md"
         text = path.read_text(encoding="utf-8")
         header = text.split("@dependency-start", 1)[1].split("@dependency-end", 1)[0]
@@ -124,6 +126,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
         self.assertIn(provenance, text.split("@dependency-end", 1)[1])
 
     def test_visualization_completion_queue_has_canonical_contract_edges(self) -> None:
+        """Require visualization queue files to expose canonical contract edges."""
         patterns = header_checker.declared_surface_patterns(PROJECT_ROOT)
         for relative_path in VISUALIZATION_QUEUE_PATHS:
             with self.subTest(path=relative_path):
@@ -143,6 +146,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
                     )
 
     def test_accepts_skill_frontmatter_before_dependency_manifest(self) -> None:
+        """Accept skill frontmatter before a valid dependency manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "SKILL.md").write_text(
@@ -164,6 +168,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
     def test_rejects_missing_contract_kind(self) -> None:
+        """Reject a manifest that omits its registered contract kind."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "doc.md").write_text(manifest(contract=None), encoding="utf-8")
@@ -176,6 +181,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
 
     def test_rejects_unregistered_contract_kind(self) -> None:
+        """Reject a manifest that names an unknown contract kind."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "doc.md").write_text(
@@ -190,6 +196,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
 
     def test_rejects_missing_dependency_manifest(self) -> None:
+        """Reject a checkable source file without a dependency manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "tool.py").write_text('"""Missing dependency header."""\n', encoding="utf-8")
@@ -201,6 +208,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
 
     def test_rejects_legacy_dependency_files_block(self) -> None:
+        """Reject the retired Dependency Files block format."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "doc.md").write_text(
@@ -213,6 +221,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_HEADERS=fail", result.stdout)
 
     def test_skips_commentless_json(self) -> None:
+        """Skip commentless JSON that cannot carry a dependency manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / "data.json").write_text('{"ok": true}\n', encoding="utf-8")
@@ -223,6 +232,7 @@ class DependencyHeaderCheckTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_HEADERS=pass", result.stdout)
 
     def test_skips_reports_artifacts(self) -> None:
+        """Skip generated report artifacts from header enforcement."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             artifact = root / "reports" / "some-run" / "generated_summary.md"
@@ -245,6 +255,7 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
         *,
         changed: list[Path] | None = None,
     ) -> tuple[int, str]:
+        """Run the checker entry point with optional changed-path selection."""
         output = io.StringIO()
         patches = [patch.object(sys, "argv", ["check_dependency_headers.py", *argv])]
         if changed is not None:
@@ -259,6 +270,7 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
         return result, output.getvalue()
 
     def test_source_manifest_passes_without_graph_executable_or_state(self) -> None:
+        """Validate source headers without graph runtime state."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / ".git").mkdir()
@@ -274,6 +286,7 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
             self.assertFalse((root / ".agent-canon").exists())
 
     def test_missing_source_manifest_fails_closed(self) -> None:
+        """Fail closed when the selected source manifest is absent."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / ".git").mkdir()
@@ -288,6 +301,7 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
             self.assertIn("missing top dependency manifest block", output)
 
     def test_changed_mode_takes_precedence_over_positional_paths(self) -> None:
+        """Prefer changed-path selection when changed mode is requested."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / ".git").mkdir()
@@ -307,6 +321,7 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_HEADERS=pass", output)
 
     def test_no_path_mode_uses_changed_untracked_selection(self) -> None:
+        """Use changed untracked selection when no explicit path is provided."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / ".git").mkdir()
@@ -325,6 +340,7 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
             self.assertIn("DEPENDENCY_HEADERS=pass", output)
 
     def test_changed_mode_fails_closed_without_scope_manifest(self) -> None:
+        """Fail closed when changed mode lacks a responsibility scope manifest."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / ".git").mkdir()
@@ -341,6 +357,7 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
             self.assertIn("scope manifest is missing", output)
 
     def test_changed_mode_fails_closed_for_invalid_or_empty_scope(self) -> None:
+        """Fail closed for invalid or empty changed-path scope declarations."""
         for declaration in (
             "dependency_header_surfaces = [\n",
             "dependency_header_surfaces = []\n",
