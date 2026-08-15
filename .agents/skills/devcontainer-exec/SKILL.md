@@ -2,7 +2,7 @@
 name: devcontainer-exec
 description: "Use when an existing Dev Container needs targeted execution or validation through devcontainer exec, including a zsh shell, while preserving exact output and exit evidence."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"d68f7560d12bc04583b49e3e58d497630f18b3c945e7787c46495620a552dd3f"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"fb9e17b17822c13f6084d0dd3a0592e08dc368bd317b551a41231a73a6273c61"} -->
 
 <!--
 @dependency-start

@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical project_reviewer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: a23ab45717e395548b3e426ca925f585d1d43708935d333ea05acc060004c3ae
+# source canonical digest: 4e03dc49156cb1bafa71b8351ba5a1f37ae6a0916a17c63afd4fc134c0bf4020
 
 name = "project_reviewer"
 description = "Read-only reviewer for repo-wide inventory, workflow health, and tooling health."

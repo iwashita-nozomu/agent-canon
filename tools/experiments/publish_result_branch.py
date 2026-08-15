@@ -23,17 +23,45 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 
+if __package__:
+    from tools.experiments.experiment_identity import (
+        DuplicateJSONKeyError,
+        ExperimentIdentity,
+        identity_from_manifest,
+        load_json_file,
+        result_branch,
+        validate_segment,
+    )
+    from tools.experiments.experiment_identity import (
+        report_relative_path as canonical_report_relative_path,
+    )
+else:
+    from experiment_identity import (  # type: ignore[no-redef]
+        DuplicateJSONKeyError,
+        ExperimentIdentity,
+        identity_from_manifest,
+        load_json_file,
+        result_branch,
+        validate_segment,
+    )
+    from experiment_identity import (  # type: ignore[no-redef]
+        report_relative_path as canonical_report_relative_path,
+    )
+
 DEFAULT_REMOTE = "origin"
 DEFAULT_SOURCE_BRANCH = "main"
 EXPERIMENTS_DIR = "experiments"
 REPORT_DIR = "report"
 RESULT_DIR = "result"
-EXPECTED_RESULT_PATH_PARTS = 4
-EXPECTED_REPORT_PATH_PARTS = 3
+EXPECTED_RESULT_PATH_PARTS = 5
+EXPECTED_REPORT_PATH_PARTS = 5
 TOPIC_PATH_INDEX = 1
 RESULT_MARKER_PATH_INDEX = 2
-RUN_NAME_PATH_INDEX = 3
-REPORT_NAME_PATH_INDEX = 2
+VARIANT_PATH_INDEX = 3
+RUN_NAME_PATH_INDEX = 4
+REPORT_TOPIC_PATH_INDEX = 2
+REPORT_VARIANT_PATH_INDEX = 3
+REPORT_NAME_PATH_INDEX = 4
 
 
 @dataclass(frozen=True)
@@ -83,19 +111,47 @@ class GitCommand:
 class ResultDirectoryIdentity:
     """Repository-relative identity parsed from one result directory path."""
 
-    topic: str
-    run_name: str
+    identity: ExperimentIdentity
     result_relative_path: Path
+
+    @property
+    def topic(self) -> str:
+        """Return the topic component of the parsed identity."""
+        return self.identity.topic
+
+    @property
+    def variant(self) -> str:
+        """Return the variant component of the parsed identity."""
+        return self.identity.variant
+
+    @property
+    def run_name(self) -> str:
+        """Return the run-name component of the parsed identity."""
+        return self.identity.run_name
 
 
 @dataclass(frozen=True)
 class ResultIdentity:
     """Repository-relative identity parsed from result and report paths."""
 
-    topic: str
-    run_name: str
+    identity: ExperimentIdentity
     result_relative_path: Path
     report_relative_path: Path
+
+    @property
+    def topic(self) -> str:
+        """Return the topic component of the parsed identity."""
+        return self.identity.topic
+
+    @property
+    def variant(self) -> str:
+        """Return the variant component of the parsed identity."""
+        return self.identity.variant
+
+    @property
+    def run_name(self) -> str:
+        """Return the run-name component of the parsed identity."""
+        return self.identity.run_name
 
 
 @dataclass(frozen=True)
@@ -112,7 +168,6 @@ class ResultArtifactSet:
 
     identity: ResultIdentity
     artifacts: tuple[ArtifactPath, ...]
-    removal_paths: tuple[Path, ...]
 
 
 @dataclass(frozen=True)
@@ -142,6 +197,7 @@ class PublicationRequest:
     repo_root: Path
     result_dir: Path
     report_path: Path
+    variant: str
     branch: str
     source_branch: str
     remote: str
@@ -161,16 +217,21 @@ def parse_args() -> argparse.Namespace:
         "--result-dir",
         type=Path,
         required=True,
-        help="Managed result directory: experiments/<topic>/result/<run_name>.",
+        help="Managed result directory: experiments/<topic>/result/<variant>/<run_name>.",
+    )
+    parser.add_argument(
+        "--variant",
+        required=True,
+        help="Required variant component of the run identity.",
     )
     parser.add_argument(
         "--report-path",
         type=Path,
-        help="Optional report path. Defaults to experiments/report/<run_name>.md.",
+        help="Optional report path. Defaults to experiments/report/<topic>/<variant>/<run_name>.md.",
     )
     parser.add_argument(
         "--branch",
-        help="Result branch. Defaults to experiment-results/<topic>.",
+        help="Result branch. Defaults to experiment-results/<topic>/<variant>.",
     )
     parser.add_argument(
         "--source-branch",
@@ -207,7 +268,7 @@ def path_relative_to_repo(repo_root: Path, path: Path) -> Path:
 
 
 def parse_result_directory_identity(repo_root: Path, result_dir: Path) -> ResultDirectoryIdentity:
-    """Parse topic/run identity from a managed result directory."""
+    """Parse the complete topic/variant/run identity from a result directory."""
     result_relative_path = path_relative_to_repo(repo_root, result_dir)
     parts = result_relative_path.parts
     if (
@@ -216,33 +277,41 @@ def parse_result_directory_identity(repo_root: Path, result_dir: Path) -> Result
         or parts[RESULT_MARKER_PATH_INDEX] != RESULT_DIR
     ):
         raise ValueError(
-            "result-dir must be experiments/<topic>/result/<run_name>: "
+            "result-dir must be experiments/<topic>/result/<variant>/<run_name>: "
             f"{result_relative_path}"
         )
+    identity = ExperimentIdentity(
+        topic=validate_segment(parts[TOPIC_PATH_INDEX], "topic"),
+        variant=validate_segment(parts[VARIANT_PATH_INDEX], "variant"),
+        run_name=validate_segment(parts[RUN_NAME_PATH_INDEX], "run_name"),
+    )
     return ResultDirectoryIdentity(
-        topic=parts[TOPIC_PATH_INDEX],
-        run_name=parts[RUN_NAME_PATH_INDEX],
+        identity=identity,
         result_relative_path=result_relative_path,
     )
 
 
-def parse_report_relative_path(repo_root: Path, report_path: Path, run_name: str) -> Path:
-    """Parse and validate the report path for one run."""
+def parse_report_relative_path(
+    repo_root: Path, report_path: Path, identity: ExperimentIdentity
+) -> Path:
+    """Parse and validate the canonical report path for one run."""
     report_relative_path = path_relative_to_repo(repo_root, report_path)
     report_parts = report_relative_path.parts
     if (
         len(report_parts) != EXPECTED_REPORT_PATH_PARTS
         or report_parts[:RESULT_MARKER_PATH_INDEX] != (EXPERIMENTS_DIR, REPORT_DIR)
+        or report_parts[REPORT_TOPIC_PATH_INDEX] != identity.topic
+        or report_parts[REPORT_VARIANT_PATH_INDEX] != identity.variant
     ):
         raise ValueError(
-            "report-path must be experiments/report/<run_name>.md: "
+            "report-path must be experiments/report/<topic>/<variant>/<run_name>.md: "
             f"{report_relative_path}"
         )
-    expected_report_name = f"{run_name}.md"
+    expected_report_name = f"{identity.run_name}.md"
     if report_parts[REPORT_NAME_PATH_INDEX] != expected_report_name:
         raise ValueError(
-            "report-path must match result run name: "
-            f"expected experiments/report/{expected_report_name}, got {report_relative_path}"
+            "report-path must match complete result identity: "
+            f"expected {canonical_report_relative_path(identity)}, got {report_relative_path}"
         )
     return report_relative_path
 
@@ -250,16 +319,27 @@ def parse_report_relative_path(repo_root: Path, report_path: Path, run_name: str
 def parse_result_identity(
     repo_root: Path, result_dir: Path, report_path: Path
 ) -> ResultIdentity:
-    """Parse topic/run identity from managed result and report paths."""
+    """Parse and cross-check identity from result, report, and manifest paths."""
     result_identity = parse_result_directory_identity(repo_root, result_dir)
     report_relative_path = parse_report_relative_path(
         repo_root,
         report_path,
-        result_identity.run_name,
+        result_identity.identity,
     )
+    manifest_path = result_dir / "run_manifest.json"
+    if manifest_path.is_symlink() or not manifest_path.is_file():
+        raise ValueError(f"run manifest is required: {manifest_path}")
+    try:
+        manifest = load_json_file(manifest_path)
+    except (json.JSONDecodeError, DuplicateJSONKeyError) as exc:
+        raise ValueError(f"run manifest is not valid JSON: {manifest_path}") from exc
+    if not isinstance(manifest, Mapping):
+        raise ValueError("run manifest must be an object")
+    manifest_identity = identity_from_manifest(manifest)
+    if manifest_identity != result_identity.identity:
+        raise ValueError("run manifest identity does not match result path identity")
     return ResultIdentity(
-        topic=result_identity.topic,
-        run_name=result_identity.run_name,
+        identity=result_identity.identity,
         result_relative_path=result_identity.result_relative_path,
         report_relative_path=report_relative_path,
     )
@@ -268,9 +348,13 @@ def parse_result_identity(
 def load_manifest_git(result_dir: Path) -> dict[str, object]:
     """Load the git section from run_manifest.json when present."""
     manifest_path = result_dir / "run_manifest.json"
+    if manifest_path.is_symlink():
+        raise ValueError(f"run manifest must not be a symlink: {manifest_path}")
     if not manifest_path.exists():
         return {}
-    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not manifest_path.is_file():
+        raise ValueError(f"run manifest must be a regular file: {manifest_path}")
+    payload = load_json_file(manifest_path)
     if not isinstance(payload, dict):
         return {}
     git_payload = payload.get("git", {})
@@ -302,28 +386,44 @@ def load_source_provenance(
 
 def infer_result_branch(identity: ResultIdentity) -> str:
     """Infer the default result branch for one experiment topic."""
-    return f"experiment-results/{identity.topic}"
+    return result_branch(identity.identity)
 
 
 def default_report_path(repo_root: Path, result_dir: Path) -> Path:
     """Return the conventional report path for one managed result directory."""
     identity = parse_result_directory_identity(repo_root, result_dir)
-    return repo_root / EXPERIMENTS_DIR / REPORT_DIR / f"{identity.run_name}.md"
+    return repo_root / canonical_report_relative_path(identity.identity)
 
 
 def build_publication_request(args: argparse.Namespace) -> PublicationRequest:
     """Build a publication request from parsed CLI args."""
     repo_root = git_repo_root(args.repo_root)
-    result_dir = args.result_dir.resolve()
-    report_path = (
-        args.report_path.resolve()
-        if args.report_path
-        else default_report_path(repo_root, result_dir)
-    )
+    result_dir = args.result_dir
+    if not result_dir.is_absolute():
+        result_dir = repo_root / result_dir
+    if result_dir.is_symlink():
+        raise ValueError(f"result directory must not be a symlink: {result_dir}")
+    original_result_dir = result_dir
+    result_dir = result_dir.resolve()
+    if result_dir != original_result_dir:
+        raise ValueError(f"result directory realpath differs: {original_result_dir}")
+    if args.report_path:
+        report_path = args.report_path
+        if not report_path.is_absolute():
+            report_path = repo_root / report_path
+        if report_path.is_symlink():
+            raise ValueError(f"report path must not be a symlink: {report_path}")
+        original_report_path = report_path
+        report_path = report_path.resolve()
+        if report_path != original_report_path:
+            raise ValueError(f"report path realpath differs: {original_report_path}")
+    else:
+        report_path = default_report_path(repo_root, result_dir)
     return PublicationRequest(
         repo_root=repo_root,
         result_dir=result_dir,
         report_path=report_path,
+        variant=validate_segment(args.variant, "variant"),
         branch=args.branch or "",
         source_branch=args.source_branch,
         remote=args.remote,
@@ -366,16 +466,40 @@ def collect_result_artifacts(
     return ResultArtifactSet(
         identity=identity,
         artifacts=tuple(artifacts),
-        removal_paths=(
-            identity.result_relative_path,
-            identity.report_relative_path,
-        ),
     )
 
 
 def branch_head(git: GitCommand, branch: str) -> str:
     """Return the current result branch head commit when it exists."""
     return git.maybe_run(["show-ref", "--verify", "--hash", f"refs/heads/{branch}"])
+
+
+def reject_existing_identity(git: GitCommand, parent: str, identity: ResultIdentity) -> None:
+    """Reject publication when the branch already contains this identity."""
+    if not parent:
+        return
+    existing = git.maybe_run(
+        [
+            "ls-tree",
+            "-r",
+            "--name-only",
+            parent,
+            identity.result_relative_path.as_posix(),
+        ]
+    )
+    if existing:
+        raise ValueError(
+            "result branch already contains this experiment identity; "
+            "publication never replaces an existing subtree"
+        )
+    report_existing = git.maybe_run(
+        ["ls-tree", "-r", "--name-only", parent, identity.report_relative_path.as_posix()]
+    )
+    if report_existing:
+        raise ValueError(
+            "result branch already contains this experiment report identity; "
+            "publication never replaces an existing subtree"
+        )
 
 
 def artifact_mode(path: Path) -> str:
@@ -396,20 +520,11 @@ def git_hash_artifact(git: GitCommand, artifact: ArtifactPath) -> str:
     return git.run(["hash-object", "-w", str(artifact.source_path)])
 
 
-def remove_branch_paths(git: GitCommand, paths: tuple[Path, ...]) -> None:
-    """Remove old branch entries for paths that will be replaced."""
-    for path in paths:
-        existing = git.maybe_run(["ls-files", "-z", "--", path.as_posix()])
-        if not existing:
-            continue
-        for relative_path in existing.split("\0"):
-            if relative_path:
-                git.run(["update-index", "--force-remove", relative_path])
-
-
 def build_result_tree(repo_root: Path, parent: str, artifact_set: ResultArtifactSet) -> str:
     """Build a result-branch tree using a temporary Git index."""
-    with tempfile.TemporaryDirectory(prefix="agentcanon-result-index-") as temp_dir:
+    temporary_root = repo_root / ".agent-canon" / "tmp"
+    temporary_root.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="result-index-", dir=temporary_root) as temp_dir:
         env = dict(os.environ)
         env["GIT_INDEX_FILE"] = str(Path(temp_dir) / "index")
         git = GitCommand(repo_root=repo_root, env=env)
@@ -417,7 +532,6 @@ def build_result_tree(repo_root: Path, parent: str, artifact_set: ResultArtifact
             git.run(["read-tree", parent])
         else:
             git.run(["read-tree", "--empty"])
-        remove_branch_paths(git, artifact_set.removal_paths)
         for artifact in artifact_set.artifacts:
             blob = git_hash_artifact(git, artifact)
             git.run(
@@ -441,6 +555,7 @@ def commit_message(
             f"Archive experiment result {artifact_set.identity.run_name}",
             "",
             f"Topic: {artifact_set.identity.topic}",
+            f"Variant: {artifact_set.identity.variant}",
             f"Run-Name: {artifact_set.identity.run_name}",
             f"Source-Branch: {source.branch}",
             f"Source-Commit: {source.commit or '(unknown)'}",
@@ -469,9 +584,9 @@ def git_create_result_commit(
 
 def update_result_branch(git: GitCommand, branch: str, parent: str, commit: str) -> None:
     """Move the local result branch ref to the new commit."""
-    args = ["update-ref", f"refs/heads/{branch}", commit]
-    if parent:
-        args.append(parent)
+    # Always pass the observed parent, including the empty value, so two
+    # first publishers cannot both believe they won the branch-creation race.
+    args = ["update-ref", f"refs/heads/{branch}", commit, parent]
     git.run(args)
 
 
@@ -480,12 +595,22 @@ def git_publish_result_branch(request: PublicationRequest) -> PublicationResult:
     repo_root = request.repo_root
     result_dir = request.result_dir
     identity = parse_result_identity(repo_root, result_dir, request.report_path)
+    if identity.variant != request.variant:
+        raise ValueError(
+            f"--variant {request.variant!r} does not match result identity {identity.variant!r}"
+        )
     result_branch = request.branch or infer_result_branch(identity)
+    expected_branch = infer_result_branch(identity)
+    if result_branch != expected_branch:
+        raise ValueError(
+            f"branch must equal canonical identity branch {expected_branch!r}; got {result_branch!r}"
+        )
     git = GitCommand(repo_root)
     source = load_source_provenance(git, result_dir, request.source_branch)
     validate_result_branch(git, result_branch, source.branch)
     artifact_set = collect_result_artifacts(repo_root, result_dir, identity)
     parent = branch_head(git, result_branch)
+    reject_existing_identity(git, parent, identity)
     tree = build_result_tree(repo_root, parent, artifact_set)
     commit = git_create_result_commit(
         git,

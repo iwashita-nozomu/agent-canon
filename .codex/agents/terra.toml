@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical terra model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 1c16d8ac47e435bda16b03b176229ddfadf198ad786e7ad553f75676d08e810c
+# source canonical digest: b6e48b66355677d73129cf0e8233efba787535161d293acf7343509e0cf68028
 
 name = "terra"
 description = "Conditional read-only cross-cutting specialist for owner closure, context reconstruction, and adversarial contradiction validation."

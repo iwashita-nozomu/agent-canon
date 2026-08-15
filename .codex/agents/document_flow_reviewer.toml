@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical document_flow_reviewer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 231c36f33aac9d61e64c32edabf324520e8832dcc0ddb36d03c56b1458daceba
+# source canonical digest: d4ce86c377fc208e2dc99533afb8d7e446ed9e0c819ab88bcda1eb625cf1258c
 
 name = "document_flow_reviewer"
 description = "Read-only reviewer for top-down document coherence, section order, term introduction order, and first-reader comprehension."

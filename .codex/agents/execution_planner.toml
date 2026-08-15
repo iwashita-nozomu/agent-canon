@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical execution_planner model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 55f4fbe0c9119b52342922d01fa83798696936236a2e34f333932ee2dc52c771
+# source canonical digest: 66c98d2a2b13f33505534be0b53fd5a5e93b87aa0826ff03c4237af5375df27c
 
 name = "execution_planner"
 description = "Execution-planning agent for stage order, subagent assignment, validation sequence, and rollback-aware task plans."

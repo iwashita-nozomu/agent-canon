@@ -36,6 +36,7 @@ from parent_root_side_effects import (  # noqa: E402
 )
 
 TOPIC = "template-smoke"
+VARIANT = "smoke.v1"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -173,7 +174,7 @@ def complete_template_fixture(topic_dir: Path) -> None:
         "branch": "codex/template-canon-refresh",
         "commit-sha": "a" * 40,
         "config-path": "experiments/template-smoke/config.yaml",
-        "result-path": "result/template-smoke-run",
+        "result-path": f"result/{VARIANT}/template-smoke-run",
         "exit-status": "0",
         "required-close-condition": "rerun after contract repair",
         "required-oracle-and-observation": "summary and manifest pass",
@@ -198,7 +199,9 @@ def complete_template_fixture(topic_dir: Path) -> None:
     }
     for token, value in placeholder_values.items():
         provenance_text = provenance_text.replace(f'"<{token}>"', f'"{value}"')
-    provenance_text = provenance_text.replace("<result-path>", "result/template-smoke-run")
+    provenance_text = provenance_text.replace(
+        "<result-path>", f"result/{VARIANT}/template-smoke-run"
+    )
     provenance_text = provenance_text.replace(
         'status = "selected-or-rejected"', 'status = "rejected"'
     )
@@ -257,7 +260,7 @@ def validate_generated_topic(parent_root: Path, registry_path: Path) -> None:
     if notebook.get("nbformat") != 4:
         raise RuntimeError("generated notebook must use nbformat 4")
 
-    result_dir = topic_dir / "result" / "template-smoke-run"
+    result_dir = topic_dir / "result" / VARIANT / "template-smoke-run"
     required_artifacts = (
         "summary.json",
         "cases.jsonl",
@@ -332,19 +335,23 @@ def _main_authenticated(session: SessionResolutionResult) -> int:
         run_checked(
             [
                 sys.executable,
-                str(create_tool),
+                "-m",
+                "tools.experiments.create_experiment_topic",
                 "--repo-root",
                 str(parent_root),
                 "--status",
                 "template",
+                "--default-variant",
+                VARIANT,
                 TOPIC,
             ],
             cwd=source_root,
             env=run_env,
         )
         topic_dir = parent_root / "experiments" / TOPIC
-        incomplete_run_dir = topic_dir / "result" / "template-smoke-incomplete"
+        incomplete_run_dir = topic_dir / "result" / VARIANT / "template-smoke-incomplete"
         run_env["EXPERIMENT_RUN_MANIFEST"] = str(parent_root / "manifest.json")
+        run_env["EXPERIMENT_VARIANT"] = VARIANT
         run_env["EXPERIMENT_RUN_DIR"] = str(incomplete_run_dir)
         incomplete_result = subprocess.run(
             [sys.executable, str(topic_dir / "run.py")],
@@ -359,14 +366,15 @@ def _main_authenticated(session: SessionResolutionResult) -> int:
         validate_run_state(incomplete_run_dir, "incomplete", 0)
 
         complete_template_fixture(topic_dir)
-        run_dir = topic_dir / "result" / "template-smoke-run"
+        run_dir = topic_dir / "result" / VARIANT / "template-smoke-run"
         run_env["EXPERIMENT_RUN_DIR"] = str(run_dir)
         run_checked([sys.executable, str(topic_dir / "run.py")], cwd=source_root, env=run_env)
         validate_generated_topic(parent_root, registry_path)
         run_checked(
             [
                 sys.executable,
-                str(registry_checker),
+                "-m",
+                "tools.ci.check_experiment_registry",
                 "--repo-root",
                 str(parent_root),
                 "--registry",

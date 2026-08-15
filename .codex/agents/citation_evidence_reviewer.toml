@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical citation_evidence_reviewer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 003e21b87184802b1ff63ae3f46c5a6295e3e3a0ae84ef375f6d0a6d50e37ef3
+# source canonical digest: 3bf6e1085ed4f15ae1fd21695684ef9fd5f868894a35f2273927829fa545b720
 
 name = "citation_evidence_reviewer"
 description = "Read-only reviewer for paper claims, citations, figures, tables, and evidence traceability."

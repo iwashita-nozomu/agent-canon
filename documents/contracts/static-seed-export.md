@@ -44,6 +44,21 @@ allowlist は現在、次の consumer-owned regular file だけを含みます�
 consumer root instruction は project-owned content です。現行 live runtime を参照する source instruction
 file を seed に混ぜません。
 
+## Consumer-static role projection
+
+35 個の role file は、単一の `agents/model_profiles.toml` を読む materializer の
+in-memory `consumer-static` mode から生成します。live mode の
+`developer_instructions` と executable role fields は変更せず、static mode だけが
+producer path を source-neutral な clause と閉じた obligation fragment に置き換えます。
+`generated_role_view_v1`、`generated_role_profile_projection_v1`、既存の TOML/JSON
+field set、`projection_digest` は維持し、static TOML のコメントは schema marker と
+digest だけに限定します。
+
+materializer は `ConsumerStaticClauseProjection` と閉じた obligation table を検証し、
+prose keyword 探索を行いません。exporter と consumer checker は全 payload bytes を
+case-normalize して、`agents/skills/`、`agents/model_profiles.toml`、
+`tools/agent_tools/`、`../../agents/`、`../../tools/` の exact prefix を拒否します。
+
 ## 生成規則
 
 maintainer は source commit を明示して export します。

@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical plan_reviewer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 8a02de81412e0048f0af30c7d1677d916868b3b82e14681ebbfb0b7ec6bd32b0
+# source canonical digest: 6ac62db6fdf4554cc38a647bdb8c656fde3e89eba721e64c61ba99b9595377a1
 
 name = "plan_reviewer"
 description = "Read-only reviewer for execution plans, stage order, reviewer separation, validation sequencing, and rollback readiness."

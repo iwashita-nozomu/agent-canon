@@ -3,6 +3,7 @@
 contract design
 responsibility Documents オブジェクト指向設計方針 for this repository.
 upstream design ./README.md documents index and discovery path
+upstream design ./software-engineering-principles.md general engineering principles, precedence, and abstraction admission
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ./coding-conventions-house-style.md shared implementation style contract
 upstream design ./coding-conventions-python.md Python convention entrypoint
@@ -22,6 +23,13 @@ upstream implementation ../../tools/sync_agent_canon.sh root symlink view genera
 # オブジェクト指向設計方針
 
 この文書は、agent-canon が共有する OOP 的な設計判断の正本です。
+[ソフトウェア工学原則](./software-engineering-principles.md) の一般原則と判断順序を、
+class、state、inheritance、composition、`Protocol`、public object model に特殊化します。
+一般的な contract、責務、KISS / YAGNI / DRY、変更単位、failure、traceability は
+この文書へ複製しません。
+
+この文書は、object contract が material に変わる場合だけ追加で読みます。class、dataclass、
+annotation、parser model、public type が存在するだけで OOP / SOLID review を起動しません。
 特定言語の syntax ではなく、責務、状態、契約、拡張点をどの単位に置くかを固定します。
 Python 固有の型注釈、命名、`Protocol` 配置は
 [Python コーディング規約](./coding-conventions-python.md) と
@@ -32,7 +40,12 @@ C++ の source/header ownership、target interface、build/test/experiment bound
 
 ## この文書の読み方
 
-この文書は、class を増やすためではなく、責務、状態、契約、拡張点の境界を決めるための OOP 方針です。まず要約と SOLID との対応で判断語彙を確認し、規約で class 作成条件、責務境界、状態、公開面、継承、composition を読みます。禁止事項、機械評価、Finding から Decision への triage、例外は、checker finding や設計 review の扱いを決めるときに使います。
+最初に一般原則の material clause と owning contract を読み、object model が判断を変える場合だけ
+この文書を使います。この文書は class を増やすためではなく、責務、状態、契約、拡張点の境界を
+決めるための OOP 方針です。まず要約と SOLID との対応で専門判断の語彙を確認し、規約で class
+作成条件、責務境界、状態、公開面、継承、composition を読みます。禁止事項、機械評価、Finding
+から Decision への triage、例外は、checker finding や設計 review の扱いを決めるときに使います。
+SOLID は全変更を採点する checklist ではなく、object contract の具体的 risk を分類する見出しです。
 
 ## 要約
 
@@ -69,6 +82,9 @@ class、module、file、directory の形を機械的に要求しません。OOP 
 ## SOLID との対応
 
 SOLID は、この文書の責務、状態、契約、公開面の規約をレビュー時に並べ替える見出しとして扱います。
+一般原則の優先順位、KISS / YAGNI / DRY、abstraction admission は
+`software-engineering-principles.md` が所有します。この section は object model が material に
+変わる場合の specialization であり、全 change へ一律適用しません。
 機械 checker は finding kind を SOLID principle signal へ投影し、Markdown / JSON report に集計を出します。
 投影の正本は `tools/oop/shared/readability_core.py` の `SOLID_PRINCIPLES_BY_KIND` です。
 

@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical diff_triage_reviewer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 543fb2137053883a9b3789a5b5ce2eb112a9b2109e1e21039d29219656819e53
+# source canonical digest: d5dfc37871027602cf5d1b92d1fede77ea09b9c1293d1d304995b9a93296e3e3
 
 name = "diff_triage_reviewer"
 description = "Read-only reviewer for bounded diffs before escalation to broad review."

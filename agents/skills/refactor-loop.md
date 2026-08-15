@@ -8,6 +8,7 @@ upstream design structure-planning.md reusable refactor structure contract
 upstream design dependency-analysis.md unified change-impact and repair-planning packet
 upstream design tool-finding-report.md tool-based finding packet and prompt feedback loop
 upstream design ../../documents/design/semantic-responsibility-contract.md semantic delta and verification-owner contract
+upstream design ../../documents/conventions/software-engineering-principles.md contract-first refactor precedence and abstraction admission
 upstream design ./agent-orchestration.md write-capable handoff validation trust boundary and work-conservation owner
 upstream implementation ../../tools/agent_tools/check_design_doc_claims.py emits design evidence findings for refactor plans
 upstream design ../internal-routines/design-implementation-correspondence.md design read, clause fingerprint, and drift-block route
@@ -20,7 +21,9 @@ upstream design ../internal-routines/design-implementation-correspondence.md des
 refactor target trace を固定する前に、owning design を read し、routine の
 clause fingerprint と implementation trace を参照します。refactor の change
 mapping と review はこの skill の owner ですが、design drift invariant は
-routine に委譲します。
+routine に委譲します。一般原則の意味、競合時の優先順位、KISS / YAGNI / DRY、
+abstraction admission は `documents/conventions/software-engineering-principles.md`
+が所有し、この skill では refactor 固有の実行 contract だけを追加します。
 
 - Purpose: manage large refactors as behavior-preserving reorganizations with
   explicit scope, deltas, and review gates.
@@ -36,6 +39,29 @@ routine に委譲します。
 ## Purpose
 
 大きめの refactor を、feature 追加ではなく挙動保存つきの再編として扱います。
+
+## Software Engineering Principle Route
+
+refactor は、[ソフトウェア工学原則](../../documents/conventions/software-engineering-principles.md)
+の選択された clause を消費します。原則の意味、優先順位、誤用防止、抽象化の admission、
+変更範囲の境界は canonical owner に委譲し、この skill や refactor packet で再定義しません。
+抽象化や scope の判断では、canonical policy の
+[`SEP-06`](../../documents/conventions/software-engineering-principles.md#sep-06-kiss)、
+[`SEP-07`](../../documents/conventions/software-engineering-principles.md#sep-07-yagni)、
+[`SEP-08`](../../documents/conventions/software-engineering-principles.md#sep-08-dry-and-abstraction-admission)、
+[`SEP-09`](../../documents/conventions/software-engineering-principles.md#sep-09-evidence-bounded-complete-owning-unit)
+を直接参照します。
+
+refactor 固有の実行契約は、挙動保存を次の順で閉じます。
+
+1. `Behavior Contract`、semantic invariant、state / lifecycle owner、public compatibility、
+   root mechanism を実装前に固定します。
+2. dependency-expanded scope から、root mechanism と evidence-linked consumer、failure handling、
+   cleanup、migration、docs、tests、validation を含む replaceable unit を選びます。
+3. `Allowed Structural Delta` と `Forbidden Semantic Delta` を分け、move、rename、split、
+   abstraction変更の各差分が contract、failure semantics、lifecycle を保存することを確認します。
+4. 判断へ影響した `SEP-*` clause と task-specific evidence だけを packet / handoff に記録し、
+   canonical policy の checklist、negative receipt、原則別 checker は追加しません。
 
 ## Validation route
 
@@ -75,6 +101,7 @@ source / pin routing を参照として担当します。
 
 ## Core References
 
+- `documents/conventions/software-engineering-principles.md`
 - `agents/TASK_WORKFLOWS.md`
 - `agents/workflows/implementation-waterfall-workflow.md`
 - `agents/workflows/comprehensive-refactoring-workflow.md`
@@ -117,6 +144,9 @@ the design trace before accepting a path or dependency-direction change.
    current repair batch に必要な excerpt だけを載せます。raw finding、raw
    raw text-search hit、単一 file 名だけから実装計画を作ってはいけません。
 1. refactor pass では `Behavior Contract:` を先に固定します。
+1. behavior contract に関係する material `SEP-*` clause、canonical owner、
+   abstraction admission、forbidden interpretation を固定します。原則名だけの
+   checklist や negative receipt は作りません。
 1. semantic responsibility contract を active design packet から参照し、各 semantic delta の
    action と obligation/primary verification owner を実装前に割り当てます。hard-edge closure
    は semantic grouping を示しますが、class、module、file の形を決める根拠にはしません。
@@ -516,7 +546,8 @@ The runtime discovery adapter delegates these required operating clauses to this
    reason as root/shared contract risk, risky semantic change, or no batchable
    target. Record `review_required` / `deferred` only as that evidence-backed
    blocker.
-1. Read `agents/skills/refactor-loop.md`.
+1. Read `agents/skills/refactor-loop.md` and the material clauses in
+   `documents/conventions/software-engineering-principles.md`.
 1. Use `$structure-planning` before editing when file moves, module boundaries, repair slices, path mapping, responsibility maps, allowed structural delta, or forbidden semantic delta are nontrivial.
 1. Fix `Behavior Contract`, `Allowed Structural Delta`, and `Forbidden Semantic Delta` before editing.
 1. For API-shaping refactors, fix `Expected API` before editing and pass that

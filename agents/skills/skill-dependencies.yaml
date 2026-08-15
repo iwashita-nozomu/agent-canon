@@ -153,14 +153,11 @@ skill_dependencies:
     - oop-readability-check
   result-artifact-writeout:
     responsibility_group: evidence
-    required_prerequisites:
-    - report-writing
+    required_prerequisites: []
     routing_candidates:
     - tool-finding-report
     - report-writing
-    - save-experiment-results
-    successors:
-    - save-experiment-results
+    successors: []
     order_constraints: []
     parallel_independent:
     - codex-task-workflow
@@ -183,7 +180,6 @@ skill_dependencies:
     - structure-planning
     - report-writing
     - html-output
-    - html-experiment-report
     - result-artifact-writeout
     - experiment-review
     - experiment-lifecycle
@@ -194,7 +190,6 @@ skill_dependencies:
     - report-writing
     - structure-planning
     - html-output
-    - html-experiment-report
     - experiment-lifecycle
     - experiment-review
   tool-finding-report:
@@ -438,14 +433,6 @@ skill_dependencies:
     - result-visualize
     - report-writing
     - code-visualization
-  html-experiment-report:
-    responsibility_group: documents
-    required_prerequisites: []
-    routing_candidates: []
-    successors: []
-    order_constraints: []
-    parallel_independent:
-    - result-visualize
   test-design:
     responsibility_group: design
     required_prerequisites: []
@@ -616,7 +603,6 @@ skill_dependencies:
     required_prerequisites: []
     routing_candidates:
     - result-artifact-writeout
-    - save-experiment-results
     - structure-planning
     - experiment-review
     - test-design
@@ -627,25 +613,10 @@ skill_dependencies:
     - result-visualize
     - structure-planning
     - test-design
-    - save-experiment-results
     - experiment-review
     - gpu-execution
     - adaptive-improvement-loop
     - research-workflow
-  save-experiment-results:
-    responsibility_group: experiments
-    required_prerequisites:
-    - result-artifact-writeout
-    routing_candidates:
-    - experiment-lifecycle
-    - result-artifact-writeout
-    - report-writing
-    - experiment-review
-    successors: []
-    order_constraints: []
-    parallel_independent:
-    - experiment-lifecycle
-    - experiment-review
   experiment-review:
     responsibility_group: experiments
     required_prerequisites: []
@@ -655,7 +626,6 @@ skill_dependencies:
     parallel_independent:
     - result-visualize
     - experiment-lifecycle
-    - save-experiment-results
   gpu-execution:
     responsibility_group: experiments
     required_prerequisites: []

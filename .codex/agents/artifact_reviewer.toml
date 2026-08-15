@@ -1,14 +1,5 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical artifact_reviewer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
-# source canonical digest: 86581acfd72ae8a74bdf040e66034148d079dda215a0eae37ba57164be6a5a70
+# source canonical digest: 3827d26022d989847d292c4ae9ae47587d5cebce0d56111029e730e7adfb8aca
 
 name = "artifact_reviewer"
 description = "Read-only reviewer for code, scripts, raw results, environment capture, and artifact-readiness."

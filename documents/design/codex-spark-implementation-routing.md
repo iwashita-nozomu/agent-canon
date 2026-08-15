@@ -2019,6 +2019,14 @@ source: the checker compares each view with the registry digest, and a drifted
 view is invalid until regenerated. This is a deliberate refinement of the
 current ownership prose, not a hidden precedence rule.
 
+The same materializer also accepts the in-memory `consumer-static` projection
+selector. It preserves `generated_role_view_v1`, the existing generated
+configuration field sets, and one mode-independent `projection_digest`; it
+does not add a persisted mode field or a second role registry. The static
+renderer composes typed `ConsumerStaticClauseProjection` obligations and
+emits only path-free schema/digest comments, while the live renderer retains
+its existing instruction bytes and dependency comments.
+
 ### 4.2 Canonical materializer interface
 
 New source: `tools/agent_tools/model_profile_registry.py`.
