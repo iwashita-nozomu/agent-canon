@@ -20,6 +20,7 @@ set -euo pipefail
 ROOT_DIR="$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || pwd)"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REVIEW_PARENT_ROOT=""
+REVIEW_TEMP_BASE=""
 
 parent_temp_base() {
   REVIEW_PARENT_ROOT="$(realpath -e "${AGENT_CANON_PARENT_ROOT:-$ROOT_DIR}")" || {
@@ -37,10 +38,12 @@ parent_temp_base() {
       return 2
       ;;
   esac
-  python3 "${script_dir}/parent_root_side_effects.py" temp-dir \
-    --root "$REVIEW_PARENT_ROOT" \
-    --candidate "$REVIEW_PARENT_ROOT/.agent-canon/tmp/dependency-review" \
-    --prefix review --purpose dependency-review-temp
+  REVIEW_TEMP_BASE="$(
+    python3 "${script_dir}/parent_root_side_effects.py" temp-dir \
+      --root "$REVIEW_PARENT_ROOT" \
+      --candidate "$REVIEW_PARENT_ROOT/.agent-canon/tmp/dependency-review" \
+      --prefix review --purpose dependency-review-temp
+  )"
 }
 CHECK_BIDIRECTIONAL=0
 CYCLE_REPORT_ONLY=0
@@ -201,7 +204,8 @@ if [[ "$ENSURE_GRAPH_ONLY" -eq 1 ]]; then
     exit 1
   fi
 
-  tmp_base="$(parent_temp_base)"
+  parent_temp_base
+  tmp_base="$REVIEW_TEMP_BASE"
   status_file="$(mktemp "$tmp_base/status.XXXXXX")"
   cleanup_review_tmp() {
     local primary_status=$?
