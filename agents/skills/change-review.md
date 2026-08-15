@@ -7,6 +7,7 @@ upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/rule/README.md document rule canon
 upstream design ../../documents/design/README.md design canon reader route
 upstream design ../../documents/design/responsibility-rationale.md durable finding and OOP-review activation rationale
+upstream design ../../documents/conventions/software-engineering-principles.md contract-first review precedence and evidence model
 upstream design ../../issues/README.md durable issue and GitHub mirror policy
 upstream design ../internal-routines/design-implementation-correspondence.md forward/reverse design correspondence and drift block route
 @dependency-end
@@ -20,9 +21,34 @@ The review packet consumes the active DIC-010 path+section+clause/ref closure re
 
 Review the actual diff and selected validation evidence findings-first. Findings must be grounded in reachable behavior, contract/design drift, or a concrete maintenance/safety failure; broad style preferences are non-blocking guidance.
 
+## Software Engineering Principle Review
+
+Use [ソフトウェア工学原則](../../documents/conventions/software-engineering-principles.md)
+as the canonical precedence and evidence model. A material finding names the concrete user/domain
+contract, semantic invariant, state/lifecycle owner, dependency or authority boundary, reachable
+failure, testability loss, or traceability break that the changed surface creates. A principle name
+alone is not a finding.
+
+Review only principles that can change the decision for the actual diff. Do not require a KISS,
+YAGNI, DRY, SOLID, determinism, or traceability checklist for every PR, and do not emit
+`not applicable`, negative receipts, or empty principle sections. When principles conflict, apply
+the canonical order: contract/correctness and invariant ownership before root-cause closure,
+responsibility boundary, verification, simplicity, and style.
+
+Typical review misuse to reject:
+
+- treating textual similarity as DRY evidence when meaning, unit, stop condition, owner, or failure semantics differ;
+- treating shortest code or minimum diff as KISS when error, migration, cleanup, or root mechanism remains open;
+- treating YAGNI as permission to leave requested behavior or consumer migration incomplete;
+- introducing a speculative interface, registry, wrapper, checker, or receipt without a concrete caller or responsibility gap;
+- applying OOP/SOLID to a change that does not materially alter an object contract.
+
+This skill records the selected clause and task-specific evidence; it does not reproduce the general
+policy or add a second principle trigger table.
+
 ## Finding model
 
-For each material finding record enough to act on it: affected surface, evidence, impact/severity, and current resolution. Issue lifecycle is independent from finding validity.
+For each material finding record enough to act on it: affected surface, evidence, impact/severity, current resolution, and the owning contract or selected engineering-principle clause when it affects the decision. Issue lifecycle is independent from finding validity.
 
 Use a durable issue only when the finding outlives the current review: it belongs to another owner/scope, recurs, needs later work, or cannot safely be closed in the current diff. Findings fixed in the current change, questions, rejected hypotheses, duplicates, and accepted local resolutions do **not** need `issue_route`, a local issue file, or a GitHub mirror.
 
@@ -37,7 +63,7 @@ Do not duplicate a second SOLID-sensitive trigger table in this skill.
 ## Review order
 
 1. Read base/head and the changed surface.
-2. Read the owning contract/design and targeted validation evidence.
+2. Read the owning contract/design, the material engineering-principle clause, and targeted validation evidence.
 3. Report blocking correctness/safety/design findings before summary.
 4. Resolve current-scope findings in the current diff when possible.
 5. Escalate only durable residual work to the issue owner.
@@ -145,7 +171,7 @@ local patch returns to cause/scope analysis rather than opening a repair wave.
    を evidence-linked にたどります。straightforward finding は direct cause proof
    を記録し、rejected/duplicate/already-covered/unreachable finding はその reason/evidence
    だけで閉じます。必要な場合だけ latest remote/Issue/branch history を確認します。
-1. 選択した contract surface に対して docs と tests が追随しているか確認します。
+1. 選択した contract surface と material engineering-principle clause に対して docs と tests が追随しているか確認します。
 1. 継承/substitutability、ownership/lifecycle、dependency inversion/DI、public object model、または typed boundary が material に変わる場合だけ `python-review` を追加し、`$oop-readability-check` と `check_solid_evidence.py` の evidence を review input にします。class、dataclass、`Protocol`、annotation、parser model、public type の存在だけでは OOP/SOLID を起動しません。
 1. 数値・solver・tolerance・convergence・residual・benchmark の test 変更では、必要な場合だけ `test-design` の Numerical Test Admission Gate と `documents/conventions/coding-conventions-testing.md` を参照し、trigger、non-numerical alternative、oracle、budget を確認します。非数値の変更にはこの gate を追加しません。
 1. まず static checks と targeted validation を実行し、full repository
@@ -164,4 +190,4 @@ local patch returns to cause/scope analysis rather than opening a repair wave.
 
 ## Boundary
 
-A review does not invent extra gates, tests, reports, or durable lifecycle records merely to make its schema complete. Existing canonical validation and publication owners remain authoritative.
+A review does not invent extra gates, tests, reports, principle checklists, or durable lifecycle records merely to make its schema complete. Existing canonical validation and publication owners remain authoritative.
