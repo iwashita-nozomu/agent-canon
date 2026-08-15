@@ -29,26 +29,45 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_skill_workflow_prompts.py"
+TEST_TEMP_ROOT = PROJECT_ROOT / ".agent-canon" / "validation"
+TEST_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 import evaluate_skill_workflow_prompts as evaluator  # noqa: E402
 from eval_manifest_paths import resolve_eval_manifest  # noqa: E402
 from parent_root_side_effects import (  # noqa: E402
-    ParentRootAttestationRequest,
     ParentRootSideEffectBoundary,
-    attest_parent_root,
+    public_session,
+    session_environment,
 )
 from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
 def run_eval(*args: str, cwd: Path = PROJECT_ROOT) -> subprocess.CompletedProcess[str]:
-    """Run the prompt eval helper."""
-    return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
-        cwd=cwd,
-        check=False,
-        capture_output=True,
-        text=True,
+    """Run the prompt eval helper through one signed public session."""
+    invocation_script = TEST_TEMP_ROOT / "evaluate-skill-workflow-session.py"
+    invocation_script.write_text(
+        "# signed prompt-evaluation fixture runner\n", encoding="utf-8"
     )
+    previous_cwd = Path.cwd()
+    previous_environment = dict(os.environ)
+    os.chdir(PROJECT_ROOT)
+    try:
+        with public_session(
+            invocation_script=invocation_script,
+            purpose="skill-workflow-test-eval",
+        ) as session:
+            environment = session_environment(session, previous_environment)
+            return subprocess.run(
+                [sys.executable, str(SCRIPT), *args],
+                cwd=cwd,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
+    finally:
+        os.chdir(previous_cwd)
+        invocation_script.unlink(missing_ok=True)
 
 
 def load_toml_document(path: Path) -> dict[str, object]:
@@ -490,7 +509,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
     def test_report_out_writes_markdown(self) -> None:
         """The runner writes a Markdown eval artifact."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report = Path(tmp_dir) / "report.md"
 
             result = run_eval(
@@ -510,7 +529,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
     def test_compact_out_limits_stdout_and_writes_summary(self) -> None:
         """Compact mode writes stats to JSON and keeps stdout bounded."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             compact = Path(tmp_dir) / "compact.json"
 
             result = run_eval(
@@ -531,7 +550,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
     def test_existing_report_out_gets_unique_sibling(self) -> None:
         """An existing report path should not be overwritten."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             report = Path(tmp_dir) / "report.md"
             report.write_text("keep me\n", encoding="utf-8")
 
@@ -553,7 +572,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
     def test_accumulate_writes_unique_agentcanon_report(self) -> None:
         """Accumulated prompt evals should create durable unique result files."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             root = Path(tmp_dir)
             result = run_eval(
                 "--root",
@@ -582,7 +601,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
 
     def test_accumulate_records_workflow_monitoring_event(self) -> None:
         """Accumulated prompt evals should append behavior-eval evidence."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             root = Path(tmp_dir)
             report_dir = root / "reports" / "agents" / "run-123"
 
@@ -616,7 +635,7 @@ class SkillWorkflowPromptEvalTest(unittest.TestCase):
         self,
     ) -> None:
         """Reports written through a wrapper root should reference canon paths."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
+        with tempfile.TemporaryDirectory(dir=TEST_TEMP_ROOT) as tmp_dir:
             tmp_root = Path(tmp_dir)
             canon_root = tmp_root / "canon"
             wrapper_root = tmp_root / "wrapper"
@@ -981,6 +1000,44 @@ class T14EvaluatorContractTest(unittest.TestCase):
 
     requirement_ids = ("R101",)
 
+    def setUp(self) -> None:
+        """Bind each T14 test to one signed public session."""
+        self._t14_previous_cwd = Path.cwd()
+        self._t14_previous_environment = dict(os.environ)
+        self._t14_invocation_script = (
+            PROJECT_ROOT / ".agent-canon" / "tmp" / "t14-session-runner.py"
+        )
+        self._t14_invocation_script.parent.mkdir(parents=True, exist_ok=True)
+        (PROJECT_ROOT / ".agent-canon" / "validation").mkdir(
+            parents=True, exist_ok=True
+        )
+        self._t14_invocation_script.write_text(
+            "# t14 signed-session fixture runner\n", encoding="utf-8"
+        )
+        os.chdir(PROJECT_ROOT)
+        self._t14_session_context = public_session(
+            invocation_script=self._t14_invocation_script,
+            purpose="t14-test-session",
+        )
+        self._t14_session = self._t14_session_context.__enter__()
+        os.environ.clear()
+        os.environ.update(
+            session_environment(self._t14_session, self._t14_previous_environment)
+        )
+        self.addCleanup(self._close_t14_session)
+
+    def _close_t14_session(self) -> None:
+        """Restore the process after the signed T14 session closes."""
+        try:
+            os.environ.clear()
+            os.environ.update(self._t14_previous_environment)
+        finally:
+            try:
+                self._t14_session_context.__exit__(None, None, None)
+            finally:
+                os.chdir(self._t14_previous_cwd)
+                self._t14_invocation_script.unlink(missing_ok=True)
+
     def parse(self, raw: Path, expected: Path, *, iteration: int = 1, attempt: int = 0):
         return evaluator.parse_skill_evaluator_report(
             raw,
@@ -1092,18 +1149,11 @@ class T14EvaluatorContractTest(unittest.TestCase):
             self.assertEqual(evaluator.compute_t14_packet_digest(packet), expected)
 
     def record_fixture(self, *, run_id: str = "test-run", attempt: int = 0, packet_digest: str | None = None):
-        configured_parent = os.environ.get("AGENT_CANON_PARENT_ROOT", "").strip()
+        configured_parent = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
         if not configured_parent:
             configured_parent = str(PROJECT_ROOT)
-            os.environ["AGENT_CANON_PARENT_ROOT"] = configured_parent
-            self.addCleanup(os.environ.pop, "AGENT_CANON_PARENT_ROOT", None)
         parent_root = Path(configured_parent)
-        fixture_parent = Path(
-            os.environ.get(
-                "TMPDIR",
-                str(parent_root / ".agent-canon" / "validation"),
-            )
-        ) / "t14-fixtures"
+        fixture_parent = parent_root / ".agent-canon" / "validation" / "t14-fixtures"
         fixture_parent.mkdir(parents=True, exist_ok=True)
         tmp = tempfile.TemporaryDirectory(dir=fixture_parent)
         root = Path(tmp.name)
@@ -1115,13 +1165,7 @@ class T14EvaluatorContractTest(unittest.TestCase):
         return_artifact.parent.mkdir(parents=True, exist_ok=True)
         return_artifact.write_bytes(report_bytes)
         boundary = ParentRootSideEffectBoundary()
-        attestation = attest_parent_root(
-            ParentRootAttestationRequest(
-                cwd=parent_root,
-                explicit_root=parent_root,
-                purpose="t14-test-cleanup",
-            )
-        )
+        attestation = self._t14_session.attestation
         return_root = parent_root / ".agent-canon" / "tmp" / "agentcanon-type-design-workspaces" / run_id
 
         def cleanup_return_artifact() -> None:
@@ -1234,7 +1278,7 @@ class T14EvaluatorContractTest(unittest.TestCase):
             evaluator.record_t14_evaluation("duplicate-scenario", fixture[1], fixture[2], fixture[2], self.requirement_ids, "OOP-TYPE-SCENARIO-01", 1, 0, fixture[4], fixture[5], fixture[3])
             second_raw = fixture[2].parent.parent / "attempt-1" / fixture[2].name
             second_raw.parent.mkdir(parents=True, exist_ok=True)
-            second_artifact = Path("/tmp/agentcanon-type-design-workspaces") / "duplicate-scenario" / "iteration-1" / "attempt-1" / "OOP-TYPE-SCENARIO-01" / "evaluator_return.bin"
+            second_artifact = PROJECT_ROOT / ".agent-canon" / "tmp" / "agentcanon-type-design-workspaces" / "duplicate-scenario" / "iteration-1" / "attempt-1" / "OOP-TYPE-SCENARIO-01" / "evaluator_return.bin"
             second_artifact.parent.mkdir(parents=True, exist_ok=True)
             second_artifact.write_bytes(fixture[1])
             assert_t14_error(self, lambda: evaluator.record_t14_evaluation("duplicate-scenario", fixture[1], second_raw, second_raw, self.requirement_ids, "OOP-TYPE-SCENARIO-01", 1, 1, fixture[4], fixture[5], fixture[3]), "t14-duplicate-scenario")
@@ -1287,7 +1331,9 @@ class T14EvaluatorContractTest(unittest.TestCase):
 
     def summary_parent(self, run_id: str = "summary") -> tuple[tempfile.TemporaryDirectory[str], Path]:
         """Create a parent evaluation with the exact initial header."""
-        tmp = tempfile.TemporaryDirectory()
+        tmp = tempfile.TemporaryDirectory(
+            dir=PROJECT_ROOT / ".agent-canon" / "validation"
+        )
         parent = Path(tmp.name) / "reports" / "agents" / run_id / "agent_evaluation.md"
         parent.parent.mkdir(parents=True)
         parent.write_text(evaluator._T14_PARENT_HEADER.format(run_id=run_id) + "\n", encoding="utf-8")

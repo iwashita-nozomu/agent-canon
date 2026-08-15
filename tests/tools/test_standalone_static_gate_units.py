@@ -49,13 +49,12 @@ def test_static_unit_runner_has_four_explicit_units() -> None:
 
 def test_static_unit_runner_self_reentry_uses_one_parent_boundary() -> None:
     text = RUNNER.read_text(encoding="utf-8")
-    assert 'if [[ -z "${AGENT_CANON_CHILD_HANDOFF:-}" ]]' in text
-    assert "exec-parent-bound" in text
-    assert "--issue-handoff" in text
-    assert "verify-child" in text
-    assert "--consume" in text
-    assert "unset AGENT_CANON_CHILD_HANDOFF" in text
-    assert '"standalone-static-gate-unit"' in text
+    assert 'if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]' in text
+    assert "public-exec" in text
+    assert '--invocation-script "${invocation_script}"' in text
+    assert "exec-parent-bound" not in text
+    assert "verify-child" not in text
+    assert "--purpose standalone-static-gate-unit" in text
     assert '"${CARGO_TARGET_DIR:?}/debug/agent-canon"' in text
     assert "trap cleanup_eval EXIT" in text
     assert "trap cleanup_eval RETURN" not in text
@@ -74,7 +73,6 @@ def test_eval_unit_surfaces_cleanup_failure_without_masking_primary_status(
         "#!/usr/bin/env bash\n"
         "set -eu\n"
         "case \"$*\" in\n"
-        "  *' verify-child '*) exit 0 ;;\n"
         "  *' temp-dir '*) mkdir -p \"$FAKE_TEMP_ROOT\"; printf '%s\\n' \"$FAKE_TEMP_ROOT\"; exit 0 ;;\n"
         "  *' ensure-dir '*)\n"
         "    candidate=''\n"
@@ -102,9 +100,9 @@ def test_eval_unit_surfaces_cleanup_failure_without_masking_primary_status(
             env={
                 **os.environ,
                 "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
-                "AGENT_CANON_CHILD_HANDOFF": "fixture-single-use-token",
-                "AGENT_CANON_HANDOFF_AUDIENCE": "standalone-static-gate-unit",
-                "AGENT_CANON_CHILD_PURPOSE": "standalone-static-gate-unit",
+                "AGENT_CANON_SIDE_EFFECT_PARENT_ROOT": str(ROOT),
+                "AGENT_CANON_SIDE_EFFECT_HANDOFF": "fixture-signed-session",
+                "AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED": "1",
                 "AGENT_CANON_HOOK_ARCHIVE_DIR": str(case_root / "hook-archive"),
                 "FAKE_TEMP_ROOT": str(case_root / "temp-root"),
                 "FAKE_EVAL_STATUS": str(eval_status),

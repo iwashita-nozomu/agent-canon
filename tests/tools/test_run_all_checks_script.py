@@ -162,12 +162,12 @@ class RunAllChecksScriptTest(unittest.TestCase):
         """The boundary adapter should be used for agent-canon execution."""
         text = SCRIPT.read_text(encoding="utf-8")
         self.assertIn(
-            'python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound',
+            'python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" public-exec',
             text,
         )
-        self.assertIn('--source-root "${AGENT_CANON_SOURCE_ROOT}"', text)
+        self.assertIn('--invocation-script "${invocation_script}"', text)
         self.assertIn("--purpose run-all-checks-script", text)
-        self.assertIn("verify-child", text)
+        self.assertNotIn("verify-child", text)
 
     def test_all_checks_installs_setup_cleanup_before_allocations(self) -> None:
         """A rejected late override must not leave earlier setup directories."""
