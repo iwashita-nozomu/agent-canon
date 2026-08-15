@@ -5,6 +5,7 @@ contract skill
 responsibility Documents AgentCanon Update Skill for this repository.
 upstream design ../canonical/skills.md skill canon registry
 upstream design ../../documents/agent-canon/agent-canon-update-route.md canonical AgentCanon update route
+upstream design ../../documents/agent-canon/source-publication-parent-handoff.md owns source packet handoff to the parent namespace
 upstream design ../../documents/rule/dependency-module-changes.md generic dependency module change contract
 upstream design ./agent-orchestration.md owns Decision Sufficiency policy
 upstream design ./structure-refactor.md owns final-structure-first scope formation
@@ -12,6 +13,7 @@ upstream design ./refactor-loop.md owns shared-structure refactor execution orde
 upstream implementation ../../tools/update_agent_canon.sh high-level AgentCanon update wrapper
 upstream implementation ../../tools/sync_agent_canon.sh root-view and submodule sync helper
 upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns transaction, queue, frontier, and cleanup records
+upstream implementation ../../tools/agent_tools/source_projection_handoff.py materializes the sole cross-namespace packet
 downstream design ./agent-update-branch.md separates parent update branch lanes from source AgentCanon PR work
 @dependency-end
 -->
@@ -69,6 +71,7 @@ TODO state up to date.
 ## Core References
 
 - `documents/agent-canon/agent-canon-update-route.md`
+- `documents/agent-canon/source-publication-parent-handoff.md`
 - `documents/runtime/SHARED_RUNTIME_SURFACES.md`
 - `agents/skills/structure-refactor.md#Pre-Task Structure Repair Contract`
 - `agents/skills/refactor-loop.md#共有構造 refactor の実行順`
@@ -144,13 +147,16 @@ TODO state up to date.
    its receipt with replay timing and does not rerun its invariant. Changed
    identity creates an explicit successor and leaves the old transaction
    immutable.
-1. The source clone enqueues once under
-   `.agent-canon/update-lifecycle/projection-queue`. The ordered predecessor
-   oracle is `#388 -> #389 -> current transaction`. Parent pin/root sync cannot
-   start from a pending or failed frontier. After publication readback, the
-   state machine writes the typed source-publication packet and the existing
-   `latest` entry advances queue/frontier/G4 internally; no queue CLI alias is
-   exposed.
+1. The source publication owner materializes exactly one typed
+   source-publication packet and hands that packet, never derived receipts, to
+   the parent-owned `.agent-canon/update-lifecycle` namespace. The canonical
+   `latest` front door binds all mutable lifecycle outputs to the explicit
+   parent root, validates remote-main publication commit/tree, and derives the
+   QueueReceipt, `#388 -> #389 -> current transaction` frontier, marker, and G4
+   there. This source-root-to-parent-root route also repairs a parent whose pin
+   predates the fix, without staging the gitlink. Manual gitlink fast-forward,
+   receipt fabrication/copy, and a second updater remain prohibited. See
+   `documents/agent-canon/source-publication-parent-handoff.md`.
 1. `PullRequestLifecycle` carries immutable base/head repository, owner, ref,
    fork/contributor, permission, Essence, review, and contributor-diff state.
    Unknown or false push permission is a typed refusal rather than assumed
