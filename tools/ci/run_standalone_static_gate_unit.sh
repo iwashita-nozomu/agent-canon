@@ -6,6 +6,7 @@
 # downstream implementation ./check_agent_canon_pr.sh aggregates all units for the manual full-confidence route
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml remote execution boundary
 # downstream implementation ../../tests/tools/test_standalone_static_gate_units.py unit partition regression
+# downstream implementation ../../tests/tools/test_standalone_static_gate_source_runtime_contract.py source/runtime ownership regression
 # @dependency-end
 
 set -euo pipefail
@@ -55,6 +56,7 @@ run_contracts() {
     tests.agent_tools.test_graph_client_source_projection \
     tests.tools.test_agent_canon_pr_dependency_source_gate \
     tests.tools.test_agent_canon_pr_graph_gate_integration \
+    tests.tools.test_standalone_static_gate_source_runtime_contract \
     tests.agent_tools.test_check_dependency_headers \
     tests.agent_tools.test_check_design_doc_claims \
     tests.agent_tools.test_tool_drift \
