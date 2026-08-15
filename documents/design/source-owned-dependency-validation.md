@@ -8,6 +8,7 @@ upstream design dependency-manifest-design.md dependency manifest DSL, relation,
 downstream design ../../agents/canonical/CLI_ENTRYPOINTS.md public source and persisted graph command routes
 downstream implementation ../../tools/agent_tools/source_dependency_graph.py derives source dependency facts
 downstream implementation ../../tools/agent_tools/graph_client.py exposes source dependency compatibility and explicit graph runtime commands
+downstream implementation ../../rust/agent-canon/src/dependency_manifest.rs owns the explicit graph-analysis source snapshot parser
 downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates canonical source manifests
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py consumes source-derived context
 downstream implementation ../../tools/agent_tools/tool_drift.py consumes source-derived dependency facts
@@ -18,6 +19,7 @@ downstream implementation ../../tools/ci/check_agent_canon_pr.sh selects trusted
 downstream implementation ../../tools/ci/pr_gate_receipt.py owns the executable source/skipped receipt schema
 downstream implementation ../../tools/ci/run_all_checks.sh consumes one validated source/skipped receipt status
 downstream implementation ../../tests/agent_tools/test_graph_client_source_projection.py verifies source projection invariants
+downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies source header regression coverage
 downstream implementation ../../tests/tools/test_agent_canon_pr_dependency_source_gate.py verifies the no-runtime PR route
 downstream implementation ../../tests/tools/test_agent_canon_pr_graph_gate_integration.py prevents persisted graph orchestration from returning
 downstream implementation ../../tests/tools/test_pr_gate_receipt.py verifies receipt schema and binding rejection

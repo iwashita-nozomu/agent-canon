@@ -383,114 +383,10 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     result.stdout,
                 )
 
-    def test_pr_check_strict_dependency_review_command_does_not_count_comment(
-        self,
-    ) -> None:
-        """Dependency-review command only in comments is rejected."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_agent_canon_pr_contract(root)
-            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
-            command = (
-                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
-                "--fail-missing --cycle-report-only --changed-path-packet "
-                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha '
-                '"${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir '
-                '"${PR_DEPENDENCY_REVIEW_DIR}"'
-            )
-            script.write_text(
-                script.read_text(encoding="utf-8").replace(command, f"# {command}"),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "missing-required-command:agent_canon_pr_check:"
-                "tools/ci/check_agent_canon_pr.sh:"
-                "missing-strict-dependency-review",
-                result.stdout,
-            )
-
-    def test_pr_check_strict_dependency_review_command_does_not_count_echo_printf_or_suppression(
-        self,
-    ) -> None:
-        """Dependency-review command via echo/printf/suppression is rejected."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_agent_canon_pr_contract(root)
-            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
-            command = (
-                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
-                "--fail-missing --cycle-report-only --changed-path-packet "
-                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha '
-                '"${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir '
-                '"${PR_DEPENDENCY_REVIEW_DIR}"'
-            )
-            script.write_text(
-                script.read_text(encoding="utf-8").replace(
-                    command, f'echo "{command}"\nprintf "{command}"\n{command} || true'
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "missing-required-command:agent_canon_pr_check:"
-                "tools/ci/check_agent_canon_pr.sh:"
-                "missing-strict-dependency-review",
-                result.stdout,
-            )
-
-    def test_pr_check_strict_dependency_review_command_is_recognized_once(self) -> None:
-        """Duplicate dependency-review invocation in PR check is rejected."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_agent_canon_pr_contract(root)
-            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
-            command = (
-                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
-                "--fail-missing --cycle-report-only --changed-path-packet "
-                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha '
-                '"${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir '
-                '"${PR_DEPENDENCY_REVIEW_DIR}"'
-            )
-            script.write_text(
-                script.read_text(encoding="utf-8") + f"\n{command}\n",
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "duplicate-required-command:agent_canon_pr_check:"
-                "tools/ci/check_agent_canon_pr.sh:"
-                "missing-strict-dependency-review:actual=2:expected=1",
-                result.stdout,
-            )
-
     def test_pr_check_command_backslash_space_tab_is_not_a_continuation(self) -> None:
         """Malformed backslash continuation after command lines is rejected for all gate checks."""
         continuation_suffixes = (" \\ \n", " \\\t\n")
         gates = [
-            (
-                "agent_canon_pr_check",
-                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
-                "missing-strict-dependency-review",
-                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing',
-                '--cycle-report-only --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
-            ),
-            (
-                "agent_canon_pr_check",
-                'python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"',
-                "missing-accumulated-agent-eval-producer",
-                'python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate',
-                '--log-dir "${PR_AGENT_EVAL_LOG_DIR}"',
-            ),
             (
                 "generated_artifact_guard",
                 'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
@@ -532,99 +428,6 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                             f"{detail}",
                             result.stdout,
                         )
-
-    def test_pr_check_strict_dependency_review_command_passes(self) -> None:
-        """Canonical dependency-review command passes command extraction."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_agent_canon_pr_contract(root)
-
-            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertNotIn(
-                "missing-required-command:agent_canon_pr_check:"
-                "tools/ci/check_agent_canon_pr.sh:",
-                result.stdout,
-            )
-
-    def test_pr_check_strict_dependency_review_requires_changed_path_packet(
-        self,
-    ) -> None:
-        """A strict review without the trusted path packet is rejected."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_agent_canon_pr_contract(root)
-            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
-            script.write_text(
-                script.read_text(encoding="utf-8").replace(
-                    ' --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}"',
-                    "",
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "missing-required-command:agent_canon_pr_check:"
-                "tools/ci/check_agent_canon_pr.sh:missing-strict-dependency-review",
-                result.stdout,
-            )
-
-    def test_pr_check_strict_dependency_review_rejects_extra_arguments(
-        self,
-    ) -> None:
-        """An extra argument cannot satisfy the exact strict-review contract."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_agent_canon_pr_contract(root)
-            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
-            command = (
-                'bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" '
-                "--fail-missing --cycle-report-only --changed-path-packet "
-                '"${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha '
-                '"${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir '
-                '"${PR_DEPENDENCY_REVIEW_DIR}"'
-            )
-            script.write_text(
-                script.read_text(encoding="utf-8").replace(
-                    command, f"{command} --unexpected-bypass-argument"
-                ),
-                encoding="utf-8",
-            )
-
-            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "missing-required-command:agent_canon_pr_check:"
-                "tools/ci/check_agent_canon_pr.sh:missing-strict-dependency-review",
-                result.stdout,
-            )
-
-    def test_pr_check_must_run_accumulated_agent_evals(self) -> None:
-        """The AgentCanon PR check must mechanically accumulate eval reports."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            self.write_agent_canon_pr_contract(root)
-            script = root / "tools" / "ci" / "check_agent_canon_pr.sh"
-            text = script.read_text(encoding="utf-8").replace(
-                'python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"\n',
-                "",
-            )
-            script.write_text(text, encoding="utf-8")
-
-            result = self.run_checker(root, "--contract", "agent_canon_pr_check")
-
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn(
-                "missing-required-command:agent_canon_pr_check:"
-                "tools/ci/check_agent_canon_pr.sh:"
-                "missing-accumulated-agent-eval-producer",
-                result.stdout,
-            )
 
     def test_pr_check_must_scope_agent_eval_archive_env(self) -> None:
         """The AgentCanon PR check must pass a writable archive env to eval producers."""
@@ -1033,14 +836,12 @@ class CheckToolConventionDriftTest(unittest.TestCase):
                     'python3 "${CANON_TOOLS_ROOT}/ci/agent_canon_pr_graph_selector.py"',
                     "PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped",
                     "if agentcanon_pr_dependency_graph_required; then",
-                    '  bash "${CANON_TOOLS_ROOT}/agent_tools/run_repo_dependency_review.sh" --fail-missing --cycle-report-only --changed-path-packet "${PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET}" --trusted-base-sha "${PR_GATE_DEPENDENCY_GRAPH_BASE_SHA}" --report-dir "${PR_DEPENDENCY_REVIEW_DIR}"',
                     "  PR_GATE_DEPENDENCY_SOURCE_STATUS=source",
                     "fi",
                     "--selector-reason \"${PR_GATE_DEPENDENCY_SOURCE_REASON}\"",
                     "--selector-evidence \"${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE}\"",
                     'write_pr_gate_receipt "${PR_GATE_DEPENDENCY_SOURCE_STATUS}" "${PR_GATE_DEPENDENCY_SOURCE_REASON}" "${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE}"',
                     'AGENT_CANON_HOOK_ARCHIVE_DIR="${PR_HOOK_ARCHIVE_DIR}" \\',
-                    'python3 "${CANON_TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" --run-id agent-canon-pr-gate --log-dir "${PR_AGENT_EVAL_LOG_DIR}"',
                     'python3 "${CANON_TOOLS_ROOT}/agent_tools/generated_artifact_guard.py" --root "${WORKSPACE_ROOT}"',
                     'python3 "${CANON_TOOLS_ROOT}/agent_tools/check_agent_runtime_alignment.py"',
                     "python3 tools/agent_tools/evaluate_skill_workflow_prompts.py --manifest evidence/agent-evals/skill_workflow_prompt_eval.toml",

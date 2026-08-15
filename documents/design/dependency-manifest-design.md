@@ -129,11 +129,13 @@ The ledger carries four fields:
 - `Refactor handoff`: structure, ownership, or route changes passed to
   `dependency-analysis` and `structure-refactor`.
 
-`check_design_doc_claims.py` implements the deterministic gate. It requests a
-bounded dependency closure and token context from the canonical graph, checks
-the returned typed evidence, and reports unsupported tokens or parent
-contradictions. It does not parse dependency headers or open evidence files as
-a second fact authority.
+`check_design_doc_claims.py` implements the deterministic design-evidence gate.
+It requests a bounded dependency closure and tokenless context through the
+source-derived `GraphClient` projections, checks the returned typed evidence,
+and reports unsupported tokens or parent contradictions. Explicit token graph
+context remains a separate persisted analysis capability. The claim checker
+does not parse dependency headers or open evidence files as a second fact
+authority.
 
 ## Parent PR Gate Selection Contract
 
@@ -210,8 +212,7 @@ responsibility <role statement...>
 ```
 
 - `direction` は `upstream` または `downstream`
-- `kind` は `design`、`implementation`、`environment`、`requirements`、
-  `review`、`evidence`
+- `kind` は `design`、`implementation`、`environment`
 - `relative-path` は manifest を持つ file から見た相対 path
 - `relative-path` は `./` の有無や bare sibling を問わず、宣言元 file の
   repo-relative parent から正規化します。absolute path は受理せず、root の
@@ -235,15 +236,17 @@ shared canon は派生 repo に配布されるため、environment edge はそ�
 
 `implementation` は code、script、test、runtime consumer、生成元、生成先を表します。
 
+`test` は contract kind registry の file-level contract 分類であり、
+dependency relation kind ではありません。依存 manifest の relation は
+`design`、`implementation`、`environment` の3種に限定し、テストへの
+依存も `downstream implementation` として宣言します。
+
 `environment` は Docker、CI、requirements、lock、tool config、runtime assumption を表します。
 
-`requirements` は同じ責任単位を拘束する要求成果物、`review` は承認・
-差し戻し判断、`evidence` は再利用される観測証拠を表します。これらは
-run bundle の会話や schedule を authority に昇格させず、明示された immutable
-artifact 間の edge にだけ使用します。
-
-登録済みの 6 種に限定します。
-新しい kind を増やす場合は、tool、docs、review gate、migration plan を同じ変更で更新します。
+Dependency relation はこの3種に限定します。`test`、`review`、`report`
+などの file-level contract 分類は、`dependency-contract-kinds.toml` の
+contract kind として別に管理します。新しい relation kind を増やす場合は、
+parser、tool、docs、review gate、migration plan を同じ変更で更新します。
 
 ## Contract Kinds
 

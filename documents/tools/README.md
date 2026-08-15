@@ -450,10 +450,13 @@ receipt を受け取ったときだけ重複する graph/header producer を省�
 `prepared` と `scoped` はこの PR receipt の退役状態であり、consumer は
 fail-closed で拒否します。receipt が無い通常経路は source review を実行し、
 明示的 graph-analysis route は独立して利用できます。
-`graph status/query/context` とその consumer は snapshot の参照専用で、
-`check_design_doc_claims.py` も persisted v2 snapshot を消費します。Each graph
-command performs at most one bounded freshness probe; consumers do not reparse
-repository-scoped dependency guarantees or rerun the runtime producer.
+`graph status`、非dependency relation query、token付き `context` とその consumer
+は明示的 graph-analysis route の snapshot 参照専用です。dependency query、
+tokenless path context、`check_design_doc_claims.py` は tracked source の
+projectionを使い、persisted v2 snapshotを読みません。通常の source review、
+PR receipt、header/format checkerもこのsnapshotを読みません。Each explicit
+graph command performs at most one bounded freshness probe; consumers do not
+reparse repository-scoped dependency guarantees or rerun the runtime producer.
 Explicit files outside a repository and non-Git checker fixtures retain their
 public local parser behavior without becoming graph authority. `graph_client.py`
 is the typed Python adapter for these responses, not a CLI entrypoint.

@@ -314,9 +314,9 @@ second report/archive materializer.
 - one independent exact-candidate APPROVE exists;
 - G1-G3 and source PR CI pass for the same RecordBinding;
 - submodule structure evidence and changed shared/root projection checks pass;
-- strict parent graph completeness passes when migration, a touched manifest,
-  or a selected profile requires it; otherwise the matching skipped receipt is
-  retained;
+- source-owned dependency review passes and its `source` or `skipped` receipt is
+  consumed by the live quick-CI handoff; explicit graph analysis remains a
+  separate opt-in capability;
 - immutable PullRequestLifecycle and permission authority pass;
 - expected-old merge CAS passes;
 - source-main publication readback matches the authoritative merge commit/tree;

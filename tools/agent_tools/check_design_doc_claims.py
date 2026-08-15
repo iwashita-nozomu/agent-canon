@@ -175,7 +175,7 @@ class GraphClaimContext:
 
 
 class GraphClaimConsumer:
-    """Consume one fresh graph snapshot without parsing dependency headers."""
+    """Consume one source-derived graph-compatible context projection."""
 
     def __init__(self, root: Path) -> None:
         """Bind the repository root and its typed graph adapter."""

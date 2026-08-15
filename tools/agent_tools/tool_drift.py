@@ -332,18 +332,6 @@ CONTRACTS = (
                 "missing-dependency-graph-selector-evidence-receipt",
             ),
         ),
-        command_checks=(
-            CommandCheck(
-                "tools/ci/check_agent_canon_pr.sh",
-                r'^bash\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/run_repo_dependency_review\.sh"\s+--fail-missing\s+--cycle-report-only\s+--changed-path-packet\s+"\$\{PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET\}"\s+--trusted-base-sha\s+"\$\{PR_GATE_DEPENDENCY_GRAPH_BASE_SHA\}"\s+--report-dir\s+"\$\{PR_DEPENDENCY_REVIEW_DIR\}"\s*$',
-                "missing-strict-dependency-review",
-            ),
-            CommandCheck(
-                "tools/ci/check_agent_canon_pr.sh",
-                r'^(?:AGENT_CANON_HOOK_ARCHIVE_DIR="\$\{PR_HOOK_ARCHIVE_DIR\}"\s+)?python3\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/run_accumulated_agent_evals\.py"\s+--run-id\s+agent-canon-pr-gate\s+--log-dir\s+"\$\{PR_AGENT_EVAL_LOG_DIR\}"\s*$',
-                "missing-accumulated-agent-eval-producer",
-            ),
-        ),
     ),
     ToolContract(
         name="convention_compliance",

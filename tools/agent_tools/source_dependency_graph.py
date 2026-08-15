@@ -24,9 +24,9 @@ from dataclasses import dataclass
 from pathlib import Path
 
 try:
-    from .surface_manifest import load_manifest, normalized_snapshot
+    from .surface_manifest import load_manifest
 except ImportError:  # pragma: no cover - direct CLI import
-    from surface_manifest import load_manifest, normalized_snapshot
+    from surface_manifest import load_manifest
 
 HEADER_SCAN_LINES = 80
 MANIFEST_FIELD_COUNT = 4
@@ -209,31 +209,21 @@ def _surface_bindings(root: Path) -> tuple[tuple[str, str], ...]:
     if not manifest.is_file():
         return ()
     try:
-        snapshot = normalized_snapshot(
-            load_manifest(root, "vendor/agent-canon", SURFACE_MANIFEST.as_posix())
+        surface_manifest = load_manifest(
+            root, "vendor/agent-canon", SURFACE_MANIFEST.as_posix()
         )
     except (OSError, ValueError) as error:
         raise SourceDependencyError(f"surface manifest snapshot unavailable: {error}") from error
-    prefix = snapshot.get("prefix")
-    entries = snapshot.get("entries")
-    if not isinstance(prefix, str) or not prefix or not isinstance(entries, list):
-        raise SourceDependencyError("surface manifest normalized snapshot is malformed")
+    prefix = surface_manifest.prefix
+    entries = surface_manifest.entries
     projected = (root / prefix).is_dir() and (root / ".git").exists()
     bindings: list[tuple[str, str]] = []
-    for raw_entry in entries:
-        if not isinstance(raw_entry, dict):
-            raise SourceDependencyError("surface manifest normalized entry is malformed")
-        path = raw_entry.get("path")
-        mode = raw_entry.get("mode")
-        source = raw_entry.get("source")
-        if not all(isinstance(value, str) for value in (path, mode, source)):
-            raise SourceDependencyError(
-                "surface manifest normalized entry has invalid binding fields"
-            )
-        if mode not in {"symlink", "copy"} or not source:
+    for entry in entries:
+        if entry.mode not in {"symlink", "copy"}:
             continue
+        source = entry.source_or_default()
         target = (Path(prefix) / source).as_posix() if projected else source
-        bindings.append((path, target))
+        bindings.append((entry.path, target))
     return tuple(sorted(bindings, key=lambda item: (-len(item[0]), item[0], item[1])))
 
 

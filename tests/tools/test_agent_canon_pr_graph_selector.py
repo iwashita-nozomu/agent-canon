@@ -22,6 +22,7 @@ import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from typing import cast
 from unittest.mock import patch
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -769,7 +770,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             "design",
             "missing target",
         )
-        payload = json.loads(fixture["payload_json"])
+        payload = json.loads(cast(str, fixture["payload_json"]))
         payload["source_span"]["start_line"] = True
         with self.assertRaises(selector.SelectorFailure) as raised:
             selector.validate_source_diagnostic(
@@ -797,7 +798,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
         )
         for mismatch in ("span", "node"):
             with self.subTest(mismatch=mismatch):
-                payload = json.loads(fixture["payload_json"])
+                payload = json.loads(cast(str, fixture["payload_json"]))
                 node_paths = {fixture["target_node_id"]: "changed.py"}
                 if mismatch == "span":
                     payload["source_span"]["path"] = "other.py"
@@ -825,7 +826,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
             "design",
             "missing target",
         )
-        payload = json.loads(fixture["payload_json"])
+        payload = json.loads(cast(str, fixture["payload_json"]))
         payload["declaration"] = "upstream design missing.md other reason"
         with self.assertRaises(selector.SelectorFailure) as raised:
             selector.validate_source_diagnostic(
@@ -1370,6 +1371,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 unavailable_reason: str,
                 invalid_reason: str,
             ) -> object:
+                """Replace the database after the selector opens it."""
                 nonlocal database_reads
                 if path == database:
                     database_reads += 1
@@ -1726,6 +1728,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 args: list[str] | tuple[str, ...],
                 extra_environment: dict[str, str] | None = None,
             ) -> subprocess.CompletedProcess[str]:
+                """Return a typed failure for the changed-path diff command."""
                 if args and args[0] == "diff":
                     return subprocess.CompletedProcess(
                         ["git", *args],
@@ -1771,6 +1774,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 args: list[str] | tuple[str, ...],
                 extra_environment: dict[str, str] | None = None,
             ) -> subprocess.CompletedProcess[str]:
+                """Record the authenticated fetch environment before delegation."""
                 if args and args[0] == "fetch":
                     self.assertEqual(tuple(args[-2:]), ("origin", base))
                     self.assertIsNotNone(extra_environment)
@@ -1840,6 +1844,7 @@ class AgentCanonPrGraphSelectorTest(unittest.TestCase):
                 args: list[str] | tuple[str, ...],
                 extra_environment: dict[str, str] | None = None,
             ) -> subprocess.CompletedProcess[str]:
+                """Reject an unexpected fetch when the base history is present."""
                 if args and args[0] == "fetch":
                     self.fail("history-ready CI preparation must not fetch")
                 return real_run_git(command_root, args, extra_environment)

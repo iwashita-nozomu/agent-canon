@@ -204,6 +204,7 @@ SKIP_EXPERIMENTS=0
 PR_GATE_RECEIPT=""
 PR_GATE_RECEIPT_VALID=0
 PR_GATE_DEPENDENCY_SOURCE_STATUS="not_applicable"
+PR_GATE_PARENT_PID="${PPID}"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --quick)
@@ -230,6 +231,14 @@ while [[ $# -gt 0 ]]; do
       PR_GATE_RECEIPT="$2"
       shift 2
       ;;
+    --pr-gate-parent-pid)
+      if [[ $# -lt 2 || ! "$2" =~ ^[1-9][0-9]*$ ]]; then
+        echo "Missing or invalid value for --pr-gate-parent-pid" >&2
+        exit 2
+      fi
+      PR_GATE_PARENT_PID="$2"
+      shift 2
+      ;;
     *)
       echo "Unknown option: $1" >&2
       exit 1
@@ -246,7 +255,7 @@ validate_pr_gate_receipt() {
   if ! validated_status="$(python3 "${CANON_CI_ROOT}/pr_gate_receipt.py" validate \
     --receipt "${PR_GATE_RECEIPT}" \
     --root "${WORKSPACE_ROOT}" \
-    --parent-pid "${PPID}")"; then
+    --parent-pid "${PR_GATE_PARENT_PID}")"; then
     echo "Invalid PR gate receipt: source-owned receipt validation failed" >&2
     return 1
   fi

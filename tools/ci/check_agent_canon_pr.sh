@@ -12,6 +12,7 @@
 # upstream implementation ../agent_tools/run_repo_dependency_review.sh strict source dependency review
 # upstream implementation ./run_pr_dependency_source_gate.sh owns no-runtime PR dependency completeness
 # upstream implementation ./pr_gate_receipt.py owns source/skipped receipt schema and binding validation
+# downstream implementation ./run_all_checks.sh consumes the live receipt before producer cleanup
 # upstream implementation ../agent_tools/parent_root_side_effects.py owns PR scratch, archive, and child execution boundaries
 # upstream implementation ./agent_canon_pr_graph_selector.py selects trusted changed-path evidence for source review scope
 # upstream implementation ../agent_tools/evaluate_skill_workflow_prompts.py skill/workflow prompt parity eval
@@ -359,7 +360,8 @@ write_pr_gate_receipt() {
   local source_status="${1:-}"
   local selector_reason="${2:-}"
   local selector_evidence="${3:-}"
-  python3 "${CANON_TOOLS_ROOT}/ci/pr_gate_receipt.py" write \
+  local published_path=""
+  if ! published_path="$(python3 "${CANON_TOOLS_ROOT}/ci/pr_gate_receipt.py" write \
     --root "${WORKSPACE_ROOT}" \
     --parent-pid "$$" \
     --status "${source_status}" \
@@ -368,7 +370,35 @@ write_pr_gate_receipt() {
     | python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" write \
     --root "${WORKSPACE_ROOT}" \
     --candidate "${PR_GATE_RECEIPT}" \
-    --purpose agent-canon-pr-receipt >/dev/null
+    --purpose agent-canon-pr-receipt)"; then
+    echo "AGENT_CANON_PR_GATE_RECEIPT=write_failed" >&2
+    return 1
+  fi
+  if [[ "${published_path}" != "${PR_GATE_RECEIPT}" ]]; then
+    echo "AGENT_CANON_PR_GATE_RECEIPT=path_mismatch" >&2
+    return 1
+  fi
+  echo "AGENT_CANON_PR_GATE_RECEIPT=${PR_GATE_RECEIPT}"
+}
+
+consume_pr_gate_receipt() {
+  local consumer_command=(
+    bash "${SCRIPT_DIR}/run_all_checks.sh"
+    --quick
+    --skip-docs
+    --skip-github-workflows
+    --skip-experiments
+    --pr-gate-receipt "${PR_GATE_RECEIPT}"
+    --pr-gate-parent-pid "$$"
+  )
+  echo "AGENT_CANON_PR_GATE_RECEIPT_HANDOFF=starting"
+  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+    --root "${WORKSPACE_ROOT}" \
+    --source-root "${AGENT_CANON_SOURCE_ROOT}" \
+    --purpose run-all-checks-script \
+    --issue-handoff \
+    -- "${consumer_command[@]}"
+  echo "AGENT_CANON_PR_GATE_RECEIPT_HANDOFF=consumed"
 }
 
 consume_source_correctness_receipt() {
@@ -569,6 +599,7 @@ write_pr_gate_receipt \
   "${PR_GATE_DEPENDENCY_SOURCE_STATUS}" \
   "${PR_GATE_DEPENDENCY_SOURCE_REASON}" \
   "${PR_GATE_DEPENDENCY_SOURCE_EVIDENCE}"
+consume_pr_gate_receipt
 echo ""
 
 echo "7️⃣  documentation checks"
