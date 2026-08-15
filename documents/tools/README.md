@@ -4,6 +4,8 @@ contract reference
 responsibility Documents ツール入口 for this repository.
 upstream design ../runtime/SHARED_RUNTIME_SURFACES.md shared documents ownership policy
 upstream design ../runtime/runtime-profiles-and-check-matrix.md runtime profile and validation routing policy
+upstream design ../design/source-owned-dependency-validation.md source-owned dependency review and PR receipt contract
+upstream design ../design/dependency-manifest-design.md dependency manifest DSL and explicit graph-analysis boundary
 upstream design ../../tools/catalog.yaml structured AgentCanon tool catalog
 upstream design ../prose-reasoning-graph/dsl-spec.md graph visualization projection contract
 upstream design ../../agents/skills/code-visualization.md sole public visualization owner and closeout boundary
@@ -16,6 +18,7 @@ downstream implementation ../../tools/agent_tools/eval_accumulation_check.py val
 downstream implementation ../../tools/agent_tools/runtime_log_archive_git.py manages mounted hook/eval/report log archive branches
 downstream implementation ../../tools/agent_tools/generated_artifact_guard.py rejects regenerated report outputs left in source tree
 downstream implementation ../../tools/agent_tools/check_design_doc_claims.py validates design-document evidence claims
+downstream implementation ../../tools/ci/pr_gate_receipt.py owns the executable PR source/skipped receipt schema and parser
 downstream design dependency-tools-and-licenses.md documents dependency tool purposes and license evidence
 downstream design ../../tools/user/README.md defines stable user-facing tool entrypoint migration target
 downstream design ../../tools/internal/README.md defines skill, workflow, and compatibility helper migration targets
@@ -432,22 +435,28 @@ Rollout discovery consumes only the explicit container-local
 `AGENT_CANON_CODEX_SESSION_ROOT` supplied by the runtime owner; host `HOME`,
 `CODEX_HOME`, and `~/.codex/sessions` are not fallback inputs.
 
-`tools/bin/agent-canon graph build` は dependency-manifest snapshot、prepared
-artifact、latest committed receipt を一つの `BuildMaterial` transaction で
-取得します。通常の `run_all_checks` は最初の graph-backed consumer より前に
-`WORKSPACE_ROOT` の graph を一度だけ build し、すべての graph-backed consumer
-は同じ fresh snapshot を共有します。AgentCanon PR gate は strict dependency
-review で作った graph と dependency-header verdict を owner、root identity、
-parent PID、prepared markers 付きの一時 receipt で quick CI に渡します。
-`run_all_checks` はその receipt を検証できた場合だけ `CANON_GRAPH_READY=1`
-として snapshot を消費し、graph/dependency-header producer を省略します。
-receipt が無い通常経路は全 producer を実行し、不正な receipt は fail closed
-です。build に失敗した場合は graph-backed checks を実行せず、一つの CI
-failure として扱います。
-`graph status/query/context` とその consumer は snapshot の参照専用で、
-`check_design_doc_claims.py` も persisted v2 snapshot を消費します。Each graph
-command performs at most one bounded freshness probe; consumers do not reparse
-repository-scoped dependency guarantees or rerun the runtime producer.
+`tools/bin/agent-canon graph build` は明示的な graph-analysis route です。
+dependency-manifest snapshot、persisted diagnostics、SQLite identity の生成と
+freshness はこの route が所有し、`--ensure-graph` を指定した呼び出しだけが
+必要な再構築を要求します。通常の PR source review は source scan、format、
+relation/cycle、TSV/DOT の source projection を実行し、graph を build、query、
+または receipt の根拠として読みません。
+`tools/ci/pr_gate_receipt.py` は PR gate の実行可能な receipt schema/parser の
+唯一の owner です。`check_agent_canon_pr.sh` は source review の結果を
+`source` または trusted header scan の `skipped` として書き、root identity、
+parent PID、selector reason/evidence とともに quick CI へ渡します。
+`run_all_checks.sh` は同じ module を一度だけ consumer として呼び、妥当な
+receipt を受け取ったときだけ重複する graph/header producer を省略します。
+`prepared` と `scoped` はこの PR receipt の退役状態であり、consumer は
+fail-closed で拒否します。receipt が無い通常経路は source review を実行し、
+明示的 graph-analysis route は独立して利用できます。
+`graph status`、非dependency relation query、token付き `context` とその consumer
+は明示的 graph-analysis route の snapshot 参照専用です。dependency query、
+tokenless path context、`check_design_doc_claims.py` は tracked source の
+projectionを使い、persisted v2 snapshotを読みません。通常の source review、
+PR receipt、header/format checkerもこのsnapshotを読みません。Each explicit
+graph command performs at most one bounded freshness probe; consumers do not
+reparse repository-scoped dependency guarantees or rerun the runtime producer.
 Explicit files outside a repository and non-Git checker fixtures retain their
 public local parser behavior without becoming graph authority. `graph_client.py`
 is the typed Python adapter for these responses, not a CLI entrypoint.

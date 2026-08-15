@@ -5,11 +5,14 @@ contract workflow
 responsibility Owns exact AgentCanon source candidate review, GitHub PR CAS, merge, and publication readback.
 upstream design ../../documents/agent-canon/agent-canon-update-route.md owns the end-to-end source-to-parent transaction.
 upstream design ../../documents/agent-canon/source-publication-parent-handoff.md owns the source packet handoff boundary.
+upstream design ../../documents/design/source-owned-dependency-validation.md owns source review authority and PR receipt states.
+upstream design ../../documents/design/dependency-manifest-design.md owns manifest DSL and explicit graph-analysis projection.
 upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns lifecycle and PR topology schemas.
 upstream implementation ../../tools/agent_tools/source_projection_handoff.py materializes the sole parent handoff packet.
 upstream implementation ../../tools/agent_tools/publication_integrator.py owns candidate CAS and publication authority.
 upstream implementation ../../tools/agent_tools/github_publish.py adapts verified GitHub remote and PR operations.
 upstream implementation ../../tools/ci/check_agent_canon_pr.sh owns the one source PR gate invocation.
+upstream implementation ../../tools/ci/pr_gate_receipt.py owns the source/skipped receipt schema consumed by quick CI.
 upstream design ../skills/code-visualization.md owns visualization source-publication policy.
 upstream implementation ../../tools/agent_tools/visualization_contract.py owns typed visualization coverage evidence.
 downstream design pr-queue-cleanup-workflow.md consumes source publication readback.
@@ -203,51 +206,27 @@ does not require the pinned commit to be reachable from the configured remote
 or the worktree `HEAD` to equal the staged gitlink; those pin lifecycle checks
 belong to the parent pin/root projection route.
 
-Parent-root strict dependency graph completeness is conditional. The caller
-sets `AGENT_CANON_PR_PARENT_GRAPH_MIGRATION=yes`, touches a dependency manifest
-or a surface declared by the dependency-manifest design owner's canonical
-dependency header, or selects a profile whose
-`strict_dependency_graph_required` field is true in
-`documents/runtime/runtime-profiles-and-check-matrix.json`. Profile inputs use
-that inventory's exact `id` through `AGENT_CANON_PR_VALIDATION_PROFILE` or the
-comma-separated `AGENT_CANON_PR_VALIDATION_PROFILES`; setting both or providing
-an unknown ID fails with a typed selector verdict.
-Otherwise `check_agent_canon_pr.sh` records
-`AGENT_CANON_PR_DEPENDENCY_GRAPH=skipped` and keeps the matching `skipped`
-receipt inside the shared gate. The shared gate never runs repository project
-tests, type checks, or lint. A derived parent projects those checks with
-`AGENT_CANON_PR_PROJECT_QUALITY=delegated` and owner `parent_ci`; its parent
-workflow must expose that owner marker together with the canonical `make ci`
-command. The existing workflow checker validates this route by owner and
-command semantics, not by a fixed job name. Standalone AgentCanon keeps the
+Dependency review is source-owned. The selector acquires trusted base/head and
+changed-path evidence, then `run_pr_dependency_source_gate.sh` runs the source
+scan, format, relation/cycle, and source-derived TSV/DOT projections selected by
+the current profile. The normal PR route does not build, query, or read a
+persisted graph and does not promote graph completeness into a receipt.
+`check_agent_canon_pr.sh` emits `source` when full source review runs and
+`skipped` when only the trusted header scan runs. The shared gate never runs
+repository project tests, type checks, or lint. A derived parent projects those
+checks with `AGENT_CANON_PR_PROJECT_QUALITY=delegated` and owner `parent_ci`;
+its parent workflow must expose that owner marker together with the canonical
+`make ci` command. The existing workflow checker validates this route by owner
+and command semantics, not by a fixed job name. Standalone AgentCanon keeps the
 existing `static-gates` shared-surface owner and introduces no repository-wide
 project-quality job. The PR script does not add a second workflow parser or
 fallback runner.
 
-When selection is required, the parent checker first builds the complete graph.
-A complete result records `prepared` and runs the full strict dependency review.
-For an incomplete parent graph, the checker uses the same validated base diff as
-the selector and traverses persisted dependency/surface edges in both directions
-from changed paths. Diagnostics declared by that closure, diagnostics whose
-target changed, changed `manifest-grammar`, and diagnostics without confirmed
-base source identity fail. Non-reachable diagnostics whose source identity is
-unchanged from the base are written individually to the acceptance report and
-produce a `scoped` receipt. The quick-CI consumer accepts that bound receipt but
-does not treat the incomplete graph as fresh or run graph-query consumers.
-Explicit parent graph migration and standalone source gates remain full-scope;
-no count-only baseline is an acceptance oracle.
-
-The consumer accepts source diagnostics only from the current typed
-`payload_json` identity: producer-resolved source and target, normalized
-declaration, declaration components, and source span. It validates that payload
-against the persisted rule and source node before evaluating changed scope
-$S(d)$ or the base-identity/severity predicates $N(d)$ and $W(d)$. Missing,
-empty, wrongly typed, span-inconsistent, target-node-inconsistent, or
-declaration-inconsistent identity fails closed before a scoped receipt can be
-published. This workflow projection consumes producer-owned identity and does
-not parse message formatting, restore a legacy schema, or provide a selector
-side fallback; current-producer and trusted-base authority remain bound by the
-parent graph contract.
+`tools/bin/agent-canon graph build|status|query|context` and
+`run_repo_dependency_review.sh --ensure-graph` remain explicit graph-analysis
+capabilities. Their persisted diagnostics and freshness contract are not inputs
+to the normal PR source review or receipt consumer. Graph acceptance and
+SQLite/database identity remain owned by that explicit analysis route.
 
 GitHub Actions resolves the comparison base from
 `pull_request.base.sha` in its trusted event payload. Before normal selection,
@@ -290,13 +269,17 @@ consumers, and the workflow checker validates that route's owner marker and
 canonical command.
 
 After the selected dependency review, the PR gate writes a temporary receipt
-containing its owner, root identity, parent PID, matching
-`strict_dependency`/`graph` status (`prepared` or `skipped`), and selector
-reason/evidence. The receipt protects the shared checker-to-consumer process
-handoff; a cryptographic nonce for a hostile local caller is outside this trust
-boundary and would not establish that the caller ran the checker. The selected
-workflow job is the sole blocking project-quality consumer, and an invalid or
-missing receipt supplied to any separate internal consumer fails closed.
+through `tools/ci/pr_gate_receipt.py`. It contains its owner, root identity,
+parent PID, matching `strict_dependency`/`graph` compatibility fields with
+status `source` or `skipped`, and selector reason/evidence. The same module
+validates the receipt once in the consumer and returns one `status=...` line;
+shell callers do not reparse its keys. `prepared` and `scoped` are retired
+graph states and fail closed. The receipt protects the shared
+checker-to-consumer process handoff; a cryptographic nonce for a hostile local
+caller is outside this trust boundary and would not establish that the caller
+ran the checker. The selected workflow job is the sole blocking project-quality
+consumer, and an invalid or missing receipt supplied to any separate internal
+consumer fails closed.
 
 The upstream Materializer hook/archive hot-path defect remains an external
 dependency. This workflow records its evidence/blocker and does not implement a
@@ -331,9 +314,9 @@ second report/archive materializer.
 - one independent exact-candidate APPROVE exists;
 - G1-G3 and source PR CI pass for the same RecordBinding;
 - submodule structure evidence and changed shared/root projection checks pass;
-- strict parent graph completeness passes when migration, a touched manifest,
-  or a selected profile requires it; otherwise the matching skipped receipt is
-  retained;
+- source-owned dependency review passes and its `source` or `skipped` receipt is
+  consumed by the live quick-CI handoff; explicit graph analysis remains a
+  separate opt-in capability;
 - immutable PullRequestLifecycle and permission authority pass;
 - expected-old merge CAS passes;
 - source-main publication readback matches the authoritative merge commit/tree;

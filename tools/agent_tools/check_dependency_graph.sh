@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # @dependency-start
 # contract tool
-# responsibility Projects and validates dependency relations captured by the canonical graph.
+# responsibility Projects and validates dependency relations directly from tracked source manifests.
+# upstream design ../../documents/design/source-owned-dependency-validation.md source-derived graph projection authority
 # upstream design ../../documents/design/dependency-manifest-design.md dependency graph semantics
-# upstream implementation ../../rust/agent-canon/src/graph.rs owns dependency parsing, binding, and storage
+# upstream design ../../documents/design/source-owned-dependency-validation.md tracked source authority boundary
+# upstream implementation ./source_dependency_graph.py owns source parsing, canonical binding, and review export
 # upstream implementation ./parent_root_side_effects.py owns graph scratch and TSV publication
 # downstream implementation ./render_dependency_manifest_graph.py renders exported dependency TSV
+# downstream implementation ../../tests/agent_tools/test_dependency_manifest_tools.py verifies source-derived graph review
 # @dependency-end
 set -euo pipefail
 
@@ -29,7 +32,8 @@ usage() {
 Usage:
   check_dependency_graph.sh [--root DIR] [--changed] [--print-edges] [--graph-tsv PATH] [--list-related] [--focus PATH] [--focus-changed] [--edit-scope PATH] [--edit-scope-changed] [--search-hits-file PATH] [--check-bidirectional] [--cycle-report-only] [paths...]
 
-Consumes one canonical graph query; it does not parse source manifests.
+Consumes deterministic dependency facts derived from tracked source manifests.
+It does not build, query, or read persisted graph runtime state.
 EOF
 }
 
@@ -40,20 +44,59 @@ while [[ $# -gt 0 ]]; do
     --print-edges) PRINT_EDGES=1; shift ;;
     --graph-tsv) GRAPH_TSV_OUTPUT="$2"; shift 2 ;;
     --list-related) LIST_RELATED=1; shift ;;
-    --focus) FOCUS_PATHS+=("${2#./}"); shift 2 ;;
+    --focus) FOCUS_PATHS+=("$2"); shift 2 ;;
     --focus-changed) FOCUS_CHANGED=1; shift ;;
-    --edit-scope) EDIT_SCOPE=1; EDIT_SCOPE_PATHS+=("${2#./}"); shift 2 ;;
+    --edit-scope) EDIT_SCOPE=1; EDIT_SCOPE_PATHS+=("$2"); shift 2 ;;
     --edit-scope-changed) EDIT_SCOPE=1; EDIT_SCOPE_CHANGED=1; shift ;;
     --search-hits-file) EDIT_SCOPE=1; EDIT_SCOPE_HITS_FILE="$2"; shift 2 ;;
     --check-bidirectional) CHECK_BIDIRECTIONAL=1; shift ;;
     --cycle-report-only) CYCLE_REPORT_ONLY=1; shift ;;
     --allow-frontmatter) shift ;;
     -h|--help) usage; exit 0 ;;
-    *) INPUT_PATHS+=("${1#./}"); shift ;;
+    *) INPUT_PATHS+=("$1"); shift ;;
   esac
 done
 
-ROOT_DIR="$(realpath -m "$ROOT_DIR")"
+ROOT_DIR="$(realpath -e "$ROOT_DIR")" || {
+  echo "DEPENDENCY_GRAPH=fail reason=root-missing" >&2
+  exit 1
+}
+
+normalize_repo_path() {
+  local raw="$1"
+  local absolute=""
+  # Selector identities are lexical repository paths. Canonical source parsing
+  # owns symlink binding and physical dependency-target containment.
+  if [[ "$raw" = /* ]]; then
+    absolute="$(realpath -m --no-symlinks "$raw")"
+  else
+    absolute="$(realpath -m --no-symlinks "$ROOT_DIR/${raw#./}")"
+  fi
+  case "$absolute" in
+    "$ROOT_DIR") printf '.\n' ;;
+    "$ROOT_DIR"/*) printf '%s\n' "${absolute#"$ROOT_DIR"/}" ;;
+    *)
+      echo "DEPENDENCY_GRAPH=fail reason=path-outside-root path=$raw" >&2
+      return 1
+      ;;
+  esac
+}
+
+normalize_path_array() {
+  local array_name="$1"
+  local -n values="$array_name"
+  local -a normalized=()
+  local value=""
+  for value in "${values[@]}"; do
+    normalized+=("$(normalize_repo_path "$value")")
+  done
+  values=("${normalized[@]}")
+}
+
+normalize_path_array INPUT_PATHS
+normalize_path_array FOCUS_PATHS
+normalize_path_array EDIT_SCOPE_PATHS
+
 PARENT_ROOT="${AGENT_CANON_PARENT_ROOT:-$(git -C "$PWD" rev-parse --show-toplevel 2>/dev/null || true)}"
 if [[ -z "$PARENT_ROOT" ]]; then
   echo "DEPENDENCY_GRAPH=fail reason=missing-parent-root" >&2
@@ -61,16 +104,9 @@ if [[ -z "$PARENT_ROOT" ]]; then
 fi
 PARENT_ROOT="$(cd "$PARENT_ROOT" && pwd -P)"
 CANON_SCRIPT_PATH="$(realpath -m "${BASH_SOURCE[0]}")"
-BOUNDARY_SCRIPT="$(dirname "$CANON_SCRIPT_PATH")/parent_root_side_effects.py"
-if [[ -x "$ROOT_DIR/vendor/agent-canon/tools/bin/agent-canon" ]]; then
-  GRAPH_CLI="$ROOT_DIR/vendor/agent-canon/tools/bin/agent-canon"
-elif [[ -x "$ROOT_DIR/tools/bin/agent-canon" ]]; then
-  GRAPH_CLI="$ROOT_DIR/tools/bin/agent-canon"
-elif [[ -x "$PARENT_ROOT/vendor/agent-canon/tools/bin/agent-canon" ]]; then
-  GRAPH_CLI="$PARENT_ROOT/vendor/agent-canon/tools/bin/agent-canon"
-else
-  GRAPH_CLI="$PARENT_ROOT/tools/bin/agent-canon"
-fi
+TOOL_DIR="$(dirname "$CANON_SCRIPT_PATH")"
+BOUNDARY_SCRIPT="${TOOL_DIR}/parent_root_side_effects.py"
+SOURCE_GRAPH_TOOL="${TOOL_DIR}/source_dependency_graph.py"
 TEMP_ROOT="$(
   python3 "$BOUNDARY_SCRIPT" temp-dir \
     --root "$PARENT_ROOT" \
@@ -79,8 +115,6 @@ TEMP_ROOT="$(
     --purpose dependency-graph
 )"
 
-status_file="$TEMP_ROOT/status.json"
-query_file="$TEMP_ROOT/query.json"
 all_edges="$TEMP_ROOT/all-edges.tsv"
 edges_file="$TEMP_ROOT/edges.tsv"
 manifest_files="$TEMP_ROOT/manifest.txt"
@@ -102,41 +136,13 @@ cleanup_dependency_graph_temp() {
 }
 trap cleanup_dependency_graph_temp EXIT
 
-set +e
-"$GRAPH_CLI" graph status --root "$ROOT_DIR" --profile default --format json >"$status_file"
-status_exit=$?
-set -e
-if [[ "$status_exit" -ne 0 || "$(jq -r '.status // "invalid"' "$status_file" 2>/dev/null)" != "fresh" ]]; then
+if ! python3 "$SOURCE_GRAPH_TOOL" \
+  --root "$ROOT_DIR" \
+  --edges-out "$all_edges" \
+  --manifests-out "$manifest_files"; then
   echo "DEPENDENCY_GRAPH=fail"
-  echo "canonical graph is not fresh"
-  cat "$status_file"
   exit 1
 fi
-
-set +e
-"$GRAPH_CLI" graph query --root "$ROOT_DIR" --profile default --format json --all --relation all --direction both --depth 0 >"$query_file"
-query_exit=$?
-set -e
-if [[ "$query_exit" -ne 0 || "$(jq -r '.status // "invalid"' "$query_file" 2>/dev/null)" != "fresh" ]]; then
-  echo "DEPENDENCY_GRAPH=fail"
-  echo "canonical graph is not fresh"
-  cat "$query_file"
-  exit 1
-fi
-
-jq -r '
-  (.nodes | map({key: .id, value: .path}) | from_entries) as $node_paths
-  | .facts[]
-  | select(.kind == "dependency" and .inferred == false)
-  | [
-      (.dependency_detail.direction // ""),
-      (.dependency_detail.kind // ""),
-      ($node_paths[.from] // ""),
-      ($node_paths[.to] // "")
-    ]
-  | @tsv
-' "$query_file" | sort -u >"$all_edges"
-jq -r '.nodes[] | select(.layer == "source" and .payload.manifest_present == true) | .path' "$query_file" | sort -u >"$manifest_files"
 
 failures=0
 while IFS= read -r projection_error; do
@@ -212,7 +218,7 @@ if [[ "$LIST_RELATED" -eq 1 ]]; then
   related_count=0
   while IFS= read -r focus; do
     [[ -n "$focus" ]] || continue
-    emit_related "${focus#./}"
+    emit_related "$(normalize_repo_path "$focus")"
     related_count=$((related_count + 1))
   done < <(focus_paths | sort -u)
   echo "DEPENDENCY_RELATED_SURFACES=$related_count"
@@ -229,7 +235,7 @@ scope_paths() {
 if [[ "$EDIT_SCOPE" -eq 1 ]]; then
   while IFS= read -r raw_focus; do
     [[ -n "$raw_focus" ]] || continue
-    focus="${raw_focus#./}"
+    focus="$(normalize_repo_path "$raw_focus")"
     printf 'DEPENDENCY_EDIT_SCOPE_PATH role=search_hit path=%s\n' "$focus"
     awk -F '\t' -v file="$focus" '
       $3 == file { printf "DEPENDENCY_EDIT_SCOPE_PATH role=declared_%s kind=%s path=%s source=%s target=%s\n", $1, $2, $4, $3, $4 }
@@ -289,4 +295,4 @@ if [[ "$failures" -gt 0 ]]; then
   echo "DEPENDENCY_GRAPH=fail"
   exit 1
 fi
-echo "DEPENDENCY_GRAPH=pass authority=canonical-graph"
+echo "DEPENDENCY_GRAPH=pass authority=tracked-source"

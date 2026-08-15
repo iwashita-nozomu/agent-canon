@@ -9,7 +9,7 @@
 # contract test
 # responsibility Tests status lifecycle taxonomy, transport, evidence, drift, and failure boundaries.
 # upstream design ../../agents/internal-routines/github-status-lifecycle.md owns lifecycle semantics.
-# upstream implementation ../../../tools/agent_tools/github_status_lifecycle.py implements the adapter.
+# upstream implementation ../../tools/agent_tools/github_status_lifecycle.py implements the adapter.
 # @dependency-end
 
 from __future__ import annotations

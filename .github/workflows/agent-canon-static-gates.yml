@@ -7,7 +7,7 @@
 # upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh executes one selected static-gate unit
 # upstream implementation ../../tools/ci/check_agent_canon_pr.sh preserves the manual full-confidence route
 # downstream implementation ../../tools/ci/check_github_workflows.py validates workflow and PR template conventions
-# downstream test ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries and selection
+# downstream implementation ../../tests/tools/test_standalone_static_gate_units.py validates execution-unit boundaries and selection
 # @dependency-end
 
 name: AgentCanon Static Gates

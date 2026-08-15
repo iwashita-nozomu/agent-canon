@@ -2,7 +2,8 @@
 # @dependency-start
 # contract tool
 # responsibility Detects drift between tool contracts, convention docs, and dependency manifests.
-# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest graph semantics
+# upstream design ../../documents/design/source-owned-dependency-validation.md source-owned dependency receipt and review authority
+# upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL and graph semantics
 # upstream design ../../agents/workflows/agent-canon-pr-workflow.md PR validation contract
 # upstream design ../../agents/canonical/CODEX_SUBAGENTS.md subagent wave routing contract
 # upstream design ../../agents/TASK_WORKFLOWS.md workflow routing contract
@@ -275,6 +276,7 @@ CONTRACTS = (
             LinkCheck(".github/PULL_REQUEST_TEMPLATE.md"),
             LinkCheck("templates/documents/github/pull-request/agent_canon.md"),
             LinkCheck("tools/agent_tools/run_repo_dependency_review.sh"),
+            LinkCheck("tools/ci/pr_gate_receipt.py"),
             LinkCheck("tools/agent_tools/run_accumulated_agent_evals.py"),
             LinkCheck("tools/agent_tools/generated_artifact_guard.py"),
             LinkCheck("tools/agent_tools/evaluate_skill_workflow_prompts.py"),
@@ -311,8 +313,8 @@ CONTRACTS = (
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                "PR_GATE_DEPENDENCY_GRAPH_STATUS=skipped",
-                "missing-optional-dependency-graph-receipt-status",
+                "PR_GATE_DEPENDENCY_SOURCE_STATUS=skipped",
+                "missing-optional-dependency-source-receipt-status",
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
@@ -321,25 +323,13 @@ CONTRACTS = (
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                "selector_reason=%s",
+                "--selector-reason",
                 "missing-dependency-graph-selector-reason-receipt",
             ),
             TextCheck(
                 "tools/ci/check_agent_canon_pr.sh",
-                "selector_evidence=%s",
+                "--selector-evidence",
                 "missing-dependency-graph-selector-evidence-receipt",
-            ),
-        ),
-        command_checks=(
-            CommandCheck(
-                "tools/ci/check_agent_canon_pr.sh",
-                r'^bash\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/run_repo_dependency_review\.sh"\s+--fail-missing\s+--cycle-report-only\s+--changed-path-packet\s+"\$\{PR_GATE_DEPENDENCY_CHANGED_PATH_PACKET\}"\s+--trusted-base-sha\s+"\$\{PR_GATE_DEPENDENCY_GRAPH_BASE_SHA\}"\s+--report-dir\s+"\$\{PR_DEPENDENCY_REVIEW_DIR\}"\s*$',
-                "missing-strict-dependency-review",
-            ),
-            CommandCheck(
-                "tools/ci/check_agent_canon_pr.sh",
-                r'^(?:AGENT_CANON_HOOK_ARCHIVE_DIR="\$\{PR_HOOK_ARCHIVE_DIR\}"\s+)?python3\s+"\$\{CANON_TOOLS_ROOT\}/agent_tools/run_accumulated_agent_evals\.py"\s+--run-id\s+agent-canon-pr-gate\s+--log-dir\s+"\$\{PR_AGENT_EVAL_LOG_DIR\}"\s*$',
-                "missing-accumulated-agent-eval-producer",
             ),
         ),
     ),
