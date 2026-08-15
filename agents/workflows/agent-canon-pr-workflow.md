@@ -4,7 +4,9 @@
 contract workflow
 responsibility Owns exact AgentCanon source candidate review, GitHub PR CAS, merge, and publication readback.
 upstream design ../../documents/agent-canon/agent-canon-update-route.md owns the end-to-end source-to-parent transaction.
+upstream design ../../documents/agent-canon/source-publication-parent-handoff.md owns the source packet handoff boundary.
 upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns lifecycle and PR topology schemas.
+upstream implementation ../../tools/agent_tools/source_projection_handoff.py materializes the sole parent handoff packet.
 upstream implementation ../../tools/agent_tools/publication_integrator.py owns candidate CAS and publication authority.
 upstream implementation ../../tools/agent_tools/github_publish.py adapts verified GitHub remote and PR operations.
 upstream implementation ../../tools/ci/check_agent_canon_pr.sh owns the one source PR gate invocation.
@@ -312,8 +314,14 @@ second report/archive materializer.
 1. A distinct post-merge source-main readback proves `origin/main` equals the
    authoritative publication merge commit/tree and materializes G5 publication
    evidence. It is not the pre-freeze rebind receipt.
-1. The source lane emits one accepted QueueReceipt and one pending frontier.
-   Retry of the same input reuses the receipt.
+1. `source_projection_handoff.py` consumes the exact post-readback
+   predecessor records and materializes one immutable source-projection packet
+   in the explicit parent owner namespace. That packet is the only
+   cross-namespace payload.
+1. The canonical `update_agent_canon.sh latest` front door validates remote
+   source-main commit/tree and derives QueueReceipt, pending/accepted frontier,
+   transaction marker, and G4 in the parent namespace. Retry of the same input
+   reuses immutable identities; derived receipt copy is invalid.
 1. Source PR completion hands off to
    `pr-queue-cleanup-workflow.md`; it never moves the parent pin directly.
 
@@ -330,7 +338,8 @@ second report/archive materializer.
 - expected-old merge CAS passes;
 - source-main publication readback matches the authoritative merge commit/tree;
 - PR Essence, reviews, and contributor diff where applicable are retained;
-- accepted QueueReceipt and pending DependencyFrontier are materialized;
+- one immutable source-projection packet is materialized in the explicit parent owner namespace;
+- accepted QueueReceipt, pending/accepted DependencyFrontier, transaction marker, and G4 are derived there by the canonical front door;
 - source/reviewer/PR descendants have durable handback, are closed, and their
   reservations are released;
 - parent projection remains untouched until frontier acceptance.
@@ -346,4 +355,5 @@ second report/archive materializer.
   `origin/main` is merged into the topic candidate;
 - updating a merged or closed PR head branch instead of creating a successor;
 - parent pin/root sync before accepted frontier;
+- manual gitlink staging or copying/fabricating QueueReceipt, DependencyFrontier, transaction marker, or G4 across namespaces;
 - cleanup before remote readback or prose-only agent closeout.
