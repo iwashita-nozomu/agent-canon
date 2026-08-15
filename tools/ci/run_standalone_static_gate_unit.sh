@@ -100,6 +100,15 @@ run_eval() (
     python3 "${TOOLS_ROOT}/agent_tools/run_accumulated_agent_evals.py" \
       --run-id agent-canon-pr-gate --log-dir "${eval_log_dir}"
   primary_status=$?
+  if [[ "${primary_status}" -ne 0 ]]; then
+    local eval_log
+    for eval_log in "${eval_log_dir}"/*.stdout.txt "${eval_log_dir}"/*.stderr.txt; do
+      [[ -f "${eval_log}" && -s "${eval_log}" ]] || continue
+      printf 'AGENT_CANON_STATIC_EVAL_LOG_BEGIN=%s\n' "$(basename "${eval_log}")"
+      sed -n '1,160p' "${eval_log}"
+      printf 'AGENT_CANON_STATIC_EVAL_LOG_END=%s\n' "$(basename "${eval_log}")"
+    done
+  fi
   if [[ "${primary_status}" -eq 0 ]]; then
     AGENT_CANON_HOOK_ARCHIVE_DIR="${hook_archive}" \
       python3 "${TOOLS_ROOT}/agent_tools/eval_accumulation_check.py"
