@@ -49,9 +49,19 @@ Before merge/ready/close/update, read fresh remote state and confirm authority. 
 
 When an explicit request or repository policy requires status label mutation on a linked Issue, invoke the private `_github-status-lifecycle` runtime skill inside this publication boundary.
 
-`pr-processing` continues to own target resolution, fresh remote reads, write authority, API mutation, and final publication readback. The private routine owns only lifecycle classification, the desired managed-label set, safe remove/add ordering, evidence-comment completeness, concurrency stop conditions, and the exact success predicate.
+`pr-processing` owns target Issue/PR resolution, the initial fresh remote snapshot,
+write authority, transport invocation, and final publication readback. Load the
+repository's `documents/operations/issue-label-taxonomy.toml` mapping and pass it,
+the lifecycle facts, trace evidence, and PR identity to the private routine. The
+routine owns lifecycle classification, evidence admission/retry identity, ordered
+single-label operations, observable concurrency stops, and the final predicate.
 
-Do not copy its state table into queue or PR procedures. Pass the repository-defined label mapping and preserve every unrelated label. A status operation is complete only when the required evidence comment exists and fresh readback equals the desired managed-label set. Concurrent drift, partial API failure, or readback mismatch leaves publication incomplete and must be reported with the exact observed state.
+The caller consumes the typed adapter result and does not duplicate its transition
+table, evidence protocol, or success predicate. It does not use full-label
+replacement, create labels, edit/delete historical evidence, close Issues, approve
+PRs, or merge as a status side effect. Concurrent drift, partial API failure, or
+readback mismatch leaves publication incomplete and is reported with the exact
+typed state returned by the routine.
 
 Status reconciliation is conditional. Read-only inspection, ordinary review, and PR processing without an explicit Issue status requirement do not activate it.
 
