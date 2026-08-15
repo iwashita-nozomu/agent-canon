@@ -33,6 +33,7 @@ if __package__ in {None, ""}:
 
 from tools.experiments.experiment_identity import (
     ExperimentIdentity,
+    load_json_file,
     report_relative_path,
     result_relative_path,
 )
@@ -259,6 +260,15 @@ def _parse_result_identity(source_root: Path, result_dir: Path) -> ResultIdentit
     run_manifest = result_dir / "run_manifest.json"
     if os.path.lexists(run_manifest):
         _ensure_regular(run_manifest, label="run manifest")
+        manifest_payload = load_json_file(run_manifest)
+        if not isinstance(manifest_payload, dict):
+            raise RetentionError("run manifest must be a JSON object")
+        manifest_identity = ExperimentIdentity.from_dict(manifest_payload)
+        if manifest_identity != run_identity:
+            raise RetentionError(
+                "run manifest identity does not match result-dir identity: "
+                f"{manifest_identity} != {run_identity}"
+            )
         _, run_manifest_sha256 = _sha256_file(run_manifest)
     else:
         run_manifest_sha256 = None
@@ -392,9 +402,15 @@ def _manifest_bytes(
         for item in sorted(source_files, key=lambda item: item.archive_path)
     ]
     report_path = identity.report_path.relative_to(identity.source_root).as_posix() if identity.report_path else None
+    run_identity = ExperimentIdentity(
+        identity.topic,
+        identity.variant,
+        identity.run_name,
+    )
     return _canonical_json(
         {
             "append_only": True,
+            **run_identity.to_dict(),
             "archive": {
                 "compression": "gzip",
                 "gzip_filename": "",
@@ -410,10 +426,7 @@ def _manifest_bytes(
             "report": report_path,
             "report_present": report_path is not None,
             "run": {
-                "name": identity.run_name,
                 "result_dir": identity.result_relative.as_posix(),
-                "topic": identity.topic,
-                "variant": identity.variant,
             },
             "schema": "git-annex-result-retention/v1",
             "source": {

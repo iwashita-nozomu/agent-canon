@@ -21,6 +21,7 @@ from pathlib import Path
 
 import pytest
 from tools.experiments import save_experiment_result_annex as retention
+from tools.experiments.experiment_identity import ExperimentIdentity
 
 SCRIPT = Path(__file__).resolve().parents[2] / "tools" / "experiments" / "save_experiment_result_annex.py"
 GIT_ANNEX = shutil.which("git-annex")
@@ -42,7 +43,17 @@ def init_source(root: Path, *, report: bool = True) -> Path:
     """Create a committed source repository with a non-empty result."""
     result = root / "experiments" / "demo" / "result" / "formal" / "run-a"
     (result / "logs").mkdir(parents=True)
-    (result / "run_manifest.json").write_text('{"status":"ok"}\n', encoding="utf-8")
+    (result / "run_manifest.json").write_text(
+        json.dumps(
+            {
+                **ExperimentIdentity("demo", "formal", "run-a").to_dict(),
+                "status": "ok",
+            },
+            sort_keys=True,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     (result / "summary.json").write_text('{"value":1}\n', encoding="utf-8")
     script = result / "run.sh"
     script.write_text("#!/bin/sh\nprintf ok\n", encoding="utf-8")
@@ -140,6 +151,9 @@ def test_retains_layout_manifest_hashes_modes_and_clean_single_commit(tmp_path: 
     assert manifest["source"]["branch"] == "main"  # type: ignore[index]
     assert manifest["source"]["dirty_paths"] == ["source-dirty.txt"]  # type: ignore[index]
     assert manifest["source"]["run_manifest_sha256"]  # type: ignore[index]
+    assert ExperimentIdentity.from_dict(manifest) == ExperimentIdentity(
+        "demo", "formal", "run-a"
+    )
     records = {item["path"]: item for item in manifest["files"]}  # type: ignore[index]
     assert records["experiments/demo/result/formal/run-a/run.sh"]["mode"] == "executable"
     assert records["experiments/demo/result/formal/run-a/summary.json"]["sha256"] == hashlib.sha256(
@@ -163,6 +177,28 @@ def test_retains_layout_manifest_hashes_modes_and_clean_single_commit(tmp_path: 
         "experiments/demo/result/formal/run-a.tar.gz",
     )
     assert fsck.returncode == 0, fsck.stderr
+
+
+def test_rejects_mismatched_run_manifest_identity_before_annex_mutation(
+    tmp_path: Path,
+) -> None:
+    """The result path and canonical run-manifest identity must agree."""
+    source = tmp_path / "source"
+    result = init_source(source)
+    (result / "run_manifest.json").write_text(
+        json.dumps(ExperimentIdentity("demo", "formal", "run-b").to_dict()) + "\n",
+        encoding="utf-8",
+    )
+    annex = init_annex(tmp_path / "annex")
+    before = run_git(annex, "rev-parse", "HEAD").stdout.strip()
+
+    completed = run_save(source, annex, result)
+
+    assert completed.returncode == 2
+    assert "identity does not match" in completed.stderr
+    assert run_git(annex, "rev-parse", "HEAD").stdout.strip() == before
+    assert run_git(annex, "status", "--porcelain=v1", "--untracked-files=all").stdout == ""
+    assert not (annex / "experiments").exists()
 
 
 def test_report_absent_and_determinism(tmp_path: Path) -> None:
