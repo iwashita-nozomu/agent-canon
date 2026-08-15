@@ -136,6 +136,85 @@ that decision.
 1. implementation が scope に入るときだけ Codex routing を出す
 1. tool が既に check した property を `explorer` や read-only reviewer に再読解させない。subagent へ渡すのは structured tool artifact と owned finding scope で、tool output が必要な抽象を欠く場合は tool contract の不足として扱う
 
+### Local Capability Priority
+
+Local Capability Priority (LCP) の全文規則はこの節だけが所有します。LCP が
+競合する候補 operation、`issue_defer`、または `split` を含む作業として選択された
+場合だけ、既存の scope / handoff record に operation mapping を記録します。
+単純な bounded/advisory single-operation task にこの mapping を新しい universal
+gate や closeout gate として要求しません。新しい classifier、schema、state machine、
+run artifact、closeout consumer は追加しません。
+
+canonical record は、run bundle がある場合はその `work_log`/scope record、run bundle
+がなく structured handoff がある場合はその structured handoff、両方がない場合だけ
+closeout recordの順で一つだけ選びます。親 packet、Issue、closeout はこの recordを
+locatorで参照し、mappingを複製しません。既存の `requested_scope`、`work_scope`、
+`covered_surfaces`、`deferred_surfaces`、`omitted_surfaces` と Decision Sufficiency
+record は、選択した canonical recordの既存 fields として再利用します。
+
+mapping が選択された場合だけ、作業範囲の既存 record に実行順で次の項目を一行ずつ
+記録します。これは既存 record の prose/table field であり、新しい public schema では
+ありません。
+
+```text
+request_clause: <exact quote> [locator: <request contract section/line>]
+operation_id: <owner-qualified unique id>
+priority: <execution list ordinal; lower runs first>
+depends_on: <zero or more operation_id values>
+split_parent_id: <parent operation_id or none>
+split_child_id: <child operation_id or none>
+operation: <one replaceable operation and owner>
+evidence: <observed local/Pro capability or explicit absence, with locator>
+classification: mandatory|local_only|pro_capable_nonblocking
+disposition: local_execute|issue_defer|split
+state: <resulting state after the selected disposition>
+completion_evidence: <artifact, command result, local Issue, or readback>
+```
+
+mapping 内の `operation_id` は owner-qualified で一意、`depends_on` は同じ mapping
+内に存在し、priority order は topological order で cycle を持たず、同順位の候補は
+record 上の行順を維持します。split は親行と子行を ID で結び、子の行順と依存を明示
+します。request clause は原文と locator を必須とし、Pro 可否は prompt keyword や
+モデルの一般的な自己評価から導出しません。
+
+unknown は disposition 前に mapping 行にも disposition にも入れません。先に Decision Sufficiency の
+未解決 branch / `evidence_missing` として記録し、local evidence が解決するか、既存の
+明示された omitted/deferred authority が成立するまで handled/close と扱いません。
+したがって disposition は、根拠のある `mandatory`、`local_only`、または明示された
+`pro_capable_nonblocking` に対してだけ選びます。
+
+`mandatory` と `local_only` は、required owner skill が selected/activated になった
+後で `local_execute` に投入します。user must-do、現在の blocker、root-cause
+investigation、acceptance validation、Docker/devcontainer/CI、環境依存のログ取得、
+filesystem side effect、Git mutation/conflict、remote mutation/readback、PR/Issue
+integration、および後続 owner/validationを決める依存 operationもこの local routeを
+先に通します。local_execute operationの owner skillが `DEFERRED_SKILLS` 候補なら、
+先にその skill を activateし、deferred のまま実行しません。
+
+`issue_defer` は、ユーザーの明示した policy または既存の承認済み capability evidence
+により Pro-capable と確認された、非必須・非ブロッキング operation に限ります。
+docs review、analysis、explanation、read-only research など、ローカルで実行可能でも
+この条件を満たす operation は、ローカルで試してからIssueへ移す二段階にせず、分類時点
+から直接 `issue_defer` にします。local-only capability、must-do、blocker/root-cause
+investigation、acceptance validation、remote mutation/integration、およびそれらに
+必要なreadbackはこの例外に含めず、`local_execute` します。既存 `issues/open/` form の
+`issue_id`、`status`、`source`、`severity`、`problem`、`evidence`、`done` を使い、future
+operator が再開できる `required_action` と `close_condition` を必ず記録します。remote
+Issue mirrorはユーザーが明示した場合だけ既存 sync routeを使います。
+
+依存がある operationは `priority` と `depends_on` が許す順に進めます。split は
+local_executeすべき子と issue_defer できる子が同じ依頼に含まれる場合だけ使い、親子ID、
+依存順、owner、validation、completion evidenceを同じ canonical recordへ記録します。
+各 operation は `operation -> resulting state -> completion evidence` の順で完了を示し、
+退避した operation は完了ではなく durable Issue への引き渡し状態です。
+
+token削減は調査範囲を縮めません。既存 issue capsule、context packet、handoff record の
+locator を再利用して raw log の全文再掲を避けます。`DEFERRED_SKILLS` は task-routing が
+所有する後続 skill candidateであり、operationの `issue_defer` とは独立です。skill が
+deferred でも local_execute operationは先に skillをactivateして実行し、skillが active
+でも上記の明示された Pro-capable nonblocking operationだけが issue_deferできます。両者を
+結ぶ alias、schema field、route outputは追加しません。
+
 ## Validation Boundary Contract
 
 検査を選ぶ前に、対象propertyの論理的な役割を次の三つから分類します。
