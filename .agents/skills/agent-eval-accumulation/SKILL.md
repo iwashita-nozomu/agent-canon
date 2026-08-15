@@ -2,7 +2,7 @@
 name: agent-eval-accumulation
 description: "Use when accumulated AgentCanon eval evidence is missing, stale, or failing; runs registered eval producers, validates eval family accumulation, and stores evidence through the log archive instead of hand-writing reports."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"3d1fc6ff701b6bde9b3d715ad5fef69e671793dc5396aaeab467da69daf907e8"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"af8beb0df272d96baaba8c42f9847fdee665b88e9081f4a7f3732ee62d30b2f8"} -->
 
 <!--
 @dependency-start

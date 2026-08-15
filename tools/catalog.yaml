@@ -918,7 +918,7 @@ entries:
       - tools/README.md
       - documents/tools/README.md
       - documents/tools/semantic_provider_html_report.md
-      - agents/skills/html-experiment-report.md
+      - agents/skills/html-output.md
       - documents/tools/semantic_index.md
       - documents/prose-reasoning-graph/dsl-spec.md
     tests:
