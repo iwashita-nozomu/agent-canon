@@ -24,11 +24,13 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+import tools.agent_tools.fixture_spawn as fixture_spawn
 import tools.agent_tools.parent_root_side_effects as side_effects
 from tools.agent_tools import work_log, workflow_monitor
 from tools.agent_tools.fixture_spawn import (
     bootstrap_fixture_public_environment,
     record_environment,
+    record_session_from_environment,
     run_fixture_command,
 )
 from tools.agent_tools.parent_root_side_effects import (
@@ -81,6 +83,9 @@ def _build_clean_env(overrides: dict[str, str] | None = None) -> dict[str, str]:
         env.pop(key, None)
     if overrides:
         env.update(overrides)
+    for key in tuple(env):
+        if key.startswith("AGENT_CANON_SIDE_EFFECT_"):
+            env.pop(key, None)
     return env
 
 
@@ -99,20 +104,54 @@ def _authenticated_cli_env(
     invocation_script.parent.mkdir(parents=True, exist_ok=True)
     invocation_script.write_text("# authenticated CLI runner\n", encoding="utf-8")
     previous_cwd = Path.cwd()
-    os.chdir(root)
+    saved_environment = os.environ.copy()
+    clean_environment = _build_clean_env(base_env)
     try:
-        with public_session(invocation_script=invocation_script, purpose=purpose) as session:
+        os.environ.clear()
+        os.environ.update(clean_environment)
+        os.chdir(root)
+        with public_session(
+            invocation_script=invocation_script,
+            purpose=purpose,
+            independent=True,
+            cleanup_state=True,
+        ) as session:
             boundary = ParentRootSideEffectBoundary()
             env = boundary.child_environment(
                 session.attestation,
-                base_env if base_env is not None else _build_clean_env(),
+                clean_environment,
                 issue_handoff=False,
                 rebase_inherited_temp=rebase_inherited_temp,
             )
             assert "AGENT_CANON_PARENT_ROOT" not in env
+            os.chdir(previous_cwd)
+            os.environ.clear()
+            os.environ.update(saved_environment)
             yield boundary, session, env
     finally:
+        os.environ.clear()
+        os.environ.update(saved_environment)
         os.chdir(previous_cwd)
+
+
+def test_authenticated_cli_env_restores_parent_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The clean bootstrap does not leak its temporary process state."""
+    git_repo(tmp_path, remote="https://example.invalid/clean-bootstrap.git")
+    monkeypatch.setenv("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "/ambient/parent")
+    monkeypatch.setenv("AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED", "1")
+    before_environment = os.environ.copy()
+    before_cwd = Path.cwd()
+
+    with _authenticated_cli_env(tmp_path, purpose="clean-bootstrap") as (_boundary, _session, env):
+        assert os.environ == before_environment
+        assert Path.cwd() == before_cwd
+        assert env[side_effects.SIDE_EFFECT_PARENT_ROOT_ENV] != "/ambient/parent"
+        assert env[side_effects.SIDE_EFFECT_REQUIRED_ENV] == "1"
+
+    assert os.environ == before_environment
+    assert Path.cwd() == before_cwd
 
 
 def git_repo(path: Path, *, remote: str | None = None) -> None:
@@ -130,25 +169,32 @@ def _record_fixture_session(
     parent: Path, fixture: Path, monkeypatch: pytest.MonkeyPatch
 ) -> Iterator[SessionResolutionResult]:
     """Open one record result for the central fixture-direct facade tests."""
-    script = parent / ".agent-canon" / "record-runner.py"
-    script.parent.mkdir(parents=True, exist_ok=True)
-    script.write_text("# record runner\n", encoding="utf-8")
     previous_cwd = Path.cwd()
-    monkeypatch.chdir(parent)
-    try:
-        with public_session(invocation_script=script, purpose="fixture-direct-test"):
-            issuer = current_supervisor_issuer()
-            assert issuer is not None
-            child = issuer.issue_child(
-                role="record", record_id=f"fixture-record-{time.monotonic_ns()}",
-                physical_root=parent, now_mono_ns=time.monotonic_ns(),
-            )
-            environment = {
-                side_effects.SIDE_EFFECT_PARENT_ROOT_ENV: str(parent.resolve()),
-                side_effects.SIDE_EFFECT_HANDOFF_ENV: child.handoff,
-                side_effects.SIDE_EFFECT_REQUIRED_ENV: "1",
-            }
-            monkeypatch.chdir(fixture)
+    if os.environ.get(side_effects.SIDE_EFFECT_PARENT_ROOT_ENV) or os.environ.get(
+        side_effects.SIDE_EFFECT_HANDOFF_ENV
+    ):
+        monkeypatch.chdir(fixture)
+        try:
+            with record_session_from_environment() as record:
+                yield record
+        finally:
+            monkeypatch.chdir(previous_cwd)
+        return
+
+    with _authenticated_cli_env(parent, purpose="fixture-direct-test") as (_boundary, _session, _env):
+        issuer = current_supervisor_issuer()
+        assert issuer is not None
+        child = issuer.issue_child(
+            role="record", record_id=f"fixture-record-{time.monotonic_ns()}",
+            physical_root=parent, now_mono_ns=time.monotonic_ns(),
+        )
+        environment = {
+            side_effects.SIDE_EFFECT_PARENT_ROOT_ENV: str(parent.resolve()),
+            side_effects.SIDE_EFFECT_HANDOFF_ENV: child.handoff,
+            side_effects.SIDE_EFFECT_REQUIRED_ENV: "1",
+        }
+        monkeypatch.chdir(fixture)
+        try:
             record = side_effects.resolve_parent_side_effect_session_v2(
                 env=environment, observed_cwd=fixture.resolve(),
             )
@@ -156,12 +202,11 @@ def _record_fixture_session(
                 yield record
             finally:
                 record.close()
-                issuer.revoke_drain_child(
-                    child=child.child, reason="normal_exit",
-                    now_mono_ns=time.monotonic_ns(),
-                )
-    finally:
-        monkeypatch.chdir(previous_cwd)
+        finally:
+            issuer.revoke_drain_child(
+                child=child.child, reason="normal_exit",
+                now_mono_ns=time.monotonic_ns(),
+            )
 
 
 def unborn_git_repo(path: Path, *, remote: str) -> None:
@@ -493,8 +538,201 @@ def test_fixture_bootstrap_modes_preserve_enclosing_record(
                 check=False,
             )
             assert child.returncode == 0
-        with record_environment(cwd=source_cwd) as environment:
+        with bootstrap_fixture_public_environment(
+            mode="ordinary_tool", record=record, fixture_cwd=source_cwd
+        ) as environment:
             assert environment[side_effects.SIDE_EFFECT_HANDOFF_ENV]
+
+
+def test_record_environment_reuses_testrunner_record_when_inherited() -> None:
+    """The runner-provided record channel remains available to ordinary tools."""
+    if not (
+        os.environ.get(side_effects.SIDE_EFFECT_PARENT_ROOT_ENV)
+        and os.environ.get(side_effects.SIDE_EFFECT_HANDOFF_ENV)
+    ):
+        pytest.skip("requires a testrunner-inherited record channel")
+    with record_environment(cwd=Path.cwd()) as environment:
+        assert environment[side_effects.SIDE_EFFECT_HANDOFF_ENV]
+
+
+def test_fixture_bootstrap_accepts_pathlike_fixture_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The public facade accepts both concrete and os.PathLike fixture paths."""
+    git_repo(tmp_path, remote="https://example.invalid/pathlike-parent.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/pathlike-source.git")
+    git_repo(fixture, remote="https://example.invalid/pathlike-fixture.git")
+
+    class FixturePathLike:
+        def __fspath__(self) -> str:
+            return str(fixture)
+
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        with bootstrap_fixture_public_environment(
+            mode="ordinary_tool", record=record, fixture_cwd=FixturePathLike()
+        ) as environment:
+            assert environment.fixture_cwd == fixture.resolve()
+            assert environment[side_effects.SIDE_EFFECT_HANDOFF_ENV]
+
+
+def test_fixture_bootstrap_missing_invocation_cleans_local_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A missing synthetic invocation cannot strand its fixture bootstrap tree."""
+    git_repo(tmp_path, remote="https://example.invalid/missing-parent.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/missing-source.git")
+    git_repo(fixture, remote="https://example.invalid/missing-fixture.git")
+    missing = fixture / "missing-invocation.py"
+    before_environment = os.environ.copy()
+
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        before_cwd = Path.cwd()
+        with pytest.raises(ParentRootSideEffectError, match="invocation script is missing"):
+            with bootstrap_fixture_public_environment(
+                mode="synthetic_tool", record=record, fixture_cwd=fixture,
+                invocation_script=missing,
+            ):
+                raise AssertionError("missing invocation unexpectedly yielded")
+        assert Path.cwd() == before_cwd
+        assert os.environ == before_environment
+    assert not (fixture / ".agent-canon" / "fixture-bootstrap").exists()
+
+
+def test_fixture_bootstrap_environment_failure_cleans_local_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Environment construction failure still removes the local bootstrap tree."""
+    git_repo(tmp_path, remote="https://example.invalid/environment-parent.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/environment-source.git")
+    git_repo(fixture, remote="https://example.invalid/environment-fixture.git")
+
+    def fail_environment(*_args: object, **_kwargs: object) -> dict[str, str]:
+        raise RuntimeError("injected environment construction failure")
+
+    monkeypatch.setattr(fixture_spawn, "_clean_fixture_environment", fail_environment)
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        before_environment = os.environ.copy()
+        before_cwd = Path.cwd()
+        with pytest.raises(RuntimeError, match="environment construction failure"):
+            with bootstrap_fixture_public_environment(
+                mode="synthetic_tool", record=record, fixture_cwd=fixture
+            ):
+                raise AssertionError("environment failure unexpectedly yielded")
+        assert Path.cwd() == before_cwd
+        assert os.environ == before_environment
+    assert not (fixture / ".agent-canon" / "fixture-bootstrap").exists()
+
+
+def test_fixture_bootstrap_write_failure_cleans_local_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Invocation write failure still removes the local bootstrap tree."""
+    git_repo(tmp_path, remote="https://example.invalid/write-parent.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/write-source.git")
+    git_repo(fixture, remote="https://example.invalid/write-fixture.git")
+
+    def fail_write(*_args: object, **_kwargs: object) -> object:
+        raise RuntimeError("injected invocation write failure")
+
+    monkeypatch.setattr(
+        fixture_spawn.ParentRootSideEffectBoundary,
+        "write_parent_owned_file",
+        fail_write,
+    )
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        before_environment = os.environ.copy()
+        before_cwd = Path.cwd()
+        with pytest.raises(RuntimeError, match="invocation write failure"):
+            with bootstrap_fixture_public_environment(
+                mode="synthetic_tool", record=record, fixture_cwd=fixture
+            ):
+                raise AssertionError("write failure unexpectedly yielded")
+        assert Path.cwd() == before_cwd
+        assert os.environ == before_environment
+    assert not (fixture / ".agent-canon" / "fixture-bootstrap").exists()
+
+
+def test_fixture_bootstrap_session_failure_cleans_local_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Independent session failure cannot strand a clean synthetic bootstrap."""
+    git_repo(tmp_path, remote="https://example.invalid/session-parent.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/session-source.git")
+    git_repo(fixture, remote="https://example.invalid/session-fixture.git")
+
+    @contextmanager
+    def fail_session(**_kwargs: object) -> Iterator[SessionResolutionResult]:
+        raise RuntimeError("injected independent session failure")
+        yield  # pragma: no cover
+
+    monkeypatch.setattr(fixture_spawn, "public_session", fail_session)
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        before_environment = os.environ.copy()
+        before_cwd = Path.cwd()
+        with pytest.raises(RuntimeError, match="independent session failure"):
+            with bootstrap_fixture_public_environment(
+                mode="synthetic_tool", record=record, fixture_cwd=fixture
+            ):
+                raise AssertionError("session failure unexpectedly yielded")
+        assert Path.cwd() == before_cwd
+        assert os.environ == before_environment
+    assert not (fixture / ".agent-canon" / "fixture-bootstrap").exists()
+
+
+def test_fixture_bootstrap_yield_failure_cleans_local_residue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A consumer failure after yield still cleans the synthetic bootstrap."""
+    git_repo(tmp_path, remote="https://example.invalid/yield-parent.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/yield-source.git")
+    git_repo(fixture, remote="https://example.invalid/yield-fixture.git")
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        before_environment = os.environ.copy()
+        before_cwd = Path.cwd()
+        with pytest.raises(RuntimeError, match="injected yield failure"):
+            with bootstrap_fixture_public_environment(
+                mode="synthetic_tool", record=record, fixture_cwd=fixture
+            ):
+                raise RuntimeError("injected yield failure")
+        assert Path.cwd() == before_cwd
+        assert os.environ == before_environment
+    assert not (fixture / ".agent-canon" / "fixture-bootstrap").exists()
+
+
+def test_fixture_bootstrap_refreshes_product_expiry_before_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Product mode rechecks expiry after fixture validation and before spawn."""
+    git_repo(tmp_path, remote="https://example.invalid/expiry-parent.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/expiry-source.git")
+    git_repo(fixture, remote="https://example.invalid/expiry-fixture.git")
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        expires = record.record.expires_mono_ns
+        before_cwd = Path.cwd()
+        with pytest.raises(SessionResolutionError, match="FIXTURE_DIRECT_SESSION_EXPIRED"):
+            with bootstrap_fixture_public_environment(
+                mode="product_fixture", record=record, fixture_cwd=fixture,
+                argv=(sys.executable, "-c", "raise SystemExit(99)"),
+                now_mono_ns=expires - 1,
+                clock=lambda: expires,
+            ):
+                raise AssertionError("expired product unexpectedly yielded")
+        assert Path.cwd() == before_cwd
+    assert not (fixture / ".agent-canon" / "fixture-direct").exists()
 
 
 def test_fixture_direct_adapter_rejects_missing_record_before_spawn(

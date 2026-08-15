@@ -133,9 +133,13 @@ def _validated_fixture(
 ) -> Iterator[tuple[Path, int, int, tuple[Path, int, int]]]:
     """Validate a nested Git root while preserving the authenticated source CWD."""
     source = _physical_identity(Path.cwd())
-    if not isinstance(fixture_cwd, Path):
-        raise ParentRootSideEffectError(ParentRootReject.INPUT_INVALID, "fixture_cwd is invalid")
-    fixture_path = fixture_cwd.resolve(strict=True)
+    try:
+        fixture_path = Path(fixture_cwd)
+    except (TypeError, ValueError, OSError) as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.INPUT_INVALID, "fixture_cwd is invalid"
+        ) from exc
+    fixture_path = fixture_path.resolve(strict=True)
     try:
         os.chdir(fixture_path)
         identity = validate_fixture_root(
@@ -175,8 +179,12 @@ def bootstrap_fixture_public_environment(
     normalized_mode = aliases.get(str(mode), str(mode))
     if normalized_mode not in {"ordinary_tool", "product_fixture", "synthetic_tool"}:
         raise ParentRootSideEffectError(ParentRootReject.INPUT_INVALID, "fixture mode is invalid")
-    if not isinstance(fixture_cwd, Path):
-        raise ParentRootSideEffectError(ParentRootReject.INPUT_INVALID, "fixture_cwd is invalid")
+    try:
+        fixture_path = Path(fixture_cwd)
+    except (TypeError, ValueError, OSError) as exc:
+        raise ParentRootSideEffectError(
+            ParentRootReject.INPUT_INVALID, "fixture_cwd is invalid"
+        ) from exc
     if record is not None and type(record) is not SessionResolutionResult:
         raise ParentRootSideEffectError(ParentRootReject.HANDOFF_INVALID, "record is invalid")
     command = None if argv is None else tuple(argv)
@@ -197,7 +205,7 @@ def bootstrap_fixture_public_environment(
 
     with record_scope() as resolved_record:
         try:
-            with _validated_fixture(resolved_record, fixture_cwd, now_mono_ns=now) as (
+            with _validated_fixture(resolved_record, fixture_path, now_mono_ns=now) as (
                 fixture_root, _fixture_dev, _fixture_ino, source,
             ):
                 if normalized_mode == "ordinary_tool":
@@ -214,11 +222,12 @@ def bootstrap_fixture_public_environment(
                 if normalized_mode == "product_fixture":
                     os.chdir(fixture_root)
                     try:
+                        product_now = time.monotonic_ns() if clock is None else clock()
                         receipt = run_fixture_command(
                             record=resolved_record,
                             fixture_cwd=fixture_root,
                             argv=command or (),
-                            now_mono_ns=now,
+                            now_mono_ns=product_now,
                             clock=clock,
                         )
                     finally:
@@ -229,32 +238,32 @@ def bootstrap_fixture_public_environment(
                     return
 
                 boundary = ParentRootSideEffectBoundary()
+                saved_environment = os.environ.copy()
                 local_receipt = boundary.create_parent_owned_temp_directory(
                     resolved_record.attestation,
                     fixture_root / ".agent-canon" / "fixture-bootstrap",
                     "fixture-bootstrap-local",
                     "fixture-bootstrap",
                 )
-                local_root = local_receipt.physical_path
-                clean_environment = _clean_fixture_environment(
-                    resolved_record, local_root, base_env
-                )
-                script = invocation_script or (local_root / "synthetic-tool.py")
-                script = script if script.is_absolute() else fixture_root / script
-                if invocation_script is None:
-                    boundary.write_parent_owned_file(
-                        resolved_record.attestation,
-                        script,
-                        b"# synthetic fixture tool\n",
-                        "fixture-bootstrap-invocation",
-                    )
-                elif not script.is_file():
-                    raise ParentRootSideEffectError(
-                        ParentRootReject.INPUT_INVALID,
-                        "synthetic invocation script is missing",
-                    )
-                saved_environment = os.environ.copy()
                 try:
+                    local_root = local_receipt.physical_path
+                    clean_environment = _clean_fixture_environment(
+                        resolved_record, local_root, base_env
+                    )
+                    script = invocation_script or (local_root / "synthetic-tool.py")
+                    script = script if script.is_absolute() else fixture_root / script
+                    if invocation_script is None:
+                        boundary.write_parent_owned_file(
+                            resolved_record.attestation,
+                            script,
+                            b"# synthetic fixture tool\n",
+                            "fixture-bootstrap-invocation",
+                        )
+                    elif not script.is_file():
+                        raise ParentRootSideEffectError(
+                            ParentRootReject.INPUT_INVALID,
+                            "synthetic invocation script is missing",
+                        )
                     os.environ.clear()
                     os.environ.update(clean_environment)
                     os.chdir(fixture_root)
@@ -268,6 +277,8 @@ def bootstrap_fixture_public_environment(
                             independent_session, clean_environment
                         )
                         _restore_source_cwd(source)
+                        os.environ.clear()
+                        os.environ.update(saved_environment)
                         yield FixturePublicEnvironment(
                             "synthetic_tool", resolved_record, fixture_root,
                             environment, session=independent_session,
@@ -276,11 +287,26 @@ def bootstrap_fixture_public_environment(
                     os.environ.clear()
                     os.environ.update(saved_environment)
                     _restore_source_cwd(source)
-                    boundary.remove_parent_owned_tree(
-                        resolved_record.attestation,
-                        local_receipt,
-                        "fixture-bootstrap-local-cleanup",
-                    )
+                    cleanup_error: BaseException | None = None
+                    try:
+                        boundary.remove_parent_owned_tree(
+                            resolved_record.attestation,
+                            local_receipt,
+                            "fixture-bootstrap-local-cleanup",
+                        )
+                    except BaseException as exc:
+                        cleanup_error = exc
+                    try:
+                        boundary.remove_empty_parent_owned_directory(
+                            resolved_record.attestation,
+                            fixture_root / ".agent-canon" / "fixture-bootstrap",
+                            "fixture-bootstrap-root-cleanup",
+                        )
+                    except BaseException as exc:
+                        if cleanup_error is None:
+                            cleanup_error = exc
+                    if cleanup_error is not None:
+                        raise cleanup_error
         finally:
             _restore_source_cwd(_physical_identity(previous_cwd))
 
