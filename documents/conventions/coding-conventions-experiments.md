@@ -39,7 +39,7 @@ C++ experiment target を、build、run、result、report の責務に分けて�
 - native C++ experiment source と target wiring は `cpp/experiments/` に置きます。
 - topic ごとに `README.md`、`run.py`、`cases.py`、`config.yaml`、`visualize.ipynb`、`result/` を基準にします。
 - `experiments/<topic>/README.md` は、その topic の実験内容、問い、比較対象、標準コマンド、設定正本、可視化 notebook、出力 schema、run_name 規則を持つ正本 entrypoint です。
-- 新規 topic は実験名を固定し、`python3 tools/experiments/create_experiment_topic.py <topic>` を実行します。create tool が `experiments/<topic>/` の scaffold、`README.md`、`provenance.toml`、registry entry を一括配置します。その後、`run.py` の `main::main`、`cases.py`、`config.yaml`、`visualize.ipynb`、`README.md` の順で編集します。
+- 新規 topic は実験名を固定し、`python3 -m tools.experiments.create_experiment_topic <topic>` を実行します。create tool が `experiments/<topic>/` の scaffold、`README.md`、`provenance.toml`、registry entry を一括配置します。その後、`run.py` の `main::main`、`cases.py`、`config.yaml`、`visualize.ipynb`、`README.md` の順で編集します。
 - 可視化は `experiments/<topic>/visualize.ipynb` の Jupyter notebook に置きます。notebook は結果確認と図表化の入口であり、正式 run の起動、細かな test、設定正本の置き場にしません。
 - topic の正本 entrypoint と smoke / formal command は `experiments/registry.toml` に集約します。
 - native target の project entrypoint は `cpp/CMakeLists.txt`、aggregate target は
@@ -47,11 +47,13 @@ C++ experiment target を、build、run、result、report の責務に分けて�
 - managed run は exact `experiments/registry.toml` を必須 source membership として
   freeze します。registry 欠落を optional 扱いせず、別名 registry や live source
   command へ fallback しません。
-- 1 回の run の report は `experiments/report/<run_name>.md` に置きます。
+- 1 回の run の report は `experiments/report/<topic>/<variant>/<run_name>.md` に置きます。
+- run identity は `(topic, variant, run_name)` の ordered tuple とし、各 manifest は
+  `agentcanon.experiment-run-identity/v2` の nested `identity` object を一つだけ持ちます。
 - 複数 run をまたぐ要約や知見は `notes/experiments/` や `notes/themes/` に置きます。
 - C++ native target の build は `cmake --build "$ROOT/build/cpp/<profile>" --target
   cpp-experiments`、run は build 済み executable から lifecycle-owned result root へ行います。
-- server 上の formal run では `result/<run_name>/run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を残します。topic 固有の追加 stdout / stderr、tool log、diagnostic log は `result/<run_name>/logs/` に置きます。
+- server 上の formal run では `result/<variant>/<run_name>/run_manifest.json`、`eval_manifest.json`、`artifact_manifest.json`、`command.json`、`environment.json`、`source_snapshot.json`、`config.json`、`config_source.yaml`、`run.log`、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log` を残します。topic 固有の追加 stdout / stderr、tool log、diagnostic log は `result/<variant>/<run_name>/logs/` に置きます。
 
 ## 3. 実行原則
 
@@ -61,10 +63,10 @@ C++ experiment target を、build、run、result、report の責務に分けて�
 - 比較条件は run 開始前に固定します。
 - 実験設定の checked-in 正本は `experiments/<topic>/config.yaml` に置きます。
 - 実験設定は Python object の暗黙状態ではなく、YAML で管理し、run 開始時に再現可能な artifact として snapshot します。
-- formal run では `result/<run_name>/config.json` と `result/<run_name>/config_source.yaml` を必須 artifact とし、seed、case 範囲、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象を run 開始前に辿れるようにします。
+- formal run では `result/<variant>/<run_name>/config.json` と `result/<variant>/<run_name>/config_source.yaml` を必須 artifact とし、seed、case 範囲、timeout、dtype、backend、worker 数、allocator、feature flag、比較対象を run 開始前に辿れるようにします。
 - C++ native run は `--run-name`、`--config`、`--result-root` を lifecycle adapter から受け取り、
-  `experiments/<topic>/result/<run_name>/` に evidence を書きます。
-- 各 run は `result/<run_name>/logs/` を持ちます。top-level `run.log` は managed runner の統合ログとして残し、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、topic 固有の追加ログは `logs/` 配下へ分けます。
+  `experiments/<topic>/result/<variant>/<run_name>/` に evidence を書きます。
+- 各 run は `result/<variant>/<run_name>/logs/` を持ちます。top-level `run.log` は managed runner の統合ログとして残し、`logs/startup.jsonl`、`logs/stdout.log`、`logs/stderr.log`、topic 固有の追加ログは `logs/` 配下へ分けます。
 - 巨大な生成物や raw ログを `main` の入口文書へ混ぜません。
 - main server host で実行する run は、topic README に exact command と wrapper の使い方を明記します。
 - 実験実行コマンドは project `Makefile` に用意します。長い `python3 ...` command を README や chat だけに残して正式手順にしません。
@@ -85,7 +87,7 @@ C++ experiment target を、build、run、result、report の責務に分けて�
 
 - 実験 script は `--config <path>` 引数で、runner が生成した `config.json` を読めるようにします。
 - `experiments/<topic>/config.yaml` は human-authored な設定正本です。default 値は `config.yaml`、`config.json`、`config_source.yaml`、`run_manifest.json` から辿れる形にします。
-- `tools/experiments/run_managed_experiment.py` を使う run では、runner が `result/<run_name>/config.json` と `result/<run_name>/config_source.yaml` を生成し、`EXPERIMENT_CONFIG_PATH` と `{config_path}` placeholder で inner command に渡します。
+- `tools/experiments/run_managed_experiment.py` を使う run では、runner が `result/<variant>/<run_name>/config.json` と `result/<variant>/<run_name>/config_source.yaml` を生成し、`EXPERIMENT_CONFIG_PATH` と `{config_path}` placeholder で inner command に渡します。
 - YAML を正本にする topic では、`experiments/<topic>/config.yaml` を編集し、runner が run 用 snapshot を保存します。`run_manifest.json` から設定正本と run 用 snapshot を辿れるようにします。
 - `experiments/registry.toml` の `smoke_inner_command` と `formal_inner_command` は `{config_path}` を含めます。
 - `summary.json` には、少なくとも `config_path` または config digest / config key list を残します。
@@ -99,16 +101,16 @@ C++ experiment target を、build、run、result、report の責務に分けて�
 .PHONY: experiment-check experiment-smoke experiment-formal
 
 experiment-check:
-  python3 tools/ci/check_experiment_registry.py
+  python3 -m tools.ci.check_experiment_registry
 
 experiment-smoke:
-  python3 tools/experiments/run_managed_experiment.py \
+  python3 -m tools.experiments.run_managed_experiment \
     --topic $(TOPIC) \
     --variant smoke \
     --use-registered-command smoke
 
 experiment-formal:
-  python3 tools/experiments/run_managed_experiment.py \
+  python3 -m tools.experiments.run_managed_experiment \
     --topic $(TOPIC) \
     --variant formal \
     --use-registered-command formal

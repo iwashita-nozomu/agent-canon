@@ -23,7 +23,6 @@
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime
 from pathlib import Path
 
 from artifact_io import (
@@ -39,13 +38,13 @@ from artifact_schema import (
     CONFIG_SNAPSHOT_NAME,
     ENVIRONMENT_SNAPSHOT_NAME,
     FAILURE_EVIDENCE_NAME,
+    PROVENANCE_SNAPSHOT_NAME,
     RESULT_CASES_NAME,
     RESULT_MANIFEST_NAME,
     RESULT_SUMMARY_NAME,
-    PROVENANCE_SNAPSHOT_NAME,
-    RunState,
     VISUALIZATION_STATUS_NAME,
     CompletionProvenance,
+    RunState,
     RunSummary,
 )
 from case_execution import execute_case, registry_failure
@@ -55,40 +54,21 @@ from visualization import (
     write_visualization_not_requested_status,
 )
 
-DEFAULT_RUN_NAME_PREFIX = "run"
-
-
-def compact_timestamp() -> str:
-    """
-    実験の managed run name 用の compact UTC 値を生成します.
-
-    責務は run identity の timestamp 部分だけを生成することです。副作用はなく、UTC と
-    caller/scheduler provenance の境界を変更しません。
-
-    Returns:
-        topic-local result directory name に使える compact UTC timestamp。
-    """
-    return datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
-
 
 def resolve_run_dir() -> Path:
     """
-    実行 caller 指定または timestamped output directory を選択します.
+    Resolve the canonical result directory supplied by the producer.
 
-    `EXPERIMENT_RUN_DIR` を優先し、未指定時だけ topic-local result path を選びます。
-    resource admission と GPU visibility はここで決めません。
+    `EXPERIMENT_RUN_DIR` を producer が必ず供給します。resource admission と GPU
+    visibility はここで決めません。
 
     Returns:
         この invocation が選択した absolute result directory。
     """
     raw_run_dir = os.environ.get("EXPERIMENT_RUN_DIR", "")
-    if raw_run_dir:
-        return Path(raw_run_dir).resolve()
-    return (
-        Path(__file__).resolve().parent
-        / "result"
-        / f"{DEFAULT_RUN_NAME_PREFIX}_{compact_timestamp()}"
-    )
+    if not raw_run_dir:
+        raise RuntimeError("managed_runner_required=explicit EXPERIMENT_RUN_DIR")
+    return Path(raw_run_dir).resolve()
 
 
 def load_cases() -> tuple[CaseSpec, ...]:
@@ -297,6 +277,8 @@ def require_managed_runner_route() -> None:
         raise RuntimeError(
             "managed_runner_required=tools/experiments/run_managed_experiment.py"
         )
+    if not os.environ.get("EXPERIMENT_VARIANT", ""):
+        raise RuntimeError("managed_runner_required=explicit EXPERIMENT_VARIANT")
 
 
 def main() -> int:

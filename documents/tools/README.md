@@ -405,10 +405,10 @@ python3 tools/oop/cpp/rule_inventory.py --format markdown
 - `tools/bin/agent-canon python-algorithm-contract-check`
   - Python AST を一度 JSON として抽出し、Rust 側で `algorithm_module_protocol` module の literal `__all__`、standard public surface、callable `Algorithm`、nested ownership、concrete `Info` schema、protocol-only import、syntax diagnostics、fnmatch 方式の `--exclude` を検査します。text/JSON artifact と exit status は同じ canonical route から出力し、fixture は `tests/fixtures/python_algorithm_contract/`、CLI parity test は `rust/agent-canon/tests/python_algorithm_contract_cli.rs` にあります。
 - `tools/experiments/update_latest_result.py`
-  - experiment result root の `LATEST.json` と `LATEST.md` を更新し、最新 run、summary、manifest、visual report の入口を固定します。
+  - `experiments/<topic>/result/<variant>/LATEST.json` と `LATEST.md` を更新し、選択した variant 内の最新 run、summary、manifest、visual report の入口を固定します。`python3 -m tools.experiments.update_latest_result experiments/<topic>/result --variant <variant>` のように variant を必ず指定します。
 - `tools/experiments/publish_result_branch.py`
-  - `main` などの source checkout で作成した `experiments/<topic>/result/<run_name>/` と `experiments/report/<run_name>.md` を、checkout を切り替えず `experiment-results/<topic>` などの result branch へ保存します。
-  - 標準形は `python3 tools/experiments/publish_result_branch.py --result-dir experiments/<topic>/result/<run_name> --branch experiment-results/<topic>` です。remote へ保存する場合だけ `--push` を足します。
+  - `main` などの source checkout で作成した `experiments/<topic>/result/<variant>/<run_name>/` と `experiments/report/<topic>/<variant>/<run_name>.md` を、checkout を切り替えず `experiment-results/<topic>/<variant>` などの result branch へ保存します。
+  - 標準形は `python3 -m tools.experiments.publish_result_branch --variant <variant> --result-dir experiments/<topic>/result/<variant>/<run_name> --branch experiment-results/<topic>/<variant>` です。remote へ保存する場合だけ `--push` を足します。
 - `tools/push_origin.sh`
   - 旧 shell push 実装の退役入口です。GitHub publish / PR 作業は `tools/agent_tools/github_publish.py` を使います。
 

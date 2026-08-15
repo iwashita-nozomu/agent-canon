@@ -123,8 +123,11 @@ Make target の両方を持ちます。
 - Python entrypoint
   - `experiments/<topic>/run.py`
   - `--config experiments/<topic>/config.yaml`
-  - `--run-dir experiments/<topic>/result/<run_name>`
+  - `--run-dir experiments/<topic>/result/<variant>/<run_name>`
   - 必要なら `--limit`、`--site`、`--day` などの入力範囲指定
+- run identity は `(topic, variant, run_name)` の ordered tuple とし、
+  `agentcanon.experiment-run-identity/v2` の nested `identity` object を
+  request/manifest/report/pointer の共通 codec として使います。
 - checked-in config
   - `experiments/<topic>/config.yaml`
   - worker 数、case 範囲、backend、dtype、timeout、allocator、feature flag、比較対象をここへ集約
@@ -142,7 +145,7 @@ topic README には、少なくとも次を書きます。
 - config 正本の path
 - smoke / formal の Make command
 - 代表的な direct single-case command
-- 出力先の `result/<run_name>/`
+- 出力先の `result/<variant>/<run_name>/`
 - 主要 artifact の一覧
 - report / notebook を再生成する command
 

@@ -24,7 +24,7 @@ managed run → result/failure → interpretation → retention/cleanup の順�
 - purpose: 実験の判断と再現可能な証拠を一つの topic contract に固定する。
 - intended reader and decision: 実験設計者、実行担当者、reviewer、保守者。
 - what this document contains: plan、複数案、algorithm contract、必要十分 oracle、resource/env/result provenance、failure semantics。
-- canonical source / generated surface: この README と `provenance.toml` が topic source、`result/<run-id>/` は run-local result。
+- canonical source / generated surface: この README と `provenance.toml` が topic source、`result/<variant>/<run-id>/` は run-local result。
 - owner boundary: orchestration、case model/execution、metrics、visualization、artifact schema/I/O の OOP/type 境界を分ける。
 - implementation map: `run.py` は入口、`case_model.py` は CaseSpec/CaseResult、`case_execution.py` は worker/failure、`artifact_schema.py` は schema、`artifact_io.py` は atomic publication/manifest、`visualization.py` は notebook consumer を所有する。
 - required readback: managed command、config snapshot、resource admission、result manifest、docs formatter/readback。
@@ -63,7 +63,7 @@ run/result provenance、失敗結果の受理条件、再現性、artifact reten
 - `visualization.py`: optional notebook consumer と visualization status artifact。
 - `config.yaml`: checked-in topic設定の正本。
 - `visualize.ipynb`: run artifactを読む可視化 notebook。
-- `result/`: `result/<run_name>/` ごとの run artifact とログ。
+- `result/`: `result/<variant>/<run_name>/` ごとの run artifact とログ。
 
 ## Scaffold structure
 
@@ -105,7 +105,7 @@ experiments/<topic>/
 `README.md` / `provenance.toml` を同じ生成routeで作成します。
 
 ```bash
-python3 tools/experiments/create_experiment_topic.py <topic>
+python3 -m tools.experiments.create_experiment_topic <topic>
 ```
 
 topic作成後の編集順は `run.py`、`cases.py`、`config.yaml`、`visualize.ipynb`、
@@ -217,7 +217,7 @@ result state は `incomplete` / `success` / `failed` / `blocked` の構造化値
 `failure_evidence`、`accepted_failure_reason`、`preserved_artifacts`、`close_condition`、
 `validation_oracle` は、成功・失敗・blocked のいずれでも省略しません。
 
-各 run は `result/<run-id>/` に immutable な snapshot と manifest を保存し、README の
+各 run は `result/<variant>/<run-id>/` に immutable な snapshot と manifest を保存し、README の
 provenance tableから追跡できるようにします。
 
 ## Run Contract
@@ -227,7 +227,7 @@ topic `run.py` を直接起動せず、必ず managed runner を入口にしま�
 判定に合わせた正式な手動commandは次のとおりです。
 
 ```bash
-python3 tools/experiments/run_managed_experiment.py \
+python3 -m tools.experiments.run_managed_experiment \
   --topic <topic> \
   --variant formal \
   -- \
@@ -238,7 +238,7 @@ python3 tools/experiments/run_managed_experiment.py \
   canonical entrypointであることを確認する。
 - runnerが `EXPERIMENT_RUN_DIR`、`EXPERIMENT_RUN_MANIFEST`、config snapshot、command/environment/source
   manifest、stdout/stderr/startup logをmanaged childへ渡し、topic `main()` は引数なしで実行する。
-- topic `run.py` は `result/<run_name>/` を作成し、少なくとも `summary.json`、`cases.jsonl`、
+- topic `run.py` は `result/<variant>/<run_name>/` を作成し、少なくとも `summary.json`、`cases.jsonl`、
   `config_snapshot.json`、`environment.json`、`artifact-manifest.json`、
   `visualization-status.json`、topic-specific artifact、必要な `logs/` を atomic に書き出す。
   失敗または空 case では `failure-evidence.json` も保存する。notebookはmanaged childのrun
