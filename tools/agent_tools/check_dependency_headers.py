@@ -5,6 +5,7 @@
 # upstream design ../../templates/agents/closeout_gate.md closeout requires dependency evidence
 # upstream design ../../documents/design/dependency-manifest-design.md dependency manifest DSL design
 # upstream design ../../documents/design/dependency-contract-kinds.toml registered dependency header contract kinds
+# upstream implementation ./surface_manifest.py resolves canonical parent projection bindings
 # downstream implementation ./check_dependency_header_format.sh validates manifest syntax
 # downstream implementation ../../tests/agent_tools/test_check_dependency_headers.py verifies changed-file checker
 # @dependency-end
@@ -25,10 +26,8 @@ except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 compatibility
     import tomli as tomllib  # type: ignore[no-redef]
 
 try:
-    from .graph_client import GraphClient, GraphClientError
     from .surface_manifest import load_manifest, normalized_snapshot
 except ImportError:  # pragma: no cover - direct CLI execution
-    from graph_client import GraphClient, GraphClientError
     from surface_manifest import load_manifest, normalized_snapshot
 
 CHECKABLE_SUFFIXES = {
@@ -161,7 +160,10 @@ def matches_declared_surface(relative: str, patterns: Sequence[str]) -> bool:
     return any(
         relative == pattern
         or fnmatch.fnmatchcase(relative, pattern)
-        or (pattern.endswith("/**") and relative.startswith(pattern[:-3].rstrip("/") + "/"))
+        or (
+            pattern.endswith("/**")
+            and relative.startswith(pattern[:-3].rstrip("/") + "/")
+        )
         for pattern in patterns
     )
 
@@ -172,20 +174,6 @@ def repo_relative(root: Path, path: Path) -> str:
         return path.resolve().relative_to(root.resolve()).as_posix()
     except ValueError:
         return path.as_posix()
-
-
-def path_is_repository_scoped(root: Path, path: Path) -> bool:
-    """Return whether graph facts can canonically identify this source path."""
-    if not (
-        (root / ".git").exists()
-        or (root / "vendor" / "agent-canon" / ".git").exists()
-    ):
-        return False
-    try:
-        path.resolve().relative_to(root.resolve())
-        return True
-    except ValueError:
-        return False
 
 
 def is_binary(path: Path) -> bool:
@@ -318,43 +306,27 @@ def contract_kind_findings(root: Path, path: Path, allowed_kinds: set[str]) -> l
     return []
 
 
-def graph_manifest_facts(root: Path) -> tuple[dict[str, dict[str, object]], list[str]]:
-    """Read manifest facts from one fresh graph snapshot."""
-    try:
-        client = GraphClient(root)
-        response = client.query(relation="all", direction="both", all_nodes=True)
-        if response.status != "fresh" or response.exit_code != 0:
-            return {}, [
-                "graph snapshot is not fresh; run the canonical graph build before "
-                "consuming dependency-header facts"
-            ]
-        nodes = response.payload.get("nodes")
-        if not isinstance(nodes, list):
-            return {}, ["graph query omitted its canonical node snapshot"]
-        facts: dict[str, dict[str, object]] = {}
-        for raw_node in nodes:
-            if not isinstance(raw_node, dict):
-                return {}, ["graph query returned a malformed node"]
-            path = raw_node.get("path")
-            payload = raw_node.get("payload")
-            if not isinstance(path, str) or not isinstance(payload, dict):
-                return {}, ["graph query returned an incomplete source node"]
-            facts[path] = payload
-        return facts, []
-    except GraphClientError as error:
-        return {}, [f"graph snapshot unavailable: {error}"]
-
-
 def normalized_surface_bindings(root: Path) -> tuple[tuple[tuple[str, str], ...], list[str]]:
     """Return manifest-owned projection bindings without a second TOML parser."""
-    manifest_path = root / "vendor/agent-canon" / "documents/runtime/shared-runtime-surfaces.toml"
+    manifest_path = (
+        root
+        / "vendor"
+        / "agent-canon"
+        / "documents"
+        / "runtime"
+        / "shared-runtime-surfaces.toml"
+    )
     if not manifest_path.is_file():
         # Standalone fixtures and ordinary parent files have no projection map;
-        # graph validation can still consume their canonical path directly.
+        # source validation can consume their repository-relative path directly.
         return (), []
     try:
         snapshot = normalized_snapshot(
-            load_manifest(root, "vendor/agent-canon", "documents/runtime/shared-runtime-surfaces.toml")
+            load_manifest(
+                root,
+                "vendor/agent-canon",
+                "documents/runtime/shared-runtime-surfaces.toml",
+            )
         )
     except (OSError, ValueError) as error:
         return (), [f"surface manifest snapshot unavailable: {error}"]
@@ -367,10 +339,9 @@ def normalized_surface_bindings(root: Path) -> tuple[tuple[tuple[str, str], ...]
     for raw_entry in entries:
         if not isinstance(raw_entry, dict):
             return (), ["surface manifest normalized entry is malformed"]
-        entry = raw_entry
-        path = entry.get("path")
-        mode = entry.get("mode")
-        source = entry.get("source")
+        path = raw_entry.get("path")
+        mode = raw_entry.get("mode")
+        source = raw_entry.get("source")
         if not all(isinstance(value, str) for value in (path, mode, source)):
             return (), ["surface manifest normalized entry has invalid binding fields"]
         if mode not in {"symlink", "copy"} or not source:
@@ -389,30 +360,40 @@ def resolve_surface_binding(relative: str, bindings: Sequence[tuple[str, str]]) 
     return relative
 
 
-def graph_contract_kind_findings(
+def canonical_manifest_source(
+    root: Path,
+    path: Path,
+    surface_bindings: Sequence[tuple[str, str]],
+) -> tuple[Path | None, str | None]:
+    """Resolve one selected view to its tracked canonical source without graph state."""
+    relative = repo_relative(root, path)
+    canonical_relative = resolve_surface_binding(relative, surface_bindings)
+    candidate = (root / canonical_relative).resolve(strict=False)
+    try:
+        candidate.relative_to(root.resolve())
+    except ValueError:
+        return None, f"{relative}: canonical dependency source escapes repository root"
+    if not candidate.is_file():
+        return None, f"{canonical_relative}: canonical dependency source is missing"
+    if candidate.is_symlink() or is_binary(candidate):
+        return None, f"{canonical_relative}: canonical dependency source is not readable text"
+    return candidate, None
+
+
+def source_contract_kind_findings(
     root: Path,
     path: Path,
     allowed_kinds: set[str],
-    facts: dict[str, dict[str, object]],
     surface_bindings: Sequence[tuple[str, str]],
 ) -> list[str]:
-    """Validate a graph-owned manifest fact without reparsing the source file."""
-    relative = repo_relative(root, path)
-    canonical_path = resolve_surface_binding(relative, surface_bindings)
-    payload = facts.get(canonical_path)
-    if payload is None or payload.get("manifest_present") is not True:
-        owner_path = canonical_path if canonical_path != relative else relative
-        return [f"{owner_path}: missing top dependency manifest block"]
-    contract_kind = payload.get("contract_kind")
-    if not isinstance(contract_kind, str) or not contract_kind:
-        return [f"{relative}: dependency manifest contract kind is absent from graph snapshot"]
-    if contract_kind not in allowed_kinds:
-        return [
-            f"{relative}: unregistered dependency contract kind '{contract_kind}'; "
-            f"fix: use an existing allowed_kinds entry from {contract_registry_path(root).as_posix()} "
-            "or update the registry with review"
-        ]
-    return []
+    """Validate manifest presence and contract kind directly from canonical source."""
+    source, error = canonical_manifest_source(root, path, surface_bindings)
+    if error is not None:
+        return [error]
+    assert source is not None
+    if not has_dependency_manifest(source):
+        return [f"{repo_relative(root, source)}: missing top dependency manifest block"]
+    return contract_kind_findings(root, source, allowed_kinds)
 
 
 def request_paths(root: Path, args: argparse.Namespace) -> list[Path]:
@@ -434,7 +415,7 @@ def main() -> int:
     args = build_parser().parse_args()
     root = Path(args.root).resolve()
     # ``--changed`` intentionally takes precedence over positional paths for
-    # compatibility with the original CLI.  No-path mode intentionally follows
+    # compatibility with the original CLI. No-path mode intentionally follows
     # the changed/untracked route to avoid an implicit full-repository over-check.
     try:
         paths = request_paths(root, args)
@@ -453,36 +434,21 @@ def main() -> int:
         )
         return 1
 
-    repository_paths: list[Path] = []
-    for path in paths:
-        resolved = path if path.is_absolute() else root / path
-        if not should_check(root, resolved):
-            continue
-        if path_is_repository_scoped(root, resolved):
-            repository_paths.append(resolved)
-            continue
-        if not has_dependency_manifest(resolved):
-            findings.append(f"{repo_relative(root, resolved)}: missing top dependency manifest block")
-            continue
-        findings.extend(contract_kind_findings(root, resolved, allowed_kinds))
-
-    surface_bindings: tuple[tuple[str, str], ...] = ()
-    if repository_paths:
-        surface_bindings, surface_findings = normalized_surface_bindings(root)
-        findings.extend(surface_findings)
-        graph_facts, graph_findings = graph_manifest_facts(root)
-        findings.extend(graph_findings)
-        if not graph_findings:
-            for resolved in repository_paths:
-                findings.extend(
-                    graph_contract_kind_findings(
-                        root,
-                        resolved,
-                        allowed_kinds,
-                        graph_facts,
-                        surface_bindings,
-                    )
+    surface_bindings, surface_findings = normalized_surface_bindings(root)
+    findings.extend(surface_findings)
+    if not surface_findings:
+        for path in paths:
+            resolved = path if path.is_absolute() else root / path
+            if not should_check(root, resolved):
+                continue
+            findings.extend(
+                source_contract_kind_findings(
+                    root,
+                    resolved,
+                    allowed_kinds,
+                    surface_bindings,
                 )
+            )
 
     if findings:
         print("DEPENDENCY_HEADERS=fail")
