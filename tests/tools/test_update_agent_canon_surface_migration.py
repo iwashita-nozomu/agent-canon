@@ -15,6 +15,7 @@ from __future__ import annotations
 import importlib.util
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -278,6 +279,142 @@ class SurfaceMigrationTest(unittest.TestCase):
         """Write a file for the fixture."""
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
+
+    def add_regular_surface(self, root: Path, path: str, source: str | None = None) -> None:
+        """Add one regular-path contract to the fixture's source manifest."""
+        manifest = root / "vendor" / "agent-canon" / "documents" / "runtime" / "shared-runtime-surfaces.toml"
+        manifest_text = manifest.read_text(encoding="utf-8")
+        if path == ".vscode":
+            manifest_text = manifest_text.replace('  ".vscode",\n', "")
+        entry = [
+            "",
+            "[[surface]]",
+            f'path = "{path}"',
+            'mode = "regular"',
+            'projection_producer = "template-or-derived-repo"',
+            'projection_kind = "active_contract"',
+        ]
+        if source is not None:
+            entry.append(f'source = "{source}"')
+        manifest.write_text(
+            manifest_text + "\n".join(entry) + "\n",
+            encoding="utf-8",
+        )
+
+    def regular_fixture(self, path: str, source: str | None = "seed/regular.txt") -> Path:
+        """Create a fixture with one regular-path contract and optional seed."""
+        root = self.clone_parent_fixture()
+        self.add_regular_surface(root, path, source)
+        if source is not None:
+            self.write_file(
+                root / "vendor" / "agent-canon" / source,
+                "canonical regular seed\n",
+            )
+        return root
+
+    def assert_regular_collision_preserved(self, path: str, create_collision) -> tuple[Path, Path]:
+        """A non-regular target fails and remains byte/identity-preserved."""
+        root = self.regular_fixture(path)
+        target = root / path
+        create_collision(target)
+        before = os.lstat(target)
+        result = self.run_sync(root, "link-root")
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"regular[{path}]=collision", result.stderr)
+        after = os.lstat(target)
+        self.assertEqual(
+            (after.st_mode, after.st_dev, after.st_ino),
+            (before.st_mode, before.st_dev, before.st_ino),
+        )
+        return root, target
+
+    def test_regular_path_state_machine_preserves_types_and_materializes_only_safe_targets(self) -> None:
+        """Regular materialization handles expected, absent, link, and typed collisions."""
+        existing = self.regular_fixture("regular-existing.txt")
+        existing_target = existing / "regular-existing.txt"
+        existing_target.write_text("parent-owned regular\n", encoding="utf-8")
+        existing_before = os.lstat(existing_target)
+        result = self.run_sync(existing, "link-root")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        existing_after = os.lstat(existing_target)
+        self.assertEqual(
+            (existing_after.st_mode, existing_after.st_dev, existing_after.st_ino),
+            (existing_before.st_mode, existing_before.st_dev, existing_before.st_ino),
+        )
+        self.assertEqual(existing_target.read_text(encoding="utf-8"), "parent-owned regular\n")
+
+        absent = self.regular_fixture("nested/regular-absent.txt")
+        result = self.run_sync(absent, "link-root")
+        absent_target = absent / "nested/regular-absent.txt"
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(absent_target.read_text(encoding="utf-8"), "canonical regular seed\n")
+
+        symlink = self.regular_fixture("regular-symlink.txt")
+        symlink_target = symlink / "regular-symlink.txt"
+        symlink_target.symlink_to("vendor/agent-canon/seed/regular.txt")
+        result = self.run_sync(symlink, "link-root")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(symlink_target.is_file() and not symlink_target.is_symlink())
+        self.assertEqual(symlink_target.read_text(encoding="utf-8"), "canonical regular seed\n")
+
+        _, directory_target = self.assert_regular_collision_preserved(
+            "regular-directory.txt",
+            lambda target: (target.mkdir(), (target / "sentinel").write_text("keep\n", encoding="utf-8")),
+        )
+        self.assertEqual(
+            (directory_target / "sentinel").read_text(encoding="utf-8"),
+            "keep\n",
+        )
+
+        def make_fifo(target: Path) -> None:
+            os.mkfifo(target)
+
+        self.assert_regular_collision_preserved("regular-fifo", make_fifo)
+
+        def make_socket(target: Path) -> None:
+            server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.addCleanup(server.close)
+            server.bind(str(target))
+
+        self.assert_regular_collision_preserved("regular-socket", make_socket)
+
+        vscode_absent = self.regular_fixture(".vscode", source=None)
+        result = self.run_sync(vscode_absent, "link-root")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue((vscode_absent / ".vscode").is_dir())
+
+        vscode_existing = self.regular_fixture(".vscode", source=None)
+        vscode_existing_target = vscode_existing / ".vscode"
+        vscode_existing_target.mkdir()
+        vscode_existing_sentinel = vscode_existing_target / "sentinel"
+        vscode_existing_sentinel.write_text("keep vscode directory\n", encoding="utf-8")
+        vscode_existing_before = os.lstat(vscode_existing_target)
+        result = self.run_sync(vscode_existing, "link-root")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        vscode_existing_after = os.lstat(vscode_existing_target)
+        self.assertEqual(
+            (vscode_existing_after.st_mode, vscode_existing_after.st_dev, vscode_existing_after.st_ino),
+            (vscode_existing_before.st_mode, vscode_existing_before.st_dev, vscode_existing_before.st_ino),
+        )
+        self.assertEqual(
+            vscode_existing_sentinel.read_text(encoding="utf-8"),
+            "keep vscode directory\n",
+        )
+
+        vscode_link = self.regular_fixture(".vscode", source=None)
+        vscode_link_target = vscode_link / ".vscode"
+        vscode_link_target.symlink_to("vendor/agent-canon")
+        result = self.run_sync(vscode_link, "link-root")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(vscode_link_target.is_dir() and not vscode_link_target.is_symlink())
+
+        vscode_file = self.regular_fixture(".vscode", source=None)
+        vscode_file_target = vscode_file / ".vscode"
+        vscode_file_target.write_text("parent-owned vscode file\n", encoding="utf-8")
+        result = self.run_sync(vscode_file, "link-root")
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("regular[.vscode]=collision", result.stderr)
+        self.assertEqual(vscode_file_target.read_text(encoding="utf-8"), "parent-owned vscode file\n")
 
     def retired_descendant_paths(self) -> tuple[str, ...]:
         """Return all manifest-listed test/fixture and note descendants."""

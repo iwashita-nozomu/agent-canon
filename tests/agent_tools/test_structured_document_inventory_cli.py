@@ -92,8 +92,13 @@ class StructuredDocumentInventoryCliTest(unittest.TestCase):
         args: list[str], *, cargo_target_dir: Path
     ) -> subprocess.CompletedProcess[str]:
         """Run the Rust CLI with build artifacts isolated from the repo target."""
-        env = os.environ.copy()
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if key != "AGENT_CANON_CLI_TARGET_DIR"
+        }
         env["CARGO_TARGET_DIR"] = str(cargo_target_dir)
+        env.pop("AGENT_CANON_CLI_TARGET_DIR", None)
         return subprocess.run(
             [str(AGENT_CANON), *args],
             cwd=PROJECT_ROOT,

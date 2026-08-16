@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import os
 import subprocess
 import tempfile
 import unittest
@@ -21,7 +20,10 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from tools.agent_tools import wiki_publish
-from tools.agent_tools.parent_root_side_effects import public_session
+from tools.agent_tools.fixture_spawn import (
+    bootstrap_fixture_public_environment,
+    record_capability_from_environment,
+)
 
 
 class FakeRunner:
@@ -111,13 +113,14 @@ class WikiPublishTests(unittest.TestCase):
         subprocess.run(["git", "init", "-q", str(source_root)], check=True)
         script = source_root / "wiki-test.py"
         script.write_text("# fixture entrypoint\n", encoding="utf-8")
-        previous_cwd = Path.cwd()
-        os.chdir(source_root)
-        try:
-            with public_session(invocation_script=script, purpose="wiki-test"):
-                yield
-        finally:
-            os.chdir(previous_cwd)
+        with bootstrap_fixture_public_environment(
+            mode="synthetic_tool",
+            record_capability=record_capability_from_environment(),
+            fixture_cwd=source_root,
+            invocation_script=script,
+            purpose="wiki-test",
+        ):
+            yield
 
     def test_user_failure_keeps_mutable_fields_and_exception_chaining(self) -> None:
         """Wiki failures preserve ordinary exception args and traceback state."""

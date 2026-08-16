@@ -74,8 +74,8 @@ from tool_calls import (  # noqa: E402
     CloseAgentLifecycleEvidence,
     materialize_close_agent_tool_call,
 )
-from tools.agent_tools.fixture_spawn import (
-    record_session_from_environment,  # noqa: E402
+from tools.agent_tools.fixture_spawn import (  # noqa: E402
+    bootstrap_fixture_public_environment,
 )
 from update_lifecycle_contract import (  # noqa: E402
     materialize_descendant_close_receipt,
@@ -100,11 +100,12 @@ def fixture_environment(parent_root: Path) -> Iterator[dict[str, str]]:
     """Bind fixture subprocesses to the current runner record capability."""
     previous_cwd = Path.cwd()
     try:
-        os.chdir(parent_root)
-        with record_session_from_environment() as session:
-            authenticated_environment = ParentRootSideEffectBoundary().session_environment(
-                session, os.environ
-            )
+        with bootstrap_fixture_public_environment(
+            mode="ordinary_tool",
+            fixture_cwd=parent_root,
+            base_env=os.environ,
+        ) as fixture:
+            authenticated_environment = dict(fixture.environment)
             with patch.dict(os.environ, authenticated_environment, clear=True):
                 yield authenticated_environment
     finally:

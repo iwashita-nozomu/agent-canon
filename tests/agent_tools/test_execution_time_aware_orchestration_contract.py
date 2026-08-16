@@ -15,6 +15,7 @@
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import sys
@@ -68,6 +69,28 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
             text=True,
         )
 
+    def run_decision(self, decision: dict[str, object]) -> subprocess.CompletedProcess[str]:
+        """Classify one explicit execution-route decision fixture."""
+        with tempfile.NamedTemporaryFile(mode="w", suffix=".json", encoding="utf-8") as handle:
+            json.dump(decision, handle)
+            handle.flush()
+            return subprocess.run(
+                [
+                    sys.executable,
+                    str(CHECKER),
+                    "--root",
+                    str(PROJECT_ROOT),
+                    "--decision",
+                    handle.name,
+                    "--format",
+                    "json",
+                ],
+                cwd=PROJECT_ROOT,
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+
     def assert_rejected(self, root: Path, category: str) -> None:
         """Require a strict checker failure for one rejected mutation class."""
         result = self.run_checker(root)
@@ -81,34 +104,6 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
         """Append one controlled negative-fixture mutation."""
         path = root / relative_path
         path.write_text(path.read_text(encoding="utf-8") + text, encoding="utf-8")
-
-    def test_owner_keeps_the_complete_work_conservation_contract(self) -> None:
-        """The canonical owner must retain every execution-time decision."""
-        text = " ".join(
-            self.read("agents/skills/agent-orchestration.md").lower().split()
-        )
-
-        for marker in (
-            "execution-time-aware work-conservation contract",
-            "dependency dag",
-            "critical path",
-            "ready set",
-            "minimize makespan",
-            "responsibility completeness",
-            "correctness",
-            "every ready node",
-            "non-conflicting",
-            "batch remote reads",
-            "warm worker and reviewer contexts",
-            "complete remaining closure",
-            "before opening the owning review",
-            "affected by the repaired node",
-            "wait only when the useful ready set is empty",
-            "elapsed-time scope gate",
-            "prompt-keyword routing",
-            "fixed duration",
-        ):
-            self.assertIn(marker, text, marker)
 
     def test_production_checker_accepts_the_complete_owner_closure(self) -> None:
         """The production checker accepts the unmutated owner closure."""
@@ -167,40 +162,68 @@ class ExecutionTimeAwareOrchestrationContractTests(unittest.TestCase):
             path.write_text(text.replace(OWNER_REF, "agents/skills/other-owner.md#Contract", 1), encoding="utf-8")
             self.assert_rejected(root, "consumer_reference_mismatch")
 
-    def test_pr_processing_consumes_and_specializes_the_owner(self) -> None:
-        """PR processing keeps queue-specific rules under the owner contract."""
-        text = " ".join(self.read("agents/skills/pr-processing.md").lower().split())
+    def test_single_node_without_edge_is_non_active(self) -> None:
+        """A single bounded node does not materialize graph-only fields."""
+        result = self.run_decision({"nodes": [{"id": "one"}], "edges": []})
 
-        self.assertIn(OWNER_REF.lower(), text)
-        for marker in (
-            "batched queue snapshot",
-            "independent candidates",
-            "one closure review for each exact candidate",
-            "only the affected candidate evidence",
-            "same warm worker and reviewer context",
-            "merge candidates in dependency order",
-            "never use elapsed time",
-        ):
-            self.assertIn(marker, text, marker)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        route = json.loads(result.stdout)
+        self.assertEqual(route["state"], "bounded_single_owner")
+        self.assertFalse(route["graph_active"])
+        self.assertEqual(route["graph_fields"], [])
 
-    def test_runtime_catalog_and_schedule_project_the_owner(self) -> None:
-        """Projections point to the owner without becoming policy copies."""
-        self.assertIn(OWNER_REF, self.read("agents/task_catalog.yaml"))
-        self.assertIn(OWNER_REF, self.read("templates/agents/schedule.md"))
-        self.assertIn(OWNER_REF, self.read(".agents/skills/agent-orchestration/SKILL.md"))
+    def test_multiple_independent_candidates_are_non_active(self) -> None:
+        """Candidate count alone does not activate graph scheduling."""
+        result = self.run_decision(
+            {"nodes": [{"id": "one"}, {"id": "two"}], "edges": []}
+        )
 
-        schedule = " ".join(self.read("templates/agents/schedule.md").lower().split())
-        for marker in (
-            "execution-time-aware plan",
-            "dependency dag / closure",
-            "critical path",
-            "ready set",
-            "useful ready set",
-            "dispatch batch",
-            "affected evidence invalidation",
-        ):
-            self.assertIn(marker, schedule, marker)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        route = json.loads(result.stdout)
+        self.assertEqual(route["state"], "bounded_single_owner")
+        self.assertEqual(route["candidate_count"], 2)
+        self.assertFalse(route["graph_active"])
 
+    def test_selected_edge_activates_graph(self) -> None:
+        """A real selected edge activates only the selected graph route."""
+        result = self.run_decision(
+            {
+                "nodes": [{"id": "one"}, {"id": "two"}],
+                "edges": [{"type": "dependency", "source": "one", "target": "two"}],
+                "graph_evidence": {
+                    "dag": [{"source": "one", "target": "two"}],
+                    "critical_path": ["one", "two"],
+                    "ready_set": ["one"],
+                    "queue_snapshot": ["one", "two"],
+                    "makespan_objective": "minimize",
+                    "node_ids": ["one", "two"],
+                },
+            }
+        )
+
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        route = json.loads(result.stdout)
+        self.assertEqual(route["state"], "selected_edge_graph")
+        self.assertTrue(route["graph_active"])
+        self.assertEqual(route["active_edge_types"], ["dependency"])
+
+    def test_invalid_or_missing_graph_evidence_is_rejected(self) -> None:
+        """An active selected edge requires complete valid graph evidence."""
+        base = {
+            "nodes": [{"id": "one"}, {"id": "two"}],
+            "edges": [{"type": "ordering", "source": "one", "target": "two"}],
+        }
+        for graph_evidence in (None, {"dag": [], "critical_path": []}):
+            decision = dict(base)
+            if graph_evidence is not None:
+                decision["graph_evidence"] = graph_evidence
+            result = self.run_decision(decision)
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            route = json.loads(result.stdout)
+            self.assertEqual(route["state"], "selected_edge_graph")
+            self.assertTrue(route["graph_active"])
+            self.assertTrue(route["findings"])
+            self.assertEqual(route["findings"][0]["category"], "execution_graph")
 
 if __name__ == "__main__":
     unittest.main()

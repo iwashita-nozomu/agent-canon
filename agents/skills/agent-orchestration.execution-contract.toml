@@ -19,20 +19,47 @@ checker = "tools/agent_tools/check_execution_time_aware_orchestration.py"
 checker_command = "python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root ."
 required_skill_command = "python3 tools/agent_tools/check_execution_time_aware_orchestration.py --root ."
 
-required_fields = [
-  "dependency_dag",
-  "makespan_objective",
-  "responsibility_completeness",
+activation_predicate = "selected_edge_type_present"
+default_state = "bounded_single_owner"
+candidate_count_alone = false
+selected_edge_types = [
+  "ordering",
+  "dependency",
+  "collision",
+  "publication",
+]
+always_required_fields = [
+  "owner",
+  "schema",
+  "dependency",
+  "validation",
   "correctness",
+  "publication_scope",
+]
+graph_only_fields = [
+  "dag",
   "critical_path",
   "ready_set",
+  "queue_snapshot",
+  "makespan_objective",
+]
+# The task catalog is a read-only legacy projection. Its field list remains
+# stable while this owner contract carries the conditional route semantics.
+task_catalog_fields = [
+  "dependency_dag",
+  "responsibility_completeness",
+  "correctness",
   "context_reuse",
   "affected_evidence_invalidation",
 ]
 
 owner_markers = [
-  "Model the complete requested work as a dependency DAG",
-  "minimize makespan subject to responsibility completeness and correctness",
+  "execution route defaults to bounded_single_owner",
+  "candidate count alone does not activate the execution graph",
+  "selected ordering, dependency, collision, or publication edge",
+  "always-required fields",
+  "graph-only fields",
+  "model the selected subgraph as a dependency DAG",
   "Dispatch every ready node that is non-conflicting",
   "Batch remote reads",
   "Reuse the warm worker and reviewer contexts",
@@ -40,7 +67,7 @@ owner_markers = [
   "Invalidate only evidence affected by the repaired node",
   "Wait only when the useful ready set is empty",
   "prompt-keyword routing is not a scheduling signal",
-  "no fixed duration, elapsed-time limit, or timeout cutoff may cut the requested scope",
+  "no timeout, elapsed-time, or capacity cutoff may reduce scope",
 ]
 
 rejected_classes = [
@@ -65,6 +92,7 @@ scope_cutoff_markers = [
   "scope cutoff:",
   "elapsed-time budget:",
   "use timeout to cut",
+  "capacity cutoff:",
 ]
 keyword_routing_markers = [
   "prompt keywords route",
@@ -80,12 +108,16 @@ scope_reduction_markers = [
 ]
 
 [invariants]
-dag = "complete_dependency_dag_with_owner_and_consumer_closure"
-objective = "minimize_makespan_subject_to_responsibility_completeness_and_correctness"
+activation = "selected_edge_type_present"
+default = "bounded_single_owner"
+candidate_count = "candidate_count_alone_false"
+always = "owner_schema_dependency_validation_correctness_publication_scope"
+graph = "dag_critical_path_ready_set_queue_snapshot_makespan_objective"
 dispatch = "all_non_conflicting_ready_nodes"
 wait = "only_when_useful_ready_set_is_empty"
 evidence = "warm_context_reuse_and_affected_evidence_only_invalidation"
 review = "closure_before_one_exact_candidate_review"
+scope = "no_timeout_elapsed_time_or_capacity_cutoff"
 
 [[consumers]]
 id = "pr-processing"
@@ -94,11 +126,28 @@ kind = "specialization"
 reference_mode = "text"
 required_markers = [
   "Execution-Time-Aware Queue Specialization",
+  "single-candidate fast path",
+  "no queue-wide snapshot",
+  "candidate count alone does not activate",
+  "selected edge",
   "batched queue snapshot",
   "independent candidates",
   "one closure review for each exact candidate",
   "same warm worker and reviewer context",
   "merge candidates in dependency order",
+]
+required_fields = [
+  "owner",
+  "schema",
+  "dependency",
+  "validation",
+  "correctness",
+  "publication_scope",
+  "dag",
+  "critical_path",
+  "ready_set",
+  "queue_snapshot",
+  "makespan_objective",
 ]
 
 [[consumers]]
@@ -118,12 +167,31 @@ kind = "schedule_projection"
 reference_mode = "text"
 required_markers = [
   "Execution-Time-Aware Plan",
+  "bounded_single_owner",
+  "candidate count alone",
+  "Always-required fields",
+  "Graph-only fields",
+  "Selected edge activation",
   "Dependency DAG / closure",
   "Critical path",
   "Ready set",
+  "Queue snapshot",
   "Useful ready set",
   "Context reuse",
   "Affected evidence invalidation",
+]
+required_fields = [
+  "owner",
+  "schema",
+  "dependency",
+  "validation",
+  "correctness",
+  "publication_scope",
+  "dag",
+  "critical_path",
+  "ready_set",
+  "queue_snapshot",
+  "makespan_objective",
 ]
 
 [[consumers]]

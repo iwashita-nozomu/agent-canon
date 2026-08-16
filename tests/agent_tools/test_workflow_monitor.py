@@ -450,7 +450,11 @@ class WorkflowMonitorTest(unittest.TestCase):
     def test_monitor_replaces_initial_blocker_with_actual_subagent_wave(self) -> None:
         """A real parent wave should replace the bootstrap authority blocker."""
         parent_root = enclosing_repository_root()
-        with tempfile.TemporaryDirectory(dir=parent_root) as tmp_dir:
+        with (
+            record_environment(cwd=PROJECT_ROOT) as environment,
+            mock.patch.dict(os.environ, environment, clear=True),
+            tempfile.TemporaryDirectory(dir=parent_root) as tmp_dir,
+        ):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True)
@@ -1173,7 +1177,11 @@ class WorkflowMonitorTest(unittest.TestCase):
     def test_bootstrap_seeds_monitoring_with_routing_evidence(self) -> None:
         """bootstrap_agent_run should seed workflow monitoring without manual edits."""
         parent_root = enclosing_repository_root()
-        with tempfile.TemporaryDirectory(dir=parent_root) as tmp_dir:
+        with (
+            record_environment(cwd=PROJECT_ROOT) as environment,
+            mock.patch.dict(os.environ, environment, clear=True),
+            tempfile.TemporaryDirectory(dir=parent_root) as tmp_dir,
+        ):
             workspace_root = Path(tmp_dir) / "workspace"
             report_root = Path(tmp_dir) / "reports"
             workspace_root.mkdir(parents=True)
@@ -1215,14 +1223,22 @@ def test_monitor_atomic_open_rejects_parent_path_replacement() -> None:
     """The monitor boundary rejects a replaced path component before opening it."""
     with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as tmp_dir:
         root = Path(tmp_dir)
-        outside = PROJECT_ROOT.parent
         replaced = root / "reports"
-        replaced.symlink_to(outside, target_is_directory=True)
         module = load_monitor_module()
         target = replaced / "workflow_monitoring.md"
         with record_environment(cwd=PROJECT_ROOT) as environment, mock.patch.dict(
             os.environ, environment, clear=True
         ):
+            # Make the symlink target physically escape the signed parent
+            # rather than merely leaving the temporary fixture directory.
+            # The oracle is about parent-boundary rejection, so its target
+            # must be outside the authenticated parent root even when the
+            # runner itself is nested.
+            signed_parent = Path(
+                os.environ["AGENT_CANON_SIDE_EFFECT_PARENT_ROOT"]
+            ).resolve()
+            outside = signed_parent.parent
+            replaced.symlink_to(outside, target_is_directory=True)
             with unittest.TestCase().assertRaises(ParentRootSideEffectError) as rejected:
                 with module.locked_monitoring_artifact(target):
                     pass

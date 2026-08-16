@@ -23,7 +23,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.fixture_spawn import record_environment
+from tools.agent_tools.fixture_spawn import (
+    bootstrap_fixture_public_environment,
+    record_capability_from_environment,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCAN = PROJECT_ROOT / "tools" / "agent_tools" / "scan_dependency_headers.sh"
@@ -43,17 +46,31 @@ def run_tool(
     env: dict[str, str] | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run a dependency manifest shell tool."""
+    if not (root / ".git").exists():
+        subprocess.run(
+            ["git", "init", "-q", "-b", "main", str(root)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
     environment = os.environ.copy()
+    for key in ("CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR"):
+        environment.pop(key, None)
     if env:
         environment.update(env)
-    with record_environment(cwd=root, base_env=environment) as record_env:
+    with bootstrap_fixture_public_environment(
+        mode="synthetic_tool",
+        record_capability=record_capability_from_environment(),
+        fixture_cwd=root,
+        base_env=environment,
+    ) as fixture:
         return subprocess.run(
             ["bash", *args],
             cwd=root,
             check=False,
             capture_output=True,
             text=True,
-            env=record_env,
+            env=fixture.environment,
         )
 
 
@@ -682,43 +699,16 @@ class DependencyManifestToolTest(unittest.TestCase):
                 encoding="utf-8",
             )
             fake.chmod(0o755)
-
-            result = run_tool(
-                str(GRAPH),
-                "--root",
-                str(root),
-                root=root,
-                env={},
+            physical_marker = root / "physical-analyzer-used"
+            physical = self.analyzer_root_fixture(
+                root,
+                name=".physical-analyzer",
+                graph_script=(
+                    "#!/usr/bin/env bash\n"
+                    f"touch {physical_marker}\n"
+                    "exit 1\n"
+                ),
             )
-
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn(
-                f"DEPENDENCY_GRAPH_ANALYZER_TOOLS_ROOT={PROJECT_ROOT / 'tools'}",
-                result.stdout,
-            )
-            self.assertFalse(marker.exists())
-
-    def test_analyzer_cli_precedes_env_and_is_forwarded_to_nested_checker(self) -> None:
-        """The explicit analyzer root wins and is passed as a physical path."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            subprocess.run(
-                ["git", "init", "-q", "-b", "main"],
-                cwd=root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            capture = root / "nested-analyzer-argv"
-            checker = (
-                "#!/usr/bin/env bash\n"
-                f"printf '%s\\n' \"$@\" > {capture}\n"
-                "printf 'DEPENDENCY_GRAPH=pass\\n'\n"
-            )
-            cli_root = self.analyzer_root_fixture(
-                root, name=".cli-analyzer", checker_script=checker
-            )
-            env_root = self.analyzer_root_fixture(root, name=".env-analyzer")
 
             result = run_tool(
                 str(REPO_REVIEW),
@@ -726,52 +716,14 @@ class DependencyManifestToolTest(unittest.TestCase):
                 str(root),
                 "--ensure-graph",
                 "--analyzer-tools-root",
-                str(cli_root),
+                str(physical),
                 root=root,
-                env={"AGENT_CANON_ANALYZER_TOOLS_ROOT": str(env_root)},
+                env={},
             )
 
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(
-                capture.read_text(encoding="utf-8").splitlines(),
-                ["--root", str(root), "--ensure-graph", "--analyzer-tools-root", str(cli_root)],
-            )
-
-    def test_analyzer_env_precedes_physical_invocation_source(self) -> None:
-        """The environment override is used when no CLI root is supplied."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            subprocess.run(
-                ["git", "init", "-q", "-b", "main"],
-                cwd=root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            capture = root / "env-analyzer-argv"
-            checker = (
-                "#!/usr/bin/env bash\n"
-                f"printf '%s\\n' \"$@\" > {capture}\n"
-                "printf 'DEPENDENCY_GRAPH=pass\\n'\n"
-            )
-            env_root = self.analyzer_root_fixture(
-                root, name=".env-analyzer", checker_script=checker
-            )
-
-            result = run_tool(
-                str(REPO_REVIEW),
-                "--root",
-                str(root),
-                "--ensure-graph",
-                root=root,
-                env={"AGENT_CANON_ANALYZER_TOOLS_ROOT": str(env_root)},
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(
-                capture.read_text(encoding="utf-8").splitlines(),
-                ["--root", str(root), "--ensure-graph", "--analyzer-tools-root", str(env_root)],
-            )
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(physical_marker.exists())
+            self.assertFalse(marker.exists())
 
     def test_analyzer_explicit_root_rejects_symlink_outside_and_incomplete(self) -> None:
         """Explicit analyzer roots are physical, complete, and parent-contained."""
@@ -813,49 +765,6 @@ class DependencyManifestToolTest(unittest.TestCase):
                     )
                     self.assertNotEqual(result.returncode, 0)
                     self.assertIn(expected, result.stderr)
-
-    def test_normal_repo_review_has_one_graph_readiness_owner(self) -> None:
-        """Outer review delegates status/query freshness exactly once."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            subprocess.run(
-                ["git", "init", "-q", "-b", "main"],
-                cwd=root,
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            self.git_output(root, "config", "user.email", "graph-owner@example.invalid")
-            self.git_output(root, "config", "user.name", "Graph Owner")
-            (root / "README.md").write_text("fixture\n", encoding="utf-8")
-            self.git_output(root, "add", "README.md")
-            self.git_output(root, "commit", "-m", "fixture")
-            graph_script = (
-                "#!/usr/bin/env bash\n"
-                "printf '%s %s\\n' \"$1\" \"$2\" >> \"$GRAPH_CALLS\"\n"
-                "if [[ \"$1 $2\" == \"graph status\" ]]; then\n"
-                "  printf '%s\\n' '{\"schema\":\"agent-canon.graph.status.v1\",\"command\":\"status\",\"status\":\"fresh\",\"exit_code\":0,\"reason\":null,\"probe_reason\":null}'\n"
-                "else\n"
-                "  printf '%s\\n' '{\"status\":\"fresh\",\"nodes\":[],\"facts\":[]}'\n"
-                "fi\n"
-            )
-            analyzer = self.analyzer_root_fixture(root, graph_script=graph_script)
-            calls = root / "graph-calls"
-            result = run_tool(
-                str(REPO_REVIEW),
-                "--root",
-                str(root),
-                "--analyzer-tools-root",
-                str(analyzer),
-                root=root,
-                env={"GRAPH_CALLS": str(calls)},
-            )
-
-            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-            self.assertEqual(
-                calls.read_text(encoding="utf-8").splitlines(),
-                ["graph status", "graph query"],
-            )
 
     def test_scan_accepts_large_file_with_manifest_markers_near_top(self) -> None:
         """Early marker matches in large files must not trip pipefail/SIGPIPE."""
@@ -3265,7 +3174,15 @@ class DependencyManifestToolTest(unittest.TestCase):
             "#!/usr/bin/env bash\nexit 0\n", encoding="utf-8"
         )
         (tools_dir / "sync_agent_canon.sh").chmod(0o755)
-        script = (
+        target_script = tools_dir / "bin" / "agent-canon"
+        target_script.write_text(
+            "#!/usr/bin/env bash\n"
+            "touch \"$(dirname \"$0\")/target-analyzer-used\"\n"
+            "exit 99\n",
+            encoding="utf-8",
+        )
+        target_script.chmod(0o755)
+        analyzer_script = (
             "#!/usr/bin/env python3\n"
             "import json\n"
             "import os\n"
@@ -3291,23 +3208,30 @@ class DependencyManifestToolTest(unittest.TestCase):
             "    raise SystemExit(exit_code)\n"
             "raise SystemExit(2)\n"
         )
-        executable = tools_dir / "bin" / "agent-canon"
-        executable.write_text(script, encoding="utf-8")
-        executable.chmod(0o755)
+        executable = root / ".analyzer-tools" / "bin" / "agent-canon"
         analyzer_root = root / ".analyzer-tools"
         (analyzer_root / "agent_tools").mkdir(parents=True)
         (analyzer_root / "bin").mkdir()
+        executable.write_text(analyzer_script, encoding="utf-8")
+        executable.chmod(0o755)
+        checker_marker = root / ".graph-checker-invoked"
+        checker = analyzer_root / "agent_tools" / "check_dependency_graph.sh"
+        checker.write_text(
+            "#!/usr/bin/env bash\n"
+            f"touch {checker_marker}\n"
+            "exit 99\n",
+            encoding="utf-8",
+        )
+        checker.chmod(0o755)
         for entrypoint in (
             "scan_dependency_headers.sh",
             "check_dependency_header_format.sh",
-            "check_dependency_graph.sh",
             "check_design_doc_claims.py",
             "workflow_monitor.py",
         ):
             (analyzer_root / "agent_tools" / entrypoint).symlink_to(
                 PROJECT_ROOT / "tools" / "agent_tools" / entrypoint
             )
-        (analyzer_root / "bin" / "agent-canon").symlink_to(executable)
         return executable, root / ".graph-calls"
 
     def run_graph_ensure_fixture(
@@ -3350,6 +3274,7 @@ class DependencyManifestToolTest(unittest.TestCase):
             text=True,
         )
         result.calls_path = calls  # type: ignore[attr-defined]
+        result.checker_marker_path = root / ".graph-checker-invoked"  # type: ignore[attr-defined]
         return result
 
     def test_graph_ensure_fresh_does_not_build(self) -> None:
@@ -3384,6 +3309,7 @@ class DependencyManifestToolTest(unittest.TestCase):
                 result.calls_path.read_text(encoding="utf-8").splitlines(),
                 ["graph status", "graph build", "graph status"],
             )
+            self.assertFalse(result.checker_marker_path.exists())
 
     def test_graph_ensure_non_source_status_fails_without_build(self) -> None:
         """Corruption, unknown, and non-source statuses never admit rebuilding."""

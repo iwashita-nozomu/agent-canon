@@ -33,10 +33,14 @@ sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 sys.path.insert(0, str(PROJECT_ROOT / ".codex" / "hooks"))
 import hook_dispatcher  # noqa: E402
 import hook_event_log  # noqa: E402
-from parent_root_side_effects import ParentRootSideEffectBoundary, public_session  # noqa: E402
 from prompt_classifier import (  # noqa: E402
     PromptClassifierInputs,
     prompt_intake_signals,
+)
+from tools.agent_tools.fixture_spawn import (  # noqa: E402
+    bootstrap_fixture_public_environment,
+    record_capability_from_environment,
+    record_environment,
 )
 
 ACTIVE_EVENTS = ("UserPromptSubmit", "PreToolUse", "PostToolUse")
@@ -110,28 +114,15 @@ class CodexHooksTest(unittest.TestCase):
     def _authenticated_fixture(self, root: Path):
         """Yield one child environment from the canonical signed-session bootstrap."""
         self._bootstrap_fixture(root)
-        previous_cwd = Path.cwd()
-        previous_environment = os.environ.copy()
-        clean_environment = {"PATH": previous_environment.get("PATH", os.defpath)}
-        os.chdir(root)
-        try:
-            with public_session(
-                invocation_script=HOOK_DISPATCHER,
-                purpose="codex-hook-test",
-                independent=True,
-                cleanup_state=True,
-            ) as session:
-                environment = ParentRootSideEffectBoundary().child_environment(
-                    session.attestation,
-                    clean_environment,
-                    issue_handoff=False,
-                    rebase_inherited_temp=True,
-                )
-                yield environment
-        finally:
-            os.environ.clear()
-            os.environ.update(previous_environment)
-            os.chdir(previous_cwd)
+        with bootstrap_fixture_public_environment(
+            mode="synthetic_tool",
+            record_capability=record_capability_from_environment(),
+            fixture_cwd=root,
+            base_env=os.environ.copy(),
+            invocation_script=HOOK_DISPATCHER,
+            purpose="codex-hook-test",
+        ) as fixture:
+            yield fixture.environment
 
     def _run_hook(
         self,
@@ -146,13 +137,15 @@ class CodexHooksTest(unittest.TestCase):
             return self._run_hook_in_root(Path(temp_dir), event, payload, extra_env=extra_env)
 
     def _contract(self) -> dict[str, object]:
-        result = subprocess.run(
-            [sys.executable, str(HOOK_DISPATCHER), "--contract"],
-            cwd=PROJECT_ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        with record_environment(cwd=PROJECT_ROOT) as environment:
+            result = subprocess.run(
+                [sys.executable, str(HOOK_DISPATCHER), "--contract"],
+                cwd=PROJECT_ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+                env=environment,
+            )
         return cast("dict[str, object]", json.loads(result.stdout))
 
     def _run_hook_in_root(
@@ -1106,7 +1099,7 @@ def test_hook_event_publish_rejects_unattested_parent_without_raw_fallback() -> 
     """Missing parent capability returns typed failure without touching the path."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         target = Path(tmp_dir) / "event.json"
-        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}):
+        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}, clear=True):
             result = hook_event_log.publish_hook_event_noreplace(target, b"event\n")
         assert result == ("failed", "parent_unattested")
         assert not target.exists()
@@ -1116,7 +1109,7 @@ def test_hook_report_requires_parent_capability() -> None:
     """Report projection stays disabled until the parent capability is present."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         target = Path(tmp_dir) / "report"
-        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}):
+        with mock.patch.dict(os.environ, {"AGENT_CANON_PARENT_ROOT": ""}, clear=True):
             assert hook_dispatcher._parent_bound_report(target, "hook-report") is None
 
 
@@ -1128,6 +1121,7 @@ def test_pointer_targets_reject_missing_and_containment_escapes() -> None:
             "AGENT_CANON_HOOK_EVENT_SPOOL_DIR": "",
             "AGENT_CANON_WORKFLOW_MONITOR_REPORT_DIR": "",
         },
+        clear=True,
     ):
         CodexHooksTest().test_pointer_targets_reject_missing_and_containment_escapes()
 

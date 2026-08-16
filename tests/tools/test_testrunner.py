@@ -182,6 +182,223 @@ command = ["python3", "-c", "import sys; sys.exit(0)"]
         with self.assertRaisesRegex(RuntimeError, "SESSION_HORIZON_MISMATCH"):
             runner["validate_child_horizon"](child, 1000)  # type: ignore[operator]
 
+    def test_record_environment_horizon_failure_revokes_all_issued_children(self) -> None:
+        """Issue/horizon failure drains every child and removes the exact record root."""
+        runner = self.runner_module()
+        root = Path(tempfile.mkdtemp(prefix="testrunner-rollback-"))
+        self.addCleanup(shutil.rmtree, root, True)
+        runtime = root / "runtime"
+        runtime.mkdir()
+        removed: list[Path] = []
+        revoked: list[str] = []
+
+        class Boundary:
+            def create_parent_owned_temp_directory(self, _attestation: object, parent: Path, _purpose: str, name: str):
+                path = parent / name
+                path.mkdir(parents=True, exist_ok=True)
+                return SimpleNamespace(physical_path=path)
+
+            def ensure_parent_owned_directory(self, _attestation: object, path: Path, _purpose: str):
+                path.mkdir(parents=True, exist_ok=True)
+                return SimpleNamespace(physical_path=path)
+
+            def remove_parent_owned_tree(self, _attestation: object, receipt: object, _purpose: str):
+                path = receipt.physical_path
+                shutil.rmtree(path)
+                removed.append(path)
+
+        class Issuer:
+            def issue_child(self, *, record_id: str, **_kwargs: object):
+                reference = SimpleNamespace(session_id=record_id, record_id=record_id, nonce=record_id)
+                return SimpleNamespace(
+                    child=reference,
+                    record=SimpleNamespace(
+                        parent_root_realpath=str(root), expires_mono_ns=100
+                    ),
+                    handoff=f"handoff-{record_id}",
+                )
+
+            def revoke_drain_child(self, *, child: object, **_kwargs: object):
+                revoked.append(child.record_id)
+                return SimpleNamespace(leases_after=0)
+
+        validation_calls = 0
+
+        def fail_second_horizon(_child: object, _deadline: int) -> None:
+            nonlocal validation_calls
+            validation_calls += 1
+            if validation_calls == 2:
+                raise RuntimeError("horizon failure")
+
+        runner["validate_child_horizon"] = fail_second_horizon
+        with self.assertRaisesRegex(RuntimeError, "horizon failure"):
+            runner["record_environment"](
+                root,
+                {},
+                Boundary(),
+                SimpleNamespace(parent_root=root),
+                SimpleNamespace(physical_path=runtime),
+                Issuer(),
+                "selected",
+                SimpleNamespace(run_deadline_mono_ns=100),
+            )
+        self.assertEqual(revoked, ["selected-private", "selected"])
+        self.assertEqual(len(removed), 1)
+        self.assertFalse(removed[0].exists())
+
+    def test_record_environment_preissues_distinct_public_private_records(self) -> None:
+        """Runner setup issues public then private records without adapter minting."""
+        runner = self.runner_module()
+        root = Path(tempfile.mkdtemp(prefix="testrunner-preissue-"))
+        self.addCleanup(shutil.rmtree, root, True)
+        runtime = root / "runtime"
+        runtime.mkdir()
+        calls: list[str] = []
+        removed: list[Path] = []
+
+        class Boundary:
+            def create_parent_owned_temp_directory(self, _attestation: object, parent: Path, _purpose: str, name: str):
+                path = parent / name
+                path.mkdir(parents=True, exist_ok=True)
+                return SimpleNamespace(physical_path=path)
+
+            def ensure_parent_owned_directory(self, _attestation: object, path: Path, _purpose: str):
+                path.mkdir(parents=True, exist_ok=True)
+                return SimpleNamespace(physical_path=path)
+
+            def remove_parent_owned_tree(self, _attestation: object, receipt: object, _purpose: str):
+                shutil.rmtree(receipt.physical_path)
+                removed.append(receipt.physical_path)
+
+        class Issuer:
+            def issue_child(self, *, record_id: str, **_kwargs: object):
+                calls.append(record_id)
+                reference = SimpleNamespace(session_id=record_id, record_id=record_id, nonce=record_id)
+                return SimpleNamespace(
+                    child=reference,
+                    record=SimpleNamespace(
+                        record_id=record_id,
+                        parent_root_realpath=str(root),
+                        expires_mono_ns=100,
+                    ),
+                    handoff=f"handoff-{record_id}",
+                )
+
+            def revoke_drain_child(self, *, child: object, **_kwargs: object):
+                return SimpleNamespace(leases_after=0)
+
+        environment, receipt, children = runner["record_environment"](
+            root,
+            {},
+            Boundary(),
+            SimpleNamespace(parent_root=root),
+            SimpleNamespace(physical_path=runtime),
+            Issuer(),
+            "selected",
+            SimpleNamespace(run_deadline_mono_ns=100),
+        )  # type: ignore[operator]
+        self.assertEqual(calls, ["selected", "selected-private"])
+        public, private = children
+        self.assertEqual(public.record.record_id, "selected")
+        self.assertEqual(private.record.record_id, "selected-private")
+        self.assertNotEqual(public.record.record_id, private.record.record_id)
+        self.assertEqual(environment["AGENT_CANON_SIDE_EFFECT_HANDOFF"], "handoff-selected")
+        self.assertEqual(environment["AGENT_CANON_PRIVATE_RECORD_HANDOFF"], "handoff-selected-private")
+        self.assertEqual(len(removed), 0)
+
+    def test_status_rows_use_begin_and_terminal_receipts(self) -> None:
+        """A selected record has setup begin and post-cleanup terminal rows."""
+        fixture = self.fixture()
+        with fixture[0]:
+            result = self.run_runner(fixture[1], fixture[2], "docker")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        records = self.records(result)
+        begin, terminal = records[0], records[1]
+        self.assertEqual(begin["receipt_type"], "runner_record_begin")
+        self.assertEqual(begin["begin_receipt"]["public_record_id"], "docker-tooling")
+        self.assertEqual(begin["begin_receipt"]["private_record_id"], "docker-tooling-private")
+        self.assertEqual(terminal["receipt_type"], "runner_record_terminal")
+        terminal_receipt = terminal["terminal_receipt"]
+        self.assertEqual(terminal_receipt["status"], "pass")
+        self.assertFalse(terminal_receipt["rollback"])
+        self.assertEqual(terminal_receipt["leases_after"], 0)
+        self.assertTrue(terminal_receipt["exact_record_root_removed"])
+        self.assertTrue(terminal_receipt["no_residue"])
+
+    def test_setup_failure_emits_rollback_without_start(self) -> None:
+        """Production row emission carries setup rollback evidence without a begin row."""
+        runner = self.runner_module()
+        error = runner["RunnerRecordSetupError"](
+            RuntimeError("horizon failure"),
+            record_root=Path("/parent/record"),
+            issued_child_ids=("selected", "selected-private"),
+            revoked_child_ids=("selected-private", "selected"),
+            leases_after=0,
+            exact_record_root_removed=True,
+            cleanup_status="rolled_back",
+            no_residue=True,
+        )
+        self.assertEqual(error.issued_child_ids, ("selected", "selected-private"))
+        self.assertEqual(set(error.issued_child_ids), set(error.revoked_child_ids))
+        self.assertEqual(error.leases_after, 0)
+        self.assertTrue(error.exact_record_root_removed)
+        self.assertTrue(error.no_residue)
+
+        rows: list[dict[str, object]] = []
+
+        class Watchdog:
+            failure = None
+
+            def __init__(self, *_args: object, **_kwargs: object) -> None:
+                pass
+
+            def start(self) -> None:
+                pass
+
+            def stop(self) -> None:
+                pass
+
+        runner["SupervisorWatchdog"] = Watchdog
+        runner["emit"] = rows.append
+        runner["load_records"] = lambda _source, _list: [
+            {
+                "id": "selected",
+                "command": ["python3", "-c", "pass"],
+                "environment": "tooling",
+                "require": "docker",
+                "code_owner": "owner.py",
+                "responsibility_scope": "container-test-route",
+            }
+        ]
+        runner["child_environment"] = lambda *_args: (
+            {},
+            object(),
+            object(),
+            None,
+            None,
+            object(),
+        )
+        runner["record_environment"] = lambda *_args: (_ for _ in ()).throw(error)
+        deadline = time.monotonic_ns() + int(runner["CLEANUP_GRACE_NS"]) + 5_000_000_000
+        result = runner["_run"](
+            PROJECT_ROOT,
+            PROJECT_ROOT / "testlist.toml",
+            "docker",
+            object(),
+            SimpleNamespace(run_deadline_mono_ns=deadline),
+        )  # type: ignore[operator]
+        self.assertEqual(result, 1)
+        self.assertEqual([row["status"] for row in rows], ["fail"])
+        self.assertEqual(len([row for row in rows if row["status"] == "start"]), 0)
+        terminal = rows[0]["terminal_receipt"]
+        assert isinstance(terminal, dict)
+        self.assertTrue(terminal["rollback"])
+        self.assertEqual(terminal["cleanup_status"], "rolled_back")
+        self.assertTrue(terminal["no_residue"])
+        self.assertEqual(set(terminal["issued_child_ids"]), set(terminal["revoked_child_ids"]))
+        self.assertEqual(terminal["leases_after"], 0)
+        self.assertTrue(terminal["exact_record_root_removed"])
+
     def test_runner_passes_the_public_session_result_without_rediscovery(self) -> None:
         """The v2 result is explicit from public_session through record setup."""
         source = RUNNER.read_text(encoding="utf-8")
@@ -253,6 +470,65 @@ print(os.environ.get("PYTHONPATH", "PYTHONPATH-absent"))
         self.assertIn("SOURCE_ROOT / \"tools\"", source)
         self.assertIn("SOURCE_ROOT / \"tools\" / \"agent_tools\"", source)
         self.assertLess(source.index("configure_import_environment()"), source.index("import pytest"))
+
+    def test_pytest_entrypoint_scrubs_runner_owned_ambient_but_retains_private_transport(self) -> None:
+        """Entrypoint drops runner cache paths while retaining child-safe inputs."""
+        probe = (
+            "import importlib.util, json, os; "
+            "spec=importlib.util.spec_from_file_location('entry', 'test/pytest_entrypoint.py'); "
+            "module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module); "
+            "module.configure_import_environment(); "
+            "print(json.dumps({key: os.environ.get(key) for key in ("
+            "'AGENT_CANON_SIDE_EFFECT_PARENT_ROOT', 'AGENT_CANON_SIDE_EFFECT_HANDOFF', "
+            "'AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED', 'AGENT_CANON_PRIVATE_RECORD_PARENT_ROOT', "
+            "'AGENT_CANON_PRIVATE_RECORD_HANDOFF', 'AGENT_CANON_PRIVATE_RECORD_REQUIRED', "
+            "'AGENT_CANON_TOOLS_HOME', 'CARGO_HOME', 'CARGO_TARGET_DIR', "
+            "'AGENT_CANON_CLI_TARGET_DIR', 'XDG_CACHE_HOME', 'PYTHONPYCACHEPREFIX', "
+            "'TMPDIR', 'HOME')}))"
+        )
+        env = {
+            **os.environ,
+            "AGENT_CANON_SIDE_EFFECT_PARENT_ROOT": "/outer/public",
+            "AGENT_CANON_SIDE_EFFECT_HANDOFF": "public-handoff",
+            "AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED": "1",
+            "AGENT_CANON_PRIVATE_RECORD_PARENT_ROOT": "/outer/private",
+            "AGENT_CANON_PRIVATE_RECORD_HANDOFF": "private-handoff",
+            "AGENT_CANON_PRIVATE_RECORD_REQUIRED": "1",
+            "AGENT_CANON_TOOLS_HOME": "/runner/tools",
+            "CARGO_HOME": "/runner/cargo-home",
+            "CARGO_TARGET_DIR": "/runner/cargo-target",
+            "AGENT_CANON_CLI_TARGET_DIR": "/runner/cli-target",
+            "XDG_CACHE_HOME": "/runner/cache",
+            "PYTHONPYCACHEPREFIX": "/runner/pycache",
+            "TMPDIR": "/runner/tmp",
+            "HOME": "/runner/home",
+        }
+        result = subprocess.run(
+            [sys.executable, "-c", probe],
+            cwd=PROJECT_ROOT,
+            env=env,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        values = json.loads(result.stdout)
+        self.assertEqual(values["AGENT_CANON_SIDE_EFFECT_PARENT_ROOT"], "/outer/public")
+        self.assertEqual(values["AGENT_CANON_SIDE_EFFECT_HANDOFF"], "public-handoff")
+        self.assertEqual(values["AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED"], "1")
+        self.assertEqual(values["AGENT_CANON_PRIVATE_RECORD_PARENT_ROOT"], "/outer/private")
+        self.assertEqual(values["AGENT_CANON_PRIVATE_RECORD_HANDOFF"], "private-handoff")
+        self.assertEqual(values["AGENT_CANON_PRIVATE_RECORD_REQUIRED"], "1")
+        for key in (
+            "AGENT_CANON_TOOLS_HOME",
+            "CARGO_HOME",
+            "CARGO_TARGET_DIR",
+            "AGENT_CANON_CLI_TARGET_DIR",
+            "XDG_CACHE_HOME",
+            "PYTHONPYCACHEPREFIX",
+        ):
+            self.assertIsNone(values[key])
+        self.assertEqual(values["TMPDIR"], "/runner/tmp")
+        self.assertEqual(values["HOME"], "/runner/home")
 
     def test_pytest_entrypoint_removes_nested_repository_origins(self) -> None:
         """Only interpreter paths precede the exact source-owned import suffix."""
@@ -408,8 +684,14 @@ print(json.dumps({"paths": sys.path, "managed": managed}))
         self.assertEqual(records[0]["active_route"], "docker")
         self.assertEqual(records[0]["code_owner"], "owner.py")
         self.assertEqual(records[0]["responsibility_scope"], "container-test-route")
+        self.assertEqual(records[0]["capability_record_id"], "docker-tooling-private")
+        self.assertEqual(records[0]["capability_type"], "runner_private_record_v2")
+        self.assertEqual(records[0]["capability_owner"], "fixture_adapter")
+        self.assertEqual(records[0]["capability_scope"], "fixture_child_environment")
         self.assertIsNone(records[0]["exit_code"])
         self.assertEqual(records[1]["exit_code"], 0)
+        self.assertEqual(records[1]["capability_record_id"], "docker-tooling-private")
+        self.assertEqual(records[1]["capability_owner"], "fixture_adapter")
         self.assertIsNone(records[2]["exit_code"])
 
     def test_devcontainer_route_selects_only_devcontainer(self) -> None:
@@ -525,6 +807,7 @@ from tools.agent_tools.fixture_spawn import (
     bootstrap_fixture_public_environment,
     record_session_from_environment,
 )
+from tools.agent_tools.parent_root_side_effects import RecordCapability
 
 source = Path.cwd()
 with record_session_from_environment() as record:
@@ -541,6 +824,7 @@ with record_session_from_environment() as record:
     with bootstrap_fixture_public_environment(
         mode="product_fixture",
         record=record,
+        record_capability=RecordCapability.from_record(record),
         fixture_cwd=fixture,
         argv=(
             sys.executable,
@@ -551,7 +835,8 @@ with record_session_from_environment() as record:
         assert product.receipt is not None
         assert product.receipt.returncode == 0
     with bootstrap_fixture_public_environment(
-        mode="synthetic_tool", record=record, fixture_cwd=fixture
+        mode="synthetic_tool", record=record,
+        record_capability=RecordCapability.from_record(record), fixture_cwd=fixture
     ) as synthetic:
         synthetic_result = subprocess.run(
             [sys.executable, "-c", "import os; assert os.environ['AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED'] == '1'"],
@@ -637,11 +922,23 @@ command = ["python3", "-c", "print('must-not-run')"]
                 stderr=subprocess.PIPE,
                 text=True,
             )
-            time.sleep(0.4)
+            # Wait until the runner has admitted the first record.  Sending
+            # TERM on a fixed startup delay races Python's import phase,
+            # before _run installs its control-signal handler, and observes
+            # the shell's raw -SIGTERM status instead of the runner's typed
+            # 128+signal receipt contract.
+            stdout_pipe = process.stdout
+            assert stdout_pipe is not None
+            start_line = stdout_pipe.readline()
+            self.assertTrue(start_line)
             process.send_signal(signal.SIGTERM)
             stdout, stderr = process.communicate(timeout=10)
         self.assertEqual(process.returncode, 128 + signal.SIGTERM, stderr)
-        records = self.records(subprocess.CompletedProcess([], process.returncode, stdout, stderr))
+        records = self.records(
+            subprocess.CompletedProcess(
+                [], process.returncode, start_line + stdout, stderr
+            )
+        )
         self.assertNotIn("docker-after-signal", [record["id"] for record in records])
 
     def test_valid_route_with_no_selected_records_fails_explicitly(self) -> None:

@@ -51,13 +51,6 @@ def lifecycle_binding() -> dict[str, object]:
     }
 
 
-def test_update_and_sync_rebase_inherited_runner_tmpdir_before_handoff() -> None:
-    """Both parent-bound update entrypoints rebase runner-owned temp state."""
-    for script_name in ("update_agent_canon.sh", "sync_agent_canon.sh"):
-        script = (PROJECT_ROOT / "tools" / script_name).read_text(encoding="utf-8")
-        assert "--rebase-inherited-temp" in script
-
-
 def test_latest_consumes_g4_g5_receipts_without_rechecking_source(tmp_path: Path) -> None:
     """The downstream latest gate trusts one ordered projection/readback bundle."""
     binding = lifecycle_binding()

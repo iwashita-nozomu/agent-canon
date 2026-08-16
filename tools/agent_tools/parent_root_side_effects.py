@@ -56,11 +56,48 @@ _RETIRED_SCHEMA_SIDE_EFFECT_SESSION_STATE = "agent-canon.parent-side-effect-sess
 SIDE_EFFECT_PARENT_ROOT_ENV = "AGENT_CANON_SIDE_EFFECT_PARENT_ROOT"
 SIDE_EFFECT_HANDOFF_ENV = "AGENT_CANON_SIDE_EFFECT_HANDOFF"
 SIDE_EFFECT_REQUIRED_ENV = "AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED"
+PRIVATE_RECORD_PARENT_ROOT_ENV = "AGENT_CANON_PRIVATE_RECORD_PARENT_ROOT"
+PRIVATE_RECORD_HANDOFF_ENV = "AGENT_CANON_PRIVATE_RECORD_HANDOFF"
+PRIVATE_RECORD_REQUIRED_ENV = "AGENT_CANON_PRIVATE_RECORD_REQUIRED"
+PRIVATE_RECORD_TRANSPORT_ENV_NAMES = (
+    PRIVATE_RECORD_PARENT_ROOT_ENV,
+    PRIVATE_RECORD_HANDOFF_ENV,
+    PRIVATE_RECORD_REQUIRED_ENV,
+)
 DATA_REPOSITORY_ROOT_ENV = "AGENT_CANON_DATA_REPOSITORY_ROOT"
 DATA_REPOSITORY_DEV_ENV = "AGENT_CANON_DATA_REPOSITORY_DEV"
 DATA_REPOSITORY_INO_ENV = "AGENT_CANON_DATA_REPOSITORY_INO"
 DATA_SOURCE_ROOT_ENV = "AGENT_CANON_DATA_SOURCE_ROOT"
 DATA_ROOT_ENV = "AGENT_CANON_DATA_ROOT"
+_FIXTURE_EXEC_PATH = (
+    "/usr/local/cargo/bin", "/usr/local/sbin", "/usr/local/bin",
+    "/usr/sbin", "/usr/bin", "/sbin", "/bin",
+)
+RUNNER_OWNED_AMBIENT_KEYS = (
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+)
+_FIXTURE_PATH_ENV_KEYS = frozenset(
+    {
+        "AGENT_CANON_PARENT_ROOT", "AGENT_CANON_PARENT_ROOT_DEV",
+        "AGENT_CANON_PARENT_ROOT_INO", "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
+        "AGENT_CANON_SOURCE_ROOT", "AGENT_CANON_ROOT", "AGENT_CANON_CHILD_HANDOFF",
+        "AGENT_CANON_CHILD_PURPOSE", "AGENT_CANON_HANDOFF_AUDIENCE",
+        "AGENT_CANON_FIXTURE_ROLE", "AGENT_CANON_REPORT_ROOT",
+        "AGENT_CANON_RUN_BUNDLE_ROOT", "AGENT_CANON_CLOSEOUT_ROOT",
+        "AGENT_CANON_RECORD_ROOT", "AGENT_CANON_RECORD_ID", "AGENT_CANON_TOOLS_HOME",
+        "CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR",
+        DATA_REPOSITORY_ROOT_ENV, DATA_REPOSITORY_DEV_ENV, DATA_REPOSITORY_INO_ENV,
+        DATA_SOURCE_ROOT_ENV, DATA_ROOT_ENV, "PYTHONPATH",
+        "AGENT_CANON_PARENT_TMPDIR", "AGENT_CANON_PARENT_TMP_ROOT",
+        PRIVATE_RECORD_PARENT_ROOT_ENV, PRIVATE_RECORD_HANDOFF_ENV,
+        PRIVATE_RECORD_REQUIRED_ENV,
+    }
+)
 _DEFAULT_TOKEN_TTL = 900
 _ALLOWED_TRANSPORTS = frozenset({"parent-local-file", "stdin", "descriptor"})
 _ALLOWED_STORAGE = frozenset({"parent-local-file", "pipe"})
@@ -101,6 +138,182 @@ class ParentRootSideEffectError(RuntimeError):
         self.reject = reject
         self.detail = detail
         super().__init__(f"{reject.value}: {detail}")
+
+
+@dataclass
+class RecordCapability:
+    """Explicit private record capability consumed by one fixture adapter."""
+
+    source: Literal["runner_private_record"]
+    record_id: str
+    parent_root: Path
+    handoff: str = field(repr=False)
+    capability_type: Literal["runner_private_record_v2"] = "runner_private_record_v2"
+    owner: Literal["fixture_adapter"] = "fixture_adapter"
+    responsibility_scope: Literal["fixture_child_environment"] = (
+        "fixture_child_environment"
+    )
+    metadata_binding: Literal["canonical_fixed_type"] = "canonical_fixed_type"
+    provenance: Literal["runner_private_record"] = "runner_private_record"
+    consumer: Literal["fixture_adapter"] = "fixture_adapter"
+    transport_env_names: tuple[str, str, str] = PRIVATE_RECORD_TRANSPORT_ENV_NAMES
+    _consumed: bool = field(default=False, init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        if self.capability_type != "runner_private_record_v2":
+            raise ValueError("record capability type is invalid")
+        if self.source != "runner_private_record":
+            raise ValueError("record capability source is invalid")
+        if not self.record_id:
+            raise ValueError("record capability record_id is invalid")
+        self.parent_root = Path(self.parent_root)
+        if not self.handoff:
+            raise ValueError("record capability handoff is invalid")
+        if self.provenance != "runner_private_record":
+            raise ValueError("record capability provenance is invalid")
+        if self.owner != "fixture_adapter":
+            raise ValueError("record capability owner is invalid")
+        if self.responsibility_scope != "fixture_child_environment":
+            raise ValueError("record capability scope is invalid")
+        if self.metadata_binding != "canonical_fixed_type":
+            raise ValueError("record capability metadata binding is invalid")
+        if self.consumer != "fixture_adapter":
+            raise ValueError("record capability consumer is invalid")
+
+    @classmethod
+    def from_record(cls, record: "SessionResolutionResult") -> "RecordCapability":
+        """Materialize a capability only from an already authenticated record."""
+        if type(record) is not SessionResolutionResult or record.status != "active":
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "private_record_capability_requires_active_record",
+            )
+        return cls(
+            source="runner_private_record",
+            record_id=record.record.record_id or "",
+            parent_root=record.parent_root,
+            handoff=record.handoff,
+        )
+
+    @classmethod
+    def from_environment(
+        cls, environment: Mapping[str, str], *, observed_cwd: Path | None = None
+    ) -> "RecordCapability":
+        """Read only the distinct private producer channel from an environment."""
+        required = environment.get(PRIVATE_RECORD_REQUIRED_ENV)
+        parent = environment.get(PRIVATE_RECORD_PARENT_ROOT_ENV, "")
+        handoff = environment.get(PRIVATE_RECORD_HANDOFF_ENV, "")
+        if required != "1" or not parent or not handoff:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "private_record_capability_missing",
+            )
+        try:
+            resolved_parent = _physical(Path(parent), strict=True)
+        except (OSError, RuntimeError, ValueError) as exc:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "private_record_capability_parent_invalid",
+            ) from exc
+        if observed_cwd is not None and not _contains(resolved_parent, _physical(observed_cwd, strict=True)):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISMATCH,
+                "private_record_capability_cwd_outside_parent",
+            )
+        try:
+            raw = base64.urlsafe_b64decode(handoff.encode("ascii"))
+            decoded: object = json.loads(raw.decode("utf-8"))
+            envelope: Mapping[str, object] = (
+                cast(Mapping[str, object], decoded)
+                if isinstance(decoded, Mapping)
+                else {}
+            )
+            record_value: object = envelope.get("record")
+            record_mapping: Mapping[str, object] = (
+                cast(Mapping[str, object], record_value)
+                if isinstance(record_value, Mapping)
+                else {}
+            )
+            record_id: object = record_mapping.get("record_id")
+        except (KeyError, TypeError, ValueError, UnicodeError, json.JSONDecodeError):
+            record_id = None
+        if not isinstance(record_id, str) or not record_id:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "private_record_capability_record_id_invalid",
+            )
+        return cls(
+            source="runner_private_record",
+            record_id=record_id,
+            parent_root=resolved_parent,
+            handoff=handoff,
+        )
+
+    def transport_environment(self) -> dict[str, str]:
+        """Return the private producer channel for one explicit adapter call."""
+        return {
+            PRIVATE_RECORD_PARENT_ROOT_ENV: str(self.parent_root),
+            PRIVATE_RECORD_HANDOFF_ENV: self.handoff,
+            PRIVATE_RECORD_REQUIRED_ENV: "1",
+        }
+
+    def consume(self) -> None:
+        """Mark the opaque capability consumed exactly once."""
+        if self._consumed:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "private_record_capability_reused",
+            )
+        self._consumed = True
+
+    @property
+    def consumed(self) -> bool:
+        """Return whether the capability has been consumed by its adapter."""
+        return self._consumed
+
+
+@dataclass(frozen=True)
+class FixtureEnvironmentRequest:
+    """Typed inputs for fixture child environment construction."""
+
+    request_id: str
+    mode: Literal["ordinary_tool", "product_fixture", "synthetic_tool"]
+    record_capability: RecordCapability | None
+    ambient_env: Mapping[str, str]
+    explicit_target_dir: Path | None = None
+    explicit_path_entries: tuple[Path, ...] = ()
+    fixture_root: Path = Path()
+
+    def __post_init__(self) -> None:
+        if not self.request_id:
+            raise ParentRootSideEffectError(
+                ParentRootReject.INPUT_INVALID,
+                "fixture environment request id is invalid",
+            )
+        if self.mode not in {"ordinary_tool", "product_fixture", "synthetic_tool"}:
+            raise ParentRootSideEffectError(
+                ParentRootReject.INPUT_INVALID,
+                "fixture environment request mode is invalid",
+            )
+        if self.record_capability is not None and type(self.record_capability) is not RecordCapability:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "fixture environment capability is invalid",
+            )
+        if self.mode != "ordinary_tool" and self.record_capability is None:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "fixture environment capability is required",
+            )
+        object.__setattr__(self, "ambient_env", dict(self.ambient_env))
+        object.__setattr__(self, "fixture_root", Path(self.fixture_root))
+        if self.explicit_target_dir is not None:
+            object.__setattr__(self, "explicit_target_dir", Path(self.explicit_target_dir))
+        object.__setattr__(
+            self,
+            "explicit_path_entries",
+            tuple(Path(entry) for entry in self.explicit_path_entries),
+        )
 
 
 @dataclass(frozen=True)
@@ -263,6 +476,27 @@ class ParentOwnedPathReceipt:
     lexical_parent_components: tuple[tuple[str, int, int], ...] = ()
     session_lease: ParentSideEffectLease | _V2Lease | None = field(default=None, repr=False, compare=False)
     session_handle: str = field(default="", repr=False, compare=False)
+
+
+@dataclass
+class FixtureAdapterLifecycleReceipt:
+    """Locked begin/end readback for one fixture-adapter child registration."""
+
+    shared_parent: ParentOwnedPathReceipt
+    registration_root: ParentOwnedPathReceipt
+    owned_root: ParentOwnedPathReceipt
+    registration: ParentOwnedPathReceipt
+    shared_parent_identity: tuple[int, int]
+    registration_root_identity: tuple[int, int]
+    owned_root_identity: tuple[int, int]
+    registration_identity: tuple[int, int]
+    remaining_count: int = 1
+    owned_root_absent: bool = False
+    registration_absent: bool = False
+    shared_parent_absent: bool = False
+    lock_closed: bool = True
+    no_residue: bool = False
+    ended: bool = False
 
 
 @dataclass
@@ -4269,15 +4503,25 @@ class ParentRootSideEffectBoundary:
                 f"parent-owned tree cleanup failed: {detail}",
             ) from errors[0]
 
+    def fixture_adapter_parent_lifecycle(
+        self,
+        record: "SessionResolutionResult",
+        shared_parent: Path,
+    ) -> "FixtureAdapterParentLifecycle":
+        """Create the private locked lifecycle owner for one adapter parent."""
+        return FixtureAdapterParentLifecycle(self, record, shared_parent)
+
     def child_environment(
         self,
         attestation: ParentRootAttestationReceipt,
         base_env: Mapping[str, str] | None = None,
         *,
+        explicit_overrides: PublicExecOverrides | None = None,
         issue_handoff: bool = True,
         rebase_inherited_temp: bool = False,
     ) -> dict[str, str]:
         """Bind persistent child state and temporary state to the parent."""
+        explicit_overrides = _typed_public_exec_overrides(explicit_overrides)
         env = dict(os.environ if base_env is None else base_env)
         if rebase_inherited_temp:
             for name in ("TMPDIR", "TEMP", "TMP"):
@@ -4287,12 +4531,51 @@ class ParentRootSideEffectBoundary:
         default_cache = root / ".agent-canon" / "cache"
         default_target = default_cache / "cargo-target"
 
-        def parent_local_value(name: str, default: Path) -> Path:
+        def explicit_parent_local_path(value: Path) -> Path:
+            """Map an explicit outside-parent path to the public typed reject."""
+            try:
+                return _physical_in_root(root, value, allow_missing=True)[0]
+            except ParentRootSideEffectError as exc:
+                if exc.reject is ParentRootReject.SYMLINK_ESCAPE:
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_MISMATCH,
+                        "explicit override is outside parent root",
+                    ) from exc
+                raise
+
+        def parent_local_value(
+            name: str,
+            default: Path,
+            explicit_value: Path | None = None,
+        ) -> Path:
             """Validate one environment path without creating anything."""
-            value = env.get(name)
-            candidate = Path(value) if value else default
+            if explicit_overrides is not None:
+                candidate = explicit_value if explicit_value is not None else default
+            else:
+                value = env.get(name)
+                candidate = Path(value) if value else default
+            if explicit_overrides is not None and explicit_value is not None:
+                return explicit_parent_local_path(candidate)
             physical, _ = _physical_in_root(root, candidate, allow_missing=True)
             return physical
+
+        explicit_target_a = (
+            None if explicit_overrides is None else explicit_overrides.cargo_target_dir
+        )
+        explicit_target_b = (
+            None if explicit_overrides is None else explicit_overrides.cli_target_dir
+        )
+        if (
+            explicit_overrides is not None
+            and explicit_target_a is not None
+            and explicit_target_b is not None
+        ):
+            target_a = explicit_parent_local_path(explicit_target_a)
+            target_b = explicit_parent_local_path(explicit_target_b)
+            if target_a != target_b:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISMATCH, "target_alias_mismatch"
+                )
 
         # Validate every override before creating any of the parent-local
         # directories.  In particular, a late invalid value must not leave
@@ -4301,22 +4584,52 @@ class ParentRootSideEffectBoundary:
             "TMPDIR": parent_local_value("TMPDIR", default_tmp),
             "TEMP": parent_local_value("TEMP", default_tmp),
             "TMP": parent_local_value("TMP", default_tmp),
-            "XDG_CACHE_HOME": parent_local_value("XDG_CACHE_HOME", default_cache),
+            "XDG_CACHE_HOME": parent_local_value(
+                "XDG_CACHE_HOME",
+                default_cache,
+                None if explicit_overrides is None else explicit_overrides.xdg_cache_home,
+            ),
             "PYTHONPYCACHEPREFIX": parent_local_value(
-                "PYTHONPYCACHEPREFIX", default_cache / "pycache"
+                "PYTHONPYCACHEPREFIX",
+                default_cache / "pycache",
+                None
+                if explicit_overrides is None
+                else explicit_overrides.python_pycache_prefix,
             ),
             "AGENT_CANON_TOOLS_HOME": parent_local_value(
-                "AGENT_CANON_TOOLS_HOME", root / ".agent-canon" / "tools"
+                "AGENT_CANON_TOOLS_HOME",
+                root / ".agent-canon" / "tools",
+                None if explicit_overrides is None else explicit_overrides.tools_home,
             ),
-            "CARGO_HOME": parent_local_value("CARGO_HOME", default_cache / "cargo-home"),
+            "CARGO_HOME": parent_local_value(
+                "CARGO_HOME",
+                default_cache / "cargo-home",
+                None if explicit_overrides is None else explicit_overrides.cargo_home,
+            ),
         }
-        target_a = parent_local_value("CARGO_TARGET_DIR", default_target)
-        target_b = parent_local_value("AGENT_CANON_CLI_TARGET_DIR", default_target)
-        if env.get("CARGO_TARGET_DIR") and env.get("AGENT_CANON_CLI_TARGET_DIR") and target_a != target_b:
+        target_a = parent_local_value("CARGO_TARGET_DIR", default_target, explicit_target_a)
+        target_b = parent_local_value(
+            "AGENT_CANON_CLI_TARGET_DIR", default_target, explicit_target_b
+        )
+        if (
+            explicit_overrides is None
+            and env.get("CARGO_TARGET_DIR")
+            and env.get("AGENT_CANON_CLI_TARGET_DIR")
+            and target_a != target_b
+        ):
             raise ParentRootSideEffectError(
                 ParentRootReject.ROOT_MISMATCH, "target_alias_mismatch"
             )
-        target = target_a if env.get("CARGO_TARGET_DIR") else target_b
+        if explicit_overrides is not None:
+            target = (
+                target_a
+                if explicit_target_a is not None
+                else target_b
+                if explicit_target_b is not None
+                else _physical_in_root(root, default_target, allow_missing=True)[0]
+            )
+        else:
+            target = target_a if env.get("CARGO_TARGET_DIR") else target_b
         paths["CARGO_TARGET_DIR"] = target
         paths["AGENT_CANON_CLI_TARGET_DIR"] = target
         for key, path in paths.items():
@@ -5007,6 +5320,9 @@ def _v2_session_environment(
         "AGENT_CANON_CHILD_PURPOSE", "AGENT_CANON_HANDOFF_AUDIENCE",
         "AGENT_CANON_FIXTURE_ROLE", "AGENT_CANON_REPORT_ROOT",
         "AGENT_CANON_RUN_BUNDLE_ROOT", "AGENT_CANON_CLOSEOUT_ROOT",
+        PRIVATE_RECORD_PARENT_ROOT_ENV,
+        PRIVATE_RECORD_HANDOFF_ENV,
+        PRIVATE_RECORD_REQUIRED_ENV,
     ):
         env.pop(key, None)
     env[SIDE_EFFECT_PARENT_ROOT_ENV] = str(result.parent_root)
@@ -5739,6 +6055,27 @@ _V2_ISSUER_CONTEXT: contextvars.ContextVar[_SupervisorIssuer | None] = contextva
 )
 
 
+@contextmanager
+def record_session_context(record: SessionResolutionResult) -> Iterator[SessionResolutionResult]:
+    """Expose one ordinary record through the central writer context.
+
+    Ordinary consumers receive the Mapping-compatible child from
+    ``record_environment``.  In-process writers that need a parent-owned
+    attestation resolve the same record through this context rather than
+    reconstructing or mutating process environment keys.
+    """
+    if type(record) is not SessionResolutionResult or record.status != "active":
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "record_session_context_requires_active_record",
+        )
+    token = _V2_SESSION_CONTEXT.set(record)
+    try:
+        yield record
+    finally:
+        _V2_SESSION_CONTEXT.reset(token)
+
+
 def current_supervisor_issuer() -> _SupervisorIssuer | None:
     """Return the private issuer for the active public supervisor context."""
     return _V2_ISSUER_CONTEXT.get()
@@ -5764,6 +6101,183 @@ class FixtureExecutionReceipt:
     fixture_root_ino: int
     returncode: int
     cleanup: CleanupEvidence
+    environment: "FixtureEnvironmentReceipt"
+
+
+@dataclass(frozen=True)
+class InputProvenance:
+    """Decision evidence for one environment input."""
+
+    name: str
+    source: Literal[
+        "caller_explicit",
+        "runner_inherited",
+        "fixture_derived",
+        "private_transport",
+        "ambient_other",
+    ]
+    decision: Literal["accepted", "dropped", "scrubbed"]
+    reason: Literal[
+        "explicit_override",
+        "derived_below_fixture_root",
+        "inherited_runner_authority",
+        "private_before_child",
+        "unsupported_ambient_authority",
+        "outside_authenticated_parent",
+        "target_alias_mismatch",
+    ]
+    value_digest: str | None = None
+    requested_value: Path | None = None
+    effective_value: Path | None = None
+
+
+@dataclass(frozen=True)
+class PublicExecOverrides:
+    """Typed caller-owned path overrides for one public child execution."""
+
+    provenance: Literal["caller_explicit"] = "caller_explicit"
+    tools_home: Path | None = None
+    cargo_home: Path | None = None
+    cargo_target_dir: Path | None = None
+    cli_target_dir: Path | None = None
+    xdg_cache_home: Path | None = None
+    python_pycache_prefix: Path | None = None
+
+    def __post_init__(self) -> None:
+        if self.provenance != "caller_explicit":
+            raise ValueError("public-exec overrides require caller_explicit provenance")
+        for name in (
+            "tools_home",
+            "cargo_home",
+            "cargo_target_dir",
+            "cli_target_dir",
+            "xdg_cache_home",
+            "python_pycache_prefix",
+        ):
+            value = getattr(self, name)
+            if value is not None and not isinstance(value, Path):
+                raise TypeError(f"{name} must be a pathlib.Path or None")
+
+
+def _typed_public_exec_overrides(
+    value: object,
+) -> PublicExecOverrides | None:
+    """Validate the sole projector boundary for public child path overrides."""
+    if value is not None and not isinstance(value, PublicExecOverrides):
+        raise ParentRootSideEffectError(
+            ParentRootReject.INPUT_INVALID,
+            "explicit_overrides must be PublicExecOverrides",
+        )
+    return value
+
+
+@dataclass
+class FixtureEnvironmentReceipt:
+    """Readback for one authenticated fixture-child environment."""
+
+    request_id: str
+    mode: Literal["ordinary_tool", "product_fixture", "synthetic_tool"]
+    authenticated_parent: Path
+    fixture_root: Path
+    local_root: Path
+    parent_tmpdir: Path
+    accepted_path_entries: tuple[str, ...]
+    dropped_path_entries: tuple[str, ...]
+    outer_sentinel: str | None
+    outer_sentinel_identity: tuple[int, int] | None
+    outer_sentinel_unchanged: bool
+    cleanup_paths: tuple[Path, ...]
+    cwd_identity: tuple[Path, int, int]
+    target_source: Literal["caller_explicit", "fixture_derived"] = "fixture_derived"
+    requested_target: Path | None = None
+    effective_target: Path | None = None
+    capability_source: Literal["runner_private_record"] = "runner_private_record"
+    capability_type: Literal["runner_private_record_v2"] = "runner_private_record_v2"
+    capability_record_id: str = ""
+    capability_parent_root: Path = Path()
+    capability_owner: Literal["fixture_adapter"] = "fixture_adapter"
+    capability_scope: Literal["fixture_child_environment"] = "fixture_child_environment"
+    capability_consumed_once: bool = False
+    capability_consumption_count: int = 0
+    capability_consumed_exactly_once: bool = False
+    input_provenance: tuple[InputProvenance, ...] = ()
+    private_transport_names: tuple[str, ...] = PRIVATE_RECORD_TRANSPORT_ENV_NAMES
+    private_transport_scrubbed_at: Literal["adapter_before_child"] = "adapter_before_child"
+    dropped_ambient_values: tuple[tuple[str, str, str], ...] = ()
+    private_transport_absent_in_child: bool = True
+    public_projection_record_id: str | None = None
+    public_projection_provenance: Literal[
+        "ordinary_record", "fixture_independent", "none"
+    ] = "none"
+    public_projection_not_private_token: bool = True
+    outer_tmpdir: Path | None = None
+    fixture_git_root: Path | None = None
+    fixture_sentinel: Path | None = None
+    issued_child_ids: tuple[str, ...] = ()
+    revoked_child_ids: tuple[str, ...] = ()
+    held_leases_after_rollback: int = 0
+    exact_record_root_removed: bool = False
+    cleanup_status: Literal["clean", "rolled_back", "failed"] = "clean"
+    sentinel_path: Path = Path()
+    sentinel_device: int = 0
+    sentinel_inode: int = 0
+    sentinel_content_digest: str = ""
+    sentinel_root_binding: str = ""
+    sentinel_preexisting: bool = False
+    sentinel_created_by_adapter: bool = False
+    sentinel_held_until_child_exit: bool = False
+    sentinel_removed: bool = False
+    no_residue: bool = False
+    adapter_shared_parent_identity: tuple[int, int] | None = None
+    adapter_registration_root_identity: tuple[int, int] | None = None
+    adapter_owned_root_identity: tuple[int, int] | None = None
+    adapter_registration_identity: tuple[int, int] | None = None
+    adapter_remaining_count: int = 0
+    adapter_owned_root_absent: bool = False
+    adapter_registration_absent: bool = False
+    adapter_shared_parent_absent: bool = False
+    adapter_lock_closed: bool = True
+
+
+@dataclass
+class FixtureChildEnvironment(Mapping[str, str]):
+    """One scrubbed child environment and its boundary-owned readback."""
+
+    environment: Mapping[str, str]
+    receipt: FixtureEnvironmentReceipt
+    _cleanup: Callable[[], None] | None = field(default=None, repr=False, compare=False)
+    _closed: bool = field(default=False, init=False, repr=False, compare=False)
+
+    def __getitem__(self, key: str) -> str:
+        return self.environment[key]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.environment)
+
+    def __len__(self) -> int:
+        return len(self.environment)
+
+    def close(self) -> None:
+        if self._closed:
+            return
+        self._closed = True
+        if self._cleanup is not None:
+            self._cleanup()
+
+    @property
+    def cleanup_callback(self) -> Callable[[], None] | None:
+        """Return the lifecycle callback for one projector-owned child."""
+        return self._cleanup
+
+    def set_cleanup(self, callback: Callable[[], None]) -> None:
+        """Replace the callback while preserving the one-close guard."""
+        self._cleanup = callback
+
+    def __enter__(self) -> "FixtureChildEnvironment":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self.close()
 
 
 def _fixture_direct_error(
@@ -5819,47 +6333,688 @@ def _fixture_direct_identity(
 
 
 def _fixture_direct_child_environment(
-    record: SessionResolutionResult, local_root: Path
-) -> dict[str, str]:
-    """Prepare only fixture-local process paths and no inherited authority."""
-    env = _v2_session_environment(record, os.environ)
+    record: SessionResolutionResult,
+    local_root: Path,
+    *,
+    request: FixtureEnvironmentRequest | None = None,
+    fixture_root: Path | None = None,
+    base_env: Mapping[str, str] | None = None,
+    ambient_env: Mapping[str, str] | None = None,
+    explicit_target_dir: Path | None = None,
+    explicit_path_entries: Sequence[str] | None = None,
+) -> FixtureChildEnvironment:
+    """Build the sole scrubbed fixture environment and its typed readback."""
+    if request is not None:
+        if any(
+            value is not None
+            for value in (fixture_root, base_env, ambient_env, explicit_target_dir)
+        ) or explicit_path_entries is not None:
+            raise _fixture_direct_error(
+                "REQUEST_INPUT_DUPLICATE", ParentRootReject.INPUT_INVALID
+            )
+        fixture_root = request.fixture_root
+        ambient_env = request.ambient_env
+        explicit_target_dir = request.explicit_target_dir
+        explicit_path_entries = tuple(str(entry) for entry in request.explicit_path_entries)
+    if base_env is not None and ambient_env is not None:
+        raise _fixture_direct_error("AMBIENT_INPUT_DUPLICATE", ParentRootReject.INPUT_INVALID)
+    if base_env is not None:
+        source_env: Mapping[str, str] = base_env
+    elif ambient_env is not None:
+        source_env = ambient_env
+    else:
+        source_env = os.environ
+    parent = _v2_physical_identity(Path(record.record.parent_root_realpath)).realpath
+    local = _v2_physical_identity(local_root).realpath
+    fixture = local if fixture_root is None else _v2_physical_identity(fixture_root).realpath
+    if not _contains(parent, fixture) or not _contains(fixture, local):
+        raise _fixture_direct_error("OUTSIDE_PARENT", ParentRootReject.ROOT_MISMATCH)
+    capability = (
+        request.record_capability
+        if request is not None and request.record_capability is not None
+        else RecordCapability.from_record(record)
+    )
+    if capability.parent_root != parent:
+        raise _fixture_direct_error("CAPABILITY_ROOT_MISMATCH", ParentRootReject.ROOT_MISMATCH)
+
+    outer_sentinel = source_env.get("AGENT_CANON_PARENT_TMPDIR")
+    outer_tmpdir_value = source_env.get("TMPDIR")
+
+    def sentinel_identity(value: str | None) -> tuple[int, int] | None:
+        if not value:
+            return None
+        try:
+            info = Path(value).resolve(strict=True).stat()
+        except (OSError, RuntimeError):
+            return None
+        return info.st_dev, info.st_ino
+
+    outer_sentinel_before = sentinel_identity(outer_sentinel)
+
+    # PATH is never trusted from ``base_env``.  Only the separately typed
+    # ``explicit_path_entries`` argument can add fixture-local candidates;
+    # the source environment's PATH is retained only as dropped readback.
+    explicit_path = explicit_path_entries
+    accepted: list[str] = []
+    dropped: list[str] = []
+    if explicit_path:
+        for entry in explicit_path:
+            if not entry:
+                raise _fixture_direct_error("PATH_INVALID", ParentRootReject.INPUT_INVALID)
+            try:
+                candidate = _physical_in_root(fixture, Path(entry), allow_missing=True)[0]
+            except ParentRootSideEffectError as exc:
+                raise _fixture_direct_error(
+                    "PATH_OUTSIDE_FIXTURE", ParentRootReject.ROOT_MISMATCH
+                ) from exc
+            if not candidate.is_dir():
+                raise _fixture_direct_error("PATH_INVALID", ParentRootReject.INPUT_INVALID)
+            value = str(candidate)
+            if value not in accepted:
+                accepted.append(value)
+    else:
+        source_path = source_env.get("PATH", "")
+        dropped.extend(entry for entry in source_path.split(os.pathsep) if entry)
+
+    env = _v2_session_environment(record, source_env)
+    input_provenance: list[InputProvenance] = []
+    for name in PRIVATE_RECORD_TRANSPORT_ENV_NAMES:
+        if name in source_env:
+            input_provenance.append(
+                InputProvenance(
+                    name=name,
+                    source="private_transport",
+                    decision="scrubbed",
+                    reason="private_before_child",
+                    value_digest=_sha256(str(source_env[name]).encode("utf-8")),
+                )
+            )
     for key in tuple(env):
         if key.startswith("AGENT_CANON_SIDE_EFFECT_"):
             env.pop(key, None)
-    for key in (
-        "AGENT_CANON_PARENT_ROOT", "AGENT_CANON_PARENT_ROOT_DEV", "AGENT_CANON_PARENT_ROOT_INO",
-        "AGENT_CANON_ACTIVE_REPOSITORY_ROOT", "AGENT_CANON_SOURCE_ROOT", "AGENT_CANON_ROOT",
-        "AGENT_CANON_CHILD_HANDOFF", "AGENT_CANON_CHILD_PURPOSE", "AGENT_CANON_HANDOFF_AUDIENCE",
-        "AGENT_CANON_FIXTURE_ROLE", "AGENT_CANON_REPORT_ROOT", "AGENT_CANON_RUN_BUNDLE_ROOT",
-        "AGENT_CANON_CLOSEOUT_ROOT", "AGENT_CANON_RECORD_ROOT", "AGENT_CANON_RECORD_ID",
-        "AGENT_CANON_TOOLS_HOME", "AGENT_CANON_CLI_TARGET_DIR", DATA_REPOSITORY_ROOT_ENV, DATA_REPOSITORY_DEV_ENV,
-        DATA_REPOSITORY_INO_ENV, DATA_SOURCE_ROOT_ENV, DATA_ROOT_ENV, "PYTHONPATH",
-    ):
+    for key in _FIXTURE_PATH_ENV_KEYS:
         env.pop(key, None)
     local_paths = {
-        "HOME": local_root / "home",
-        "TMPDIR": local_root / "tmp",
-        "TEMP": local_root / "tmp",
-        "TMP": local_root / "tmp",
-        "XDG_CACHE_HOME": local_root / "xdg-cache",
-        "XDG_CONFIG_HOME": local_root / "xdg-config",
-        "XDG_DATA_HOME": local_root / "xdg-data",
-        "PYTHONPYCACHEPREFIX": local_root / "pycache",
-        "CARGO_HOME": local_root / "cargo-home",
-        "CARGO_TARGET_DIR": local_root / "cargo-target",
-        "AGENT_CANON_TOOLS_HOME": local_root / "tools",
-        "AGENT_CANON_CLI_TARGET_DIR": local_root / "cargo-target",
+        "HOME": local / "home",
+        "TMPDIR": local / "tmp",
+        "TEMP": local / "tmp",
+        "TMP": local / "tmp",
+        "AGENT_CANON_PARENT_TMPDIR": local / "tmp",
+        "XDG_CACHE_HOME": local / "xdg-cache",
+        "XDG_CONFIG_HOME": local / "xdg-config",
+        "XDG_DATA_HOME": local / "xdg-data",
+        "PYTHONPYCACHEPREFIX": local / "pycache",
+        "CARGO_HOME": local / "cargo-home",
+        "CARGO_TARGET_DIR": local / "cargo-target",
+        "AGENT_CANON_TOOLS_HOME": local / "tools",
+        "AGENT_CANON_CLI_TARGET_DIR": local / "cargo-target",
     }
     for name, path in local_paths.items():
         path.mkdir(mode=0o700, parents=True, exist_ok=True)
         env[name] = str(path)
-    return env
+    requested_target = None if explicit_target_dir is None else Path(explicit_target_dir)
+    target_source: Literal["caller_explicit", "fixture_derived"] = (
+        "caller_explicit" if requested_target is not None else "fixture_derived"
+    )
+    if requested_target is not None:
+        try:
+            target = _physical_in_root(fixture, requested_target, allow_missing=True)[0]
+        except ParentRootSideEffectError as exc:
+            raise _fixture_direct_error(
+                "TARGET_OUTSIDE_FIXTURE: path resolves outside fixture root",
+                ParentRootReject.ROOT_MISMATCH,
+            ) from exc
+        input_provenance.append(
+            InputProvenance(
+                name="explicit_target_dir",
+                source="caller_explicit",
+                decision="accepted",
+                reason="explicit_override",
+                value_digest=_sha256(str(requested_target).encode("utf-8")),
+            )
+        )
+    else:
+        target = local / "cargo-target"
+        input_provenance.append(
+            InputProvenance(
+                name="CARGO_TARGET_DIR",
+                source="fixture_derived",
+                decision="accepted",
+                reason="derived_below_fixture_root",
+                value_digest=_sha256(str(target).encode("utf-8")),
+            )
+        )
+    env["CARGO_TARGET_DIR"] = str(target)
+    env["AGENT_CANON_CLI_TARGET_DIR"] = str(target)
+    dropped_ambient_values = tuple(
+        (name, str(source_env[name]), "runner_inherited")
+        for name in ("CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR")
+        if name in source_env
+    )
+    for name, value, _reason in dropped_ambient_values:
+        input_provenance.append(
+            InputProvenance(
+                name=name,
+                source="runner_inherited",
+                decision="dropped",
+                reason="inherited_runner_authority",
+                value_digest=_sha256(value.encode("utf-8")),
+            )
+        )
+    if explicit_path_entries is None:
+        for entry in dropped:
+            input_provenance.append(
+                InputProvenance(
+                    name="PATH",
+                    source="ambient_other",
+                    decision="dropped",
+                    reason="unsupported_ambient_authority",
+                    value_digest=_sha256(entry.encode("utf-8")),
+                )
+            )
+    else:
+        for entry in accepted:
+            input_provenance.append(
+                InputProvenance(
+                    name="explicit_path_entries",
+                    source="caller_explicit",
+                    decision="accepted",
+                    reason="explicit_override",
+                    value_digest=_sha256(entry.encode("utf-8")),
+                )
+            )
+
+    # Materialize the exact nested-root sentinel only after all caller inputs
+    # have passed containment checks.  A rejected target therefore performs no
+    # fixture write before the typed failure is returned.
+    sentinel = fixture / ".agent-canon" / "fixture-sentinel"
+    _DEFAULT_BOUNDARY.ensure_parent_owned_directory(
+        record.attestation,
+        sentinel.parent,
+        "fixture-root-sentinel-parent",
+    )
+    sentinel_payload = f"{fixture}\n".encode("utf-8")
+    sentinel_preexisting = sentinel.exists()
+    sentinel_created_by_adapter = False
+    sentinel_receipt: ParentOwnedPathReceipt | None = None
+    if not sentinel_preexisting:
+        sentinel_receipt = _DEFAULT_BOUNDARY.write_parent_owned_file(
+            record.attestation,
+            sentinel,
+            sentinel_payload,
+            "fixture-root-sentinel",
+        )
+        sentinel_created_by_adapter = True
+    else:
+        try:
+            observed_payload = sentinel.read_bytes()
+            observed_identity = sentinel.stat()
+        except OSError as exc:
+            raise _fixture_direct_error(
+                "FIXTURE_SENTINEL_INVALID", ParentRootReject.ROOT_MISMATCH
+            ) from exc
+        if observed_payload != sentinel_payload:
+            raise _fixture_direct_error(
+                "FIXTURE_SENTINEL_BINDING", ParentRootReject.ROOT_MISMATCH
+            )
+        sentinel_device = observed_identity.st_dev
+        sentinel_inode = observed_identity.st_ino
+    sentinel_stat = sentinel.stat()
+    sentinel_device = sentinel_stat.st_dev
+    sentinel_inode = sentinel_stat.st_ino
+    sentinel_content_digest = _sha256(sentinel_payload)
+    canonical_tools = str(local / "tools")
+    path_entries = [*accepted, canonical_tools]
+    path_entries.extend(entry for entry in _FIXTURE_EXEC_PATH if entry not in path_entries)
+    env["PATH"] = os.pathsep.join(path_entries)
+    cwd = _v2_physical_identity(Path.cwd())
+    outer_sentinel_after = sentinel_identity(outer_sentinel)
+    receipt = FixtureEnvironmentReceipt(
+        request_id=request.request_id if request is not None else secrets.token_hex(16),
+        mode=request.mode if request is not None else "product_fixture",
+        authenticated_parent=parent,
+        fixture_root=fixture,
+        local_root=local,
+        parent_tmpdir=local / "tmp",
+        accepted_path_entries=tuple(accepted),
+        dropped_path_entries=tuple(dropped),
+        outer_sentinel=outer_sentinel,
+        outer_sentinel_identity=outer_sentinel_before,
+        outer_sentinel_unchanged=(outer_sentinel_before == outer_sentinel_after),
+        cleanup_paths=(local,),
+        cwd_identity=(cwd.realpath, cwd.dev, cwd.ino),
+        target_source=target_source,
+        requested_target=requested_target,
+        effective_target=target,
+        capability_record_id=capability.record_id,
+        capability_parent_root=capability.parent_root,
+        capability_consumed_once=capability.consumed,
+        capability_consumption_count=1 if capability.consumed else 0,
+        capability_consumed_exactly_once=capability.consumed,
+        input_provenance=tuple(input_provenance),
+        dropped_ambient_values=dropped_ambient_values,
+        private_transport_absent_in_child=not any(
+            key in env for key in PRIVATE_RECORD_TRANSPORT_ENV_NAMES
+        ),
+        public_projection_record_id=(
+            record.record.record_id if request is not None and request.mode == "ordinary_tool" else None
+        ),
+        public_projection_provenance=(
+            "ordinary_record" if request is not None and request.mode == "ordinary_tool" else "none"
+        ),
+        public_projection_not_private_token=(
+            request is None
+            or request.mode != "ordinary_tool"
+            or record.record.record_id != capability.record_id
+        ),
+        outer_tmpdir=(Path(outer_tmpdir_value) if outer_tmpdir_value else None),
+        fixture_git_root=fixture,
+        fixture_sentinel=sentinel,
+        sentinel_path=sentinel,
+        sentinel_device=sentinel_device,
+        sentinel_inode=sentinel_inode,
+        sentinel_content_digest=sentinel_content_digest,
+        sentinel_root_binding=str(fixture),
+        sentinel_preexisting=sentinel_preexisting,
+        sentinel_created_by_adapter=sentinel_created_by_adapter,
+        sentinel_held_until_child_exit=True,
+    )
+
+    def cleanup() -> None:
+        """Release only the adapter-created marker after child exit."""
+        try:
+            current = sentinel.stat()
+            current_digest = _sha256(sentinel.read_bytes())
+            same_identity = (
+                current.st_dev == receipt.sentinel_device
+                and current.st_ino == receipt.sentinel_inode
+                and current_digest == receipt.sentinel_content_digest
+            )
+            if receipt.sentinel_created_by_adapter and same_identity and sentinel_receipt is not None:
+                _DEFAULT_BOUNDARY.remove_parent_owned_file(sentinel_receipt)
+                _DEFAULT_BOUNDARY.remove_empty_parent_owned_directory(
+                    record.attestation,
+                    sentinel.parent,
+                    "fixture-root-sentinel-parent-cleanup",
+                )
+                receipt.sentinel_removed = True
+            elif receipt.sentinel_created_by_adapter and not same_identity:
+                receipt.cleanup_status = "failed"
+                receipt.no_residue = False
+                raise _fixture_direct_error(
+                    "FIXTURE_SENTINEL_RACE", ParentRootReject.ROOT_RACE_DETECTED
+                )
+            else:
+                receipt.sentinel_removed = False
+            receipt.cleanup_status = "clean"
+            receipt.no_residue = True
+        except FileNotFoundError:
+            if receipt.sentinel_created_by_adapter:
+                receipt.sentinel_removed = True
+                receipt.cleanup_status = "clean"
+                receipt.no_residue = True
+            else:
+                receipt.cleanup_status = "failed"
+                receipt.no_residue = False
+                raise
+        finally:
+            receipt.sentinel_held_until_child_exit = False
+
+    return FixtureChildEnvironment(env, receipt, cleanup)
+
+
+class FixtureAdapterParentLifecycle:
+    """Own one registered fixture child beneath a locked shared parent."""
+
+    def __init__(
+        self,
+        boundary: ParentRootSideEffectBoundary,
+        record: SessionResolutionResult,
+        shared_parent: Path,
+    ) -> None:
+        self._boundary = boundary
+        self._record = record
+        self._shared_parent = shared_parent
+        self._attestation = record.attestation
+        self.receipt: FixtureAdapterLifecycleReceipt | None = None
+
+    def _locked_attestation(self) -> ParentRootAttestationReceipt:
+        refreshed = self._boundary._refresh_attestation(  # pyright: ignore[reportPrivateUsage]
+            self._attestation, "fixture-adapter-lifecycle"
+        )
+        # The enclosing v2 session lock is the revalidation boundary for the
+        # complete begin/end transaction.  Do not reacquire it from each
+        # parent-owned helper while that lock is held.
+        lease = refreshed.session_lease
+        try:
+            return replace(refreshed, session_handle="", session_lease=None)
+        finally:
+            self._boundary._release_operation_lease(lease)  # pyright: ignore[reportPrivateUsage]
+
+    @contextmanager
+    def _parent_lifecycle_lock(
+        self, attestation: ParentRootAttestationReceipt
+    ) -> Iterator[None]:
+        """Lock the authenticated parent namespace shared by all sessions."""
+        lock_receipt = self._boundary.ensure_parent_owned_directory(
+            attestation,
+            attestation.parent_root / ".agent-canon",
+            "fixture-adapter-parent-lock-namespace",
+        )
+        lock_fd = os.open(
+            lock_receipt.physical_path,
+            os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+        )
+        before_lock_dir = os.fstat(lock_fd)
+        before_parent = _identity(attestation.parent_root)
+        try:
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            after_lock_dir = os.fstat(lock_fd)
+            if (after_lock_dir.st_dev, after_lock_dir.st_ino) != (
+                before_lock_dir.st_dev,
+                before_lock_dir.st_ino,
+            ):
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "fixture adapter lock namespace identity changed",
+                )
+            if _identity(attestation.parent_root) != before_parent:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_RACE_DETECTED,
+                    "parent identity changed around fixture adapter lock",
+                )
+            self._target_identity(lock_receipt, "fixture adapter lock namespace")
+            yield
+        finally:
+            fcntl.flock(lock_fd, fcntl.LOCK_UN)
+            os.close(lock_fd)
+
+    @staticmethod
+    def _target_identity(receipt: ParentOwnedPathReceipt, label: str) -> tuple[int, int]:
+        try:
+            _verify_parent_components(receipt)
+            info = receipt.physical_path.lstat()
+        except FileNotFoundError as exc:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISSING,
+                f"{label} disappeared before lifecycle operation",
+            ) from exc
+        observed = (info.st_dev, info.st_ino)
+        expected = (receipt.target_dev, receipt.target_ino)
+        if expected != observed or not stat.S_ISDIR(info.st_mode):
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_RACE_DETECTED,
+                f"{label} identity changed before lifecycle operation",
+            )
+        return observed
+
+    @classmethod
+    def _registration_names(
+        cls,
+        receipt: ParentOwnedPathReceipt,
+    ) -> tuple[str, ...]:
+        cls._target_identity(receipt, "fixture registration root")
+        try:
+            directory_fd = os.open(
+                receipt.physical_path,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+            )
+        except FileNotFoundError as exc:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISSING,
+                "fixture registration root disappeared",
+            ) from exc
+        try:
+            names = tuple(sorted(os.listdir(directory_fd)))
+            for name in names:
+                try:
+                    child_fd = os.open(
+                        name,
+                        os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+                        dir_fd=directory_fd,
+                    )
+                except OSError as exc:
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_RACE_DETECTED,
+                        f"fixture registration entry is not a directory: {name}",
+                    ) from exc
+                os.close(child_fd)
+            return names
+        finally:
+            os.close(directory_fd)
+
+    @classmethod
+    def _shared_names(
+        cls,
+        receipt: ParentOwnedPathReceipt,
+    ) -> tuple[str, ...]:
+        cls._target_identity(receipt, "fixture adapter shared parent")
+        try:
+            directory_fd = os.open(
+                receipt.physical_path,
+                os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC,
+            )
+        except FileNotFoundError as exc:
+            raise ParentRootSideEffectError(
+                ParentRootReject.ROOT_MISSING,
+                "fixture adapter shared parent disappeared",
+            ) from exc
+        try:
+            return tuple(sorted(os.listdir(directory_fd)))
+        finally:
+            os.close(directory_fd)
+
+    def begin(self) -> FixtureAdapterLifecycleReceipt:
+        """Register one unique child while holding the existing parent lock."""
+        if self.receipt is not None:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "fixture adapter lifecycle already began",
+            )
+        attestation = self._locked_attestation()
+        shared_parent: ParentOwnedPathReceipt | None = None
+        registration_root: ParentOwnedPathReceipt | None = None
+        owned_root: ParentOwnedPathReceipt | None = None
+        registration: ParentOwnedPathReceipt | None = None
+        try:
+            with self._parent_lifecycle_lock(attestation):
+                shared_parent = self._boundary.ensure_parent_owned_directory(
+                    attestation,
+                    self._shared_parent,
+                    "fixture-adapter-shared-parent",
+                )
+                registration_root = self._boundary.ensure_parent_owned_directory(
+                    attestation,
+                    shared_parent.physical_path / ".registrations",
+                    "fixture-adapter-registration-root",
+                )
+                owned_root = self._boundary.create_parent_owned_temp_directory(
+                    attestation,
+                    shared_parent.physical_path,
+                    "fixture-adapter-child",
+                    "child",
+                )
+                registration = self._boundary.create_parent_owned_temp_directory(
+                    attestation,
+                    registration_root.physical_path,
+                    "fixture-adapter-registration",
+                    "registration",
+                )
+                shared_identity = self._target_identity(
+                    shared_parent, "fixture adapter shared parent"
+                )
+                registration_root_identity = self._target_identity(
+                    registration_root, "fixture registration root"
+                )
+                owned_identity = self._target_identity(owned_root, "fixture child root")
+                registration_identity = self._target_identity(
+                    registration, "fixture child registration"
+                )
+                remaining = len(self._registration_names(registration_root))
+                self.receipt = FixtureAdapterLifecycleReceipt(
+                    shared_parent=shared_parent,
+                    registration_root=registration_root,
+                    owned_root=owned_root,
+                    registration=registration,
+                    shared_parent_identity=shared_identity,
+                    registration_root_identity=registration_root_identity,
+                    owned_root_identity=owned_identity,
+                    registration_identity=registration_identity,
+                    remaining_count=remaining,
+                )
+                return self.receipt
+        except BaseException:
+            if registration is not None and owned_root is not None and registration_root is not None:
+                try:
+                    cleanup_attestation = self._locked_attestation()
+                    with self._parent_lifecycle_lock(cleanup_attestation):
+                        self._boundary.remove_parent_owned_tree(
+                            cleanup_attestation, registration, "fixture-adapter-registration-rollback"
+                        )
+                        self._boundary.remove_parent_owned_tree(
+                            cleanup_attestation, owned_root, "fixture-adapter-child-rollback"
+                        )
+                except BaseException:
+                    pass
+            raise
+
+    def end(self) -> FixtureAdapterLifecycleReceipt:
+        """Remove only this child and its registration, then drain the parent."""
+        if self.receipt is None:
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "fixture adapter lifecycle has not begun",
+            )
+        receipt = self.receipt
+        if receipt.ended:
+            return receipt
+        attestation = self._locked_attestation()
+        with self._parent_lifecycle_lock(attestation):
+            self._target_identity(receipt.shared_parent, "fixture adapter shared parent")
+            self._target_identity(receipt.registration_root, "fixture registration root")
+            self._target_identity(receipt.owned_root, "fixture child root")
+            self._target_identity(receipt.registration, "fixture child registration")
+            before = self._registration_names(receipt.registration_root)
+            if receipt.registration.physical_path.name not in before:
+                raise ParentRootSideEffectError(
+                    ParentRootReject.ROOT_MISSING,
+                    "fixture child registration is not live",
+                )
+            self._boundary.remove_parent_owned_tree(
+                attestation, receipt.owned_root, "fixture-adapter-child-cleanup"
+            )
+            receipt.owned_root_absent = True
+            self._boundary.remove_parent_owned_tree(
+                attestation, receipt.registration, "fixture-adapter-registration-cleanup"
+            )
+            receipt.registration_absent = True
+            remaining = len(self._registration_names(receipt.registration_root))
+            receipt.remaining_count = remaining
+            if remaining == 0:
+                shared_names = self._shared_names(receipt.shared_parent)
+                if shared_names != (receipt.registration_root.physical_path.name,):
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_RACE_DETECTED,
+                        "unregistered fixture-adapter child remains",
+                    )
+                if not self._boundary.remove_empty_parent_owned_directory(
+                    attestation,
+                    receipt.registration_root,
+                    "fixture-adapter-registration-root-cleanup",
+                ):
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_RACE_DETECTED,
+                        "fixture registration root is not empty",
+                    )
+                if not self._boundary.remove_empty_parent_owned_directory(
+                    attestation,
+                    receipt.shared_parent,
+                    "fixture-adapter-shared-parent-cleanup",
+                ):
+                    raise ParentRootSideEffectError(
+                        ParentRootReject.ROOT_RACE_DETECTED,
+                        "fixture adapter shared parent is not empty",
+                    )
+                receipt.shared_parent_absent = True
+            receipt.no_residue = receipt.owned_root_absent and receipt.registration_absent
+            receipt.ended = True
+            return receipt
+
+
+def project_fixture_environment(
+    record: SessionResolutionResult,
+    *,
+    request: FixtureEnvironmentRequest,
+    local_root: Path | None = None,
+) -> FixtureChildEnvironment:
+    """Project one immutable request into one child environment and receipt."""
+    if request.mode not in {"ordinary_tool", "product_fixture", "synthetic_tool"}:
+        raise _fixture_direct_error("MODE_INVALID", ParentRootReject.INPUT_INVALID)
+    if request.record_capability is None and request.mode != "ordinary_tool":
+        raise _fixture_direct_error(
+            "RECORD_CAPABILITY_REQUIRED", ParentRootReject.HANDOFF_INVALID
+        )
+    lifecycle: FixtureAdapterParentLifecycle | None = None
+    if local_root is None:
+        lifecycle = _DEFAULT_BOUNDARY.fixture_adapter_parent_lifecycle(
+            record,
+            request.fixture_root / ".agent-canon" / "fixture-adapter",
+        )
+        lifecycle_receipt = lifecycle.begin()
+        local_root = lifecycle_receipt.owned_root.physical_path
+    try:
+        child = _fixture_direct_child_environment(record, local_root, request=request)
+    except BaseException:
+        if lifecycle is not None:
+            try:
+                lifecycle.end()
+            except BaseException:
+                pass
+        raise
+    if lifecycle is None:
+        return child
+    previous_cleanup = child.cleanup_callback
+
+    def cleanup_owned_root() -> None:
+        try:
+            if previous_cleanup is not None:
+                previous_cleanup()
+            lifecycle_receipt = lifecycle.end()
+            child.receipt.adapter_shared_parent_identity = (
+                lifecycle_receipt.shared_parent_identity
+            )
+            child.receipt.adapter_registration_root_identity = (
+                lifecycle_receipt.registration_root_identity
+            )
+            child.receipt.adapter_owned_root_identity = (
+                lifecycle_receipt.owned_root_identity
+            )
+            child.receipt.adapter_registration_identity = (
+                lifecycle_receipt.registration_identity
+            )
+            child.receipt.adapter_remaining_count = lifecycle_receipt.remaining_count
+            child.receipt.adapter_owned_root_absent = lifecycle_receipt.owned_root_absent
+            child.receipt.adapter_registration_absent = lifecycle_receipt.registration_absent
+            child.receipt.adapter_shared_parent_absent = lifecycle_receipt.shared_parent_absent
+            child.receipt.adapter_lock_closed = lifecycle_receipt.lock_closed
+            child.receipt.exact_record_root_removed = True
+            child.receipt.no_residue = lifecycle_receipt.no_residue
+        except BaseException:
+            child.receipt.cleanup_status = "failed"
+            child.receipt.no_residue = False
+            raise
+
+    child.set_cleanup(cleanup_owned_root)
+    return child
 
 
 def _run_fixture_direct_command(
     *, caller: _RecordFixtureDirectCallerMarker, record: SessionResolutionResult,
     fixture_cwd: Path, argv: Sequence[str], now_mono_ns: int,
     clock: Callable[[], int] = time.monotonic_ns,
+    ambient_env: Mapping[str, str] | None = None,
+    explicit_target_dir: Path | None = None,
+    request: FixtureEnvironmentRequest | None = None,
 ) -> FixtureExecutionReceipt:
     """Validate, spawn, read back, and clean one record-owned fixture command."""
     if caller is not _RECORD_FIXTURE_DIRECT_CALLER_MARKER:
@@ -5873,6 +7028,7 @@ def _run_fixture_direct_command(
     fixture = _fixture_direct_identity(record, fixture_cwd, now_mono_ns=now_mono_ns)
     parent_attestation = record.attestation
     local_receipt: ParentOwnedPathReceipt | None = None
+    environment_child: FixtureChildEnvironment | None = None
     created: tuple[str, ...] = ()
     removed: tuple[str, ...] = ()
     cleanup_detail: str | None = None
@@ -5885,7 +7041,21 @@ def _run_fixture_direct_command(
         )
         local_root = local_receipt.physical_path
         created = (str(local_root),)
-        env = _fixture_direct_child_environment(record, local_root)
+        if request is None:
+            capability = RecordCapability.from_record(record)
+            capability.consume()
+            request = FixtureEnvironmentRequest(
+                request_id=secrets.token_hex(16),
+                mode="product_fixture",
+                record_capability=capability,
+                ambient_env=os.environ if ambient_env is None else ambient_env,
+                explicit_target_dir=explicit_target_dir,
+                fixture_root=fixture.realpath,
+            )
+        environment_child = project_fixture_environment(
+            record, request=request, local_root=local_root
+        )
+        env = environment_child.environment
         before = _fixture_direct_identity(
             record, fixture.realpath, require_lease=False, now_mono_ns=clock()
         )
@@ -5899,6 +7069,11 @@ def _run_fixture_direct_command(
         if after != fixture:
             raise _fixture_direct_error("ROOT_CHANGED", ParentRootReject.ROOT_RACE_DETECTED)
     finally:
+        if environment_child is not None:
+            try:
+                environment_child.close()
+            except BaseException as exc:
+                cleanup_detail = str(exc)
         if local_receipt is not None:
             try:
                 _DEFAULT_BOUNDARY.remove_parent_owned_tree(
@@ -5911,7 +7086,31 @@ def _run_fixture_direct_command(
         "clean" if cleanup_detail is None else "failed", created, removed, cleanup_detail
     )
     return FixtureExecutionReceipt(
-        digest, str(fixture.realpath), fixture.dev, fixture.ino, returncode, cleanup
+        digest,
+        str(fixture.realpath),
+        fixture.dev,
+        fixture.ino,
+        returncode,
+        cleanup,
+        environment_child.receipt
+        if environment_child is not None
+        else FixtureEnvironmentReceipt(
+            request_id=secrets.token_hex(16),
+            mode="product_fixture",
+            authenticated_parent=parent_attestation.parent_root,
+            fixture_root=fixture.realpath,
+            local_root=local_receipt.physical_path if local_receipt else fixture.realpath,
+            parent_tmpdir=fixture.realpath,
+            accepted_path_entries=(),
+            dropped_path_entries=(),
+            outer_sentinel=None,
+            outer_sentinel_identity=None,
+            outer_sentinel_unchanged=True,
+            cleanup_paths=(),
+            cwd_identity=(fixture.realpath, fixture.dev, fixture.ino),
+            capability_record_id=record.record.record_id or "",
+            capability_parent_root=parent_attestation.parent_root,
+        ),
     )
 
 
@@ -5922,6 +7121,9 @@ def fixture_direct_command(
     argv: Sequence[str],
     now_mono_ns: int,
     clock: Callable[[], int] = time.monotonic_ns,
+    ambient_env: Mapping[str, str] | None = None,
+    explicit_target_dir: Path | None = None,
+    request: FixtureEnvironmentRequest | None = None,
 ) -> FixtureExecutionReceipt:
     """Run one marker-bound fixture command through the private adapter."""
     return _run_fixture_direct_command(
@@ -5931,6 +7133,9 @@ def fixture_direct_command(
         argv=argv,
         now_mono_ns=now_mono_ns,
         clock=clock,
+        ambient_env=ambient_env,
+        explicit_target_dir=explicit_target_dir,
+        request=request,
     )
 
 
@@ -5954,9 +7159,54 @@ def validate_fixture_root(
 def fixture_child_environment(
     record: SessionResolutionResult,
     local_root: Path,
+    *,
+    fixture_root: Path | None = None,
+    base_env: Mapping[str, str] | None = None,
+    ambient_env: Mapping[str, str] | None = None,
+    explicit_target_dir: Path | None = None,
+    explicit_path_entries: Sequence[str] | None = None,
 ) -> dict[str, str]:
     """Build the scrubbed fixture child environment for a validated record."""
-    return _fixture_direct_child_environment(record, local_root)
+    return dict(_fixture_direct_child_environment(
+        record,
+        local_root,
+        fixture_root=fixture_root,
+        base_env=base_env,
+        ambient_env=ambient_env,
+        explicit_target_dir=explicit_target_dir,
+        explicit_path_entries=explicit_path_entries,
+    ).environment)
+
+
+def fixture_child_environment_with_receipt(
+    record: SessionResolutionResult,
+    local_root: Path | None = None,
+    *,
+    request: FixtureEnvironmentRequest | None = None,
+    fixture_root: Path | None = None,
+    base_env: Mapping[str, str] | None = None,
+    ambient_env: Mapping[str, str] | None = None,
+    explicit_target_dir: Path | None = None,
+    explicit_path_entries: Sequence[str] | None = None,
+) -> FixtureChildEnvironment:
+    """Build one fixture child environment and return its boundary readback."""
+    if request is None:
+        if local_root is None or fixture_root is None:
+            raise _fixture_direct_error("REQUEST_REQUIRED", ParentRootReject.INPUT_INVALID)
+        capability = RecordCapability.from_record(record)
+        capability.consume()
+        request = FixtureEnvironmentRequest(
+            request_id=secrets.token_hex(16),
+            mode="synthetic_tool",
+            record_capability=capability,
+            ambient_env=os.environ if ambient_env is None else ambient_env,
+            explicit_target_dir=explicit_target_dir,
+            explicit_path_entries=tuple(
+                Path(entry) for entry in (explicit_path_entries or ())
+            ),
+            fixture_root=fixture_root,
+        )
+    return project_fixture_environment(record, request=request, local_root=local_root)
 
 
 _DEFAULT_BOUNDARY = ParentRootSideEffectBoundary()
@@ -6318,6 +7568,7 @@ def public_exec(
     invocation_script: Path | str,
     purpose: str,
     argv: Sequence[str],
+    explicit_overrides: PublicExecOverrides | None = None,
 ) -> int:
     """Run a command under a direct or inherited public side-effect session."""
     argv_object: object = cast(object, argv)
@@ -6329,21 +7580,20 @@ def public_exec(
         raise ParentRootSideEffectError(ParentRootReject.INPUT_INVALID, "argv is invalid") from exc
     if not command or any(not isinstance(item, str) or not item or "\x00" in item for item in command):
         raise ParentRootSideEffectError(ParentRootReject.INPUT_INVALID, "argv is invalid")
+    explicit_overrides = _typed_public_exec_overrides(explicit_overrides)
     cwd = _physical(Path.cwd(), strict=True)
     with public_session(invocation_script=invocation_script, purpose=purpose) as session:
         child_base = _v2_session_environment(session, os.environ)
-        for path_name in (
-            "XDG_CACHE_HOME",
-            "PYTHONPYCACHEPREFIX",
-            "AGENT_CANON_TOOLS_HOME",
-            "CARGO_HOME",
-            "CARGO_TARGET_DIR",
-            "AGENT_CANON_CLI_TARGET_DIR",
-        ):
-            child_base.pop(path_name, None)
+        if explicit_overrides is None:
+            child_base = {
+                key: value
+                for key, value in child_base.items()
+                if key not in RUNNER_OWNED_AMBIENT_KEYS
+            }
         environment = _DEFAULT_BOUNDARY.child_environment(
             session.attestation,
             child_base,
+            explicit_overrides=explicit_overrides,
             issue_handoff=False,
             rebase_inherited_temp=True,
         )
@@ -6611,12 +7861,14 @@ def child_environment(
     attestation: ParentRootAttestationReceipt,
     base_env: Mapping[str, str] | None = None,
     *,
+    explicit_overrides: PublicExecOverrides | None = None,
     issue_handoff: bool = True,
     rebase_inherited_temp: bool = False,
 ) -> dict[str, str]:
     return _DEFAULT_BOUNDARY.child_environment(
         attestation,
         base_env,
+        explicit_overrides=explicit_overrides,
         issue_handoff=issue_handoff,
         rebase_inherited_temp=rebase_inherited_temp,
     )

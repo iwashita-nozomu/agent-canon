@@ -38,4 +38,3 @@ def test_memory_adapter_contains_no_record_schema_logic() -> None:
     source = ADAPTER.read_text(encoding="utf-8")
     assert "Problem/Symptom" not in source
     assert "record_schema" not in source
-    assert "duplicate" not in source

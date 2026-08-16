@@ -39,11 +39,13 @@ from tools.agent_tools.parent_root_side_effects import (
     ParentRootReject,
     ParentRootSideEffectBoundary,
     ParentRootSideEffectError,
+    PublicExecOverrides,
     SessionResolutionError,
     SessionResolutionResult,
     attest_parent_root,
     current_supervisor_issuer,
     parse_session_record_v2,
+    public_exec,
     public_session,
     resolve_parent_owned_path,
 )
@@ -162,6 +164,108 @@ def git_repo(path: Path, *, remote: str | None = None) -> None:
                     "-m", "fixture"], check=True, capture_output=True)
 
 
+def test_public_exec_typed_overrides_validate_owner_before_side_effect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Public execution accepts parent-local paths and rejects unsafe aliases early."""
+    root = tmp_path / "parent"
+    git_repo(root, remote="https://example.invalid/public-exec.git")
+    invocation_script = root / ".agent-canon" / "invoke.py"
+    invocation_script.parent.mkdir(parents=True)
+    invocation_script.write_text("# public-exec test source\n", encoding="utf-8")
+    monkeypatch.chdir(root)
+
+    explicit_tools = root / "explicit-tools"
+    explicit_cargo_home = root / "explicit-cargo-home"
+    explicit_target = root / "explicit-target"
+    explicit_cache = root / "explicit-cache"
+    explicit_pycache = root / "explicit-pycache"
+    for key in (
+        "AGENT_CANON_TOOLS_HOME",
+        "CARGO_HOME",
+        "CARGO_TARGET_DIR",
+        "AGENT_CANON_CLI_TARGET_DIR",
+        "XDG_CACHE_HOME",
+        "PYTHONPYCACHEPREFIX",
+    ):
+        monkeypatch.setenv(key, str(tmp_path / "runner-owned" / key))
+    probe = root / "public-exec-probe.json"
+    probe_code = (
+        "import json, os, sys; "
+        "from pathlib import Path; "
+        "Path(sys.argv[1]).write_text(json.dumps({key: os.environ.get(key) for key in ("
+        "'AGENT_CANON_TOOLS_HOME', 'CARGO_HOME', 'CARGO_TARGET_DIR', "
+        "'AGENT_CANON_CLI_TARGET_DIR', 'XDG_CACHE_HOME', 'PYTHONPYCACHEPREFIX')}))"
+    )
+    accepted = public_exec(
+        invocation_script=invocation_script,
+        purpose="public-exec-typed-override",
+        argv=(sys.executable, "-c", probe_code, str(probe)),
+        explicit_overrides=PublicExecOverrides(
+            tools_home=explicit_tools,
+            cargo_home=explicit_cargo_home,
+            cargo_target_dir=explicit_target,
+            cli_target_dir=explicit_target,
+            xdg_cache_home=explicit_cache,
+            python_pycache_prefix=explicit_pycache,
+        ),
+    )
+    assert accepted == 0
+    values = json.loads(probe.read_text(encoding="utf-8"))
+    assert Path(values["AGENT_CANON_TOOLS_HOME"]) == explicit_tools
+    assert Path(values["CARGO_HOME"]) == explicit_cargo_home
+    assert Path(values["CARGO_TARGET_DIR"]) == explicit_target
+    assert Path(values["AGENT_CANON_CLI_TARGET_DIR"]) == explicit_target
+    assert Path(values["XDG_CACHE_HOME"]) == explicit_cache
+    assert Path(values["PYTHONPYCACHEPREFIX"]) == explicit_pycache
+    for path in (
+        explicit_tools,
+        explicit_cargo_home,
+        explicit_target,
+        explicit_cache,
+        explicit_pycache,
+    ):
+        assert path.is_dir()
+
+    authenticated_parent = Path(
+        os.environ.get(
+            side_effects.SIDE_EFFECT_PARENT_ROOT_ENV,
+            str(root),
+        )
+    ).resolve()
+    outside = authenticated_parent.parent / (
+        f"{authenticated_parent.name}-{tmp_path.name}-outside-tools"
+    )
+    with pytest.raises(ParentRootSideEffectError) as external_error:
+        public_exec(
+            invocation_script=invocation_script,
+            purpose="public-exec-external-override",
+            argv=(sys.executable, "-c", "raise SystemExit(99)"),
+            explicit_overrides=PublicExecOverrides(tools_home=outside),
+        )
+    assert external_error.value.reject is ParentRootReject.ROOT_MISMATCH
+    assert not outside.exists()
+
+    mismatch_left = root / "mismatch-left"
+    mismatch_right = root / "mismatch-right"
+    with pytest.raises(ParentRootSideEffectError) as alias_error:
+        public_exec(
+            invocation_script=invocation_script,
+            purpose="public-exec-target-alias",
+            argv=(sys.executable, "-c", "raise SystemExit(99)"),
+            explicit_overrides=PublicExecOverrides(
+                cargo_target_dir=mismatch_left,
+                cli_target_dir=mismatch_right,
+            ),
+        )
+    assert alias_error.value.reject is ParentRootReject.ROOT_MISMATCH
+    assert not mismatch_left.exists()
+    assert not mismatch_right.exists()
+
+    with pytest.raises(TypeError):
+        PublicExecOverrides(tools_home=str(root / "string-not-path"))  # type: ignore[arg-type]
+
+
 @contextmanager
 def _record_fixture_session(
     parent: Path, fixture: Path, monkeypatch: pytest.MonkeyPatch
@@ -202,13 +306,18 @@ def _record_fixture_session(
             finally:
                 record.close()
         finally:
-            try:
-                os.chdir(authenticated_cwd)
-            finally:
-                issuer.revoke_drain_child(
-                    child=child.child, reason="normal_exit",
-                    now_mono_ns=time.monotonic_ns(),
-                )
+            os.chdir(authenticated_cwd)
+            issuer.revoke_drain_child(
+                child=child.child, reason="normal_exit",
+                now_mono_ns=time.monotonic_ns(),
+            )
+
+
+def _explicit_fixture_capability(record: SessionResolutionResult) -> side_effects.RecordCapability:
+    """Create the explicit adapter capability required by product/synthetic modes."""
+    capability = side_effects.RecordCapability.from_record(record)
+    capability.consume()
+    return capability
 
 
 def unborn_git_repo(path: Path, *, remote: str) -> None:
@@ -497,6 +606,337 @@ def test_fixture_direct_adapter_scrubs_identity_and_cleans_owned_paths(
         assert receipt.cleanup.created_paths == receipt.cleanup.removed_paths
 
 
+def test_ordinary_public_projection_scrubs_private_transport_and_returns_mapping_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Ordinary projection consumes private transport and exposes a distinct public token."""
+    git_repo(tmp_path, remote="https://example.invalid/ordinary-private.git")
+    fixture = tmp_path / "fixture"
+    git_repo(fixture, remote="https://example.invalid/ordinary-fixture.git")
+    with _record_fixture_session(tmp_path, fixture, monkeypatch) as record:
+        capability = side_effects.RecordCapability(
+            source="runner_private_record",
+            record_id=f"{record.record.record_id}-private",
+            parent_root=record.parent_root,
+            handoff=record.handoff,
+        )
+        capability.consume()
+        ambient = capability.transport_environment()
+        request = side_effects.FixtureEnvironmentRequest(
+            request_id="ordinary-private-receipt",
+            mode="ordinary_tool",
+            record_capability=capability,
+            ambient_env=ambient,
+            fixture_root=fixture,
+        )
+        child = side_effects.project_fixture_environment(record, request=request)
+        try:
+            assert isinstance(child, dict | side_effects.FixtureChildEnvironment)
+            assert all(name not in child for name in capability.transport_env_names)
+            assert child.receipt.public_projection_record_id != capability.record_id
+            assert child.receipt.request_id == request.request_id
+            assert child.receipt.mode == "ordinary_tool"
+            assert child.receipt.capability_type == "runner_private_record_v2"
+            assert child.receipt.capability_owner == "fixture_adapter"
+            assert child.receipt.capability_scope == "fixture_child_environment"
+            assert child.receipt.capability_consumed_exactly_once
+            assert child.receipt.private_transport_absent_in_child
+            assert child.receipt.public_projection_provenance == "ordinary_record"
+            assert any(item.source == "private_transport" for item in child.receipt.input_provenance)
+            assert dict(child)["CARGO_TARGET_DIR"] == str(child.receipt.effective_target)
+        finally:
+            child.close()
+        assert child.receipt.sentinel_held_until_child_exit is False
+        assert child.receipt.no_residue
+
+
+def test_product_and_synthetic_modes_require_explicit_capability(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Product and synthetic adapters never rediscover the outer record."""
+    git_repo(tmp_path, remote="https://example.invalid/explicit-capability.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/explicit-source.git")
+    git_repo(fixture, remote="https://example.invalid/explicit-fixture.git")
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        with pytest.raises(ParentRootSideEffectError, match="explicit record capability"):
+            with bootstrap_fixture_public_environment(
+                mode="product_fixture",
+                record=record,
+                fixture_cwd=fixture,
+                argv=(sys.executable, "-c", "raise SystemExit(99)"),
+            ):
+                raise AssertionError("product mode unexpectedly yielded")
+        with pytest.raises(ParentRootSideEffectError, match="explicit record capability"):
+            with bootstrap_fixture_public_environment(
+                mode="synthetic_tool", record=record, fixture_cwd=fixture
+            ):
+                raise AssertionError("synthetic mode unexpectedly yielded")
+
+
+def test_product_receipt_contains_request_environment_and_cleanup_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Product execution returns the exact projector receipt without reconstruction."""
+    git_repo(tmp_path, remote="https://example.invalid/product-receipt.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/product-source.git")
+    git_repo(fixture, remote="https://example.invalid/product-fixture.git")
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        with bootstrap_fixture_public_environment(
+            mode="product_fixture",
+            record=record,
+            record_capability=_explicit_fixture_capability(record),
+            fixture_cwd=fixture,
+            argv=(sys.executable, "-c", "import os; assert 'AGENT_CANON_PRIVATE_RECORD_HANDOFF' not in os.environ"),
+        ) as product:
+            assert product.receipt is not None
+            assert product.receipt.environment.mode == "product_fixture"
+            assert product.receipt.environment is product.receipt.environment
+            assert product.receipt.environment.capability_record_id
+            assert product.receipt.environment.private_transport_absent_in_child
+            assert product.receipt.environment.cleanup_status == "clean"
+            assert product.receipt.environment.sentinel_held_until_child_exit is False
+
+
+def test_sentinel_identity_is_held_and_preexisting_marker_is_preserved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The projector validates marker identity and removes only adapter-created state."""
+    git_repo(tmp_path, remote="https://example.invalid/sentinel-parent.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/sentinel-source.git")
+    git_repo(fixture, remote="https://example.invalid/sentinel-fixture.git")
+    marker = fixture / ".agent-canon" / "fixture-sentinel"
+    marker.parent.mkdir()
+    marker.write_text(f"{fixture.resolve()}\n", encoding="utf-8")
+    original = marker.stat()
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        request = side_effects.FixtureEnvironmentRequest(
+            request_id="preexisting-sentinel",
+            mode="synthetic_tool",
+            record_capability=_explicit_fixture_capability(record),
+            ambient_env={},
+            fixture_root=fixture,
+        )
+        child = side_effects.project_fixture_environment(record, request=request)
+        assert child.receipt.sentinel_preexisting
+        assert child.receipt.sentinel_device == original.st_dev
+        assert child.receipt.sentinel_inode == original.st_ino
+        assert child.receipt.sentinel_held_until_child_exit
+        child.close()
+    assert marker.exists()
+    assert marker.stat().st_ino == original.st_ino
+    assert not child.receipt.sentinel_removed
+    assert child.receipt.no_residue
+
+
+def test_fixture_adapter_parent_lifecycle_interleaves_two_producers(
+    tmp_path: Path,
+) -> None:
+    """Two independent sessions serialize child cleanup on one fixture parent."""
+    fixture = tmp_path / "fixture"
+    git_repo(fixture, remote="https://example.invalid/adapter-lifecycle.git")
+    sentinel = fixture / ".agent-canon" / "fixture-sentinel"
+    sentinel.parent.mkdir(parents=True)
+    sentinel.write_text(f"{fixture.resolve()}\n", encoding="utf-8")
+    runner = fixture / "producer-runner.py"
+    runner.write_text("# lifecycle producer\n", encoding="utf-8")
+    source_root = Path(__file__).resolve().parents[2]
+    wrapper = r'''
+import json
+import os
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, sys.argv[1])
+from tools.agent_tools.parent_root_side_effects import (
+    FixtureEnvironmentRequest,
+    RecordCapability,
+    current_supervisor_issuer,
+    project_fixture_environment,
+    public_session,
+    resolve_parent_side_effect_session_v2,
+    SIDE_EFFECT_HANDOFF_ENV,
+    SIDE_EFFECT_PARENT_ROOT_ENV,
+    SIDE_EFFECT_REQUIRED_ENV,
+)
+
+fixture = Path(sys.argv[2])
+ready = Path(sys.argv[3])
+release = Path(sys.argv[4])
+index = sys.argv[5]
+runner = fixture / "producer-runner.py"
+with public_session(
+    invocation_script=runner,
+    purpose=f"fixture-adapter-producer-{index}",
+    independent=True,
+    cleanup_state=True,
+) as session:
+    issuer = current_supervisor_issuer()
+    assert issuer is not None
+    child_session = issuer.issue_child(
+        role="record",
+        record_id=f"lifecycle-{index}-{time.monotonic_ns()}",
+        physical_root=fixture,
+        now_mono_ns=time.monotonic_ns(),
+    )
+    record = resolve_parent_side_effect_session_v2(
+        env={
+            SIDE_EFFECT_PARENT_ROOT_ENV: str(fixture),
+            SIDE_EFFECT_HANDOFF_ENV: child_session.handoff,
+            SIDE_EFFECT_REQUIRED_ENV: "1",
+        },
+        observed_cwd=fixture,
+    )
+    capability = RecordCapability.from_record(record)
+    capability.consume()
+    request = FixtureEnvironmentRequest(
+        request_id=f"lifecycle-request-{index}",
+        mode="ordinary_tool",
+        record_capability=capability,
+        ambient_env={},
+        fixture_root=fixture,
+    )
+    projected = project_fixture_environment(record, request=request)
+    begin = projected.receipt
+    ready.write_text(
+        json.dumps({
+            "remaining_count": begin.adapter_remaining_count,
+            "owned_root": str(begin.local_root),
+        }),
+        encoding="utf-8",
+    )
+    deadline = time.monotonic() + 15
+    while not release.exists():
+        if time.monotonic() >= deadline:
+            raise TimeoutError("lifecycle release was not signaled")
+        time.sleep(0.01)
+    projected.close()
+    end = projected.receipt
+    print(
+        json.dumps({
+            "remaining_count": end.adapter_remaining_count,
+            "shared_parent_absent": end.adapter_shared_parent_absent,
+            "owned_root_absent": end.adapter_owned_root_absent,
+            "registration_absent": end.adapter_registration_absent,
+            "no_residue": end.no_residue,
+        }),
+        flush=True,
+    )
+    record.close()
+    issuer.revoke_drain_child(
+        child=child_session.child,
+        reason="normal_exit",
+        now_mono_ns=time.monotonic_ns(),
+    )
+'''
+
+    def run_order(order: tuple[int, int]) -> list[dict[str, object]]:
+        run_root = tmp_path / f"run-{order[0]}-{order[1]}"
+        run_root.mkdir()
+        processes: list[subprocess.Popen[str]] = []
+        ready_paths: list[Path] = []
+        release_paths: list[Path] = []
+        for index in range(2):
+            ready = run_root / f"ready-{index}"
+            release = run_root / f"release-{index}"
+            ready_paths.append(ready)
+            release_paths.append(release)
+            processes.append(
+                subprocess.Popen(
+                    [
+                        sys.executable,
+                        "-c",
+                        wrapper,
+                        str(source_root),
+                        str(fixture),
+                        str(ready),
+                        str(release),
+                        str(index),
+                    ],
+                    cwd=fixture,
+                    env={
+                        key: value
+                        for key, value in os.environ.items()
+                        if not key.startswith("AGENT_CANON_SIDE_EFFECT_")
+                    },
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                )
+            )
+        try:
+            deadline = time.monotonic() + 15
+            while not all(path.exists() for path in ready_paths):
+                if time.monotonic() >= deadline:
+                    raise AssertionError("producer did not reach lifecycle begin")
+                time.sleep(0.01)
+            results: list[dict[str, object]] = []
+            for index in order:
+                release_paths[index].write_text("release\n", encoding="utf-8")
+                output, error = processes[index].communicate(timeout=15)
+                assert processes[index].returncode == 0, error
+                lines = [line for line in output.splitlines() if line.strip()]
+                results.append(json.loads(lines[-1]))
+            return results
+        finally:
+            for process in processes:
+                if process.poll() is None:
+                    process.kill()
+                    process.wait()
+
+    for order in ((0, 1), (1, 0)):
+        results = run_order(order)
+        assert results[0]["remaining_count"] == 1
+        assert results[0]["shared_parent_absent"] is False
+        assert results[0]["owned_root_absent"] is True
+        assert results[0]["registration_absent"] is True
+        assert results[0]["no_residue"] is True
+        assert results[1]["remaining_count"] == 0
+        assert results[1]["shared_parent_absent"] is True
+        assert results[1]["owned_root_absent"] is True
+        assert results[1]["registration_absent"] is True
+        assert results[1]["no_residue"] is True
+        assert not (fixture / ".agent-canon" / "fixture-adapter").exists()
+
+
+def test_fixture_adapter_parent_lifecycle_rejects_shared_parent_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A replaced shared parent is preserved and rejected before child removal."""
+    fixture = tmp_path / "fixture"
+    git_repo(fixture, remote="https://example.invalid/adapter-replacement.git")
+    with _record_fixture_session(fixture, fixture, monkeypatch) as record:
+        lifecycle = side_effects.FixtureAdapterParentLifecycle(
+            side_effects.ParentRootSideEffectBoundary(),
+            record,
+            fixture / ".agent-canon" / "fixture-adapter",
+        )
+        receipt = lifecycle.begin()
+        shared_parent = receipt.shared_parent.physical_path
+        replacement_target = fixture / ".agent-canon" / "fixture-adapter-original"
+        shared_parent.rename(replacement_target)
+        shared_parent.symlink_to(replacement_target, target_is_directory=True)
+        try:
+            with pytest.raises(
+                ParentRootSideEffectError,
+                match="identity changed|outside|symlink",
+            ) as error:
+                lifecycle.end()
+            assert error.value.reject is ParentRootReject.ROOT_RACE_DETECTED
+            assert shared_parent.is_symlink()
+            assert replacement_target.is_dir()
+            assert receipt.owned_root.physical_path.exists()
+        finally:
+            shared_parent.unlink()
+            replacement_target.rename(shared_parent)
+
+
 def test_fixture_bootstrap_modes_preserve_enclosing_record(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -517,6 +957,7 @@ def test_fixture_bootstrap_modes_preserve_enclosing_record(
         with bootstrap_fixture_public_environment(
             mode="product_fixture",
             record=record,
+            record_capability=_explicit_fixture_capability(record),
             fixture_cwd=fixture,
             argv=(
                 sys.executable,
@@ -528,7 +969,8 @@ def test_fixture_bootstrap_modes_preserve_enclosing_record(
             assert product.receipt is not None
             assert product.receipt.returncode == 0
         with bootstrap_fixture_public_environment(
-            mode="synthetic_tool", record=record, fixture_cwd=fixture
+            mode="synthetic_tool", record=record,
+            record_capability=_explicit_fixture_capability(record), fixture_cwd=fixture
         ) as synthetic:
             assert Path.cwd() == source_cwd
             assert synthetic.session is not None
@@ -565,14 +1007,112 @@ def test_fixture_bootstrap_preserves_contained_explicit_cargo_target(
         with bootstrap_fixture_public_environment(
             mode="synthetic_tool",
             record=record,
+            record_capability=_explicit_fixture_capability(record),
             fixture_cwd=fixture,
             base_env={"CARGO_TARGET_DIR": str(explicit_target)},
+            explicit_target_dir=explicit_target,
         ) as synthetic:
             assert synthetic["CARGO_TARGET_DIR"] == str(explicit_target)
             assert synthetic["AGENT_CANON_CLI_TARGET_DIR"] == str(explicit_target)
             assert not explicit_target.exists()
 
     assert not explicit_target.exists()
+
+
+def test_fixture_environment_uses_contained_fake_bin_before_system_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Explicit fixture tools win while the environment remains parent-contained."""
+    git_repo(tmp_path, remote="https://example.invalid/path-owner.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/path-source.git")
+    git_repo(fixture, remote="https://example.invalid/path-fixture.git")
+    fake_bin = fixture / "fake-bin"
+    fake_bin.mkdir()
+    fake = fake_bin / "fixture-tool"
+    fake.write_text("#!/bin/sh\nprintf fixture-first\n", encoding="utf-8")
+    fake.chmod(0o700)
+
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        with bootstrap_fixture_public_environment(
+            mode="synthetic_tool",
+            record=record,
+            record_capability=_explicit_fixture_capability(record),
+            fixture_cwd=fixture,
+            explicit_path_entries=(str(fake_bin),),
+        ) as environment:
+            assert environment.child is not None
+            evidence = environment.child.receipt
+            assert evidence.accepted_path_entries == (str(fake_bin.resolve()),)
+            assert evidence.dropped_path_entries == ()
+            assert environment["PATH"].split(os.pathsep)[0] == str(fake_bin.resolve())
+            assert subprocess.check_output(
+                ["fixture-tool"], env=dict(environment), text=True
+            ) == "fixture-first"
+
+
+def test_fixture_environment_rejects_external_path_and_rebinds_parent_tmp(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """External PATH/TMP authority is rejected or rebound before child spawn."""
+    git_repo(tmp_path, remote="https://example.invalid/env-owner.git")
+    source = tmp_path / "source"
+    fixture = tmp_path / "fixture"
+    git_repo(source, remote="https://example.invalid/env-source.git")
+    git_repo(fixture, remote="https://example.invalid/env-fixture.git")
+    external = tmp_path.parent / "external-fixture-env"
+    inherited_tmp = external / "outer-tmp"
+    sentinel = inherited_tmp / "sentinel"
+    inherited_tmp.mkdir(parents=True)
+    sentinel.write_text("keep\n", encoding="utf-8")
+    before = os.environ.copy()
+
+    with _record_fixture_session(tmp_path, source, monkeypatch) as record:
+        with pytest.raises(SessionResolutionError) as rejected:
+            with bootstrap_fixture_public_environment(
+                mode="synthetic_tool",
+                record=record,
+                record_capability=_explicit_fixture_capability(record),
+                fixture_cwd=fixture,
+                base_env={
+                    "AGENT_CANON_PARENT_TMPDIR": str(inherited_tmp),
+                    "AGENT_CANON_PARENT_TMP_ROOT": str(inherited_tmp),
+                },
+                explicit_path_entries=(str(external),),
+            ):
+                raise AssertionError("external PATH unexpectedly accepted")
+        assert rejected.value.reject is ParentRootReject.ROOT_MISMATCH
+        assert "PATH_OUTSIDE_FIXTURE" in rejected.value.detail
+
+        with bootstrap_fixture_public_environment(
+            mode="synthetic_tool",
+            record=record,
+            record_capability=_explicit_fixture_capability(record),
+            fixture_cwd=fixture,
+            base_env={
+                "PATH": os.pathsep.join((str(external), "/usr/bin")),
+                "AGENT_CANON_PARENT_TMPDIR": str(inherited_tmp),
+                "AGENT_CANON_PARENT_TMP_ROOT": str(inherited_tmp),
+            },
+        ) as environment:
+            assert environment.child is not None
+            evidence = environment.child.receipt
+            assert evidence.outer_sentinel == str(inherited_tmp)
+            assert evidence.outer_sentinel_identity is not None
+            assert evidence.outer_sentinel_unchanged
+            assert evidence.dropped_path_entries == (str(external), "/usr/bin")
+            assert "/opt/agent-canon-parent/vendor/agent-canon/test" not in environment["PATH"]
+            assert evidence.parent_tmpdir.is_relative_to(fixture.resolve())
+            assert environment["AGENT_CANON_PARENT_TMPDIR"] == str(evidence.parent_tmpdir)
+            assert environment["TMPDIR"] == str(evidence.parent_tmpdir)
+            assert environment["TEMP"] == str(evidence.parent_tmpdir)
+            assert environment["TMP"] == str(evidence.parent_tmpdir)
+            assert str(external) not in environment["PATH"].split(os.pathsep)
+
+    assert os.environ == before
+    assert sentinel.read_text(encoding="utf-8") == "keep\n"
+    assert not (fixture / ".agent-canon" / "fixture-bootstrap").exists()
 
 
 def test_fixture_bootstrap_rejects_external_cargo_target_before_synthetic_spawn(
@@ -609,8 +1149,10 @@ def test_fixture_bootstrap_rejects_external_cargo_target_before_synthetic_spawn(
             with bootstrap_fixture_public_environment(
                 mode="synthetic_tool",
                 record=record,
+                record_capability=_explicit_fixture_capability(record),
                 fixture_cwd=fixture,
                 base_env={"CARGO_TARGET_DIR": str(external_target)},
+                explicit_target_dir=external_target,
             ):
                 raise AssertionError("external target unexpectedly accepted")
 
@@ -671,7 +1213,8 @@ def test_fixture_bootstrap_missing_invocation_cleans_local_residue(
         before_cwd = Path.cwd()
         with pytest.raises(ParentRootSideEffectError, match="invocation script is missing"):
             with bootstrap_fixture_public_environment(
-                mode="synthetic_tool", record=record, fixture_cwd=fixture,
+                mode="synthetic_tool", record=record,
+                record_capability=_explicit_fixture_capability(record), fixture_cwd=fixture,
                 invocation_script=missing,
             ):
                 raise AssertionError("missing invocation unexpectedly yielded")
@@ -690,16 +1233,19 @@ def test_fixture_bootstrap_environment_failure_cleans_local_residue(
     git_repo(source, remote="https://example.invalid/environment-source.git")
     git_repo(fixture, remote="https://example.invalid/environment-fixture.git")
 
-    def fail_environment(*_args: object, **_kwargs: object) -> dict[str, str]:
+    def fail_environment(*_args: object, **_kwargs: object) -> object:
         raise RuntimeError("injected environment construction failure")
 
-    monkeypatch.setattr(fixture_spawn, "_clean_fixture_environment", fail_environment)
+    monkeypatch.setattr(
+        fixture_spawn, "fixture_child_environment_with_receipt", fail_environment
+    )
     with _record_fixture_session(tmp_path, source, monkeypatch) as record:
         before_environment = os.environ.copy()
         before_cwd = Path.cwd()
         with pytest.raises(RuntimeError, match="environment construction failure"):
             with bootstrap_fixture_public_environment(
-                mode="synthetic_tool", record=record, fixture_cwd=fixture
+                mode="synthetic_tool", record=record,
+                record_capability=_explicit_fixture_capability(record), fixture_cwd=fixture
             ):
                 raise AssertionError("environment failure unexpectedly yielded")
         assert Path.cwd() == before_cwd
@@ -730,7 +1276,8 @@ def test_fixture_bootstrap_write_failure_cleans_local_residue(
         before_cwd = Path.cwd()
         with pytest.raises(RuntimeError, match="invocation write failure"):
             with bootstrap_fixture_public_environment(
-                mode="synthetic_tool", record=record, fixture_cwd=fixture
+                mode="synthetic_tool", record=record,
+                record_capability=_explicit_fixture_capability(record), fixture_cwd=fixture
             ):
                 raise AssertionError("write failure unexpectedly yielded")
         assert Path.cwd() == before_cwd
@@ -759,7 +1306,8 @@ def test_fixture_bootstrap_session_failure_cleans_local_residue(
         before_cwd = Path.cwd()
         with pytest.raises(RuntimeError, match="independent session failure"):
             with bootstrap_fixture_public_environment(
-                mode="synthetic_tool", record=record, fixture_cwd=fixture
+                mode="synthetic_tool", record=record,
+                record_capability=_explicit_fixture_capability(record), fixture_cwd=fixture
             ):
                 raise AssertionError("session failure unexpectedly yielded")
         assert Path.cwd() == before_cwd
@@ -781,7 +1329,8 @@ def test_fixture_bootstrap_yield_failure_cleans_local_residue(
         before_cwd = Path.cwd()
         with pytest.raises(RuntimeError, match="injected yield failure"):
             with bootstrap_fixture_public_environment(
-                mode="synthetic_tool", record=record, fixture_cwd=fixture
+                mode="synthetic_tool", record=record,
+                record_capability=_explicit_fixture_capability(record), fixture_cwd=fixture
             ):
                 raise RuntimeError("injected yield failure")
         assert Path.cwd() == before_cwd
@@ -817,7 +1366,8 @@ def test_fixture_bootstrap_source_cwd_replacement_reports_cleanup_outcome(
             match="fixture bootstrap restoration/cleanup outcome",
         ) as rejected:
             with bootstrap_fixture_public_environment(
-                mode="synthetic_tool", record=record, fixture_cwd=fixture
+                mode="synthetic_tool", record=record,
+                record_capability=_explicit_fixture_capability(record), fixture_cwd=fixture
             ):
                 raise AssertionError("replaced source CWD unexpectedly yielded")
         assert rejected.value.reject is ParentRootReject.ROOT_RACE_DETECTED
@@ -841,7 +1391,8 @@ def test_fixture_bootstrap_refreshes_product_expiry_before_run(
         before_cwd = Path.cwd()
         with pytest.raises(SessionResolutionError, match="FIXTURE_DIRECT_SESSION_EXPIRED"):
             with bootstrap_fixture_public_environment(
-                mode="product_fixture", record=record, fixture_cwd=fixture,
+                mode="product_fixture", record=record,
+                record_capability=_explicit_fixture_capability(record), fixture_cwd=fixture,
                 argv=(sys.executable, "-c", "raise SystemExit(99)"),
                 now_mono_ns=expires - 1,
                 clock=lambda: expires,

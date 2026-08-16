@@ -9,6 +9,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 import os
 import sqlite3
@@ -23,33 +24,87 @@ from typing import cast
 import yaml
 
 from tools.agent_tools import prose_reasoning_graph as prose_graph
+from tools.agent_tools.fixture_spawn import (
+    bootstrap_fixture_public_environment,
+    record_capability_from_environment,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "prose_reasoning_graph.py"
 
 
+def graph_fixture_root(args: tuple[str, ...]) -> Path:
+    """Select the temporary repository containing all path-bearing arguments."""
+    paths = [
+        Path(argument).resolve()
+        for argument in args
+        if argument.startswith("/")
+    ]
+    if not paths:
+        return PROJECT_ROOT
+    parents = [path if path.is_dir() else path.parent for path in paths]
+    return Path(os.path.commonpath([str(path) for path in parents]))
+
+
+@contextmanager
+def graph_fixture_session(root: Path, overrides: dict[str, str]):
+    """Run one CLI call under the canonical synthetic fixture facade."""
+    root.mkdir(parents=True, exist_ok=True)
+    if not (root / ".git").exists():
+        subprocess.run(
+            ["git", "init", "-q", "-b", "main", str(root)],
+            check=True,
+            capture_output=True,
+        )
+    base_environment = {
+        key: value for key, value in os.environ.items()
+        if not key.startswith("AGENT_CANON_") and key != "PYTHONPATH"
+    }
+    base_environment.update(overrides)
+    with bootstrap_fixture_public_environment(
+        mode="synthetic_tool",
+        record_capability=record_capability_from_environment(),
+        fixture_cwd=root,
+        base_env=base_environment,
+        invocation_script=SCRIPT,
+        purpose="prose-reasoning-graph-test",
+    ) as fixture:
+        yield dict(fixture)
+
+
 def run_graph(*args: str) -> subprocess.CompletedProcess[str]:
-    """Run the prose reasoning graph CLI."""
-    return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
-        cwd=PROJECT_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-        env=os.environ.copy(),
-    )
+    """Run the prose reasoning graph CLI under a selected fixture session."""
+    root = graph_fixture_root(args)
+    with graph_fixture_session(root, {}) as environment:
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), *args],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
 
 
 def run_graph_with_env(env: dict[str, str], *args: str) -> subprocess.CompletedProcess[str]:
     """Run the prose reasoning graph CLI with environment overrides."""
-    return subprocess.run(
-        [sys.executable, str(SCRIPT), *args],
-        cwd=PROJECT_ROOT,
-        check=False,
-        capture_output=True,
-        text=True,
-        env={**os.environ, **env},
-    )
+    root = graph_fixture_root(args)
+    with graph_fixture_session(root, env) as environment:
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), *args],
+            cwd=root,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
+
+
+@contextmanager
+def graph_database_session(path: Path):
+    """Open a fixture database through the authenticated parent boundary."""
+    with graph_fixture_session(path.parent, {}):
+        yield
 
 
 def stdout_value(result: subprocess.CompletedProcess[str], key: str) -> str:
@@ -234,7 +289,7 @@ class ProseReasoningGraphTest(unittest.TestCase):
         """Hard ordering cycles should be visible in diagnostics."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             db = Path(tmp_dir) / "graph.sqlite"
-            with prose_graph.connect(db) as connection:
+            with graph_database_session(db), prose_graph.connect(db) as connection:
                 prose_graph.initialize_schema(connection)
                 connection.execute(
                     """
@@ -420,8 +475,8 @@ class ProseReasoningGraphTest(unittest.TestCase):
                 db_path,
             )
 
-    def test_ingest_uses_home_cache_when_cache_env_is_unset(self) -> None:
-        """The default DB route should be under HOME when no cache override is set."""
+    def test_ingest_uses_parent_cache_when_cache_env_is_unset(self) -> None:
+        """The default DB route should be under the authenticated parent cache."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             fake_home = root / "home"
@@ -436,7 +491,7 @@ class ProseReasoningGraphTest(unittest.TestCase):
 
             self.assertEqual(ingest.returncode, 0, ingest.stdout + ingest.stderr)
             db_path = Path(stdout_value(ingest, "PROSE_REASONING_GRAPH_DB"))
-            expected_root = fake_home / ".cache" / "agent-canon" / "prose-reasoning-graph"
+            expected_root = root / ".agent-canon" / "prose-reasoning-graph"
             self.assertTrue(db_path.exists(), db_path)
             self.assertTrue(
                 db_path.resolve().as_posix().startswith(expected_root.resolve().as_posix()),
@@ -1044,34 +1099,6 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertNotIn("topic_jump_without_bridge", diagnostic_rules(db))
             self.assertNotIn("merge_paragraphs", operation_payloads(db))
 
-    def test_dependency_header_comment_is_not_an_edit_target(self) -> None:
-        """Dependency headers are metadata, not prose rewrite targets."""
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            source = root / "header.md"
-            db = root / "graph.sqlite"
-            source.write_text(
-                textwrap.dedent(
-                    """
-                    <!--
-                    @dependency-start
-                    responsibility Documents prose graph usage and contract.
-                    upstream implementation tools/agent_tools/prose_reasoning_graph.py builds prose graph usage.
-                    @dependency-end
-                    -->
-
-                    # Tool
-
-                    This prose graph usage guide documents command surface and result surface.
-                    """
-                ).strip(),
-                encoding="utf-8",
-            )
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "report").returncode, 0)
-
-            self.assertNotIn("merge_paragraphs", operation_payloads(db))
-
     def test_experiment_vocabulary_explanation_does_not_trigger_plan_diagnostics(self) -> None:
         """Explaining experiment vocabulary should not become an experiment plan."""
         with tempfile.TemporaryDirectory() as tmp_dir:
@@ -1195,41 +1222,46 @@ class ProseReasoningGraphTest(unittest.TestCase):
             self.assertNotIn("v1.2.3 and Fig.", sentences)
 
     def test_graph_dependency_evidence_supports_responsibility_claims(self) -> None:
-        """Canonical graph evidence supports claims without parser branches."""
+        """Canonical dependency evidence projects a stable semantic support basis."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             source = root / "contract.md"
             db = root / "graph.sqlite"
-            source.write_text(
-                textwrap.dedent(
-                    """
-                    # Contract
-                    <!--
-                    @dependency-start
-                    responsibility Documents canonical anchor graph contract.
-                    upstream design documents/spec.md canonical anchor graph contract and projection vocabulary.
-                    downstream implementation tools/graph.py preserves canonical anchors.
-                    @dependency-end
-                    -->
+            source_text = textwrap.dedent(
+                """
+                # Contract
 
-                    The graph must preserve canonical anchors.
-                    """
-                ).strip(),
-                encoding="utf-8",
+                The graph must preserve canonical anchors.
+                """
+            ).strip()
+            source.write_text(source_text, encoding="utf-8")
+            dependency_record = prose_graph.GraphDependencyRecord(
+                role="responsibility",
+                body="Documents canonical anchor graph contract.",
+                text="responsibility Documents canonical anchor graph contract.",
+                source_start=0,
+                source_end=len(source_text),
             )
 
-            self.assertEqual(run_graph("ingest", str(source), "--db", str(db)).returncode, 0)
-            self.assertEqual(run_graph("analyze", "--db", str(db), "--profile", "writing").returncode, 0)
-
-            rules = diagnostic_rules(db)
-            self.assertNotIn("unsupported_claim", rules)
-            with sqlite3.connect(db) as connection:
+            with graph_database_session(db), prose_graph.connect(db) as connection:
+                prose_graph.initialize_schema(connection)
+                prose_graph.ingest_document(
+                    connection,
+                    source,
+                    source_text,
+                    document_id="doc:1",
+                    source_node_id="src:1",
+                    kind="document",
+                    dependency_records=(dependency_record,),
+                )
+                prose_graph.analyze_graph(connection, "writing")
                 support_basis = {
                     json.loads(row[0])["basis"]
                     for row in connection.execute(
                         "SELECT payload_json FROM edges WHERE layer = 'evidence' AND kind = 'supports'"
                     )
                 }
+
             self.assertIn("graph_dependency_concept_coverage", support_basis)
 
     def test_prompt_file_influences_corpus_hints_and_missing_file_errors(self) -> None:

@@ -22,7 +22,7 @@ import tomllib
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.fixture_spawn import record_environment
+from tools.agent_tools.fixture_spawn import bootstrap_fixture_public_environment
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CHECKER = PROJECT_ROOT / "tools" / "agent_tools" / "parent_repo_readiness.py"
@@ -67,14 +67,18 @@ class ParentRepoReadinessTest(unittest.TestCase):
             *checker_args,
             *args,
         ]
-        with record_environment(cwd=PROJECT_ROOT, base_env=checker_env) as signed_env:
+        with bootstrap_fixture_public_environment(
+            mode="ordinary_tool",
+            fixture_cwd=PROJECT_ROOT,
+            base_env=checker_env,
+        ) as fixture:
             return subprocess.run(
                 command,
                 cwd=PROJECT_ROOT,
                 check=False,
                 capture_output=True,
                 text=True,
-                env=signed_env,
+                env=fixture.environment,
             )
 
     def temporary_directory(self) -> tempfile.TemporaryDirectory[str]:

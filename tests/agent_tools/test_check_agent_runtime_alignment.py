@@ -44,11 +44,8 @@ from packets import (  # noqa: E402
     resolve_role_document_packet,
 )
 from team_config import TaskCatalog, load_team_config, resolve_role  # noqa: E402
-from tools.agent_tools.fixture_spawn import (
-    record_session_from_environment,  # noqa: E402
-)
-from tools.agent_tools.parent_root_side_effects import (
-    ParentRootSideEffectBoundary,  # noqa: E402
+from tools.agent_tools.fixture_spawn import (  # noqa: E402
+    bootstrap_fixture_public_environment,
 )
 from workspace_scope import resolve_report_bundle_artifact_path  # noqa: E402
 
@@ -149,14 +146,15 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
 
     def test_alignment_script_passes(self) -> None:
         """The runtime alignment checker should succeed without findings."""
-        with record_session_from_environment() as session:
-            environment = ParentRootSideEffectBoundary().session_environment(
-                session, os.environ
-            )
+        with bootstrap_fixture_public_environment(
+            mode="ordinary_tool",
+            fixture_cwd=PROJECT_ROOT,
+            base_env=os.environ,
+        ) as fixture:
             result = subprocess.run(
                 [sys.executable, str(SCRIPT_PATH)],
                 cwd=PROJECT_ROOT,
-                env=environment,
+                env=fixture.environment,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -171,14 +169,15 @@ class AgentRuntimeAlignmentTest(unittest.TestCase):
     def test_alignment_script_standalone_parent_uses_external_fixture_parent(self) -> None:
         """Standalone parent-bound checks keep derived reports outside source."""
         before = set(PROJECT_ROOT.parent.glob(".agent-canon-runtime-parent-*"))
-        with record_session_from_environment() as session:
-            environment = ParentRootSideEffectBoundary().session_environment(
-                session, os.environ
-            )
+        with bootstrap_fixture_public_environment(
+            mode="ordinary_tool",
+            fixture_cwd=PROJECT_ROOT,
+            base_env=os.environ,
+        ) as fixture:
             result = subprocess.run(
                 [sys.executable, str(SCRIPT_PATH)],
                 cwd=PROJECT_ROOT,
-                env=environment,
+                env=fixture.environment,
                 check=False,
                 capture_output=True,
                 text=True,

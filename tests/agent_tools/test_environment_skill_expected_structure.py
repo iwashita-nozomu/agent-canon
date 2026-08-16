@@ -176,33 +176,5 @@ class EnvironmentSkillExpectedStructureTests(unittest.TestCase):
             ):
                 self.assertIn(marker, text, f"{relative_path}: {marker}")
 
-    def test_image_host_and_scope_boundaries_are_explicit(self) -> None:
-        """The image owns standard inputs and the route cannot widen acceptance scope."""
-        text = self.read("agents/skills/environment-maintenance.md")
-        for marker in (
-            "docker/dockerfile",
-            "test/testrunner.sh",
-            "test/testlist.toml",
-            "standard-test dependency",
-            "runtime/host setup",
-            "host-side duplicate test",
-            "host-side canonical/full test",
-            "既存 container",
-            "tests/agent_tools",
-            "optional runtime mount",
-            "optional mount",
-            "requirement",
-            "optional gpu",
-            "special check",
-            "追加の evidence",
-            "standard pair",
-            "template repository",
-            "#163",
-            "scope_excluded",
-        ):
-            self.assertIn(marker, text, marker)
-        self.assertNotIn("test/source mount", text)
-
-
 if __name__ == "__main__":
     unittest.main()

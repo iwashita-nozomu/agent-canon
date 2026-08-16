@@ -20,7 +20,10 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from tools.agent_tools.fixture_spawn import record_environment
+from tools.agent_tools.fixture_spawn import (
+    bootstrap_fixture_public_environment,
+    record_capability_from_environment,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOLS_ROOT = PROJECT_ROOT / "tools" / "agent_tools"
@@ -183,11 +186,28 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             "SHARED_STATUS": str(shared_status),
             "PARENT_STATUS": str(parent_status),
         }
-        with record_environment(cwd=command_root, base_env=base_env) as environment:
+        for key in ("CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR"):
+            base_env.pop(key, None)
+        invocation_script = command_root / ".devcontainer" / "post-create-entrypoint.sh"
+        if not invocation_script.is_file():
+            invocation_script = (
+                command_root
+                / "vendor"
+                / "agent-canon"
+                / ".devcontainer"
+                / "post-create-entrypoint.sh"
+            )
+        with bootstrap_fixture_public_environment(
+            mode="synthetic_tool",
+            record_capability=record_capability_from_environment(),
+            fixture_cwd=command_root,
+            base_env=base_env,
+            invocation_script=invocation_script,
+        ) as fixture:
             return subprocess.run(
                 command,
                 cwd=command_root,
-                env=environment,
+                env=fixture.environment,
                 check=False,
                 capture_output=True,
                 text=True,
@@ -252,7 +272,12 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             self.assertEqual(os.readlink(public_view), ".")
             script = clone / "tools" / "sync_agent_canon.sh"
             self.assertEqual(script.stat().st_mode & stat.S_IXUSR, stat.S_IXUSR)
-            with record_environment(cwd=clone) as environment:
+            with bootstrap_fixture_public_environment(
+                mode="synthetic_tool",
+                record_capability=record_capability_from_environment(),
+                fixture_cwd=clone,
+                invocation_script=clone / "tools" / "agent_tools" / "repo_structure_contract.py",
+            ) as fixture:
                 result = subprocess.run(
                     [
                         sys.executable,
@@ -265,7 +290,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                     check=False,
                     capture_output=True,
                     text=True,
-                    env=environment,
+                    env=fixture.environment,
                 )
 
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -295,7 +320,12 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
             )
             subprocess.run(["git", "init", "-q"], cwd=clone, check=True)
             (clone / "tools" / "agent-canon").symlink_to(".", target_is_directory=True)
-            with record_environment(cwd=clone) as environment:
+            with bootstrap_fixture_public_environment(
+                mode="synthetic_tool",
+                record_capability=record_capability_from_environment(),
+                fixture_cwd=clone,
+                invocation_script=clone / "tools" / "agent_tools" / "agent_canon_source_root.py",
+            ) as fixture:
                 result = subprocess.run(
                     [
                         sys.executable,
@@ -309,7 +339,7 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                         "documents/structure/repo-structure-contract.toml",
                     ],
                     cwd=clone,
-                    env=environment,
+                    env=fixture.environment,
                     check=False,
                     capture_output=True,
                     text=True,
@@ -412,6 +442,8 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                         **os.environ,
                         "AGENT_CANON_TEST_LOG": str(test_log),
                     }
+                    for key in ("CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR"):
+                        environment.pop(key, None)
                     for key in (
                         "initializeCommand",
                         "postCreateCommand",
@@ -422,13 +454,28 @@ class AgentCanonSourceRootCLITests(unittest.TestCase):
                             str(selected_workspace),
                         )
                         self.assertIn(PUBLIC_RESOLVER, command)
-                        with record_environment(
-                            cwd=command_root, base_env=environment
-                        ) as signed_environment:
+                        invocation_script = (
+                            selected_workspace
+                            / ".devcontainer"
+                            / "post-create-entrypoint.sh"
+                        )
+                        if not invocation_script.is_file():
+                            invocation_script = (
+                                source
+                                / ".devcontainer"
+                                / "post-create-entrypoint.sh"
+                            )
+                        with bootstrap_fixture_public_environment(
+                            mode="synthetic_tool",
+                            record_capability=record_capability_from_environment(),
+                            fixture_cwd=command_root,
+                            base_env=environment,
+                            invocation_script=invocation_script,
+                        ) as fixture:
                             result = subprocess.run(
                                 ["bash", "-lc", command],
                                 cwd=command_root,
-                                env=signed_environment,
+                                env=fixture.environment,
                                 check=False,
                                 capture_output=True,
                                 text=True,

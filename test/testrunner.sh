@@ -70,6 +70,135 @@ RECORD_SCRUB_KEYS = (
     "AGENT_CANON_DATA_ROOT",
     "PYTHONPATH",
 )
+PRIVATE_RECORD_PARENT_ROOT_ENV = "AGENT_CANON_PRIVATE_RECORD_PARENT_ROOT"
+PRIVATE_RECORD_HANDOFF_ENV = "AGENT_CANON_PRIVATE_RECORD_HANDOFF"
+PRIVATE_RECORD_REQUIRED_ENV = "AGENT_CANON_PRIVATE_RECORD_REQUIRED"
+
+
+class RunnerRecordBeginReceipt:
+    """Readback emitted after one record's setup and pre-issued channels."""
+
+    def __init__(
+        self,
+        *,
+        record_id: str,
+        public_record_id: str,
+        private_record_id: str,
+        record_root: str,
+        issued_child_ids: tuple[str, ...],
+        provenance: str = "testrunner_preissued",
+        public_private_ids_differ: bool = True,
+    ) -> None:
+        self.record_id = record_id
+        self.public_record_id = public_record_id
+        self.private_record_id = private_record_id
+        self.record_root = record_root
+        self.issued_child_ids = issued_child_ids
+        self.provenance = provenance
+        self.public_private_ids_differ = public_private_ids_differ
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "type": "runner_record_begin",
+            "record_id": self.record_id,
+            "public_record_id": self.public_record_id,
+            "private_record_id": self.private_record_id,
+            "record_root": self.record_root,
+            "issued_child_ids": list(self.issued_child_ids),
+            "provenance": self.provenance,
+            "public_private_ids_differ": self.public_private_ids_differ,
+        }
+
+
+class RunnerRecordTerminalReceipt:
+    """Readback emitted after process drain and exact record cleanup."""
+
+    def __init__(
+        self,
+        *,
+        record_id: str,
+        public_record_id: str,
+        private_record_id: str,
+        status: str,
+        termination_reason: str,
+        issued_child_ids: tuple[str, ...],
+        revoked_child_ids: tuple[str, ...],
+        leases_after: int,
+        exact_record_root_removed: bool,
+        cleanup_status: str,
+        no_residue: bool,
+        rollback: bool,
+        termination_signal: str | None = None,
+    ) -> None:
+        self.record_id = record_id
+        self.public_record_id = public_record_id
+        self.private_record_id = private_record_id
+        self.status = status
+        self.termination_reason = termination_reason
+        self.issued_child_ids = issued_child_ids
+        self.revoked_child_ids = revoked_child_ids
+        self.leases_after = leases_after
+        self.exact_record_root_removed = exact_record_root_removed
+        self.cleanup_status = cleanup_status
+        self.no_residue = no_residue
+        self.rollback = rollback
+        self.termination_signal = termination_signal
+
+    def as_mapping(self) -> dict[str, Any]:
+        return {
+            "type": "runner_record_terminal",
+            "record_id": self.record_id,
+            "public_record_id": self.public_record_id,
+            "private_record_id": self.private_record_id,
+            "status": self.status,
+            "termination_reason": self.termination_reason,
+            "termination_signal": self.termination_signal,
+            "issued_child_ids": list(self.issued_child_ids),
+            "revoked_child_ids": list(self.revoked_child_ids),
+            "leases_after": self.leases_after,
+            "exact_record_root_removed": self.exact_record_root_removed,
+            "cleanup_status": self.cleanup_status,
+            "cleanup": self.cleanup_status,
+            "no_residue": self.no_residue,
+            "rollback": self.rollback,
+        }
+
+
+class RunnerRecordSetupError(RuntimeError):
+    """Setup failure carrying the completed runner rollback readback."""
+
+    def __init__(
+        self,
+        cause: BaseException,
+        *,
+        record_root: Path | None,
+        issued_child_ids: tuple[str, ...],
+        revoked_child_ids: tuple[str, ...],
+        leases_after: int,
+        exact_record_root_removed: bool,
+        cleanup_status: str,
+        no_residue: bool,
+    ) -> None:
+        super().__init__(str(cause))
+        self.record_root = record_root
+        self.issued_child_ids = issued_child_ids
+        self.revoked_child_ids = revoked_child_ids
+        self.leases_after = leases_after
+        self.exact_record_root_removed = exact_record_root_removed
+        self.cleanup_status = cleanup_status
+        self.no_residue = no_residue
+
+
+def _runner_child_record_id(child_receipt: Any) -> str | None:
+    """Read a child record id from an opaque issuer receipt."""
+    try:
+        value = child_receipt.record.record_id
+    except AttributeError:
+        value = None
+    if isinstance(value, str) and value:
+        return value
+    value = child_receipt.child.record_id
+    return value if isinstance(value, str) and value else None
 
 
 class SchemaError(ValueError):
@@ -208,62 +337,149 @@ def record_environment(
     horizon: Any,
 ) -> tuple[dict[str, str], Any, Any]:
     """Issue one authenticated handoff and parent-owned state root per record."""
-    record_receipt = boundary.create_parent_owned_temp_directory(
-        attestation,
-        runtime_receipt.physical_path,
-        "public-test-runner-record-base",
-        f"record-{record_id}",
-    )
-    record_root = record_receipt.physical_path
-    record_environment_base = dict(base_environment)
-    record_environment_base.update(
-        {
-            "HOME": str(record_root / "home"),
-            "TMPDIR": str(record_root / "tmp"),
-            "TEMP": str(record_root / "tmp"),
-            "TMP": str(record_root / "tmp"),
-            "XDG_CACHE_HOME": str(record_root / "cache"),
-            "XDG_CONFIG_HOME": str(record_root / "config"),
-            "XDG_DATA_HOME": str(record_root / "data"),
-            "PYTHONPYCACHEPREFIX": str(record_root / "cache" / "pycache"),
-            "AGENT_CANON_RECORD_ROOT": str(record_root),
-            "AGENT_CANON_RECORD_ID": record_id,
-        }
-    )
-    for name in ("home", "tmp", "cache", "config"):
-        boundary.ensure_parent_owned_directory(
+    record_receipt = None
+    issued_children: list[Any] = []
+    try:
+        record_receipt = boundary.create_parent_owned_temp_directory(
             attestation,
-            record_root / name,
-            f"public-test-runner-record-{name}",
+            runtime_receipt.physical_path,
+            "public-test-runner-record-base",
+            f"record-{record_id}",
         )
-    child = issuer.issue_child(
-        role="record",
-        record_id=record_id,
-        physical_root=attestation.parent_root,
-        now_mono_ns=time.monotonic_ns(),
-    )
-    validate_child_horizon(child, horizon.run_deadline_mono_ns)
-    child_environment = dict(record_environment_base)
-    # A broad test record may own nested Git fixtures. Keep the complete
-    # parent-confined signed side-effect channel for record-local lifecycle,
-    # HOME/TMP/XDG/CARGO, and writer infrastructure effects. Repository/data
-    # identity and the host import path are derived only from each physical
-    # command CWD or removed by the record-only fixture-direct adapter.
-    for key in RECORD_SCRUB_KEYS:
-        child_environment.pop(key, None)
-    # Replace the supervisor channel with the exact record handoff issued
-    # above.  The record process must resolve the capability it was issued;
-    # retaining the supervisor handoff would make fixture-direct commands
-    # fail closed (or, worse, accidentally retain supervisor authority).
-    child_environment["AGENT_CANON_SIDE_EFFECT_PARENT_ROOT"] = (
-        child.record.parent_root_realpath
-    )
-    child_environment["AGENT_CANON_SIDE_EFFECT_HANDOFF"] = child.handoff
-    child_environment["AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED"] = "1"
-    # The record retains its private lifecycle receipt and signed channel;
-    # explicitly spawned fixture commands use tools/agent_tools/fixture_spawn.py, which
-    # removes that channel immediately before the production child starts.
-    return child_environment, record_receipt, child
+        record_root = record_receipt.physical_path
+        record_environment_base = dict(base_environment)
+        record_environment_base.update(
+            {
+                "HOME": str(record_root / "home"),
+                "TMPDIR": str(record_root / "tmp"),
+                "TEMP": str(record_root / "tmp"),
+                "TMP": str(record_root / "tmp"),
+                "XDG_CACHE_HOME": str(record_root / "cache"),
+                "XDG_CONFIG_HOME": str(record_root / "config"),
+                "XDG_DATA_HOME": str(record_root / "data"),
+                "PYTHONPYCACHEPREFIX": str(record_root / "cache" / "pycache"),
+                "AGENT_CANON_RECORD_ROOT": str(record_root),
+                "AGENT_CANON_RECORD_ID": record_id,
+            }
+        )
+        for name in ("home", "tmp", "cache", "config"):
+            boundary.ensure_parent_owned_directory(
+                attestation,
+                record_root / name,
+                f"public-test-runner-record-{name}",
+            )
+        child = issuer.issue_child(
+            role="record",
+            record_id=record_id,
+            physical_root=attestation.parent_root,
+            now_mono_ns=time.monotonic_ns(),
+        )
+        issued_children.append(child)
+        private_child = issuer.issue_child(
+            role="record",
+            record_id=f"{record_id}-private",
+            physical_root=attestation.parent_root,
+            now_mono_ns=time.monotonic_ns(),
+        )
+        issued_children.append(private_child)
+        validate_child_horizon(child, horizon.run_deadline_mono_ns)
+        validate_child_horizon(private_child, horizon.run_deadline_mono_ns)
+        child_environment = dict(record_environment_base)
+        # Keep the complete parent-confined signed channel for ordinary
+        # record-owned tooling; the fixture adapter consumes private transport
+        # and projects the mode-specific public channel exactly once.
+        for key in RECORD_SCRUB_KEYS:
+            child_environment.pop(key, None)
+        child_environment["AGENT_CANON_SIDE_EFFECT_PARENT_ROOT"] = (
+            child.record.parent_root_realpath
+        )
+        child_environment["AGENT_CANON_SIDE_EFFECT_HANDOFF"] = child.handoff
+        child_environment["AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED"] = "1"
+        child_environment[PRIVATE_RECORD_PARENT_ROOT_ENV] = (
+            private_child.record.parent_root_realpath
+        )
+        child_environment[PRIVATE_RECORD_HANDOFF_ENV] = private_child.handoff
+        child_environment[PRIVATE_RECORD_REQUIRED_ENV] = "1"
+        return child_environment, record_receipt, (child, private_child)
+    except BaseException:
+        rollback_cause = sys.exc_info()[1]
+        rollback_errors: list[BaseException] = []
+        revoked_child_ids: list[str] = []
+        leases_after = 0
+        for issued in reversed(issued_children):
+            try:
+                drain = issuer.revoke_drain_child(
+                    child=issued.child,
+                    reason="normal_exit",
+                    now_mono_ns=time.monotonic_ns(),
+                )
+                leases_after = max(leases_after, int(drain.leases_after))
+                if drain.leases_after != 0:
+                    rollback_errors.append(
+                        RuntimeError("record session leases remain after rollback")
+                    )
+                child_id = _runner_child_record_id(issued)
+                if child_id is not None:
+                    revoked_child_ids.append(child_id)
+            except BaseException as error:
+                rollback_errors.append(error)
+        exact_record_root_removed = record_receipt is None
+        if record_receipt is not None:
+            try:
+                boundary.remove_parent_owned_tree(
+                    attestation,
+                    record_receipt,
+                    "public-test-runner-record-rollback",
+                )
+                exact_record_root_removed = not record_receipt.physical_path.exists()
+            except BaseException as error:
+                rollback_errors.append(error)
+                exact_record_root_removed = not record_receipt.physical_path.exists()
+        issued_child_ids = tuple(
+            child_id
+            for child in issued_children
+            if (child_id := _runner_child_record_id(child)) is not None
+        )
+        cleanup_status = "failed" if rollback_errors else "rolled_back"
+        no_residue = (
+            exact_record_root_removed
+            and leases_after == 0
+            and not rollback_errors
+            and set(issued_child_ids) == set(revoked_child_ids)
+        )
+        if rollback_errors:
+            rollback_detail = RuntimeError(
+                "record environment rollback failed: "
+                + "; ".join(str(error) for error in rollback_errors)
+            )
+            if rollback_cause is not None:
+                rollback_detail.__cause__ = rollback_cause
+            raise RunnerRecordSetupError(
+                rollback_detail,
+                record_root=(
+                    record_receipt.physical_path if record_receipt is not None else None
+                ),
+                issued_child_ids=issued_child_ids,
+                revoked_child_ids=tuple(revoked_child_ids),
+                leases_after=leases_after,
+                exact_record_root_removed=exact_record_root_removed,
+                cleanup_status=cleanup_status,
+                no_residue=no_residue,
+            ) from rollback_cause
+        if rollback_cause is None:
+            rollback_cause = RuntimeError("record environment setup failed")
+        raise RunnerRecordSetupError(
+            rollback_cause,
+            record_root=(
+                record_receipt.physical_path if record_receipt is not None else None
+            ),
+            issued_child_ids=issued_child_ids,
+            revoked_child_ids=tuple(revoked_child_ids),
+            leases_after=leases_after,
+            exact_record_root_removed=exact_record_root_removed,
+            cleanup_status=cleanup_status,
+            no_residue=no_residue,
+        ) from rollback_cause
 
 
 def load_scopes(source_root: Path) -> dict[str, tuple[tuple[str, ...], tuple[str, ...]]]:
@@ -589,12 +805,39 @@ def _run(
                 result = 1
                 break
             selected_count += 1
-            emit({**common, "status": "start", "exit_code": None})
+            selected_common = {
+                **common,
+                "selected_record_id": record["id"],
+                "capability_record_id": f"{record['id']}-private",
+                "public_record_id": record["id"],
+                "capability_type": "runner_private_record_v2",
+                "capability_owner": "fixture_adapter",
+                "capability_scope": "fixture_child_environment",
+            }
             record_environment_value: dict[str, str] | None = None
             record_receipt: Any | None = None
             record_child: Any | None = None
+            begin_receipt: RunnerRecordBeginReceipt | None = None
             termination_reason = "normal_exit"
+            termination_signal: str | None = None
             exit_code = 1
+            issued_child_ids: list[str] = []
+            revoked_child_ids: list[str] = []
+            leases_after = 0
+            exact_record_root_removed = False
+            cleanup_status = "clean"
+            setup_no_residue: bool | None = None
+
+            def child_record_id(child_receipt: Any) -> str | None:
+                try:
+                    value = child_receipt.record.record_id
+                except AttributeError:
+                    value = None
+                if isinstance(value, str) and value:
+                    return value
+                value = child_receipt.child.record_id
+                return value if isinstance(value, str) and value else None
+
             try:
                 record_environment_value, record_receipt, record_child = record_environment(
                     source_root,
@@ -605,6 +848,48 @@ def _run(
                     issuer,
                     record["id"],
                     horizon,
+                )
+                record_children = (
+                    record_child
+                    if isinstance(record_child, tuple)
+                    else (record_child,)
+                )
+                issued_child_ids = [
+                    child_id
+                    for child in record_children
+                    if (child_id := child_record_id(child)) is not None
+                ]
+                public_record_id = next(
+                    (child_id for child_id in issued_child_ids if child_id == record["id"]),
+                    "",
+                )
+                private_record_id = next(
+                    (
+                        child_id
+                        for child_id in issued_child_ids
+                        if child_id.endswith("-private")
+                    ),
+                    "",
+                )
+                if not public_record_id or not private_record_id:
+                    raise RuntimeError("runner preissued public/private records are incomplete")
+                begin_receipt = RunnerRecordBeginReceipt(
+                    record_id=record["id"],
+                    public_record_id=public_record_id,
+                    private_record_id=private_record_id,
+                    record_root=str(record_receipt.physical_path),
+                    issued_child_ids=tuple(issued_child_ids),
+                    public_private_ids_differ=(public_record_id != private_record_id),
+                )
+                emit(
+                    {
+                        **selected_common,
+                        "status": "start",
+                        "exit_code": None,
+                        "receipt_type": "runner_record_begin",
+                        "begin_receipt": begin_receipt.as_mapping(),
+                        "receipt": begin_receipt.as_mapping(),
+                    }
                 )
                 if stop_requested or watchdog.failure is not None:
                     termination_reason = "signal" if stop_requested else "parent_changed"
@@ -625,15 +910,18 @@ def _run(
                     while process.poll() is None:
                         if stop_requested:
                             termination_reason = "signal"
-                            terminate_process(process)
+                            killed = terminate_process(process)
+                            termination_signal = "SIGKILL" if killed else "SIGTERM"
                             break
                         if watchdog.failure is not None:
                             termination_reason = "parent_changed"
-                            terminate_process(process)
+                            killed = terminate_process(process)
+                            termination_signal = "SIGKILL" if killed else "SIGTERM"
                             break
                         if time.monotonic_ns() >= command_deadline(run_deadline_ns):
                             termination_reason = "timeout"
-                            terminate_process(process)
+                            killed = terminate_process(process)
+                            termination_signal = "SIGKILL" if killed else "SIGTERM"
                             break
                         control_event.wait(TERMINATION_POLL_NS / 1_000_000_000)
                         control_event.clear()
@@ -642,33 +930,76 @@ def _run(
                         exit_code = 128 + (interrupted_signum or signal.SIGTERM)
                     elif termination_reason == "parent_changed" and exit_code == 0:
                         exit_code = 1
+                    elif termination_reason == "normal_exit" and exit_code != 0:
+                        termination_reason = "body_failure"
+            except RunnerRecordSetupError as error:
+                issued_child_ids = list(error.issued_child_ids)
+                revoked_child_ids = list(error.revoked_child_ids)
+                leases_after = error.leases_after
+                exact_record_root_removed = error.exact_record_root_removed
+                cleanup_status = error.cleanup_status
+                setup_no_residue = error.no_residue
+                termination_reason = (
+                    "horizon_failure"
+                    if "horizon" in str(error).lower()
+                    else "setup_failure"
+                )
+                exit_code = 1
             except HorizonMismatch as error:
                 print(f"testrunner: parent session horizon rejected: {error}", file=sys.stderr)
+                termination_reason = "horizon_failure"
                 exit_code = 1
             except OSError as error:
                 print(f"testrunner: command start failed: {error}", file=sys.stderr)
+                termination_reason = "body_failure"
                 exit_code = 127
             except Exception as error:
                 detail = str(error)
                 if "horizon_mismatch" in detail.lower() or "session_horizon_mismatch" in detail.lower():
                     print(f"testrunner: parent session horizon rejected: {error}", file=sys.stderr)
+                    termination_reason = "horizon_failure"
                 else:
                     print(f"testrunner: record execution failed: {error}", file=sys.stderr)
+                    termination_reason = "body_failure"
                 exit_code = 1
             finally:
                 active_process = None
                 if record_child is not None and issuer is not None:
-                    try:
-                        drain = issuer.revoke_drain_child(
-                            child=record_child.child,
-                            reason=termination_reason,
-                            now_mono_ns=time.monotonic_ns(),
-                        )
-                        if drain.leases_after != 0:
-                            raise RuntimeError("record session leases remain after drain")
-                    except Exception as error:
-                        cleanup_failed = True
-                        print(f"testrunner: record session cleanup failed: {error}", file=sys.stderr)
+                    children = (
+                        record_child
+                        if isinstance(record_child, tuple)
+                        else (record_child,)
+                    )
+                    for child_receipt in children:
+                        try:
+                            drain = issuer.revoke_drain_child(
+                                child=child_receipt.child,
+                                reason=(
+                                    termination_reason
+                                    if termination_reason
+                                    in {
+                                        "normal_exit",
+                                        "timeout",
+                                        "expired",
+                                        "signal",
+                                        "shutdown",
+                                        "parent_changed",
+                                        "stale_recovery",
+                                    }
+                                    else "normal_exit"
+                                ),
+                                now_mono_ns=time.monotonic_ns(),
+                            )
+                            leases_after = max(leases_after, int(drain.leases_after))
+                            if drain.leases_after != 0:
+                                raise RuntimeError("record session leases remain after drain")
+                            child_id = child_record_id(child_receipt)
+                            if child_id is not None:
+                                revoked_child_ids.append(child_id)
+                        except Exception as error:
+                            cleanup_failed = True
+                            cleanup_status = "failed"
+                            print(f"testrunner: record session cleanup failed: {error}", file=sys.stderr)
                 if record_receipt is not None and record_receipt.physical_path.exists():
                     try:
                         boundary.remove_parent_owned_tree(
@@ -676,13 +1007,69 @@ def _run(
                             record_receipt,
                             "public-test-runner-record-cleanup",
                         )
+                        exact_record_root_removed = not record_receipt.physical_path.exists()
                     except Exception as error:
                         cleanup_failed = True
+                        cleanup_status = "failed"
                         print(f"testrunner: record cleanup failed: {error}", file=sys.stderr)
+                elif record_receipt is not None:
+                    exact_record_root_removed = not record_receipt.physical_path.exists()
+                if cleanup_failed and cleanup_status == "clean":
+                    cleanup_status = "failed"
             status = "pass" if exit_code == 0 and not cleanup_failed else "fail"
             if status == "fail":
                 failed_count += 1
-            emit({**common, "status": status, "exit_code": exit_code})
+            terminal_public_record_id = (
+                begin_receipt.public_record_id
+                if begin_receipt is not None
+                else (record["id"] if record["id"] in issued_child_ids else "")
+            )
+            terminal_private_record_id = (
+                begin_receipt.private_record_id
+                if begin_receipt is not None
+                else next(
+                    (
+                        child_id
+                        for child_id in issued_child_ids
+                        if child_id.endswith("-private")
+                    ),
+                    "",
+                )
+            )
+            terminal_receipt = RunnerRecordTerminalReceipt(
+                record_id=record["id"],
+                public_record_id=terminal_public_record_id,
+                private_record_id=terminal_private_record_id,
+                status=status,
+                termination_reason=termination_reason,
+                issued_child_ids=tuple(issued_child_ids),
+                revoked_child_ids=tuple(revoked_child_ids),
+                leases_after=leases_after,
+                exact_record_root_removed=exact_record_root_removed,
+                cleanup_status=cleanup_status,
+                no_residue=(
+                    setup_no_residue
+                    if setup_no_residue is not None
+                    else (
+                        exact_record_root_removed
+                        and leases_after == 0
+                        and cleanup_status == "clean"
+                        and set(issued_child_ids) == set(revoked_child_ids)
+                    )
+                ),
+                rollback=begin_receipt is None,
+                termination_signal=termination_signal,
+            )
+            emit(
+                {
+                    **selected_common,
+                    "status": status,
+                    "exit_code": exit_code,
+                    "receipt_type": "runner_record_terminal",
+                    "terminal_receipt": terminal_receipt.as_mapping(),
+                    "receipt": terminal_receipt.as_mapping(),
+                }
+            )
             if cleanup_failed:
                 print("testrunner: cleanup_failed; later records are not admitted", file=sys.stderr)
                 break

@@ -11,7 +11,6 @@ import os
 import shutil
 import subprocess
 import sys
-import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
@@ -26,11 +25,6 @@ if str(AGENT_TOOLS) not in sys.path:
 from attach_clean_detached_submodule import attach
 from tools.agent_tools.fixture_spawn import bootstrap_fixture_public_environment
 from tools.agent_tools.parent_root_side_effects import (
-    SIDE_EFFECT_HANDOFF_ENV,
-    SIDE_EFFECT_PARENT_ROOT_ENV,
-    SIDE_EFFECT_REQUIRED_ENV,
-    current_supervisor_issuer,
-    public_session,
     resolve_parent_side_effect_session_v2,
 )
 
@@ -184,70 +178,24 @@ def update_product_fixture(
     environment: dict[str, str],
 ) -> Iterator[object]:
     """Run the update product command through the canonical fixture facade."""
-    saved_environment = os.environ.copy()
-    previous_cwd = Path.cwd()
     command = ("bash", "tools/update_agent_canon.sh", "latest")
     invocation_script = parent / "tools" / "update_agent_canon.sh"
+    record = resolve_parent_side_effect_session_v2(
+        env=environment,
+        observed_cwd=parent,
+    )
     try:
-        os.environ.clear()
-        os.environ.update(environment)
-        if environment.get(SIDE_EFFECT_HANDOFF_ENV) and environment.get(
-            SIDE_EFFECT_PARENT_ROOT_ENV
-        ):
-            with bootstrap_fixture_public_environment(
-                mode="product_fixture",
-                fixture_cwd=parent,
-                base_env=environment,
-                argv=command,
-                invocation_script=invocation_script,
-            ) as fixture:
-                yield fixture
-            return
-
-        os.chdir(parent)
-        with public_session(
+        with bootstrap_fixture_public_environment(
+            mode="product_fixture",
+            fixture_cwd=parent,
+            record=record,
+            base_env=environment,
+            argv=command,
             invocation_script=invocation_script,
-            purpose="update-product-test-supervisor",
-            independent=True,
-            cleanup_state=True,
-        ):
-            issuer = current_supervisor_issuer()
-            assert issuer is not None
-            child = issuer.issue_child(
-                role="record",
-                record_id=f"update-record-{time.monotonic_ns()}",
-                physical_root=parent,
-                now_mono_ns=time.monotonic_ns(),
-            )
-            record = resolve_parent_side_effect_session_v2(
-                env={
-                    SIDE_EFFECT_PARENT_ROOT_ENV: child.record.parent_root_realpath,
-                    SIDE_EFFECT_HANDOFF_ENV: child.handoff,
-                    SIDE_EFFECT_REQUIRED_ENV: "1",
-                },
-                observed_cwd=parent,
-            )
-            try:
-                with bootstrap_fixture_public_environment(
-                    mode="product_fixture",
-                    fixture_cwd=parent,
-                    record=record,
-                    base_env=environment,
-                    argv=command,
-                    invocation_script=invocation_script,
-                ) as fixture:
-                    yield fixture
-            finally:
-                record.close()
-                issuer.revoke_drain_child(
-                    child=child.child,
-                    reason="normal_exit",
-                    now_mono_ns=time.monotonic_ns(),
-                )
+        ) as fixture:
+            yield fixture
     finally:
-        os.environ.clear()
-        os.environ.update(saved_environment)
-        os.chdir(previous_cwd)
+        record.close()
 
 
 def test_clean_detached_at_parent_pin_attaches_requested_branch(tmp_path: Path) -> None:

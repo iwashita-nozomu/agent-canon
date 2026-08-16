@@ -34,13 +34,34 @@ OWNER_REF = (
 )
 EXPECTED_SCHEMA = "agent-canon.execution-time-aware-orchestration.v1"
 EXPECTED_OWNER_SKILL = "agent-orchestration"
-EXPECTED_REQUIRED_FIELDS = (
-    "dependency_dag",
-    "makespan_objective",
-    "responsibility_completeness",
+EXPECTED_ACTIVATION_PREDICATE = "selected_edge_type_present"
+EXPECTED_DEFAULT_STATE = "bounded_single_owner"
+EXPECTED_CANDIDATE_COUNT_ALONE = False
+EXPECTED_SELECTED_EDGE_TYPES = (
+    "ordering",
+    "dependency",
+    "collision",
+    "publication",
+)
+EXPECTED_ALWAYS_REQUIRED_FIELDS = (
+    "owner",
+    "schema",
+    "dependency",
+    "validation",
     "correctness",
+    "publication_scope",
+)
+EXPECTED_GRAPH_ONLY_FIELDS = (
+    "dag",
     "critical_path",
     "ready_set",
+    "queue_snapshot",
+    "makespan_objective",
+)
+EXPECTED_TASK_CATALOG_FIELDS = (
+    "dependency_dag",
+    "responsibility_completeness",
+    "correctness",
     "context_reuse",
     "affected_evidence_invalidation",
 )
@@ -53,12 +74,16 @@ EXPECTED_REJECTED_CLASSES = (
     "consumer_reference_mismatch",
 )
 EXPECTED_INVARIANTS = {
-    "dag": "complete_dependency_dag_with_owner_and_consumer_closure",
-    "objective": "minimize_makespan_subject_to_responsibility_completeness_and_correctness",
+    "activation": "selected_edge_type_present",
+    "default": "bounded_single_owner",
+    "candidate_count": "candidate_count_alone_false",
+    "always": "owner_schema_dependency_validation_correctness_publication_scope",
+    "graph": "dag_critical_path_ready_set_queue_snapshot_makespan_objective",
     "dispatch": "all_non_conflicting_ready_nodes",
     "wait": "only_when_useful_ready_set_is_empty",
     "evidence": "warm_context_reuse_and_affected_evidence_only_invalidation",
     "review": "closure_before_one_exact_candidate_review",
+    "scope": "no_timeout_elapsed_time_or_capacity_cutoff",
 }
 EXPECTED_CONSUMERS = {
     "pr-processing": {
@@ -148,6 +173,146 @@ def catalog_skill(root: Path, skill: str) -> dict[str, Any] | None:
     return matches[0]
 
 
+def _non_empty(value: Any) -> bool:
+    """Return whether one graph evidence value is materially present."""
+    if value is None or value is False:
+        return False
+    if isinstance(value, (str, bytes)):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, dict, set)):
+        return bool(value)
+    return True
+
+
+def classify_execution_route(
+    decision: Any,
+    contract: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Classify one explicit execution decision without inferring from count.
+
+    The classifier is deliberately independent from repository prose.  A
+    decision remains bounded single-owner unless a selected edge type is
+    present.  Once a selected edge is present, every graph-only evidence field
+    is required and malformed edge/node references are rejected.
+    """
+    contract_values = contract or {}
+    edge_types = tuple(contract_values.get("selected_edge_types", EXPECTED_SELECTED_EDGE_TYPES))
+    graph_fields = tuple(contract_values.get("graph_only_fields", EXPECTED_GRAPH_ONLY_FIELDS))
+    default_state = str(contract_values.get("default_state", EXPECTED_DEFAULT_STATE))
+    findings: list[Finding] = []
+    if not isinstance(decision, dict):
+        findings.append(Finding("execution_graph", "decision", "decision-not-mapping"))
+        return {
+            "status": "reject",
+            "state": default_state,
+            "graph_active": False,
+            "active_edge_types": [],
+            "findings": [asdict(item) for item in findings],
+        }
+
+    nodes = decision.get("nodes")
+    if not isinstance(nodes, list) or not nodes:
+        findings.append(Finding("execution_graph", "decision", "missing-nodes"))
+        return {
+            "status": "reject",
+            "state": default_state,
+            "graph_active": False,
+            "active_edge_types": [],
+            "findings": [asdict(item) for item in findings],
+        }
+    node_ids: list[str] = []
+    for index, node in enumerate(nodes):
+        node_id = node.get("id") if isinstance(node, dict) else node
+        if not isinstance(node_id, str) or not node_id:
+            findings.append(Finding("execution_graph", f"nodes[{index}]", "invalid-node-id"))
+        elif node_id in node_ids:
+            findings.append(Finding("execution_graph", f"nodes[{index}]", "duplicate-node-id"))
+        else:
+            node_ids.append(node_id)
+
+    edges = decision.get("edges", [])
+    if not isinstance(edges, list):
+        findings.append(Finding("execution_graph", "edges", "invalid-edges"))
+        edges = []
+    active_edges: list[dict[str, Any]] = []
+    for index, edge in enumerate(edges):
+        if not isinstance(edge, dict):
+            findings.append(Finding("execution_graph", f"edges[{index}]", "invalid-edge"))
+            continue
+        selected = edge.get("selected", True)
+        if not isinstance(selected, bool):
+            findings.append(Finding("execution_graph", f"edges[{index}]", "invalid-selected-flag"))
+            continue
+        edge_type = edge.get("type", edge.get("edge_type"))
+        if not selected or edge_type not in edge_types:
+            continue
+        source = edge.get("source")
+        target = edge.get("target")
+        if (
+            not isinstance(source, str)
+            or not isinstance(target, str)
+            or source not in node_ids
+            or target not in node_ids
+            or source == target
+        ):
+            findings.append(Finding("execution_graph", f"edges[{index}]", "invalid-selected-edge"))
+            continue
+        active_edges.append(edge)
+
+    if findings:
+        return {
+            "status": "reject",
+            "state": default_state,
+            "graph_active": False,
+            "active_edge_types": sorted({str(edge.get("type", edge.get("edge_type"))) for edge in active_edges}),
+            "findings": [asdict(item) for item in findings],
+        }
+
+    if not active_edges:
+        return {
+            "status": "pass",
+            "state": default_state,
+            "graph_active": False,
+            "candidate_count": len(node_ids),
+            "active_edge_types": [],
+            "graph_fields": [],
+            "findings": [],
+        }
+
+    graph = decision.get("graph_evidence")
+    if not isinstance(graph, dict):
+        findings.append(Finding("execution_graph", "graph_evidence", "missing-graph-evidence"))
+    else:
+        for field in graph_fields:
+            if field not in graph or not _non_empty(graph[field]):
+                findings.append(Finding("execution_graph", "graph_evidence", f"missing-or-invalid:{field}"))
+        scoped_nodes = graph.get("node_ids")
+        if scoped_nodes is not None:
+            if not isinstance(scoped_nodes, list) or any(
+                not isinstance(node_id, str) or node_id not in node_ids for node_id in scoped_nodes
+            ):
+                findings.append(Finding("execution_graph", "graph_evidence.node_ids", "outside-selected-subgraph"))
+
+    if findings:
+        return {
+            "status": "reject",
+            "state": "selected_edge_graph",
+            "graph_active": True,
+            "candidate_count": len(node_ids),
+            "active_edge_types": sorted({str(edge.get("type", edge.get("edge_type"))) for edge in active_edges}),
+            "findings": [asdict(item) for item in findings],
+        }
+    return {
+        "status": "pass",
+        "state": "selected_edge_graph",
+        "graph_active": True,
+        "candidate_count": len(node_ids),
+        "active_edge_types": sorted({str(edge.get("type", edge.get("edge_type"))) for edge in active_edges}),
+        "graph_fields": list(graph_fields),
+        "findings": [],
+    }
+
+
 def check_contract(root: Path, contract_path: Path) -> list[Finding]:
     """Validate the canonical contract, owner, route, and all projections."""
     findings: list[Finding] = []
@@ -180,9 +345,23 @@ def check_contract(root: Path, contract_path: Path) -> list[Finding]:
     if checker_command != required_skill_command:
         add(findings, "required_command_route", contract_label, "checker-command-not-identical")
 
-    fields = tuple(contract.get("required_fields", ()))
-    if fields != EXPECTED_REQUIRED_FIELDS or len(set(fields)) != len(fields):
-        add(findings, "consumer_reference_without_executable_fields", contract_label, "required-fields-mismatch")
+    if contract.get("activation_predicate") != EXPECTED_ACTIVATION_PREDICATE:
+        add(findings, "contract_schema", contract_label, "activation-predicate-mismatch")
+    if contract.get("default_state") != EXPECTED_DEFAULT_STATE:
+        add(findings, "contract_schema", contract_label, "default-state-mismatch")
+    if contract.get("candidate_count_alone") is not EXPECTED_CANDIDATE_COUNT_ALONE:
+        add(findings, "contract_schema", contract_label, "candidate-count-policy-mismatch")
+    if tuple(contract.get("selected_edge_types", ())) != EXPECTED_SELECTED_EDGE_TYPES:
+        add(findings, "contract_schema", contract_label, "selected-edge-types-mismatch")
+    always_fields = tuple(contract.get("always_required_fields", ()))
+    if always_fields != EXPECTED_ALWAYS_REQUIRED_FIELDS or len(set(always_fields)) != len(always_fields):
+        add(findings, "consumer_reference_without_executable_fields", contract_label, "always-fields-mismatch")
+    graph_fields = tuple(contract.get("graph_only_fields", ()))
+    if graph_fields != EXPECTED_GRAPH_ONLY_FIELDS or len(set(graph_fields)) != len(graph_fields):
+        add(findings, "consumer_reference_without_executable_fields", contract_label, "graph-fields-mismatch")
+    task_catalog_fields = tuple(contract.get("task_catalog_fields", ()))
+    if task_catalog_fields != EXPECTED_TASK_CATALOG_FIELDS or len(set(task_catalog_fields)) != len(task_catalog_fields):
+        add(findings, "consumer_reference_without_executable_fields", contract_label, "task-catalog-fields-mismatch")
     rejected = tuple(contract.get("rejected_classes", ()))
     if rejected != EXPECTED_REJECTED_CLASSES or len(set(rejected)) != len(rejected):
         add(findings, "contract_schema", contract_label, "rejected-classes-mismatch")
@@ -242,7 +421,7 @@ def check_contract(root: Path, contract_path: Path) -> list[Finding]:
             count = text.count(OWNER_REF)
             if count != 1:
                 add(findings, "consumer_reference_mismatch", path, f"owner-ref-count:{count}")
-            for field in EXPECTED_REQUIRED_FIELDS:
+            for field in item.get("required_fields", ()):
                 if field not in normalized:
                     add(findings, "consumer_reference_without_executable_fields", path, f"missing-field:{field}")
         for marker in item.get("required_markers", ()):
@@ -287,7 +466,7 @@ def check_contract(root: Path, contract_path: Path) -> list[Finding]:
             task_spec = next((item for item in consumers if isinstance(item, dict) and item.get("id") == "task-catalog"), {})
             if nested_mapping(task_data, tuple(task_spec.get("owner_ref_path", ()))) != OWNER_REF:
                 add(findings, "consumer_reference_mismatch", EXPECTED_CONSUMERS["task-catalog"]["path"], "owner-ref-path-mismatch")
-            if nested_mapping(task_data, tuple(task_spec.get("fields_path", ()))) != list(EXPECTED_REQUIRED_FIELDS):
+            if nested_mapping(task_data, tuple(task_spec.get("fields_path", ()))) != list(EXPECTED_TASK_CATALOG_FIELDS):
                 add(findings, "consumer_reference_without_executable_fields", EXPECTED_CONSUMERS["task-catalog"]["path"], "executable-fields-mismatch")
             projection_path = tuple(task_spec.get("projection_path", ()))
             if nested_mapping(task_data, projection_path) != task_spec.get("projection_ref"):
@@ -318,6 +497,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", default=str(DEFAULT_ROOT), help="Repository root.")
     parser.add_argument("--contract", default=str(DEFAULT_CONTRACT), help="Contract path relative to root.")
+    parser.add_argument(
+        "--decision",
+        help="Classify one explicit execution decision JSON fixture instead of checking the owner closure.",
+    )
     parser.add_argument("--format", choices=("text", "json"), default="text")
     return parser
 
@@ -329,6 +512,28 @@ def main() -> int:
     contract_path = Path(args.contract)
     if not contract_path.is_absolute():
         contract_path = root / contract_path
+    if args.decision:
+        try:
+            contract = tomllib.loads(contract_path.read_text(encoding="utf-8"))
+            decision = json.loads(Path(args.decision).read_text(encoding="utf-8"))
+            route = classify_execution_route(decision, contract)
+        except (OSError, json.JSONDecodeError, tomllib.TOMLDecodeError, TypeError, ValueError) as exc:
+            route = {
+                "status": "reject",
+                "state": EXPECTED_DEFAULT_STATE,
+                "graph_active": False,
+                "active_edge_types": [],
+                "findings": [asdict(Finding("execution_graph", args.decision, f"fixture-error:{exc}"))],
+            }
+        if args.format == "json":
+            print(json.dumps(route, indent=2, sort_keys=True))
+        else:
+            for item in route["findings"]:
+                print(Finding(**item).render())
+            print(f"EXECUTION_TIME_AWARE_ORCHESTRATION_ROUTE_STATE={route['state']}")
+            print(f"EXECUTION_TIME_AWARE_ORCHESTRATION_GRAPH_ACTIVE={str(route['graph_active']).lower()}")
+            print(f"EXECUTION_TIME_AWARE_ORCHESTRATION={'pass' if route['status'] == 'pass' else 'fail'}")
+        return 0 if route["status"] == "pass" else 1
     try:
         findings = check_contract(root, contract_path)
     except (OSError, ValueError, TypeError, AttributeError) as exc:

@@ -8,34 +8,20 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import json
 import os
+import shutil
 import subprocess
 from pathlib import Path
 
+from tools.agent_tools.fixture_spawn import (
+    bootstrap_fixture_public_environment,
+    record_capability_from_environment,
+)
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "scan_secrets.sh"
-PATH_ENV_KEYS = {
-    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
-    "AGENT_CANON_ROOT",
-    "AGENT_CANON_SOURCE_ROOT",
-    "AGENT_CANON_CHILD_HANDOFF",
-    "AGENT_CANON_CHILD_PURPOSE",
-    "AGENT_CANON_CLI_TARGET_DIR",
-    "AGENT_CANON_PARENT_ROOT",
-    "AGENT_CANON_PARENT_ROOT_DEV",
-    "AGENT_CANON_PARENT_ROOT_INO",
-    "AGENT_CANON_TOOLS_HOME",
-    "CARGO_HOME",
-    "CARGO_TARGET_DIR",
-    "PYTHONPYCACHEPREFIX",
-    "TEMP",
-    "TMP",
-    "TMPDIR",
-    "XDG_CACHE_HOME",
-}
-
-
 def _write_executable(path: Path, body: str) -> None:
     path.write_text(body, encoding="utf-8")
     path.chmod(0o755)
@@ -52,6 +38,25 @@ def _pending_handoff_nonces(root: Path) -> dict[str, object]:
     value = json.loads(state.read_text(encoding="utf-8"))
     assert isinstance(value, dict)
     return value
+
+
+@contextmanager
+def fixture_session(
+    parent: Path,
+    invocation: Path,
+    explicit_path_entries: tuple[Path, ...] = (),
+):
+    """Issue an authenticated session rooted at the selected scanner fixture."""
+    with bootstrap_fixture_public_environment(
+        mode="synthetic_tool",
+        record_capability=record_capability_from_environment(),
+        fixture_cwd=parent,
+        base_env=os.environ.copy(),
+        invocation_script=invocation,
+        purpose="scan-secrets-test",
+        explicit_path_entries=tuple(str(path) for path in explicit_path_entries),
+    ) as fixture:
+        yield dict(fixture.environment)
 
 
 def test_scan_uses_parent_local_temp_and_preserves_existing_entries(tmp_path: Path) -> None:
@@ -71,7 +76,16 @@ def test_scan_uses_parent_local_temp_and_preserves_existing_entries(tmp_path: Pa
         cwd=parent,
     )
 
-    scan_source = tmp_path / "scan-source"
+    (parent / "tools" / "ci").mkdir(parents=True)
+    (parent / "tools" / "agent_tools").mkdir(parents=True)
+    invocation = parent / "tools" / "ci" / SCRIPT.name
+    shutil.copy2(SCRIPT, invocation)
+    shutil.copy2(
+        PROJECT_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py",
+        parent / "tools" / "agent_tools" / "parent_root_side_effects.py",
+    )
+
+    scan_source = parent / "scan-source"
     scan_source.mkdir()
     _git("init", "-q", "-b", "main", cwd=scan_source)
     (scan_source / "tracked.txt").write_text("safe\n", encoding="utf-8")
@@ -90,7 +104,7 @@ def test_scan_uses_parent_local_temp_and_preserves_existing_entries(tmp_path: Pa
     preexisting = parent / ".agent-canon" / "tmp" / "preexisting.txt"
     preexisting.parent.mkdir(parents=True)
     preexisting.write_text("keep\n", encoding="utf-8")
-    fake_bin = tmp_path / "bin"
+    fake_bin = parent / ".fixture-bin"
     fake_bin.mkdir()
     scan_log = parent / ".agent-canon" / "scanner-child.log"
     _write_executable(
@@ -105,19 +119,25 @@ def test_scan_uses_parent_local_temp_and_preserves_existing_entries(tmp_path: Pa
         fake_bin / "detect-secrets",
         '#!/bin/sh\nprintf "detect-secrets %s tmp=%s cargo=%s\\n" "$*" "$TMPDIR" "$CARGO_HOME" >> "$SCAN_LOG"\nprintf \'{"results": {}}\\n\'\n',
     )
-    env = {key: value for key, value in os.environ.items() if key not in PATH_ENV_KEYS}
-    env["PATH"] = f"{fake_bin}{os.pathsep}{env['PATH']}"
-    env["SCAN_LOG"] = str(scan_log)
-    env["AGENT_CANON_PARENT_ROOT"] = str(parent)
-
-    result = subprocess.run(
-        ("bash", str(SCRIPT), "--root", str(scan_source), "--current-only"),
-        cwd=parent,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    with fixture_session(parent, invocation, (fake_bin,)) as env:
+        env["SCAN_LOG"] = str(scan_log)
+        for name, relative in (
+            ("TMPDIR", Path(".agent-canon") / "tmp"),
+            ("TEMP", Path(".agent-canon") / "tmp"),
+            ("TMP", Path(".agent-canon") / "tmp"),
+            ("CARGO_HOME", Path(".agent-canon") / "cache" / "cargo-home"),
+        ):
+            value = parent / relative
+            value.mkdir(parents=True, exist_ok=True)
+            env[name] = str(value)
+        result = subprocess.run(
+            ("bash", str(invocation), "--root", str(scan_source), "--current-only"),
+            cwd=parent,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
 
     assert result.returncode == 0, result.stdout + result.stderr
     assert "SECRET_SCAN=pass" in result.stdout

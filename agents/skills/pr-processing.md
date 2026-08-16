@@ -19,6 +19,47 @@ downstream implementation ../../.agents/skills/pr-processing/SKILL.md exposes th
 
 Process PRs/issues with fresh base/head/diff/check/authority state and explicit publication readback. Queue-wide snapshots and dependency DAGs are an optimization/safety mechanism for interacting candidates, not a prerequisite for every PR.
 
+## Execution-Time-Aware Queue Specialization
+
+`agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract`
+owns the dependency DAG, makespan objective, ready-set dispatch, batching,
+warm-context reuse, closure, and scope-preserving wait rules. This skill
+specializes that contract for PR and Issue queues:
+
+- Always-required fields: `owner`, `schema`, `dependency`, `validation`,
+  `correctness`, `publication_scope`.
+- Graph-only fields: `dag`, `critical_path`, `ready_set`, `queue_snapshot`,
+  `makespan_objective`.
+- Candidate count alone does not activate the graph. A single PR and multiple
+  independent PRs remain on the bounded single-candidate route unless a
+  selected edge is present.
+
+The single-candidate fast path takes no queue-wide snapshot. The dependency
+queue path activates only for a selected ordering, dependency, collision, or
+publication edge and then snapshots and reviews only that selected subgraph.
+
+1. For an active selected edge, take one immutable, batched queue snapshot for
+   the selected PR and Issue subgraph, including fields required for
+   classification and dependency ordering. Batch remote and tool reads while
+   retaining exact candidate identity and readback evidence.
+2. Compute each selected candidate's complete owner, schema, dependency,
+   validation, and publication closure before its first owning review. Prepare
+   and, only with the required mutation authority, publish independent
+   candidates in non-conflicting lanes; do not serialize independent candidate
+   preparation.
+3. Run one closure review for each exact candidate after that candidate's
+   closure is complete. A review finding invalidates only the affected
+   candidate evidence and its dependent evidence; rerun that affected closure
+   with the same warm worker and reviewer context when the route is unchanged.
+4. Merge candidates in dependency order. Independent preparation and
+   publication may remain batched, but a dependent source, parent pin, or root
+   projection cannot merge before its accepted predecessor receipt and exact
+   readback.
+5. Never use elapsed time or a fixed duration to cut queue scope, skip a
+   candidate, replace closure review, or declare closeout. When no useful ready
+   candidate exists, record the actual dependency, conflict, capacity, or
+   external-state blocker and wait for that state to change.
+
 ## Single-candidate fast path
 
 When one PR is independent, read only what determines that PR:

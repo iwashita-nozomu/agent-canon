@@ -19,9 +19,9 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
-from tools.agent_tools.parent_root_side_effects import (
-    ParentRootSideEffectBoundary,
-    public_session,
+from tools.agent_tools.fixture_spawn import (
+    bootstrap_fixture_public_environment,
+    record_capability_from_environment,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -120,46 +120,17 @@ def writer_environment(root: Path) -> Iterator[dict[str, str]]:
             "AGENT_CANON_CLI_TARGET_DIR",
         }
     }
-    previous_cwd = Path.cwd()
-    os.chdir(root)
-    try:
-        invocation_script = root / ".agent-canon-test-runner.py"
-        invocation_script.write_text("# authenticated fixture runner\n", encoding="utf-8")
-        with public_session(
-            invocation_script=invocation_script,
-            purpose="token-footprint-test",
-        ) as session:
-            boundary = ParentRootSideEffectBoundary()
-            child = boundary.child_environment(
-                session.attestation,
-                base_env=environment,
-                issue_handoff=False,
-            )
-            for key, relative, purpose in (
-                ("HOME", ".agent-canon-test-home", "token-footprint-test-HOME"),
-                (
-                    "XDG_CONFIG_HOME",
-                    ".agent-canon-test-config",
-                    "token-footprint-test-XDG-CONFIG-HOME",
-                ),
-                (
-                    "XDG_DATA_HOME",
-                    ".agent-canon-test-data",
-                    "token-footprint-test-XDG-DATA-HOME",
-                ),
-            ):
-                directory = boundary.ensure_parent_owned_directory(
-                    session.attestation,
-                    root / relative,
-                    purpose,
-                )
-                try:
-                    child[key] = str(directory.physical_path)
-                finally:
-                    boundary.release_parent_owned_path(directory)
-            yield child
-    finally:
-        os.chdir(previous_cwd)
+    invocation_script = root / ".agent-canon-test-runner.py"
+    invocation_script.write_text("# authenticated fixture runner\n", encoding="utf-8")
+    with bootstrap_fixture_public_environment(
+        mode="synthetic_tool",
+        record_capability=record_capability_from_environment(),
+        fixture_cwd=root,
+        base_env=environment,
+        invocation_script=invocation_script,
+        purpose="token-footprint-test",
+    ) as fixture:
+        yield dict(fixture.environment)
 
 
 class CompareCodexTokenFootprintsTest(unittest.TestCase):

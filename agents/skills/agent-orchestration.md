@@ -285,44 +285,39 @@ Validation command scope is governed by the preceding write-capable handoff
 trust boundary; work-conservation scheduling does not authorize a worker to
 expand a selected validation route.
 
-Use a dependency/overlap graph only when the selected work has real ordering,
-schema, validation, publication, or collision edges. A node is a full
-replaceable responsibility unit, not a file-sized chunk or timed slice. Direct
-owner edits and one-writer tasks need no manufactured DAG or schedule artifact;
-prompt-keyword routing is never a scheduling signal.
+The execution route defaults to bounded_single_owner. Candidate count alone
+does not activate the execution graph: one node without an edge and multiple
+independent candidates without an edge remain non-active. Every route carries
+the always-required fields `owner`, `schema`, `dependency`, `validation`,
+`correctness`, and `publication_scope`.
 
-The optimization objective is to minimize makespan subject to responsibility
-completeness and correctness. Efficiency is therefore a scheduling objective,
-never permission to omit, split, weaken, or prematurely close a required node.
-Runtime observations may inform ordering, but no fixed duration, elapsed-time
-limit, or timeout cutoff may cut the requested scope. An operational timeout
-may mark a node blocked and trigger recovery; it may not turn incomplete work
-into completion.
+Only a selected ordering, dependency, collision, or publication edge
+activates the execution graph. When such an edge is selected, model the
+selected subgraph as a dependency DAG and materialize the graph-only fields
+`dag`, `critical_path`, `ready_set`, `queue_snapshot`, and
+`makespan_objective`. Missing or invalid graph evidence rejects the active
+route; unrelated candidates do not expand the selected subgraph.
 
-When coordination is selected, dispatch decisions:
+When the graph is active, the optimization objective is to minimize makespan
+subject to responsibility completeness and correctness. Efficiency is a
+scheduling objective, never permission to omit, split, weaken, or prematurely
+close a required node. Refresh the selected closure, compute its critical path
+and ready set, and dispatch every ready node that is non-conflicting under
+actual capacity. Batch remote reads and queue snapshots for that selected
+subgraph while preserving each node's identity and exact evidence.
 
-1. Refresh only the dependency and collision edges that can change the next
-   owner, order, or merge decision.
-2. Dispatch every ready non-conflicting responsibility unit under actual
-   capacity; serialize colliding units and do not invent timed stages.
-3. Batch remote reads, queue snapshots, and tool operations that share an
-   authority, input, or readback boundary. Preserve each node's identity and
-   exact evidence even when operations are batched.
-4. Reuse the warm worker and reviewer contexts for repeated repair when the
-   responsibility unit and route are unchanged. Invalidate only evidence
-   affected by the repaired node and its dependent closure; retain unaffected
-   evidence.
-5. Compute owner, schema, dependency, validation, and publication closure only
-   when the selected workflow requires those edges. Review the exact candidate
-   closure once; accepted findings create only affected repair nodes.
-6. Wait only when the useful ready set is empty. Record the predecessor,
-   conflict, capacity, or external-state blocker that makes it empty, then
-   resume when that state changes. Waiting is not an elapsed-time scope gate.
+Reuse the warm worker and reviewer contexts when the responsibility unit and
+route are unchanged. Invalidate only evidence affected by the repaired node
+and its dependent closure. Compute owner, schema, dependency, validation, and
+publication closure before opening the owning review; review the exact
+candidate closure once and create only affected repair nodes from accepted
+findings. Wait only when the useful ready set is empty, recording the actual
+predecessor, conflict, capacity, or external-state blocker before resuming.
 
-The selected schedule continues until its required units, validation, and
-publication evidence are complete. This contract is state- and
-dependency-driven; prompt keywords, arbitrary serial waits, and hard-coded
-durations cannot replace a real ordering or collision decision.
+No timeout, elapsed-time, or capacity cutoff may reduce scope in either the
+bounded single-owner or selected-edge graph state. An operational timeout may
+mark a node blocked and trigger recovery; it may not turn incomplete work into
+completion. Prompt-keyword routing is not a scheduling signal.
 
 ### Canonical Skill Invocation Order
 

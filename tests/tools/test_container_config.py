@@ -19,9 +19,12 @@ import os
 import shutil
 import subprocess
 import sys
+from contextlib import contextmanager
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
+
 from tools.agent_tools.fixture_spawn import record_environment
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -44,7 +47,7 @@ PARENT_POST_CREATE_COMMAND = POST_CREATE_COMMAND
 
 def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
     """Run the semantic container configuration checker."""
-    with record_environment(cwd=PROJECT_ROOT) as environment:
+    with record_environment(cwd=PROJECT_ROOT, base_env=os.environ.copy()) as environment:
         return subprocess.run(
             [sys.executable, str(SCRIPT), "--root", str(root)],
             cwd=PROJECT_ROOT,
@@ -53,6 +56,14 @@ def run_validator(root: Path) -> subprocess.CompletedProcess[str]:
             text=True,
             env=environment,
         )
+
+
+@contextmanager
+def public_validation_session():
+    """Provide one direct signed session for in-process writer validation."""
+    with record_environment(cwd=PROJECT_ROOT, base_env=os.environ.copy()) as environment:
+        with patch.dict(os.environ, environment, clear=True):
+            yield
 
 
 def write_file(root: Path, relative: str, content: str) -> None:
@@ -371,7 +382,8 @@ def test_public_standalone_docker_route_requires_no_runtime_packs() -> None:
     module = load_container_config_module()
 
     assert module.validate_public_test_git_context(PROJECT_ROOT) == []
-    report = module.validate(PROJECT_ROOT)
+    with public_validation_session():
+        report = module.validate(PROJECT_ROOT)
     assert report.status == "pass"
     assert "docker/Dockerfile" in report.checked
     assert "docker/packs" not in report.checked
@@ -659,9 +671,10 @@ def test_generator_scenarios_require_default_and_gpu_compose_outputs(
     generator.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
     generator.chmod(0o755)
 
-    findings = load_container_config_module().validate_generated_compose_scenarios(
-        repo, None
-    )
+    with public_validation_session():
+        findings = load_container_config_module().validate_generated_compose_scenarios(
+            repo, None
+        )
 
     assert {finding.detail for finding in findings} == {
         "default-scenario-compose-required",
@@ -695,7 +708,8 @@ def test_generated_compose_scenario_cleanup_preserves_source_snapshot(
 
     monkeypatch.setattr(module.subprocess, "run", fake_run)
     monkeypatch.setattr(module, "validate_generated_compose", lambda *args, **kwargs: [])
-    assert module.validate_generated_compose_scenarios(repo, None) == []
+    with public_validation_session():
+        assert module.validate_generated_compose_scenarios(repo, None) == []
     assert sentinel.read_bytes() == before
     assert agent_canon_tree_snapshot(repo) == before_tree
     assert not (repo / ".agent-canon" / "tmp").exists()
@@ -721,7 +735,8 @@ def test_generated_compose_failure_cleanup_preserves_source_snapshot(
         return subprocess.CompletedProcess(args, 17, "", "injected failure")
 
     monkeypatch.setattr(module.subprocess, "run", failed_run)
-    findings = module.validate_generated_compose_scenarios(repo, None)
+    with public_validation_session():
+        findings = module.validate_generated_compose_scenarios(repo, None)
     assert any("default-scenario-generation-failed:rc=17" in f.detail for f in findings)
     assert sentinel.read_text(encoding="utf-8") == "source\n"
     assert agent_canon_tree_snapshot(repo) == before_tree

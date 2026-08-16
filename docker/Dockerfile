@@ -30,7 +30,11 @@ RUN set -eux; \
       pkg-config \
       python3 \
       python3-pip \
+      nodejs \
+      npm \
       tree; \
+    test "$(command -v node)" = /usr/bin/node; \
+    test "$(command -v npm)" = /usr/bin/npm; \
     rm -rf /var/lib/apt/lists/*; \
     case "${PROJECT_UID}" in \
       ''|*[!0-9]*) echo "PROJECT_UID must be a nonzero decimal" >&2; exit 1 ;; \

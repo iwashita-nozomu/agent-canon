@@ -32,42 +32,34 @@ SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "evaluate_skill_workflow_promp
 TEST_TEMP_ROOT = PROJECT_ROOT / ".agent-canon" / "validation"
 TEST_TEMP_ROOT.mkdir(parents=True, exist_ok=True)
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
+# Keep direct-import production fallbacks available while binding every
+# parent-side-effect object in this test to the package-canonical module.
+from tools.agent_tools import parent_root_side_effects as _canonical_parent  # noqa: E402
+sys.modules["parent_root_side_effects"] = _canonical_parent
+
 import evaluate_skill_workflow_prompts as evaluator  # noqa: E402
 from eval_manifest_paths import resolve_eval_manifest  # noqa: E402
-from parent_root_side_effects import (  # noqa: E402
+from tools.agent_tools.fixture_spawn import (  # noqa: E402
+    record_environment,
+)
+from tools.agent_tools.parent_root_side_effects import (  # noqa: E402
     ParentRootSideEffectBoundary,
-    public_session,
-    session_environment,
+    resolve_parent_writer_attestation,
 )
 from runtime_log_paths import mounted_log_archive_root  # noqa: E402
 
 
 def run_eval(*args: str, cwd: Path = PROJECT_ROOT) -> subprocess.CompletedProcess[str]:
-    """Run the prompt eval helper through one signed public session."""
-    invocation_script = TEST_TEMP_ROOT / "evaluate-skill-workflow-session.py"
-    invocation_script.write_text(
-        "# signed prompt-evaluation fixture runner\n", encoding="utf-8"
-    )
-    previous_cwd = Path.cwd()
-    previous_environment = dict(os.environ)
-    os.chdir(PROJECT_ROOT)
-    try:
-        with public_session(
-            invocation_script=invocation_script,
-            purpose="skill-workflow-test-eval",
-        ) as session:
-            environment = session_environment(session, previous_environment)
-            return subprocess.run(
-                [sys.executable, str(SCRIPT), *args],
-                cwd=cwd,
-                check=False,
-                capture_output=True,
-                text=True,
-                env=environment,
-            )
-    finally:
-        os.chdir(previous_cwd)
-        invocation_script.unlink(missing_ok=True)
+    """Run the prompt eval helper through the inherited ordinary boundary."""
+    with record_environment(cwd=PROJECT_ROOT, base_env=dict(os.environ)) as environment:
+        return subprocess.run(
+            [sys.executable, str(SCRIPT), *args],
+            cwd=cwd,
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+        )
 
 
 def load_toml_document(path: Path) -> dict[str, object]:
@@ -1001,42 +993,37 @@ class T14EvaluatorContractTest(unittest.TestCase):
     requirement_ids = ("R101",)
 
     def setUp(self) -> None:
-        """Bind each T14 test to one signed public session."""
+        """Bind each T14 test to one inherited ordinary environment."""
         self._t14_previous_cwd = Path.cwd()
         self._t14_previous_environment = dict(os.environ)
-        self._t14_invocation_script = (
-            PROJECT_ROOT / ".agent-canon" / "tmp" / "t14-session-runner.py"
-        )
-        self._t14_invocation_script.parent.mkdir(parents=True, exist_ok=True)
         (PROJECT_ROOT / ".agent-canon" / "validation").mkdir(
             parents=True, exist_ok=True
         )
-        self._t14_invocation_script.write_text(
-            "# t14 signed-session fixture runner\n", encoding="utf-8"
+        self._t14_environment_context = record_environment(
+            cwd=PROJECT_ROOT,
+            base_env=self._t14_previous_environment,
         )
-        os.chdir(PROJECT_ROOT)
-        self._t14_session_context = public_session(
-            invocation_script=self._t14_invocation_script,
-            purpose="t14-test-session",
+        self._t14_environment = self._t14_environment_context.__enter__()
+        self._t14_attestation = resolve_parent_writer_attestation(
+            purpose="t14-test-session"
         )
-        self._t14_session = self._t14_session_context.__enter__()
-        os.environ.clear()
-        os.environ.update(
-            session_environment(self._t14_session, self._t14_previous_environment)
+        self._t14_parent_capability_patch = mock.patch.object(
+            evaluator,
+            "_parent_capability",
+            return_value=(ParentRootSideEffectBoundary(), self._t14_attestation),
         )
+        self._t14_parent_capability_patch.start()
         self.addCleanup(self._close_t14_session)
 
     def _close_t14_session(self) -> None:
-        """Restore the process after the signed T14 session closes."""
+        """Restore the process after the ordinary environment closes."""
         try:
-            os.environ.clear()
-            os.environ.update(self._t14_previous_environment)
+            self._t14_parent_capability_patch.stop()
         finally:
             try:
-                self._t14_session_context.__exit__(None, None, None)
+                self._t14_environment_context.__exit__(None, None, None)
             finally:
                 os.chdir(self._t14_previous_cwd)
-                self._t14_invocation_script.unlink(missing_ok=True)
 
     def parse(self, raw: Path, expected: Path, *, iteration: int = 1, attempt: int = 0):
         return evaluator.parse_skill_evaluator_report(
@@ -1149,10 +1136,7 @@ class T14EvaluatorContractTest(unittest.TestCase):
             self.assertEqual(evaluator.compute_t14_packet_digest(packet), expected)
 
     def record_fixture(self, *, run_id: str = "test-run", attempt: int = 0, packet_digest: str | None = None):
-        configured_parent = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
-        if not configured_parent:
-            configured_parent = str(PROJECT_ROOT)
-        parent_root = Path(configured_parent)
+        parent_root = self._t14_environment.receipt.authenticated_parent
         fixture_parent = parent_root / ".agent-canon" / "validation" / "t14-fixtures"
         fixture_parent.mkdir(parents=True, exist_ok=True)
         tmp = tempfile.TemporaryDirectory(dir=fixture_parent)
@@ -1165,7 +1149,7 @@ class T14EvaluatorContractTest(unittest.TestCase):
         return_artifact.parent.mkdir(parents=True, exist_ok=True)
         return_artifact.write_bytes(report_bytes)
         boundary = ParentRootSideEffectBoundary()
-        attestation = self._t14_session.attestation
+        attestation = self._t14_attestation
         return_root = parent_root / ".agent-canon" / "tmp" / "agentcanon-type-design-workspaces" / run_id
 
         def cleanup_return_artifact() -> None:

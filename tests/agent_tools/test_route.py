@@ -1852,9 +1852,10 @@ class RouteToolTest(unittest.TestCase):
         decision = json.loads(result.stdout)
         self.assertIn("experiment-lifecycle", decision["matched_skills"])
         self.assertIn("experiment-lifecycle", decision["active_skills"])
-        self.assertLess(
-            decision["skills"].index("result-artifact-writeout"),
-            decision["skills"].index("experiment-lifecycle"),
+        self.assertIn("result-artifact-writeout", decision["related_skill_candidates"])
+        self.assertIn(
+            "result-artifact-writeout",
+            decision["related_skills"]["experiment-lifecycle"],
         )
 
     def test_prompt_routes_result_save_export_to_writeout(self) -> None:

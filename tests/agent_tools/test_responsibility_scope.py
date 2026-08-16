@@ -13,6 +13,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -45,6 +46,11 @@ class ResponsibilityScopeTest(unittest.TestCase):
             check=False,
             capture_output=True,
             text=True,
+            env={
+                key: value
+                for key, value in os.environ.items()
+                if not key.startswith("AGENT_CANON_") and key != "PYTHONPATH"
+            },
         )
 
     def test_missing_protecting_tool_fails(self) -> None:

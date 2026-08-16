@@ -357,7 +357,8 @@ class ToolRejectionPreflightTest(unittest.TestCase):
             for gate in payload["predicted_gates"]
             if gate["gate"] == "experiment_execution_surface_guard"
         )
-        self.assertIn("check_experiment_registry.py", guarded_gate["command"])
+        self.assertIn("check_experiment_registry", guarded_gate["command"])
+        self.assertIn("tools.ci.check_experiment_registry", guarded_gate["command"])
         self.assertIn("test_run_managed_experiment.py", guarded_gate["command"])
         self.assertIn("$experiment-lifecycle", guarded_gate["handoff"])
         self.assertIn("$test-design", guarded_gate["handoff"])

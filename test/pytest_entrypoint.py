@@ -14,6 +14,7 @@ import os
 import site
 import sys
 import sysconfig
+from collections.abc import Mapping, MutableMapping
 from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).resolve().parent.parent
@@ -40,6 +41,25 @@ SCRUB_ENVIRONMENT_KEYS = (
     "AGENT_CANON_DATA_SOURCE_ROOT",
     "AGENT_CANON_DATA_ROOT",
 )
+RUNNER_OWNED_AMBIENT_KEYS = (
+    "AGENT_CANON_TOOLS_HOME",
+    "CARGO_HOME",
+    "CARGO_TARGET_DIR",
+    "AGENT_CANON_CLI_TARGET_DIR",
+    "XDG_CACHE_HOME",
+    "PYTHONPYCACHEPREFIX",
+)
+
+
+def scrub_runner_owned_environment(
+    *, runner_ambient_env: Mapping[str, str]
+) -> dict[str, str]:
+    """Remove only runner-owned cache/tool paths from inherited ambient state."""
+    return {
+        key: value
+        for key, value in runner_ambient_env.items()
+        if key not in RUNNER_OWNED_AMBIENT_KEYS
+    }
 
 
 def _interpreter_origins() -> tuple[Path, ...]:
@@ -101,7 +121,9 @@ def _is_interpreter_origin(entry: str) -> bool:
     return any(part in {"site-packages", "dist-packages"} for part in physical.parts)
 
 
-def configure_import_environment() -> None:
+def configure_import_environment(
+    environment: MutableMapping[str, str] = os.environ,
+) -> None:
     """Keep interpreter paths and install only the exact repository origins."""
     preserved = [
         entry
@@ -112,8 +134,20 @@ def configure_import_environment() -> None:
     sys.path[:] = [*preserved, *repository_origins]
     if tuple(sys.path[-len(repository_origins):]) != repository_origins:
         raise RuntimeError("pytest repository import suffix is not canonical")
+    from tools.agent_tools.parent_root_side_effects import (
+        PRIVATE_RECORD_TRANSPORT_ENV_NAMES,
+    )
+
+    private_transport_keys = tuple(
+        str(key) for key in PRIVATE_RECORD_TRANSPORT_ENV_NAMES
+    )
+    if any(key in SCRUB_ENVIRONMENT_KEYS for key in private_transport_keys):
+        raise RuntimeError("private record transport must remain at the adapter boundary")
     for key in SCRUB_ENVIRONMENT_KEYS:
-        os.environ.pop(key, None)
+        environment.pop(key, None)
+    scrubbed = scrub_runner_owned_environment(runner_ambient_env=environment)
+    environment.clear()
+    environment.update(scrubbed)
 
 
 def main(argv: list[str] | None = None) -> int:

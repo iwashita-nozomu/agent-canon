@@ -88,10 +88,16 @@ parent_read_presence() {
     read-presence --root "$PARENT_ROOT_DIR" --candidate "$candidate" --purpose "$purpose"
 }
 run_parent_bound_sync() {
-  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+  # Rebase the inherited runner temp on every nested parent-bound handoff.
+  # AGENT_CANON_PARENT_TMPDIR belongs to this outer update transaction.  A
+  # nested sync must select its own parent-local default instead of sharing
+  # and cleaning the caller's latest-log namespace.
+  env -u AGENT_CANON_PARENT_TMPDIR \
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
     --root "${PARENT_ROOT_DIR}" \
     --source-root "${AGENT_CANON_SOURCE_ROOT}" \
     --purpose agent-canon-sync-script \
+    --rebase-inherited-temp \
     --issue-handoff \
     -- bash "$CANON_TOOLS_ROOT/sync_agent_canon.sh" "$@"
 }
@@ -410,10 +416,14 @@ rebuild_agent_tools_if_available() {
     echo "AGENT_CANON_TOOL_REBUILD=skipped_missing_tool"
     return
   fi
-  python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
+  # Rebuild receives the boundary-selected TMPDIR, never the outer update's
+  # transaction directory.
+  env -u AGENT_CANON_PARENT_TMPDIR \
+    python3 "${AGENT_CANON_BOUNDARY_SCRIPT}" exec-parent-bound \
       --root "${PARENT_ROOT_DIR}" \
       --source-root "${AGENT_CANON_SOURCE_ROOT}" \
       --purpose agent-canon-rebuild-script \
+      --rebase-inherited-temp \
       --issue-handoff \
       -- bash "$rebuild_tool"
 }

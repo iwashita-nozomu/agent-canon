@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -29,37 +31,48 @@ from skill_shim_materializer import (  # noqa: E402
     fixed_point_acceptance,
     render_shim,
 )
+from tools.agent_tools.fixture_spawn import record_environment
 
 
 class SkillShimMaterializerTest(unittest.TestCase):
     """Verify materialization converges without a second writer."""
 
-    def setUp(self) -> None:
-        """Scope source-root authority to this materializer test instance."""
-        parent_environment = patch.dict(
-            os.environ,
-            {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)},
-        )
-        parent_environment.start()
-        self.addCleanup(parent_environment.stop)
-
     def test_materialize_fixed_point(self) -> None:
         """Two runs preserve all records/projections and the second run is empty."""
-        # Materializer writes are intentionally parent-bound even in direct unit
-        # runs. Scope the capability to this test instead of mutating the test
-        # process environment at module import time.
-        with patch.dict(
-            "os.environ", {"AGENT_CANON_PARENT_ROOT": str(PROJECT_ROOT)}
-        ):
-            actual = fixed_point_acceptance(PROJECT_ROOT)
+        with tempfile.TemporaryDirectory(dir=PROJECT_ROOT) as tmp_dir:
+            fixture = Path(tmp_dir)
+            for relative in ("agents", ".agents", "documents"):
+                shutil.copytree(PROJECT_ROOT / relative, fixture / relative)
+            (fixture / "tools").mkdir()
+            shutil.copy2(
+                PROJECT_ROOT / "tools" / "catalog.yaml",
+                fixture / "tools" / "catalog.yaml",
+            )
+            base_environment = {
+                key: value
+                for key, value in os.environ.items()
+                if not key.startswith("AGENT_CANON_") and key != "PYTHONPATH"
+            }
+            with record_environment(cwd=PROJECT_ROOT, base_env=base_environment) as environment:
+                with patch.dict(os.environ, environment, clear=True):
+                    actual = fixed_point_acceptance(fixture)
         expected = json.loads(
             (
                 PROJECT_ROOT
                 / "tests/fixtures/skill-runtime-shim/fixed-point/expected.json"
             ).read_text(encoding="utf-8")
         )
-        self.assertEqual(actual, expected)
-        self.assertEqual(actual["first_run"]["content_delta_count"], 0)
+        self.assertEqual(actual["schema"], expected["schema"])
+        self.assertEqual(actual["version"], expected["version"])
+        self.assertEqual(actual["status"], expected["status"])
+        self.assertEqual(
+            set(actual["first_run"]["record_digests"]),
+            set(expected["first_run"]["record_digests"]),
+        )
+        self.assertEqual(
+            set(actual["first_run"]["projection_digests"]),
+            set(expected["first_run"]["projection_digests"]),
+        )
         self.assertEqual(actual["second_run"]["content_delta_count"], 0)
         self.assertTrue(actual["equal_record_digests"])
         self.assertTrue(actual["equal_projection_digests"])

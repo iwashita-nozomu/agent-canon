@@ -18,6 +18,7 @@ import sys
 import tempfile
 import time
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
@@ -35,6 +36,7 @@ from runtime_log_paths import (  # noqa: E402
     mounted_log_archive_root,
     repo_log_key,
 )
+from tools.agent_tools.fixture_spawn import record_environment  # noqa: E402
 
 
 class ExportCodexRuntimeSummaryTest(unittest.TestCase):
@@ -70,17 +72,24 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
                 thread_id=thread_id,
             )
 
-            output = codex_runtime_summary_path(source, canon, thread_id)
-            records = [
-                json.loads(line)
-                for line in output.read_text(encoding="utf-8").splitlines()
-                if line.strip()
-            ]
-            index = [
-                json.loads(line)
-                for line in codex_runtime_index_path(source, canon).read_text(encoding="utf-8").splitlines()
-                if line.strip()
-            ]
+            # The runner temp root may itself sit below a Git checkout.  Keep
+            # the fixture ceiling active for path readback as well as for the
+            # child exporter, otherwise the parent checkout leaks a commit
+            # key into this no-git-head fixture oracle.
+            with exporter_environment(root) as environment, patch.dict(
+                os.environ, environment, clear=True
+            ):
+                output = codex_runtime_summary_path(source, canon, thread_id)
+                records = [
+                    json.loads(line)
+                    for line in output.read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
+                index = [
+                    json.loads(line)
+                    for line in codex_runtime_index_path(source, canon).read_text(encoding="utf-8").splitlines()
+                    if line.strip()
+                ]
 
         self.assertEqual(first.returncode, 0, first.stdout + first.stderr)
         self.assertIn("CODEX_RUNTIME_SUMMARY_STATUS=appended", first.stdout)
@@ -125,26 +134,29 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
             write_history(history, history_thread)
             write_sqlite(sqlite_log, sqlite_thread)
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--source-root",
-                    str(source),
-                    "--canon-root",
-                    str(canon),
-                    "--all-threads",
-                    "--history-jsonl",
-                    str(history),
-                    "--sqlite-log",
-                    str(sqlite_log),
-                    "--recent-days",
-                    "5",
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            with exporter_environment(root) as environment:
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--source-root",
+                        str(source),
+                        "--canon-root",
+                        str(canon),
+                        "--all-threads",
+                        "--history-jsonl",
+                        str(history),
+                        "--sqlite-log",
+                        str(sqlite_log),
+                        "--recent-days",
+                        "5",
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    cwd=source,
+                    env=environment,
+                )
             output_dir = codex_runtime_index_path(source, canon).parent / "chats"
             exported = sorted(path.name for path in output_dir.iterdir() if path.is_dir())
             index_records = [
@@ -167,21 +179,24 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
             source.mkdir()
             canon.mkdir()
 
-            result = subprocess.run(
-                [
-                    sys.executable,
-                    str(SCRIPT),
-                    "--source-root",
-                    str(source),
-                    "--canon-root",
-                    str(canon),
-                    "--thread-id",
-                    "",
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-            )
+            with exporter_environment(root) as environment:
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        str(SCRIPT),
+                        "--source-root",
+                        str(source),
+                        "--canon-root",
+                        str(canon),
+                        "--thread-id",
+                        "",
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    cwd=source,
+                    env=environment,
+                )
 
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         self.assertIn("CODEX_RUNTIME_SUMMARY=skip", result.stdout)
@@ -202,7 +217,7 @@ class ExportCodexRuntimeSummaryTest(unittest.TestCase):
                 patch.dict(
                     os.environ,
                     {"AGENT_CANON_SIDE_EFFECT_PARENT_ROOT": str(root)},
-                    clear=False,
+                    clear=True,
                 ),
                 patch.object(
                     export_codex_runtime_summary,
@@ -228,27 +243,39 @@ def run_exporter(
     thread_id: str,
 ) -> subprocess.CompletedProcess[str]:
     """Run the exporter against test fixtures."""
-    return subprocess.run(
-        [
-            sys.executable,
-            str(SCRIPT),
-            "--source-root",
-            str(source),
-            "--canon-root",
-            str(canon),
-            "--thread-id",
-            thread_id,
-            "--history-jsonl",
-            str(history),
-            "--sqlite-log",
-            str(sqlite_log),
-            "--recent-days",
-            "5",
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    with exporter_environment(source.parent) as environment:
+        return subprocess.run(
+            [
+                sys.executable,
+                str(SCRIPT),
+                "--source-root",
+                str(source),
+                "--canon-root",
+                str(canon),
+                "--thread-id",
+                thread_id,
+                "--history-jsonl",
+                str(history),
+                "--sqlite-log",
+                str(sqlite_log),
+                "--recent-days",
+                "5",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            cwd=source,
+            env=environment,
+        )
+
+
+@contextmanager
+def exporter_environment(root: Path):
+    """Run exporter fixtures with a fresh Git discovery boundary."""
+    base = os.environ.copy()
+    base["GIT_CEILING_DIRECTORIES"] = str(root)
+    with record_environment(cwd=PROJECT_ROOT, base_env=base) as environment:
+        yield environment
 
 
 def write_history(path: Path, thread_id: str) -> None:

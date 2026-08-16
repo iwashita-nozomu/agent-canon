@@ -30,10 +30,18 @@ TOOLS_DIR = PROJECT_ROOT / "tools" / "agent_tools"
 sys.path.insert(0, str(HOOKS_DIR))
 sys.path.insert(0, str(TOOLS_DIR))
 
+from tools.agent_tools import (
+    parent_root_side_effects as _canonical_parent,  # noqa: E402
+)
+
+sys.modules["parent_root_side_effects"] = _canonical_parent
 import hook_dispatcher  # noqa: E402
 import hook_event_log  # noqa: E402
 import runtime_log_archive_git  # noqa: E402
-from parent_root_side_effects import ParentRootSideEffectBoundary, public_session  # noqa: E402
+from tools.agent_tools.fixture_spawn import (  # noqa: E402
+    bootstrap_fixture_public_environment,
+    record_capability_from_environment,
+)
 
 
 def hook_entry(hook_run_id: str, *, status: str = "pass") -> dict[str, object]:
@@ -71,34 +79,21 @@ def authenticated_hook_environment(root: Path):
         check=True,
         capture_output=True,
     )
-    previous_cwd = Path.cwd()
-    previous_environment = os.environ.copy()
-    clean_environment = {
-        key: value
-        for key, value in previous_environment.items()
-        if not key.startswith("AGENT_CANON_SIDE_EFFECT_")
-    }
-    os.chdir(root)
-    try:
-        with public_session(
-            invocation_script=HOOKS_DIR / "hook_event_log.py",
-            purpose="hook-event-test",
-            independent=True,
-            cleanup_state=True,
-        ) as session:
-            environment = ParentRootSideEffectBoundary().child_environment(
-                session.attestation,
-                clean_environment,
-                issue_handoff=False,
-                rebase_inherited_temp=True,
-            )
-            os.environ.clear()
-            os.environ.update(environment)
-            yield
-    finally:
-        os.environ.clear()
-        os.environ.update(previous_environment)
-        os.chdir(previous_cwd)
+    with bootstrap_fixture_public_environment(
+        mode="synthetic_tool",
+        record_capability=record_capability_from_environment(),
+        fixture_cwd=root,
+        base_env=os.environ.copy(),
+        invocation_script=HOOKS_DIR / "hook_event_log.py",
+        purpose="hook-event-test",
+    ) as fixture:
+        previous_cwd = Path.cwd()
+        try:
+            os.chdir(root)
+            with patch.dict(os.environ, fixture.environment, clear=True):
+                yield
+        finally:
+            os.chdir(previous_cwd)
 
 
 class HookEventLogHotPathTest(unittest.TestCase):
@@ -200,6 +195,7 @@ class HookEventLogHotPathTest(unittest.TestCase):
     def test_h02_concurrent_events_use_independent_no_replace_files(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
+            previous_cwd = Path.cwd()
             context = hook_event_log.HookLogContext(
                 root,
                 "PostToolUse",
@@ -219,6 +215,7 @@ class HookEventLogHotPathTest(unittest.TestCase):
                 self.assertEqual({result.status for result in results}, {"spooled"})
                 self.assertEqual(len({result.spool_path for result in results}), 2)
                 for result in results:
+                    self.assertTrue(result.spool_path.is_relative_to(root))
                     self.assertTrue(result.spool_path.is_file())
                     self.assertEqual(
                         result.event_sha256,
@@ -250,6 +247,7 @@ class HookEventLogHotPathTest(unittest.TestCase):
                     (conflict.status, conflict.error_code),
                     ("failed", "spool_conflict"),
                 )
+            self.assertEqual(Path.cwd(), previous_cwd)
 
     def test_h05_spool_failure_emits_nothing_and_dispatcher_json_remains_valid(self) -> None:
         with tempfile.TemporaryDirectory() as tmp_dir:

@@ -17,8 +17,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tools.agent_tools.fixture_spawn import record_session_from_environment
-from tools.agent_tools.parent_root_side_effects import ParentRootSideEffectBoundary
+from tools.agent_tools.fixture_spawn import (
+    bootstrap_fixture_public_environment,
+    record_capability_from_environment,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "issue_sync.py"
@@ -78,23 +80,35 @@ class IssueSyncTest(unittest.TestCase):
     ) -> subprocess.CompletedProcess[str]:
         """Run issue sync with fake tools inside its authenticated root."""
         self.prepare_fixture_repository(root)
-        previous_cwd = Path.cwd()
-        try:
-            os.chdir(root)
-            with record_session_from_environment() as session:
-                environment = ParentRootSideEffectBoundary().session_environment(
-                    session, env
-                )
-                return subprocess.run(
-                    [sys.executable, str(SCRIPT), "--root", str(root), *args],
-                    cwd=root,
-                    check=False,
-                    capture_output=True,
-                    text=True,
-                    env=environment,
-                )
-        finally:
-            os.chdir(previous_cwd)
+        invocation_script = root / ".agent-canon-issue-sync.py"
+        invocation_script.write_text("# fixture issue-sync entrypoint\n", encoding="utf-8")
+        fixture_env = dict(env)
+        for key in ("CARGO_TARGET_DIR", "AGENT_CANON_CLI_TARGET_DIR"):
+            fixture_env.pop(key, None)
+        fixture_root = root.resolve()
+        fixture_path_entries: list[str] = []
+        for entry in env.get("PATH", "").split(os.pathsep):
+            if not entry:
+                continue
+            candidate = Path(entry).resolve(strict=False)
+            if candidate.is_relative_to(fixture_root):
+                fixture_path_entries.append(str(candidate))
+        with bootstrap_fixture_public_environment(
+            mode="synthetic_tool",
+            record_capability=record_capability_from_environment(),
+            fixture_cwd=root,
+            base_env=fixture_env,
+            invocation_script=invocation_script,
+            explicit_path_entries=fixture_path_entries,
+        ) as fixture:
+            return subprocess.run(
+                [sys.executable, str(SCRIPT), "--root", str(root), *args],
+                cwd=root,
+                check=False,
+                capture_output=True,
+                text=True,
+                env=fixture.environment,
+            )
 
     def test_missing_required_field_fails(self) -> None:
         """Local issue files must keep required fields."""

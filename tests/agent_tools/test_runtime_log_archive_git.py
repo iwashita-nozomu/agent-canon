@@ -78,6 +78,7 @@ for _module_name in (
         sys.modules.pop(_module_name, None)
 
 from tools.agent_tools import github_publish
+from tools.agent_tools import parent_root_side_effects as _canonical_parent
 from tools.agent_tools.graph_client import GraphClient
 from tools.agent_tools.log_repository_identity import stable_source_repository_id
 from tools.agent_tools.parent_root_side_effects import (
@@ -104,6 +105,7 @@ LIFECYCLE_REVERSE_COVERAGE = {
     "tools/agent_tools/runtime_log_archive_git.py": {"RL-004", "RL-005", "RL-006", "RL-007", "RL-008", "RL-011", "RL-013", "RL-015"},
     "tools/ci/run_codex_in_repo_container.py": {"RL-002", "RL-004"},
 }
+sys.modules["parent_root_side_effects"] = _canonical_parent
 import runtime_log_archive_git  # noqa: E402
 from tools.agent_tools.fixture_spawn import record_environment  # noqa: E402
 
@@ -147,6 +149,9 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         os.environ["GIT_CEILING_DIRECTORIES"] = tempfile.gettempdir()
         for env_name in ("AGENT_CANON_HOOK_ARCHIVE_DIR", "AGENT_CANON_HOOK_EVENT_SPOOL_DIR"):
             os.environ.pop(env_name, None)
+        self._record_environment_context = record_environment(cwd=PROJECT_ROOT)
+        self._record_environment = self._record_environment_context.__enter__()
+        self.addCleanup(self._record_environment_context.__exit__, None, None, None)
 
     def tearDown(self) -> None:
         """Restore the caller's source remote environment."""
@@ -479,7 +484,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             target = root / "external-summary.json"
-            with patch.dict(os.environ, {}, clear=False):
+            with patch.dict(os.environ, {}, clear=True):
                 os.environ.pop("AGENT_CANON_PARENT_ROOT", None)
                 with self.assertRaises(github_publish.ParentRootSideEffectError) as raised:
                     github_publish._write_publication_summary(target, b"{}\n")
@@ -2029,7 +2034,7 @@ class RuntimeLogArchiveGitTest(unittest.TestCase):
                     "CODEX_HOME": str(host_home / ".codex"),
                     "HOME": str(host_home),
                 },
-                clear=False,
+                clear=True,
             ):
                 with self.assertRaises(
                     runtime_log_archive_git.RuntimeEventMaterializationError

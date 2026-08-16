@@ -13,21 +13,19 @@ import json
 import os
 import shutil
 import subprocess
-import time
-from collections.abc import Iterator
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
-from tools.agent_tools.fixture_spawn import bootstrap_fixture_public_environment
+from tools.agent_tools.fixture_spawn import (
+    bootstrap_fixture_public_environment,
+    record_capability_from_environment,
+    record_environment,
+)
 from tools.agent_tools.parent_root_side_effects import (
+    ParentRootReject,
     ParentRootSideEffectError,
-    current_supervisor_issuer,
-    public_session,
-    resolve_parent_side_effect_session_v2,
-    SIDE_EFFECT_HANDOFF_ENV,
-    SIDE_EFFECT_PARENT_ROOT_ENV,
-    SIDE_EFFECT_REQUIRED_ENV,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -46,70 +44,27 @@ def _build_clean_env(overrides: dict[str, str] | None = None) -> dict[str, str]:
 def _authenticated_parent_env(
     parent_root: Path,
     base_env: dict[str, str],
+    *,
+    explicit_path_entries: Sequence[str] = (),
+    explicit_target_dir: Path | None = None,
 ) -> Iterator[dict[str, str]]:
-    """Run a wrapper synthetic tool through the canonical fixture facade."""
+    """Run a wrapper synthetic tool through one consumed runner capability."""
     wrapper = parent_root / "tools" / "bin" / "agent-canon"
     if not wrapper.is_file():
         wrapper = parent_root / "vendor" / "agent-canon" / "tools" / "bin" / "agent-canon"
-    saved_environment = os.environ.copy()
-    previous_cwd = Path.cwd()
-    try:
-        os.environ.clear()
-        os.environ.update(base_env)
-        if base_env.get(SIDE_EFFECT_HANDOFF_ENV) and base_env.get(SIDE_EFFECT_PARENT_ROOT_ENV):
-            with bootstrap_fixture_public_environment(
-                mode="synthetic_tool",
-                fixture_cwd=parent_root,
-                base_env=base_env,
-                invocation_script=wrapper,
-            ) as fixture:
-                yield fixture.environment
-            return
-
-        os.chdir(parent_root)
-        with public_session(
-            invocation_script=wrapper,
-            purpose="wrapper-test-supervisor",
-            independent=True,
-            cleanup_state=True,
-        ):
-            issuer = current_supervisor_issuer()
-            assert issuer is not None
-            child = issuer.issue_child(
-                role="record",
-                record_id=f"wrapper-record-{time.monotonic_ns()}",
-                physical_root=parent_root,
-                now_mono_ns=time.monotonic_ns(),
-            )
-            child_environment = {
-                SIDE_EFFECT_PARENT_ROOT_ENV: child.record.parent_root_realpath,
-                SIDE_EFFECT_HANDOFF_ENV: child.handoff,
-                SIDE_EFFECT_REQUIRED_ENV: "1",
-            }
-            record = resolve_parent_side_effect_session_v2(
-                env=child_environment,
-                observed_cwd=parent_root,
-            )
-            try:
-                with bootstrap_fixture_public_environment(
-                    mode="synthetic_tool",
-                    fixture_cwd=parent_root,
-                    record=record,
-                    base_env=base_env,
-                    invocation_script=wrapper,
-                ) as fixture:
-                    yield fixture.environment
-            finally:
-                record.close()
-                issuer.revoke_drain_child(
-                    child=child.child,
-                    reason="normal_exit",
-                    now_mono_ns=time.monotonic_ns(),
-                )
-    finally:
-        os.environ.clear()
-        os.environ.update(saved_environment)
-        os.chdir(previous_cwd)
+    capability = record_capability_from_environment(
+        observed_cwd=Path.cwd().resolve()
+    )
+    with bootstrap_fixture_public_environment(
+        mode="synthetic_tool",
+        fixture_cwd=parent_root,
+        record_capability=capability,
+        base_env=base_env,
+        invocation_script=wrapper,
+        explicit_path_entries=explicit_path_entries,
+        explicit_target_dir=explicit_target_dir,
+    ) as fixture:
+        yield fixture.environment
 
 
 def _pending_handoff_nonces(root: Path) -> dict[str, object]:
@@ -119,6 +74,44 @@ def _pending_handoff_nonces(root: Path) -> dict[str, object]:
     value = json.loads(state.read_text(encoding="utf-8"))
     assert isinstance(value, dict)
     return value
+
+
+def test_record_environment_uses_preissued_public_record() -> None:
+    """The ordinary adapter consumes private transport and projects public setup."""
+    if not (
+        os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT")
+        and os.environ.get("AGENT_CANON_SIDE_EFFECT_HANDOFF")
+        and os.environ.get("AGENT_CANON_PRIVATE_RECORD_REQUIRED") == "1"
+    ):
+        pytest.skip("requires a producer-preissued public/private record pair")
+    from tools.agent_tools.parent_root_side_effects import (
+        resolve_parent_side_effect_session_v2,
+    )
+
+    capability = record_capability_from_environment(observed_cwd=Path.cwd().resolve())
+    public = resolve_parent_side_effect_session_v2(
+        env=os.environ,
+        observed_cwd=Path.cwd().resolve(),
+    )
+    try:
+        with record_environment(cwd=Path.cwd()) as child:
+            assert child.receipt.capability_record_id == capability.record_id
+            assert child.receipt.capability_consumed_once
+            assert child.receipt.capability_consumption_count == 1
+            assert child.receipt.public_projection_record_id == public.record.record_id
+            assert child.receipt.public_projection_record_id != capability.record_id
+            assert child.receipt.private_transport_absent_in_child
+            assert child["AGENT_CANON_SIDE_EFFECT_HANDOFF"] == public.handoff
+            assert all(
+                name not in child
+                for name in (
+                    "AGENT_CANON_PRIVATE_RECORD_PARENT_ROOT",
+                    "AGENT_CANON_PRIVATE_RECORD_HANDOFF",
+                    "AGENT_CANON_PRIVATE_RECORD_REQUIRED",
+                )
+            )
+    finally:
+        public.close()
 
 
 def _prepare_canon_layout(tmp_path: Path) -> tuple[Path, Path, Path]:
@@ -345,12 +338,11 @@ def _run_with_fake_cargo(
             "WRAPPER_CAPTURE": str(capture),
         }
     )
-    if cargo_target_dir is None:
-        base_env.pop("CARGO_TARGET_DIR", None)
-    else:
-        base_env["CARGO_TARGET_DIR"] = str(cargo_target_dir)
+    base_env.pop("CARGO_TARGET_DIR", None)
 
-    with _authenticated_parent_env(canon_root, base_env) as env:
+    with _authenticated_parent_env(
+        canon_root, base_env, explicit_target_dir=cargo_target_dir
+    ) as env:
         installed_binary = Path(env["AGENT_CANON_TOOLS_HOME"]) / "agent-canon" / "bin" / "agent-canon"
         installed_binary.parent.mkdir(parents=True, exist_ok=True)
         installed_binary.write_text(
@@ -482,7 +474,7 @@ def test_wrapper_nested_scrubbed_env_selects_prebuilt_without_cargo(
         canon_root / "rust" / "agent-canon" / "src" / "main.rs",
     ):
         os.utime(source_path, ns=(source_time, source_time))
-    fake_bin = tmp_path / "fake-bin"
+    fake_bin = outer_root / "fake-bin"
     fake_bin.mkdir()
     fake_cargo = fake_bin / "cargo"
     fake_cargo.write_text(
@@ -492,11 +484,8 @@ def test_wrapper_nested_scrubbed_env_selects_prebuilt_without_cargo(
     fake_cargo.chmod(0o755)
     with _authenticated_parent_env(
         outer_root,
-        _build_clean_env(
-            {
-                "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
-            }
-        ),
+        _build_clean_env(),
+        explicit_path_entries=(str(fake_bin),),
     ) as env:
         installed_binary = Path(env["AGENT_CANON_TOOLS_HOME"]) / "agent-canon" / "bin" / "agent-canon"
         installed_binary.parent.mkdir(parents=True, exist_ok=True)
@@ -545,30 +534,19 @@ def test_wrapper_preserves_explicit_cargo_target_dir(tmp_path: Path) -> None:
 
 def test_wrapper_rejects_explicit_external_cargo_target_before_side_effects(tmp_path: Path) -> None:
     """The wrapper rejects a physically external Cargo target before writes."""
-    wrapper, _tools_home, canon_root = _prepare_canon_layout(tmp_path)
+    _wrapper, _tools_home, canon_root = _prepare_canon_layout(tmp_path)
     capture = canon_root / "cargo-target.txt"
     external_target = tmp_path.parent / "external-cargo-target"
     env = _build_clean_env({"WRAPPER_CAPTURE": str(capture)})
-    with _authenticated_parent_env(canon_root, env) as child_environment:
-        child_environment = dict(child_environment)
-        fake_cargo = Path(child_environment["AGENT_CANON_TOOLS_HOME"]) / "cargo"
-        fake_cargo.write_text(
-            f'#!/bin/sh\nprintf reached > "{capture}"\nexit 0\n',
-            encoding="utf-8",
-        )
-        fake_cargo.chmod(0o755)
-        child_environment["CARGO_TARGET_DIR"] = str(external_target)
-        result = subprocess.run(
-            [str(wrapper), "--version"],
-            cwd=canon_root,
-            env=child_environment,
-            check=False,
-            capture_output=True,
-            text=True,
-        )
+    env.pop("CARGO_TARGET_DIR", None)
+    with pytest.raises(ParentRootSideEffectError) as raised:
+        with _authenticated_parent_env(
+            canon_root, env, explicit_target_dir=external_target
+        ):
+            raise AssertionError("external target was admitted by fixture facade")
 
-    assert result.returncode != 0
-    assert "outside parent root" in result.stderr
+    assert raised.value.reject is ParentRootReject.ROOT_MISMATCH
+    assert "TARGET_OUTSIDE_FIXTURE" in str(raised.value)
     assert not capture.exists()
     assert not external_target.exists()
 

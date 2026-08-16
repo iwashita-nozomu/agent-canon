@@ -8,12 +8,13 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 from pathlib import Path
 
-from tools.agent_tools.fixture_spawn import record_session_from_environment
-from tools.agent_tools.parent_root_side_effects import ParentRootSideEffectBoundary
+from tools.agent_tools.fixture_spawn import (
+    bootstrap_fixture_public_environment,
+    record_capability_from_environment,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "agent_tools" / "check_dependency_graph.sh"
@@ -60,14 +61,16 @@ def _parent_fixture(tmp_path: Path) -> tuple[Path, Path]:
 def test_graph_uses_selected_parent_for_temp_and_output(tmp_path: Path) -> None:
     parent, source = _parent_fixture(tmp_path)
     output = parent / "reports" / "dependency.tsv"
-    with record_session_from_environment() as session:
-        environment = ParentRootSideEffectBoundary().session_environment(
-            session, os.environ
-        )
+    with bootstrap_fixture_public_environment(
+        mode="synthetic_tool",
+        record_capability=record_capability_from_environment(),
+        fixture_cwd=parent,
+        invocation_script=parent / "tools" / "bin" / "agent-canon",
+    ) as fixture:
         result = subprocess.run(
             ("bash", str(SCRIPT), "--root", str(source), "--graph-tsv", str(output)),
             cwd=parent,
-            env=environment,
+            env=fixture.environment,
             check=False,
             capture_output=True,
             text=True,
@@ -83,14 +86,16 @@ def test_graph_uses_selected_parent_for_temp_and_output(tmp_path: Path) -> None:
 def test_graph_rejects_output_outside_selected_parent(tmp_path: Path) -> None:
     parent, source = _parent_fixture(tmp_path)
     output = source / "dependency.tsv"
-    with record_session_from_environment() as session:
-        environment = ParentRootSideEffectBoundary().session_environment(
-            session, os.environ
-        )
+    with bootstrap_fixture_public_environment(
+        mode="synthetic_tool",
+        record_capability=record_capability_from_environment(),
+        fixture_cwd=parent,
+        invocation_script=parent / "tools" / "bin" / "agent-canon",
+    ) as fixture:
         result = subprocess.run(
             ("bash", str(SCRIPT), "--root", str(source), "--graph-tsv", str(output)),
             cwd=parent,
-            env=environment,
+            env=fixture.environment,
             check=False,
             capture_output=True,
             text=True,

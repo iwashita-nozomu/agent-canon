@@ -1875,24 +1875,45 @@ regular_path() {
   local abs_path="$ROOT_DIR/$path"
   local abs_source=""
   [ "$(realpath -m "$abs_path")" != "$ROOT_DIR" ] || die "regular target must not be repository root"
-  if [ -e "$abs_path" ] && [ ! -L "$abs_path" ] \
-    && { [ "$path" != ".vscode" ] || [ -d "$abs_path" ]; }; then
-    return
-  fi
-  if [ -z "$source" ]; then
-    if [ -L "$abs_path" ]; then
-      # Remove legacy whole-directory views before child links materialize.
-      # Do not create an empty parent; the child surface creates it safely.
-      parent_remove_file "$abs_path"
+  if [ "$path" = ".vscode" ]; then
+    if [ -d "$abs_path" ] && [ ! -L "$abs_path" ]; then
+      return
     fi
+    if [ -L "$abs_path" ]; then
+      parent_remove_file "$abs_path"
+      parent_ensure_dir "$abs_path"
+      return
+    fi
+    if [ ! -e "$abs_path" ]; then
+      parent_ensure_dir "$abs_path"
+      return
+    fi
+    die "regular[${path}]=collision type=non-directory"
+  fi
+
+  if [ -f "$abs_path" ] && [ ! -L "$abs_path" ]; then
     return
   fi
-  [ -n "$source" ] || die "regular path '$path' is missing or is a symlink and has no seed source"
-  abs_source="$ROOT_DIR/$source"
-  [ -e "$abs_source" ] || die "regular seed source '$source' does not exist"
-  parent_remove_tree "$abs_path"
-  parent_ensure_dir "$(dirname "$abs_path")"
-  parent_copy_file "$abs_source" "$abs_path"
+  if [ -L "$abs_path" ]; then
+    [ -n "$source" ] || die "regular path '$path' is a symlink and has no seed source"
+    abs_source="$ROOT_DIR/$source"
+    [ -f "$abs_source" ] && [ ! -L "$abs_source" ] \
+      || die "regular seed source '$source' is not a regular file"
+    parent_remove_file "$abs_path"
+    parent_ensure_dir "$(dirname "$abs_path")"
+    parent_copy_file "$abs_source" "$abs_path"
+    return
+  fi
+  if [ ! -e "$abs_path" ]; then
+    [ -n "$source" ] || die "regular path '$path' is absent and has no seed source"
+    abs_source="$ROOT_DIR/$source"
+    [ -f "$abs_source" ] && [ ! -L "$abs_source" ] \
+      || die "regular seed source '$source' is not a regular file"
+    parent_ensure_dir "$(dirname "$abs_path")"
+    parent_copy_file "$abs_source" "$abs_path"
+    return
+  fi
+  die "regular[${path}]=collision type=non-regular"
 }
 
 path_is_tracked_in_head() {

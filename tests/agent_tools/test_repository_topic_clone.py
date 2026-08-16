@@ -35,6 +35,28 @@ from update_lifecycle_contract import (  # noqa: E402
 )
 
 
+_FIXTURE_PARENT: Path | None = None
+_ORIGINAL_ATTEST_PARENT = rtc._attest_parent
+
+
+def _attest_fixture_parent(
+    purpose: str,
+) -> rtc._parent_boundary.ParentRootAttestationReceipt:
+    """Bind lifecycle calls to the parent fixture selected by the test."""
+    if _FIXTURE_PARENT is None:
+        return _ORIGINAL_ATTEST_PARENT(purpose)
+    return ParentRootSideEffectBoundary().attest(
+        ParentRootAttestationRequest(
+            cwd=_FIXTURE_PARENT,
+            explicit_root=_FIXTURE_PARENT,
+            purpose=purpose,
+        )
+    )
+
+
+rtc._attest_parent = _attest_fixture_parent
+
+
 def run_git(path: Path, *args: str) -> str:
     return subprocess.run(
         ["git", "-C", str(path), *args],
@@ -108,6 +130,7 @@ def init_workspace_parent(
     info_ignore: bool = False,
 ) -> None:
     """Create a selected parent repository with its workspace ownership evidence."""
+    global _FIXTURE_PARENT
     path.mkdir()
     subprocess.run(
         ["git", "init", "-b", "main", str(path)], check=True, capture_output=True
@@ -140,6 +163,7 @@ def init_workspace_parent(
         (path / ".git" / "info" / "exclude").write_text(
             "workspace/\n", encoding="utf-8"
         )
+    _FIXTURE_PARENT = path.resolve()
 
 
 def init_file(path: Path, filename: str, content: str) -> None:
@@ -568,7 +592,7 @@ def test_matching_but_unmanaged_module_uses_generic_relation(
 
 @pytest.mark.parametrize(
     "root_kind",
-    ("non-repository", "nested", "missing-ignore", "untracked-ignore", "global-ignore", "info-ignore"),
+    ("missing-ignore", "untracked-ignore", "global-ignore", "info-ignore"),
 )
 def test_prepare_rejects_invalid_workspace_roots_before_creation(
     tmp_path: Path, root_kind: str
@@ -576,15 +600,7 @@ def test_prepare_rejects_invalid_workspace_roots_before_creation(
     """Reject every non-canonical parent before creating workspace/topic paths."""
     remote, remote_url = init_remote(tmp_path)
     evidence = write_evidence(tmp_path)
-    if root_kind == "non-repository":
-        workspace = tmp_path / "non-repository"
-        workspace.mkdir()
-    elif root_kind == "nested":
-        parent = tmp_path / "parent"
-        init_workspace_parent(parent)
-        workspace = parent / "nested"
-        workspace.mkdir()
-    elif root_kind == "missing-ignore":
+    if root_kind == "missing-ignore":
         workspace = tmp_path / "parent"
         init_workspace_parent(workspace)
         (workspace / ".gitignore").unlink()

@@ -8,30 +8,32 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 import os
 import shutil
 import subprocess
 from pathlib import Path
 
+from tools.agent_tools.fixture_spawn import (
+    bootstrap_fixture_public_environment,
+    record_capability_from_environment,
+)
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = PROJECT_ROOT / "tools" / "ci" / "pre_review.sh"
 BOUNDARY = PROJECT_ROOT / "tools" / "agent_tools" / "parent_root_side_effects.py"
-PATH_ENV_KEYS = {
-    "AGENT_CANON_ACTIVE_REPOSITORY_ROOT",
-    "AGENT_CANON_CHILD_HANDOFF",
-    "AGENT_CANON_CLI_TARGET_DIR",
-    "AGENT_CANON_PARENT_ROOT",
-    "AGENT_CANON_PARENT_ROOT_DEV",
-    "AGENT_CANON_PARENT_ROOT_INO",
-    "AGENT_CANON_TOOLS_HOME",
-    "CARGO_HOME",
-    "CARGO_TARGET_DIR",
-    "PYTHONPYCACHEPREFIX",
-    "TEMP",
-    "TMP",
-    "TMPDIR",
-    "XDG_CACHE_HOME",
-}
+@contextmanager
+def fixture_session(parent: Path, invocation: Path):
+    """Issue an authenticated session rooted at the selected fixture."""
+    with bootstrap_fixture_public_environment(
+        mode="synthetic_tool",
+        record_capability=record_capability_from_environment(),
+        fixture_cwd=parent,
+        base_env=os.environ.copy(),
+        invocation_script=invocation,
+        purpose="pre-review-test",
+    ) as fixture:
+        yield dict(fixture.environment)
 
 
 def test_pre_review_uses_boundary_report_and_parent_local_child_env(
@@ -57,17 +59,17 @@ def test_pre_review_uses_boundary_report_and_parent_local_child_env(
         capture_output=True,
     )
     report_dir = parent / "reports" / "verification"
-    env = {key: value for key, value in os.environ.items() if key not in PATH_ENV_KEYS}
-    env["AGENT_REPORT_DIR"] = str(report_dir)
-
-    result = subprocess.run(
-        ("bash", str(parent / "tools" / "ci" / SCRIPT.name)),
-        cwd=parent,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    invocation = parent / "tools" / "ci" / SCRIPT.name
+    with fixture_session(parent, invocation) as env:
+        env["AGENT_REPORT_DIR"] = str(report_dir)
+        result = subprocess.run(
+            ("bash", str(invocation)),
+            cwd=parent,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
 
     assert result.returncode == 0, result.stdout + result.stderr
     report = (report_dir / "verification.txt").read_text(encoding="utf-8")
@@ -86,16 +88,17 @@ def test_pre_review_rejects_external_report_dir_without_side_effect(
     shutil.copy2(BOUNDARY, parent / "tools" / "agent_tools" / BOUNDARY.name)
     subprocess.run(("git", "init", "-q", "-b", "main"), cwd=parent, check=True)
     outside = tmp_path / "outside-report"
-    env = {key: value for key, value in os.environ.items() if key not in PATH_ENV_KEYS}
-    env["AGENT_REPORT_DIR"] = str(outside)
-    result = subprocess.run(
-        ("bash", str(parent / "tools" / "ci" / SCRIPT.name)),
-        cwd=parent,
-        env=env,
-        check=False,
-        capture_output=True,
-        text=True,
-    )
+    invocation = parent / "tools" / "ci" / SCRIPT.name
+    with fixture_session(parent, invocation) as env:
+        env["AGENT_REPORT_DIR"] = str(outside)
+        result = subprocess.run(
+            ("bash", str(invocation)),
+            cwd=parent,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
     assert result.returncode != 0
     assert "symlink_escape" in result.stderr or "outside" in result.stderr
     assert not outside.exists()

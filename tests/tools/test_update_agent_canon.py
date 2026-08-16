@@ -445,7 +445,10 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                 env=env,
             )
             self.assertEqual(rejected.returncode, 2, rejected.stderr)
-            self.assertIn("AGENT_CANON_UPDATE_PARENT_HANDOFF=missing", rejected.stderr)
+            self.assertIn(
+                "PARENT_ROOT_SIDE_EFFECT_ERROR=handoff_invalid: legacy_authority_forbidden",
+                rejected.stderr,
+            )
             self.assertFalse((outer / ".agent-canon").exists())
             self.assertFalse((nested / ".agent-canon").exists())
 
@@ -459,7 +462,7 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
             )
             self.assertEqual(rebuild_rejected.returncode, 2, rebuild_rejected.stderr)
             self.assertIn(
-                "AGENT_CANON_REBUILD_PARENT_HANDOFF=missing",
+                "PARENT_ROOT_SIDE_EFFECT_ERROR=handoff_invalid: legacy_authority_forbidden",
                 rebuild_rejected.stderr,
             )
             self.assertFalse((outer / ".agent-canon").exists())
@@ -474,7 +477,10 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                 env=env,
             )
             self.assertEqual(sync_rejected.returncode, 2, sync_rejected.stderr)
-            self.assertIn("AGENT_CANON_SYNC_PARENT_HANDOFF=missing", sync_rejected.stderr)
+            self.assertIn(
+                "PARENT_ROOT_SIDE_EFFECT_ERROR=handoff_invalid: legacy_authority_forbidden",
+                sync_rejected.stderr,
+            )
             self.assertFalse((outer / ".agent-canon").exists())
             self.assertFalse((nested / ".agent-canon").exists())
 
@@ -503,8 +509,6 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                 f"stdout={accepted.stdout!r} stderr={accepted.stderr!r}",
             )
             self.assertIn("agent_canon_source_mode=standalone_source", accepted.stdout)
-            self.assertTrue((outer / ".agent-canon" / "tmp" / "update").is_dir())
-            self.assertFalse((nested / ".agent-canon").exists())
 
             sync_accepted = subprocess.run(
                 [
@@ -529,7 +533,7 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                 0,
                 f"stdout={sync_accepted.stdout!r} stderr={sync_accepted.stderr!r}",
             )
-            self.assertFalse((nested / ".agent-canon").exists())
+            self.assertIn(f"repo_root={nested}", sync_accepted.stdout)
 
             rebuild_accepted = subprocess.run(
                 [
@@ -558,9 +562,23 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                 "AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_rust_manifest",
                 rebuild_accepted.stdout,
             )
-            self.assertFalse((nested / ".agent-canon").exists())
-            nonce_path = outer / ".agent-canon" / "handoff" / "nonces.json"
-            self.assertEqual(json.loads(nonce_path.read_text(encoding="utf-8")), {})
+
+            nested_session_root = (
+                nested / ".agent-canon" / "runtime" / "side-effect-sessions-v2"
+            )
+            if nested_session_root.exists():
+                for record_path in sorted(nested_session_root.glob("*/record.json")):
+                    record = json.loads(record_path.read_text(encoding="utf-8"))
+                    self.assertEqual(record["parent_root_realpath"], str(nested.resolve()))
+                    self.assertEqual(record["role"], "supervisor")
+            # A nested .agent-canon containing v2 records is owned by the
+            # nested CWD; its existence is not accepted-command completion
+            # evidence. The observable completion evidence is status/output,
+            # cleanup, and unchanged external state below.
+            legacy_update_tmp = outer / ".agent-canon" / "tmp" / "update"
+            self.assertFalse(legacy_update_tmp.exists())
+            legacy_nonce = outer / ".agent-canon" / "handoff" / "nonces.json"
+            self.assertFalse(legacy_nonce.exists())
             self.assertEqual(env["HOME"], str(home))
             self.assertFalse(outside.exists())
 
@@ -914,6 +932,10 @@ class CommitProvenanceStaticContractTest(unittest.TestCase):
                     AGENT_CANON_SOURCE_ROOT / relative,
                     script_root / "vendor" / "agent-canon" / relative,
                 )
+            (script_root / "vendor" / "agent-canon" / "fresh-clone-fixture-delta.txt").write_text(
+                "fresh-clone-fixture-delta-v1\n",
+                encoding="utf-8",
+            )
             subprocess.run(
                 ["git", "-C", str(script_root / "vendor" / "agent-canon"), "add", "-A"],
                 check=True,
@@ -2492,6 +2514,9 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
                     "# Standalone Surface Policy",
                     "",
                     "documents/runtime/shared-runtime-surfaces.toml",
+                    "AGENTS.md",
+                    ".codex/config.toml",
+                    ".codex/agents",
                     ".codex/hooks.json",
                     ".codex/hooks",
                     ".devcontainer/",
@@ -2581,14 +2606,20 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
         shutil.copytree(AGENT_CANON_SOURCE_ROOT / "tools" / "lib", repo / "tools" / "lib")
         fixture_agent_tools = repo / "tools" / "agent_tools"
         fixture_agent_tools.mkdir()
-        for name in (
+        fixture_tool_closure = (
             "artifact_identity.py",
             "parent_root_side_effects.py",
             "update_lifecycle_contract.py",
-        ):
-            shutil.copy2(
-                AGENT_CANON_SOURCE_ROOT / "tools" / "agent_tools" / name,
-                fixture_agent_tools / name,
+            "attach_clean_detached_submodule.py",
+        )
+        for name in fixture_tool_closure:
+            source_file = AGENT_CANON_SOURCE_ROOT / "tools" / "agent_tools" / name
+            target_file = fixture_agent_tools / name
+            shutil.copy2(source_file, target_file)
+            self.assertEqual(
+                target_file.read_bytes(),
+                source_file.read_bytes(),
+                f"fixture closure readback mismatch: {name}",
             )
         if public_submodule_add:
             subprocess.run(["git", "add", "tools"], cwd=repo, check=True)
@@ -4251,6 +4282,109 @@ class SubmoduleUpdateAgentCanonTest(unittest.TestCase):
             self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=updated", latest.stdout)
             self.assertIn("NEXT_ACTION=run_validation_then_push_parent_repo", latest.stdout)
             self.assertTrue((repo / "vendor" / "agent-canon" / "remote-marker.txt").is_file())
+
+    def test_latest_rebases_inherited_temp_through_sync_and_rebuild(self) -> None:
+        """A signed inherited runner temp is untouched by nested update handoffs."""
+        # Keep this authenticated fixture below the record's physical parent;
+        # the signed inherited session must be able to validate every nested
+        # Git root before update/sync begins.
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT) as tmp_dir:
+            root = Path(tmp_dir)
+            bare_repo, work_dir = self.make_agent_canon_remote(root)
+            repo = self.make_superproject(root, bare_repo)
+
+            # The parent fixture includes a tiny rebuild entrypoint so latest
+            # exercises the same parent-bound rebuild handoff as a real source
+            # checkout without requiring a Rust toolchain in this test.
+            shared_surface_doc = (
+                work_dir / "documents" / "runtime" / "SHARED_RUNTIME_SURFACES.md"
+            )
+            with shared_surface_doc.open("a", encoding="utf-8") as document:
+                document.write("\nAGENTS.md\n.codex/config.toml\n.codex/agents\n")
+            rebuild_script = repo / "tools" / "rebuild_agent_tools.sh"
+            rebuild_script.write_text(
+                "#!/usr/bin/env bash\n"
+                "set -euo pipefail\n"
+                "echo AGENT_CANON_REBUILD_OBSERVED_TMPDIR=\"$TMPDIR\"\n"
+                "echo AGENT_CANON_TOOL_REBUILD_RUST=skipped_missing_rust_manifest\n"
+                "echo AGENT_CANON_TOOL_REBUILD=pass\n",
+                encoding="utf-8",
+            )
+            rebuild_script.chmod(0o755)
+            subprocess.run(
+                [
+                    "git",
+                    "add",
+                    "documents/runtime/SHARED_RUNTIME_SURFACES.md",
+                ],
+                cwd=work_dir,
+                check=True,
+            )
+            subprocess.run(
+                ["git", "commit", "-m", "add rebuild fixture entrypoint"],
+                cwd=work_dir,
+                check=True,
+            )
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+
+            (work_dir / "remote-marker.txt").write_text("remote\n", encoding="utf-8")
+            subprocess.run(["git", "add", "remote-marker.txt"], cwd=work_dir, check=True)
+            subprocess.run(["git", "commit", "-m", "advance remote"], cwd=work_dir, check=True)
+            subprocess.run(["git", "push", "origin", "main"], cwd=work_dir, check=True)
+            self.materialize_parent_projection_frontier(repo, work_dir)
+
+            outer_temp = root / "outer-runner-temp"
+            outer_temp.mkdir()
+            outer_sentinel = outer_temp / "runner-sentinel"
+            outer_sentinel.write_text("must remain untouched\n", encoding="utf-8")
+            outer_latest = outer_temp / "latest"
+            env = authorized_test_env()
+            env["GIT_ALLOW_PROTOCOL"] = "file"
+            env["AGENT_CANON_PARENT_TMPDIR"] = str(outer_latest)
+            for name in ("TMPDIR", "TEMP", "TMP"):
+                env[name] = str(outer_temp)
+
+            with record_environment(cwd=repo, base_env=env) as signed_env:
+                signed_parent_root = Path(
+                    signed_env["AGENT_CANON_SIDE_EFFECT_PARENT_ROOT"]
+                ).resolve()
+                latest = subprocess.run(
+                    ["bash", "tools/update_agent_canon.sh", "latest"],
+                    cwd=repo,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    env=signed_env,
+                )
+
+            combined_output = f"{latest.stdout}\n{latest.stderr}"
+            self.assertEqual(latest.returncode, 0, combined_output)
+            self.assertIn("agent_canon_latest=updating_submodule", combined_output)
+            self.assertIn("agent_canon_latest_submodule_local_state_checked=yes", combined_output)
+            self.assertIn("shared surface is in sync", combined_output)
+            self.assertIn("AGENT_CANON_REBUILD_OBSERVED_TMPDIR=", combined_output)
+            self.assertIn("AGENT_CANON_TOOL_REBUILD=pass", combined_output)
+            self.assertIn("AGENT_CANON_LATEST_TOOL_RESULT=updated", combined_output)
+            self.assertTrue((repo / "vendor" / "agent-canon" / "remote-marker.txt").is_file())
+
+            nested_sync_tmp = signed_parent_root / ".agent-canon" / "tmp" / "sync"
+            boundary_tmp = signed_parent_root / ".agent-canon" / "tmp"
+            observed_rebuild_tmp = next(
+                line.split("=", 1)[1]
+                for line in combined_output.splitlines()
+                if line.startswith("AGENT_CANON_REBUILD_OBSERVED_TMPDIR=")
+            )
+            self.assertTrue(outer_latest.is_dir())
+            self.assertTrue(nested_sync_tmp.is_dir())
+            self.assertTrue(outer_latest.resolve().is_relative_to(signed_parent_root))
+            self.assertTrue(nested_sync_tmp.resolve().is_relative_to(signed_parent_root))
+            self.assertNotEqual(outer_latest.resolve(), nested_sync_tmp.resolve())
+            self.assertNotEqual(boundary_tmp.resolve(), outer_latest.resolve())
+            self.assertEqual(observed_rebuild_tmp, str(boundary_tmp))
+            self.assertTrue(Path(observed_rebuild_tmp).resolve().is_relative_to(signed_parent_root))
+            self.assertNotEqual(Path(observed_rebuild_tmp).resolve(), outer_latest.resolve())
+            self.assertNotEqual(Path(observed_rebuild_tmp).resolve(), outer_temp.resolve())
+            self.assertEqual(outer_sentinel.read_text(encoding="utf-8"), "must remain untouched\n")
 
     def test_rebuild_tools_installs_rust_cli_from_current_submodule(self) -> None:
         """Rebuild-tools should install a Rust CLI matching the current AgentCanon source."""

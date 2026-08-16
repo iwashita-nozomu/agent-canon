@@ -26,15 +26,18 @@ upstream design ../../agents/skills/agent-orchestration.md execution-time-aware 
 <!-- 下記の canonical owner を射影し、scheduling policy を再記述したり duration cutoff を追加したりしません。 -->
 
 - Owner contract: `agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract`
-- Executable scheduling fields: `dependency_dag`, `makespan_objective`, `responsibility_completeness`, `correctness`, `critical_path`, `ready_set`, `context_reuse`, `affected_evidence_invalidation`.
-- Dependency DAG / closure:
-- Makespan objective:
-- Responsibility completeness:
-- Correctness:
-- Critical path:
-- Ready set:
-- Useful ready set:
-- Dispatch batch:
+- Default execution state: `bounded_single_owner`.
+- Candidate count alone does not activate the execution graph.
+- Always-required fields: `owner`, `schema`, `dependency`, `validation`, `correctness`, `publication_scope`.
+- Graph-only fields: `dag`, `critical_path`, `ready_set`, `queue_snapshot`, `makespan_objective`.
+- Selected edge activation: `ordering`, `dependency`, `collision`, or `publication`.
+- Dependency DAG / closure (active selected subgraph only):
+- Makespan objective (active selected subgraph only):
+- Critical path (active selected subgraph only):
+- Ready set (active selected subgraph only):
+- Useful ready set (active selected subgraph only):
+- Queue snapshot (active selected subgraph only):
+- Dispatch batch (active selected subgraph only):
 - Wait reason (only when the useful ready set is empty):
 - Context reuse:
 - Affected evidence invalidation:
