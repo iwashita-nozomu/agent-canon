@@ -33,7 +33,7 @@ try:
 except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib  # type: ignore[no-redef]
 import sys
-from collections.abc import Collection
+from collections.abc import Collection, Iterator, Mapping
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -258,6 +258,40 @@ class AlignmentWorkspace:
 
 
 @contextmanager
+def _project_process_environment(
+    environment: Mapping[str, str],
+) -> Iterator[None]:
+    """Replace the process environment for one fixture-owned operation.
+
+    ``bootstrap_fixture_public_environment`` deliberately returns a value and
+    restores its own caller environment before yielding.  Runtime alignment
+    therefore projects that value only across the derived-bundle operation,
+    then restores the complete prior mapping even when the operation fails.
+    """
+    previous = os.environ.copy()
+    primary_error: BaseException | None = None
+    try:
+        os.environ.clear()
+        os.environ.update(environment)
+        yield
+    except BaseException as error:
+        primary_error = error
+        raise
+    finally:
+        try:
+            os.environ.clear()
+            os.environ.update(previous)
+        except BaseException as restoration_error:
+            if primary_error is not None:
+                primary_error.add_note(
+                    "runtime-alignment environment restoration failed: "
+                    f"{restoration_error}"
+                )
+            else:
+                raise
+
+
+@contextmanager
 def runtime_alignment_parent(source_resolution: RootResolution):
     """Yield one fixture-owned parent for derived runtime-alignment state.
 
@@ -374,7 +408,7 @@ def runtime_alignment_parent(source_resolution: RootResolution):
                         / "runtime-alignment",
                         "runtime-alignment-temp",
                     )
-                    with _temporary_environment(fixture.environment):
+                    with _project_process_environment(fixture.environment):
                         os.chdir(fixture_parent)
                         try:
                             yield base.physical_path
