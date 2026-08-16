@@ -25,9 +25,12 @@ ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 TOOLS_ROOT="$(agent_canon_source_tools_root "${ROOT}")"
 cd "${ROOT}"
 
-if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" \
-   || -z "${AGENT_CANON_PRIVATE_RECORD_HANDOFF:-}" \
-   || "${AGENT_CANON_PRIVATE_RECORD_REQUIRED:-}" != "1" ]]; then
+if [[ "${AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED:-}" != "1" \
+   || -z "${AGENT_CANON_SIDE_EFFECT_PARENT_ROOT:-}" \
+   || -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" \
+   || "${AGENT_CANON_PRIVATE_RECORD_REQUIRED:-}" != "1" \
+   || -z "${AGENT_CANON_PRIVATE_RECORD_PARENT_ROOT:-}" \
+   || -z "${AGENT_CANON_PRIVATE_RECORD_HANDOFF:-}" ]]; then
   invocation_script="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
   if [[ -z "${invocation_script}" || ! -f "${invocation_script}" ]]; then
     echo "STANDALONE_STATIC_GATE=fail reason=invocation_script_missing" >&2
