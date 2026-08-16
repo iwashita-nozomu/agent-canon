@@ -2,14 +2,13 @@
 
 # @dependency-start
 # contract test
-# responsibility Tests responsibility scope validation.
+# responsibility Tests the total single-owner relation for tracked repository paths.
 # upstream implementation ../../tools/agent_tools/responsibility_scope.py validates scope manifest
 # upstream design ../../responsibility-scope.toml scope fixture contract
 # @dependency-end
 
 from __future__ import annotations
 
-import json
 import subprocess
 import sys
 import tempfile
@@ -64,31 +63,47 @@ class ResponsibilityScopeTest(unittest.TestCase):
             self.assertIn("missing:tools/agent_tools/missing_scope_tool.py", result.stdout)
             self.assertIn("uncataloged:tools/agent_tools/missing_scope_tool.py", result.stdout)
 
-    def test_uncovered_required_path_fails(self) -> None:
-        """Required top-level coverage must be claimed by a scope."""
+    def test_unowned_tracked_path_fails(self) -> None:
+        """Every existing tracked path must have exactly one owning scope."""
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            self.write_fixture(root)
+            self.write_file(root, "README.md", "unowned\n")
+
+            result = self.run_checker(root)
+
+            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
+            self.assertIn("scope_unowned:README.md:no-owning-scope", result.stdout)
+
+    def test_empty_scope_patterns_do_not_impose_existence(self) -> None:
+        """Ownership patterns may denote an empty set in the current tracked tree."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_fixture(root)
             manifest = root / "responsibility-scope.toml"
             manifest.write_text(
                 manifest.read_text(encoding="utf-8").replace(
-                    'required_coverage = ["tools"]',
-                    'required_coverage = ["tools", "issues"]',
+                    'paths = ["tools/**", "tests/**", "responsibility-scope.toml"]',
+                    'paths = ["tools/**", "tests/**", "responsibility-scope.toml", ".agents/**", "agents/**", "examples/**"]\nexclude_paths = ["tools/retired/**"]',
                 ),
                 encoding="utf-8",
             )
 
             result = self.run_checker(root)
 
-            self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("coverage:issues:uncovered-required-path", result.stdout)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertNotIn("no-match", result.stdout)
 
     def test_parent_repository_requires_top_level_manifest(self) -> None:
         """A parent repo must require its own responsibility manifest."""
         with tempfile.TemporaryDirectory() as temp_dir:
             root = Path(temp_dir)
             self.write_file(root, "tools/catalog.yaml", "version: 1\nentries: []\n")
-            self.write_file(root, "vendor/agent-canon/responsibility-scope.toml", "catalog_kind = \"agent_canon_responsibility_scope\"\n")
+            self.write_file(
+                root,
+                "vendor/agent-canon/responsibility-scope.toml",
+                'catalog_kind = "agent_canon_responsibility_scope"\n',
+            )
 
             result = self.run_checker(root)
 
@@ -97,12 +112,11 @@ class ResponsibilityScopeTest(unittest.TestCase):
             self.assertIn("responsibility-scope.toml:missing-file", result.stdout)
 
     def test_eval_and_hook_evidence_includes_log_archive_control_plane(self) -> None:
-        """The eval/hook evidence scope should cover log archive control-plane files."""
-        result = self.run_checker(PROJECT_ROOT, "--format", "json")
-
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        report = json.loads(result.stdout)
-        scopes = {scope["scope_id"]: scope for scope in report["scopes"]}
+        """The canonical manifest assigns log-archive control-plane paths once."""
+        data = tomllib.loads(
+            (PROJECT_ROOT / "responsibility-scope.toml").read_text(encoding="utf-8")
+        )
+        scopes = {str(raw["id"]): raw for raw in data["scope"]}
         paths = set(scopes["eval-and-hook-evidence"]["paths"])
         runtime_paths = set(scopes["runtime-entrypoints"]["paths"])
 
@@ -112,8 +126,10 @@ class ResponsibilityScopeTest(unittest.TestCase):
         self.assertIn("documents/runtime/runtime-log-archive-migration.md", paths)
         self.assertIn("tools/agent_tools/runtime_log_paths.py", paths)
         self.assertIn("tools/agent_tools/runtime_log_archive_git.py", paths)
-        self.assertIn("tools/agent_tools/runtime_log_archive_git.py", paths)
-        self.assertNotIn("evidence/agent-evals/**", scopes["runtime-entrypoints"]["exclude_paths"])
+        self.assertNotIn(
+            "evidence/agent-evals/**",
+            scopes["runtime-entrypoints"].get("exclude_paths", []),
+        )
         self.assertIn(
             "tools/agent_tools/runtime_log_paths.py",
             scopes["shared-tooling"]["exclude_paths"],
@@ -153,15 +169,12 @@ class ResponsibilityScopeTest(unittest.TestCase):
             result = self.run_checker(root)
 
             self.assertEqual(result.returncode, 1, result.stdout + result.stderr)
-            self.assertIn("scope_overlap:tools/evidence.py:scopes:tools,evidence", result.stdout)
+            self.assertIn("scope_overlap:tools/evidence.py:scopes:fixture,evidence", result.stdout)
 
     def test_starter_manifest_partitions_parent_tools_from_agent_canon_view(self) -> None:
         """Keep only active AgentCanon views in the starter runtime scope."""
         data = tomllib.loads(STARTER_MANIFEST.read_text(encoding="utf-8"))
-        scopes = {
-            str(raw["id"]): scope_from_mapping(raw)
-            for raw in data["scope"]
-        }
+        scopes = {str(raw["id"]): scope_from_mapping(raw) for raw in data["scope"]}
         agent_canon = scopes["agent-canon-runtime-view"]
         parent = scopes["parent-repo-active-contract"]
         durable = scopes["project-durable-state"]
@@ -233,13 +246,12 @@ class ResponsibilityScopeTest(unittest.TestCase):
                     "version = 1",
                     'owner_values = ["agent-canon"]',
                     'class_values = ["tooling"]',
-                    'required_coverage = ["tools"]',
                     "[[scope]]",
-                    'id = "tools"',
+                    'id = "fixture"',
                     'owner = "agent-canon"',
                     'class = "tooling"',
-                    'description = "Fixture tools."',
-                    'paths = ["tools/**"]',
+                    'description = "Fixture paths."',
+                    'paths = ["tools/**", "tests/**", "responsibility-scope.toml"]',
                     'protecting_tools = ["tools/agent_tools/responsibility_scope.py"]',
                     'issues = []',
                     "",

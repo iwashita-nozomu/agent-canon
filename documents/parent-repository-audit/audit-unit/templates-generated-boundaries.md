@@ -55,17 +55,6 @@ path/manifest/readback が pass し、旧 checklist の二重正本が残って�
 `surface:templates.generated-boundary`、`surface:evidence.artifacts`、`surface:docs.canon`。
 template、artifact schema、generated projection、document placement の変更時だけ本 unit を更新します。
 
-## Scope Patterns
-
-- `pattern:templates/**`
-- `pattern:reports/**`
-- `pattern:evidence/**`
-- `pattern:memory/**`
-- `pattern:notes/**`
-- `pattern:.state/**`
-- `pattern:.agent-canon/**`
-- `pattern:workspace/**`
-
 ## Legacy Migration IDs
 
 PRA-M01 PRA-M02 PRA-M03 PRA-M04 PRA-M05 PRA-M06 PRA-M07 PRA-M08 PRA-C043 PRA-C044 PRA-C045 PRA-C046 PRA-C079 PRA-C080 PRA-C081 PRA-C082 PRA-C083 PRA-C084 PRA-C085 PRA-C086 PRA-C101 PRA-C106 PRA-C107 PRA-C108 PRA-C109 PRA-C110 PRA-X027 PRA-X045 PRA-X046

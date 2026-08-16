@@ -60,15 +60,6 @@ canonical skill、catalog、dependency row、typed resolver/tool command、gener
 `surface:ci.hooks-skills`、`surface:skill.catalog`、`surface:skill.dependencies`、
 `surface:skill.runtime-shim`、`surface:skill.graph`。これらの契約変更時だけ本 unit を更新します。
 
-## Scope Patterns
-
-- `pattern:.github/**`
-- `pattern:.codex/**`
-- `pattern:.agents/**`
-- `pattern:agents/skills/**`
-- `pattern:tools/agent_tools/**`
-- `pattern:Makefile`
-
 ## Legacy Migration IDs
 
 PRA-C040 PRA-C041 PRA-C042 PRA-C047 PRA-C048 PRA-C049 PRA-C055 PRA-C092 PRA-C093 PRA-C094 PRA-C095 PRA-C096 PRA-X026 PRA-X028 PRA-X029 PRA-X030 PRA-X031 PRA-X035 PRA-X049

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Compares observed repository trees with the AgentCanon structure contract.
+# responsibility Compares observed repository path existence and kinds with the AgentCanon structure contract.
 # upstream design ../../documents/structure/repo-structure-contract.toml expected repository structure profiles
-# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared root surface policy
+# upstream design ../../responsibility-scope.toml canonical path owner and class relation
+# upstream design ../../documents/runtime/SHARED_RUNTIME_SURFACES.md shared root projection policy
 # upstream design ../../documents/tools/README.md tool entrypoint policy
 # downstream implementation ../../tests/agent_tools/test_repo_structure_contract.py tests tree and contract comparison
 # @dependency-end
@@ -29,6 +30,8 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
 DEFAULT_CONTRACT = "documents/structure/repo-structure-contract.toml"
 ERROR = "error"
 WARN = "warn"
+REQUIRED_PATH = "required_path"
+OPTIONAL_PATH = "optional_path"
 TREE_KIND_MAP = {
     "directory": "dir",
     "file": "file",
@@ -52,11 +55,10 @@ class Finding:
 
 @dataclass(frozen=True)
 class ExpectedPath:
-    """One expected repository path from the contract."""
+    """One expected repository path and its filesystem kind."""
 
     path: str
     kind: str
-    category: str
 
 
 @dataclass(frozen=True)
@@ -66,8 +68,6 @@ class Profile:
     profile_id: str
     summary: str
     detect_all: tuple[str, ...]
-    allowed_top_level: tuple[str, ...]
-    extra_top_level_severity: str
     required: tuple[ExpectedPath, ...]
     optional: tuple[ExpectedPath, ...]
 
@@ -118,11 +118,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="JSON produced by `tree -a -J` from the repository root. Defaults to running tree.",
     )
     parser.add_argument("--format", choices=("text", "json"), default="text")
-    parser.add_argument(
-        "--strict-extra-top-level",
-        action="store_true",
-        help="Treat top-level paths outside the profile contract as errors.",
-    )
     return parser
 
 
@@ -160,17 +155,15 @@ def resolve_path(root: Path, path: str) -> Path:
 
 
 def expected_path(raw: object) -> ExpectedPath | None:
-    """Parse one expected path entry from TOML."""
+    """Parse one expected path/kind entry from TOML."""
     mapping = as_mapping(raw)
     path = mapping.get("path")
     if not isinstance(path, str) or not path:
         return None
     kind = mapping.get("kind")
-    category = mapping.get("category")
     return ExpectedPath(
         path=normalize_path(path),
         kind=kind if isinstance(kind, str) else "any",
-        category=category if isinstance(category, str) else "contract",
     )
 
 
@@ -203,14 +196,11 @@ def load_contract(root: Path, contract_path: str) -> tuple[IgnoreRules, tuple[Pr
         if not isinstance(profile_id, str) or not profile_id:
             continue
         summary = mapping.get("summary")
-        severity = mapping.get("extra_top_level_severity")
         profiles.append(
             Profile(
                 profile_id=profile_id,
                 summary=summary if isinstance(summary, str) else "",
                 detect_all=string_list(mapping.get("detect_all")),
-                allowed_top_level=string_list(mapping.get("allowed_top_level")),
-                extra_top_level_severity=severity if severity in {ERROR, WARN} else WARN,
                 required=expected_paths(mapping.get("required")),
                 optional=expected_paths(mapping.get("optional")),
             )
@@ -310,7 +300,11 @@ def profile_detects(profile: Profile, observed: Mapping[str, str]) -> bool:
     return all(path in observed for path in profile.detect_all)
 
 
-def select_profile(requested: str, profiles: Sequence[Profile], observed: Mapping[str, str]) -> Profile:
+def select_profile(
+    requested: str,
+    profiles: Sequence[Profile],
+    observed: Mapping[str, str],
+) -> Profile:
     """Select a profile by id or by contract detection rules."""
     if requested != "auto":
         for profile in profiles:
@@ -332,27 +326,23 @@ def kind_matches(expected: str, actual: str | None) -> bool:
     return expected == actual
 
 
-def top_level(path: str) -> str:
-    """Return the first path component."""
-    return normalize_path(path).split("/", 1)[0]
-
-
 def compare_structure(
     profile: Profile,
     observed: Mapping[str, str],
-    strict_extra_top_level: bool,
 ) -> tuple[Finding, ...]:
-    """Compare observed paths against the selected profile."""
+    """Compare path existence and kinds against the selected profile."""
     findings: list[Finding] = []
     for expected in profile.required:
         actual_kind = observed.get(expected.path)
         if actual_kind is None:
-            findings.append(Finding(ERROR, expected.category, expected.path, f"missing-{expected.kind}"))
+            findings.append(
+                Finding(ERROR, REQUIRED_PATH, expected.path, f"missing-{expected.kind}")
+            )
         elif not kind_matches(expected.kind, actual_kind):
             findings.append(
                 Finding(
                     ERROR,
-                    expected.category,
+                    REQUIRED_PATH,
                     expected.path,
                     f"kind-mismatch:{actual_kind}!={expected.kind}",
                 )
@@ -363,21 +353,14 @@ def compare_structure(
             findings.append(
                 Finding(
                     WARN,
-                    expected.category,
+                    OPTIONAL_PATH,
                     expected.path,
                     f"optional-kind-mismatch:{actual_kind}!={expected.kind}",
                 )
             )
-    allowed = set(profile.allowed_top_level)
-    allowed.update(top_level(item.path) for item in (*profile.required, *profile.optional))
-    extra_severity = ERROR if strict_extra_top_level else profile.extra_top_level_severity
-    observed_top_level = sorted({top_level(path) for path in observed if "/" not in path})
-    for item in observed_top_level:
-        if item not in allowed:
-            findings.append(
-                Finding(extra_severity, "unexpected_top_level", item, "not-in-profile-contract")
-            )
-    return tuple(sorted(findings, key=lambda item: (item.severity, item.category, item.path, item.detail)))
+    return tuple(
+        sorted(findings, key=lambda item: (item.severity, item.category, item.path, item.detail))
+    )
 
 
 def run_check(
@@ -385,7 +368,6 @@ def run_check(
     contract_path: str,
     profile_id: str,
     tree_json: str | None,
-    strict_extra_top_level: bool,
 ) -> StructureReport:
     """Run the structure contract check."""
     root = root.resolve()
@@ -399,7 +381,7 @@ def run_check(
         tree_source = f"tree-command:{root}"
     observed = {record.path: record.kind for record in records}
     profile = select_profile(profile_id, profiles, observed)
-    findings = compare_structure(profile, observed, strict_extra_top_level)
+    findings = compare_structure(profile, observed)
     status = "fail" if any(finding.severity == ERROR for finding in findings) else "pass"
     return StructureReport(
         status=status,
@@ -438,7 +420,6 @@ def main(argv: Sequence[str] | None = None) -> int:
             contract_path=args.contract,
             profile_id=args.profile,
             tree_json=args.tree_json,
-            strict_extra_top_level=args.strict_extra_top_level,
         )
     except (OSError, ValueError, json.JSONDecodeError, subprocess.CalledProcessError) as exc:
         print(f"REPO_STRUCTURE_ERROR={exc}", file=sys.stderr)
