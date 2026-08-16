@@ -876,3 +876,26 @@ def test_linux_executor_does_not_wait_for_preexisting_runner_child(
     result = json.loads(result_path.read_text())
     assert result["returncode"] == 0
     assert result["unrelated_alive"] is True
+
+
+def test_busy_candidate_close_is_a_complete_release_disposition() -> None:
+    dispositions = (
+        FdReleaseEvidence(
+            component="gpu-reservation-lock",
+            uuid=GPU_A,
+            disposition="busy_candidate",
+            close_attempts=1,
+            error_kind=None,
+            fingerprint="busy-candidate-closed",
+        ),
+        FdReleaseEvidence(
+            component="gpu-reservation-lock",
+            uuid=GPU_B,
+            disposition="released",
+            close_attempts=1,
+            error_kind=None,
+            fingerprint="selected-candidate-released",
+        ),
+    )
+
+    assert direct._release_dispositions_complete(dispositions) is True

@@ -1564,7 +1564,11 @@ def _release_dispositions_complete(
 ) -> bool:
     return bool(dispositions) and all(
         item.error_kind is None
-        and item.disposition in {"released", "rolled_back"}
+        and item.disposition in {
+            "busy_candidate",
+            "released",
+            "rolled_back",
+        }
         for item in dispositions
     )
 
