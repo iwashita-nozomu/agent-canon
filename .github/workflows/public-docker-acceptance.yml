@@ -1,0 +1,61 @@
+# @dependency-start
+# contract configuration
+# responsibility Runs the canonical no-mount public Docker acceptance against the PR candidate tree.
+# upstream design ../../CONTAINER_OPERATIONS.md standalone source test boundary
+# upstream implementation ../../docker/Dockerfile public test image
+# upstream implementation ../../test/testrunner.sh source-owned typed test runner
+# downstream implementation ../../tests/tools/test_public_docker_acceptance.py acceptance contract regression tests
+# @dependency-end
+
+name: AgentCanon Public Docker Acceptance
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: agent-canon-public-docker-${{ github.event.pull_request.head.sha || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  public-docker-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Checkout candidate tree
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+          persist-credentials: false
+
+      - name: Build public test image
+        run: docker build -f docker/Dockerfile -t agent-canon-current .
+
+      - name: Run source-owned public test contract
+        run: docker run --rm agent-canon-current testrunner.sh
+
+      - name: Remove task-owned Docker resources
+        if: always()
+        run: |
+          set -euo pipefail
+          container_ids="$(docker ps -aq --filter 'ancestor=agent-canon-current')"
+          if [ -n "${container_ids}" ]; then
+            docker rm -f ${container_ids}
+          fi
+          image_id="$(docker image inspect --format '{{.Id}}' agent-canon-current 2>/dev/null || true)"
+          if [ -n "${image_id}" ]; then
+            docker image rm "${image_id}"
+          fi
+          test -z "$(docker ps -aq --filter 'ancestor=agent-canon-current')"
+          if [ -n "${image_id}" ] && docker image inspect "${image_id}" >/dev/null 2>&1; then
+            echo "task-owned Docker image remains: ${image_id}" >&2
+            exit 1
+          fi
+          if docker image inspect agent-canon-current >/dev/null 2>&1; then
+            echo "task-owned Docker tag remains: agent-canon-current" >&2
+            exit 1
+          fi
