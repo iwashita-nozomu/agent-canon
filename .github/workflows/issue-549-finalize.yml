@@ -50,9 +50,9 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          path = Path('.github/scripts/issue_549_finalize.py')
-          text = path.read_text(encoding='utf-8')
-          replacements = (
+          finalizer = Path('.github/scripts/issue_549_finalize.py')
+          finalizer_text = finalizer.read_text(encoding='utf-8')
+          finalizer_replacements = (
               (
                   'fallback_pattern.subn(fallback_test, text, count=1)',
                   'fallback_pattern.subn(lambda _match: fallback_test, text, count=1)',
@@ -62,11 +62,29 @@ jobs:
                   'subprocess.run(["git", "rm", "-f", *paths], cwd=ROOT, check=True)',
               ),
           )
-          for old, new in replacements:
-              if text.count(old) != 1:
+          for old, new in finalizer_replacements:
+              if finalizer_text.count(old) != 1:
                   raise SystemExit(f'unexpected finalizer replacement site: {old}')
-              text = text.replace(old, new, 1)
-          path.write_text(text, encoding='utf-8')
+              finalizer_text = finalizer_text.replace(old, new, 1)
+          finalizer.write_text(finalizer_text, encoding='utf-8')
+
+          checker = Path('tools/agent_tools/check_dependency_headers.py')
+          checker_text = checker.read_text(encoding='utf-8')
+          old_guard = (
+              '        if not all(isinstance(value, str) for value in (path, mode, source)):\n'
+              '            return (), ["surface manifest normalized entry has invalid binding fields"]\n'
+          )
+          new_guard = (
+              '        if (\n'
+              '            not isinstance(path, str)\n'
+              '            or not isinstance(mode, str)\n'
+              '            or not isinstance(source, str)\n'
+              '        ):\n'
+              '            return (), ["surface manifest normalized entry has invalid binding fields"]\n'
+          )
+          if checker_text.count(old_guard) != 1:
+              raise SystemExit('unexpected dependency binding guard')
+          checker.write_text(checker_text.replace(old_guard, new_guard, 1), encoding='utf-8')
           PY
 
       - name: Assemble final branch tree
