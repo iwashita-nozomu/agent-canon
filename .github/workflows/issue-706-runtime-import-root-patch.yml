@@ -1,3 +1,4 @@
+# One-shot delivery workflow; removes itself after applying the source-owned fix.
 name: Issue 706 runtime import-root patch
 
 on:
