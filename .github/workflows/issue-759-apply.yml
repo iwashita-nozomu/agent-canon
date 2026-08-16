@@ -49,6 +49,18 @@ jobs:
                   f"issue-759 payload digest mismatch: expected={expected_digest} actual={actual_digest}"
               )
           source = zlib.decompress(base64.b64decode(payload)).decode("utf-8")
+          expected_source_digest = "aa9b5d684f9952e6a0b9f7a0e19c3e9e72bd9cd7786813672ae0718b8f1cbc10"
+          actual_source_digest = hashlib.sha256(source.encode("utf-8")).hexdigest()
+          if actual_source_digest != expected_source_digest:
+              raise SystemExit(
+                  "issue-759 source digest mismatch: "
+                  f"expected={expected_source_digest} actual={actual_source_digest}"
+              )
+          source = source.replace(
+              '"minimum_decision_relevant_total_work",',
+              '"minimum decision-relevant total work",',
+              1,
+          )
           target = Path("tools/agent_tools/_issue_759_apply.py")
           target.write_text(source, encoding="utf-8")
           subprocess.run([sys.executable, str(target)], check=True)
