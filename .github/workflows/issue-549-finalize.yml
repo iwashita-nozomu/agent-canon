@@ -127,25 +127,38 @@ jobs:
           python3 tools/agent_tools/skill_shim_materializer.py \
             check --root . --all --format text
 
-      - name: Validate ownership, structure, audit semantics, and focused regressions
-        shell: bash
+      - name: Validate canonical tracked ownership
         run: |
-          set -euo pipefail
           python3 tools/agent_tools/responsibility_scope.py \
             --root . --manifest responsibility-scope.toml --format text
+
+      - name: Validate structure existence and kinds
+        run: |
           tree -a -J --noreport \
             -I '.git|.pytest_cache|.ruff_cache|__pycache__' . \
             > /tmp/issue-549-tree.json
           python3 tools/agent_tools/repo_structure_contract.py \
             --root . --profile agent_canon_standalone \
             --tree-json /tmp/issue-549-tree.json --format text
-          PYTHONPATH=tools/agent_tools \
-            python3 tools/agent_tools/parent_repository_audit.py \
+
+      - name: Validate semantic parent audit selection
+        env:
+          PYTHONPATH: tools/agent_tools
+        run: |
+          python3 tools/agent_tools/parent_repository_audit.py \
             check --root . --unit-status pass --format text
-          PYTHONPATH=tools/agent_tools python3 -m unittest -v \
+
+      - name: Run focused Issue 549 regressions
+        env:
+          PYTHONPATH: tools/agent_tools
+        run: |
+          python3 -m unittest -v \
             tests.agent_tools.test_responsibility_scope \
             tests.agent_tools.test_parent_repository_audit \
             tests.agent_tools.test_repo_structure_contract
+
+      - name: Validate focused Python sources
+        run: |
           python3 -m py_compile \
             tools/agent_tools/responsibility_scope.py \
             tools/agent_tools/repo_structure_contract.py \
@@ -164,9 +177,15 @@ jobs:
             tools/agent_tools/responsibility_scope.py \
             tools/agent_tools/repo_structure_contract.py \
             tools/agent_tools/parent_repository_audit.py
-          python3 tools/agent_tools/check_dependency_headers.py --root .
-          python3 tools/agent_tools/tool_drift.py --root .
-          git diff --check
+
+      - name: Validate dependency headers
+        run: python3 tools/agent_tools/check_dependency_headers.py --root .
+
+      - name: Validate tool drift
+        run: python3 tools/agent_tools/tool_drift.py --root .
+
+      - name: Validate final diff
+        run: git diff --check
 
       - name: Commit and publish validated branch
         shell: bash
