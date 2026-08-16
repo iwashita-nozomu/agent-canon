@@ -27,8 +27,7 @@ jobs:
           set -euo pipefail
           git fetch --no-tags origin main:refs/remotes/origin/main
           git bundle create issue-706.bundle HEAD refs/remotes/origin/main
-          tar --exclude=.git --exclude=issue-706.bundle --exclude=issue-706-worktree.tar.gz \
-            -czf issue-706-worktree.tar.gz .
+          git archive --format=tar.gz --output=issue-706-worktree.tar.gz HEAD
           git bundle verify issue-706.bundle
 
       - name: Upload source bundle
