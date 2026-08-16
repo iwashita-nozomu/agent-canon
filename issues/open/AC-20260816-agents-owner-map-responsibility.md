@@ -7,6 +7,7 @@ downstream design ../../documents/design/entrypoint-owner-map.md structural targ
 downstream design ../../AGENTS.md standalone source-tree entrypoint
 downstream design ../../ROOT_AGENTS.md explicit live-integration entrypoint
 downstream design ../../agents/skills/comprehensive-development.md implementation-basis owner consumer
+downstream implementation ../../tools/agent_tools/convention_compliance_contracts.toml canonical marker ownership projection
 downstream implementation ../../tools/agent_tools/check_entrypoint_owner_map.py structural verifier
 downstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py focused regression
 @dependency-end
@@ -21,7 +22,7 @@ severity: S2
 problem: `AGENTS.md` / `ROOT_AGENTS.md` がreader mapを宣言しながらSkill、Git、update、validation、closeoutの詳細手順を再所有し、別名見出しで手順を再導入できる。
 evidence: https://github.com/iwashita-nozomu/agent-canon/issues/738
 done: root entrypointをidentity・reader map・owner mapへ限定し、contract-complete implementationと数理・engineering basisをSkillへ移し、構造checkerで再流入を拒否する。
-affected_surfaces: AGENTS.md, ROOT_AGENTS.md, documents/design/entrypoint-owner-map.md, agents/skills/comprehensive-development.md, tools/agent_tools/check_entrypoint_owner_map.py, tests/agent_tools/test_check_entrypoint_owner_map.py, .github/workflows/entrypoint-owner-map.yml
+affected_surfaces: AGENTS.md, ROOT_AGENTS.md, documents/design/entrypoint-owner-map.md, agents/skills/comprehensive-development.md, tools/agent_tools/convention_compliance_contracts.toml, tools/agent_tools/check_entrypoint_owner_map.py, tests/agent_tools/test_check_entrypoint_owner_map.py, .github/workflows/entrypoint-owner-map.yml
 edit_scope: owner-bounded
 required_action: 詳細手順をcanonical ownerへ委譲し、entrypoint grammar、implementation basis、focused regression、remote validationを同一changeで閉じる。
 close_condition: PRがmergeされ、entrypoint checker、focused tests、runtime alignment、convention、workflow validationがpassし、Issueにbranch・PR・validation evidenceが残る。
@@ -50,11 +51,12 @@ The prior delegation check rejected a fixed list of historical heading names. It
 | general engineering precedence | `documents/conventions/software-engineering-principles.md` |
 | cross-surface implementation-basis packet | `agents/skills/comprehensive-development.md` |
 | structure, Git, update, subagent, validation, closeout detail | existing task-specific Skills and canonical workflow owners |
+| operational marker ownership | `convention_compliance_contracts.toml` with no root entrypoint surfaces |
 | structural regression | `check_entrypoint_owner_map.py` and focused tests |
 
 ## Engineering basis
 
-The checker verifies a grammar rather than an arbitrary byte limit. For each entrypoint `e`, the level-2 heading sequence must equal the declared allowed sequence, procedural syntax must be absent, and required responsibility rows must resolve to canonical owners. This closes renamed-section drift without creating a natural-language policy classifier.
+The checker verifies a grammar rather than an arbitrary byte limit. For each entrypoint `e`, the level-2 heading sequence must equal the declared allowed sequence, procedural syntax must be absent, and required responsibility rows must resolve to canonical owners. Convention marker surfaces must also remain disjoint from the root entrypoint set. This closes renamed-section and marker-contract drift without creating a natural-language policy classifier.
 
 Implementation selection uses the smallest contract-complete owning unit, not the smallest diff. Material algorithm, numerical, architecture, performance, resource, concurrency, or reliability decisions require a basis appropriate to the claim and a validation oracle. Missing basis remains an explicit blocker rather than a temporary success path.
 
@@ -74,6 +76,6 @@ Implementation selection uses the smallest contract-complete owning unit, not th
 - Skill or workflow procedures are not copied into root entrypoints.
 - cross-surface implementation packets distinguish contract-complete scope from responsibility-incomplete minimum implementations.
 - material mechanism decisions carry mathematical, domain, or engineering basis, alternatives, and a validation oracle.
-- renamed operational headings, nested procedure headings, fenced commands, numbered procedures, command bullets, and missing owner rows fail focused regression.
+- renamed operational headings, nested procedure headings, fenced commands, numbered procedures, command bullets, missing owner rows, and root operational marker surfaces fail focused regression.
 - default static `project_template` remains source-free and self-contained.
 - GitHub Issue #738 retains status, branch, PR, validation, and remaining verification evidence.

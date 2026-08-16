@@ -7,6 +7,7 @@ upstream design ../runtime/SHARED_RUNTIME_SURFACES.md default-consumer and expli
 downstream design ../../AGENTS.md standalone source-tree entrypoint
 downstream design ../../ROOT_AGENTS.md explicit live-integration entrypoint
 downstream implementation ../../tools/agent_tools/check_entrypoint_owner_map.py structural verifier
+downstream implementation ../../tools/agent_tools/convention_compliance_contracts.toml canonical marker ownership projection
 downstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py contract regression
 downstream design ../../agents/skills/comprehensive-development.md implementation-basis consumer
 @dependency-end
@@ -35,6 +36,8 @@ canonical owner を `owner(r)` とします。
   入口に持たない。
 - material な各 `r` について、入口は `owner(r)` への一つの route を持ち、同じ policy を
   本文で再定義しない。
+- convention marker contract の集合を `C` とすると、`∀c ∈ C, paths(c) ∩ E = ∅`。
+  入口は operational marker の canonical surface にならない。
 - standalone source、explicit live integration、static-seed consumer の identity を混同しない。
 
 byte 数や行数は、この不変条件の代理にしません。短い文書でも command recipe を持てば違反で、
@@ -89,6 +92,8 @@ validation menu、closeout token は、それぞれの owner surface に置き�
 - fenced block と番号付き procedure がないこと
 - bullet / direct command recipe がないこと
 - required owner-map row が同一 row 内に存在すること
+- convention marker manifest が `AGENTS.md` / `ROOT_AGENTS.md` を operational surface として
+  再登録していないこと
 
 checker は prose の意味を推測しません。意味上の重複は review owner が判断し、構造的に再流入可能な
 surface は checker が拒否します。この分担により、自然言語 classifier を新しい policy owner に

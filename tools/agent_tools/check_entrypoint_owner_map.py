@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Verifies that root agent instruction entrypoints remain thin owner maps instead of procedural policy stores.
 # upstream design ../../documents/design/entrypoint-owner-map.md structural grammar and owner-map contract
+# upstream implementation ./convention_compliance_contracts.toml operational marker ownership manifest
 # downstream implementation ../../tests/agent_tools/test_check_entrypoint_owner_map.py focused regression
 # downstream implementation ../../.github/workflows/entrypoint-owner-map.yml remote verification
 # @dependency-end
@@ -13,6 +14,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import tomllib
 from collections.abc import Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -118,6 +120,9 @@ CONTRACTS = (
         ),
     ),
 )
+
+MARKER_MANIFEST_PATH = "tools/agent_tools/convention_compliance_contracts.toml"
+ROOT_ENTRYPOINT_PATHS = frozenset(contract.path for contract in CONTRACTS)
 
 H1_RE = re.compile(r"^#(?!#)\s+\S")
 H2_RE = re.compile(r"^##(?!#)\s+\S")
@@ -239,6 +244,67 @@ def check_entrypoint(root: Path, contract: EntrypointContract) -> list[Finding]:
     return findings
 
 
+def check_marker_manifest(root: Path) -> list[Finding]:
+    """Reject operational marker contracts that re-own root entrypoint prose."""
+    target = root / MARKER_MANIFEST_PATH
+    if not target.is_file():
+        return [Finding(MARKER_MANIFEST_PATH, "marker-manifest", "missing")]
+
+    try:
+        payload = tomllib.loads(target.read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        return [
+            Finding(
+                MARKER_MANIFEST_PATH,
+                "marker-manifest",
+                f"parse-error={type(exc).__name__}",
+            )
+        ]
+
+    contracts = payload.get("contracts")
+    if not isinstance(contracts, list):
+        return [Finding(MARKER_MANIFEST_PATH, "marker-manifest", "contracts-not-list")]
+
+    findings: list[Finding] = []
+    for contract in contracts:
+        if not isinstance(contract, dict):
+            findings.append(
+                Finding(MARKER_MANIFEST_PATH, "marker-manifest", "contract-not-table")
+            )
+            continue
+        contract_id = str(contract.get("id", "<missing>"))
+        surfaces = contract.get("surfaces", [])
+        if not isinstance(surfaces, list):
+            findings.append(
+                Finding(
+                    MARKER_MANIFEST_PATH,
+                    "marker-manifest",
+                    f"contract={contract_id};surfaces-not-list",
+                )
+            )
+            continue
+        for surface in surfaces:
+            if not isinstance(surface, dict):
+                findings.append(
+                    Finding(
+                        MARKER_MANIFEST_PATH,
+                        "marker-manifest",
+                        f"contract={contract_id};surface-not-table",
+                    )
+                )
+                continue
+            surface_path = surface.get("path")
+            if surface_path in ROOT_ENTRYPOINT_PATHS:
+                findings.append(
+                    Finding(
+                        MARKER_MANIFEST_PATH,
+                        "delegated-marker-surface",
+                        f"contract={contract_id};path={surface_path}",
+                    )
+                )
+    return findings
+
+
 def run_checks(root: Path) -> list[Finding]:
     """Run all root entrypoint checks."""
     findings = [
@@ -246,6 +312,7 @@ def run_checks(root: Path) -> list[Finding]:
         for contract in CONTRACTS
         for finding in check_entrypoint(root, contract)
     ]
+    findings.extend(check_marker_manifest(root))
     return sorted(
         findings,
         key=lambda finding: (

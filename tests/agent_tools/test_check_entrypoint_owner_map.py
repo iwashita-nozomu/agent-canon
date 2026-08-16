@@ -27,7 +27,15 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         root = Path(temporary.name)
         for contract in checker.CONTRACTS:
             source = REPOSITORY_ROOT / contract.path
-            (root / contract.path).write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+            (root / contract.path).write_text(
+                source.read_text(encoding="utf-8"), encoding="utf-8"
+            )
+        manifest_source = REPOSITORY_ROOT / checker.MARKER_MANIFEST_PATH
+        manifest_target = root / checker.MARKER_MANIFEST_PATH
+        manifest_target.parent.mkdir(parents=True, exist_ok=True)
+        manifest_target.write_text(
+            manifest_source.read_text(encoding="utf-8"), encoding="utf-8"
+        )
         return root
 
     def _rules(self, root: Path) -> set[str]:
@@ -98,6 +106,18 @@ class EntrypointOwnerMapTest(unittest.TestCase):
         ) + "\n"
         target.write_text(text, encoding="utf-8")
         self.assertIn("owner-map", self._rules(root))
+
+    def test_rejects_operational_marker_surface(self) -> None:
+        root = self._fixture()
+        target = root / checker.MARKER_MANIFEST_PATH
+        target.write_text(
+            target.read_text(encoding="utf-8")
+            + "\n[[contracts]]\nid = \"regression\"\n"
+            + "[[contracts.surfaces]]\npath = \"AGENTS.md\"\n"
+            + "markers = [\"operational detail\"]\n",
+            encoding="utf-8",
+        )
+        self.assertIn("delegated-marker-surface", self._rules(root))
 
 
 if __name__ == "__main__":
