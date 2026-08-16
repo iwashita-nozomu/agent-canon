@@ -53,6 +53,31 @@ jobs:
           ruff check --fix --unsafe-fixes \
             tests/agent_tools/test_responsibility_scope.py
 
+      - name: Capture dependency header regressions
+        id: dependency_regressions
+        env:
+          PYTHONPATH: tools/agent_tools
+        shell: bash
+        run: |
+          set +e
+          python3 -m unittest -v tests.agent_tools.test_check_dependency_headers \
+            2>&1 | tee /tmp/issue-549-dependency-regressions.log
+          code=${PIPESTATUS[0]}
+          echo "code=${code}" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Upload dependency regression diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-549-dependency-regressions
+          path: /tmp/issue-549-dependency-regressions.log
+          if-no-files-found: error
+
+      - name: Enforce dependency header regressions
+        if: steps.dependency_regressions.outputs.code != '0'
+        run: exit 1
+
       - name: Materialize canonical runtime views
         env:
           AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
@@ -96,11 +121,6 @@ jobs:
             tests.agent_tools.test_responsibility_scope \
             tests.agent_tools.test_parent_repository_audit \
             tests.agent_tools.test_repo_structure_contract
-
-      - name: Run dependency header regressions
-        env:
-          PYTHONPATH: tools/agent_tools
-        run: python3 -m unittest -v tests.agent_tools.test_check_dependency_headers
 
       - name: Validate focused Python sources
         run: |
