@@ -14,6 +14,7 @@
 # upstream implementation ./packets.py owns active design packet normalization and materialization
 # upstream implementation ./team_config.py owns team and role configuration resolution
 # upstream implementation ./workspace_scope.py owns typed workspace/source/report roots
+# upstream implementation ./fixture_spawn.py owns synthetic repository identity and writable-environment projection
 # @dependency-end
 
 """Validate that agent runtime surfaces, task catalog, and bundle outputs align."""
@@ -38,14 +39,26 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
+    from .fixture_spawn import (
+        bootstrap_fixture_public_environment,
+        record_capability_from_environment,
+    )
     from .parent_root_side_effects import (
+        PRIVATE_RECORD_REQUIRED_ENV,
         ParentRootSideEffectBoundary,
+        RecordCapability,
         public_session,
         resolve_parent_writer_attestation,
     )
 except ImportError:
+    from fixture_spawn import (  # type: ignore[no-redef]
+        bootstrap_fixture_public_environment,
+        record_capability_from_environment,
+    )
     from parent_root_side_effects import (  # type: ignore[no-redef]
+        PRIVATE_RECORD_REQUIRED_ENV,
         ParentRootSideEffectBoundary,
+        RecordCapability,
         public_session,
         resolve_parent_writer_attestation,
     )
@@ -245,19 +258,27 @@ class AlignmentWorkspace:
 
 @contextmanager
 def runtime_alignment_parent(source_resolution: RootResolution):
-    """Yield an authenticated parent that can host derived alignment state.
+    """Yield one fixture-owned parent for derived runtime-alignment state.
 
-    The standalone static-gate wrapper authenticates the source checkout itself
-    as the parent.  A derived workspace cannot place reports below that source
-    without violating the typed root boundary, so the self-check creates a
-    short-lived Git parent beside the source checkout for this fixture only.
-    Managed parent/derived executions retain their caller-provided parent.
+    Tooling remains loaded from ``source_root``.  When the caller's writable
+    parent is the source checkout itself, the source record authorizes only a
+    nested temporary Git fixture.  The central synthetic fixture bootstrap then
+    projects an independent repository identity and fixture-local writable
+    environment before any derived bundle is created.
     """
     source_root = source_resolution.source_root.resolve()
-    configured_parent = os.environ.get("AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", "").strip()
-    parent = Path(configured_parent).resolve(strict=True) if configured_parent else source_root
+    configured_parent = os.environ.get(
+        "AGENT_CANON_SIDE_EFFECT_PARENT_ROOT", ""
+    ).strip()
+    parent = (
+        Path(configured_parent).resolve(strict=True)
+        if configured_parent
+        else source_root
+    )
     if parent != source_root:
-        attestation = resolve_parent_writer_attestation(purpose="runtime-alignment")
+        attestation = resolve_parent_writer_attestation(
+            purpose="runtime-alignment"
+        )
         base = ParentRootSideEffectBoundary().ensure_parent_owned_directory(
             attestation,
             parent / ".agent-canon" / "tmp" / "runtime-alignment",
@@ -266,38 +287,107 @@ def runtime_alignment_parent(source_resolution: RootResolution):
         yield base.physical_path
         return
 
-    source_origin = subprocess.run(
-        ["git", "-C", str(source_root), "remote", "get-url", "origin"],
-        check=True,
-        capture_output=True,
-        text=True,
-    ).stdout.strip()
-    with tempfile.TemporaryDirectory(
-        prefix=".agent-canon-runtime-parent-",
-        dir=source_root.parent,
-    ) as fixture_parent_text:
-        fixture_parent = Path(fixture_parent_text)
-        subprocess.run(["git", "init", "-q", str(fixture_parent)], check=True)
-        subprocess.run(
-            ["git", "-C", str(fixture_parent), "remote", "add", "origin", source_origin],
-            check=True,
-        )
-        boundary = ParentRootSideEffectBoundary()
-        previous_cwd = Path.cwd()
-        try:
-            os.chdir(source_root)
-            with public_session(
-                invocation_script=Path(__file__), purpose="runtime-alignment"
-            ) as outer:
-                os.chdir(fixture_parent)
-                base = boundary.ensure_parent_owned_directory(
-                    outer.attestation,
-                    fixture_parent / ".agent-canon" / "tmp" / "runtime-alignment",
-                    "runtime-alignment-temp",
+    boundary = ParentRootSideEffectBoundary()
+    previous_cwd = Path.cwd().resolve()
+
+    @contextmanager
+    def source_capability():
+        if os.environ.get(PRIVATE_RECORD_REQUIRED_ENV) == "1":
+            yield (
+                resolve_parent_writer_attestation(
+                    purpose="runtime-alignment-source"
+                ),
+                record_capability_from_environment(
+                    observed_cwd=source_root
+                ),
+            )
+            return
+        with public_session(
+            invocation_script=Path(__file__).resolve(),
+            purpose="runtime-alignment-source",
+            cleanup_state=True,
+        ) as source_session:
+            yield (
+                source_session.attestation,
+                RecordCapability.from_record(source_session),
+            )
+
+    try:
+        os.chdir(source_root)
+        with source_capability() as (source_attestation, capability):
+            fixture_receipt = boundary.create_parent_owned_temp_directory(
+                source_attestation,
+                source_root / ".agent-canon" / "tmp",
+                "runtime-alignment-parent",
+                "runtime-alignment",
+            )
+            fixture_parent = fixture_receipt.physical_path
+            try:
+                subprocess.run(
+                    ["git", "init", "-q", str(fixture_parent)],
+                    check=True,
                 )
-                yield base.physical_path
-        finally:
-            os.chdir(previous_cwd)
+                source_origin = subprocess.run(
+                    [
+                        "git",
+                        "-C",
+                        str(source_root),
+                        "remote",
+                        "get-url",
+                        "origin",
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                if source_origin.returncode == 0 and source_origin.stdout.strip():
+                    subprocess.run(
+                        [
+                            "git",
+                            "-C",
+                            str(fixture_parent),
+                            "remote",
+                            "add",
+                            "origin",
+                            source_origin.stdout.strip(),
+                        ],
+                        check=True,
+                    )
+
+                with bootstrap_fixture_public_environment(
+                    mode="synthetic_tool",
+                    fixture_cwd=fixture_parent,
+                    record_capability=capability,
+                    ambient_env=os.environ,
+                    purpose="agent-runtime-alignment",
+                ) as fixture:
+                    if fixture.session is None:
+                        raise RuntimeError(
+                            "runtime alignment synthetic session is missing"
+                        )
+                    base = boundary.ensure_parent_owned_directory(
+                        fixture.session.attestation,
+                        fixture_parent
+                        / ".agent-canon"
+                        / "tmp"
+                        / "runtime-alignment",
+                        "runtime-alignment-temp",
+                    )
+                    with _temporary_environment(fixture.environment):
+                        os.chdir(fixture_parent)
+                        try:
+                            yield base.physical_path
+                        finally:
+                            os.chdir(source_root)
+            finally:
+                os.chdir(source_root)
+                boundary.remove_parent_owned_tree(
+                    source_attestation,
+                    fixture_receipt,
+                    "runtime-alignment-parent-cleanup",
+                )
+    finally:
+        os.chdir(previous_cwd)
 
 
 def resolve_packet_probe_workspace() -> Path:
