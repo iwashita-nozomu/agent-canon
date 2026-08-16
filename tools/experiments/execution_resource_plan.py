@@ -2809,22 +2809,7 @@ def build_source_path_set(
             "gpu_source_path_topic_invalid",
             "source path selection requires one simple topic name",
         )
-    fixed_core = (
-        "tools/experiments/execution_resource_plan.py",
-        "tools/experiments/run_managed_experiment.py",
-        "tools/experiments/registry_lib.py",
-        "tools/agent_tools/jit_canonical_ir.py",
-    )
     result: list[str] = []
-    for relative_path in fixed_core:
-        candidate = source_root / relative_path
-        if not candidate.is_file():
-            raise TypedPreflightFailure(
-                "gpu_source_path_missing",
-                "a fixed managed source path is missing",
-                relative_path=relative_path,
-            )
-        result.append(relative_path)
     registry_path = source_root / "experiments/registry.toml"
     if not registry_path.is_file():
         raise TypedPreflightFailure(
@@ -3011,7 +2996,7 @@ _NVIDIA_MIG_LINE_RE = re.compile(
     r"^[ ]{2,}MIG ([0-9]+c\.)?[0-9]+g\.[0-9]+gb[ ]{2,}Device[ ]{2}([0-9]+): \(UUID: (MIG-[A-Za-z0-9-]+)\)$"
 )
 _NVIDIA_UUID_RE = re.compile(r"^(GPU|MIG)-[A-Za-z0-9-]+$")
-_NVIDIA_UNSAFE_XML_RE = re.compile(r"<!\s*(?:DOCTYPE|ENTITY)\b", re.IGNORECASE)
+_NVIDIA_UNSAFE_XML_RE = re.compile(r"<!\s*ENTITY\b", re.IGNORECASE)
 _NVIDIA_PROCESS_CONTAINER_TAGS = frozenset(
     {"processes", "compute_processes", "graphics_processes"}
 )
@@ -3353,7 +3338,7 @@ def _parse_nvidia_smi_xml_document(evidence: EvidenceFd) -> _ParsedNvidiaXmlDocu
     if _NVIDIA_UNSAFE_XML_RE.search(data.decode("ascii", errors="ignore")):
         raise _nvidia_parser_failure(
             "gpu_structured_probe_unsafe_xml",
-            "NVIDIA XML must not contain DTD or entity declarations",
+            "NVIDIA XML must not contain entity declarations",
             evidence=evidence,
         )
     _decode_nvidia_utf8(data, evidence)
