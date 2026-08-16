@@ -3,6 +3,7 @@
 # contract tool
 # responsibility Runs one standalone AgentCanon static-gate execution unit without selecting whether that unit is required.
 # upstream design ../../documents/runtime/runtime-profiles-and-check-matrix.md risk-based validation routing
+# upstream implementation ./run_with_fixture_record.py owns the unit-level private fixture record bootstrap
 # downstream implementation ./check_agent_canon_pr.sh aggregates all units for the manual full-confidence route
 # downstream implementation ../../.github/workflows/agent-canon-static-gates.yml remote execution boundary
 # downstream implementation ../../tests/tools/test_standalone_static_gate_units.py unit partition regression
@@ -23,13 +24,15 @@ ROOT="$(agent_canon_repo_root "${BASH_SOURCE[0]}")"
 TOOLS_ROOT="$(agent_canon_source_tools_root "${ROOT}")"
 cd "${ROOT}"
 
-if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]; then
+if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" \
+   || -z "${AGENT_CANON_PRIVATE_RECORD_HANDOFF:-}" \
+   || "${AGENT_CANON_PRIVATE_RECORD_REQUIRED:-}" != "1" ]]; then
   invocation_script="$(realpath -e "${BASH_SOURCE[0]}" 2>/dev/null || true)"
   if [[ -z "${invocation_script}" || ! -f "${invocation_script}" ]]; then
     echo "STANDALONE_STATIC_GATE=fail reason=invocation_script_missing" >&2
     exit 2
   fi
-  exec python3 "${TOOLS_ROOT}/agent_tools/parent_root_side_effects.py" public-exec \
+  exec python3 "${TOOLS_ROOT}/ci/run_with_fixture_record.py" \
     --invocation-script "${invocation_script}" \
     --purpose standalone-static-gate-unit \
     -- bash "${invocation_script}" "$UNIT"
