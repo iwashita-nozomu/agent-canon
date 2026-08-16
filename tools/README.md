@@ -382,7 +382,7 @@ findings for resilient test planning.
 - `audit/`
   - portable audit-log schema and JSONL writer
 - `experiments/`
-  - topic scaffold、registry sync、managed run、result branch publication、remote HTML artifact access
+  - topic scaffold、registry sync、managed run、deterministic git-annex result archive、remote HTML artifact access
 - `oop/`
   - `python/` と `cpp/` に分けた OOP readability / inventory entrypoint。共有実装は `oop/shared/` に置き、言語別の default path を機械的に列挙できるようにします。
 - `shared/`

@@ -3,7 +3,7 @@
 # contract tool
 # responsibility Owns the canonical v2 experiment identity tuple and path/ref grammar.
 # upstream design ../../documents/experiments/experiment-registry.md defines experiment identity.
-# downstream implementation ./run_managed_experiment.py, ./publish_result_branch.py, ./update_latest_result.py consume this owner.
+# downstream implementation ./run_managed_experiment.py, ./save_experiment_result_annex.py, ./update_latest_result.py consume this owner.
 # @dependency-end
 """Canonical identity and path helpers for managed experiment runs.
 
@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 import unicodedata
 from collections.abc import Mapping
 from dataclasses import dataclass
@@ -136,20 +135,6 @@ def report_relative_path(identity: ExperimentIdentity) -> Path:
     )
 
 
-def result_branch(identity: ExperimentIdentity) -> str:
-    """Return and validate the canonical result branch for an identity."""
-    branch = f"experiment-results/{identity.topic}/{identity.variant}"
-    checked = subprocess.run(
-        ["git", "check-ref-format", "--branch", branch],
-        check=False,
-        capture_output=True,
-        text=True,
-    )
-    if checked.returncode != 0:
-        raise ExperimentIdentityError(f"invalid result branch: {branch}")
-    return branch
-
-
 def contained_path(repo_root: Path, path: Path) -> Path:
     """Resolve a path and require that it remains inside ``repo_root``."""
     root = repo_root.resolve()
@@ -176,7 +161,6 @@ __all__ = [
     "load_json_file",
     "load_json_text",
     "report_relative_path",
-    "result_branch",
     "result_relative_path",
     "validate_segment",
 ]

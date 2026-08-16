@@ -94,7 +94,7 @@ write set）、`validation`（その判断を読み戻す検証）を記録す�
 | `RDC-RESULT-RETENTION` | `logical:documents/experiments/result-log-retention-and-visualization.md`: `Storage Classes`, `Required Bundle Shape`, `Visualization Rules`, `Retention Rules`, `Closeout Evidence` | result storage → run evidence and retention | result directory remains `experiments/<topic>/result/<variant>/<run_name>/`; native target emits domain outputs, lifecycle/save owner emits manifests/report/retention evidence | native runner arguments, result bundle, save-results publish | bundle shape, artifact/eval manifests, report/retention evidence |
 | `RDC-CONTAINER` | `logical:CONTAINER_OPERATIONS.md`: `Canonical Source Contract`, `Ownership Boundary`, `Manifest Source Roles And Cardinality`, `Dockerfile Rules`, `GitHub Workflow Rules`, `Required Validation` | container source/pack → CMake smoke projection | Docker pack/check owns container build and smoke; its CMake command changes to the parent anchor without moving C++ ownership into Docker | `docker/README.md`, `docker/check_build.sh`, `docker/packs/default.toml`, CI | `docker_dependency_validator.sh`, pack print/smoke, Docker workflow checker |
 | `RDC-EXPERIMENT-LIFECYCLE` | `logical:agents/skills/experiment-lifecycle.md`: `Purpose`, `Use When`, `Core References`, `Boundary`; `logical:agents/workflows/experiment-workflow.md`: `1. この文書の役割`, `2. 段階別手順` (`準備`, `静的チェック`, `実験実行`, `結果レポート`) | lifecycle skill/workflow → run protocol | build target creation and native execution are two events; lifecycle owns `run_name`, config snapshot, result root, command/environment/source evidence | `cpp-experiment-<name>` build target plus managed adapter/direct run contract | lifecycle run manifest, command/env/source snapshot, exit status; build/run separation gate |
-| `RDC-RESULT-PERSISTENCE` | `logical:agents/skills/experiment-lifecycle.md`: `Canonical ownership`, `Lifecycle`; `logical:agents/skills/result-artifact-writeout.md`: `Contract`, `Reports and publication` | lifecycle/writeout owners → explicit retention/publication | C++ target never publishes directly; lifecycle owns run identity and explicit publication decisions while writeout owns concrete artifact identity/checksum/no-overwrite readback | `experiments/<topic>/result/<variant>/<run_name>/`, `publish_result_branch.py` | lifecycle terminal-status/publication evidence and artifact manifest/checksum/readback |
+| `RDC-RESULT-PERSISTENCE` | `logical:agents/skills/experiment-lifecycle.md`: `Canonical ownership`, `Lifecycle`; `logical:agents/skills/result-artifact-writeout.md`: `Contract`, `Reports and publication` | lifecycle/writeout owners → explicit annex retention | C++ target never archives directly; lifecycle owns run identity and explicit retention decisions while writeout owns concrete artifact identity/checksum/no-overwrite readback | `experiments/<topic>/result/<variant>/<run_name>/`, `save_experiment_result_annex.py` | lifecycle terminal-status/retention evidence and artifact manifest/checksum/readback |
 | `RDC-ARTIFACT-WRITEOUT` | `logical:agents/skills/result-artifact-writeout.md`: `Output Contract`, `Destination Rules`, `Required Shape`, `Closeout Tokens` | artifact writer → evidence shape | native result output is written below lifecycle-selected run directory and is not a build-tree artifact | runner result arguments and artifact manifest | result-artifact checker/manifest shape |
 | `RDC-EXPERIMENT-REVIEW` | `logical:agents/skills/experiment-review.md`: `Review Checklist`, `Findings Policy` | experiment review → executable/config/result review | review checks target source, registry adapter, config, evidence, and report as one trace without changing experiment protocol in design pass | `P-EXPERIMENT-*`, native source packet | experiment review findings and managed run evidence |
 | `RDC-CPP-REVIEW` | `logical:agents/skills/cpp-review.md`: `Use When`, `Required Checks`, `Core References`, `Expected Outcome`, `Mandatory Checklist` | C++ reviewer → native build/header/CTest evidence | project-native configure/build/test is implementation-phase evidence; this design phase records the route and does not claim execution | `cpp/CMakeLists.txt`, `cpp/include`, `cpp/tests`, target graph | configure/build/CTest, header/link/ownership review; `not_run` until implementation |
@@ -376,7 +376,7 @@ cache; install does not create a second build tree or reconfigure a second prefi
 Build and run are separate lifecycle events (`D-EXPERIMENT-LIFECYCLE`). The CMake project owns compilation
 and target dependency evidence; `experiment-lifecycle` owns run planning,
 `run_name`, config selection, result-root selection, execution evidence, terminal state,
-and explicit result-branch publication decisions; `result-artifact-writeout` owns
+and explicit annex retention decisions; `result-artifact-writeout` owns
 retention of concrete artifacts that actually exist, including path, semantic role,
 checksum, no-overwrite behavior, and readback. Reader-facing report linkage is added
 through `report-writing` only when requested.
@@ -392,7 +392,7 @@ through `report-writing` only when requested.
 | result directory | `$ROOT/experiments/<topic>/result/<variant>/<run_name>/` |
 | raw domain outputs | `summary.json`, `cases.jsonl`, case artifacts under the result directory |
 | lifecycle evidence | `run_manifest.json`, `command.json`, `environment.json`, `source_snapshot.json`, config snapshot, logs, exit status |
-| save/report evidence | `artifact_manifest.json`, `eval_manifest.json`, report path, retention plan, result branch status |
+| save/report evidence | `artifact_manifest.json`, `eval_manifest.json`, report path, retention plan, annex archive status |
 
 Build command:
 
@@ -430,10 +430,9 @@ python3 -m tools.experiments.run_managed_experiment --topic "$TOPIC" --variant f
 After a run, the save owner validates and retains the same result directory (`RDC-RESULT-PERSISTENCE`):
 
 ```bash
-python3 -m tools.experiments.publish_result_branch \
-  --variant "$VARIANT" \
+python3 -m tools.experiments.save_experiment_result_annex \
   --result-dir "$ROOT/experiments/$TOPIC/result/$VARIANT/$RUN_NAME" \
-  --branch "experiment-results/$TOPIC/$VARIANT"
+  --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
 ```
 
 The retention evidence records `experiment_topic`, `experiment_variant`, `experiment_run_name`, `D-EXPERIMENT-LIFECYCLE`,

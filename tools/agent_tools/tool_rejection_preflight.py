@@ -126,7 +126,7 @@ EXPERIMENT_EXECUTION_SURFACE_PATHS = frozenset(
         "documents/design/experiment_runner.md",
         "experiments/registry.toml",
         "tools/ci/check_experiment_registry.py",
-        "tools/experiments/publish_result_branch.py",
+        "tools/experiments/save_experiment_result_annex.py",
         "tools/experiments/registry_lib.py",
         "tools/experiments/run_managed_experiment.py",
     }
@@ -411,7 +411,7 @@ EXPERIMENT_EXECUTION_SURFACE_GATE_TEMPLATES = (
         handoff=(
             "route planned edits through $experiment-lifecycle and $test-design; "
             "preserve the managed runner, registry checker, registry contract, "
-            "and result-branch publication contract with lightweight registry and "
+            "and compressed git-annex retention contract with lightweight registry and "
             "runner validation evidence"
         ),
     ),

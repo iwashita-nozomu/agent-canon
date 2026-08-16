@@ -47,9 +47,11 @@ JSONL and accumulated eval archive branch policy belong to
   generated plots, HTML, SVG, HLO dumps, and machine-readable summaries.
 - `experiments/<topic>/result/<variant>/<run-id>/logs/` stores per-run stdout/stderr,
   tool, checker, and diagnostic logs that are not the managed wrapper `run.log`.
-- `experiment-results/<topic>/<variant>` stores the
-  Git-retained copy of formal experiment result/report artifacts produced from
-  the source checkout.
+- `experiments/<topic>/result/<variant>/<run_name>.tar.gz` stores the
+  one-run compressed git-annex archive of formal experiment result/report
+  artifacts produced from the source checkout. The archive contains the result
+  tree, optional `experiments/report/<topic>/<variant>/<run_name>.md`, and its
+  canonical retention manifest.
 - `experiments/<topic>/visualize.ipynb` stores the Jupyter notebook used to visualize
   run artifacts and regenerate figures/tables from `result/<variant>/<run-id>/`.
 - `experiments/report/<topic>/<variant>/<run-id>.md` stores the human-readable experiment report.
@@ -103,7 +105,7 @@ Canonical helper commands:
 python3 tools/data/jsonl_to_md.py <input.jsonl> <output.md>
 python3 tools/hlo/summarize_hlo_jsonl.py <hlo.jsonl> > summary.json
 python3 tools/experiments/html_artifact_access.py <report.html>
-python3 -m tools.experiments.publish_result_branch --variant <variant> --result-dir experiments/<topic>/result/<variant>/<run_name> --branch experiment-results/<topic>/<variant>
+python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<variant>/<run_name> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
 python3 -m tools.experiments.update_latest_result experiments/<topic>/result --variant <variant>
 dot -V
 ```
@@ -128,11 +130,11 @@ directly from inside a container and tunneling to the container IP.
   task, archive it mechanically with `runtime_log_archive_git.py
   archive-agent-report`; do not create a hand-written duplicate report in the
   source tree.
-- For formal experiments, run from the source checkout and publish the generated
-  `experiments/<topic>/result/<variant>/<run_name>/` plus
+- For formal experiments, run from the source checkout and retain the generated
+  `experiments/<topic>/result/<variant>/<run_name>/` plus optional
   `experiments/report/<topic>/<variant>/<run_name>.md` with
-  `tools/experiments/publish_result_branch.py`. Use `--push` when the retention
-  decision is remote result-branch storage.
+  `tools/experiments/save_experiment_result_annex.py` in the configured annex
+  worktree. The archive operation is append-only and has no remote-push mode.
 
 ## Closeout Evidence
 

@@ -2382,7 +2382,7 @@ id = "experiment-lifecycle-owner-contract"
 target = ".agents/skills/experiment-lifecycle/SKILL.md"
 canonical_target = "agents/skills/experiment-lifecycle.md"
 kind = "skill"
-description = "Experiment lifecycle is the sole run-state owner; artifact, report, HTML, and publication work remain explicit owners."
+description = "Experiment lifecycle is the sole run-state owner; artifact, report, HTML, and annex retention work remain explicit owners."
 
 [[evals.checklist]]
 id = "EXPERIMENT-LIFECYCLE-OWNER-1"
@@ -2392,7 +2392,7 @@ required_regex = ["Own one experiment run", "Run identity/state", "reproducibili
 [[evals.checklist]]
 id = "EXPERIMENT-LIFECYCLE-OWNER-2"
 critical = true
-required_regex = ["result-artifact-writeout", "report-writing", "html-output", "publish_result_branch.py", "explicit"]
+required_regex = ["result-artifact-writeout", "report-writing", "html-output", "save_experiment_result_annex.py", "explicit"]
 forbidden_regex = ["html-experiment-report", "save-experiment-results"]
 
 [[evals.checklist]]

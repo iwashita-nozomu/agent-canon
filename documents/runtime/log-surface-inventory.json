@@ -18636,7 +18636,7 @@
       "certainty": "dynamic",
       "emitter": "key_value_stdout",
       "field": "<dynamic>",
-      "line": 716,
+      "line": 752,
       "path": "tools/ci/check_experiment_registry.py",
       "surface": "tool"
     },
@@ -18644,7 +18644,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "registry_path",
-      "line": 714,
+      "line": 750,
       "path": "tools/ci/check_experiment_registry.py",
       "surface": "tool"
     },
@@ -18652,7 +18652,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "repo_root",
-      "line": 713,
+      "line": 749,
       "path": "tools/ci/check_experiment_registry.py",
       "surface": "tool"
     },
@@ -18660,7 +18660,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EXPERIMENT_TEMPLATE_EXECUTION",
-      "line": 394,
+      "line": 402,
       "path": "tools/ci/check_experiment_template.py",
       "surface": "tool"
     },
@@ -18668,7 +18668,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EXPERIMENT_TEMPLATE_SMOKE",
-      "line": 392,
+      "line": 400,
       "path": "tools/ci/check_experiment_template.py",
       "surface": "tool"
     },
@@ -18676,7 +18676,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "EXPERIMENT_TEMPLATE_TOPIC",
-      "line": 393,
+      "line": 401,
       "path": "tools/ci/check_experiment_template.py",
       "surface": "tool"
     },
@@ -19644,7 +19644,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "canonical_provenance_template",
-      "line": 172,
+      "line": 186,
       "path": "tools/experiments/create_experiment_topic.py",
       "surface": "tool"
     },
@@ -19652,7 +19652,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "canonical_readme_template",
-      "line": 171,
+      "line": 185,
       "path": "tools/experiments/create_experiment_topic.py",
       "surface": "tool"
     },
@@ -19660,7 +19660,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "dry_run",
-      "line": 169,
+      "line": 183,
       "path": "tools/experiments/create_experiment_topic.py",
       "surface": "tool"
     },
@@ -19668,7 +19668,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "planned_topic_files",
-      "line": 175,
+      "line": 189,
       "path": "tools/experiments/create_experiment_topic.py",
       "surface": "tool"
     },
@@ -19676,7 +19676,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "registry_path",
-      "line": 174,
+      "line": 188,
       "path": "tools/experiments/create_experiment_topic.py",
       "surface": "tool"
     },
@@ -19684,7 +19684,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "registry_path",
-      "line": 212,
+      "line": 226,
       "path": "tools/experiments/create_experiment_topic.py",
       "surface": "tool"
     },
@@ -19692,7 +19692,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "template_dir",
-      "line": 170,
+      "line": 184,
       "path": "tools/experiments/create_experiment_topic.py",
       "surface": "tool"
     },
@@ -19700,7 +19700,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "topic_dir",
-      "line": 173,
+      "line": 187,
       "path": "tools/experiments/create_experiment_topic.py",
       "surface": "tool"
     },
@@ -19708,7 +19708,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "topic_dir",
-      "line": 211,
+      "line": 225,
       "path": "tools/experiments/create_experiment_topic.py",
       "surface": "tool"
     },
@@ -19716,7 +19716,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "topic_name",
-      "line": 213,
+      "line": 227,
       "path": "tools/experiments/create_experiment_topic.py",
       "surface": "tool"
     },
@@ -19849,62 +19849,6 @@
       "surface": "tool"
     },
     {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RESULT_ARTIFACT_COUNT",
-      "line": 524,
-      "path": "tools/experiments/publish_result_branch.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RESULT_BRANCH",
-      "line": 519,
-      "path": "tools/experiments/publish_result_branch.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RESULT_BRANCH_COMMIT",
-      "line": 520,
-      "path": "tools/experiments/publish_result_branch.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RESULT_BRANCH_PARENT",
-      "line": 521,
-      "path": "tools/experiments/publish_result_branch.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "RESULT_BRANCH_PUSHED",
-      "line": 525,
-      "path": "tools/experiments/publish_result_branch.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SOURCE_BRANCH",
-      "line": 522,
-      "path": "tools/experiments/publish_result_branch.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "key_value_stdout",
-      "field": "SOURCE_COMMIT",
-      "line": 523,
-      "path": "tools/experiments/publish_result_branch.py",
-      "surface": "tool"
-    },
-    {
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
@@ -19932,7 +19876,7 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 990,
+      "line": 730,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -19940,7 +19884,47 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 1001,
+      "line": 739,
+      "path": "tools/experiments/run_managed_experiment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 1101,
+      "path": "tools/experiments/run_managed_experiment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 1112,
+      "path": "tools/experiments/run_managed_experiment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 1543,
+      "path": "tools/experiments/run_managed_experiment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 1769,
+      "path": "tools/experiments/run_managed_experiment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 2335,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -19948,7 +19932,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "admission_fingerprint",
-      "line": 407,
+      "line": 495,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -19956,7 +19940,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "admission_observation_fingerprint",
-      "line": 2634,
+      "line": 3043,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -19964,7 +19948,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "argv",
-      "line": 1014,
+      "line": 1127,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -19972,7 +19956,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "capacity",
-      "line": 641,
+      "line": 730,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -19980,7 +19964,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "capacity",
-      "line": 650,
+      "line": 739,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -19988,7 +19972,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "capacity",
-      "line": 1431,
+      "line": 1543,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -19996,7 +19980,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "cases",
-      "line": 641,
+      "line": 730,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20004,7 +19988,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "cases",
-      "line": 650,
+      "line": 739,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20012,7 +19996,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "cases",
-      "line": 1431,
+      "line": 1543,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20020,7 +20004,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "cuda_visible_devices",
-      "line": 407,
+      "line": 495,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20028,7 +20012,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "disposition",
-      "line": 2306,
+      "line": 2715,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20036,7 +20020,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "disposition",
-      "line": 2318,
+      "line": 2727,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20044,7 +20028,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "environment",
-      "line": 641,
+      "line": 730,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20052,7 +20036,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "environment",
-      "line": 650,
+      "line": 739,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20060,7 +20044,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "environment",
-      "line": 1431,
+      "line": 1543,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20068,7 +20052,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "event",
-      "line": 1660,
+      "line": 1769,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20076,7 +20060,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "exact_env_map",
-      "line": 407,
+      "line": 495,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20084,7 +20068,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "executable",
-      "line": 1014,
+      "line": 1127,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20092,7 +20076,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "failure_kind",
-      "line": 2306,
+      "line": 2715,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20100,7 +20084,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "failure_kind",
-      "line": 2318,
+      "line": 2727,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20108,7 +20092,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "field_name",
-      "line": 2306,
+      "line": 2715,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20116,7 +20100,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "field_name",
-      "line": 2318,
+      "line": 2727,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20124,7 +20108,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "final_eligible_ids",
-      "line": 2634,
+      "line": 3043,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20132,7 +20116,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "initial_observation_fingerprint",
-      "line": 2634,
+      "line": 3043,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20140,7 +20124,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "metadata",
-      "line": 641,
+      "line": 730,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20148,7 +20132,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "metadata",
-      "line": 650,
+      "line": 739,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20156,7 +20140,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "metadata",
-      "line": 1431,
+      "line": 1543,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20164,7 +20148,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "nvidia_visible_devices",
-      "line": 407,
+      "line": 495,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20172,7 +20156,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "process_returncode",
-      "line": 1014,
+      "line": 1127,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20180,7 +20164,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "provider_contract",
-      "line": 1014,
+      "line": 1127,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20188,7 +20172,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "request_fingerprint",
-      "line": 1014,
+      "line": 1127,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20196,7 +20180,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "reservation_evidence_fingerprint",
-      "line": 2634,
+      "line": 3043,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20204,7 +20188,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "reservation_owner",
-      "line": 2634,
+      "line": 3043,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20212,7 +20196,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "resolved_executable",
-      "line": 1014,
+      "line": 1127,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20220,7 +20204,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "resource_estimate",
-      "line": 641,
+      "line": 730,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20228,7 +20212,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "resource_estimate",
-      "line": 650,
+      "line": 739,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20236,7 +20220,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "resource_estimate",
-      "line": 1431,
+      "line": 1543,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20244,7 +20228,15 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "result_content_fingerprint",
-      "line": 1014,
+      "line": 1127,
+      "path": "tools/experiments/run_managed_experiment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "result_inode",
+      "line": 2335,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20252,7 +20244,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "run_id",
-      "line": 641,
+      "line": 730,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20260,7 +20252,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "run_id",
-      "line": 650,
+      "line": 739,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20268,15 +20260,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "run_id",
-      "line": 1431,
-      "path": "tools/experiments/run_managed_experiment.py",
-      "surface": "tool"
-    },
-    {
-      "certainty": "static",
-      "emitter": "json_object",
-      "field": "run_name",
-      "line": 1660,
+      "line": 1543,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20284,7 +20268,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 641,
+      "line": 730,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20292,7 +20276,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 650,
+      "line": 739,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20300,7 +20284,15 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema",
-      "line": 1431,
+      "line": 1543,
+      "path": "tools/experiments/run_managed_experiment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "schema",
+      "line": 2335,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20308,7 +20300,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema_version",
-      "line": 407,
+      "line": 495,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20316,7 +20308,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "schema_version",
-      "line": 1014,
+      "line": 1127,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20324,7 +20316,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "selected_gpu_ids",
-      "line": 641,
+      "line": 730,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20332,7 +20324,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "selected_gpu_ids",
-      "line": 650,
+      "line": 739,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20340,7 +20332,15 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "selected_gpu_ids",
-      "line": 1431,
+      "line": 1543,
+      "path": "tools/experiments/run_managed_experiment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "json_object",
+      "field": "state",
+      "line": 2335,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20348,7 +20348,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "task",
-      "line": 641,
+      "line": 730,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20356,7 +20356,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "task",
-      "line": 650,
+      "line": 739,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20364,7 +20364,7 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "task",
-      "line": 1431,
+      "line": 1543,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20372,15 +20372,15 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "timestamp_utc",
-      "line": 1660,
+      "line": 1769,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
     {
       "certainty": "static",
       "emitter": "json_object",
-      "field": "topic",
-      "line": 1660,
+      "field": "token",
+      "line": 2335,
       "path": "tools/experiments/run_managed_experiment.py",
       "surface": "tool"
     },
@@ -20388,8 +20388,64 @@
       "certainty": "static",
       "emitter": "json_object",
       "field": "worker_pid",
-      "line": 1014,
+      "line": 1127,
       "path": "tools/experiments/run_managed_experiment.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 147,
+      "path": "tools/experiments/save_experiment_result_annex.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "EXPERIMENT_RESULT_ANNEX_KEY",
+      "line": 977,
+      "path": "tools/experiments/save_experiment_result_annex.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "EXPERIMENT_RESULT_ARCHIVE_PATH",
+      "line": 975,
+      "path": "tools/experiments/save_experiment_result_annex.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "EXPERIMENT_RESULT_ARCHIVE_SHA256",
+      "line": 979,
+      "path": "tools/experiments/save_experiment_result_annex.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "EXPERIMENT_RESULT_ARCHIVE_SIZE",
+      "line": 978,
+      "path": "tools/experiments/save_experiment_result_annex.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "EXPERIMENT_RESULT_COMMIT",
+      "line": 976,
+      "path": "tools/experiments/save_experiment_result_annex.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "static",
+      "emitter": "key_value_stdout",
+      "field": "EXPERIMENT_RESULT_STATUS",
+      "line": 974,
+      "path": "tools/experiments/save_experiment_result_annex.py",
       "surface": "tool"
     },
     {
@@ -20412,7 +20468,15 @@
       "certainty": "dynamic",
       "emitter": "json_object",
       "field": "<dynamic>",
-      "line": 73,
+      "line": 347,
+      "path": "tools/experiments/update_latest_result.py",
+      "surface": "tool"
+    },
+    {
+      "certainty": "dynamic",
+      "emitter": "json_object",
+      "field": "<dynamic>",
+      "line": 387,
       "path": "tools/experiments/update_latest_result.py",
       "surface": "tool"
     },
@@ -20420,7 +20484,7 @@
       "certainty": "static",
       "emitter": "key_value_stdout",
       "field": "latest_result_dir",
-      "line": 112,
+      "line": 474,
       "path": "tools/experiments/update_latest_result.py",
       "surface": "tool"
     },
@@ -24460,10 +24524,11 @@
     "tools/experiments/__init__.py",
     "tools/experiments/create_experiment_topic.py",
     "tools/experiments/execution_resource_plan.py",
+    "tools/experiments/experiment_identity.py",
     "tools/experiments/html_artifact_access.py",
-    "tools/experiments/publish_result_branch.py",
     "tools/experiments/registry_lib.py",
     "tools/experiments/run_managed_experiment.py",
+    "tools/experiments/save_experiment_result_annex.py",
     "tools/experiments/sync_experiment_registry_context.py",
     "tools/experiments/update_latest_result.py",
     "tools/hlo/summarize_hlo_jsonl.py",

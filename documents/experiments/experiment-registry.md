@@ -37,9 +37,9 @@ run の主キーは topic だけではなく、`(topic, variant, run_name)` の�
 値は `agentcanon.experiment-run-identity/v2` の nested `identity` object として
 manifest、report、result pointer に一度だけ記録します。canonical path は
 `experiments/<topic>/result/<variant>/<run_name>/`、report は
-`experiments/report/<topic>/<variant>/<run_name>.md`、result branch は
-`experiment-results/<topic>/<variant>` です。旧 topic-only layout は新しい runner、
-publisher、LATEST updater から読み替えません。
+`experiments/report/<topic>/<variant>/<run_name>.md`、archive は annex worktree の
+`experiments/<topic>/result/<variant>/<run_name>.tar.gz` です。旧 topic-only layout は
+新しい runner、annex retention、LATEST updater から読み替えません。
 
 ## 正本ファイル
 
@@ -138,7 +138,7 @@ python3 -m tools.experiments.create_experiment_topic <topic>
 
 ```bash
 python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant <variant> -- python3 experiments/<topic>/run.py
-python3 -m tools.experiments.publish_result_branch --variant <variant> --result-dir experiments/<topic>/result/<variant>/<run_name> --branch experiment-results/<topic>/<variant>
+python3 -m tools.experiments.save_experiment_result_annex --result-dir experiments/<topic>/result/<variant>/<run_name> --annex-repo "$EXPERIMENT_RESULT_ANNEX_REPO"
 python3 -m tools.experiments.update_latest_result experiments/<topic>/result --variant <variant>
 ```
 

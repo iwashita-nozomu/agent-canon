@@ -11,7 +11,7 @@ downstream implementation ../../tests/agent_tools/test_skill_dependency_map.py c
 <!-- Generated from the typed skill/tool invocation graph; do not edit by hand. -->
 # Public Skill/Tool Invocation Graph
 
-<!-- graph_digest=b42004d4bbdd35dd20bbb1254949373edcf3e4cccc8e1792a3245a78ee764ce0 coverage_digest=105782c1ad60b770b0caf093f6e71b7d20804bef3c94457271e9ea736de7dff1 -->
+<!-- graph_digest=5c6bedb636d51a54fababaff3c9ca7169aa3604d87cca816aed06cba3aa1cb82 coverage_digest=482f1e5d9232acb6191f4b24322843e8eefbd1fad90b2fc702d244c801368f7d -->
 ```mermaid
 graph LR
   subgraph responsibility_n_analysis["Responsibility: analysis"]
@@ -533,8 +533,8 @@ graph LR
     n_command_oop_type_design_conditional_0001["python3 tools/agent_tools/check_static_any.py --submodule-aware (order=1; ref=2a6afb6ca52563e89dfb22c9c72034b87bf66a60cb349f0b6621773c465cdadc)"]
     %% node kind=command id=command:oop-type-design:conditional:0002 digest=30bacd5218656278dbff4b814f9c5de8c8a42a85569e98c4e89fe7eba061656a order=2
     n_command_oop_type_design_conditional_0002["bash tools/agent_tools/run_repo_dependency_review.sh --report-dir '<run-dir>/dependency-review' --fail-missing (order=2; ref=30bacd5218656278dbff4b814f9c5de8c8a42a85569e98c4e89fe7eba061656a)"]
-    %% node kind=command id=command:result-artifact-writeout:conditional:0000 digest=4da7e9e9d320f13475ce7d97b6b1a199a4d11064f6a0954ab90fd96edca4c380 order=0
-    n_command_result_artifact_writeout_conditional_0000["python3 -m tools.experiments.publish_result_branch --result-dir 'experiments/<topic>/result/<variant>/<run_name>' --variant '<variant>' --branch 'experiment-results/<topic>/<variant>' (order=0; ref=4da7e9e9d320f13475ce7d97b6b1a199a4d11064f6a0954ab90fd96edca4c380)"]
+    %% node kind=command id=command:result-artifact-writeout:conditional:0000 digest=b8f14ad7025f116b428715f44beaa06925470446a38d9cc18c604b79960bfc83 order=0
+    n_command_result_artifact_writeout_conditional_0000["python3 -m tools.experiments.save_experiment_result_annex --result-dir 'experiments/<topic>/result/<variant>/<run_name>' --annex-repo '$EXPERIMENT_RESULT_ANNEX_REPO' (order=0; ref=b8f14ad7025f116b428715f44beaa06925470446a38d9cc18c604b79960bfc83)"]
     %% node kind=command id=command:result-artifact-writeout:conditional:0001 digest=d9108fc7cb8dc28af457cb0fe013fd5ca9ac3edc9377ff5905b2115cea8cef8e order=1
     n_command_result_artifact_writeout_conditional_0001["python3 tools/agent_tools/runtime_log_archive_git.py archive-agent-report --report-dir 'reports/agents/<run-id>' (order=1; ref=d9108fc7cb8dc28af457cb0fe013fd5ca9ac3edc9377ff5905b2115cea8cef8e)"]
     %% node kind=command id=command:result-artifact-writeout:conditional:0002 digest=27b5ab346908eca375d30f9d257b647931da242f3bc64f3cb82c13bc81227b69 order=2
@@ -831,8 +831,8 @@ graph LR
     n_command_experiment_lifecycle_conditional_0001["python3 -m tools.ci.check_experiment_registry (order=1; ref=4784852a799506961c3e38dc69aef8580bd56389d95827b37b97da75b5d67ffa)"]
     %% node kind=command id=command:experiment-lifecycle:conditional:0002 digest=e892e1fc0d0ed9851bb63dacabc7c2b79061adcfe766fbdd8381db9a69360ad4 order=2
     n_command_experiment_lifecycle_conditional_0002["python3 -m tools.experiments.run_managed_experiment --topic '<topic>' --variant '<variant>' -- python3 'experiments/<topic>/run.py' (order=2; ref=e892e1fc0d0ed9851bb63dacabc7c2b79061adcfe766fbdd8381db9a69360ad4)"]
-    %% node kind=command id=command:experiment-lifecycle:conditional:0003 digest=5012bcc9fbb53e4da9be273e6bbf7f3427aae3488d2502cd529e3b7e9ba8e92a order=3
-    n_command_experiment_lifecycle_conditional_0003["python3 -m tools.experiments.publish_result_branch --result-dir 'experiments/<topic>/result/<variant>/<run_name>' --variant '<variant>' --branch 'experiment-results/<topic>/<variant>' (order=3; ref=5012bcc9fbb53e4da9be273e6bbf7f3427aae3488d2502cd529e3b7e9ba8e92a)"]
+    %% node kind=command id=command:experiment-lifecycle:conditional:0003 digest=9e3a7275b7599b694331e1272f46856bc927d2890a04017486469bed532cc914 order=3
+    n_command_experiment_lifecycle_conditional_0003["python3 -m tools.experiments.save_experiment_result_annex --result-dir 'experiments/<topic>/result/<variant>/<run_name>' --annex-repo '$EXPERIMENT_RESULT_ANNEX_REPO' (order=3; ref=9e3a7275b7599b694331e1272f46856bc927d2890a04017486469bed532cc914)"]
     %% node kind=command id=command:experiment-lifecycle:conditional:0004 digest=0948c6d40a65e62c03f271f8fbc5a5a4f2c0e37c23a30b4371a12328de2f0b51 order=4
     n_command_experiment_lifecycle_conditional_0004["python3 tools/agent_tools/tool_rejection_preflight.py --root . '<planned-edit-paths>' (order=4; ref=0948c6d40a65e62c03f271f8fbc5a5a4f2c0e37c23a30b4371a12328de2f0b51)"]
     %% node kind=command id=command:experiment-lifecycle:conditional:0005 digest=07ddf6fbf915be6c144ddff716bb1280a31cf99d10c34dd0ef3160a6e093d8ff order=5
@@ -1403,8 +1403,8 @@ graph LR
     n_tool_run_python_quality_checks[["run-python-quality-checks (ref=6c5c51391a32892cd4121abddf606727cf81bd9d559b61658da13b177b33f1fa)"]]
     %% node kind=tool id=tool:check-static-any digest=766b9f87ceb04dfa65dde29e07a0b5661f1db4c7afe3d443c6ee07af5b0e3d36 order=0
     n_tool_check_static_any[["check-static-any (ref=766b9f87ceb04dfa65dde29e07a0b5661f1db4c7afe3d443c6ee07af5b0e3d36)"]]
-    %% node kind=tool id=tool:publish-result-branch digest=cfbb5236c563a8828bd13c2688837f67db8381054d1767d41606fe575b21e1ad order=0
-    n_tool_publish_result_branch[["publish-result-branch (ref=cfbb5236c563a8828bd13c2688837f67db8381054d1767d41606fe575b21e1ad)"]]
+    %% node kind=tool id=tool:save-experiment-result-annex digest=43c24eed5bed453316916e63eeb63ec901842e8a9bf4ef3e5d4506d6cdcd19cb order=0
+    n_tool_save_experiment_result_annex[["save-experiment-result-annex (ref=43c24eed5bed453316916e63eeb63ec901842e8a9bf4ef3e5d4506d6cdcd19cb)"]]
     %% node kind=tool id=tool:runtime-log-archive-git digest=095884b5ea4cc967bf6709080fa1794c1e0d254f4717b0b62697fb7361bf4c3c order=0
     n_tool_runtime_log_archive_git[["runtime-log-archive-git (ref=095884b5ea4cc967bf6709080fa1794c1e0d254f4717b0b62697fb7361bf4c3c)"]]
     %% node kind=tool id=tool:evaluate-skill-workflow-prompts digest=6167a62ef314566e3242c2973fdbbaad6730fbcc1fbd792d94f3f2dd872e42e4 order=0
@@ -1819,9 +1819,9 @@ graph LR
   %% source kind=field id=source:field:00001:cbe49145e85f1871 digest=ec0d265ed381dae1acf1ba6a24e76ca6d8eb8b4f32f0b9943204280c0e03cee8 locator=tools/agent_tools/skill_tool_commands.py#oop-type-design:maintenance:1 ordinal=1
   %% source kind=phase id=source:phase:00000:a386754794ab1f70 digest=c2db96ae6f17c25cd77073f52f793ba6fde745e05f0246f4dbe4fc6a5c3a0677 locator=agents/skills/catalog.yaml#skill:result-artifact-writeout.tool_commands.required ordinal=0
   %% source kind=phase id=source:phase:00001:5f0702d8afdb544b digest=aed639451b0378b3747b2e30698ecde3b878df7e1290522a4624e622a2ab04c8 locator=agents/skills/catalog.yaml#skill:result-artifact-writeout.tool_commands.conditional ordinal=1
-  %% source kind=identity id=source:identity:00000:4d314018d1bdafb6 digest=7ee9a6ae36434f18a15342fa3a39d6a816085deb4c2e5bcb76d9167a77fcebec locator=agents/skills/catalog.yaml#skill:result-artifact-writeout.tool_commands.conditional[0] ordinal=0
-  %% source kind=field id=source:field:00000:a08612f6003483ab digest=5342600db115ab25d8c3297fc284f982350100dc6714d4f3e3ed0ee325fe6ff6 locator=tools/agent_tools/skill_tool_commands.py#result-artifact-writeout:conditional:0 ordinal=0
-  %% source kind=module id=source:module:00021:fbdb3c28e7bec869 digest=6a3e5f9d035df056722a9e556b093622b0fac5d5b77d58124825e51a7992f07c locator=tools/catalog.yaml#tool:publish-result-branch ordinal=21
+  %% source kind=identity id=source:identity:00000:79d97f34c575c056 digest=9840256dfd0e1c5c1170109830f208bbc5583b767bdba7111bf2ee396dd4a87b locator=agents/skills/catalog.yaml#skill:result-artifact-writeout.tool_commands.conditional[0] ordinal=0
+  %% source kind=field id=source:field:00000:d5492254d77b992b digest=6f7cec0f56cd05ad4df4f3e1084fe6411f719e9d335f6e33b16ce3699d1200fc locator=tools/agent_tools/skill_tool_commands.py#result-artifact-writeout:conditional:0 ordinal=0
+  %% source kind=module id=source:module:00021:10ed9dfc035cee34 digest=939437b8d6e50cc022225ee6e845bd521415cfed21747e4401ac47abaf9c84d3 locator=tools/catalog.yaml#tool:save-experiment-result-annex ordinal=21
   %% source kind=identity id=source:identity:00001:9f50185e4054ea9b digest=638e1919968d134adeface2d8e04330c9ec992972caf5c6ee219a1aeca5e2051 locator=agents/skills/catalog.yaml#skill:result-artifact-writeout.tool_commands.conditional[1] ordinal=1
   %% source kind=field id=source:field:00001:97d02f6f06e2200f digest=232498cb96c0bf3eb4792aefbd96102031e047b555f9549aaa1cfc402ea25fc7 locator=tools/agent_tools/skill_tool_commands.py#result-artifact-writeout:conditional:1 ordinal=1
   %% source kind=module id=source:module:00022:b1a52c19af8f4dac digest=aba6785662755c7cd013d4d2685afe585f25b1fc813f163e8efc620689846be0 locator=tools/catalog.yaml#tool:runtime-log-archive-git ordinal=22
@@ -2357,8 +2357,8 @@ graph LR
   %% source kind=identity id=source:identity:00002:ebf344c2e2f28948 digest=b013e7307990d30f189d0766de230c732b44b2bfa4119177160bbf15807d4862 locator=agents/skills/catalog.yaml#skill:experiment-lifecycle.tool_commands.conditional[2] ordinal=2
   %% source kind=field id=source:field:00002:f4ff0e89d1967dd1 digest=2b97b5a8dfa333cdea6ee80028b679295fb08ad14305d56cc782904ccc48709a locator=tools/agent_tools/skill_tool_commands.py#experiment-lifecycle:conditional:2 ordinal=2
   %% source kind=module id=source:module:00041:233ab2bf90b98481 digest=dc11970363124dbdc8363fc9ea362ef355c5163c39865bf0fc31a3cb11d77980 locator=tools/catalog.yaml#tool:run-managed-experiment ordinal=41
-  %% source kind=identity id=source:identity:00003:213410dedfe1681b digest=878a5f42263d76f64d740182fd6cd174b886839ab21ab2b7c2323b1e4cc6581d locator=agents/skills/catalog.yaml#skill:experiment-lifecycle.tool_commands.conditional[3] ordinal=3
-  %% source kind=field id=source:field:00003:9d9540fa3421a543 digest=a35b2266c7af9e94a4e8358e5cf42b7b5632dd0dffb4ad8314b8439efaeb122a locator=tools/agent_tools/skill_tool_commands.py#experiment-lifecycle:conditional:3 ordinal=3
+  %% source kind=identity id=source:identity:00003:8547b9aff678d598 digest=9e2126aaf041aacd52e3bf3e627030e0d5d78098100977c71beb62ddae8aed9a locator=agents/skills/catalog.yaml#skill:experiment-lifecycle.tool_commands.conditional[3] ordinal=3
+  %% source kind=field id=source:field:00003:267af6360a5c3658 digest=c3605fbe98ac0bc5c554eb7ebca04330dbea13a7cedadde5a91bf1c71b551725 locator=tools/agent_tools/skill_tool_commands.py#experiment-lifecycle:conditional:3 ordinal=3
   %% source kind=identity id=source:identity:00004:127e45b6cb9f4de8 digest=c08ee245d0ff3c6c0323f2dd133c3b0a844ea9b5e31f9c2594bf2e2edcb13481 locator=agents/skills/catalog.yaml#skill:experiment-lifecycle.tool_commands.conditional[4] ordinal=4
   %% source kind=field id=source:field:00004:94bcd7c7c0e14cd8 digest=143c5321bce7f4cd31f726ddad89c45e93f3e781a3bb5f7b9ffb0658871803f7 locator=tools/agent_tools/skill_tool_commands.py#experiment-lifecycle:conditional:4 ordinal=4
   %% source kind=identity id=source:identity:00005:0c2d37813297bcb1 digest=f8261ed5587baf5a61793281443be3ce965e5260ca326e2ed894a5af7c161076 locator=agents/skills/catalog.yaml#skill:experiment-lifecycle.tool_commands.conditional[5] ordinal=5
@@ -2667,11 +2667,11 @@ graph LR
   %% source kind=field id=source:field:00004:223dcdaa3baf12ed digest=aec681624a1f36ff10838531f6486f9ad0640154a1f416b3c199323e11b91ab1 locator=tools/agent_tools/skill_tool_commands.py#skill-cleanup:conditional:4 ordinal=4
   %% source kind=phase id=source:phase:00002:61a912619cf9ec2e digest=5a15b0c459a6d82aa0fd513841b62ad9256c7ce85328f9a7231b57efaea9ed12 locator=agents/skills/catalog.yaml#skill:skill-cleanup.tool_commands.maintenance ordinal=2
   %% source kind=module id=source:module:00000:efcc8c1d91224b3c digest=929389bbc1c9cd97297a6137e33d39eafb83ad7ccb941f49da39bd7d31bbd642 locator=agents/skills/code-visualization.md ordinal=0
-  %% source kind=evidence id=source:evidence:01183:61c43d1e723a8dfa digest=edbe32472e204131913ad4b67161a8b5434d48b6f6d9d23a99a77397b3ed54b9 locator=agents/skills/catalog.yaml ordinal=1183
+  %% source kind=evidence id=source:evidence:01183:9fd70b26772cefd1 digest=64bb67a2168381521e39803110f20dda671563fa67684c9ea1b46a0bb0882d06 locator=agents/skills/catalog.yaml ordinal=1183
   %% source kind=evidence id=source:evidence:01184:c11993c7e41de069 digest=ec2bada811290c1c1c82c1e3949a5c413cf78c39452cfdf60d73356295ccac1e locator=agents/skills/skill-dependencies.yaml ordinal=1184
   %% source kind=evidence id=source:evidence:01185:9bd806ab9c7e1e8d digest=41c9c7e594e9a5209310dd9bd5b4ea6805e2b70555f3dae34e29a4ee22fc67df locator=agents/canonical/skills.md ordinal=1185
   %% source kind=evidence id=source:evidence:01186:5e113765a1942f76 digest=11061849df6bc218af457bc5fbd5da3f8f7743031cc1ad58112c67d6634d6005 locator=agents/skills/catalog.yaml#routing ordinal=1186
-  %% source kind=evidence id=source:evidence:01187:56faf493f393d345 digest=694ac3cdad1631928ce318b46108dcbf008eb98e4032e7c14c710e7c324f811e locator=tools/agent_tools/skill_tool_commands.py#canonical-resolution ordinal=1187
+  %% source kind=evidence id=source:evidence:01187:2df0f3ea843333df digest=558edddf881a6250b4980609301b960b2b01244b08a3d8afab8d7398bf83bd2b locator=tools/agent_tools/skill_tool_commands.py#canonical-resolution ordinal=1187
   %% source kind=evidence id=source:evidence:01188:abd77f01d024e4b6 digest=b2b94bac012ecacebbc8aec84b061987046559be92754df74875bfbd682aa8dd locator=agents/skills/catalog.yaml#typed-visualization-toolcalls ordinal=1188
   %% source kind=edge id=source:edge:00000:fc6e388d1a034763 digest=4caf05610f97ddedb2b303961308da403f7e2584df7eafeba152bc11b136a9ad locator=graph:edge:00000 ordinal=0
   %% source kind=edge id=source:edge:00001:393efbc033d17a1f digest=a4edc37be2840ecbec90abb3f94b178c30e71666802659057a798bb4c967dc9c locator=graph:edge:00001 ordinal=1
@@ -2784,7 +2784,7 @@ graph LR
   %% source kind=edge id=source:edge:00108:b843803a7b9c8551 digest=4b34c79fb09b60434144217cce08a11d921305469930cc9fc35e1937052751b0 locator=graph:edge:00108 ordinal=108
   %% source kind=edge id=source:edge:00109:fab1996aa11afeb6 digest=482822c9908530ad545bd71ee8586f53192068da2c81aaa4e8e38116beacaee1 locator=graph:edge:00109 ordinal=109
   %% source kind=edge id=source:edge:00110:69a29e95a460f739 digest=58b05c83c48238337513a4743ecdfad5bedae7d6c550df472295a5dee3e1bc3b locator=graph:edge:00110 ordinal=110
-  %% source kind=edge id=source:edge:00111:67a8faac66b5c48c digest=391557575bafaae08c50965ed3372d5d320079d18b4693f50e7d53ab64213b05 locator=graph:edge:00111 ordinal=111
+  %% source kind=edge id=source:edge:00111:ccd533138d62b9d6 digest=f7bb338b0be7f4ec84195e5bb0a2161af204f12ec308d6267563cf67cb90764c locator=graph:edge:00111 ordinal=111
   %% source kind=edge id=source:edge:00112:36dada140ca83722 digest=fc361eff9dbdfa3713afb0a3cadcceead4586ac7a991ae7848dfe0a0ec82dce5 locator=graph:edge:00112 ordinal=112
   %% source kind=edge id=source:edge:00113:9d16ece9f6c19f26 digest=2ac6178fa781eaea12b87ffc6b9b458f8a4fcb6e4be9319512c5187c7296a61d locator=graph:edge:00113 ordinal=113
   %% source kind=edge id=source:edge:00114:3b6b68ff954e880a digest=345781f4cf6ca0193c298f7b6e14b2059dd894ee8792079fea216b9cc47ed845 locator=graph:edge:00114 ordinal=114
@@ -3089,7 +3089,7 @@ graph LR
   %% source kind=edge id=source:edge:00413:cffbe4d2f3f8362b digest=5c544a306a9f9f2579eb8d2472076f40d64f6de3c54ecde28dde97e8bb655e53 locator=graph:edge:00413 ordinal=413
   %% source kind=edge id=source:edge:00414:d27b823d4bb5664e digest=7e1d2364adb63a3b8ffb2f94f07906421f6d830cb1e2599993a3e533efc79e47 locator=graph:edge:00414 ordinal=414
   %% source kind=edge id=source:edge:00415:78974d0013a6e3ec digest=aa8c98b022e0c1b838c534a98b47383c70e7a86c26c59bf6e81041e442f509f8 locator=graph:edge:00415 ordinal=415
-  %% source kind=edge id=source:edge:00416:1c0ccb14863f63e0 digest=5b9745eb9ad8272a00990d3e0c660736cd417bcbd1e8ff8b1bb7fd9298430c5b locator=graph:edge:00416 ordinal=416
+  %% source kind=edge id=source:edge:00416:0d4a81511ef5c1fb digest=cba1306efcd509a58c0f182f52d3efaaed92a34ff7e4491983f7975fccb87eb1 locator=graph:edge:00416 ordinal=416
   %% source kind=edge id=source:edge:00417:174e8844850d2f26 digest=25a2471e926328b64f5090c39420003f58ebf5db96bb58c6e268a83c1f2ef064 locator=graph:edge:00417 ordinal=417
   %% source kind=edge id=source:edge:00418:b53aea6a6dc9c8c7 digest=4470c2ed5bbe78e07d05379b7e8ba3b8237b46ce12b1ab8c0abdb24a671d7678 locator=graph:edge:00418 ordinal=418
   %% source kind=edge id=source:edge:00419:fa3d5f892430a9c4 digest=5a740b04fbf5e47eb3bb778c82041e2532bd48a21ae652a57ec15a7a47a32ba8 locator=graph:edge:00419 ordinal=419
@@ -3639,7 +3639,7 @@ graph LR
   %% source kind=edge id=source:edge:00963:203d0c9c0b07ed4e digest=439d3457462cec97c4a7c36b2c2b33508cf71f731162f9ad20ca8dc7d0f66e5b locator=graph:edge:00963 ordinal=963
   %% source kind=edge id=source:edge:00964:35ee60424f51d40a digest=ae3685f4febb053349fb998b0ddedd07b6c62681fdc015ff47eee0a27c210588 locator=graph:edge:00964 ordinal=964
   %% source kind=edge id=source:edge:00965:1c14a98b0f3c8da8 digest=785e186bea23c604b726a11e99834ddbffdc75a5306c67ecad4c2b4f07d9e118 locator=graph:edge:00965 ordinal=965
-  %% source kind=edge id=source:edge:00966:9faf20955b8f0223 digest=67e430678d8b6b65550b2885ddf70d681e5c4a370006fd5959bf4f05d89ed3db locator=graph:edge:00966 ordinal=966
+  %% source kind=edge id=source:edge:00966:a98d5a1a42272f5f digest=ff0ee9cc041a988f7287b8ddcef8621554082ff498fc78c5991929dab4b3a661 locator=graph:edge:00966 ordinal=966
   %% source kind=edge id=source:edge:00967:7f169543d666eb30 digest=0abc46fa4f86e139802969a84db013339d00e02cb0988c5c80dd2c10ad8998ea locator=graph:edge:00967 ordinal=967
   %% source kind=edge id=source:edge:00968:8a7ec40354e22e1c digest=1a403f88b476c69decc280f472acc76e97109e9b3bf2bb36765b39047296cbb2 locator=graph:edge:00968 ordinal=968
   %% source kind=edge id=source:edge:00969:c54e1659af6b129d digest=385bf0dd06c2ee861f52d383f638100186662d63cfccbb45899f1a1c56e6a501 locator=graph:edge:00969 ordinal=969
@@ -3803,7 +3803,7 @@ graph LR
   %% source kind=edge id=source:edge:01127:99039e83afdb4dc6 digest=cd707ab33d69e1dd4cd198dd344066f14e1e37e63c225357919538b2ce584c1f locator=graph:edge:01127 ordinal=1127
   %% source kind=edge id=source:edge:01128:10382451b8e89b73 digest=c4aa391e1d6888ff8b225e17dc698d4fa99e25807cef292a66aa1d283effc412 locator=graph:edge:01128 ordinal=1128
   %% source kind=edge id=source:edge:01129:edac27543e3f59f6 digest=353f644890adcaf6f77c4bb91b82ace0272f56b29a7abe5aae46336dddee5174 locator=graph:edge:01129 ordinal=1129
-  %% source kind=edge id=source:edge:01130:fbdc9cd20a80fd18 digest=a9a7bc3dd3524d490c2e1517bc0e36c3b618fde21e73596cdbce299215b0d172 locator=graph:edge:01130 ordinal=1130
+  %% source kind=edge id=source:edge:01130:a13a466e49131eae digest=669b65b4057b6c51bc31bb2453a143e6f175a950990870bcd022920969047f61 locator=graph:edge:01130 ordinal=1130
   %% source kind=edge id=source:edge:01131:741b8ef7a44165d3 digest=b3159a5eaea36373095fe5dc92af67dcfdd16628107ebf17224b0a9278edee8d locator=graph:edge:01131 ordinal=1131
   %% source kind=edge id=source:edge:01132:dc7a6675fc4fa7cf digest=a9807b5d17af866f9c3b85b91cbbe1c1401dacef8ce21ddb69302e8f3ae2dd88 locator=graph:edge:01132 ordinal=1132
   %% source kind=edge id=source:edge:01133:0bb20479cf36c3b6 digest=db08749a625b606a66671d93ec8aa9d2e41c12c024cd5d90fceba3307cf847d4 locator=graph:edge:01133 ordinal=1133
@@ -4124,7 +4124,7 @@ graph LR
   n_skill_result_artifact_writeout -->|"invocation (order=109; ref=97140bb51e6785f18b8cc28bb1d31226d273ec59fd8a91824f3f3c2d6da005b9)"| n_phase_result_artifact_writeout_required
   %% edge id=edge:00110 digest=5e9ac0e111b44c8935321869dc3bdbc05464f9b9b31540b372221cffc448de35 type=invocation source=skill:result-artifact-writeout source_digest=cd6e98a1d287259d40e391b6186dd0daa1bdc729f0bbbea8fa06a3c1a939360d target=phase:result-artifact-writeout:conditional target_digest=2c2fbd8367fd7c3be9d77e61748ac604dc8e2adbda698b06bbddb1633c49932a order=110
   n_skill_result_artifact_writeout -->|"invocation (order=110; ref=5e9ac0e111b44c8935321869dc3bdbc05464f9b9b31540b372221cffc448de35)"| n_phase_result_artifact_writeout_conditional
-  %% edge id=edge:00111 digest=1c19abd36c91becd7d4832a33d76fcd7520314711c3a7576a62b411df1f15b28 type=invocation source=phase:result-artifact-writeout:conditional source_digest=2c2fbd8367fd7c3be9d77e61748ac604dc8e2adbda698b06bbddb1633c49932a target=command:result-artifact-writeout:conditional:0000 target_digest=4da7e9e9d320f13475ce7d97b6b1a199a4d11064f6a0954ab90fd96edca4c380 order=111
+  %% edge id=edge:00111 digest=1c19abd36c91becd7d4832a33d76fcd7520314711c3a7576a62b411df1f15b28 type=invocation source=phase:result-artifact-writeout:conditional source_digest=2c2fbd8367fd7c3be9d77e61748ac604dc8e2adbda698b06bbddb1633c49932a target=command:result-artifact-writeout:conditional:0000 target_digest=b8f14ad7025f116b428715f44beaa06925470446a38d9cc18c604b79960bfc83 order=111
   n_phase_result_artifact_writeout_conditional -->|"invocation (order=111; ref=1c19abd36c91becd7d4832a33d76fcd7520314711c3a7576a62b411df1f15b28)"| n_command_result_artifact_writeout_conditional_0000
   %% edge id=edge:00112 digest=8cd2c9207e7e0cd4e00462e29f442911b4efa0c3f4d0c20c08bbd15a42e5ead4 type=invocation source=phase:result-artifact-writeout:conditional source_digest=2c2fbd8367fd7c3be9d77e61748ac604dc8e2adbda698b06bbddb1633c49932a target=command:result-artifact-writeout:conditional:0001 target_digest=d9108fc7cb8dc28af457cb0fe013fd5ca9ac3edc9377ff5905b2115cea8cef8e order=112
   n_phase_result_artifact_writeout_conditional -->|"invocation (order=112; ref=8cd2c9207e7e0cd4e00462e29f442911b4efa0c3f4d0c20c08bbd15a42e5ead4)"| n_command_result_artifact_writeout_conditional_0001
@@ -4734,7 +4734,7 @@ graph LR
   n_phase_experiment_lifecycle_conditional -->|"invocation (order=414; ref=3c54d1afb45fa7bed2d448f9b1c7ee4a36bccbb9ac83dd291cc301033796fc98)"| n_command_experiment_lifecycle_conditional_0001
   %% edge id=edge:00415 digest=96705d5171eed05fedba351ef835e1ae025bd1b6821785b8875f078040db8eae type=invocation source=phase:experiment-lifecycle:conditional source_digest=a70c3a05770cc3ebb21d41db696ee5470c2b1c5a0cb9df8f6837beb6b5b0fdd2 target=command:experiment-lifecycle:conditional:0002 target_digest=e892e1fc0d0ed9851bb63dacabc7c2b79061adcfe766fbdd8381db9a69360ad4 order=415
   n_phase_experiment_lifecycle_conditional -->|"invocation (order=415; ref=96705d5171eed05fedba351ef835e1ae025bd1b6821785b8875f078040db8eae)"| n_command_experiment_lifecycle_conditional_0002
-  %% edge id=edge:00416 digest=ee7b868102c54c151ed045d75f4256f1021fbcc857abbaa99ac20006f80a2ba1 type=invocation source=phase:experiment-lifecycle:conditional source_digest=a70c3a05770cc3ebb21d41db696ee5470c2b1c5a0cb9df8f6837beb6b5b0fdd2 target=command:experiment-lifecycle:conditional:0003 target_digest=5012bcc9fbb53e4da9be273e6bbf7f3427aae3488d2502cd529e3b7e9ba8e92a order=416
+  %% edge id=edge:00416 digest=ee7b868102c54c151ed045d75f4256f1021fbcc857abbaa99ac20006f80a2ba1 type=invocation source=phase:experiment-lifecycle:conditional source_digest=a70c3a05770cc3ebb21d41db696ee5470c2b1c5a0cb9df8f6837beb6b5b0fdd2 target=command:experiment-lifecycle:conditional:0003 target_digest=9e3a7275b7599b694331e1272f46856bc927d2890a04017486469bed532cc914 order=416
   n_phase_experiment_lifecycle_conditional -->|"invocation (order=416; ref=ee7b868102c54c151ed045d75f4256f1021fbcc857abbaa99ac20006f80a2ba1)"| n_command_experiment_lifecycle_conditional_0003
   %% edge id=edge:00417 digest=eb9a0f52a9339a9d986c463f8cc8989e8202791cbbc31f4484c75287031f2163 type=invocation source=phase:experiment-lifecycle:conditional source_digest=a70c3a05770cc3ebb21d41db696ee5470c2b1c5a0cb9df8f6837beb6b5b0fdd2 target=command:experiment-lifecycle:conditional:0004 target_digest=0948c6d40a65e62c03f271f8fbc5a5a4f2c0e37c23a30b4371a12328de2f0b51 order=417
   n_phase_experiment_lifecycle_conditional -->|"invocation (order=417; ref=eb9a0f52a9339a9d986c463f8cc8989e8202791cbbc31f4484c75287031f2163)"| n_command_experiment_lifecycle_conditional_0004
@@ -5834,8 +5834,8 @@ graph LR
   n_command_oop_type_design_maintenance_0000 -->|"tool-resolution (order=964; ref=89888f42aacd94965fea62b1412a3d1596859c4e6b83d09b1c4317329db2d5b7)"| n_tool_check_skill_frontmatter
   %% edge id=edge:00965 digest=d6017cf6668932ef9bf0043a0b82030cbaabdc3bd89fc5128f7f15cec5e35130 type=tool-resolution source=command:oop-type-design:maintenance:0001 source_digest=ead869b230ff436e0ea60eebf3cea5e5c123e2bdbf7d4667c2ea48d72006a5fd target=tool:skill-tool-commands target_digest=9817677188d1c939fc278ae6aaa651ba0b00ebb13024fe9add2a997444b67b29 order=965
   n_command_oop_type_design_maintenance_0001 -->|"tool-resolution (order=965; ref=d6017cf6668932ef9bf0043a0b82030cbaabdc3bd89fc5128f7f15cec5e35130)"| n_tool_skill_tool_commands
-  %% edge id=edge:00966 digest=9cb116aa480ae88e01cfbb7a3f137576da6dfe9c3acabf6d216a7df4331c7979 type=tool-resolution source=command:result-artifact-writeout:conditional:0000 source_digest=4da7e9e9d320f13475ce7d97b6b1a199a4d11064f6a0954ab90fd96edca4c380 target=tool:publish-result-branch target_digest=cfbb5236c563a8828bd13c2688837f67db8381054d1767d41606fe575b21e1ad order=966
-  n_command_result_artifact_writeout_conditional_0000 -->|"tool-resolution (order=966; ref=9cb116aa480ae88e01cfbb7a3f137576da6dfe9c3acabf6d216a7df4331c7979)"| n_tool_publish_result_branch
+  %% edge id=edge:00966 digest=65cc898e4fcd33bc8b7b9c2f0ac317822ca30e2958856f63c4daaa47cfda5152 type=tool-resolution source=command:result-artifact-writeout:conditional:0000 source_digest=b8f14ad7025f116b428715f44beaa06925470446a38d9cc18c604b79960bfc83 target=tool:save-experiment-result-annex target_digest=43c24eed5bed453316916e63eeb63ec901842e8a9bf4ef3e5d4506d6cdcd19cb order=966
+  n_command_result_artifact_writeout_conditional_0000 -->|"tool-resolution (order=966; ref=65cc898e4fcd33bc8b7b9c2f0ac317822ca30e2958856f63c4daaa47cfda5152)"| n_tool_save_experiment_result_annex
   %% edge id=edge:00967 digest=e03e785ebd7246f21d66018618a437e0a079d340f265339944030943f200cf99 type=tool-resolution source=command:result-artifact-writeout:conditional:0001 source_digest=d9108fc7cb8dc28af457cb0fe013fd5ca9ac3edc9377ff5905b2115cea8cef8e target=tool:runtime-log-archive-git target_digest=095884b5ea4cc967bf6709080fa1794c1e0d254f4717b0b62697fb7361bf4c3c order=967
   n_command_result_artifact_writeout_conditional_0001 -->|"tool-resolution (order=967; ref=e03e785ebd7246f21d66018618a437e0a079d340f265339944030943f200cf99)"| n_tool_runtime_log_archive_git
   %% edge id=edge:00968 digest=b9f2684f1a7badad0910d33da346a638d690af2628c5a1cd0401e2471db4563c type=tool-resolution source=command:result-artifact-writeout:conditional:0002 source_digest=27b5ab346908eca375d30f9d257b647931da242f3bc64f3cb82c13bc81227b69 target=tool:runtime-log-archive-git target_digest=095884b5ea4cc967bf6709080fa1794c1e0d254f4717b0b62697fb7361bf4c3c order=968
@@ -6162,8 +6162,8 @@ graph LR
   n_command_experiment_lifecycle_conditional_0001 -->|"tool-resolution (order=1128; ref=ef6c33e819eaa6539e2b7e0eacb607d0f3d99c19fb5f0f555a11f82e079f3b48)"| n_tool_check_experiment_registry
   %% edge id=edge:01129 digest=892b8322f9dbc5814c630f1e4022f5791221399cd2962ceda3bd52f83d5482d7 type=tool-resolution source=command:experiment-lifecycle:conditional:0002 source_digest=e892e1fc0d0ed9851bb63dacabc7c2b79061adcfe766fbdd8381db9a69360ad4 target=tool:run-managed-experiment target_digest=5978277c03695124e12e7833f43858840a1db67f622d8672a54665780c9a46de order=1129
   n_command_experiment_lifecycle_conditional_0002 -->|"tool-resolution (order=1129; ref=892b8322f9dbc5814c630f1e4022f5791221399cd2962ceda3bd52f83d5482d7)"| n_tool_run_managed_experiment
-  %% edge id=edge:01130 digest=f07b153b24dad1cb2afd2d4c7995b42c92204f739b6a848edabd3dac38cc0085 type=tool-resolution source=command:experiment-lifecycle:conditional:0003 source_digest=5012bcc9fbb53e4da9be273e6bbf7f3427aae3488d2502cd529e3b7e9ba8e92a target=tool:publish-result-branch target_digest=cfbb5236c563a8828bd13c2688837f67db8381054d1767d41606fe575b21e1ad order=1130
-  n_command_experiment_lifecycle_conditional_0003 -->|"tool-resolution (order=1130; ref=f07b153b24dad1cb2afd2d4c7995b42c92204f739b6a848edabd3dac38cc0085)"| n_tool_publish_result_branch
+  %% edge id=edge:01130 digest=0e677cc9529ba4a3361a8728000880b4f5fb4b7f18ded816708a00c681e19ba0 type=tool-resolution source=command:experiment-lifecycle:conditional:0003 source_digest=9e3a7275b7599b694331e1272f46856bc927d2890a04017486469bed532cc914 target=tool:save-experiment-result-annex target_digest=43c24eed5bed453316916e63eeb63ec901842e8a9bf4ef3e5d4506d6cdcd19cb order=1130
+  n_command_experiment_lifecycle_conditional_0003 -->|"tool-resolution (order=1130; ref=0e677cc9529ba4a3361a8728000880b4f5fb4b7f18ded816708a00c681e19ba0)"| n_tool_save_experiment_result_annex
   %% edge id=edge:01131 digest=bb1d4acd265c24b6a3dd25daaa49e5e359f3c7b9b35d41d6d5ac9d077e66863e type=tool-resolution source=command:experiment-lifecycle:conditional:0004 source_digest=0948c6d40a65e62c03f271f8fbc5a5a4f2c0e37c23a30b4371a12328de2f0b51 target=tool:tool-rejection-preflight target_digest=0714e471be556b5e989998e10edfd7fb3880e6d43971e9a5b0714d113cd778fb order=1131
   n_command_experiment_lifecycle_conditional_0004 -->|"tool-resolution (order=1131; ref=bb1d4acd265c24b6a3dd25daaa49e5e359f3c7b9b35d41d6d5ac9d077e66863e)"| n_tool_tool_rejection_preflight
   %% edge id=edge:01132 digest=b96cab9aed1a54bf150d54fac4d7716a65007126ee34b320114555aa55487f19 type=tool-resolution source=command:experiment-lifecycle:conditional:0005 source_digest=07ddf6fbf915be6c144ddff716bb1280a31cf99d10c34dd0ef3160a6e093d8ff target=tool:tool-catalog target_digest=6e07fc8293a598e6fd55c2b6e300e614042a7b7438f982f9cd4283312e103422 order=1132
@@ -6368,5 +6368,5 @@ graph LR
 - `prerequisite`, `successor`, `order`, `invocation`, and `tool-resolution`: solid directed edges.
 - `routing` and `parallel`: dashed directed edges.
 
-Coverage digest: `105782c1ad60b770b0caf093f6e71b7d20804bef3c94457271e9ea736de7dff1`.
-Graph digest: `b42004d4bbdd35dd20bbb1254949373edcf3e4cccc8e1792a3245a78ee764ce0`.
+Coverage digest: `482f1e5d9232acb6191f4b24322843e8eefbd1fad90b2fc702d244c801368f7d`.
+Graph digest: `5c6bedb636d51a54fababaff3c9ca7169aa3604d87cca816aed06cba3aa1cb82`.

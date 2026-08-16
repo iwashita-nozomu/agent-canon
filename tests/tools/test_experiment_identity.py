@@ -11,6 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+
 from tools.experiments.experiment_identity import (
     DuplicateJSONKeyError,
     ExperimentIdentity,
@@ -18,7 +19,6 @@ from tools.experiments.experiment_identity import (
     contained_path,
     load_json_text,
     report_relative_path,
-    result_branch,
     result_relative_path,
     validate_segment,
 )
@@ -39,7 +39,6 @@ def test_identity_round_trip_is_nested_v2_wire() -> None:
     assert ExperimentIdentity.from_dict(payload) == identity
     assert result_relative_path(identity) == Path("experiments/topic.v1/result/smoke.v2/run.3")
     assert report_relative_path(identity) == Path("experiments/report/topic.v1/smoke.v2/run.3.md")
-    assert result_branch(identity) == "experiment-results/topic.v1/smoke.v2"
 
 
 @pytest.mark.parametrize("value", ["", ".", "..", "a/b", "a\\b", "a b", "a\x00b", "é"])
