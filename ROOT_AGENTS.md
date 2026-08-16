@@ -13,7 +13,7 @@ upstream design documents/conventions/software-engineering-principles.md contrac
 upstream design agents/canonical/CODEX_WORKFLOW.md executable task and closeout owner
 upstream design agents/canonical/CODEX_SUBAGENTS.md subagent lifecycle owner
 upstream design agents/workflows/agent-canon-pr-workflow.md shared AgentCanon PR workflow
-downstream data evidence/agent-evals/skill_workflow_prompt_eval.toml validates root routing
+downstream design evidence/agent-evals/skill_workflow_prompt_eval.toml validates root routing
 downstream implementation tools/agent_tools/check_entrypoint_owner_map.py validates thin entrypoint structure
 downstream implementation tools/agent_tools/check_agent_runtime_alignment.py validates runtime owner-map alignment
 @dependency-end
