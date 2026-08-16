@@ -70,127 +70,44 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          def replace_once(path: str, old: str, new: str) -> None:
+          replacements = {
+              "tests/agent_tools/test_parent_repository_audit.py": (
+                  (
+                      "from parent_repository_audit import _load_units  # noqa: E402",
+                      "from parent_repository_audit import _load_units",
+                  ),
+                  (
+                      '"documents/parent-repository-audit/audit-unit/"\n'
+                      '                    "environment-containers.md"',
+                      '"documents/parent-repository-audit/audit-unit/'
+                      'environment-containers.md"',
+                  ),
+              ),
+              "tests/agent_tools/test_responsibility_scope.py": (
+                  (
+                      "from responsibility_scope import scope_covers, "
+                      "scope_from_mapping  # noqa: E402",
+                      "from responsibility_scope import scope_covers, scope_from_mapping",
+                  ),
+              ),
+              "tools/agent_tools/repo_structure_contract.py": (
+                  (
+                      'raise ValueError(f"missing profile list in structure contract: {path}")',
+                      'raise TypeError(f"missing profile list in structure contract: {path}")',
+                  ),
+              ),
+          }
+          for path, path_replacements in replacements.items():
               target = Path(path)
               text = target.read_text(encoding="utf-8")
-              count = text.count(old)
-              if count != 1:
-                  raise SystemExit(f"replacement count for {path}: expected 1, got {count}")
-              target.write_text(text.replace(old, new), encoding="utf-8")
-
-          replace_once(
-              "tests/agent_tools/test_parent_repository_audit.py",
-              "from parent_repository_audit import _load_units  # noqa: E402",
-              "from parent_repository_audit import _load_units",
-          )
-          replace_once(
-              "tests/agent_tools/test_parent_repository_audit.py",
-              '''                [
-                    "documents/parent-repository-audit/audit-unit/"
-                    "environment-containers.md"
-                ],''',
-              '''                [
-                    "documents/parent-repository-audit/audit-unit/environment-containers.md"
-                ],''',
-          )
-          replace_once(
-              "tests/agent_tools/test_responsibility_scope.py",
-              "from responsibility_scope import scope_covers, scope_from_mapping  # noqa: E402",
-              "from responsibility_scope import scope_covers, scope_from_mapping",
-          )
-          replace_once(
-              "tests/agent_tools/test_responsibility_scope.py",
-              '''            manifest.write_text(
-                manifest.read_text(encoding="utf-8")
-                + "\\n".join(
-                    [
-                        "",
-                        "[[scope]]",
-                        'id = "evidence"',
-                        'owner = "agent-canon"',
-                        'class = "tooling"',
-                        'description = "Fixture evidence."',
-                        'paths = ["tools/evidence.py"]',
-                        'protecting_tools = ["tools/agent_tools/responsibility_scope.py"]',
-                        'issues = []',
-                        "",
-                    ]
-                ),
-                encoding="utf-8",
-            )''',
-              '''            manifest.write_text(
-                manifest.read_text(encoding="utf-8")
-                + (
-                    "\\n\\n[[scope]]\\n"
-                    'id = "evidence"\\n'
-                    'owner = "agent-canon"\\n'
-                    'class = "tooling"\\n'
-                    'description = "Fixture evidence."\\n'
-                    'paths = ["tools/evidence.py"]\\n'
-                    'protecting_tools = ["tools/agent_tools/responsibility_scope.py"]\\n'
-                    'issues = []\\n'
-                ),
-                encoding="utf-8",
-            )''',
-          )
-          replace_once(
-              "tests/agent_tools/test_responsibility_scope.py",
-              '''            "\\n".join(
-                [
-                    "version: 1",
-                    "entries:",
-                    "  - id: responsibility-scope",
-                    "    path: tools/agent_tools/responsibility_scope.py",
-                    "",
-                ]
-            ),''',
-              '''            (
-                "version: 1\\n"
-                "entries:\\n"
-                "  - id: responsibility-scope\\n"
-                "    path: tools/agent_tools/responsibility_scope.py\\n"
-            ),''',
-          )
-          replace_once(
-              "tests/agent_tools/test_responsibility_scope.py",
-              '''            "\\n".join(
-                [
-                    'catalog_kind = "agent_canon_responsibility_scope"',
-                    "version = 1",
-                    'owner_values = ["agent-canon"]',
-                    'class_values = ["tooling"]',
-                    "[[scope]]",
-                    'id = "fixture"',
-                    'owner = "agent-canon"',
-                    'class = "tooling"',
-                    'description = "Fixture paths."',
-                    'paths = ["tools/**", "tests/**", "responsibility-scope.toml"]',
-                    'protecting_tools = ["tools/agent_tools/responsibility_scope.py"]',
-                    'issues = []',
-                    "",
-                ]
-            ),''',
-              '''            (
-                'catalog_kind = "agent_canon_responsibility_scope"\\n'
-                "version = 1\\n"
-                'owner_values = ["agent-canon"]\\n'
-                'class_values = ["tooling"]\\n'
-                "[[scope]]\\n"
-                'id = "fixture"\\n'
-                'owner = "agent-canon"\\n'
-                'class = "tooling"\\n'
-                'description = "Fixture paths."\\n'
-                'paths = ["tools/**", "tests/**", "responsibility-scope.toml"]\\n'
-                'protecting_tools = ["tools/agent_tools/responsibility_scope.py"]\\n'
-                'issues = []\\n'
-            ),''',
-          )
-          replace_once(
-              "tools/agent_tools/repo_structure_contract.py",
-              'raise ValueError(f"missing profile list in structure contract: {path}")',
-              'raise TypeError(f"missing profile list in structure contract: {path}")',
-          )
+              for old, new in path_replacements:
+                  if old not in text:
+                      raise SystemExit(f"missing normalization target in {path}: {old!r}")
+                  text = text.replace(old, new, 1)
+              target.write_text(text, encoding="utf-8")
           PY
+          ruff check --fix --unsafe-fixes \
+            tests/agent_tools/test_responsibility_scope.py
           chmod +x \
             tools/agent_tools/responsibility_scope.py \
             tools/agent_tools/repo_structure_contract.py \
