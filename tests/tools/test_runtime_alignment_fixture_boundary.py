@@ -19,9 +19,14 @@ RUNTIME_ALIGNMENT = (
 )
 
 
+def _runtime_alignment_source() -> str:
+    """Return the canonical source text used by script and package entrypoints."""
+    return RUNTIME_ALIGNMENT.read_text(encoding="utf-8")
+
+
 def _runtime_alignment_parent_source() -> str:
     """Return only the owner context-manager source from the canonical module."""
-    source = RUNTIME_ALIGNMENT.read_text(encoding="utf-8")
+    source = _runtime_alignment_source()
     tree = ast.parse(source)
     function = next(
         node
@@ -32,6 +37,16 @@ def _runtime_alignment_parent_source() -> str:
     segment = ast.get_source_segment(source, function)
     assert segment is not None
     return segment
+
+
+def test_runtime_alignment_projects_source_root_before_fixture_imports() -> None:
+    """Direct script execution resolves the repository-owned central adapter."""
+    source = _runtime_alignment_source()
+    projection = "sys.path.insert(0, str(Path(__file__).resolve().parents[2]))"
+
+    assert source.count(projection) == 1
+    assert source.index(projection) < source.index("from .fixture_spawn import")
+    assert source.index(projection) < source.index("from fixture_spawn import")
 
 
 def test_runtime_alignment_uses_central_synthetic_fixture_projection() -> None:
