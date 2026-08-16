@@ -92,6 +92,23 @@ class EnvironmentSkillExpectedStructureTests(unittest.TestCase):
         ):
             self.assertIn(marker, normalized, marker)
 
+    def test_validation_keeps_static_preflight_outside_exact_acceptance_pair(self) -> None:
+        """Static owner checks supplement but cannot expand the acceptance pair."""
+        validation = self.section("## Validation", "### Failure semantics")
+        commands = self.code_fence(validation, "bash").splitlines()
+        self.assertEqual(commands, list(STANDARD_COMMANDS))
+
+        normalized = " ".join(validation.lower().split())
+        for marker in (
+            "static owner preflight",
+            "`python3 tools/ci/container_config.py`",
+            "exact command pair",
+            "一部でも代替でもなく",
+            "acceptance evidence",
+            "fresh image",
+        ):
+            self.assertIn(marker, normalized, marker)
+
     def test_testlist_toml_has_required_entry_fields_and_ordered_command(self) -> None:
         """The TOML example has required fields without inventory overchecks."""
         invariants = self.section("### Standard invariants", "## Purpose")
@@ -175,6 +192,7 @@ class EnvironmentSkillExpectedStructureTests(unittest.TestCase):
                 "repositoryの標準テスト一式",
             ):
                 self.assertIn(marker, text, f"{relative_path}: {marker}")
+
 
 if __name__ == "__main__":
     unittest.main()
