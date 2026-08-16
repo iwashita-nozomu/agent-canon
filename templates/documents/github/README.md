@@ -25,9 +25,11 @@ content であり、ここから投影しません。
 ## Reader Map
 
 この README は、Issue/PR source、standalone の checked-in target、owner、cleanup の境界を
-最初に説明します。PR の本文は concise な PR Essence、canonical route、changed-surface
-validation、mutation authority、risk/follow-up の順で記録します。Alternatives / independent
-review は実際の選択肢またはリスクがある場合だけ記録します。
+最初に説明します。Maintenance Issue は発生事象、変更目的、作業進捗、残作業、更新
+blocker を current snapshot として先に示し、詳細 evidence 欄へ接続します。PR の本文は
+concise な PR Essence、canonical route、changed-surface validation、mutation authority、
+risk/follow-up の順で記録します。Alternatives / independent review は実際の選択肢または
+リスクがある場合だけ記録します。
 
 - purpose: GitHub Issue/PR source を一つの canonical path で提供する。
 - intended reader and decision: issue author、PR author/reviewer、maintainer、親repo integrator。
@@ -39,6 +41,8 @@ review は実際の選択肢またはリスクがある場合だけ記録しま�
 ## 責務
 
 - Issue Form YAML と PR Markdown の必須 evidence 欄を正本として定義する。
+- Maintenance Issue の operational current snapshot を、発生事象、変更目的、進捗、残作業、
+  blocked operation と解除条件の一つの reader route として定義する。
 - AgentCanon 自身の `.github` checked-in targets の対応を明示する。親rootへの projection は定義しない。
 - Issue taxonomy、eval capture、PR workflow、GitHub subtree instructions を同じ reader
   pathへ接続する。
@@ -80,6 +84,31 @@ duplicate owner を作らず、source と checked-in standalone targets を同�
   authority として重複掲載しない。
 - GitHub YAML parse、Markdown/docs format/check、および gate が呼び出す
   `python3 tools/ci/check_github_workflows.py --root .` を実行する。
+- Maintenance Issue Form は canonical source と checked-in standalone target の
+  `name:` 以下を read back し、operational field ID、required flag、表示順の一致を確認する。
+
+## Operational current snapshot
+
+Maintenance Issue Form の先頭では、Issue の履歴全文ではなく、現在の handoff と更新可否を
+判断するための最小状態を必須にします。
+
+| field ID | owner |
+| --- | --- |
+| `current_behavior` | 具体的に何が起きたかと観測証拠 |
+| `change_purpose` | 誰のどの判断・操作を可能にし、どの状態へ到達させるか |
+| `work_progress` | 完了済み、作業中、branch / commit / PR / validation evidence |
+| `remaining_work` | 現在未達の作業、次の owner、完了証拠 |
+| `update_blocker` | blocked operation、blocker、分類、証拠、解除条件 |
+
+この snapshot は起票時の固定 plan ではありません。branch、commit、PR、validation、
+blocker が変わるたびに Issue 本文を更新します。blocker がない場合も `none` と理由を
+記録し、未観測と block なしを区別します。
+
+`remaining_work` は現在未達の差分を所有し、最終契約は `acceptance` が所有します。
+`update_blocker` は現在止まっている操作と再開条件を所有し、原因の詳細分類と最終 close
+condition は `failure_cause` が所有します。`work_progress` は current snapshot、
+`closeout_evidence` は完了時の固定証拠です。この境界により同じ事実を複数欄へ全文複製
+しません。
 
 ## Required evidence vocabulary（必要な evidence 用語）
 
