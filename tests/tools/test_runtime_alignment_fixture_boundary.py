@@ -12,9 +12,11 @@ from __future__ import annotations
 
 import ast
 import os
+import tempfile
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -28,41 +30,58 @@ def _runtime_alignment_source() -> str:
     return RUNTIME_ALIGNMENT.read_text(encoding="utf-8")
 
 
-def _function_source(name: str) -> str:
-    """Return one top-level function from the canonical runtime owner."""
-    source = _runtime_alignment_source()
-    tree = ast.parse(source)
-    function = next(
+def _function_node(name: str) -> ast.FunctionDef | ast.AsyncFunctionDef:
+    """Return one top-level function node from the canonical runtime owner."""
+    tree = ast.parse(_runtime_alignment_source())
+    return next(
         node
         for node in tree.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         and node.name == name
     )
-    segment = ast.get_source_segment(source, function)
+
+
+def _function_source(name: str) -> str:
+    """Return one top-level function source from the canonical runtime owner."""
+    segment = ast.get_source_segment(
+        _runtime_alignment_source(),
+        _function_node(name),
+    )
     assert segment is not None
     return segment
 
 
-def _load_environment_projection() -> Any:
-    """Compile only the pure environment boundary without importing the CLI."""
-    source = _runtime_alignment_source()
-    tree = ast.parse(source)
-    function = next(
-        node
-        for node in tree.body
-        if isinstance(node, ast.FunctionDef)
-        and node.name == "_project_process_environment"
-    )
+def _load_function(name: str, namespace: dict[str, Any]) -> Any:
+    """Compile one focused owner function without importing the full CLI."""
+    function = _function_node(name)
     module = ast.Module(body=[function], type_ignores=[])
     ast.fix_missing_locations(module)
-    namespace: dict[str, Any] = {
-        "contextmanager": contextmanager,
-        "Iterator": Iterator,
-        "Mapping": Mapping,
-        "os": os,
-    }
     exec(compile(module, str(RUNTIME_ALIGNMENT), "exec"), namespace)
-    return namespace["_project_process_environment"]
+    return namespace[name]
+
+
+def _load_environment_projection() -> Any:
+    """Compile only the pure environment boundary without importing the CLI."""
+    return _load_function(
+        "_project_process_environment",
+        {
+            "contextmanager": contextmanager,
+            "Iterator": Iterator,
+            "Mapping": Mapping,
+            "os": os,
+        },
+    )
+
+
+def _load_public_tool_projection() -> Any:
+    """Compile only the source-to-public-view projection boundary."""
+    return _load_function(
+        "_materialize_alignment_public_tool_view",
+        {
+            "AlignmentWorkspace": object,
+            "Path": Path,
+        },
+    )
 
 
 def test_runtime_alignment_projects_source_root_before_fixture_imports() -> None:
@@ -101,6 +120,59 @@ def test_runtime_alignment_environment_restores_after_body_failure() -> None:
         raise AssertionError("probe failure was not propagated")
 
     assert dict(os.environ) == previous
+
+
+def test_runtime_alignment_public_tool_view_is_source_backed_not_copied() -> None:
+    """The fixture owns the public name while source owns executable bytes."""
+    materialize = _load_public_tool_projection()
+
+    with tempfile.TemporaryDirectory(prefix="agent-canon-runtime-tool-view-") as directory:
+        root = Path(directory)
+        source_root = root / "source"
+        source_tools = source_root / "tools"
+        source_tools.mkdir(parents=True)
+        marker = source_tools / "owner-marker.txt"
+        marker.write_text("source-owned\n", encoding="utf-8")
+
+        workspace_root = root / "fixture" / "workspace"
+        workspace_root.mkdir(parents=True)
+        public_tool_root = workspace_root / "tools" / "agent-canon"
+        workspace = SimpleNamespace(
+            workspace_root=workspace_root,
+            repository_roots=SimpleNamespace(
+                public_tool_root=public_tool_root,
+                agentcanon_source_root=source_root,
+            ),
+        )
+
+        materialize(workspace)
+
+        assert public_tool_root.is_symlink()
+        assert public_tool_root.resolve() == source_tools.resolve()
+        assert Path(os.readlink(public_tool_root)) == source_tools.resolve()
+        assert (public_tool_root / marker.name).read_text(encoding="utf-8") == (
+            "source-owned\n"
+        )
+
+
+def test_runtime_alignment_public_tool_projection_has_no_copy_or_install_lane() -> None:
+    """Public-view construction cannot become a second tool-product owner."""
+    function = _function_source("_materialize_alignment_public_tool_view")
+    initializer = _function_source("initialize_alignment_workspace")
+
+    assert 'workspace.workspace_root / "tools" / "agent-canon"' in function
+    assert '(source_root / "tools").resolve()' in function
+    assert "symlink_to(source_tools, target_is_directory=True)" in function
+    assert "_materialize_alignment_public_tool_view(workspace)" in initializer
+    for forbidden in (
+        "copytree",
+        "copy2",
+        "pip install",
+        "cargo install",
+        "npm install",
+        "apt-get",
+    ):
+        assert forbidden not in function
 
 
 def test_runtime_alignment_uses_central_synthetic_fixture_projection() -> None:
