@@ -75,6 +75,7 @@ jobs:
       - name: Normalize focused formatting
         run: |
           ruff check --fix --unsafe-fixes \
+            tools/agent_tools/check_dependency_headers.py \
             tests/agent_tools/test_responsibility_scope.py
 
       - name: Capture dependency header regressions
