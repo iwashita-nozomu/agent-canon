@@ -3,6 +3,7 @@
 # responsibility Verifies standalone static-gate unit ownership, canonical selection, workflow activation, and full-confidence parity.
 # upstream implementation ../../tools/agent_tools/classify_path_risk.py canonical selector and unit mapping
 # upstream implementation ../../tools/ci/run_standalone_static_gate_unit.sh unit executor
+# upstream implementation ../../tools/ci/run_with_fixture_record.py central public/private fixture-record bootstrap
 # upstream implementation ../../tools/ci/check_agent_canon_pr.sh manual full-confidence aggregate
 # upstream implementation ../../.github/workflows/agent-canon-static-gates.yml remote selected-unit jobs
 # @dependency-end
@@ -47,11 +48,20 @@ def test_static_unit_runner_has_four_explicit_units() -> None:
     assert "unknown standalone static-gate unit" in text
 
 
-def test_static_unit_runner_self_reentry_uses_one_parent_boundary() -> None:
+def test_static_unit_runner_reentry_requires_complete_central_record_boundary() -> None:
     text = RUNNER.read_text(encoding="utf-8")
-    assert 'if [[ -z "${AGENT_CANON_SIDE_EFFECT_HANDOFF:-}" ]]' in text
-    assert "public-exec" in text
+    for variable in (
+        "AGENT_CANON_SIDE_EFFECT_SESSION_REQUIRED",
+        "AGENT_CANON_SIDE_EFFECT_PARENT_ROOT",
+        "AGENT_CANON_SIDE_EFFECT_HANDOFF",
+        "AGENT_CANON_PRIVATE_RECORD_REQUIRED",
+        "AGENT_CANON_PRIVATE_RECORD_PARENT_ROOT",
+        "AGENT_CANON_PRIVATE_RECORD_HANDOFF",
+    ):
+        assert variable in text
+    assert '"${TOOLS_ROOT}/ci/run_with_fixture_record.py"' in text
     assert '--invocation-script "${invocation_script}"' in text
+    assert "public-exec" not in text
     assert "exec-parent-bound" not in text
     assert "verify-child" not in text
     assert "--purpose standalone-static-gate-unit" in text
