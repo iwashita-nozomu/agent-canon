@@ -175,6 +175,14 @@ jobs:
 
           runpy.run_path(str(extracted / ".issue737" / "bootstrap_patch.py"))
 
+          direct_doc = root / "documents/experiments/gpu-direct-command.md"
+          direct_text = direct_doc.read_text(encoding="utf-8")
+          direct_text = (
+              direct_text.replace(r"\(", "$",).replace(r"\)", "$")
+              .replace(r"\[", "$$\n").replace(r"\]", "\n$$")
+          )
+          direct_doc.write_text(direct_text, encoding="utf-8")
+
           def replace_one(path: Path, old: str, new: str) -> None:
               text = path.read_text(encoding="utf-8")
               if text.count(old) != 1:
