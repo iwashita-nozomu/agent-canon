@@ -28,7 +28,24 @@ import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
-from tools.agent_tools.parent_root_side_effects import (
+
+def _repository_source_root() -> Path:
+    """Find the physical source root without trusting invocation PYTHONPATH."""
+    script = Path(__file__).resolve(strict=True)
+    for candidate in script.parents:
+        if (
+            (candidate / "tools" / "agent_tools" / "parent_root_side_effects.py").is_file()
+            and (candidate / ".git").exists()
+        ):
+            return candidate
+    raise RuntimeError("repository source root is unavailable")
+
+
+_SOURCE_ROOT = _repository_source_root()
+if str(_SOURCE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_SOURCE_ROOT))
+
+from tools.agent_tools.parent_root_side_effects import (  # noqa: E402
     PRIVATE_RECORD_HANDOFF_ENV,
     PRIVATE_RECORD_PARENT_ROOT_ENV,
     PRIVATE_RECORD_REQUIRED_ENV,
@@ -261,7 +278,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             purpose=args.purpose,
             argv=args.argv,
         )
-    except (OSError, ValueError, ParentRootSideEffectError) as error:
+    except (OSError, RuntimeError, ValueError, ParentRootSideEffectError) as error:
         print(
             "FIXTURE_RECORD_BOOTSTRAP=fail "
             f"error={type(error).__name__} detail={error}",
