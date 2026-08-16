@@ -14,7 +14,7 @@ downstream implementation ../../tools/agent_tools/github_status_lifecycle.py tra
 # [GitHub運用] Issue status lifecycle skill を追加する
 
 issue_id: AC-20260815-github-status-lifecycle-skill
-status: in_progress
+status: resolved
 source: user
 severity: S2
 problem: repository-changing task の GitHub Issue status label 遷移、証拠コメント、競合・部分失敗時の扱いが単一 owner を持たず、相反 label や追跡不能な handoff を生じ得る。
@@ -25,12 +25,15 @@ edit_scope: owner-bounded
 required_action: status lifecycle の正本、TOML taxonomy、private runtime shim、transport/reconciler、FakeRunner tests を追加し、pr-processing の publication boundary から責務を重複せず委譲する。
 close_condition: implementation PR が merge され、focused tests、semantic responsibility、dependency headers、Markdown、runtime alignment、issue mirror、git diff check が pass している。
 github_issue: https://github.com/iwashita-nozomu/agent-canon/issues/719
+resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/729
 
-## Current snapshot
+## Resolution snapshot
 
-- Baseline: `main@cdde13b18e4d0c667d9e04b95a77ddd3e1152266`
-- Active branch: `fix/719-status-lifecycle-followup-20260815`
-- Root cause: prior merge supplied policy text only; no testable GitHub adapter, evidence create/readback, or per-label drift protocol existed.
+- Initial policy merge: PR #720 / `cdde13b18e4d0c667d9e04b95a77ddd3e1152266`.
+- Final implementation merge: PR #729 / `1fa8d89a506945e41f3d935dac1f41c4ad2ddea2`.
+- Closeout baseline: `main@4d8a8f20c99859569070b222f0c15bb396b1b691`.
+- Closeout branch: `fix/719-resolve-status-lifecycle-issue`.
+- Root cause: the first merge supplied policy text without a testable adapter, canonical taxonomy owner, evidence create/readback admission, or per-label drift protocol; PR #729 added those missing executable boundaries.
 - Canonical label owner: `documents/operations/issue-label-taxonomy.toml` (`in progress`, `ready for review`, `need verification`; declared legacy aliases only).
 - Implementation owner: `tools/agent_tools/github_status_lifecycle.py`, reusing `github_publish.Runner` without extending `issue_sync`.
 
@@ -111,10 +114,18 @@ python3 -m pytest -q tests/agent_tools/test_github_status_lifecycle.py
 python3 tools/agent_tools/check_semantic_responsibility_contract.py --root . --instance <run-local>/semantic_responsibility_contract.toml
 python3 tools/agent_tools/check_dependency_headers.py --changed
 python3 tools/agent_tools/check_agent_runtime_alignment.py
-tools/bin/agent-canon docs check agents/internal-routines/github-status-lifecycle.md agents/skills/pr-processing.md .agents/skills/_github-status-lifecycle/SKILL.md documents/operations/issue-label-taxonomy.md documents/operations/issue-label-taxonomy.toml issues/open/AC-20260815-github-status-lifecycle-skill.md
+tools/bin/agent-canon docs check agents/internal-routines/github-status-lifecycle.md agents/skills/pr-processing.md .agents/skills/_github-status-lifecycle/SKILL.md documents/operations/issue-label-taxonomy.md documents/operations/issue-label-taxonomy.toml issues/closed/AC-20260815-github-status-lifecycle-skill.md
 python3 tools/agent_tools/issue_sync.py --root . --repo iwashita-nozomu/agent-canon --github-check
 git diff --check
 ```
+
+## Closeout evidence
+
+- PR #729 head `531e0a9936ab95093639eee8baac2f3c9d6e5a3b` passed AgentCanon Static Gates run #2145, Issue Mirror run #2903, and Agent Runtime Dashboard run #2973.
+- PR #729 reported 26 focused lifecycle tests, 69 parent lifecycle tests, Pyright with zero errors, Ruff, dependency headers, semantic responsibility, SOLID evidence, and diff checks as passing.
+- PR #729 had zero unresolved review threads and merged as `1fa8d89a506945e41f3d935dac1f41c4ad2ddea2`.
+- Current main retains the implementation and taxonomy; later drift only corrected the focused test dependency-header path.
+- Remaining verification: none.
 
 ## Non-goals
 
