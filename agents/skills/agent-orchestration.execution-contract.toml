@@ -1,8 +1,9 @@
 # @dependency-start
 # contract design
-# responsibility Defines the machine-readable execution-time-aware orchestration contract owned by agent-orchestration.
+# responsibility Defines the machine-readable execution-time-aware orchestration and autonomous convergence contract owned by agent-orchestration.
 # upstream design agent-orchestration.md sole owner policy prose and invariants
 # downstream implementation ../../tools/agent_tools/check_execution_time_aware_orchestration.py production contract checker
+# downstream implementation ../../tools/agent_tools/autonomous_convergence.py transition and closeout validator
 # downstream implementation ../../tools/agent_tools/skill_tool_commands.py required selected-skill command route
 # downstream design pr-processing.md PR queue specialization consumer
 # downstream design ../../templates/agents/schedule.md schedule projection consumer
@@ -10,7 +11,7 @@
 # downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md runtime discovery consumer
 # @dependency-end
 
-schema = "agent-canon.execution-time-aware-orchestration.v1"
+schema = "agent-canon.execution-time-aware-orchestration.v2"
 owner_skill = "agent-orchestration"
 owner_doc = "agents/skills/agent-orchestration.md"
 owner_heading = "Execution-Time-Aware Work-Conservation Contract"
@@ -21,22 +22,32 @@ required_skill_command = "python3 tools/agent_tools/check_execution_time_aware_o
 
 required_fields = [
   "dependency_dag",
-  "makespan_objective",
   "responsibility_completeness",
   "correctness",
+  "decision_relevant_total_work",
+  "makespan_objective",
   "critical_path",
   "ready_set",
   "context_reuse",
   "affected_evidence_invalidation",
+  "candidate_epoch",
+  "blocking_finding_ids",
+  "focused_recheck",
+  "terminal_state",
 ]
 
 owner_markers = [
   "Model the complete requested work as a dependency DAG",
-  "minimize makespan subject to responsibility completeness and correctness",
-  "Dispatch every ready node that is non-conflicting",
+  "lexicographic order",
+  "minimum decision-relevant total work",
+  "Dispatch every ready node that is non-conflicting and admissible",
   "Batch remote reads",
   "Reuse the warm worker and reviewer contexts",
-  "before opening the owning review",
+  "candidate epoch",
+  "stable blocking finding IDs",
+  "focused recheck",
+  "non_convergent_cycle",
+  "zero blocking findings",
   "Invalidate only evidence affected by the repaired node",
   "Wait only when the useful ready set is empty",
   "prompt-keyword routing is not a scheduling signal",
@@ -48,6 +59,9 @@ rejected_classes = [
   "duration_or_timeout_scope_cutoff",
   "keyword_based_routing",
   "responsibility_scope_reduction",
+  "same_state_same_action_repeat",
+  "advisory_rework",
+  "broad_review_restart_without_new_epoch_evidence",
   "consumer_reference_without_executable_fields",
   "consumer_reference_mismatch",
 ]
@@ -81,11 +95,60 @@ scope_reduction_markers = [
 
 [invariants]
 dag = "complete_dependency_dag_with_owner_and_consumer_closure"
-objective = "minimize_makespan_subject_to_responsibility_completeness_and_correctness"
-dispatch = "all_non_conflicting_ready_nodes"
+objective = "lexicographic_completeness_correctness_then_decision_relevant_total_work_then_makespan"
+dispatch = "all_non_conflicting_admissible_ready_nodes"
 wait = "only_when_useful_ready_set_is_empty"
 evidence = "warm_context_reuse_and_affected_evidence_only_invalidation"
-review = "closure_before_one_exact_candidate_review"
+review = "one_initial_review_per_candidate_epoch_then_focused_recheck"
+convergence = "strict_unresolved_measure_decrease_or_new_decision_evidence"
+terminal = "zero_blockers_and_request_clauses_with_selected_validation_pass"
+
+[convergence]
+state_fields = [
+  "request_digest",
+  "candidate_digest",
+  "candidate_epoch",
+  "owner",
+  "implementation_mechanism",
+  "validation_route",
+  "review_status",
+  "blocking_finding_ids",
+  "unresolved_validation_ids",
+  "unresolved_request_clause_ids",
+  "terminal_state",
+]
+action_classes = [
+  "initial_review",
+  "repair",
+  "focused_recheck",
+  "validation",
+  "advisory",
+  "ship",
+]
+decision_evidence_kinds = [
+  "owner_change",
+  "implementation_mechanism_change",
+  "validation_route_change",
+  "ship_state_change",
+]
+new_epoch_evidence_kinds = [
+  "contract_change",
+  "reachable_behavior_change",
+  "structural_contradiction",
+]
+action_admission = [
+  "one_initial_review_for_candidate_epoch",
+  "new_decision_evidence",
+  "strict_unresolved_measure_decrease",
+  "typed_new_epoch_evidence",
+  "advisory_record_without_rework",
+]
+terminal_conditions = [
+  "zero_open_blocking_findings",
+  "zero_unresolved_request_clauses",
+  "selected_validation_pass_or_not_applicable",
+]
+cycle_stop = "non_convergent_cycle"
 
 [[consumers]]
 id = "pr-processing"
@@ -96,7 +159,8 @@ required_markers = [
   "Execution-Time-Aware Queue Specialization",
   "batched queue snapshot",
   "independent candidates",
-  "one closure review for each exact candidate",
+  "one initial owning review for each candidate epoch",
+  "focused recheck",
   "same warm worker and reviewer context",
   "merge candidates in dependency order",
 ]
@@ -124,6 +188,10 @@ required_markers = [
   "Useful ready set",
   "Context reuse",
   "Affected evidence invalidation",
+  "Candidate epoch",
+  "Blocking finding IDs",
+  "Focused recheck",
+  "Terminal state",
 ]
 
 [[consumers]]

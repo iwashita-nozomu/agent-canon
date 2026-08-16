@@ -32,33 +32,90 @@ OWNER_REF = (
     "agents/skills/agent-orchestration.md#"
     "Execution-Time-Aware Work-Conservation Contract"
 )
-EXPECTED_SCHEMA = "agent-canon.execution-time-aware-orchestration.v1"
+EXPECTED_SCHEMA = "agent-canon.execution-time-aware-orchestration.v2"
 EXPECTED_OWNER_SKILL = "agent-orchestration"
 EXPECTED_REQUIRED_FIELDS = (
     "dependency_dag",
-    "makespan_objective",
     "responsibility_completeness",
     "correctness",
+    "decision_relevant_total_work",
+    "makespan_objective",
     "critical_path",
     "ready_set",
     "context_reuse",
     "affected_evidence_invalidation",
+    "candidate_epoch",
+    "blocking_finding_ids",
+    "focused_recheck",
+    "terminal_state",
 )
 EXPECTED_REJECTED_CLASSES = (
     "duplicate_local_scheduling_definition",
     "duration_or_timeout_scope_cutoff",
     "keyword_based_routing",
     "responsibility_scope_reduction",
+    "same_state_same_action_repeat",
+    "advisory_rework",
+    "broad_review_restart_without_new_epoch_evidence",
     "consumer_reference_without_executable_fields",
     "consumer_reference_mismatch",
 )
 EXPECTED_INVARIANTS = {
     "dag": "complete_dependency_dag_with_owner_and_consumer_closure",
-    "objective": "minimize_makespan_subject_to_responsibility_completeness_and_correctness",
-    "dispatch": "all_non_conflicting_ready_nodes",
+    "objective": "lexicographic_completeness_correctness_then_decision_relevant_total_work_then_makespan",
+    "dispatch": "all_non_conflicting_admissible_ready_nodes",
     "wait": "only_when_useful_ready_set_is_empty",
     "evidence": "warm_context_reuse_and_affected_evidence_only_invalidation",
-    "review": "closure_before_one_exact_candidate_review",
+    "review": "one_initial_review_per_candidate_epoch_then_focused_recheck",
+    "convergence": "strict_unresolved_measure_decrease_or_new_decision_evidence",
+    "terminal": "zero_blockers_and_request_clauses_with_selected_validation_pass",
+}
+EXPECTED_CONVERGENCE = {
+    "state_fields": [
+        "request_digest",
+        "candidate_digest",
+        "candidate_epoch",
+        "owner",
+        "implementation_mechanism",
+        "validation_route",
+        "review_status",
+        "blocking_finding_ids",
+        "unresolved_validation_ids",
+        "unresolved_request_clause_ids",
+        "terminal_state",
+    ],
+    "action_classes": [
+        "initial_review",
+        "repair",
+        "focused_recheck",
+        "validation",
+        "advisory",
+        "ship",
+    ],
+    "decision_evidence_kinds": [
+        "owner_change",
+        "implementation_mechanism_change",
+        "validation_route_change",
+        "ship_state_change",
+    ],
+    "new_epoch_evidence_kinds": [
+        "contract_change",
+        "reachable_behavior_change",
+        "structural_contradiction",
+    ],
+    "action_admission": [
+        "one_initial_review_for_candidate_epoch",
+        "new_decision_evidence",
+        "strict_unresolved_measure_decrease",
+        "typed_new_epoch_evidence",
+        "advisory_record_without_rework",
+    ],
+    "terminal_conditions": [
+        "zero_open_blocking_findings",
+        "zero_unresolved_request_clauses",
+        "selected_validation_pass_or_not_applicable",
+    ],
+    "cycle_stop": "non_convergent_cycle",
 }
 EXPECTED_CONSUMERS = {
     "pr-processing": {
@@ -189,6 +246,10 @@ def check_contract(root: Path, contract_path: Path) -> list[Finding]:
     invariants = contract.get("invariants")
     if invariants != EXPECTED_INVARIANTS:
         add(findings, "contract_schema", contract_label, "invariants-mismatch")
+
+    convergence = contract.get("convergence")
+    if convergence != EXPECTED_CONVERGENCE:
+        add(findings, "contract_schema", contract_label, "convergence-mismatch")
 
     owner_path = contract.get("owner_doc")
     if isinstance(owner_path, str):

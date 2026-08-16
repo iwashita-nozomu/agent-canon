@@ -92,8 +92,8 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 - C++ design-only / convention-only 差分では native execution を `not_run` とし、
   docs、dependency、target/path contract の evidence と実行 phase の未実行項目を分離します。
 - Markdown 差分を含む場合は、少なくとも `tools/bin/agent-canon docs check` を実行します。
-- checkpoint review と final acceptance review では、変更ファイルだけでなく全 repo に `bash tools/agent_tools/run_repo_dependency_review.sh` を適用し、`change_review.md` または `final_review.md` に `REPO_DEPENDENCY_REVIEW=pass` と checked path count を残します。
-- final acceptance review 前に、read-only diff-check agent に最新 diff、run bundle、request contract、schedule、dependency evidence、validation evidence を渡し、parent 自己レビューではなく独立 review decision を artifact に残します。
+- dependency owner または affected closure を局所化できない場合だけ全 repo dependency review を選びます。局所化できる変更は affected dependency evidence を再利用し、repair 後は invalidated evidence だけを再実行します。
+- selected owning review gate が必要な場合、exact candidate epoch に一度だけ read-only initial diff review を行います。repair 後は stable blocker IDs と invalidated evidence の focused recheck に限定し、latest diff 全体の broad review を再開しません。
 - `tools/bin/agent-canon docs check`、lint、link check、smoke run は readability や reader flow の accept evidence ではありません。可読性は `document_flow_reviewer`、docs completeness review、または task に応じた reviewer judgement で確認します。
 - README、workflow、guide、migration 文書のような長文では、`document_flow_reviewer` と別 reviewer による docs completeness review を省略しません。
 - 学術文章では、`document_flow_reviewer`、`notation_definition_reviewer`、`logic_gap_reviewer`、別 reviewer による docs completeness review を省略しません。
@@ -169,7 +169,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
    taxonomy の owner route に従って approved intent を保った修正または intent
    変更前の escalation を確認します。
 1. review artifact が `revise`、`required_change`、または `fix now` finding を返し、その後に code / docs / workflow / config の修正が入った場合は、その修正量に関わらず full required review set を最初から再実行します。
-1. post-fix full review では、少なくとも `change_review.md`、`final_review.md`、task に必要な language / docs / specialist review artifact を最新の fix 後に作り直します。
+1. focused recheck では、少なくとも `change_review.md`、`final_review.md`、task に必要な language / docs / specialist review artifact を最新の fix 後に作り直します。
 1. validation 実行後に final acceptance review を行い、必要なら追加修正や追加検証を行います。
 1. audit review で required reviews と evidence の欠落を確認します。
 1. run 固有の review artifact は `reports/agents/<run-id>/` に残します。
@@ -188,7 +188,7 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 - 対象に応じた validation 結果が確認されていること
 - runtime success だけでなく、task に式、仕様、protocol、method contract がある場合は alignment evidence が review artifact に残っていること
 - checkpoint review と final acceptance review で、全 repo 対象の dependency review が pass していること
-- mechanical completion loop と read-only diff-check agent review が最新 diff に対して pass していること
+- review convergence gate と read-only diff-check agent review が最新 diff に対して pass していること
 - review-driven fix が入った場合、最新 diff に対する full review rerun evidence が残っていること
 - 変更理由と影響範囲が追えること
 - コンフリクトがないこと
@@ -197,8 +197,8 @@ repo-wide の恒久ルールは `documents/` と `agents/` に残し、run 固�
 - `verification.txt` が `status=pass` であること
 - `closeout_gate.md` が `auditor_status=resolved` かつ `user_completion_report=unlocked` であること
 - `closeout_gate.md` が `completion_coverage_consumer=yes`、`coverage_check.ok=true`、および `completion_boundary.topology_errors=[]` を記録していること
-- `closeout_gate.md` が `post_fix_full_review_complete=yes` であること
-- `closeout_gate.md` が `mechanical_completion_loop_complete=yes` かつ `diff_check_agent_complete=yes` であること
+- `closeout_gate.md` が `focused_recheck_complete=yes` であること
+- `closeout_gate.md` が `review_convergence_complete=yes` かつ `diff_check_agent_complete=yes` であること
 - `user_request_contract.md` が `all_clauses_resolved=yes` かつ `forbidden_drift_detected=no` であること
 
 ## エビデンス保存

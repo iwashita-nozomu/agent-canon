@@ -1,5 +1,14 @@
+# @dependency-start
+# contract configuration
+# responsibility Projects the canonical worker model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
+# @dependency-end
 # generated role view: generated_role_view_v1
-# source canonical digest: b27d089e5a19edf68f913e74a5b95e1ece5d48c1d14362b9d74e2bd33538c39d
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: 1f15909c0171a228fba484f0713d64abaff321266569dda062d6fd2f845e2d49
 
 name = "worker"
 description = "Implementation agent for bounded code, docs, or test changes."
@@ -9,4 +18,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "xhigh"
 
-developer_instructions = "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Execute only implement, commit, and push actions within assigned authority; parent owns pull-request, admin-override, base-integration, and final editorial decisions. follow the parent-selected closed validation route act only on the parent packet and assigned scope do not perform parent-only integration or final decisions return branch/head/check evidence or the role result and stop"
+developer_instructions = "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop."

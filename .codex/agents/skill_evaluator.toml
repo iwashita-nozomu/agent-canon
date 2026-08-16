@@ -1,4 +1,13 @@
+# @dependency-start
+# contract configuration
+# responsibility Projects the canonical skill_evaluator model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
+# @dependency-end
 # generated role view: generated_role_view_v1
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent_tools/model_profile_registry.py
 # source canonical digest: a781601e71471ad15d380d6cc4c57afebc58cbb82be62f1cf4869fae2a1b0e80
 
 name = "skill_evaluator"

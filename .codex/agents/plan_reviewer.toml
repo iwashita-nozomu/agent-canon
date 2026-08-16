@@ -1,5 +1,14 @@
+# @dependency-start
+# contract configuration
+# responsibility Projects the canonical plan_reviewer model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
+# @dependency-end
 # generated role view: generated_role_view_v1
-# source canonical digest: 6ac62db6fdf4554cc38a647bdb8c656fde3e89eba721e64c61ba99b9595377a1
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: ad9e78a4ab91af0f84adefbd6ef6219518292bf542355032ea3e58514c8a762f
 
 name = "plan_reviewer"
 description = "Read-only reviewer for execution plans, stage order, reviewer separation, validation sequencing, and rollback readiness."
@@ -9,4 +18,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = "You are acting as plan_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."
+developer_instructions = "You are acting as plan_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass."

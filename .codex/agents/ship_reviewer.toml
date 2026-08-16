@@ -1,5 +1,14 @@
+# @dependency-start
+# contract configuration
+# responsibility Projects the canonical ship_reviewer model profile into executable Codex settings.
+# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
+# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
+# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
+# @dependency-end
 # generated role view: generated_role_view_v1
-# source canonical digest: 1f4cb8eb9ee61edd4ace6aff2857c8d726a1f5a3a3794e5f05d653157fb17fa2
+# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
+# materializer: tools/agent_tools/model_profile_registry.py
+# source canonical digest: 64a5b8ad853f5b38bd5d5866d66641c0eaf72cd6e12628f49e3095f830777415
 
 name = "ship_reviewer"
 description = "High-assurance read-only reviewer for final clause coverage and release readiness."
@@ -9,4 +18,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "xhigh"
 
-developer_instructions = "You are acting as ship_reviewer for ship readiness under luna_ship. Constrain edits to one responsibility unit and one-pass materialization only when selected."
+developer_instructions = "You are acting as ship_reviewer for ship readiness under luna_ship. Act as the terminal gate for one candidate epoch. Confirm stable open blocking finding IDs and the selected validation result; do not restart broad review after repair. Zero blockers and validation pass or not_applicable is terminal, while advisory improvements go to a separate Issue or note."

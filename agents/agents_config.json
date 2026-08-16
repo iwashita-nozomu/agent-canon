@@ -1,5 +1,5 @@
 {
-  "version": 19,
+  "version": 20,
   "team": {
     "id": "repo_permanent_team",
     "report_root": "reports/agents",
@@ -9,7 +9,7 @@
     "task_catalog": "agents/task_catalog.yaml",
     "communication_protocol": "agents/COMMUNICATION_PROTOCOL.md",
     "canonical_runtime": "tools/agent_tools/agent_team.py",
-    "summary": "The manager owns intake coordination, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability, but subagent execution is modeled as repeatable role instances identified by role_id+instance_id+agent_type. Repo-changing tasks use an explicit staged flow by workflow family: owner-bounded changes use boundary-evidenced triage, while shared-canon and high-risk changes keep requirements organization -> requirements review -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> implementation -> conditional post-implementation test design -> implementation review. Research and scientific-software tasks use evidence-gated perspective review instead of enabling every reviewer by default. One physical agent candidate is selected for each active decision; specialists remain inactive until the parent cites a distinct decision, input artifact, and expected output, with decision_id, review_focus, and disjoint packets required for multiple perspectives. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles only when their named evidence exists. Academic writing adds separate notation-definition review and logic-gap review before closeout. Requirements review, plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are separate agents when activated; the same role may have multiple instances when each instance has a distinct input packet, expected output, and review or write scope. Every reviewed execution role must apply feedback before the next handoff, every run must maintain a user request contract with atomic must-do and must-not-do clauses plus source buckets and accumulated-context resolution, final review must prove spec-to-product coverage and review-finding incorporation, and detailed design review remains the strongest pre-implementation gate when owner-boundary evidence is incomplete. Detailed design fixes identifier naming before implementation. Parent-managed write scopes govern all write-capable roles: write-capable agents may run concurrently, including same-role instances, only when their manifest write policies and handoffs assign disjoint paths in the current checkout; colliding writers are serialized into later waves instead of moved to separate worktrees; review roles remain artifact-only."
+    "summary": "The manager owns intake coordination, context sweep, library sweep, routing declaration, specialist activation, escalation, and user-request traceability, but subagent execution is modeled as repeatable role instances identified by role_id+instance_id+agent_type. Repo-changing tasks use an explicit staged flow by workflow family: owner-bounded changes use boundary-evidenced triage, while shared-canon and high-risk changes keep requirements organization -> requirements review -> research -> execution planning -> plan review -> detailed design -> detailed design review -> document flow review -> implementation -> conditional post-implementation test design -> implementation review. Research and scientific-software tasks use evidence-gated perspective review instead of enabling every reviewer by default. One physical agent candidate is selected for each active decision; specialists remain inactive until the parent cites a distinct decision, input artifact, and expected output, with decision_id, review_focus, and disjoint packets required for multiple perspectives. Repo-wide and workflow-heavy changes add independent project, docs-workflow, test-design, and Python review roles only when their named evidence exists. Academic writing adds separate notation-definition review and logic-gap review before closeout. Requirements review, plan review, detailed design review, document flow review, test design, notation-definition review, logic-gap review, project review, docs-workflow review, Python review, and report review are separate agents when activated; the same role may have multiple instances when each instance has a distinct input packet, expected output, and review or write scope. Every reviewed execution role uses one initial owning review per candidate epoch, stable blocking finding IDs, and focused recheck of only repaired blockers plus invalidated evidence. Advisory or duplicate findings never reopen implementation, repeated state/action fingerprints stop as non_convergent_cycle, and zero blockers with selected validation pass is terminal. Every run maintains a user request contract with atomic must-do and must-not-do clauses plus source buckets and accumulated-context resolution; detailed design review remains the strongest pre-implementation gate only when owner-boundary evidence is incomplete. Detailed design fixes identifier naming before implementation. Parent-managed write scopes govern all write-capable roles: write-capable agents may run concurrently, including same-role instances, only when their manifest write policies and handoffs assign disjoint paths in the current checkout; colliding writers are serialized into later waves instead of moved to separate worktrees; review roles remain artifact-only."
   },
   "always_on_roles": [
     {
@@ -229,7 +229,7 @@
         "allowed_artifacts": [
           "change_review"
         ],
-        "notes": "The implementation reviewer is the single owning review dispatch. It checks each coding chunk, verifies request-clause and Design Side-Effect Map coverage, records finding-level status, and may only update review artifacts. Python/C++ reviewers are bounded domain validators for distinct claims selected by the owning dispatch; they do not create duplicate full-review workflows."
+        "notes": "The implementation reviewer is the single owning review dispatch. It performs one initial review per candidate epoch, emits stable blocking finding IDs separately from advisory notes, and after repair runs only a focused recheck of addressed blockers and invalidated evidence. Python/C++ reviewers validate distinct selected claims and do not create duplicate full-review workflows."
       }
     },
     {
@@ -253,7 +253,7 @@
         "allowed_artifacts": [
           "final_review"
         ],
-        "notes": "The final reviewer performs an independent ship decision, requires complete spec-to-product and Design Side-Effect Map coverage, checks fix-now review finding incorporation, and remains artifact-only."
+        "notes": "The final reviewer is the terminal ship gate for the current candidate epoch. It reads the stable open blocker set and selected validation result, does not restart broad review, and approves or hands back when blockers and unresolved request clauses are zero. Advisory improvements are separate work."
       }
     },
     {
@@ -296,7 +296,7 @@
           "workflow_monitoring",
           "retrospective"
         ],
-        "notes": "Audit closeout is recorded in the closeout gate, CompletionCoverage, workflow monitoring, agent evaluation, and retrospective artifacts. The auditor may unlock completion only after completion_coverage_consumer=yes, coverage_check.ok=true, completion_boundary.topology_errors=[], post_fix_full_review_complete=yes, mechanical_completion_loop_complete=yes with structured loop evidence, diff_check_agent_complete=yes with a run-local independent read-only diff-check artifact, workflow monitoring decisions are resolved, and agent evaluation feedback is resolved."
+        "notes": "Audit closeout is recorded in the closeout gate, CompletionCoverage, workflow monitoring, agent evaluation, and retrospective artifacts. The auditor unlocks completion only after coverage and topology gates pass, stable blocking findings and unresolved request clauses are empty, selected validation passes or is not applicable, focused recheck is complete when selected, the convergence projection rejects same-state/action repetition, required diff-check evidence is present when selected, and workflow monitoring plus agent evaluation feedback are resolved."
       }
     }
   ],
@@ -1882,7 +1882,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as artifact_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as artifact_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "artifact_reviewer",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/14",
       "profile_id": "luna_reasoning_high",
@@ -1904,7 +1904,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "3827d26022d989847d292c4ae9ae47587d5cebce0d56111029e730e7adfb8aca"
+      "projection_digest": "0abbeccf12fa7f8ae0fdd7c23076f4dacba3bbef93762692f370e846a818f0af"
     },
     "benchmark_reviewer": {
       "name": "benchmark_reviewer",
@@ -1916,7 +1916,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as benchmark_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as benchmark_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "benchmark_reviewer",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/13",
       "profile_id": "luna_reasoning_high",
@@ -1938,7 +1938,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e61ce371dc956805af95b9cd4c489cadac8f56ce469514f0eddaf5c2846f7d58"
+      "projection_digest": "6b5d10f3080ba6273cb69789fb0ea8aa537d2b3113f71dcc1325c16b78c7a9ce"
     },
     "citation_evidence_reviewer": {
       "name": "citation_evidence_reviewer",
@@ -1950,7 +1950,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as citation_evidence_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as citation_evidence_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "citation_evidence_reviewer",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/6",
       "profile_id": "luna_reasoning_high",
@@ -1972,7 +1972,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "3bf6e1085ed4f15ae1fd21695684ef9fd5f868894a35f2273927829fa545b720"
+      "projection_digest": "902677a5bd158cec47097f36f68b6d7ec5e4443afd9aa7337567d8cca26c56a2"
     },
     "cpp_reviewer": {
       "name": "cpp_reviewer",
@@ -1984,7 +1984,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as cpp_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as cpp_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "change_reviewer+cpp_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/22",
       "profile_id": "luna_reasoning_high",
@@ -2006,7 +2006,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "08cb4f2c7e836084cf262740b84e30614a7ce045aaa5d9ed6436f445e17210dc"
+      "projection_digest": "02d90f734b7e962ed496499be6b32241b45749a7cdba3821ff8ce2323766bed1"
     },
     "detailed_design_reviewer": {
       "name": "detailed_design_reviewer",
@@ -2018,7 +2018,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as detailed_design_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as detailed_design_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "design_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/3",
       "profile_id": "luna_reasoning_high",
@@ -2040,7 +2040,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "d39777852f75eb311a7cbdcb3cf92b6135eccacf693d5cefcfcbfcc9305b6608"
+      "projection_digest": "8b822567869acba5dd868ff15d931fa4bf29fa0d107001cee7996fad18559511"
     },
     "detailed_designer": {
       "name": "detailed_designer",
@@ -2052,7 +2052,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as detailed_designer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as detailed_designer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "designer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/2",
       "profile_id": "luna_reasoning_high",
@@ -2074,7 +2074,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e510b3dae82d950566f218b95a4bfd7f0297c0bbdda61b1c44d951f7d3d7fb0a"
+      "projection_digest": "7bda9f797204511bf61540839b7b33cafff3dffcc6dbbfe946601283f1e8e12a"
     },
     "diff_triage_reviewer": {
       "name": "diff_triage_reviewer",
@@ -2086,7 +2086,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review bounded diffs findings-first; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope.",
+      "developer_instructions": "You are acting as diff_triage_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Review bounded diffs findings-first. Perform one initial owning review per candidate epoch, emit stable blocking finding IDs separately from advisory notes, and on repair perform only a focused recheck of addressed IDs and invalidated evidence; route SOLID-sensitive Python boundaries to python_reviewer and require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence. Return approve, revise, or escalate, and escalate public API, workflow, runtime, security, dependency, or cross-owner scope.",
       "logical_role_id": "change_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/7",
       "profile_id": "luna_reasoning_high",
@@ -2108,7 +2108,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "d5dfc37871027602cf5d1b92d1fede77ea09b9c1293d1d304995b9a93296e3e3"
+      "projection_digest": "3a7ed2b0e0fd3df50669fa1c141e5a109a32c8ba65607cb25430d7398dfebbbf"
     },
     "docs_workflow_steward": {
       "name": "docs_workflow_steward",
@@ -2120,7 +2120,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as docs_workflow_steward with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as docs_workflow_steward with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "infra_steward+docs_workflow_steward",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/9+agents/agents_config.json#/specialist_roles/19",
       "profile_id": "luna_reasoning_high",
@@ -2142,7 +2142,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "576c8ab2e14bec6ebc46a39f85834b3a21ec136e7600777cfe9e116ea6b1dca6"
+      "projection_digest": "9dd0da4ef7ba4583e8973659923c45fe2d9dd9f48cef9ac0bff9668a71385edf"
     },
     "document_flow_reviewer": {
       "name": "document_flow_reviewer",
@@ -2154,7 +2154,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as document_flow_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as document_flow_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "document_flow_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/4",
       "profile_id": "luna_reasoning_high",
@@ -2176,7 +2176,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "d4ce86c377fc208e2dc99533afb8d7e446ed9e0c819ab88bcda1eb625cf1258c"
+      "projection_digest": "4d54b44e6fb6377539fb8d8ade86f8aaaae6fff981899a235d4553523fb22c52"
     },
     "execution_planner": {
       "name": "execution_planner",
@@ -2188,7 +2188,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as execution_planner with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as execution_planner with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "scheduler",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/4",
       "profile_id": "luna_reasoning_high",
@@ -2210,7 +2210,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "66c98d2a2b13f33505534be0b53fd5a5e93b87aa0826ff03c4237af5375df27c"
+      "projection_digest": "65ed99b343be6a7b2ae4af86919b5de34af35b9e23560689d4756340a5fb2750"
     },
     "experiment_runner": {
       "name": "experiment_runner",
@@ -2222,7 +2222,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as experiment_runner with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as experiment_runner with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "experimenter",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/2",
       "profile_id": "luna_reasoning_high",
@@ -2244,7 +2244,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "ef46e727576126425bb66f3f1c37a509e1c0c38314f123ae738b43bcb1fb3ad1"
+      "projection_digest": "1277de395ba2ad076d614c454d212cc62664d9f8d2398a212b9e56076f8eb084"
     },
     "explorer": {
       "name": "explorer",
@@ -2256,7 +2256,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as explorer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as explorer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "researcher",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/0",
       "profile_id": "luna_reasoning_high",
@@ -2278,7 +2278,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "26ff95a4c31397e8498a1793e5f1b67982a05f90e7b5ae7c55b51c6eaf41ed3d"
+      "projection_digest": "fae14932dc39cb9b34f6cae0539ab8d79c60ff2595081bde7adf1d910598c077"
     },
     "fair_data_reviewer": {
       "name": "fair_data_reviewer",
@@ -2290,7 +2290,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as fair_data_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as fair_data_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "fair_data_reviewer",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/15",
       "profile_id": "luna_reasoning_high",
@@ -2312,7 +2312,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "b9d7f643ab6230ee5cbabd3f55a49cd494a347399770359bc62b704ecd556440"
+      "projection_digest": "b71dacfb12b3227967d0df89519c6632ca886513a66f8376cf9f05b4e88c6392"
     },
     "literature_researcher": {
       "name": "literature_researcher",
@@ -2324,7 +2324,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as literature_researcher with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as literature_researcher with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "researcher",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/0",
       "profile_id": "luna_reasoning_high",
@@ -2346,7 +2346,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "ea38bbb1255a9a4b7d4baf2a6b03159fbe2d668ba45e3e4b684dd590e54b0033"
+      "projection_digest": "3625ca215ccfc2f9aa3b577a46fc2713338007b3147f974e42961cda1516e6b7"
     },
     "logic_gap_reviewer": {
       "name": "logic_gap_reviewer",
@@ -2358,7 +2358,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as logic_gap_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as logic_gap_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "logic_gap_reviewer",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/8",
       "profile_id": "luna_reasoning_high",
@@ -2380,7 +2380,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "ded3e4f88a36dece3796bc119d3f760ccd1d50a1bf48a96e56352e55359716d5"
+      "projection_digest": "05707f4e7569c1c60a75f49a9fd3cdefdc7c9b4f4b0c453e3b0a7261987c52a3"
     },
     "long_form_writer": {
       "name": "long_form_writer",
@@ -2392,7 +2392,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as long_form_writer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as long_form_writer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "long_form_writer",
       "role_contract_ref": "agents/model_profiles.toml#/standalone_role_metadata/long_form_writer",
       "profile_id": "luna_reasoning_high",
@@ -2414,7 +2414,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "5f07b3a93b0448f4fd644e6f7956d2f4f8000743852c683556629d7f28ea06be"
+      "projection_digest": "51869dec6585ea3e6608ab99195338f7229eddf9850aca56d13af61629c17bae"
     },
     "manager_reviewer": {
       "name": "manager_reviewer",
@@ -2426,7 +2426,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as manager_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as manager_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "manager_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/1",
       "profile_id": "luna_reasoning_high",
@@ -2448,7 +2448,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "de3abc4187832ec96fc933696e6b936fc81d90733356c0959fa48537378f17d0"
+      "projection_digest": "701b2e073dd62e10f892840e666363e29e7d9b3763b41b0643d06b22cc8d0676"
     },
     "ml_science_reviewer": {
       "name": "ml_science_reviewer",
@@ -2460,7 +2460,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as ml_science_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as ml_science_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "ml_science_reviewer",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/16",
       "profile_id": "luna_reasoning_high",
@@ -2482,7 +2482,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e6241fa54886e3493c538260cee429d6e0b91dffbba6576cfb6bbe1527808bf3"
+      "projection_digest": "9ad01d8cd1345204073843092d4adefe1bd7a128e3ae2cdfa2b383d2054f1453"
     },
     "notation_definition_reviewer": {
       "name": "notation_definition_reviewer",
@@ -2494,7 +2494,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as notation_definition_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as notation_definition_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "notation_definition_reviewer",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/7",
       "profile_id": "luna_reasoning_high",
@@ -2516,7 +2516,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "54b701a02f49347a06636ac597e7a93ba38a7a9590a06eb503e00f85396cbc88"
+      "projection_digest": "e534d6dd5ddbda99bde8c7be7c91184bc8e63d3f3292753e994740f1f82c77fc"
     },
     "oop_readability_reviewer": {
       "name": "oop_readability_reviewer",
@@ -2528,7 +2528,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as oop_readability_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as oop_readability_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "oop_readability_reviewer",
       "role_contract_ref": "agents/model_profiles.toml#/standalone_role_metadata/oop_readability_reviewer",
       "profile_id": "luna_reasoning_high",
@@ -2550,7 +2550,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "334ac75d773923d229e48217c5499431d1412662dfb1c615db99da5f41aed9de"
+      "projection_digest": "f370b5fd59864c597f08d773001f60690fe097441dcc3c4f7b23d717843c9d01"
     },
     "plan_reviewer": {
       "name": "plan_reviewer",
@@ -2562,7 +2562,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as plan_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as plan_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "schedule_reviewer",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/5",
       "profile_id": "luna_reasoning_high",
@@ -2584,7 +2584,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "6ac62db6fdf4554cc38a647bdb8c656fde3e89eba721e64c61ba99b9595377a1"
+      "projection_digest": "ad9e78a4ab91af0f84adefbd6ef6219518292bf542355032ea3e58514c8a762f"
     },
     "project_reviewer": {
       "name": "project_reviewer",
@@ -2596,7 +2596,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as project_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as project_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "final_reviewer+project_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/8+agents/agents_config.json#/specialist_roles/17",
       "profile_id": "luna_reasoning_high",
@@ -2618,7 +2618,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "4e03dc49156cb1bafa71b8351ba5a1f37ae6a0916a17c63afd4fc134c0bf4020"
+      "projection_digest": "fcecb6843792f9729bb4a4c369e421b79ac1080ff9430e01817c4e92650bb9e9"
     },
     "prompt_config_reviewer": {
       "name": "prompt_config_reviewer",
@@ -2630,7 +2630,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as prompt_config_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as prompt_config_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "prompt_config_reviewer",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/20",
       "profile_id": "luna_reasoning_high",
@@ -2652,7 +2652,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "f0b9f15f3972c135e36583440eae3d99c33fe9ba5b1a4ddb68ba61623095a787"
+      "projection_digest": "dae3bd6ab1f49f16434bee17b81fe057151372603d5272b1bfd58256cd2fe0e6"
     },
     "python_reviewer": {
       "name": "python_reviewer",
@@ -2664,7 +2664,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as python_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review Python diffs findings-first for behavior, types, tests, and public boundaries. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route. follow the parent-selected closed validation route act only on the parent packet and assigned scope",
+      "developer_instructions": "You are acting as python_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Review Python diffs findings-first for behavior, types, tests, and public boundaries. Preserve the candidate epoch and stable blocking finding IDs; after repair, recheck only addressed IDs and invalidated evidence, never restart broad review. Follow agents/skills/python-review.md#Validation route and agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for validation scope; review the parent packet route and do not add validation outside that route. When the canonical route selects SOLID evidence, require a path-covered OOP readability report, SOLID principle signal, Single responsibility, Open/closed, Liskov substitution, Interface segregation, Dependency inversion, and check_solid_evidence.py path-coverage evidence; otherwise do not add those checks. Return revise only for evidence required by the canonical route.",
       "logical_role_id": "change_reviewer+python_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/specialist_roles/21",
       "profile_id": "luna_reasoning_high",
@@ -2686,7 +2686,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "9a4a336613685a4c060d655bd089542e086d3b983042df932c4d5dd662aa8fed"
+      "projection_digest": "36c2442657835c72fd3fe8e611a9b92ce22c724d64302ca261d838eda3d23b85"
     },
     "report_reviewer": {
       "name": "report_reviewer",
@@ -2698,7 +2698,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as report_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as report_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "report_reviewer",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/23",
       "profile_id": "luna_reasoning_high",
@@ -2720,7 +2720,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "0e3a499a86b6e5f4bce274d9f50e391b7aed88c316aa8e4248013b01217ae5e8"
+      "projection_digest": "d5d3e11fcec742198d5b8c68059e1f23c11e888e203499555323a9178a558561"
     },
     "reproducibility_reviewer": {
       "name": "reproducibility_reviewer",
@@ -2732,7 +2732,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as reproducibility_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as reproducibility_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "reproducibility_reviewer",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/11",
       "profile_id": "luna_reasoning_high",
@@ -2754,7 +2754,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "b4b0518ca22ef08565f32c5a9d6936d4654d9184fb30820bbb5dd9d99cd71b7b"
+      "projection_digest": "c50595c4dc87d1eda2d269aa864cce6e243d35d8c63e2336237a5933ba98831d"
     },
     "requirements_organizer": {
       "name": "requirements_organizer",
@@ -2766,7 +2766,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as requirements_organizer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as requirements_organizer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "manager",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/0",
       "profile_id": "luna_reasoning_high",
@@ -2788,7 +2788,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "7314b3aabbccfdca89443f706f9ae271eeb8014e47bc1036ba2f0ecebd86b0f4"
+      "projection_digest": "c9c37a42bafaa203ddbe3eb0f5c68c2798d28a3ef2efa7b1b8868159cc36fcfc"
     },
     "reviewer": {
       "name": "reviewer",
@@ -2800,7 +2800,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions. Review exact diffs findings-first against request clauses and owning evidence. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete.",
+      "developer_instructions": "You are acting as reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass. Review exact diffs findings-first against request clauses and owning evidence. Run one initial owning review per candidate epoch, separate stable blocking finding IDs from advisory notes, and use focused recheck only after repair. For SOLID-sensitive Python changes require a path-covered OOP readability report, SOLID principle signal counts, and check_solid_evidence.py evidence; return revise when that evidence or changed-path coverage is incomplete.",
       "logical_role_id": "change_reviewer+final_reviewer+research_reviewer+experiment_reviewer+infra_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/7+agents/agents_config.json#/always_on_roles/8+agents/agents_config.json#/specialist_roles/1+agents/agents_config.json#/specialist_roles/3+agents/agents_config.json#/specialist_roles/10",
       "profile_id": "luna_reasoning_high",
@@ -2822,7 +2822,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e9b7c5e65c2fda433cb32677308c34ff806528311e6489804f74def3b03b7721"
+      "projection_digest": "49b3913d6f3ea366015b116edc8d61d658979729d7db9e13e9a27604363ee27b"
     },
     "scientific_computing_reviewer": {
       "name": "scientific_computing_reviewer",
@@ -2834,7 +2834,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as scientific_computing_reviewer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as scientific_computing_reviewer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "scientific_computing_reviewer",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/12",
       "profile_id": "luna_reasoning_high",
@@ -2856,7 +2856,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "f8edd9eef4b799b62ba9dd76a0ce6a19800c08bee0ebfdfc2535cf3e3604738e"
+      "projection_digest": "5fa520fd7faa6b1a1b4d8cdc1925361bcb81396ebf4e6a5a8ed364848f4de1f7"
     },
     "ship_reviewer": {
       "name": "ship_reviewer",
@@ -2868,7 +2868,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "xhigh",
-      "developer_instructions": "You are acting as ship_reviewer for ship readiness under luna_ship. Constrain edits to one responsibility unit and one-pass materialization only when selected.",
+      "developer_instructions": "You are acting as ship_reviewer for ship readiness under luna_ship. Act as the terminal gate for one candidate epoch. Confirm stable open blocking finding IDs and the selected validation result; do not restart broad review after repair. Zero blockers and validation pass or not_applicable is terminal, while advisory improvements go to a separate Issue or note.",
       "logical_role_id": "final_reviewer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/8",
       "profile_id": "luna_ship_xhigh",
@@ -2890,7 +2890,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "single_owner_gate",
       "continuation_policy": "terminal_after_gate",
-      "projection_digest": "1f4cb8eb9ee61edd4ace6aff2857c8d726a1f5a3a3794e5f05d653157fb17fa2"
+      "projection_digest": "64a5b8ad853f5b38bd5d5866d66641c0eaf72cd6e12628f49e3095f830777415"
     },
     "skill_evaluator": {
       "name": "skill_evaluator",
@@ -2935,7 +2935,7 @@
       "approval_policy": "never",
       "model": "gpt-5.3-codex-spark",
       "model_reasoning_effort": "low",
-      "developer_instructions": "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Execute only implement, commit, and push actions within assigned authority; parent owns pull-request, admin-override, base-integration, and final editorial decisions. follow the parent-selected closed validation route act only on the parent packet and assigned scope do not perform parent-only integration or final decisions return branch/head/check evidence or the role result and stop",
+      "developer_instructions": "You are acting as spark_worker for implementation execution with spark_implementation. Materialize one fixed packet directly, keep checkpoints observational, and return the closed Spark result schema. Repair only assigned stable blocking finding IDs; do not repeat the same packet and evidence or restart broad review. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. Execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.",
       "logical_role_id": "implementer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/6",
       "profile_id": "spark_implementation_low",
@@ -2959,7 +2959,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation_only",
       "continuation_policy": "same_spark_after_one_repaired_structural_gap",
-      "projection_digest": "9185a102939919aa42fbcf919fd9f80b585bb7bad4e290df83db12c18c670c79"
+      "projection_digest": "6e5959b0024f75e8f043e89f67c823b998f9a6167bddf68b393217345013e6a5"
     },
     "terra": {
       "name": "terra",
@@ -2971,7 +2971,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-terra",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as terra with terra_cross_cutting cross-cutting review capacity. Operate only as a conditional read-only cross-cutting specialist. Activate on multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation. Treat user-provided alternatives and alternatives already present in findings as admissible adversarial-comparison input. Return owner closure, context capsule, and accepted/rejected/escalated handback; send unresolved findings to Sol. Do not invent unrequested alternatives, adopt an architecture, coordinate, implement as a general worker, mutate repository state, create PRs, or make final integration decisions.",
+      "developer_instructions": "You are acting as terra with terra_cross_cutting cross-cutting review capacity. Operate only as a conditional read-only cross-cutting specialist. Activate on multi-owner dependency closure, compaction/long-run/incomplete-handoff context reconstruction, or adversarial contradiction validation. Preserve the current candidate epoch and stable blocker IDs; add a blocker only with new contract, reachable-behavior, or structural-contradiction evidence, and never repeat the same state/action. Treat user-provided alternatives and alternatives already present in findings as admissible adversarial-comparison input. Return owner closure, context capsule, and accepted/rejected/escalated handback; send unresolved findings to Sol. Do not invent unrequested alternatives, adopt an architecture, coordinate, implement as a general worker, mutate repository state, create PRs, or make final integration decisions.",
       "logical_role_id": "terra",
       "role_contract_ref": "agents/agents_config.json#/specialist_roles/18",
       "profile_id": "terra_cross_cutting_read_only",
@@ -2995,7 +2995,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "b6e48b66355677d73129cf0e8233efba787535161d293acf7343509e0cf68028"
+      "projection_digest": "9c04473a57afa40f203131e9a701e9d788270c8e21080cf00a5abcb830ade647"
     },
     "test_designer": {
       "name": "test_designer",
@@ -3007,7 +3007,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "high",
-      "developer_instructions": "You are acting as test_designer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions.",
+      "developer_instructions": "You are acting as test_designer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass.",
       "logical_role_id": "test_designer",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/5",
       "profile_id": "luna_reasoning_high",
@@ -3029,7 +3029,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "04208a0f63875c6428ed4e70f11998530ef5de53e516745d92eb837ec0064cc7"
+      "projection_digest": "e1796fc6a4f4da412e2090f03f0d83221ddf2e63900d260f1d907227e1a847dc"
     },
     "worker": {
       "name": "worker",
@@ -3041,7 +3041,7 @@
       "approval_policy": "never",
       "model": "gpt-5.6-luna",
       "model_reasoning_effort": "xhigh",
-      "developer_instructions": "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Execute only implement, commit, and push actions within assigned authority; parent owns pull-request, admin-override, base-integration, and final editorial decisions. follow the parent-selected closed validation route act only on the parent packet and assigned scope do not perform parent-only integration or final decisions return branch/head/check evidence or the role result and stop",
+      "developer_instructions": "You are acting as worker with luna_implementation implementation rigor. Use precise mechanical changes and strict failure semantics; avoid unrelated scope expansion. Repair only parent-assigned stable blocking finding IDs in the current candidate epoch; do not restart design, broaden review, or repeat an unchanged state/action. Follow the sole validation scope owner at agents/skills/agent-orchestration.md#Write-Capable Handoff Validation Trust Boundary for parent-assigned commands, mechanism-required static checks, full-suite selection, and unexpected-action reporting. For this role, execute only implement/commit/push within authority bounds; PR create/merge/close, admin override, base integration decision, and final integration/final editorial decision are parent-only. After push, return branch, head, and check evidence to the parent integrator and stop.",
       "logical_role_id": "implementer+experimenter+infra_steward",
       "role_contract_ref": "agents/agents_config.json#/always_on_roles/6+agents/agents_config.json#/specialist_roles/2+agents/agents_config.json#/specialist_roles/9",
       "profile_id": "luna_implementation_xhigh",
@@ -3064,7 +3064,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "b27d089e5a19edf68f913e74a5b95e1ece5d48c1d14362b9d74e2bd33538c39d"
+      "projection_digest": "1f15909c0171a228fba484f0713d64abaff321266569dda062d6fd2f845e2d49"
     }
   },
   "roles": [
@@ -3089,7 +3089,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "3827d26022d989847d292c4ae9ae47587d5cebce0d56111029e730e7adfb8aca"
+      "projection_digest": "0abbeccf12fa7f8ae0fdd7c23076f4dacba3bbef93762692f370e846a818f0af"
     },
     {
       "id": "benchmark_reviewer",
@@ -3112,7 +3112,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e61ce371dc956805af95b9cd4c489cadac8f56ce469514f0eddaf5c2846f7d58"
+      "projection_digest": "6b5d10f3080ba6273cb69789fb0ea8aa537d2b3113f71dcc1325c16b78c7a9ce"
     },
     {
       "id": "citation_evidence_reviewer",
@@ -3135,7 +3135,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "3bf6e1085ed4f15ae1fd21695684ef9fd5f868894a35f2273927829fa545b720"
+      "projection_digest": "902677a5bd158cec47097f36f68b6d7ec5e4443afd9aa7337567d8cca26c56a2"
     },
     {
       "id": "cpp_reviewer",
@@ -3158,7 +3158,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "08cb4f2c7e836084cf262740b84e30614a7ce045aaa5d9ed6436f445e17210dc"
+      "projection_digest": "02d90f734b7e962ed496499be6b32241b45749a7cdba3821ff8ce2323766bed1"
     },
     {
       "id": "detailed_design_reviewer",
@@ -3181,7 +3181,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "d39777852f75eb311a7cbdcb3cf92b6135eccacf693d5cefcfcbfcc9305b6608"
+      "projection_digest": "8b822567869acba5dd868ff15d931fa4bf29fa0d107001cee7996fad18559511"
     },
     {
       "id": "detailed_designer",
@@ -3204,7 +3204,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e510b3dae82d950566f218b95a4bfd7f0297c0bbdda61b1c44d951f7d3d7fb0a"
+      "projection_digest": "7bda9f797204511bf61540839b7b33cafff3dffcc6dbbfe946601283f1e8e12a"
     },
     {
       "id": "diff_triage_reviewer",
@@ -3227,7 +3227,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "d5dfc37871027602cf5d1b92d1fede77ea09b9c1293d1d304995b9a93296e3e3"
+      "projection_digest": "3a7ed2b0e0fd3df50669fa1c141e5a109a32c8ba65607cb25430d7398dfebbbf"
     },
     {
       "id": "docs_workflow_steward",
@@ -3250,7 +3250,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "576c8ab2e14bec6ebc46a39f85834b3a21ec136e7600777cfe9e116ea6b1dca6"
+      "projection_digest": "9dd0da4ef7ba4583e8973659923c45fe2d9dd9f48cef9ac0bff9668a71385edf"
     },
     {
       "id": "document_flow_reviewer",
@@ -3273,7 +3273,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "d4ce86c377fc208e2dc99533afb8d7e446ed9e0c819ab88bcda1eb625cf1258c"
+      "projection_digest": "4d54b44e6fb6377539fb8d8ade86f8aaaae6fff981899a235d4553523fb22c52"
     },
     {
       "id": "execution_planner",
@@ -3296,7 +3296,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "66c98d2a2b13f33505534be0b53fd5a5e93b87aa0826ff03c4237af5375df27c"
+      "projection_digest": "65ed99b343be6a7b2ae4af86919b5de34af35b9e23560689d4756340a5fb2750"
     },
     {
       "id": "experiment_runner",
@@ -3319,7 +3319,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "ef46e727576126425bb66f3f1c37a509e1c0c38314f123ae738b43bcb1fb3ad1"
+      "projection_digest": "1277de395ba2ad076d614c454d212cc62664d9f8d2398a212b9e56076f8eb084"
     },
     {
       "id": "explorer",
@@ -3342,7 +3342,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "26ff95a4c31397e8498a1793e5f1b67982a05f90e7b5ae7c55b51c6eaf41ed3d"
+      "projection_digest": "fae14932dc39cb9b34f6cae0539ab8d79c60ff2595081bde7adf1d910598c077"
     },
     {
       "id": "fair_data_reviewer",
@@ -3365,7 +3365,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "b9d7f643ab6230ee5cbabd3f55a49cd494a347399770359bc62b704ecd556440"
+      "projection_digest": "b71dacfb12b3227967d0df89519c6632ca886513a66f8376cf9f05b4e88c6392"
     },
     {
       "id": "literature_researcher",
@@ -3388,7 +3388,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "ea38bbb1255a9a4b7d4baf2a6b03159fbe2d668ba45e3e4b684dd590e54b0033"
+      "projection_digest": "3625ca215ccfc2f9aa3b577a46fc2713338007b3147f974e42961cda1516e6b7"
     },
     {
       "id": "logic_gap_reviewer",
@@ -3411,7 +3411,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "ded3e4f88a36dece3796bc119d3f760ccd1d50a1bf48a96e56352e55359716d5"
+      "projection_digest": "05707f4e7569c1c60a75f49a9fd3cdefdc7c9b4f4b0c453e3b0a7261987c52a3"
     },
     {
       "id": "long_form_writer",
@@ -3434,7 +3434,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "5f07b3a93b0448f4fd644e6f7956d2f4f8000743852c683556629d7f28ea06be"
+      "projection_digest": "51869dec6585ea3e6608ab99195338f7229eddf9850aca56d13af61629c17bae"
     },
     {
       "id": "manager_reviewer",
@@ -3457,7 +3457,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "de3abc4187832ec96fc933696e6b936fc81d90733356c0959fa48537378f17d0"
+      "projection_digest": "701b2e073dd62e10f892840e666363e29e7d9b3763b41b0643d06b22cc8d0676"
     },
     {
       "id": "ml_science_reviewer",
@@ -3480,7 +3480,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e6241fa54886e3493c538260cee429d6e0b91dffbba6576cfb6bbe1527808bf3"
+      "projection_digest": "9ad01d8cd1345204073843092d4adefe1bd7a128e3ae2cdfa2b383d2054f1453"
     },
     {
       "id": "notation_definition_reviewer",
@@ -3503,7 +3503,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "54b701a02f49347a06636ac597e7a93ba38a7a9590a06eb503e00f85396cbc88"
+      "projection_digest": "e534d6dd5ddbda99bde8c7be7c91184bc8e63d3f3292753e994740f1f82c77fc"
     },
     {
       "id": "oop_readability_reviewer",
@@ -3526,7 +3526,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "334ac75d773923d229e48217c5499431d1412662dfb1c615db99da5f41aed9de"
+      "projection_digest": "f370b5fd59864c597f08d773001f60690fe097441dcc3c4f7b23d717843c9d01"
     },
     {
       "id": "plan_reviewer",
@@ -3549,7 +3549,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "6ac62db6fdf4554cc38a647bdb8c656fde3e89eba721e64c61ba99b9595377a1"
+      "projection_digest": "ad9e78a4ab91af0f84adefbd6ef6219518292bf542355032ea3e58514c8a762f"
     },
     {
       "id": "project_reviewer",
@@ -3572,7 +3572,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "4e03dc49156cb1bafa71b8351ba5a1f37ae6a0916a17c63afd4fc134c0bf4020"
+      "projection_digest": "fcecb6843792f9729bb4a4c369e421b79ac1080ff9430e01817c4e92650bb9e9"
     },
     {
       "id": "prompt_config_reviewer",
@@ -3595,7 +3595,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "f0b9f15f3972c135e36583440eae3d99c33fe9ba5b1a4ddb68ba61623095a787"
+      "projection_digest": "dae3bd6ab1f49f16434bee17b81fe057151372603d5272b1bfd58256cd2fe0e6"
     },
     {
       "id": "python_reviewer",
@@ -3618,7 +3618,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "9a4a336613685a4c060d655bd089542e086d3b983042df932c4d5dd662aa8fed"
+      "projection_digest": "36c2442657835c72fd3fe8e611a9b92ce22c724d64302ca261d838eda3d23b85"
     },
     {
       "id": "report_reviewer",
@@ -3641,7 +3641,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "0e3a499a86b6e5f4bce274d9f50e391b7aed88c316aa8e4248013b01217ae5e8"
+      "projection_digest": "d5d3e11fcec742198d5b8c68059e1f23c11e888e203499555323a9178a558561"
     },
     {
       "id": "reproducibility_reviewer",
@@ -3664,7 +3664,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "b4b0518ca22ef08565f32c5a9d6936d4654d9184fb30820bbb5dd9d99cd71b7b"
+      "projection_digest": "c50595c4dc87d1eda2d269aa864cce6e243d35d8c63e2336237a5933ba98831d"
     },
     {
       "id": "requirements_organizer",
@@ -3687,7 +3687,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "7314b3aabbccfdca89443f706f9ae271eeb8014e47bc1036ba2f0ecebd86b0f4"
+      "projection_digest": "c9c37a42bafaa203ddbe3eb0f5c68c2798d28a3ef2efa7b1b8868159cc36fcfc"
     },
     {
       "id": "reviewer",
@@ -3710,7 +3710,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "e9b7c5e65c2fda433cb32677308c34ff806528311e6489804f74def3b03b7721"
+      "projection_digest": "49b3913d6f3ea366015b116edc8d61d658979729d7db9e13e9a27604363ee27b"
     },
     {
       "id": "scientific_computing_reviewer",
@@ -3733,7 +3733,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "f8edd9eef4b799b62ba9dd76a0ce6a19800c08bee0ebfdfc2535cf3e3604738e"
+      "projection_digest": "5fa520fd7faa6b1a1b4d8cdc1925361bcb81396ebf4e6a5a8ed364848f4de1f7"
     },
     {
       "id": "ship_reviewer",
@@ -3756,7 +3756,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "single_owner_gate",
       "continuation_policy": "terminal_after_gate",
-      "projection_digest": "1f4cb8eb9ee61edd4ace6aff2857c8d726a1f5a3a3794e5f05d653157fb17fa2"
+      "projection_digest": "64a5b8ad853f5b38bd5d5866d66641c0eaf72cd6e12628f49e3095f830777415"
     },
     {
       "id": "skill_evaluator",
@@ -3803,7 +3803,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation_only",
       "continuation_policy": "same_spark_after_one_repaired_structural_gap",
-      "projection_digest": "9185a102939919aa42fbcf919fd9f80b585bb7bad4e290df83db12c18c670c79"
+      "projection_digest": "6e5959b0024f75e8f043e89f67c823b998f9a6167bddf68b393217345013e6a5"
     },
     {
       "id": "terra",
@@ -3828,7 +3828,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "b6e48b66355677d73129cf0e8233efba787535161d293acf7343509e0cf68028"
+      "projection_digest": "9c04473a57afa40f203131e9a701e9d788270c8e21080cf00a5abcb830ade647"
     },
     {
       "id": "test_designer",
@@ -3851,7 +3851,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "parent_owned_review_gate",
       "continuation_policy": "same_packet_when_suitable",
-      "projection_digest": "04208a0f63875c6428ed4e70f11998530ef5de53e516745d92eb837ec0064cc7"
+      "projection_digest": "e1796fc6a4f4da412e2090f03f0d83221ddf2e63900d260f1d907227e1a847dc"
     },
     {
       "id": "worker",
@@ -3875,7 +3875,7 @@
       "return_schema_id": "claim_evidence_v1",
       "checkpoint_policy": "nonblocking_observation",
       "continuation_policy": "same_packet_until_handoff",
-      "projection_digest": "b27d089e5a19edf68f913e74a5b95e1ece5d48c1d14362b9d74e2bd33538c39d"
+      "projection_digest": "1f15909c0171a228fba484f0713d64abaff321266569dda062d6fd2f845e2d49"
     }
   ],
   "generated_profile_projection": {
@@ -3883,6 +3883,6 @@
     "materializer": "tools/agent_tools/model_profile_registry.py",
     "registry_ref": "agents/model_profiles.toml",
     "role_count": 35,
-    "projection_digest": "b2f6dba9186cb7de9d4712165eb8c6896e7c9f265d15036cb315a44b321555ce"
+    "projection_digest": "f7318c87bcde3a3b7e661bd3d763bfc551163fb192990d4bc24b4be375efe0b6"
   }
 }
