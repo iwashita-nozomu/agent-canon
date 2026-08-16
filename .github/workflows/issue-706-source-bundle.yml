@@ -29,6 +29,7 @@ jobs:
           git bundle create issue-706.bundle HEAD refs/remotes/origin/main
           git archive --format=tar.gz --output=issue-706-worktree.tar.gz HEAD
           git bundle verify issue-706.bundle
+          printf '%s\n' "ISSUE_706_BUNDLE_MAIN=$(git rev-parse refs/remotes/origin/main)"
 
       - name: Upload source bundle
         uses: actions/upload-artifact@v4
