@@ -1,0 +1,85 @@
+| Unit | Stable surfaces | Responsibility |
+| --- | --- | --- |
+| `ci-hooks-skills` | `surface:ci.hooks-skills`<br>`surface:skill.catalog`<br>`surface:skill.dependencies`<br>`surface:skill.runtime-shim`<br>`surface:skill.graph` | CI、hooks、public skill、catalog/dependency/runtime adapter |
+| `code-type-boundaries` | `surface:code.type-boundary`<br>`surface:code.oop-responsibility`<br>`surface:implementation.trace`<br>`surface:language.python`<br>`surface:language.native` | public API、型、OOP responsibility、language boundary |
+| `dependency-integrity` | `surface:dependency.headers`<br>`surface:dependency.graph`<br>`surface:dependency.manifests` | dependency header、manifest、graph direction |
+| `docs-design-trace` | `surface:docs.design-trace`<br>`surface:docs.reader-map`<br>`surface:docs.formatter` | reader route、design trace、Markdown correctness |
+| `environment-containers` | `surface:environment.containers`<br>`surface:runtime.profiles`<br>`surface:devcontainer`<br>`surface:gpu.host-driver` | Docker、devcontainer、runtime profile、host-driver boundary |
+| `ownership-root-views` | `surface:agentcanon.root-views`<br>`surface:agentcanon.source-root`<br>`surface:submodule.pin` | AgentCanon source、pin、root view、publication boundary |
+| `repository-structure` | `surface:repo.structure`<br>`surface:responsibility.scope` | required/optional path existence と filesystem kind |
+| `templates-generated-boundaries` | `surface:templates.generated-boundary`<br>`surface:evidence.artifacts`<br>`surface:docs.canon` | template、source、generated/evidence classification |
+| `tests-and-oracles` | `surface:tests.oracle`<br>`surface:runtime.validation`<br>`surface:code.behavior` | test oracle と必要十分な validation |
+
+
+## Deterministic Execution
+
+```bash
+python3 tools/agent_tools/parent_repository_audit.py list --root <parent-root> --format text
+python3 tools/agent_tools/parent_repository_audit.py list --root <parent-root> \
+  --surface <stable-surface> --scope <tracked-evidence> --format text
+python3 tools/agent_tools/parent_repository_audit.py check --root <parent-root> \
+  --unit-status <pass|closed|failed|deferred|blocked> --format text
+```
+
+unit file は path 昇順、surface selector は CLI の最初の出現順を保持します。未知 surface、
+path escape、missing scope、invalid unit、parent Git missing は typed failure です。scope なしの
+実行は全 tracked path を evidence として数えますが、coverage/overlap を再分類しません。
+submodule 内部は親 tracked universe に展開しません。
+
+unit receipt の集約は、`failed|deferred` を failed、`blocked` を blocked、全て
+`pass|closed` の場合だけ closed とします。finding は owner repair、target readback、close
+まで進め、blocked unit は未完了のまま次 unit へ進みます。
+
+## Validation And Close Condition
+
+変更後は少なくとも次を確認します。
+
+1. `responsibility_scope.py` が全 tracked path に owner 1 件を与える。
+2. 空の ownership glob は no-match failure にならない。
+3. unowned tracked path と overlapping ownership は fail する。
+4. structure contract は path/kind だけを保持し owner/category を持たない。
+5. audit unit は semantic surface を持ち broad path selector を持たない。
+6. `--scope` は evidence のみ、`--surface` は unit selection のみを変える。
+7. legacy migration ID は全 171 件が一つの unit にだけ対応する。
+
+close condition は、owner relation が一意、structure と projection の境界が維持され、
+semantic unit selection と receipt aggregation の focused tests が pass することです。
+
+## One-Time Legacy Migration Ledger
+
+次の表は旧 checklist から unit への一回限りの対応を保持します。実行時の owner map、path
+selector、または新規項目の registry ではありません。
+
+| Stable ID | Canonical audit unit |
+| --- | --- |
+| `PRA-C040` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-C041` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-C042` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-C047` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-C048` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-C049` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-C055` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-C092` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-C093` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-C094` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-C095` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-C096` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-X026` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-X028` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-X029` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-X030` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-X031` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-X035` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-X049` | `documents/parent-repository-audit/audit-unit/ci-hooks-skills.md` |
+| `PRA-C052` | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
+| `PRA-C053` | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
+| `PRA-C054` | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
+| `PRA-C071` | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
+| `PRA-C072` | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
+| `PRA-C073` | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
+| `PRA-C074` | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
+| `PRA-C075` | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
+| `PRA-C076` | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
+| `PRA-C077` | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
+| `PRA-C078` | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
+| `PRA-X032` | `documents/parent-repository-audit/audit-unit/code-type-boundaries.md` |
