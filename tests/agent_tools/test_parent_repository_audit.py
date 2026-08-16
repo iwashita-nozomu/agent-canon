@@ -22,7 +22,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 TOOL = PROJECT_ROOT / "tools" / "agent_tools" / "parent_repository_audit.py"
 sys.path.insert(0, str(PROJECT_ROOT / "tools" / "agent_tools"))
 
-from parent_repository_audit import _load_units  # noqa: E402
+from parent_repository_audit import _load_units
 
 
 class ParentRepositoryAuditTests(unittest.TestCase):
@@ -196,8 +196,7 @@ class ParentRepositoryAuditTests(unittest.TestCase):
             self.assertEqual(
                 payload["unit_paths"],
                 [
-                    "documents/parent-repository-audit/audit-unit/"
-                    "environment-containers.md"
+                    "documents/parent-repository-audit/audit-unit/environment-containers.md"
                 ],
             )
 

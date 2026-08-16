@@ -52,6 +52,10 @@ ownership validation merely because they are absent. Required existence and
 filesystem kind are separate facts and must be declared only in the structure
 contract.
 
+Dependency-header selection is a separate finite path relation owned by
+`documents/design/dependency-contract-kinds.toml`. It is consumed by the
+dependency-header tools and is not stored in the ownership manifest.
+
 Each scope declares:
 
 - `owner`: who owns the surface.

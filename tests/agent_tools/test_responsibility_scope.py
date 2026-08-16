@@ -28,7 +28,7 @@ STARTER_MANIFEST = (
 
 sys.path.insert(0, str(SCRIPT.parent))
 
-from responsibility_scope import scope_covers, scope_from_mapping  # noqa: E402
+from responsibility_scope import scope_covers, scope_from_mapping
 
 
 class ResponsibilityScopeTest(unittest.TestCase):
@@ -149,20 +149,7 @@ class ResponsibilityScopeTest(unittest.TestCase):
             manifest = root / "responsibility-scope.toml"
             manifest.write_text(
                 manifest.read_text(encoding="utf-8")
-                + "\n".join(
-                    [
-                        "",
-                        "[[scope]]",
-                        'id = "evidence"',
-                        'owner = "agent-canon"',
-                        'class = "tooling"',
-                        'description = "Fixture evidence."',
-                        'paths = ["tools/evidence.py"]',
-                        'protecting_tools = ["tools/agent_tools/responsibility_scope.py"]',
-                        'issues = []',
-                        "",
-                    ]
-                ),
+                + '\n[[scope]]\nid = "evidence"\nowner = "agent-canon"\nclass = "tooling"\ndescription = "Fixture evidence."\npaths = ["tools/evidence.py"]\nprotecting_tools = ["tools/agent_tools/responsibility_scope.py"]\nissues = []\n',
                 encoding="utf-8",
             )
 
@@ -227,36 +214,12 @@ class ResponsibilityScopeTest(unittest.TestCase):
         self.write_file(
             root,
             "tools/catalog.yaml",
-            "\n".join(
-                [
-                    "version: 1",
-                    "entries:",
-                    "  - id: responsibility-scope",
-                    "    path: tools/agent_tools/responsibility_scope.py",
-                    "",
-                ]
-            ),
+            "version: 1\nentries:\n  - id: responsibility-scope\n    path: tools/agent_tools/responsibility_scope.py\n",
         )
         self.write_file(
             root,
             "responsibility-scope.toml",
-            "\n".join(
-                [
-                    'catalog_kind = "agent_canon_responsibility_scope"',
-                    "version = 1",
-                    'owner_values = ["agent-canon"]',
-                    'class_values = ["tooling"]',
-                    "[[scope]]",
-                    'id = "fixture"',
-                    'owner = "agent-canon"',
-                    'class = "tooling"',
-                    'description = "Fixture paths."',
-                    'paths = ["tools/**", "tests/**", "responsibility-scope.toml"]',
-                    'protecting_tools = ["tools/agent_tools/responsibility_scope.py"]',
-                    'issues = []',
-                    "",
-                ]
-            ),
+            'catalog_kind = "agent_canon_responsibility_scope"\nversion = 1\nowner_values = ["agent-canon"]\nclass_values = ["tooling"]\n[[scope]]\nid = "fixture"\nowner = "agent-canon"\nclass = "tooling"\ndescription = "Fixture paths."\npaths = ["tools/**", "tests/**", "responsibility-scope.toml"]\nprotecting_tools = ["tools/agent_tools/responsibility_scope.py"]\nissues = []\n',
         )
 
     def write_file(self, root: Path, relative: str, text: str) -> None:

@@ -184,7 +184,7 @@ def load_contract(root: Path, contract_path: str) -> tuple[IgnoreRules, tuple[Pr
     defaults = as_mapping(raw.get("defaults"))
     profiles_raw = raw.get("profile")
     if not isinstance(profiles_raw, list):
-        raise ValueError(f"missing profile list in structure contract: {path}")
+        raise TypeError(f"missing profile list in structure contract: {path}")
     ignore_rules = IgnoreRules(
         names=string_list(defaults.get("ignore_names")),
         globs=string_list(defaults.get("ignore_globs")),
