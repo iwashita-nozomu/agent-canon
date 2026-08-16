@@ -2,7 +2,7 @@
 name: document-canon-cleanup
 description: "Use when organizing repository documents, finding non-canonical docs, separating source canon from generated reports, eval results, closed issues, duplicate headings, or stale document paths."
 ---
-<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"fc3dbad0ce6448e1e53a38847a161ce9824fbef5a5e516c951bb38ab96cca789"} -->
+<!-- materialization-record: {"schema":"agent_canon.skill_runtime_shim.materialization_record","version":2,"record_digest":"e4b1f72fd80e2a9817912e6511c0fa753a9dfdfb5d34bd158a2df447cb3dc5a1"} -->
 
 <!--
 @dependency-start

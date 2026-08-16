@@ -55,15 +55,6 @@ trace が対象責務を覆う。legacy checklist の全移行IDが対応 unit �
 `surface:docs.design-trace`、`surface:docs.reader-map`、`surface:docs.formatter`。design、
 README、Markdown formatter、audit canon の change surface を変更したときだけ本 unit を更新します。
 
-## Scope Patterns
-
-- `pattern:README.md`
-- `pattern:**/README.md`
-- `pattern:documents/**`
-- `pattern:AGENTS.md`
-- `pattern:ROOT_AGENTS.md`
-- `pattern:agents/**`
-
 ## Legacy Migration IDs
 
 PRA-C033 PRA-C034 PRA-C035 PRA-C036 PRA-C037 PRA-C038 PRA-C039 PRA-X022 PRA-X023 PRA-X024 PRA-X025

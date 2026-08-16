@@ -1,12 +1,34 @@
 # @dependency-start
 # contract registry
-# responsibility Registers dependency header contract kinds for AgentCanon manifests.
+# responsibility Registers dependency header contract kinds and changed-file header surfaces.
 # upstream design dependency-manifest-design.md dependency manifest DSL design
-# downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates changed-file contract kinds
+# downstream implementation ../../tools/agent_tools/check_dependency_headers.py validates changed-file contract kinds and surface selection
 # downstream implementation ../../tools/agent_tools/check_dependency_header_format.sh validates registered contract kinds
+# downstream implementation ../../tools/agent_tools/scan_dependency_headers.sh scans the same dependency-owned surfaces
 # @dependency-end
 
 schema = "agent_canon.dependency_contract_kinds.v1"
+
+# Header-required paths are a dependency-policy relation, not repository path
+# ownership. Keep this selection beside the dependency contract registry so
+# responsibility-scope.toml remains the sole path -> owner/class relation.
+header_surfaces = [
+  "AGENTS.md",
+  "ROOT_AGENTS.md",
+  "responsibility-scope.toml",
+  "agent-canon-environment.toml",
+  "agents/canonical/**",
+  "agents/workflows/**",
+  "documents/design/**",
+  "documents/runtime/**",
+  "tools/agent_tools/**",
+  "tools/ci/**",
+  "tools/sync_agent_canon.sh",
+  "rust/**",
+  ".devcontainer/**",
+  ".github/workflows/**",
+  ".github/scripts/**",
+]
 
 allowed_kinds = [
   "agent-runtime",

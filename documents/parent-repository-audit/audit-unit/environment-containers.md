@@ -6,7 +6,7 @@ responsibility Audits Ubuntu direct base, cold-build reproducibility, non-root o
 upstream design ../README.md owns static-first audit policy
 upstream design ../../runtime/runtime-profiles-and-check-matrix.md owns profile validation selection
 upstream implementation ../../../agents/skills/environment-maintenance.md owns environment repair
-downstream implementation ../../../tools/agent_tools/parent_repository_audit.py selects this unit by path
+downstream implementation ../../../tools/agent_tools/parent_repository_audit.py selects this unit by semantic change surface
 @dependency-end
 -->
 
@@ -81,13 +81,6 @@ evidence で pass し、対象 configuration readback が意図した差分だ�
 `surface:environment.containers`、`surface:runtime.profiles`、`surface:devcontainer`、
 `surface:gpu.host-driver`。Docker、devcontainer、profile、safe-directory、container
 validation contract、owner split の変更時だけ本 unit を更新します。
-
-## Scope Patterns
-
-- `pattern:docker/**`
-- `pattern:.devcontainer/**`
-- `pattern:CONTAINER_OPERATIONS.md`
-- `pattern:agent-canon-environment.toml`
 
 ## Legacy Migration IDs
 

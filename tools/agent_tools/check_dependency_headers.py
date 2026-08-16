@@ -57,7 +57,6 @@ BINARY_SNIFF_BYTES = 4096
 CONTRACT_REGISTRY = Path("documents/design/dependency-contract-kinds.toml")
 CONTRACT_LINE_RE = re.compile(r"^contract\s+(?P<kind>[a-z0-9][a-z0-9-]*)$")
 TOML_STRING_RE = re.compile(r'"(?P<value>[a-z0-9][a-z0-9-]*)"')
-RESPONSIBILITY_SCOPE_MANIFEST = Path("responsibility-scope.toml")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -128,29 +127,33 @@ def changed_paths(root: Path) -> list[Path]:
 
 
 def declared_surface_patterns(root: Path) -> tuple[str, ...]:
-    """Read the canonical opt-in header surfaces from responsibility scope."""
-    manifest = root / RESPONSIBILITY_SCOPE_MANIFEST
-    if not manifest.is_file():
+    """Read dependency-owned opt-in header surfaces from the existing registry."""
+    registry = contract_registry_path(root)
+    if not registry.is_file():
         raise ValueError(
-            f"dependency header scope manifest is missing: {manifest}; "
-            "restore responsibility-scope.toml before using --changed or no-path mode"
+            f"dependency contract registry is missing: {registry}; "
+            "restore dependency-contract-kinds.toml before using --changed or no-path mode"
         )
     try:
-        raw = tomllib.loads(manifest.read_text(encoding="utf-8"))
+        raw = tomllib.loads(registry.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         raise ValueError(
-            f"dependency header scope manifest is invalid: {manifest}: {error}"
+            f"dependency contract registry is invalid: {registry}: {error}"
         ) from error
-    values = raw.get("dependency_header_surfaces")
+    if raw.get("schema") != "agent_canon.dependency_contract_kinds.v1":
+        raise ValueError(
+            f"dependency contract registry has an unsupported schema: {registry}"
+        )
+    values = raw.get("header_surfaces")
     if not isinstance(values, list) or not values:
         raise ValueError(
-            f"dependency header scope manifest has no declared surfaces: {manifest}; "
-            "add a non-empty dependency_header_surfaces list"
+            f"dependency contract registry has no declared header surfaces: {registry}; "
+            "add a non-empty header_surfaces list"
         )
     if any(not isinstance(value, str) or not value for value in values):
         raise ValueError(
-            f"dependency header scope manifest contains an invalid surface: {manifest}; "
-            "each dependency_header_surfaces entry must be a non-empty string"
+            f"dependency contract registry contains an invalid header surface: {registry}; "
+            "each header_surfaces entry must be a non-empty string"
         )
     return tuple(value for value in values if isinstance(value, str))
 
@@ -286,22 +289,22 @@ def contract_kind_findings(root: Path, path: Path, allowed_kinds: set[str]) -> l
     ]
     if len(contract_lines) != 1:
         return [
-            f"{relative}: dependency manifest must contain exactly one contract line; "
+            (f"{relative}: dependency manifest must contain exactly one contract line; "
             f"fix: add 'contract <registered-kind>' after @dependency-start and choose the kind "
-            f"from {contract_registry_path(root).as_posix()}"
+            f"from {contract_registry_path(root).as_posix()}")
         ]
     match = CONTRACT_LINE_RE.fullmatch(contract_lines[0])
     if match is None:
         return [
-            f"{relative}: contract line must be: contract <registered-kind>; "
-            f"fix: use lowercase kebab-case from {contract_registry_path(root).as_posix()}"
+            (f"{relative}: contract line must be: contract <registered-kind>; "
+            f"fix: use lowercase kebab-case from {contract_registry_path(root).as_posix()}")
         ]
     contract_kind = match.group("kind")
     if contract_kind not in allowed_kinds:
         return [
-            f"{relative}: unregistered dependency contract kind '{contract_kind}'; "
+            (f"{relative}: unregistered dependency contract kind '{contract_kind}'; "
             f"fix: use an existing allowed_kinds entry from {contract_registry_path(root).as_posix()} "
-            "or update the registry with review"
+            "or update the registry with review")
         ]
     return []
 
@@ -342,7 +345,11 @@ def normalized_surface_bindings(root: Path) -> tuple[tuple[tuple[str, str], ...]
         path = raw_entry.get("path")
         mode = raw_entry.get("mode")
         source = raw_entry.get("source")
-        if not all(isinstance(value, str) for value in (path, mode, source)):
+        if (
+            not isinstance(path, str)
+            or not isinstance(mode, str)
+            or not isinstance(source, str)
+        ):
             return (), ["surface manifest normalized entry has invalid binding fields"]
         if mode not in {"symlink", "copy"} or not source:
             continue

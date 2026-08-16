@@ -3,7 +3,9 @@
 # responsibility Declares canonical-source marker contracts consumed by convention compliance checks.
 # upstream design ../../agents/skills/oop-readability-check.md SOLID checker route ownership
 # upstream design ../../agents/canonical/CODEX_WORKFLOW.md branch reuse and checkout continuity policy
+# upstream design ../../documents/design/entrypoint-owner-map.md root entrypoint responsibility boundary
 # downstream implementation ./check_convention_compliance.py loads marker contracts
+# downstream implementation ./check_entrypoint_owner_map.py rejects operational marker ownership in root entrypoints
 # downstream implementation ../../tests/agent_tools/test_check_convention_compliance.py verifies marker contracts
 # @dependency-end
 
@@ -11,14 +13,11 @@ schema_version = 1
 
 # Skill policy markers belong to agents/skills/<skill>.md canonical prose owners.
 # Generated .agents/skills/<skill>/SKILL.md adapters use dedicated shim readback gates.
+# AGENTS.md and ROOT_AGENTS.md are reader maps; operational marker contracts stay in owners.
 
 [[contracts]]
 id = "design_integrity_gate"
 description = "Implementation starts from an owning responsibility model and semantic decision sufficiency: owner, replaceable unit, implementation mechanism, validation route, unresolved branch, and design_issue_blocker."
-
-[[contracts.surfaces]]
-path = "ROOT_AGENTS.md"
-markers = ["Design Integrity Gate", "owning responsibility model", "owner, replaceable unit", "implementation mechanism", "validation route", "unresolved branch", "design_issue_blocker"]
 
 [[contracts.surfaces]]
 path = "agents/skills/agent-orchestration.md"
@@ -162,14 +161,6 @@ markers = [
     "worktree の remove/move/repair/prune/force-add",
     "ambient 変数や prior segment は authority になりません",
 ]
-
-[[contracts.surfaces]]
-path = "ROOT_AGENTS.md"
-markers = ["Multiple chats or sessions", "unknown dirty", "Proven exact task ownership", "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval", "AGENT_CANON_DESTRUCTIVE_GIT_REASON"]
-
-[[contracts.surfaces]]
-path = "AGENTS.md"
-markers = ["Multiple chats or sessions", "unknown dirty", "Proven exact task ownership", "AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval", "AGENT_CANON_DESTRUCTIVE_GIT_REASON"]
 
 [[contracts.surfaces]]
 path = ".codex/README.md"

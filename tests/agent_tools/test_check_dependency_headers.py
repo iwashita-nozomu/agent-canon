@@ -101,6 +101,20 @@ def run_cli(root: Path, *paths: str, allow_frontmatter: bool = False) -> subproc
     )
 
 
+def write_contract_registry(root: Path, declaration: str) -> None:
+    """Write one dependency registry fixture with header selection and kinds."""
+    registry = root / "documents" / "design" / "dependency-contract-kinds.toml"
+    registry.parent.mkdir(parents=True, exist_ok=True)
+    registry.write_text(
+        'schema = "agent_canon.dependency_contract_kinds.v1"\n'
+        'allowed_kinds = [\n'
+        '  "tool",\n'
+        ']\n'
+        + declaration,
+        encoding="utf-8",
+    )
+
+
 class DependencyHeaderCheckTest(unittest.TestCase):
     """Exercise source-owned dependency header checks through the CLI."""
 
@@ -305,8 +319,9 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / ".git").mkdir()
-            (root / "responsibility-scope.toml").write_text(
-                'dependency_header_surfaces = ["scoped.py"]\n', encoding="utf-8"
+            write_contract_registry(
+                root,
+                'header_surfaces = ["scoped.py"]\n',
             )
             scoped = root / "scoped.py"
             scoped.write_text("# scoped\n" + manifest(contract="tool"), encoding="utf-8")
@@ -325,8 +340,9 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / ".git").mkdir()
-            (root / "responsibility-scope.toml").write_text(
-                'dependency_header_surfaces = ["scoped.py"]\n', encoding="utf-8"
+            write_contract_registry(
+                root,
+                'header_surfaces = ["scoped.py"]\n',
             )
             (root / "scoped.py").write_text("# no header\n", encoding="utf-8")
 
@@ -339,13 +355,16 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
             self.assertEqual(result, 0, output)
             self.assertIn("DEPENDENCY_HEADERS=pass", output)
 
-    def test_changed_mode_fails_closed_without_scope_manifest(self) -> None:
-        """Fail closed when changed mode lacks a responsibility scope manifest."""
+    def test_changed_mode_uses_canonical_registry_without_parent_copy(self) -> None:
+        """Consume AgentCanon's dependency registry without mirroring it into a parent."""
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)
             (root / ".git").mkdir()
-            changed = root / "scoped.py"
-            changed.write_text("# scoped\n", encoding="utf-8")
+            changed = root / "tools" / "agent_tools" / "scoped.py"
+            changed.parent.mkdir(parents=True)
+            changed.write_text(
+                "# scoped\n" + manifest(contract="tool"), encoding="utf-8"
+            )
 
             result, output = self.run_main(
                 root,
@@ -353,21 +372,19 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
                 changed=[changed],
             )
 
-            self.assertNotEqual(result, 0)
-            self.assertIn("scope manifest is missing", output)
+            self.assertEqual(result, 0, output)
+            self.assertIn("DEPENDENCY_HEADERS=pass", output)
 
-    def test_changed_mode_fails_closed_for_invalid_or_empty_scope(self) -> None:
+    def test_changed_mode_fails_closed_for_invalid_or_empty_registry(self) -> None:
         """Fail closed for invalid or empty changed-path scope declarations."""
         for declaration in (
-            "dependency_header_surfaces = [\n",
-            "dependency_header_surfaces = []\n",
+            "header_surfaces = [\n",
+            "header_surfaces = []\n",
         ):
             with self.subTest(declaration=declaration), tempfile.TemporaryDirectory() as tmp_dir:
                 root = Path(tmp_dir)
                 (root / ".git").mkdir()
-                (root / "responsibility-scope.toml").write_text(
-                    declaration, encoding="utf-8"
-                )
+                write_contract_registry(root, declaration)
                 changed = root / "scoped.py"
                 changed.write_text("# scoped\n", encoding="utf-8")
 
@@ -378,7 +395,7 @@ class DependencyHeaderSourceSelectionTest(unittest.TestCase):
                 )
 
                 self.assertNotEqual(result, 0)
-                self.assertIn("scope manifest", output)
+                self.assertIn("dependency contract registry", output)
 
 
 if __name__ == "__main__":
