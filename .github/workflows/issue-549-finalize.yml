@@ -1,0 +1,129 @@
+# @dependency-start
+# contract configuration
+# responsibility One-time branch-local assembly and validation for Issue #549 before the branch is rewritten to a clean final commit.
+# upstream design ../../documents/design/responsibility-scope-management.md canonical path ownership relation
+# upstream implementation ../../tools/agent_tools/skill_shim_materializer.py generated runtime adapter fixed point
+# downstream implementation ../../tests/agent_tools/test_responsibility_scope.py focused ownership regression
+# @dependency-end
+
+name: Issue 549 Finalize
+
+on:
+  push:
+    branches:
+      - fix/549-path-ownership-boundary
+    paths:
+      - .github/workflows/issue-549-finalize.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: issue-549-finalize-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Issue branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install focused validation dependencies
+        run: |
+          python3 -m pip install --upgrade pyyaml tomli packaging pytest ruff pyright
+          sudo apt-get update
+          sudo apt-get install -y tree
+
+      - name: Assemble the canonical design ledger
+        run: |
+          cat .issue-549-design.part-00 \
+              .issue-549-design.part-01 \
+              .issue-549-design.part-02 \
+              .issue-549-design.part-03 \
+            > documents/design/parent-repository-audit.md
+          printf '%s  %s\n' \
+            '11690482006b371a6c979307e4c0e78e443b2ea36da13ef59d46e17a7a89a8cf' \
+            'documents/design/parent-repository-audit.md' | sha256sum --check --strict
+          git rm .issue-549-design.part-00 \
+                 .issue-549-design.part-01 \
+                 .issue-549-design.part-02 \
+                 .issue-549-design.part-03
+          git add documents/design/parent-repository-audit.md
+
+      - name: Materialize and read back runtime skill adapters
+        env:
+          AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
+        run: |
+          python3 tools/agent_tools/skill_shim_materializer.py \
+            materialize --root . --all --format text
+          python3 tools/agent_tools/skill_shim_materializer.py \
+            materialize --root . --all --format text | tee /tmp/issue-549-materialize-second.txt
+          grep -F 'SKILL_SHIM_MATERIALIZER_CONTENT_DELTA_COUNT=0' \
+            /tmp/issue-549-materialize-second.txt
+          python3 tools/agent_tools/skill_shim_materializer.py \
+            check --root . --all --format text
+
+      - name: Validate ownership, structure, audit semantics, and focused regressions
+        run: |
+          python3 tools/agent_tools/responsibility_scope.py \
+            --root . --manifest responsibility-scope.toml --format text
+          tree -a -J --noreport -I '.git|.pytest_cache|__pycache__' . > /tmp/issue-549-tree.json
+          python3 tools/agent_tools/repo_structure_contract.py \
+            --root . --profile agent_canon_standalone \
+            --tree-json /tmp/issue-549-tree.json --format text
+          PYTHONPATH=tools/agent_tools \
+            python3 tools/agent_tools/parent_repository_audit.py \
+            check --root . --unit-status pass --format text
+          PYTHONPATH=tools/agent_tools python3 -m unittest -v \
+            tests.agent_tools.test_responsibility_scope \
+            tests.agent_tools.test_parent_repository_audit \
+            tests.agent_tools.test_repo_structure_contract
+          python3 -m py_compile \
+            tools/agent_tools/responsibility_scope.py \
+            tools/agent_tools/repo_structure_contract.py \
+            tools/agent_tools/parent_repository_audit.py \
+            tests/agent_tools/test_responsibility_scope.py \
+            tests/agent_tools/test_repo_structure_contract.py \
+            tests/agent_tools/test_parent_repository_audit.py
+          ruff check \
+            tools/agent_tools/responsibility_scope.py \
+            tools/agent_tools/repo_structure_contract.py \
+            tools/agent_tools/parent_repository_audit.py \
+            tests/agent_tools/test_responsibility_scope.py \
+            tests/agent_tools/test_repo_structure_contract.py \
+            tests/agent_tools/test_parent_repository_audit.py
+          pyright \
+            tools/agent_tools/responsibility_scope.py \
+            tools/agent_tools/repo_structure_contract.py \
+            tools/agent_tools/parent_repository_audit.py \
+            tests/agent_tools/test_responsibility_scope.py \
+            tests/agent_tools/test_repo_structure_contract.py \
+            tests/agent_tools/test_parent_repository_audit.py
+          git diff --check
+
+      - name: Upload generated canonical files
+        uses: actions/upload-artifact@v4
+        with:
+          name: issue-549-generated
+          path: |
+            documents/design/parent-repository-audit.md
+            .agents/skills/parent-repository-audit/SKILL.md
+          if-no-files-found: error
+
+      - name: Commit generated canonical files
+        run: |
+          git add -A
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'chore: materialize Issue 549 canonical artifacts'
+          git push origin HEAD:fix/549-path-ownership-boundary
