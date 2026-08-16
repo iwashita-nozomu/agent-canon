@@ -3,6 +3,7 @@
 # responsibility Defines deterministic run-bundle evals for observable agent behavior.
 # upstream design README.md eval directory contract
 # upstream design ../../templates/agents/workflow_monitoring.md stores behavior events during a run
+# upstream design ../../documents/runtime/task-contract-observation.md defines task contract observation coverage
 # downstream implementation ../../tools/agent_tools/evaluate_agent_run.py consumes these criteria
 # downstream implementation ../../tests/agent_tools/test_evaluate_agent_run.py verifies behavior scoring
 # @dependency-end
@@ -227,4 +228,31 @@ forbidden_any = [
   "active_subagents:",
   "max_write_subagents:",
   "profile_fallback=",
+]
+
+[[criteria]]
+name = "task_contract_observation_coverage_recorded"
+max_score = 10
+source = "bundle"
+feedback = "Record every activated task contract with the canonical schema, or record one explicit no-observation event, then run task_contract_observation.py to prove complete coverage."
+required_all = [
+  "contract_observation_schema=agent-canon.task-contract-observation.v1",
+  "task_contract_observation_eval_status=pass",
+  "task_contract_observation_digest=",
+  "task_contract_observation_coverage=complete",
+]
+required_any = [
+  "contract_observation=observed",
+  "contract_observation=none",
+]
+
+[[criteria]]
+name = "task_contract_resolution_and_archive_route_recorded"
+max_score = 10
+source = "bundle"
+feedback = "Close blocked or violated contract observations to a terminal outcome and route the run bundle to agent-canon-log agent-reports."
+required_all = [
+  "task_contract_resolution=terminal",
+  "task_contract_observation_unresolved=none",
+  "contract_archive_route=agent-canon-log:agent-reports",
 ]

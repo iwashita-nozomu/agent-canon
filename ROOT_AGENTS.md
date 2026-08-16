@@ -6,9 +6,14 @@ responsibility Routes an explicitly selected live AgentCanon parent integration 
 upstream design documents/design/entrypoint-owner-map.md root entrypoint grammar and responsibility boundary
 upstream design documents/runtime/SHARED_RUNTIME_SURFACES.md explicit live-agent-canon integration boundary
 upstream design documents/runtime/shared-runtime-surfaces.toml live integration manifest
+upstream design documents/runtime/task-contract-observation.md task contract observation and archive route
+upstream design documents/runtime/runtime-log-archive.md durable agent-canon-log ownership
+upstream design documents/tools/search-coordination.md coordinated search owner
 upstream design documents/conventions/software-engineering-principles.md contract-complete engineering decision policy
 upstream design agents/canonical/CODEX_WORKFLOW.md executable task and closeout owner
 upstream design agents/canonical/CODEX_SUBAGENTS.md subagent lifecycle owner
+upstream design agents/workflows/agent-canon-pr-workflow.md shared AgentCanon PR workflow
+downstream data evidence/agent-evals/skill_workflow_prompt_eval.toml validates root routing
 downstream implementation tools/agent_tools/check_entrypoint_owner_map.py validates thin entrypoint structure
 downstream implementation tools/agent_tools/check_agent_runtime_alignment.py validates runtime owner-map alignment
 @dependency-end
@@ -36,11 +41,14 @@ or network access as a fallback.
 | Task intent | Canonical owner in an explicit live integration |
 | --- | --- |
 | request interpretation and task transport | `vendor/agent-canon/agents/skills/agent-orchestration.md`, `vendor/agent-canon/agents/skills/codex-task-workflow.md` |
+| search, read scope, and reuse survey | `vendor/agent-canon/documents/tools/search-coordination.md`, `tools/bin/agent-canon semantic-index`, `vendor/agent-canon/tools/agent_tools/search.py`, dependency review artifacts |
 | contract-complete implementation and engineering basis | `vendor/agent-canon/documents/conventions/software-engineering-principles.md`, `vendor/agent-canon/agents/skills/comprehensive-development.md`, task-specific Skill |
 | mathematical, algorithmic, and numerical obligations | `vendor/agent-canon/documents/design/semantic-responsibility-contract.md`, selected proof / optimization Skill |
 | design-to-implementation correspondence | `vendor/agent-canon/agents/internal-routines/design-implementation-correspondence.md` |
 | repository structure and responsibility boundaries | parent structure owner plus `vendor/agent-canon/agents/skills/structure-refactor.md` when selected |
 | branch, worktree, and destructive Git safety | `vendor/agent-canon/agents/skills/worktree-health.md`, canonical workflow, active hooks |
+| task contract observation and durable archive | `vendor/agent-canon/documents/runtime/task-contract-observation.md`, `vendor/agent-canon/tools/agent_tools/task_contract_observation.py`, `vendor/agent-canon/documents/runtime/runtime-log-archive.md`, `agent-canon-log` |
+| shared AgentCanon update and PR evidence | `vendor/agent-canon/tools/update_agent_canon.sh`, `vendor/agent-canon/tools/sync_agent_canon.sh`, AgentCanon PR workflow, `agentcanon_structure_followup` |
 | AgentCanon source update and root projection | `vendor/agent-canon/agents/skills/agent-canon-update.md`, update route |
 | subagent activation and handoff | orchestration, subagent Skill, and canonical subagent inventory |
 | validation profile and closeout | `vendor/agent-canon/documents/runtime/runtime-profiles-and-check-matrix.md`, canonical workflow, closeout tools |
@@ -68,6 +76,7 @@ This entrypoint only routes to that contract.
 | subagent lifecycle, same-role instances, wave ledger | `vendor/agent-canon/agents/canonical/CODEX_SUBAGENTS.md` | `workflow_monitor.py` |
 | role behavior and stage conditions | `vendor/agent-canon/.codex/agents/*.toml` | `check_agent_runtime_alignment.py` |
 | skill routing and public skill surface | `vendor/agent-canon/agents/skills/catalog.yaml` | `python3 tools/agent-canon/agent_tools/route.py --prompt` |
+| contract observation and archive evidence | `vendor/agent-canon/documents/runtime/task-contract-observation.md` | `task_contract_observation.py`, then runtime-log archive readback |
 | report and closeout structure | `vendor/agent-canon/tools/agent_tools/task_close.py` | `closeout gate` |
 | explicit live integration surface | `vendor/agent-canon/documents/runtime/shared-runtime-surfaces.toml` | `surface_manifest.py` |
 | entrypoint responsibility grammar | `vendor/agent-canon/documents/design/entrypoint-owner-map.md` | `check_entrypoint_owner_map.py` |
