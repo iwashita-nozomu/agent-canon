@@ -72,6 +72,25 @@ jobs:
             /tmp/issue-549-materialize-second.txt
           python3 tools/agent_tools/skill_shim_materializer.py \
             check --root . --all --format text
+          cp .agents/skills/parent-repository-audit/SKILL.md \
+            /tmp/issue-549-parent-repository-audit-SKILL.md
+          git restore --source=HEAD --worktree --staged .agents/skills
+          install -m 0644 /tmp/issue-549-parent-repository-audit-SKILL.md \
+            .agents/skills/parent-repository-audit/SKILL.md
+          git add .agents/skills/parent-repository-audit/SKILL.md
+          PYTHONPATH=tools/agent_tools python3 - <<'PY'
+          from pathlib import Path
+          from skill_shim_materializer import build_context, build_rows
+
+          root = Path('.').resolve()
+          context = build_context(root)
+          _, rendered, _ = build_rows(context)
+          actual = (root / '.agents/skills/parent-repository-audit/SKILL.md').read_text(
+              encoding='utf-8'
+          )
+          assert actual == rendered['parent-repository-audit']
+          print('ISSUE_549_PARENT_SHIM_FIXED_POINT=pass')
+          PY
 
       - name: Validate ownership, structure, audit semantics, and focused regressions
         run: |
