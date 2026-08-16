@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # @dependency-start
 # contract tool
-# responsibility Validates AgentCanon responsibility scopes and their protecting tools.
+# responsibility Validates the total single-owner relation from tracked repository paths to responsibility scopes.
 # upstream design ../../responsibility-scope.toml machine-readable repo-local scope manifest
 # upstream design ../../templates/documents/responsibility-scope.template.toml starter manifest for template-derived repositories
 # upstream design ../../documents/design/responsibility-scope-management.md scope ownership policy
+# upstream design ../../documents/structure/repo-structure-contract.toml separate path existence and kind contract
 # upstream design ../../tools/catalog.yaml structured tool ownership
 # upstream design ../../tools/README.md tool entrypoint index
 # upstream design ../../documents/tools/README.md user-facing tool index
@@ -168,20 +169,8 @@ def import_rule_from_mapping(raw_rule: Mapping[str, object]) -> ImportRule:
     )
 
 
-def has_glob(pattern: str) -> bool:
-    """Return whether one path pattern contains glob syntax."""
-    return any(token in pattern for token in ("*", "?", "["))
-
-
-def pattern_matches(root: Path, pattern: str) -> bool:
-    """Return whether one scope path pattern matches current tree content."""
-    if has_glob(pattern):
-        return any(root.glob(pattern))
-    return (root / pattern).exists()
-
-
 def pattern_covers(pattern: str, required_path: str) -> bool:
-    """Return whether a scope pattern covers a required path."""
+    """Return whether a scope pattern covers one existing tracked path."""
     if pattern == required_path:
         return True
     if pattern.endswith("/**"):
@@ -220,15 +209,9 @@ def validate_scope_shape(
     return findings
 
 
-def validate_scope_paths(root: Path, scope: Scope) -> list[Finding]:
-    """Validate one scope's path and issue references."""
+def validate_scope_references(root: Path, scope: Scope) -> list[Finding]:
+    """Validate durable issue references without imposing path existence policy."""
     findings: list[Finding] = []
-    for pattern in scope.paths:
-        if not pattern_matches(root, pattern):
-            findings.append(Finding("scope_path", scope.scope_id, f"no-match:{pattern}"))
-    for pattern in scope.exclude_paths:
-        if not pattern_matches(root, pattern):
-            findings.append(Finding("scope_exclude_path", scope.scope_id, f"no-match:{pattern}"))
     for issue in scope.issues:
         if not (root / issue).is_file():
             findings.append(Finding("scope_issue", scope.scope_id, f"missing:{issue}"))
@@ -257,15 +240,6 @@ def validate_protecting_tools(
     return findings
 
 
-def coverage_findings(required: Sequence[str], scopes: Sequence[Scope]) -> list[Finding]:
-    """Return findings for required paths not covered by any scope."""
-    findings: list[Finding] = []
-    for required_path in required:
-        if not any(scope_covers(scope, required_path) for scope in scopes):
-            findings.append(Finding("coverage", required_path, "uncovered-required-path"))
-    return findings
-
-
 def tracked_paths(root: Path) -> tuple[str, ...]:
     """Return tracked paths when git is available, otherwise repository files."""
     result = subprocess.run(
@@ -288,12 +262,14 @@ def tracked_paths(root: Path) -> tuple[str, ...]:
     return tuple(sorted(paths))
 
 
-def overlap_findings(root: Path, scopes: Sequence[Scope]) -> list[Finding]:
-    """Return findings for files claimed by more than one scope."""
+def ownership_findings(paths: Sequence[str], scopes: Sequence[Scope]) -> list[Finding]:
+    """Validate that tracked-path ownership is a total single-valued relation."""
     findings: list[Finding] = []
-    for path in tracked_paths(root):
+    for path in paths:
         scope_ids = tuple(scope.scope_id for scope in scopes if scope_covers(scope, path))
-        if len(scope_ids) > 1:
+        if not scope_ids:
+            findings.append(Finding("scope_unowned", path, "no-owning-scope"))
+        elif len(scope_ids) > 1:
             findings.append(Finding("scope_overlap", path, "scopes:" + ",".join(scope_ids)))
     return findings
 
@@ -347,10 +323,10 @@ def validate(root: Path, manifest: str) -> ScopeReport:
             findings.append(Finding("scope", scope.scope_id, "duplicate-id"))
         seen.add(scope.scope_id)
         findings.extend(validate_scope_shape(scope, owners, classes))
-        findings.extend(validate_scope_paths(scope_root, scope))
+        findings.extend(validate_scope_references(scope_root, scope))
         findings.extend(validate_protecting_tools(scope_root, scope, catalog_paths))
-    findings.extend(coverage_findings(string_tuple(data.get("required_coverage")), scopes))
-    findings.extend(overlap_findings(scope_root, scopes))
+    tracked = tracked_paths(scope_root)
+    findings.extend(ownership_findings(tracked, scopes))
     findings.extend(validate_import_rules(scopes, import_rules))
     return ScopeReport(
         scopes,

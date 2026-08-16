@@ -87,10 +87,20 @@ cd "$ROOT_DIR"
 ROOT_DIR="$(pwd -P)"
 
 load_declared_surfaces() {
-  local manifest="$ROOT_DIR/responsibility-scope.toml"
-  [[ -f "$manifest" ]] || return 0
-  awk '
-    /^dependency_header_surfaces[[:space:]]*=[[:space:]]*\[/ { in_block = 1; next }
+  local registry="${DEPENDENCY_CONTRACT_KIND_REGISTRY:-}"
+  if [[ -z "$registry" && -f "$ROOT_DIR/documents/design/dependency-contract-kinds.toml" ]]; then
+    registry="$ROOT_DIR/documents/design/dependency-contract-kinds.toml"
+  elif [[ -z "$registry" && -f "$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml" ]]; then
+    registry="$ROOT_DIR/vendor/agent-canon/documents/design/dependency-contract-kinds.toml"
+  elif [[ -z "$registry" ]]; then
+    local script_path script_dir
+    script_path="$(readlink -f "${BASH_SOURCE[0]}")"
+    script_dir="$(cd "$(dirname "$script_path")" && pwd)"
+    registry="$(realpath -m "$script_dir/../../documents/design/dependency-contract-kinds.toml")"
+  fi
+  [[ -f "$registry" ]] || return 0
+  awk '''
+    /^header_surfaces[[:space:]]*=[[:space:]]*\[/ { in_block = 1; next }
     in_block && /^[[:space:]]*\]/ { exit }
     in_block {
       line = $0
@@ -99,7 +109,7 @@ load_declared_surfaces() {
         line = substr(line, RSTART + RLENGTH)
       }
     }
-  ' "$manifest"
+  ''' "$registry"
 }
 mapfile -t DECLARED_SURFACES < <(load_declared_surfaces)
 

@@ -57,13 +57,6 @@ test output と変更 source の readback が一致する。実行不能なら `
 `surface:tests.oracle`、`surface:runtime.validation`、`surface:code.behavior`。production
 contract、test oracle、validation matrix、test routing の変更時だけ本 unit を更新します。
 
-## Scope Patterns
-
-- `pattern:tests/**`
-- `pattern:cpp/tests/**`
-- `pattern:pyproject.toml`
-- `pattern:.github/workflows/**`
-
 ## Legacy Migration IDs
 
 PRA-C050 PRA-C051 PRA-X034
