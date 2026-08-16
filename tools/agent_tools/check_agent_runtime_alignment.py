@@ -38,6 +38,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 try:
     from .fixture_spawn import (
         bootstrap_fixture_public_environment,
@@ -63,7 +65,6 @@ except ImportError:
         resolve_parent_writer_attestation,
     )
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from typing import cast
 
 import model_profile_registry
