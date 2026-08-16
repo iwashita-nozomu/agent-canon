@@ -9,9 +9,10 @@ upstream design ../agents_config.json permanent team role ownership and write po
 upstream design ../canonical/CODEX_SUBAGENTS.md Codex subagent inventory and activation contract
 upstream design ../internal-routines/design-implementation-correspondence.md cross-surface design-to-implementation correspondence route
 upstream design ../../documents/conventions/software-engineering-principles.md contract-first decision precedence and responsibility-boundary policy
+upstream design ../../documents/design/semantic-responsibility-contract.md semantic action and verification-owner allocation
+upstream design ../../documents/design/entrypoint-owner-map.md root entrypoint responsibility migration boundary
 @dependency-end
 -->
-
 
 ## Purpose
 
@@ -45,6 +46,34 @@ handoff には、全原則の checklist ではなく、実際に判断へ影響�
 OOP / SOLID specialization は class、state、inheritance、`Protocol`、public object model が material に
 変わる場合だけ選びます。
 
+## Contract-Complete Implementation Basis
+
+この skill が束ねる implementation は、行数、file 数、diff の小ささを completion condition にしません。
+候補の中から、要求された contract、invariant、reachable failure、cleanup、migration、validation を
+閉じる最小の owning unit を選びます。必要な責務を落とした「最小実装」、既存 check を通すだけの
+wrapper / fallback、temporary route、test relaxation は、単純化ではなく未完了として扱います。
+
+material な mechanism decision は、既存の task packet / design trace に次の情報を接続します。
+新しい universal schema や全原則 checklist は作りません。
+
+| Evidence | Required content |
+| --- | --- |
+| contract | input / output、invariant、failure semantics、compatibility のうち変更に関係するもの |
+| owner | state、effect、recovery、validation を閉じる canonical owner と complete owning unit |
+| mechanism | 採用する algorithm、architecture、protocol、resource strategy、migration route |
+| basis | 数理導出、proof obligation、complexity / error bound、conditioning、停止条件、公式仕様、domain model、workload model、measurement、benchmark、failure analysis、標準のうち判断を支える evidence |
+| alternatives | 少なくとも現実に競合した候補、棄却理由、cost / risk / compatibility trade-off |
+| oracle | contract を判定できる test、static property、proof、measurement、readback |
+
+数式や外部文献は、判断がそれを必要とするときだけ使います。単純な rename や明示された定数置換へ
+形式的 proof を追加する必要はありません。一方、algorithm の停止、numerical tolerance、近似誤差、
+concurrency ordering、resource capacity、performance claim、reliability boundary を material に変える場合、
+直感や既存値の踏襲だけを basis にしません。
+
+必要な basis または oracle が得られない場合は、placeholder implementation で成功へ変換せず、
+不足する design clause、必要な evidence、owner、再開条件を blocker として残します。review は
+「check が green」という事実と、変更した contract が立証されたことを区別します。
+
 ## Use When
 
 - implementation、docs、tooling、Docker、CI を同時に整理する
@@ -59,6 +88,7 @@ OOP / SOLID specialization は class、state、inheritance、`Protocol`、public
 - `agents/canonical/CODEX_SUBAGENTS.md`
 - `agents/COMMUNICATION_PROTOCOL.md`
 - `documents/conventions/software-engineering-principles.md`
+- `documents/design/semantic-responsibility-contract.md`
 
 ## Standard Bundle
 
@@ -74,13 +104,14 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 
 1. family を `Comprehensive Development` に固定します。
 1. current requirement と owning contract を読み、material な engineering principle clause、canonical owner、forbidden interpretation を固定します。
+1. material な mechanism decision について、contract、owner、mechanism、basis、alternatives、oracle を既存 task packet / design trace に接続します。
 1. `agents/task_catalog.yaml` の `comprehensive_development` family から `spawn_budget`、`role_topology`、`roles`、`subagent_prompt` を読みます。
 1. `agents/agents_config.json` で permanent team role ownership、required output、write policy を確認します。
 1. `agents/canonical/CODEX_SUBAGENTS.md` で Codex inventory、activation、runtime surface を確認します。
 1. run bundle を作り、`workflow=<family>`, `skills=<...>`, `review=<...>` と catalog / config 由来の route を宣言します。
 1. `agents/COMMUNICATION_PROTOCOL.md` の fresh context capsule と bounded source packet を使って、stage ごとに subagent handoff を作ります。
 1. write-capable work は approved design trace から導いた bounded slice に限定し、親が integration order と validation rerun を管理します。
-1. closeout では `project_reviewer` を integration gate として使い、canonical contract、selected principle clause、catalog / config / inventory と実 diff の同期を確認します。
+1. closeout では `project_reviewer` を integration gate として使い、canonical contract、selected principle clause、implementation basis、catalog / config / inventory と実 diff の同期を確認します。
 
 ## Parent-Managed Write Scope
 
@@ -95,3 +126,4 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 - Docker / CI が中心なら `Platform And Environment` を使います。
 - 外部調査と experiment が主役なら `Research-Driven Change` を使います。
 - 一般原則の意味、優先順位、誤用防止はこの skill に複製せず、canonical policy を参照します。
+- root `AGENTS.md` / `ROOT_AGENTS.md` は owner route だけを持ち、本節の basis contract を複製しません。
