@@ -122,8 +122,24 @@ def test_runtime_alignment_environment_restores_after_body_failure() -> None:
     assert dict(os.environ) == previous
 
 
+def test_alignment_workspace_keeps_repository_identity_as_a_product_component() -> None:
+    """Repository, workspace, report, and tool roots cannot collapse to one path."""
+    product = _function_source("alignment_workspace")
+
+    assert "identity_resolution = resolve_agent_canon_source_root" in product
+    assert "repository_roots = resolve_repository_roots" in product
+    assert (
+        "repository_root=identity_resolution.current_repository_root.resolve()"
+        in product
+    )
+    assert "workspace_root=workspace_root" in product
+    assert "report_root=report_root" in product
+    assert "repository_roots=repository_roots" in product
+    assert "root projections disagree on the public tool view" in product
+
+
 def test_runtime_alignment_public_tool_view_is_source_backed_not_copied() -> None:
-    """The fixture owns the public name while source owns executable bytes."""
+    """The repository owns the public name while source owns executable bytes."""
     materialize = _load_public_tool_projection()
 
     with tempfile.TemporaryDirectory(prefix="agent-canon-runtime-tool-view-") as directory:
@@ -134,10 +150,12 @@ def test_runtime_alignment_public_tool_view_is_source_backed_not_copied() -> Non
         marker = source_tools / "owner-marker.txt"
         marker.write_text("source-owned\n", encoding="utf-8")
 
-        workspace_root = root / "fixture" / "workspace"
+        repository_root = root / "fixture-repository"
+        workspace_root = repository_root / "scratch" / "workspace"
         workspace_root.mkdir(parents=True)
-        public_tool_root = workspace_root / "tools" / "agent-canon"
+        public_tool_root = repository_root / "tools" / "agent-canon"
         workspace = SimpleNamespace(
+            repository_root=repository_root,
             workspace_root=workspace_root,
             repository_roots=SimpleNamespace(
                 public_tool_root=public_tool_root,
@@ -155,12 +173,42 @@ def test_runtime_alignment_public_tool_view_is_source_backed_not_copied() -> Non
         )
 
 
+def test_runtime_alignment_public_tool_view_rejects_workspace_escape() -> None:
+    """A repository-owned public path cannot authorize an external workspace."""
+    materialize = _load_public_tool_projection()
+
+    with tempfile.TemporaryDirectory(prefix="agent-canon-runtime-escape-") as directory:
+        root = Path(directory)
+        source_root = root / "source"
+        (source_root / "tools").mkdir(parents=True)
+        repository_root = root / "fixture-repository"
+        repository_root.mkdir()
+        external_workspace = root / "external-workspace"
+        external_workspace.mkdir()
+        workspace = SimpleNamespace(
+            repository_root=repository_root,
+            workspace_root=external_workspace,
+            repository_roots=SimpleNamespace(
+                public_tool_root=repository_root / "tools" / "agent-canon",
+                agentcanon_source_root=source_root,
+            ),
+        )
+
+        try:
+            materialize(workspace)
+        except RuntimeError as error:
+            assert "workspace escapes repository identity" in str(error)
+        else:
+            raise AssertionError("external workspace was accepted")
+
+
 def test_runtime_alignment_public_tool_projection_has_no_copy_or_install_lane() -> None:
     """Public-view construction cannot become a second tool-product owner."""
     function = _function_source("_materialize_alignment_public_tool_view")
     initializer = _function_source("initialize_alignment_workspace")
 
-    assert 'workspace.workspace_root / "tools" / "agent-canon"' in function
+    assert 'workspace.repository_root.resolve(strict=True)' in function
+    assert 'repository_root / "tools" / "agent-canon"' in function
     assert '(source_root / "tools").resolve()' in function
     assert "symlink_to(source_tools, target_is_directory=True)" in function
     assert "_materialize_alignment_public_tool_view(workspace)" in initializer
