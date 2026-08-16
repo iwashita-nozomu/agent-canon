@@ -69,6 +69,33 @@ An unavailable pydocstyle tool or its diagnostics fail only the explicit
 review command.
 AgentCanon development prompt and accumulated eval producers belong to the standalone static-gates owner; derived shared gates do not invoke them or apply their diagnostics to parent-owned documents.
 
+## Diagnostic Evidence And Completion Evidence
+
+A focused unit/regression test is diagnostic evidence unless that test itself is
+the canonical oracle owned by the changed responsibility. It may prove that a
+counterexample is reproduced, a root cause is isolated, or a local repair now
+satisfies one invariant; it does not automatically prove that the formal caller,
+consumer projection, runtime boundary, or clean replay remains correct.
+
+When a changed responsibility has a boundary or acceptance oracle, completion
+requires that selected canonical route in addition to focused diagnostics. The
+route may be a property/exhaustive check, public API or canonical entrypoint,
+caller/provider integration, canonical image, fresh clone, remote-only check, or
+other owner-defined acceptance. Do not add all of these mechanically; execute
+only the oracle selected by the changed contract and risk class.
+
+If that canonical acceptance cannot be observed because the required environment,
+capability, runner, permission, or external system is unavailable, preserve the
+focused result as partial evidence and report the acceptance as unverified. Do
+not convert a focused pass into verified completion and do not weaken, replace,
+or duplicate the canonical oracle merely to obtain green status.
+
+Regression additions follow the implementation/review owner: bind the witness to
+a canonical invariant, prefer consolidation into an existing property/table/
+finite-state/boundary oracle, and avoid test-side copies of parser, classifier,
+state, lifecycle, or environment semantics. This document selects validation
+routes; it does not create a second regression taxonomy or test registry.
+
 ## Validation Failure Response
 
 After any validation test/check failure, do not simplify, revert, delete intended behavior/tests, weaken the oracle, or downscope required validation just to pass.
