@@ -37,8 +37,8 @@ required_fields = [
 ]
 
 owner_markers = [
-  "Model the complete requested work as a dependency DAG",
-  "lexicographic order",
+  "Use a dependency/overlap graph only when the selected work has real ordering",
+  "lexicographic, in this order",
   "minimum decision-relevant total work",
   "Dispatch every ready node that is non-conflicting and admissible",
   "Batch remote reads",
@@ -50,7 +50,7 @@ owner_markers = [
   "zero blocking findings",
   "Invalidate only evidence affected by the repaired node",
   "Wait only when the useful ready set is empty",
-  "prompt-keyword routing is not a scheduling signal",
+  "prompt-keyword routing is never a scheduling signal",
   "no fixed duration, elapsed-time limit, or timeout cutoff may cut the requested scope",
 ]
 
@@ -159,7 +159,7 @@ required_markers = [
   "Execution-Time-Aware Queue Specialization",
   "batched queue snapshot",
   "independent candidates",
-  "one initial owning review for each candidate epoch",
+  "Each candidate epoch gets one initial owning review",
   "focused recheck",
   "same warm worker and reviewer context",
   "merge candidates in dependency order",
