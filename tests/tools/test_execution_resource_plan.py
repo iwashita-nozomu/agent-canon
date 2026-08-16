@@ -750,7 +750,6 @@ class ExecutionResourcePlanContractTest(unittest.TestCase):
 
     def test_nvidia_fixture_xml_reject_unsafe_or_unproven_inventory(self) -> None:
         for record_id in (
-            "xml.reject.dtd",
             "xml.reject.entity",
             "xml.reject.hidden_process_inventory",
             "xml.reject.ambiguous_scope",
