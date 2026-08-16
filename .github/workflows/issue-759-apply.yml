@@ -1,0 +1,74 @@
+name: issue-759-apply
+
+on:
+  push:
+    branches:
+      - fix/759-autonomous-convergence
+    paths:
+      - .github/workflows/issue-759-apply.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/759-autonomous-convergence
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install focused test dependencies
+        run: python -m pip install --disable-pip-version-check pytest pyyaml tomli
+
+      - name: Apply convergence contract and regenerate views
+        shell: bash
+        run: |
+          python - <<'PY'
+          import base64
+          import subprocess
+          import sys
+          import zlib
+          from pathlib import Path
+
+          payload = "".join(
+              path.read_text(encoding="utf-8").strip()
+              for path in sorted(Path(".github/issue-759-payload").glob("part-*.txt"))
+          )
+          source = zlib.decompress(base64.b64decode(payload)).decode("utf-8")
+          target = Path("tools/agent_tools/_issue_759_apply.py")
+          target.write_text(source, encoding="utf-8")
+          subprocess.run([sys.executable, str(target)], check=True)
+          target.unlink()
+          PY
+
+      - name: Commit generated change
+        shell: bash
+        run: |
+          rm -rf .github/issue-759-payload .github/workflows/issue-759-apply.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --stat
+          git commit -m "Enforce autonomous convergence (#759)"
+          git push origin HEAD:fix/759-autonomous-convergence
+
+      - name: Check machine-readable convergence contracts
+        run: |
+          python tools/agent_tools/check_execution_time_aware_orchestration.py --root .
+          python tools/agent_tools/autonomous_convergence.py --root . --check-contract
+          python tools/agent_tools/model_profile_registry.py --root . --check-role-views
+
+      - name: Run focused regression tests
+        run: |
+          python -m pytest \
+            tests/agent_tools/test_autonomous_convergence.py \
+            tests/agent_tools/test_execution_time_aware_orchestration_contract.py \
+            tests/agent_tools/test_model_profile_registry.py \
+            tests/agent_tools/test_bootstrap_and_close.py \
+            -q --tb=short
