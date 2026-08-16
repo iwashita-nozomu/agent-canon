@@ -45,6 +45,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y tree
 
+      - name: Preserve finalizer replacement literals
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path('.github/scripts/issue_549_finalize.py')
+          text = path.read_text(encoding='utf-8')
+          old = 'fallback_pattern.subn(fallback_test, text, count=1)'
+          new = 'fallback_pattern.subn(lambda _match: fallback_test, text, count=1)'
+          if text.count(old) != 1:
+              raise SystemExit('unexpected fallback replacement site')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
       - name: Assemble final branch tree
         run: python3 .github/scripts/issue_549_finalize.py
 
