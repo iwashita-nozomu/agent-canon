@@ -6,6 +6,7 @@ on:
       - fix/759-autonomous-convergence
     paths:
       - .github/workflows/issue-759-apply.yml
+      - .github/issue-759-payload/**
 
 permissions:
   contents: write
@@ -31,6 +32,7 @@ jobs:
         run: |
           python - <<'PY'
           import base64
+          import hashlib
           import subprocess
           import sys
           import zlib
@@ -40,6 +42,12 @@ jobs:
               path.read_text(encoding="utf-8").strip()
               for path in sorted(Path(".github/issue-759-payload").glob("part-*.txt"))
           )
+          expected_digest = "20433fa356d1c6595f770a70a6484ab53c8ba7f5f92107d85e42163314e5b4aa"
+          actual_digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+          if actual_digest != expected_digest:
+              raise SystemExit(
+                  f"issue-759 payload digest mismatch: expected={expected_digest} actual={actual_digest}"
+              )
           source = zlib.decompress(base64.b64decode(payload)).decode("utf-8")
           target = Path("tools/agent_tools/_issue_759_apply.py")
           target.write_text(source, encoding="utf-8")
