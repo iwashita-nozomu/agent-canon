@@ -33,6 +33,7 @@ resolved_by: https://github.com/iwashita-nozomu/agent-canon/pull/753
 - PR #753 was squash-merged as `5e6d88e49049bd96115b2b0727ddc868f19a6ff7`.
 - Durable closeout baseline: `main@5e6d88e49049bd96115b2b0727ddc868f19a6ff7`.
 - Durable closeout branch: `docs/752-close-durable-record`.
+- Durable closeout PR: https://github.com/iwashita-nozomu/agent-canon/pull/756.
 - Pre-merge review state: zero review submissions and zero review threads.
 - Remaining verification: none.
 
@@ -131,8 +132,8 @@ Validated head `605ff5ba9e96140f0aae086cc44f22e499f804ca`:
 - Merge commit `5e6d88e49049bd96115b2b0727ddc868f19a6ff7` contains only the canonical skill contract and
   its durable Issue record; no project_template implementation was added.
 - The first protected-main Issue Mirror sync correctly projected the still-open durable record
-  and therefore reopened GitHub Issue #752. This closeout moves the canonical record to
+  and therefore reopened GitHub Issue #752. PR #756 moves the canonical record to
   `issues/closed/` with `status: resolved`, preventing future main-push sync from restoring the
   obsolete in-progress state.
-- GitHub Issue #752 contains the branch, validated head, PR, merge commit, final review basis,
-  checks, and label-reconciliation evidence.
+- GitHub Issue #752 contains the branch, validated head, PR #753, merge commit, closeout PR #756,
+  final review basis, checks, and label-reconciliation evidence.
