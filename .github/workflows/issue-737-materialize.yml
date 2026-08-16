@@ -33,6 +33,9 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Install validation dependencies
+        run: python3 -m pip install --upgrade pytest pyyaml tomli packaging
+
       - name: Merge latest main
         run: |
           git config user.name "github-actions[bot]"
@@ -215,9 +218,6 @@ jobs:
         run: |
           python3 tools/agent_tools/skill_shim_materializer.py materialize --root . --all
           python3 tools/agent_tools/skill_shim_materializer.py readback --root . --all
-
-      - name: Install validation dependencies
-        run: python3 -m pip install --upgrade pytest pyyaml tomli packaging
 
       - name: Validate direct and managed GPU contracts
         run: |
