@@ -51,8 +51,7 @@ jobs:
       - name: Normalize focused formatting
         run: |
           ruff check --fix --unsafe-fixes \
-            tests/agent_tools/test_responsibility_scope.py \
-            tests/agent_tools/test_check_dependency_headers.py
+            tests/agent_tools/test_responsibility_scope.py
 
       - name: Materialize canonical runtime views
         env:
