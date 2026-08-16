@@ -20,6 +20,9 @@ jobs:
   materialize:
     if: ${{ !contains(github.event.head_commit.message, '[materialized-737]') }}
     runs-on: ubuntu-latest
+    env:
+      AGENT_CANON_PARENT_ROOT: ${{ github.workspace }}
+      AGENT_CANON_ACTIVE_REPOSITORY_ROOT: ${{ github.workspace }}
     steps:
       - name: Checkout issue branch
         uses: actions/checkout@v4
