@@ -175,10 +175,25 @@ jobs:
 
           runpy.run_path(str(extracted / ".issue737" / "bootstrap_patch.py"))
 
+          for relative in (
+              "tools/experiments/gpu_command_admission.py",
+              "tools/experiments/run_gpu_command.py",
+          ):
+              path = root / relative
+              text = path.read_text(encoding="utf-8")
+              text = text.replace(
+                  "# upstream contract ",
+                  "# upstream implementation ",
+              ).replace(
+                  "# downstream contract ",
+                  "# downstream implementation ",
+              )
+              path.write_text(text, encoding="utf-8")
+
           direct_doc = root / "documents/experiments/gpu-direct-command.md"
           direct_text = direct_doc.read_text(encoding="utf-8")
           direct_text = (
-              direct_text.replace(r"\(", "$",).replace(r"\)", "$")
+              direct_text.replace(r"\(", "$").replace(r"\)", "$")
               .replace(r"\[", "$$\n").replace(r"\]", "\n$$")
           )
           direct_doc.write_text(direct_text, encoding="utf-8")
