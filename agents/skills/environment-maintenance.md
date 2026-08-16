@@ -181,6 +181,9 @@ docker build -f docker/Dockerfile -t <rootrepo> .
 docker run --rm <rootrepo> testrunner.sh
 ```
 
+- static owner preflight は `python3 tools/ci/container_config.py` で Dockerfile、public runner、
+  container configuration の静的な責務関係を検査します。この preflight は上記 exact command
+  pair の一部でも代替でもなく、acceptance evidence は fresh image の build と run だけです。
 - command pair は target repository Git root を current directory として、同じ `<rootrepo>`
   image name/tag で実行します。Dockerfile、context、runner、test list、source、tests、
   standard-test dependency が image 側にあることを確認します。
