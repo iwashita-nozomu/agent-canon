@@ -1584,26 +1584,33 @@ skill_families:
         - ["preallocation", "experiment"]
         - ["notebook", "artifact", "experiment"]
   - id: gpu-execution
-    purpose: Route GPU/CUDA/JAX/XLA/IREE execution through managed ExperimentRunner-backed runs with preallocation disabled and GPU blocker evidence preserved.
+    purpose: Route GPU/CUDA/JAX/XLA/IREE execution through provider-independent full-UUID admission by default, with the managed ExperimentRunner adapter only for managed experiment lifecycle contracts.
     canonical_doc: agents/skills/gpu-execution.md
     shim: .agents/skills/gpu-execution/SKILL.md
     discovery:
       name: gpu-execution
-      description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX/XLA/IREE backend execution, GPU validation blockers, nvidia-smi evidence, CUDA_VISIBLE_DEVICES handling, ExperimentRunner-based Python runs, or JAX/XLA preallocation-disabled execution."
+      description: "Use when planning, running, validating, or diagnosing GPU/CUDA/JAX/XLA/IREE execution, free-GPU admission, full UUID or MIG selection, nvidia-smi evidence, arbitrary pytest/benchmark/diagnostic argv, managed ExperimentRunner runs, GPU validation blockers, or preallocation-disabled JAX/XLA execution."
     tool_commands:
       required: []
       conditional:
+      - python3 tools/experiments/run_gpu_command.py --gpu-count 1 --min-free-memory <bytes> -- <argv...>
+      - python3 -m tools.experiments.run_managed_experiment --topic <topic> --variant <variant> -- <inner argv...>
+      - python3 -m pytest tests/tools/test_run_gpu_command.py -q
       - python3 tools/agent_tools/route.py --prompt "<user request>" --format json
       maintenance:
       - python3 tools/agent_tools/check_skill_frontmatter.py --root .
       - python3 tools/agent_tools/skill_tool_commands.py check
     routing:
       stage_policy: active
-      reason: GPU/CUDA/JAX/XLA execution, ExperimentRunner Python execution, or preallocation-disabled validation is in scope
+      reason: GPU/CUDA/JAX/XLA execution, provider-independent direct admission, managed experiment execution, or preallocation-disabled validation is in scope
       triggers:
         - ["gpu", "実行"]
         - ["gpu", "利用"]
         - ["gpu", "検証"]
+        - ["gpu", "空き"]
+        - ["free gpu"]
+        - ["gpu", "command"]
+        - ["run_gpu_command"]
         - ["cuda", "実行"]
         - ["cuda", "backend"]
         - ["jax", "gpu"]
@@ -1616,6 +1623,8 @@ skill_families:
         - ["experiment_runner"]
         - ["python", "experimentrunner"]
         - ["python", "実行", "experimentrunner"]
+        - ["pytest", "gpu"]
+        - ["benchmark", "gpu"]
         - ["preallocation", "disable"]
         - ["preallocate", "false"]
         - ["xla_python_client_preallocate"]
