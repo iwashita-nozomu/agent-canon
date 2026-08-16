@@ -242,10 +242,6 @@ jobs:
               "header_surfaces",
           )
           test_text = test_text.replace(
-              "test_changed_mode_fails_closed_without_scope_manifest",
-              "test_changed_mode_fails_closed_without_contract_registry",
-          )
-          test_text = test_text.replace(
               "test_changed_mode_fails_closed_for_invalid_or_empty_scope",
               "test_changed_mode_fails_closed_for_invalid_or_empty_registry",
           )
@@ -254,13 +250,41 @@ jobs:
               "dependency contract registry",
           )
           test_text = test_text.replace(
-              "scope manifest is missing",
-              "dependency contract registry is missing",
-          )
-          test_text = test_text.replace(
               "scope manifest",
               "dependency contract registry",
           )
+          missing_registry_pattern = re.compile(
+              r"    def test_changed_mode_fails_closed_without_scope_manifest\(self\) -> None:\n"
+              r".*?(?=\n    def test_changed_mode_fails_closed_for_invalid_or_empty_registry)",
+              re.DOTALL,
+          )
+          canonical_fallback_test = '''    def test_changed_mode_uses_canonical_registry_without_parent_copy(self) -> None:
+              """Consume AgentCanon's dependency registry without mirroring it into a parent."""
+              with tempfile.TemporaryDirectory() as tmp_dir:
+                  root = Path(tmp_dir)
+                  (root / ".git").mkdir()
+                  changed = root / "tools" / "agent_tools" / "scoped.py"
+                  changed.parent.mkdir(parents=True)
+                  changed.write_text(
+                      "# scoped\\n" + manifest(contract="tool"), encoding="utf-8"
+                  )
+
+                  result, output = self.run_main(
+                      root,
+                      ["--root", str(root), "--changed"],
+                      changed=[changed],
+                  )
+
+                  self.assertEqual(result, 0, output)
+                  self.assertIn("DEPENDENCY_HEADERS=pass", output)
+          '''
+          test_text, replacement_count = missing_registry_pattern.subn(
+              canonical_fallback_test,
+              test_text,
+              count=1,
+          )
+          if replacement_count != 1:
+              raise SystemExit("canonical registry fallback test replacement failed")
           test_path.write_text(test_text, encoding="utf-8")
 
           scope_doc = Path("documents/design/responsibility-scope-management.md")
@@ -308,27 +332,43 @@ jobs:
           python3 tools/agent_tools/skill_shim_materializer.py \
             check --root . --all --format text
 
-      - name: Validate Issue 549 contracts
-        env:
-          PYTHONPATH: tools/agent_tools
-        shell: bash
+      - name: Validate canonical tracked ownership
         run: |
-          set -euo pipefail
           python3 tools/agent_tools/responsibility_scope.py \
             --root . --manifest responsibility-scope.toml --format text
+
+      - name: Validate structure existence and kinds
+        run: |
           tree -a -J --noreport \
             -I '.git|.pytest_cache|.ruff_cache|__pycache__' . \
             > /tmp/issue-549-tree.json
           python3 tools/agent_tools/repo_structure_contract.py \
             --root . --profile agent_canon_standalone \
             --tree-json /tmp/issue-549-tree.json --format text
+
+      - name: Validate semantic parent audit selection
+        env:
+          PYTHONPATH: tools/agent_tools
+        run: |
           python3 tools/agent_tools/parent_repository_audit.py \
             check --root . --unit-status pass --format text
+
+      - name: Run ownership and structure regressions
+        env:
+          PYTHONPATH: tools/agent_tools
+        run: |
           python3 -m unittest -v \
             tests.agent_tools.test_responsibility_scope \
             tests.agent_tools.test_parent_repository_audit \
-            tests.agent_tools.test_repo_structure_contract \
-            tests.agent_tools.test_check_dependency_headers
+            tests.agent_tools.test_repo_structure_contract
+
+      - name: Run dependency header regressions
+        env:
+          PYTHONPATH: tools/agent_tools
+        run: python3 -m unittest -v tests.agent_tools.test_check_dependency_headers
+
+      - name: Validate focused Python sources
+        run: |
           python3 -m py_compile \
             tools/agent_tools/responsibility_scope.py \
             tools/agent_tools/repo_structure_contract.py \
@@ -352,13 +392,21 @@ jobs:
             tools/agent_tools/repo_structure_contract.py \
             tools/agent_tools/parent_repository_audit.py \
             tools/agent_tools/check_dependency_headers.py
+
+      - name: Validate Python dependency selection
+        run: python3 tools/agent_tools/check_dependency_headers.py --root .
+
+      - name: Validate shell dependency selection
+        run: |
           bash -n tools/agent_tools/scan_dependency_headers.sh
           bash -n tools/agent_tools/check_dependency_header_format.sh
-          python3 tools/agent_tools/check_dependency_headers.py --root .
           bash tools/agent_tools/scan_dependency_headers.sh \
             --root . --changed --fail-missing
           bash tools/agent_tools/check_dependency_header_format.sh \
             --root . --changed --require-header
+
+      - name: Validate tool drift and final diff
+        run: |
           python3 tools/agent_tools/tool_drift.py --root .
           git diff --check
 
