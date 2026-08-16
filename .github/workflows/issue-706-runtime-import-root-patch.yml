@@ -1,0 +1,69 @@
+name: Issue 706 runtime import-root patch
+
+on:
+  push:
+    branches:
+      - fix/docker-run-repository-tests-20260814
+
+permissions:
+  contents: write
+
+jobs:
+  apply-runtime-import-root-patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout active branch
+        uses: actions/checkout@v4
+        with:
+          ref: fix/docker-run-repository-tests-20260814
+          fetch-depth: 0
+          persist-credentials: true
+
+      - name: Move source-root projection before central adapter imports
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("tools/agent_tools/check_agent_runtime_alignment.py")
+          text = path.read_text(encoding="utf-8")
+          before = '''from pathlib import Path
+
+try:
+    from .fixture_spawn import (
+'''
+          after = '''from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+try:
+    from .fixture_spawn import (
+'''
+          if text.count(before) != 1:
+              raise SystemExit("runtime import prelude did not match exactly once")
+          text = text.replace(before, after, 1)
+          stale = '''
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from typing import cast
+'''
+          replacement = '''
+from typing import cast
+'''
+          if text.count(stale) != 1:
+              raise SystemExit("stale late source-root projection did not match exactly once")
+          text = text.replace(stale, replacement, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Commit source correction and remove transient workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/issue-706-runtime-import-root-patch.yml
+          git add tools/agent_tools/check_agent_runtime_alignment.py
+          git diff --check --cached
+          git commit -m "fix: project source root before fixture imports (#706)"
+          git push origin HEAD:fix/docker-run-repository-tests-20260814
