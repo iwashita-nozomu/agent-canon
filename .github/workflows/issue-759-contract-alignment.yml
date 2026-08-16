@@ -1,0 +1,76 @@
+name: issue-759-contract-alignment
+
+on:
+  push:
+    branches:
+      - fix/759-autonomous-convergence
+    paths:
+      - .github/workflows/issue-759-contract-alignment.yml
+
+permissions:
+  contents: write
+
+jobs:
+  align-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/759-autonomous-convergence
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Align semantic markers with the bounded owner prose
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("agents/skills/agent-orchestration.execution-contract.toml")
+          text = path.read_text(encoding="utf-8")
+          replacements = {
+              '"Model the complete requested work as a dependency DAG",':
+                  '"Use a dependency/overlap graph only when the selected work has real ordering",',
+              '"lexicographic order",':
+                  '"lexicographic, in this order",',
+              '"prompt-keyword routing is not a scheduling signal",':
+                  '"prompt-keyword routing is never a scheduling signal",',
+              '"one initial owning review for each candidate epoch",':
+                  '"Each candidate epoch gets one initial owning review",',
+          }
+          for old, new in replacements.items():
+              if text.count(old) != 1:
+                  raise SystemExit(f"expected one contract marker: {old}")
+              text = text.replace(old, new, 1)
+          path.write_text(text, encoding="utf-8")
+          PY
+
+      - name: Commit contract alignment
+        run: |
+          rm .github/workflows/issue-759-contract-alignment.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --stat
+          git commit -m "Align convergence contract markers (#759)"
+          git push origin HEAD:fix/759-autonomous-convergence
+
+      - name: Install focused test dependencies
+        run: python -m pip install --disable-pip-version-check pytest pyyaml tomli
+
+      - name: Check convergence contracts
+        run: |
+          python tools/agent_tools/check_execution_time_aware_orchestration.py --root .
+          python tools/agent_tools/autonomous_convergence.py --root . --check-contract
+          python tools/agent_tools/model_profile_registry.py --root . --check-role-views
+
+      - name: Run focused regression tests
+        run: |
+          python -m pytest \
+            tests/agent_tools/test_autonomous_convergence.py \
+            tests/agent_tools/test_execution_time_aware_orchestration_contract.py \
+            tests/agent_tools/test_model_profile_registry.py \
+            tests/agent_tools/test_bootstrap_and_close.py \
+            -q --tb=short
