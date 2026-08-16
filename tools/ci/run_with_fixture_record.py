@@ -68,10 +68,57 @@ def _validated_command(argv: Sequence[str]) -> tuple[str, ...]:
     return command
 
 
+def _channel_state(
+    environment: Mapping[str, str],
+    *,
+    parent_key: str,
+    handoff_key: str,
+    required_key: str,
+    label: str,
+) -> str:
+    """Classify one canonical three-field transport as absent or complete."""
+    parent = environment.get(parent_key, "")
+    handoff = environment.get(handoff_key, "")
+    required = environment.get(required_key, "")
+    if not parent and not handoff and not required:
+        return "absent"
+    if parent and handoff and required == "1":
+        return "complete"
+    raise ParentRootSideEffectError(
+        ParentRootReject.HANDOFF_INVALID,
+        f"{label}_channel_incomplete",
+    )
+
+
 def _bootstrap_process_environment(
     ambient: Mapping[str, str],
 ) -> dict[str, str]:
-    """Remove inherited identity channels before opening an independent owner."""
+    """Classify and remove inherited identity before opening an owner session."""
+    public_state = _channel_state(
+        ambient,
+        parent_key=SIDE_EFFECT_PARENT_ROOT_ENV,
+        handoff_key=SIDE_EFFECT_HANDOFF_ENV,
+        required_key=SIDE_EFFECT_REQUIRED_ENV,
+        label="public",
+    )
+    private_state = _channel_state(
+        ambient,
+        parent_key=PRIVATE_RECORD_PARENT_ROOT_ENV,
+        handoff_key=PRIVATE_RECORD_HANDOFF_ENV,
+        required_key=PRIVATE_RECORD_REQUIRED_ENV,
+        label="private_record",
+    )
+    if private_state == "complete":
+        if public_state != "complete":
+            raise ParentRootSideEffectError(
+                ParentRootReject.HANDOFF_INVALID,
+                "private_record_without_public_supervisor",
+            )
+        raise ParentRootSideEffectError(
+            ParentRootReject.HANDOFF_INVALID,
+            "fixture_record_capability_already_present",
+        )
+
     environment = dict(ambient)
     for key in _CHANNEL_KEYS:
         environment.pop(key, None)
@@ -122,7 +169,7 @@ def run_with_fixture_record(
     os.environ.update(bootstrap_environment)
     process: subprocess.Popen[bytes] | None = None
     interrupted_signal: int | None = None
-    previous_handlers: dict[int, signal.Handlers] = {}
+    previous_handlers: dict[int, object] = {}
 
     try:
         with public_session(
@@ -191,7 +238,7 @@ def run_with_fixture_record(
         if process is not None:
             _terminate_process_group(process)
         for signum, handler in previous_handlers.items():
-            signal.signal(signum, handler)
+            signal.signal(signum, handler)  # pyright: ignore[reportArgumentType]
         os.environ.clear()
         os.environ.update(ambient)
 
