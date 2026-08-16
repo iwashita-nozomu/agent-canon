@@ -140,8 +140,6 @@ paths = [
 ]
 protecting_tools = [
   "tools/agent_tools/check_agent_runtime_alignment.py",
-  "tools/agent_tools/skill_shim_materializer.py",
-  "tools/agent_tools/skill_graph.py",
 ]
 issues = []
 
@@ -170,6 +168,7 @@ paths = [
   "documents/evals/**",
   "documents/runtime/runtime-log-archive.md",
   "documents/runtime/runtime-log-archive-migration.md",
+  "reports/**",
   "tools/agent_tools/eval_accumulation_check.py",
   "tools/agent_tools/eval_learning.py",
   "tools/agent_tools/eval_trend.py",
@@ -197,11 +196,7 @@ paths = [
 ]
 protecting_tools = [
   "tools/agent_tools/eval_accumulation_check.py",
-  "tools/agent_tools/eval_learning.py",
-  "tools/agent_tools/hook_outcome_review.py",
   "tools/agent_tools/runtime_log_archive_git.py",
-  "tools/agent_tools/runtime_log_paths.py",
-  "tools/agent_tools/skill_evaluation.py",
 ]
 issues = []
 
@@ -307,7 +302,6 @@ paths = [
 ]
 protecting_tools = [
   "tools/ci/check_github_workflows.py",
-  "tools/agent_tools/github_status_lifecycle.py",
 ]
 issues = []
 
@@ -320,8 +314,8 @@ paths = [
   "vendor/**",
 ]
 protecting_tools = [
-  "tools/agent_tools/task_authority.py",
-  "tools/agent_tools/vendor_import.py",
+  "tools/agent_tools/vendor_skill_adapters.py",
+  "tools/agent_tools/responsibility_scope.py",
 ]
 issues = []
 
