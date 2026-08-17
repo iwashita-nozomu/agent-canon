@@ -1,4 +1,4 @@
-# deterministic source-patch finalization rerun
+# canonical-format finalization rerun
 name: issue-759-finite-convergence-finalization
 
 on:
@@ -109,6 +109,11 @@ jobs:
           chmod +x \
             tools/agent_tools/autonomous_convergence.py \
             tools/agent_tools/check_execution_time_aware_orchestration.py
+          python -m ruff format \
+            tools/agent_tools/autonomous_convergence.py \
+            tools/agent_tools/check_execution_time_aware_orchestration.py \
+            tests/agent_tools/test_autonomous_convergence.py \
+            tests/agent_tools/test_execution_time_aware_orchestration_contract.py
           python tools/agent_tools/model_profile_registry.py --root . --projection consumer-static --generate-role-views
 
       - name: Check owner and generated-consumer alignment
