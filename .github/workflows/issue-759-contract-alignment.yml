@@ -1,3 +1,4 @@
+# runtime-shim fixture alignment rerun
 name: issue-759-finite-convergence-finalization
 
 on:
@@ -76,6 +77,8 @@ jobs:
             .github/issue-759-payload-checker.txt \
             .github/issue-759-payload-contract-tests.txt \
             .github/workflows/issue-759-contract-alignment.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --stat
           git commit -m "fix: enforce finite autonomous convergence (#759)"
