@@ -1,13 +1,4 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical terra model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
 # source canonical digest: 9c04473a57afa40f203131e9a701e9d788270c8e21080cf00a5abcb830ade647
 
 name = "terra"

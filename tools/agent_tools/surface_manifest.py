@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 
 try:
@@ -584,6 +585,58 @@ def render_root_absent_paths(entries: Iterable[SurfaceEntry]) -> str:
     return "\n".join(lines)
 
 
+def git_index_paths(root: Path) -> frozenset[str] | None:
+    """Return index paths, or None when repository state cannot be inspected."""
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(root), "ls-files", "-z", "--"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if completed.returncode != 0:
+        return None
+    return frozenset(path for path in completed.stdout.split("\0") if path)
+
+
+def path_has_index_entry(path: str, index_paths: frozenset[str]) -> bool:
+    """Return whether the index contains a path or one of its descendants."""
+    normalized = path.rstrip("/")
+    prefix = f"{normalized}/"
+    return normalized in index_paths or any(
+        index_path.startswith(prefix) for index_path in index_paths
+    )
+
+
+def render_actionable_root_absent_paths(
+    entries: Iterable[SurfaceEntry], root: Path
+) -> str:
+    """Render R ∩ (E ∪ I), excluding root-absence fixed points.
+
+    R is the manifest-declared root-absence set, E is the set of paths that
+    currently exist in the worktree, and I is the set represented in the Git
+    index. A path absent from both E and I is already at the desired fixed point
+    and must not be reintroduced into a Git pathspec. If index inspection is not
+    available, the full declarative set is retained as a conservative fallback.
+    """
+    candidates = [
+        entry.path
+        for entry in entries
+        if entry.mode in {"removed_legacy", "standalone_only"}
+    ]
+    index_paths = git_index_paths(root)
+    if index_paths is None:
+        return "\n".join(candidates)
+    actionable = [
+        path
+        for path in candidates
+        if os.path.lexists(root / path) or path_has_index_entry(path, index_paths)
+    ]
+    return "\n".join(actionable)
+
+
 def normalized_snapshot(manifest: SurfaceManifest) -> Mapping[str, object]:
     """Return the strict DTO consumed by non-Python graph producers.
 
@@ -665,6 +718,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as exc:
         print(f"SURFACE_MANIFEST_ERROR={exc}", file=sys.stderr)
         return 1
+    if args.command == "root-absent-paths":
+        print(render_actionable_root_absent_paths(manifest.entries, root))
+        return 0
     outputs = render_command_outputs(manifest, root)
     if args.command in outputs:
         print(outputs[args.command])

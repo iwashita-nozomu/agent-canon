@@ -1,13 +1,4 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical reproducibility_reviewer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
 # source canonical digest: c50595c4dc87d1eda2d269aa864cce6e243d35d8c63e2336237a5933ba98831d
 
 name = "reproducibility_reviewer"

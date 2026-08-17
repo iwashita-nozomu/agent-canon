@@ -1,13 +1,4 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical report_reviewer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
 # source canonical digest: d5d3e11fcec742198d5b8c68059e1f23c11e888e203499555323a9178a558561
 
 name = "report_reviewer"

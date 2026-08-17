@@ -1,13 +1,4 @@
-# @dependency-start
-# contract configuration
-# responsibility Projects the canonical prompt_config_reviewer model profile into executable Codex settings.
-# upstream implementation ../../agents/model_profiles.toml owns model/profile authority
-# upstream implementation ../../tools/agent_tools/model_profile_registry.py materializes this view
-# downstream implementation ../../tools/agent_tools/check_agent_runtime_alignment.py validates projection parity
-# @dependency-end
 # generated role view: generated_role_view_v1
-# generated from agents/model_profiles.toml plus canonical team/runtime role metadata
-# materializer: tools/agent_tools/model_profile_registry.py
 # source canonical digest: dae3bd6ab1f49f16434bee17b81fe057151372603d5272b1bfd58256cd2fe0e6
 
 name = "prompt_config_reviewer"
