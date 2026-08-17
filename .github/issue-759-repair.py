@@ -9,33 +9,7 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-PAYLOADS = [
-    (
-        "tools/agent_tools/autonomous_convergence.py",
-        ".github/issue-759-payload-autonomous.txt",
-        "d8c015131a6d21e5ada871073b1f9836acc29b703851bc24904e08accbd42453",
-    ),
-    (
-        "tests/agent_tools/test_autonomous_convergence.py",
-        ".github/issue-759-payload-autonomous-tests.txt",
-        "08dc2824884191e633d6b848b728138218be56fb19407c813937229808a5d6a2",
-    ),
-    (
-        "agents/skills/agent-orchestration.execution-contract.toml",
-        ".github/issue-759-payload-contract.txt",
-        "e5a65f979d2474508f2b668d873979e05d1fcd1095452361e8e2a1aae1dce9a1",
-    ),
-    (
-        "tools/agent_tools/check_execution_time_aware_orchestration.py",
-        ".github/issue-759-payload-checker.txt",
-        "2016d8c7bdf84c97ec3c1fef07c0a8fc6e635b9c748538ce9f394f10d315b271",
-    ),
-    (
-        "tests/agent_tools/test_execution_time_aware_orchestration_contract.py",
-        ".github/issue-759-payload-contract-tests.txt",
-        "507dda78aabf127631818de841a12bef6477c8303f4d6db105918d6767aeb5dc",
-    ),
-]
+PAYLOADS = [('tools/agent_tools/autonomous_convergence.py', '.github/issue-759-payload-autonomous.txt', 'a64fc3a27dd2a61098cb32cc06c02d2b440743a1e4d94dbc0a6ba10e84ad8f69'), ('tests/agent_tools/test_autonomous_convergence.py', '.github/issue-759-payload-autonomous-tests.txt', '51495943b262a91ea76418c7528f80120f8d397380602abda030a40f79d02382'), ('agents/skills/agent-orchestration.execution-contract.toml', '.github/issue-759-payload-contract.txt', 'e5a65f979d2474508f2b668d873979e05d1fcd1095452361e8e2a1aae1dce9a1'), ('tools/agent_tools/check_execution_time_aware_orchestration.py', '.github/issue-759-payload-checker.txt', '915700f6b1f0364660338de871ca6a5e0ad6b5ae9b6368554b6ec7bbaeb69573'), ('tests/agent_tools/test_execution_time_aware_orchestration_contract.py', '.github/issue-759-payload-contract-tests.txt', '507dda78aabf127631818de841a12bef6477c8303f4d6db105918d6767aeb5dc')]
 
 
 def main() -> int:

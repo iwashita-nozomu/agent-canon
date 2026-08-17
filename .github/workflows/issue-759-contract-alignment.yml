@@ -1,4 +1,4 @@
-# ruff-aligned finalization rerun
+# deterministic source-patch finalization rerun
 name: issue-759-finite-convergence-finalization
 
 on:
@@ -37,6 +37,75 @@ jobs:
       - name: Materialize reviewed finite-state implementation
         run: |
           python .github/issue-759-repair.py
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              "tools/agent_tools/autonomous_convergence.py": [
+                  (
+                      "from dataclasses import dataclass, fields\n"
+                      "from pathlib import Path\n"
+                      "from typing import Iterable, Mapping, Sequence\n",
+                      "from collections.abc import Iterable, Mapping, Sequence\n"
+                      "from dataclasses import dataclass, fields\n"
+                      "from pathlib import Path\n",
+                  ),
+                  (
+                      "    if enforce_terminal_gate and state.terminal_state in {\"ship\", \"handoff\"}:\n"
+                      "        if not _terminal_ready(state):\n"
+                      "            raise ConvergenceContractError(\n"
+                      "                \"terminal_state:terminal_gate_not_satisfied\"\n"
+                      "            )\n",
+                      "    if (\n"
+                      "        enforce_terminal_gate\n"
+                      "        and state.terminal_state in {\"ship\", \"handoff\"}\n"
+                      "        and not _terminal_ready(state)\n"
+                      "    ):\n"
+                      "        raise ConvergenceContractError(\n"
+                      "            \"terminal_state:terminal_gate_not_satisfied\"\n"
+                      "        )\n",
+                  ),
+              ],
+              "tools/agent_tools/check_execution_time_aware_orchestration.py": [
+                  (
+                      "    if consumer_id != EXPECTED_OWNER_SKILL and owner_heading:\n"
+                      "        if text.count(owner_heading):\n"
+                      "            add(\n"
+                      "                findings,\n"
+                      "                \"duplicate_local_scheduling_definition\",\n"
+                      "                path,\n"
+                      "                \"owner-definition-present\",\n"
+                      "            )\n",
+                      "    if (\n"
+                      "        consumer_id != EXPECTED_OWNER_SKILL\n"
+                      "        and owner_heading\n"
+                      "        and text.count(owner_heading)\n"
+                      "    ):\n"
+                      "        add(\n"
+                      "            findings,\n"
+                      "            \"duplicate_local_scheduling_definition\",\n"
+                      "            path,\n"
+                      "            \"owner-definition-present\",\n"
+                      "        )\n",
+                  ),
+              ],
+              "tests/agent_tools/test_autonomous_convergence.py": [
+                  (
+                      "from autonomous_convergence import (  # noqa: E402\n",
+                      "from autonomous_convergence import (\n",
+                  ),
+              ],
+          }
+
+          for path_string, changes in replacements.items():
+              path = Path(path_string)
+              text = path.read_text(encoding="utf-8")
+              for old, new in changes:
+                  if text.count(old) != 1:
+                      raise SystemExit(f"unexpected patch cardinality for {path}: {old!r}")
+                  text = text.replace(old, new)
+              path.write_text(text, encoding="utf-8")
+          PY
           chmod +x \
             tools/agent_tools/autonomous_convergence.py \
             tools/agent_tools/check_execution_time_aware_orchestration.py
