@@ -1,4 +1,4 @@
-# runtime-shim fixture alignment rerun
+# ruff-aligned finalization rerun
 name: issue-759-finite-convergence-finalization
 
 on:
@@ -37,6 +37,9 @@ jobs:
       - name: Materialize reviewed finite-state implementation
         run: |
           python .github/issue-759-repair.py
+          chmod +x \
+            tools/agent_tools/autonomous_convergence.py \
+            tools/agent_tools/check_execution_time_aware_orchestration.py
           python tools/agent_tools/model_profile_registry.py --root . --projection consumer-static --generate-role-views
 
       - name: Check owner and generated-consumer alignment
