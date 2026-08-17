@@ -291,19 +291,24 @@ replaceable responsibility unit, not a file-sized chunk or timed slice. Direct
 owner edits and one-writer tasks need no manufactured DAG or schedule artifact;
 prompt-keyword routing is never a scheduling signal.
 
-The optimization objective is to minimize makespan subject to responsibility
-completeness and correctness. Efficiency is therefore a scheduling objective,
-never permission to omit, split, weaken, or prematurely close a required node.
-Runtime observations may inform ordering, but no fixed duration, elapsed-time
-limit, or timeout cutoff may cut the requested scope. An operational timeout
-may mark a node blocked and trigger recovery; it may not turn incomplete work
-into completion.
+The optimization objective is lexicographic, in this order: request
+completeness and correctness, minimum decision-relevant total work, then
+minimum makespan. Makespan therefore never makes extra parallel review,
+implementation, or validation work free. A ready action is admissible only
+when it can change the decision tuple `(owner, implementation mechanism,
+validation route, terminal state)`, strictly decrease the unresolved measure
+defined below, or open a typed new candidate epoch from new evidence.
+Efficiency is never permission to omit, split, weaken, or prematurely close a
+required node. Runtime observations may inform ordering, but no fixed duration,
+elapsed-time limit, or timeout cutoff may cut the requested scope. An
+operational timeout may mark a node blocked and trigger recovery; it may not
+turn incomplete work into completion.
 
 When coordination is selected, dispatch decisions:
 
 1. Refresh only the dependency and collision edges that can change the next
    owner, order, or merge decision.
-2. Dispatch every ready non-conflicting responsibility unit under actual
+2. Dispatch every ready node that is non-conflicting and admissible under actual
    capacity; serialize colliding units and do not invent timed stages.
 3. Batch remote reads, queue snapshots, and tool operations that share an
    authority, input, or readback boundary. Preserve each node's identity and
@@ -318,6 +323,27 @@ When coordination is selected, dispatch decisions:
 6. Wait only when the useful ready set is empty. Record the predecessor,
    conflict, capacity, or external-state blocker that makes it empty, then
    resume when that state changes. Waiting is not an elapsed-time scope gate.
+
+For autonomous review and repair, one exact candidate digest defines one
+candidate epoch. The initial owning review runs at most once in that epoch and
+returns stable blocking finding IDs separately from advisory notes. Advisory,
+style preference, duplicate, already-covered, and evidence-free findings do not
+reopen implementation. A repair targets assigned blocking finding IDs, and the
+following focused recheck may inspect only those IDs plus evidence invalidated
+by the repair. It may not restart broad review or add a new blocker unless a
+new contract, reachable-behavior witness, or structural contradiction opens a
+new candidate epoch.
+
+For a state `S`, define the unresolved measure as
+`mu(S) = |blocking_finding_ids| + |unresolved_validation_ids| +
+|unresolved_request_clause_ids|`. After the one initial review, every admitted
+action must either change the decision tuple using typed evidence or strictly
+decrease `mu`. Repeating the same state fingerprint and action fingerprint is
+a `non_convergent_cycle`; stop that action and hand back the typed cycle rather
+than starting another review or implementation pass. Zero blocking findings,
+zero unresolved request clauses, and selected validation `pass` or
+`not_applicable` form the terminal ship/handoff condition. Improvement ideas
+after that point are advisory or separate-Issue work.
 
 The selected schedule continues until its required units, validation, and
 publication evidence are complete. This contract is state- and

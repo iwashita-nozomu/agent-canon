@@ -37,6 +37,23 @@ Build an immutable candidate snapshot and DAG only when there is evidence of sou
 
 Candidate count alone is not sufficient; activation is based on dependency evidence.
 
+## Execution-Time-Aware Queue Specialization
+
+This skill consumes
+`agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract`.
+Its executable fields are `dependency_dag`, `responsibility_completeness`,
+`correctness`, `decision_relevant_total_work`, `makespan_objective`,
+`critical_path`, `ready_set`, `context_reuse`,
+`affected_evidence_invalidation`, `candidate_epoch`,
+`blocking_finding_ids`, `focused_recheck`, and `terminal_state`.
+
+Use a batched queue snapshot only for interacting independent candidates.
+Each candidate epoch gets one initial owning review with stable blocking finding
+IDs. Repairs reuse the same warm worker and reviewer context, invalidate only
+the affected candidate evidence, and receive a focused recheck rather than a
+new broad review. Merge candidates in dependency order. Advisory or duplicate
+findings do not create another implementation or review wave.
+
 ## Validation and repair
 
 Code/doc repair remains owned by the changed surface. This skill consumes the resulting validation/review evidence and does not invent a second implementation workflow or duplicate selected gates.

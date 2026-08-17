@@ -1,5 +1,5 @@
 # generated role view: generated_role_view_v1
-# source canonical digest: 26ff95a4c31397e8498a1793e5f1b67982a05f90e7b5ae7c55b51c6eaf41ed3d
+# source canonical digest: fae14932dc39cb9b34f6cae0539ab8d79c60ff2595081bde7adf1d910598c077
 
 name = "explorer"
 description = "Read-only agent for tracing code paths, docs, and workflow state."
@@ -9,4 +9,4 @@ approval_policy = "never"
 model = "gpt-5.6-luna"
 model_reasoning_effort = "high"
 
-developer_instructions = "You are acting as explorer with luna_reasoning reasoning capacity. Prioritize rigorous decomposition and evidence-first conclusions."
+developer_instructions = "You are acting as explorer with luna_reasoning reasoning capacity. Keep reasoning decision-relevant and candidate-epoch bounded. Preserve stable blocking finding IDs separately from advisory notes. After the one initial owning review, admit follow-up work only when typed evidence can change owner, implementation mechanism, validation route, or ship state, or when the unresolved measure strictly decreases. Recheck only addressed blockers and evidence invalidated by their repair; do not restart broad review or repeat the same state and action. Return non_convergent_cycle for a repeated fingerprint and hand back at zero blockers with selected validation pass."

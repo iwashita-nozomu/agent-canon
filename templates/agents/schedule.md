@@ -26,11 +26,12 @@ upstream design ../../agents/skills/agent-orchestration.md execution-time-aware 
 <!-- 下記の canonical owner を射影し、scheduling policy を再記述したり duration cutoff を追加したりしません。 -->
 
 - Owner contract: `agents/skills/agent-orchestration.md#Execution-Time-Aware Work-Conservation Contract`
-- Executable scheduling fields: `dependency_dag`, `makespan_objective`, `responsibility_completeness`, `correctness`, `critical_path`, `ready_set`, `context_reuse`, `affected_evidence_invalidation`.
+- Executable scheduling fields: `dependency_dag`, `responsibility_completeness`, `correctness`, `decision_relevant_total_work`, `makespan_objective`, `critical_path`, `ready_set`, `context_reuse`, `affected_evidence_invalidation`, `candidate_epoch`, `blocking_finding_ids`, `focused_recheck`, `terminal_state`.
 - Dependency DAG / closure:
-- Makespan objective:
 - Responsibility completeness:
 - Correctness:
+- Decision-relevant total work:
+- Makespan objective:
 - Critical path:
 - Ready set:
 - Useful ready set:
@@ -38,6 +39,10 @@ upstream design ../../agents/skills/agent-orchestration.md execution-time-aware 
 - Wait reason (only when the useful ready set is empty):
 - Context reuse:
 - Affected evidence invalidation:
+- Candidate epoch:
+- Blocking finding IDs:
+- Focused recheck:
+- Terminal state:
 
 | DAG Node | Depends On | Conflict Scope | Status | Evidence |
 | -------- | ---------- | -------------- | ------ | -------- |
@@ -56,7 +61,7 @@ upstream design ../../agents/skills/agent-orchestration.md execution-time-aware 
 
 ## Task Completion Boundary（task 完了境界）
 
-<!-- user-facing completion 前に成立すべき条件を定義します。active clause 解決、selected work unit 完了、selected owning review gate の判定、mechanical completion loop、validation、closeout gate unlock、commit/push を含みます。candidate review pack と rejected hypothesis は work を作らず、chunk/slice/checkpoint/subpass は内部進捗だけです。 -->
+<!-- user-facing completion 前に成立すべき条件を定義します。active clause 解決、selected work unit 完了、selected owning review gate の判定、review convergence、validation、closeout gate unlock、commit/push を含みます。candidate review pack と rejected hypothesis は work を作らず、chunk/slice/checkpoint/subpass は内部進捗だけです。 -->
 
 ## Explicit Subagents（明示的 subagent）
 
