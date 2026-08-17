@@ -3,8 +3,11 @@
 # responsibility Registers issue-derived AgentCanon behavior eval cases.
 # upstream design ../../documents/codex/prompt-skill-evaluation-checklist.md defines eval taxonomy and close conditions.
 # upstream design ../../issues/README.md defines durable operational issue storage.
+# upstream design ../../agents/skills/comprehensive-development.md owns regression admission mappings.
+# upstream design ../../agents/skills/change-review.md owns regression evidence review.
 # downstream implementation ../../tools/agent_tools/evaluate_skill_workflow_prompts.py consumes skill/workflow eval patterns.
 # downstream implementation ../../tools/agent_tools/eval_accumulation_check.py validates eval accumulation surfaces.
+# downstream implementation ../../tests/agent_tools/test_issue_eval_manifest.py validates issue-derived mappings.
 # @dependency-end
 
 catalog_kind = "agent_canon_issue_eval_manifest"
@@ -391,4 +394,40 @@ linked_rules = [
   ".github/ISSUE_TEMPLATE/agentcanon-maintenance.yml",
   ".github/ISSUE_TEMPLATE/eval-capture.yml",
   "documents/operations/issue-label-taxonomy.md",
+]
+
+[[eval]]
+id = "canonical-regression-contract-integration"
+category = "insufficient-evidence"
+source_issue = 761
+oracle_type = "machine"
+protects = [
+  "representative historical regressions are admitted through canonical invariant and boundary oracles",
+  "generated skill shims remain projection-only consumers of canonical policy owners",
+  "focused reproduction passes do not substitute for canonical acceptance",
+]
+expected_route = [
+  "cleanup / rollback / audit preservation => lifecycle / recovery / audit invariant => terminal / nonterminal, interruption, repeated attempt, partial-effect rollback",
+  "concurrency / reservation / idempotent retry => reservation protocol / state-transition / idempotency invariant => zero / one / many contenders, duplicate request, capacity boundary, interleaving",
+  "wait / backoff / timeout / cancel => temporal / liveness / cancellation invariant => pre-timeout / at-timeout / post-timeout, cancel before / after effect, retry exhaustion",
+  "payment / refund / discount / tax normalization / rounding => monetary normalization / ordering / precision invariant => zero / negative, ordering, precision limit, rounding tie",
+  "empty / malformed / legacy input shape => parser / compatibility invariant => omitted, empty, scalar, malformed, legacy shape",
+  "multi-binding / submodule / generated-file ownership / projection drift => single-owner source identity / projection invariant => zero / one / many bindings, stale pin / source digest, generated drift",
+  "PASS / FAIL / NOT_RUN, missing artifacts, stale evidence => completion-state / evidence identity invariant => status-artifact cross-product, missing artifact, stale evidence, clean-replay contradiction",
+  "extend the existing comprehensive-development and change-review owners instead of introducing a standalone regression taxonomy",
+  "run focused diagnosis first and require the owner-selected canonical boundary acceptance before completion",
+]
+forbidden_route = [
+  "add a standalone regression taxonomy or a second checker for issue 761",
+  "copy canonical regression policy into generated consumer shims",
+  "promote a focused pass to canonical acceptance",
+  "accept contradictory PASS / FAIL / NOT_RUN state, missing eval artifact, or stale evidence as completed",
+]
+linked_rules = [
+  "agents/skills/comprehensive-development.md",
+  "agents/skills/change-review.md",
+  ".agents/skills/comprehensive-development/SKILL.md",
+  ".agents/skills/change-review/SKILL.md",
+  "evidence/agent-evals/issue_eval_manifest.toml",
+  "tests/agent_tools/test_issue_eval_manifest.py",
 ]
