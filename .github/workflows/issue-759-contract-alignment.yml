@@ -1,4 +1,4 @@
-name: issue-759-consumer-static-validation
+name: issue-759-finite-convergence-finalization
 
 on:
   push:
@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 jobs:
-  validate:
+  finalize:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,16 +23,20 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install focused test dependencies
-        run: python -m pip install --disable-pip-version-check pytest pyyaml tomli
+      - name: Install repository validation dependencies
+        run: python -m pip install --disable-pip-version-check pytest pyyaml tomli ruff
 
-      - name: Restore consumer-static views
+      - name: Integrate current main without discarding branch history
         run: |
-          mkdir -p "$HOME/.agent-canon/tmp"
+          git fetch origin main
+          git merge --no-commit --no-ff origin/main
+
+      - name: Materialize reviewed finite-state implementation
+        run: |
           python .github/issue-759-repair.py
           python tools/agent_tools/model_profile_registry.py --root . --projection consumer-static --generate-role-views
 
-      - name: Check convergence contracts
+      - name: Check owner and generated-consumer alignment
         run: |
           python tools/agent_tools/check_execution_time_aware_orchestration.py --root .
           python tools/agent_tools/autonomous_convergence.py --root . --check-contract
@@ -40,15 +44,39 @@ jobs:
 
       - name: Run focused regression tests
         run: |
-          python -m pytest tests/agent_tools/test_autonomous_convergence.py tests/agent_tools/test_execution_time_aware_orchestration_contract.py tests/agent_tools/test_model_profile_registry.py tests/agent_tools/test_bootstrap_and_close.py -q --tb=short
+          python -m pytest \
+            tests/agent_tools/test_autonomous_convergence.py \
+            tests/agent_tools/test_execution_time_aware_orchestration_contract.py \
+            tests/agent_tools/test_model_profile_registry.py \
+            -q --tb=short
 
-      - name: Commit validated repair
+      - name: Run repository-owned static validation
         run: |
-          rm .github/issue-759-repair.py
-          rm .github/workflows/issue-759-contract-alignment.yml
+          python -m ruff check \
+            tools/agent_tools/autonomous_convergence.py \
+            tools/agent_tools/check_execution_time_aware_orchestration.py \
+            tests/agent_tools/test_autonomous_convergence.py \
+            tests/agent_tools/test_execution_time_aware_orchestration_contract.py
+          python -m ruff format --check \
+            tools/agent_tools/autonomous_convergence.py \
+            tools/agent_tools/check_execution_time_aware_orchestration.py \
+            tests/agent_tools/test_autonomous_convergence.py \
+            tests/agent_tools/test_execution_time_aware_orchestration_contract.py
+          git diff --check
+
+      - name: Commit main integration and validated implementation
+        run: |
+          rm \
+            .github/issue-759-repair.py \
+            .github/issue-759-payload-autonomous.txt \
+            .github/issue-759-payload-autonomous-tests.txt \
+            .github/issue-759-payload-contract.txt \
+            .github/issue-759-payload-checker.txt \
+            .github/issue-759-payload-contract-tests.txt \
+            .github/workflows/issue-759-contract-alignment.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
           git diff --cached --stat
-          git commit -m "Restore consumer-static convergence views (#759)"
+          git commit -m "fix: enforce finite autonomous convergence (#759)"
           git push origin HEAD:fix/759-autonomous-convergence

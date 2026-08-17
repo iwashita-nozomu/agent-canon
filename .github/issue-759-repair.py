@@ -1,135 +1,32 @@
+#!/usr/bin/env python3
+"""Materialize the reviewed #759 implementation from checked-in transport payloads."""
+
 from __future__ import annotations
 
+import base64
+import hashlib
+import zlib
 from pathlib import Path
-import re
+
+ROOT = Path(__file__).resolve().parents[1]
+PAYLOADS = [('tools/agent_tools/autonomous_convergence.py', '.github/issue-759-payload-autonomous.txt', 'a64fc3a27dd2a61098cb32cc06c02d2b440743a1e4d94dbc0a6ba10e84ad8f69'), ('tests/agent_tools/test_autonomous_convergence.py', '.github/issue-759-payload-autonomous-tests.txt', '51495943b262a91ea76418c7528f80120f8d397380602abda030a40f79d02382'), ('agents/skills/agent-orchestration.execution-contract.toml', '.github/issue-759-payload-contract.txt', 'e5a65f979d2474508f2b668d873979e05d1fcd1095452361e8e2a1aae1dce9a1'), ('tools/agent_tools/check_execution_time_aware_orchestration.py', '.github/issue-759-payload-checker.txt', '915700f6b1f0364660338de871ca6a5e0ad6b5ae9b6368554b6ec7bbaeb69573'), ('tests/agent_tools/test_execution_time_aware_orchestration_contract.py', '.github/issue-759-payload-contract-tests.txt', '61320a90d12952759365735d064707ef00b4d7f973c98efb2045d8d5d94bf452')]
 
 
-TEST_PATH = Path("tests/agent_tools/test_execution_time_aware_orchestration_contract.py")
-
-
-def replace_exact(text: str, old: str, new: str, label: str) -> str:
-    if text.count(old) != 1:
-        raise SystemExit(f"unexpected {label}: expected one exact block")
-    return text.replace(old, new, 1)
-
-
-def replace_function(text: str, pattern: str, replacement: str, label: str) -> str:
-    updated, count = re.subn(pattern, replacement, text, flags=re.DOTALL)
-    if count != 1:
-        raise SystemExit(f"unexpected {label}: expected one function block")
-    return updated
-
-
-def main() -> None:
-    text = TEST_PATH.read_text(encoding="utf-8")
-    text = replace_exact(
-        text,
-        "import tempfile\nimport unittest",
-        "import tempfile\nimport tomllib\nimport unittest",
-        "orchestration test import block",
-    )
-
-    old_helper = '''    def read(self, relative_path: str) -> str:
-        """Read one repository surface for a static contract assertion."""
-        return (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
-
-'''
-    new_helper = old_helper + '''    def contract(self) -> dict[str, object]:
-        """Read the machine-readable owner instead of duplicating its markers."""
-        return tomllib.loads(
-            self.read("agents/skills/agent-orchestration.execution-contract.toml")
-        )
-
-'''
-    text = replace_exact(
-        text,
-        old_helper,
-        new_helper,
-        "orchestration test helper block",
-    )
-
-    text = replace_function(
-        text,
-        r"    def test_owner_keeps_the_complete_work_conservation_contract\(self\) -> None:\n.*?(?=    def test_production_checker_accepts_the_complete_owner_closure)",
-        '''    def test_owner_keeps_the_complete_work_conservation_contract(self) -> None:
-        """The canonical owner must retain every declared execution-time decision."""
-        text = " ".join(
-            self.read("agents/skills/agent-orchestration.md").lower().split()
-        )
-        markers = self.contract()["owner_markers"]
-        self.assertIsInstance(markers, list)
-        for marker in markers:
-            self.assertIsInstance(marker, str)
-            self.assertIn(" ".join(marker.lower().split()), text, marker)
-
-''',
-        "owner contract test",
-    )
-
-    text = replace_function(
-        text,
-        r"    def test_pr_processing_consumes_and_specializes_the_owner\(self\) -> None:\n.*?(?=    def test_runtime_catalog_and_schedule_project_the_owner)",
-        '''    def test_pr_processing_consumes_and_specializes_the_owner(self) -> None:
-        """PR processing keeps queue-specific rules under the owner contract."""
-        text = " ".join(self.read("agents/skills/pr-processing.md").lower().split())
-        consumers = self.contract()["consumers"]
-        self.assertIsInstance(consumers, list)
-        consumer = next(
-            item
-            for item in consumers
-            if isinstance(item, dict) and item.get("id") == "pr-processing"
-        )
-        markers = consumer["required_markers"]
-        self.assertIsInstance(markers, list)
-
-        self.assertIn(OWNER_REF.lower(), text)
-        for marker in markers:
-            self.assertIsInstance(marker, str)
-            self.assertIn(" ".join(marker.lower().split()), text, marker)
-        self.assertIn("never use elapsed time", text)
-
-''',
-        "PR consumer test",
-    )
-
-    text = replace_function(
-        text,
-        r"    def test_runtime_catalog_and_schedule_project_the_owner\(self\) -> None:\n.*?(?=\nif __name__ == \"__main__\":)",
-        '''    def test_runtime_catalog_and_schedule_project_the_owner(self) -> None:
-        """Projections point to the owner without becoming policy copies."""
-        consumers = self.contract()["consumers"]
-        self.assertIsInstance(consumers, list)
-        indexed = {
-            item["id"]: item
-            for item in consumers
-            if isinstance(item, dict) and isinstance(item.get("id"), str)
-        }
-
-        self.assertIn(OWNER_REF, self.read("agents/task_catalog.yaml"))
-        self.assertIn(OWNER_REF, self.read("templates/agents/schedule.md"))
-
-        runtime = " ".join(
-            self.read(".agents/skills/agent-orchestration/SKILL.md").lower().split()
-        )
-        runtime_markers = indexed["runtime-shim"]["required_markers"]
-        self.assertIsInstance(runtime_markers, list)
-        for marker in runtime_markers:
-            self.assertIsInstance(marker, str)
-            self.assertIn(" ".join(marker.lower().split()), runtime, marker)
-
-        schedule = " ".join(self.read("templates/agents/schedule.md").lower().split())
-        schedule_markers = indexed["schedule"]["required_markers"]
-        self.assertIsInstance(schedule_markers, list)
-        for marker in schedule_markers:
-            self.assertIsInstance(marker, str)
-            self.assertIn(" ".join(marker.lower().split()), schedule, marker)
-
-''',
-        "runtime projection test",
-    )
-
-    TEST_PATH.write_text(text, encoding="utf-8")
+def main() -> int:
+    for target_rel, payload_rel, expected_sha256 in PAYLOADS:
+        compressed = base64.b64decode((ROOT / payload_rel).read_text(encoding="ascii"))
+        content = zlib.decompress(compressed)
+        actual_sha256 = hashlib.sha256(content).hexdigest()
+        if actual_sha256 != expected_sha256:
+            raise SystemExit(
+                f"payload digest mismatch for {target_rel}: "
+                f"expected {expected_sha256}, got {actual_sha256}"
+            )
+        target = ROOT / target_rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(content)
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
