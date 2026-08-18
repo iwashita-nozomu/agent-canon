@@ -74,6 +74,35 @@ concurrency ordering、resource capacity、performance claim、reliability bound
 不足する design clause、必要な evidence、owner、再開条件を blocker として残します。review は
 「check が green」という事実と、変更した contract が立証されたことを区別します。
 
+## Regression Evidence Admission
+
+新しい regression test、fixture、mock、test-only adapter を追加すること自体を進捗や
+root-cause closure とみなしません。追加前に、現在の task packet / design trace の既存 evidence
+へ次の判断を接続します。これらのための新しい universal schema や checker は作りません。
+
+- failure が反証した canonical contract / invariant と、その最小 contract-complete owner
+- failure をその invariant の反例として表す最小 witness
+- 既存の property / table-driven / finite-state / boundary acceptance へ witness を統合できるか
+- test が private field、temporary path、helper topology、storage layout 等の replaceable representation を contract 化しないか
+- parser、classifier、state construction、lifecycle、environment setup を production owner と別に test 側で再実装しないか
+- 同じ invariant を固定する historical regression を削除・統合できるか
+- focused test が診断する property と、正式 entrypoint / consumer boundary から判定する completion oracle
+
+同じ invariant に属する複数の historical failure は、個別 bug 名ごとの test を増やすより、
+可能な限り一つの canonical oracle と最小 counterexample 集合へ収束させます。有限 relation / state
+space は table-driven または exhaustive check、入力空間に一般則がある場合は property test、
+consumer contract は public/canonical entrypoint を通る boundary acceptance を優先します。
+
+局所 algorithm 自体が独立した数学的・工学的 contract owner である場合は、owner-local unit test を
+保持して構いません。逆に、正しい alternative implementation へ置換しただけで失敗する test は、
+contract ではなく representation を固定していないか再評価します。coverage percentage、test count、
+mutation score、追加 test 数を単独の品質目的にしません。
+
+validation evidence は役割を分離します。focused test は counterexample の再現、root-cause isolation、
+repair の高速確認に使います。handoff / completion は変更責務が選んだ canonical boundary / acceptance
+oracle まで満たした evidence で判断します。canonical acceptance が環境上実行不能なら、focused pass を
+verified completion に昇格させず remaining verification として残します。
+
 ## Use When
 
 - implementation、docs、tooling、Docker、CI を同時に整理する
@@ -105,6 +134,7 @@ python3 tools/agent_tools/bootstrap_agent_run.py \
 1. family を `Comprehensive Development` に固定します。
 1. current requirement と owning contract を読み、material な engineering principle clause、canonical owner、forbidden interpretation を固定します。
 1. material な mechanism decision について、contract、owner、mechanism、basis、alternatives、oracle を既存 task packet / design trace に接続します。
+1. regression / fixture / mock を追加する場合は、canonical invariant、minimal counterexample、existing oracle への統合可能性、representation independence、duplicate truth、旧 regression の consolidation、completion oracle を先に確認します。
 1. `agents/task_catalog.yaml` の `comprehensive_development` family から `spawn_budget`、`role_topology`、`roles`、`subagent_prompt` を読みます。
 1. `agents/agents_config.json` で permanent team role ownership、required output、write policy を確認します。
 1. `agents/canonical/CODEX_SUBAGENTS.md` で Codex inventory、activation、runtime surface を確認します。
