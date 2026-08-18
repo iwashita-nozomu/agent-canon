@@ -37,10 +37,92 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Normalize asserted identity-test baseline
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("tests/tools/test_experiment_identity.py")
+          text = path.read_text(encoding="utf-8")
+          current_imports = '''    contained_path,
+              load_json_text,
+              report_relative_path,
+              result_relative_path,
+          '''
+          asserted_imports = '''    contained_path,
+              identity_from_manifest,
+              load_json_file,
+              load_json_text,
+              report_relative_path,
+              result_relative_path,
+          '''
+          current_assertions = '''    assert result_relative_path(identity) == Path("experiments/topic.v1/result/smoke.v2/run.3")
+              assert report_relative_path(identity) == Path("experiments/report/topic.v1/smoke.v2/run.3.md")
+          '''
+          asserted_assertions = '''    assert result_relative_path(identity) == Path("experiments/demo/result/formal/run-a")
+              assert report_relative_path(identity) == Path(
+                  "experiments/report/demo/formal/run-a.md"
+              )
+          '''
+          if text.count(current_imports) != 1 or text.count(current_assertions) != 1:
+              raise SystemExit("identity test baseline drifted before Issue #766 patch")
+          path.write_text(
+              text.replace(current_imports, asserted_imports).replace(
+                  current_assertions, asserted_assertions
+              ),
+              encoding="utf-8",
+          )
+          PY
+
       - name: Apply asserted canonical patch
         run: |
           cat .github/issue-766/part-* > .github/issue-766/apply_issue_766.py
           python3 .github/issue-766/apply_issue_766.py
+
+      - name: Restore canonical identity-test fixture
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          path = Path("tests/tools/test_experiment_identity.py")
+          text = path.read_text(encoding="utf-8")
+          patched_imports = '''    contained_path,
+              identity_from_manifest,
+              identity_from_raw_relative_path,
+              load_json_file,
+              load_json_text,
+              raw_relative_path,
+              report_relative_path,
+              result_relative_path,
+          '''
+          canonical_imports = '''    contained_path,
+              identity_from_raw_relative_path,
+              load_json_text,
+              raw_relative_path,
+              report_relative_path,
+              result_relative_path,
+          '''
+          patched_assertions = '''    assert result_relative_path(identity) == Path("experiments/demo/result/formal/run-a")
+              assert raw_relative_path(identity) == Path("experiments/demo/raw/formal/run-a")
+              assert identity_from_raw_relative_path(raw_relative_path(identity)) == identity
+              assert report_relative_path(identity) == Path(
+                  "experiments/report/demo/formal/run-a.md"
+              )
+          '''
+          canonical_assertions = '''    assert result_relative_path(identity) == Path("experiments/topic.v1/result/smoke.v2/run.3")
+              assert raw_relative_path(identity) == Path("experiments/topic.v1/raw/smoke.v2/run.3")
+              assert identity_from_raw_relative_path(raw_relative_path(identity)) == identity
+              assert report_relative_path(identity) == Path("experiments/report/topic.v1/smoke.v2/run.3.md")
+          '''
+          if text.count(patched_imports) != 1 or text.count(patched_assertions) != 1:
+              raise SystemExit("identity test patch result drifted")
+          path.write_text(
+              text.replace(patched_imports, canonical_imports).replace(
+                  patched_assertions, canonical_assertions
+              ),
+              encoding="utf-8",
+          )
+          PY
 
       - name: Remove one-time patch transport
         run: |
