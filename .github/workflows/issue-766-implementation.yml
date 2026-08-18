@@ -8,9 +8,9 @@
 name: Issue 766 implementation
 
 on:
-  push:
+  pull_request:
     branches:
-      - feat/766-split-raw-annex-results
+      - main
 
 permissions:
   contents: write
