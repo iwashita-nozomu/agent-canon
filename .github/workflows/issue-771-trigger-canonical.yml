@@ -60,7 +60,101 @@ jobs:
               raise RuntimeError(
                   f"expected four materialization scripts, found {len(scripts)}"
               )
-          for script in scripts[:3]:
+
+          subprocess.run(
+              ["bash", "-euo", "pipefail", "-c", scripts[0]],
+              check=True,
+          )
+
+          source_path = Path("tools/agent_tools/surface_manifest.py")
+          source = source_path.read_text(encoding="utf-8")
+          old_resolution = '''        try:
+              canonical_path = (
+                  canonical_root / normalized
+              ).resolve(strict=False)
+          except (OSError, RuntimeError) as exc:
+              raise ValueError(
+                  f"{owner}: deletion target {raw_path!r} cannot be resolved"
+              ) from exc
+          if canonical_path == canonical_root:
+          '''
+          new_resolution = '''        candidate_path = canonical_root / normalized
+          try:
+              canonical_parent = candidate_path.parent.resolve(strict=False)
+          except (OSError, RuntimeError) as exc:
+              raise ValueError(
+                  f"{owner}: deletion target {raw_path!r} cannot be resolved"
+              ) from exc
+          canonical_path = canonical_parent / candidate_path.name
+          if canonical_path == canonical_root:
+          '''
+          if source.count(old_resolution) != 1:
+              raise RuntimeError("canonical deletion resolution anchor drifted")
+          source_path.write_text(
+              source.replace(old_resolution, new_resolution, 1),
+              encoding="utf-8",
+          )
+
+          test_path = Path(
+              "tests/agent_tools/test_surface_manifest_deletion_targets.py"
+          )
+          test_text = test_path.read_text(encoding="utf-8")
+          old_test = '''    def test_canonical_root_alias_and_symlink_escape_fail_closed(self) -> None:
+              """Physical resolution rejects root aliases and repository escapes."""
+              with self.temporary_directory() as tmp_dir:
+                  sandbox = Path(tmp_dir)
+                  root = sandbox / "checkout"
+                  outside = sandbox / "outside"
+                  root.mkdir()
+                  outside.mkdir()
+                  os.symlink(".", root / "root-alias")
+                  os.symlink(outside, root / "outside-alias")
+                  for path in ("root-alias", "outside-alias/retired"):
+                      with self.subTest(path=path):
+                          self.assert_rejected(root, path)
+          '''
+          new_test = '''    def test_intermediate_symlink_escape_fails_closed(self) -> None:
+              """Canonical parent resolution rejects repository escapes."""
+              with self.temporary_directory() as tmp_dir:
+                  sandbox = Path(tmp_dir)
+                  root = sandbox / "checkout"
+                  outside = sandbox / "outside"
+                  root.mkdir()
+                  outside.mkdir()
+                  os.symlink(outside, root / "outside-alias")
+                  self.assert_rejected(root, "outside-alias/retired")
+
+              def test_final_symlink_is_admitted_as_an_lstat_leaf(self) -> None:
+                  """Admission does not dereference the leaf that removal would unlink."""
+                  with self.temporary_directory() as tmp_dir:
+                      sandbox = Path(tmp_dir)
+                      root = sandbox / "checkout"
+                      outside = sandbox / "outside"
+                      root.mkdir()
+                      outside.mkdir()
+                      os.symlink(outside, root / "retired")
+                      manifest_path = self.write_manifest(
+                          root, root_absent_paths=("retired",)
+                      )
+                      manifest = load_manifest(root, ".", manifest_path.name)
+                      target = manifest.deletion_targets[0]
+                      self.assertEqual(
+                          target.canonical_path, root.resolve() / "retired"
+                      )
+                      result = self.run_manifest(
+                          root, manifest_path, "root-absent-paths"
+                      )
+                      self.assertEqual(result.returncode, 0, result.stderr)
+                      self.assertEqual(result.stdout, "retired\n")
+          '''
+          if test_text.count(old_test) != 1:
+              raise RuntimeError("canonical deletion regression anchor drifted")
+          test_path.write_text(
+              test_text.replace(old_test, new_test, 1),
+              encoding="utf-8",
+          )
+
+          for script in scripts[1:3]:
               subprocess.run(
                   ["bash", "-euo", "pipefail", "-c", script],
                   check=True,
