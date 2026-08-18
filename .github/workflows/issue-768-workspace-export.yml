@@ -1,6 +1,9 @@
 name: Issue 768 Workspace Export
 
 on:
+  pull_request:
+    branches:
+      - main
   push:
     branches:
       - fix/768-sealed-candidate-publication
