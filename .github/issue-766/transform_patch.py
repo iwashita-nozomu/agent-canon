@@ -55,6 +55,10 @@ write(RUNNER, runner_text.replace(runner_old, runner_new))""",
         "",
         "absent legacy run-id archive spelling",
     )
+    source += """
+post_apply = ROOT / ".github" / "issue-766" / "post_apply.py"
+exec(compile(post_apply.read_text(encoding="utf-8"), str(post_apply), "exec"))
+"""
 
     encoded = base64.b64encode(gzip.compress(source.encode("utf-8"), mtime=0)).decode()
     lines[index] = f"_PATCH = {encoded!r}"
