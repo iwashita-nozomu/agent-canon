@@ -33,17 +33,27 @@ jobs:
           import os
           import subprocess
           from pathlib import Path
+          from types import ModuleType
 
-          module_path = Path(
-              "tests/tools/test_update_agent_canon_surface_migration.py"
-          ).resolve()
-          spec = importlib.util.spec_from_file_location(
-              "issue_771_surface_migration", module_path
+
+          def load_module(name: str, path: str) -> ModuleType:
+              module_path = Path(path).resolve()
+              spec = importlib.util.spec_from_file_location(name, module_path)
+              if spec is None or spec.loader is None:
+                  raise RuntimeError(f"cannot load {module_path}")
+              module = importlib.util.module_from_spec(spec)
+              spec.loader.exec_module(module)
+              return module
+
+
+          migration = load_module(
+              "issue_771_surface_migration",
+              "tests/tools/test_update_agent_canon_surface_migration.py",
           )
-          if spec is None or spec.loader is None:
-              raise RuntimeError(f"cannot load {module_path}")
-          module = importlib.util.module_from_spec(spec)
-          spec.loader.exec_module(module)
+          lifecycle = load_module(
+              "issue_771_update_lifecycle",
+              "tests/tools/test_update_agent_canon.py",
+          )
 
 
           def environment() -> dict[str, str]:
@@ -61,7 +71,9 @@ jobs:
               return env
 
 
-          def preserve_or_fail(root: Path, result: subprocess.CompletedProcess[str]) -> None:
+          def preserve_or_fail(
+              root: Path, result: subprocess.CompletedProcess[str]
+          ) -> None:
               print(result.stdout)
               print(result.stderr)
               if result.returncode != 0:
@@ -75,7 +87,7 @@ jobs:
                   raise RuntimeError("parent checkout root was removed")
 
 
-          ensure_case = module.SurfaceMigrationTest(methodName="runTest")
+          ensure_case = migration.SurfaceMigrationTest(methodName="runTest")
           try:
               ensure_root = ensure_case.clone_parent_fixture()
               (ensure_root / "parent-checkout-sentinel.txt").write_text(
@@ -88,13 +100,27 @@ jobs:
           finally:
               ensure_case.doCleanups()
 
-          update_case = module.SurfaceMigrationTest(methodName="runTest")
+          update_case = migration.SurfaceMigrationTest(methodName="runTest")
           try:
               update_root = update_case.clone_parent_fixture()
               (update_root / "parent-checkout-sentinel.txt").write_text(
                   "preserve\n", encoding="utf-8"
               )
               source = update_root / "vendor" / "agent-canon"
+              source_remote = Path(
+                  subprocess.run(
+                      ["git", "-C", str(source), "remote", "get-url", "origin"],
+                      check=True,
+                      capture_output=True,
+                      text=True,
+                  ).stdout.strip()
+              )
+              lifecycle_case = lifecycle.SubmoduleUpdateAgentCanonTest(
+                  methodName="runTest"
+              )
+              lifecycle_case.materialize_parent_projection_frontier(
+                  update_root, source_remote
+              )
               update_result = subprocess.run(
                   [
                       "bash",
