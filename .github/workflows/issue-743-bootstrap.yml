@@ -1,41 +1,15 @@
 name: Issue 743 repository snapshot
 
 # Temporary transport; removed from the final implementation diff.
-# Re-triggered after the draft PR was reopened on latest main.
+# Push triggering is disabled while payload chunks are staged.
 on:
-  push:
-    branches:
-      - fix/743-experiment-result-retention-planning
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
-  snapshot:
+  disabled-staging-marker:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout branch
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Pack repository snapshot
-        shell: bash
-        run: |
-          set -euo pipefail
-          tar \
-            --exclude=.git \
-            --exclude=.github/workflows/issue-743-bootstrap.yml \
-            -czf /tmp/agent-canon-issue-743-latest-main.tgz \
-            .
-
-      - name: Upload repository snapshot
-        uses: actions/upload-artifact@v4
-        with:
-          name: agent-canon-issue-743-latest-main
-          path: /tmp/agent-canon-issue-743-latest-main.tgz
-          if-no-files-found: error
-          retention-days: 1
+      - run: echo "Issue #743 payload staging only"
