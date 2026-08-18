@@ -1,0 +1,85 @@
+name: Issue 771 canonical materialization trigger
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+    paths:
+      - .github/workflows/issue-771-trigger-canonical.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: fix/771-canonical-deletion-admission
+
+      - name: Execute canonical implementation and validation stages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          workflow = Path(
+              ".github/workflows/issue-771-materialize-canonical.yml"
+          ).read_text(encoding="utf-8")
+          lines = workflow.splitlines()
+          scripts: list[str] = []
+          index = 0
+          while index < len(lines):
+              if lines[index] != "        run: |":
+                  index += 1
+                  continue
+              index += 1
+              block: list[str] = []
+              while index < len(lines):
+                  line = lines[index]
+                  if line.startswith("          "):
+                      block.append(line[10:])
+                      index += 1
+                      continue
+                  if not line:
+                      block.append("")
+                      index += 1
+                      continue
+                  break
+              scripts.append("\n".join(block))
+          if len(scripts) != 4:
+              raise RuntimeError(
+                  f"expected four materialization scripts, found {len(scripts)}"
+              )
+          for script in scripts[:3]:
+              subprocess.run(
+                  ["bash", "-euo", "pipefail", "-c", script],
+                  check=True,
+              )
+          PY
+
+      - name: Commit the reviewable implementation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "AgentCanon Issue Automation"
+          git config user.email "agent-canon-issue@automation.invalid"
+          git rm \
+            .github/workflows/issue-771-materialize-canonical.yml \
+            .github/workflows/issue-771-trigger-canonical.yml
+          git add \
+            tools/agent_tools/surface_manifest.py \
+            tests/agent_tools/test_surface_manifest_root_absence.py \
+            tests/agent_tools/test_surface_manifest_deletion_targets.py
+          git diff --cached --check
+          git commit -m "fix: admit only task-owned deletion targets (#771)"
+          git push origin HEAD:fix/771-canonical-deletion-admission
