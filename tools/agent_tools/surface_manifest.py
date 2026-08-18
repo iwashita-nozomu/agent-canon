@@ -24,7 +24,7 @@ except ModuleNotFoundError:  # Python < 3.11 compatibility.
     import tomli as tomllib
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import cast
 
 DEFAULT_MANIFEST = Path("documents/runtime/shared-runtime-surfaces.toml")
@@ -243,6 +243,27 @@ def required_string_value(mapping: Mapping[str, object], key: str) -> str:
     return string_value(mapping, key)
 
 
+def validate_sync_target_path(path: str, label: str) -> str:
+    """Return a normalized non-root repository-relative sync target."""
+    pure_path = PurePosixPath(path)
+    forbidden_characters = ("\0", "\n", "\r", "\t", "\\", ":")
+    invalid = (
+        not path
+        or path != path.strip()
+        or path == "."
+        or pure_path.is_absolute()
+        or pure_path.as_posix() != path
+        or ".." in pure_path.parts
+        or any(character in path for character in forbidden_characters)
+        or (pure_path.parts and pure_path.parts[0] == ".git")
+    )
+    if invalid:
+        raise ValueError(
+            f"{label} must be a normalized non-root repository-relative POSIX path"
+        )
+    return path
+
+
 def path_list(mapping: Mapping[str, object]) -> tuple[str, ...]:
     """Return a validated path list from one group."""
     raw_paths = mapping.get("paths")
@@ -258,6 +279,7 @@ def path_list(mapping: Mapping[str, object]) -> tuple[str, ...]:
 
 def validate_entry(entry: SurfaceEntry) -> SurfaceEntry:
     """Validate one manifest entry."""
+    validate_sync_target_path(entry.path, "surface path")
     if entry.mode not in ALLOWED_MODES:
         raise ValueError(f"{entry.path}: invalid mode {entry.mode}")
     if entry.projection_producer not in ALLOWED_PROJECTION_PRODUCERS:
@@ -429,9 +451,10 @@ def update_transition_from_mapping(mapping: Mapping[str, object]) -> UpdateTrans
         raise ValueError(f"{transition_id}: invalid from_agent_canon_pins")
     candidates: list[UpdateTransitionCandidate] = []
     for candidate in manifest_tables(mapping, "candidate"):
-        path = string_value(candidate, "path")
-        if not path or path.startswith("/") or "\t" in path or "\n" in path:
-            raise ValueError(f"{transition_id}: invalid transition candidate path")
+        path = validate_sync_target_path(
+            string_value(candidate, "path"),
+            f"{transition_id} transition candidate path",
+        )
         identities = tuple(
             legacy_identity_from_mapping(identity)
             for identity in manifest_tables(candidate, "identity")
@@ -707,6 +730,14 @@ def render_command_outputs(manifest: SurfaceManifest, root: Path) -> Mapping[str
     }
 
 
+def write_command_output(output: str) -> None:
+    """Write one line protocol without materializing an empty record."""
+    if not output:
+        return
+    sys.stdout.write(output)
+    sys.stdout.write("\n")
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the manifest command."""
     args = build_parser().parse_args(argv)
@@ -719,11 +750,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"SURFACE_MANIFEST_ERROR={exc}", file=sys.stderr)
         return 1
     if args.command == "root-absent-paths":
-        print(render_actionable_root_absent_paths(manifest.entries, root))
+        write_command_output(
+            render_actionable_root_absent_paths(manifest.entries, root)
+        )
         return 0
     outputs = render_command_outputs(manifest, root)
     if args.command in outputs:
-        print(outputs[args.command])
+        write_command_output(outputs[args.command])
         return 0
     if args.command == "check-doc":
         findings = check_doc(root, manifest.prefix, manifest)
