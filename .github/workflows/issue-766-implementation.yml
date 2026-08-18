@@ -75,6 +75,15 @@ jobs:
           bash tools/ci/run_standalone_static_gate_unit.sh eval
           bash tools/ci/run_standalone_static_gate_unit.sh workflow-container
 
+      - name: Restore one-time transport outside the implementation commit
+        run: |
+          git checkout HEAD -- .github/issue-766 .github/workflows/issue-766-implementation.yml
+          if git diff --name-only -- .github/issue-766 .github/workflows/issue-766-implementation.yml | grep -q .; then
+            echo "temporary transport differs after restore" >&2
+            exit 1
+          fi
+          git diff --check
+
       - name: Commit validated implementation
         run: |
           git config user.name "github-actions[bot]"
