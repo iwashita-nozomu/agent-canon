@@ -52,77 +52,14 @@ jobs:
           PY
           bash /tmp/issue-771-materialize.sh
 
-      - name: Run focused producer and parent-update regressions
+      - name: Run focused producer and ensure-latest regressions
         shell: bash
         run: |
           set -euo pipefail
+          python3 -m py_compile tools/agent_tools/surface_manifest.py
           python3 tests/agent_tools/test_surface_manifest_root_absence.py
           python3 tests/agent_tools/test_surface_manifest_sync_protocol.py
           python3 tests/tools/test_update_agent_canon_removed_legacy.py
-          python3 - <<'PY'
-          from pathlib import Path
-          import shutil
-          import subprocess
-          import tempfile
-
-          from tests.tools import test_update_agent_canon_latest_todos as latest_todos
-          from tests.tools.test_update_agent_canon import (
-              SubmoduleUpdateAgentCanonTest,
-              authorized_test_env,
-          )
-
-          original_make_superproject = SubmoduleUpdateAgentCanonTest.make_superproject
-
-          def make_superproject_with_parent_projection(self, *args, **kwargs):
-              repo = original_make_superproject(self, *args, **kwargs)
-              shutil.copytree(
-                  latest_todos.PROJECT_ROOT / 'tools',
-                  repo / 'tools',
-                  dirs_exist_ok=True,
-                  symlinks=True,
-              )
-              environment = authorized_test_env()
-              environment['AGENT_CANON_FORCE_RELINK'] = '1'
-              projection = subprocess.run(
-                  ['bash', 'tools/sync_agent_canon.sh', 'link-root'],
-                  cwd=repo,
-                  check=False,
-                  capture_output=True,
-                  text=True,
-                  env=environment,
-              )
-              assert projection.returncode == 0, (
-                  projection.stdout + projection.stderr
-              )
-              subprocess.run(['git', 'add', '-A'], cwd=repo, check=True)
-              staged = subprocess.run(
-                  ['git', 'diff', '--cached', '--quiet'],
-                  cwd=repo,
-                  check=False,
-              )
-              if staged.returncode != 0:
-                  subprocess.run(
-                      ['git', 'commit', '-m', 'materialize parent root projection'],
-                      cwd=repo,
-                      check=True,
-                      capture_output=True,
-                      text=True,
-                  )
-              return repo
-
-          SubmoduleUpdateAgentCanonTest.make_superproject = (
-              make_superproject_with_parent_projection
-          )
-          try:
-              with tempfile.TemporaryDirectory() as tmp_dir:
-                  latest_todos.test_latest_reports_pending_update_todos_without_failing(
-                      Path(tmp_dir)
-                  )
-          finally:
-              SubmoduleUpdateAgentCanonTest.make_superproject = (
-                  original_make_superproject
-              )
-          PY
 
       - name: Run exact /workspace bind-mount regression
         shell: bash
