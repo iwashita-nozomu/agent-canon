@@ -12,9 +12,11 @@ upstream design ./structure-refactor.md owns final-structure-first scope formati
 upstream design ./refactor-loop.md owns shared-structure refactor execution order
 upstream implementation ../../tools/update_agent_canon.sh high-level AgentCanon update wrapper
 upstream implementation ../../tools/sync_agent_canon.sh root-view and submodule sync helper
+upstream implementation ../../tools/agent_tools/skill_tool_commands.py resolves optional parent Make aliases without evaluating Make
 upstream implementation ../../tools/agent_tools/update_lifecycle_contract.py owns transaction, queue, frontier, and cleanup records
 upstream implementation ../../tools/agent_tools/source_projection_handoff.py materializes the sole cross-namespace packet
 downstream design ./agent-update-branch.md separates parent update branch lanes from source AgentCanon PR work
+downstream implementation ../../tests/agent_tools/test_skill_tool_commands_update_entrypoint.py live command-packet regression contract
 @dependency-end
 -->
 
@@ -58,9 +60,13 @@ TODO state up to date.
 ## Use When
 
 - The user asks to update, latest, refresh, or sync AgentCanon.
-- `make agent-canon-ensure-latest`, `make agent-canon-latest`,
-  `tools/update_agent_canon.sh`, or `tools/sync_agent_canon.sh` is the likely
-  entrypoint.
+- `make agent-canon-update-plan`, `make agent-canon-latest`, and
+  `make agent-canon-ensure-latest` are optional parent-owned aliases. The runtime
+  command packet keeps an alias only when the selected parent Makefile declares
+  that exact literal target; otherwise it emits the source-root resolver route
+  to `tools/update_agent_canon.sh`.
+- `tools/update_agent_canon.sh` or `tools/sync_agent_canon.sh` is the canonical
+  owner entrypoint independently of parent Makefile shape.
 - A parent repo has AgentCanon submodule pin drift, root-view drift, safe
   dirty checkout state, or pending `.agent-canon/update-state.toml` TODOs.
 - `vendor/agent-canon/` contains the named topic branch for current source work,
@@ -76,6 +82,7 @@ TODO state up to date.
 - `agents/skills/structure-refactor.md#Pre-Task Structure Repair Contract`
 - `agents/skills/refactor-loop.md#共有構造 refactor の実行順`
 - `tools/update_agent_canon.sh`
+- `tools/agent_tools/skill_tool_commands.py`
 - `PYTHONPATH=vendor/agent-canon/tools:tools python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh`
 - `agents/skills/agent-update-branch.md`
 
@@ -209,12 +216,42 @@ Record:
 
 The runtime discovery adapter delegates these required operating clauses to this canonical owner.
 
-Run `make agent-canon-update-plan` first. If it reports an update, request
-current-task user approval and rerun
-`AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> make agent-canon-ensure-latest`
-with inline destructive authority/reason fields in the same command segment.
-Add creation authority/reason only when the route creates a branch or
-worktree; force-create or ref-overwrite routes require both pairs.
+Generate the command packet from the current repository root. The packet treats
+`agent-canon-update-plan`, `agent-canon-latest`, and
+`agent-canon-ensure-latest` consistently as optional parent-owned Make aliases.
+It keeps an alias only when the first default Makefile selected from
+`GNUmakefile`, `makefile`, or `Makefile` declares that exact literal target.
+The detector reads text only: it does not execute Make, expand variables, load
+dynamic target names, or evaluate parse-time functions. Any absent, dynamic, or
+unreadable alias fails closed to the canonical owner command; the parent
+Makefile is never projected or modified.
+
+The direct plan command is:
+
+```bash
+PYTHONPATH=vendor/agent-canon/tools:tools \
+  python3 -m agent_tools.agent_canon_source_root exec \
+  tools/update_agent_canon.sh plan
+```
+
+If the plan reports an update, request current-task user approval and run the
+packet's `latest` command with the same inline authority and provenance fields.
+Both `agent-canon-latest` and `agent-canon-ensure-latest` fall back to:
+
+```bash
+AGENT_CANON_COMMIT_REQUEST_EVIDENCE=evidence:<sha256-of-exact-authorization-evidence-bytes> \
+AGENT_CANON_DESTRUCTIVE_GIT_AUTHORITY=explicit_user_approval \
+AGENT_CANON_DESTRUCTIVE_GIT_REASON=<reason> \
+PYTHONPATH=vendor/agent-canon/tools:tools \
+  python3 -m agent_tools.agent_canon_source_root exec \
+  tools/update_agent_canon.sh latest
+```
+
+The source-root resolver, not chat text or parent Makefile shape, decides
+standalone versus vendored execution. Existing explicit aliases remain valid;
+the fallback is the same owner route rather than a second updater. Add creation
+authority/reason only when the route creates a branch or worktree; force-create
+or ref-overwrite routes require both authority pairs.
 
 Treat this as the mandatory `agentcanon_structure_followup` gate when this
 owner route reports the parent sync trigger is active for active root projection.
@@ -248,8 +285,9 @@ python3 -m agent_tools.agent_canon_source_root exec tools/sync_agent_canon.sh ch
   refreshes, root-view repair, and latest-state checklist work.
 - Use When: updating `vendor/agent-canon/`, applying AgentCanon update TODOs,
   or routing local AgentCanon commits through source PRs before parent pins.
-- Tool Commands: run this skill's command packet, then read the canonical
-  update-route and parent latest-state documents.
+- Tool Commands: run this skill's command packet from the current repository
+  root. The packet resolves optional parent aliases before execution, then read
+  the canonical update-route and parent latest-state documents.
 - Boundary: use `dependency-module-change` for source edits. Parent source編集は
   原則 `vendor/agent-canon` の topic-named branch で行い、別 topic の dirty
   親 vendor 状態がある場合のみ `workspace/<topic-slug>/agent-canon` の

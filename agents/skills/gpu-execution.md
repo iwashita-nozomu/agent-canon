@@ -8,9 +8,11 @@ upstream design ../../documents/experiments/gpu-direct-command.md direct admissi
 upstream design ../../documents/experiments/gpu-admission-r5-source-packet.md canonical discovery, occupancy, lock, and admission evidence ownership
 upstream design ../../documents/experiments/gpu-admission-r5-nvidia-visibility.md NVIDIA topology and full UUID boundary
 upstream design experiment-lifecycle.md managed experiment artifact boundary
+downstream design ./environment-maintenance.md consumes canonical CDI device and exact environment forwarding
 downstream implementation ../../tools/experiments/run_gpu_command.py provider-independent direct-command CLI
 downstream implementation ../../tools/experiments/run_managed_experiment.py optional managed provider adapter
 downstream implementation ../../.agents/skills/gpu-execution/SKILL.md Codex discovery shim
+downstream implementation ../../tests/agent_tools/test_gpu_execution_cdi_contract.py CDI documentation regression contract
 upstream environment ../../agent-canon-environment.toml audited managed ExperimentRunner provider identity and runtime item
 @dependency-end
 -->
@@ -112,6 +114,41 @@ JAX は admitted child 内で初めて import します。`JAX_PLATFORMS=cuda` �
 ない場合の CPU fallback を成功扱いしません。継承した secret 値は plaintext evidence に
 書かず、fingerprint では値を hash して exact environment に束縛します。
 
+## Docker GPU wiring
+
+admitted child が Docker CLI で GPU container を起動する場合、device injection の canonical
+route は CDI です。Docker argv は `--device nvidia.com/gpu=<qualified-device>` を使い、
+legacy runtime hook を canonical route にしません。
+
+- CDI registry が selected full UUID に対応する個別 qualified device を公開する場合は、その
+  device を `--device` に渡します。admission identity は引き続き selected full UUID であり、
+  integer index や UUID prefix へ変換しません。
+- WSL など registry が `nvidia.com/gpu=all` だけを公開する環境では、device injection は
+  `--device nvidia.com/gpu=all` とし、container 内の compute visibility は admission が固定した
+  full UUID の `CUDA_VISIBLE_DEVICES` と `NVIDIA_VISIBLE_DEVICES` で制限します。
+- exact environment は値を書き換えず Docker の `-e NAME` で継承します。次の6変数を同じ
+  child argv で全て渡し、一部だけを alternate route にしません。
+- cgroup 全体を無効化する設定、rootful/rootless の自動判定、legacy hook と CDI を選ぶ新しい
+  runtime detector は追加しません。device injection failure は typed blocker として閉じます。
+- Docker socket URI の重複 slash は path 正規化上の事実であり、同一 socket の二重 mount を
+  単独では証明しません。socket mount evidence と CDI device evidence は別に記録します。
+
+```text
+docker run --rm \
+  --device nvidia.com/gpu=all \
+  -e CUDA_VISIBLE_DEVICES \
+  -e NVIDIA_VISIBLE_DEVICES \
+  -e JAX_PLATFORMS \
+  -e XLA_PYTHON_CLIENT_PREALLOCATE \
+  -e XLA_PYTHON_CLIENT_ALLOCATOR \
+  -e XLA_PYTHON_CLIENT_USE_CUDA_HOST_ALLOCATOR \
+  <canonical-image> <argv...>
+```
+
+JAX は host 側や既存 container state で先に import せず、上記 exact environment を受けた
+新規 container child 内で初めて import します。container 内で `jax.default_backend()` が
+`gpu` でない結果は CPU fallback であり、GPU validation pass ではありません。
+
 ## Child lifecycle
 
 direct adapter は argv array、`shell=False`、新しい session で一度だけ child を起動します。
@@ -154,15 +191,32 @@ python3 tools/experiments/run_gpu_command.py \
   python3 -c 'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
 ```
 
+Docker CDI 実機 smoke:
+
+```text
+python3 tools/experiments/run_gpu_command.py \
+  --gpu-count 1 --min-free-memory 2147483648 -- \
+  docker run --rm \
+    --device nvidia.com/gpu=all \
+    -e CUDA_VISIBLE_DEVICES \
+    -e NVIDIA_VISIBLE_DEVICES \
+    -e JAX_PLATFORMS \
+    -e XLA_PYTHON_CLIENT_PREALLOCATE \
+    -e XLA_PYTHON_CLIENT_ALLOCATOR \
+    -e XLA_PYTHON_CLIENT_USE_CUDA_HOST_ALLOCATOR \
+    <canonical-image> \
+    python3 -c 'import jax; assert jax.default_backend() == "gpu"; print(jax.devices())'
+```
+
 GPU-heavy test/benchmark も同じ direct adapter の `--` 後へ argv として渡します。managed
 regression は既存 `tests/tools/test_run_managed_experiment.py` で確認します。
 
-GPU が利用不可なら `gpu_validation_blocker=<reason>`、未実行 claim、`nvidia-smi`/stderr/
-diagnostic を closeout に記録します。fake test、static pass、CPU-only smoke は実機 GPU pass
-ではありません。
+GPU または CDI registry が利用不可なら `gpu_validation_blocker=<reason>`、未実行 claim、
+`nvidia-smi`/CDI diagnostic/stderr を closeout に記録します。fake test、static pass、CPU-only
+smoke は実機 GPU pass ではありません。
 
 ## Closeout
 
 closeout は選択した route、candidate/selected full UUID、plan/admission/environment fingerprint、
-start/end、raw exit、stdout/stderr hash、descendant quiescence、release evidence、targeted tests、
-managed regression、`gpu_validation_blocker` を参照します。
+CDI qualified device、start/end、raw exit、stdout/stderr hash、descendant quiescence、release
+evidence、targeted tests、managed regression、`gpu_validation_blocker` を参照します。

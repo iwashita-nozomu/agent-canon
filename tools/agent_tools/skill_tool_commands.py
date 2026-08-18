@@ -7,6 +7,7 @@
 # upstream design ../../agents/skills/agent-orchestration.md tool-first skill execution contract
 # upstream design ../../agents/skills/catalog.yaml public skill related-skill metadata
 # upstream implementation ../../tools/agent_tools/route.py parses and validates the public skill catalog
+# upstream implementation ../../tools/agent_tools/agent_canon_source_root.py resolves standalone/vendored owner roots for fallback execution
 # downstream implementation ../../.agents/skills/agent-orchestration/SKILL.md materialized runtime skill command entry example
 # downstream implementation ../../tools/agent_tools/check_convention_compliance.py verifies command section wiring
 # downstream implementation ../../tests/agent_tools/test_skill_tool_commands.py tests command extraction and read-only checks
@@ -90,6 +91,148 @@ COMMAND_PREFIXES = (
 )
 ASSIGNMENT_TOKEN_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=.*")
 INLINE_CODE_RE = re.compile(r"`([^`]+)`")
+MAKEFILE_NAMES = ("GNUmakefile", "makefile", "Makefile")
+OPTIONAL_AGENT_CANON_MAKE_TARGETS = {
+    "agent-canon-update-plan": "plan",
+    "agent-canon-latest": "latest",
+    "agent-canon-ensure-latest": "latest",
+}
+SOURCE_ROOT_PYTHONPATH = "vendor/agent-canon/tools:tools"
+SOURCE_ROOT_UPDATE_PREFIX = (
+    "python3",
+    "-m",
+    "agent_tools.agent_canon_source_root",
+    "exec",
+    "tools/update_agent_canon.sh",
+)
+
+
+def _canonical_makefile(repository_root: Path) -> Path | None:
+    """Return Make's first default file only when it remains inside the repo."""
+    root = repository_root.resolve()
+    for name in MAKEFILE_NAMES:
+        candidate = root / name
+        if not candidate.is_file():
+            continue
+        try:
+            resolved = candidate.resolve()
+            resolved.relative_to(root)
+        except (OSError, RuntimeError, ValueError):
+            return None
+        return resolved
+    return None
+
+
+def _logical_makefile_lines(text: str) -> Iterable[str]:
+    """Yield non-recipe logical lines with odd trailing backslashes joined."""
+    pending = ""
+    pending_is_recipe = False
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip()
+        is_recipe = pending_is_recipe or raw_line.startswith("\t")
+        if pending:
+            line = pending + line.lstrip()
+        trailing_backslashes = len(line) - len(line.rstrip("\\"))
+        if trailing_backslashes % 2 == 1:
+            pending = line[:-1] + " "
+            pending_is_recipe = is_recipe
+            continue
+        if not is_recipe:
+            yield line
+        pending = ""
+        pending_is_recipe = False
+    if pending and not pending_is_recipe:
+        yield pending
+
+
+def _strip_unescaped_comment(line: str) -> str:
+    """Remove a Make comment while preserving escaped hash characters."""
+    escaped = False
+    result: list[str] = []
+    for character in line:
+        if character == "#" and not escaped:
+            break
+        result.append(character)
+        if character == "\\" and not escaped:
+            escaped = True
+        else:
+            escaped = False
+    return "".join(result)
+
+
+def explicit_make_targets(makefile: Path) -> frozenset[str]:
+    """Return literal target names without expanding Make syntax or includes."""
+    try:
+        text = makefile.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return frozenset()
+
+    targets: set[str] = set()
+    for logical_line in _logical_makefile_lines(text):
+        line = _strip_unescaped_comment(logical_line).strip()
+        if not line or line.startswith(("define ", "endef")) or ":" not in line:
+            continue
+        left, right = line.split(":", maxsplit=1)
+        # ``:=`` and ``::=`` are assignments, not target declarations.
+        if right.lstrip().startswith(("=", ":=")):
+            continue
+        for token in left.split():
+            if token and not any(marker in token for marker in ("$", "%")):
+                targets.add(token.replace(r"\#", "#"))
+    return frozenset(targets)
+
+
+def make_target_is_explicit(repository_root: Path, target: str) -> bool:
+    """Return whether the selected parent Makefile declares one literal target."""
+    makefile = _canonical_makefile(repository_root)
+    return makefile is not None and target in explicit_make_targets(makefile)
+
+
+def resolve_optional_agent_canon_make_alias(
+    command: str,
+    repository_root: Path,
+) -> str:
+    """Keep an existing explicit alias or return the canonical owner-tool route."""
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        return command
+    command_index = 0
+    while (
+        command_index < len(tokens)
+        and ASSIGNMENT_TOKEN_RE.fullmatch(tokens[command_index])
+    ):
+        command_index += 1
+    body = tokens[command_index:]
+    if len(body) != 2 or body[0] != "make":
+        return command
+    mode = OPTIONAL_AGENT_CANON_MAKE_TARGETS.get(body[1])
+    if mode is None or make_target_is_explicit(repository_root, body[1]):
+        return command
+
+    environment = [
+        token
+        for token in tokens[:command_index]
+        if not token.startswith("PYTHONPATH=")
+    ]
+    resolved = (
+        *environment,
+        f"PYTHONPATH={SOURCE_ROOT_PYTHONPATH}",
+        *SOURCE_ROOT_UPDATE_PREFIX,
+        mode,
+    )
+    return shlex.join(resolved)
+
+
+def resolve_optional_agent_canon_make_aliases(
+    commands: Iterable[str],
+    repository_root: Path,
+) -> tuple[str, ...]:
+    """Resolve every optional alias in stable input order."""
+    return tuple(
+        resolve_optional_agent_canon_make_alias(command, repository_root)
+        for command in commands
+    )
 ISSUE_CONTRACT_MARKERS: dict[str, tuple[tuple[str, str], ...]] = {
     "experiment-lifecycle": (
         (
@@ -245,6 +388,27 @@ def _project_contract_path(token: str, prefix: str) -> str:
     return token
 
 
+def _public_executable_tokens(tokens: tuple[str, ...]) -> tuple[str, ...]:
+    """Return only public path tokens that are executable positions."""
+    candidates: list[str] = []
+    if tokens and tokens[0].startswith(("tools/", "vendor/agent-canon/tools/")):
+        candidates.append(tokens[0])
+    if (
+        len(tokens) > 1
+        and tokens[0] in SCRIPT_INTERPRETERS
+        and tokens[1].startswith(("tools/", "vendor/agent-canon/tools/"))
+    ):
+        candidates.append(tokens[1])
+    candidates.extend(
+        token
+        for index, token in enumerate(tokens)
+        if index > 0
+        and tokens[index - 1] == "exec"
+        and token.startswith(("tools/", "vendor/agent-canon/tools/"))
+    )
+    return tuple(dict.fromkeys(candidates))
+
+
 def project_public_command(
     logical_command: str,
     root_resolution: RootResolution,
@@ -281,6 +445,8 @@ def project_public_command(
             projected_tokens.append(_project_public_path(token, prefix))
         elif token_index == 0 and token.startswith(("tools/", "vendor/agent-canon/tools/")):
             projected_tokens.append(_project_public_path(token, prefix))
+        elif token_index > 0 and tokens[token_index - 1] == "exec":
+            projected_tokens.append(_project_public_path(token, prefix))
         elif token_index > 0 and tokens[token_index - 1] == "--contract":
             projected_tokens.append(_project_contract_path(token, prefix))
         elif token.startswith("--contract="):
@@ -293,9 +459,7 @@ def project_public_command(
         public_root = (
             root_resolution.current_repository_root / "tools" / "agent-canon"
         ).resolve()
-        for token in public_tokens[:2]:
-            if not token.startswith(f"{prefix}/"):
-                continue
+        for token in _public_executable_tokens(public_tokens):
             candidate = (
                 root_resolution.current_repository_root / token
             ).resolve()
@@ -506,6 +670,13 @@ def build_command_plan(logical_command: str, source_root: Path) -> CommandPlan:
                 else token
             )
             continue
+        if (
+            index > 0
+            and tokens[index - 1] == "exec"
+            and token.startswith(SOURCE_ROOT_SCRIPT_PREFIXES)
+        ):
+            resolved.append(str((source_root_as_path / token).resolve()))
+            continue
         if index == 0 and token.startswith(SOURCE_ROOT_COMMAND_PREFIXES):
             resolved.append(str((source_root_as_path / token).resolve()))
             continue
@@ -545,6 +716,14 @@ def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillComman
         conditional_for_resolution = conditional or (FALLBACK_COMMAND,)
         required = load_skill_required_tool_commands(root).get(skill, ())
         maintenance = LEGACY_MAINTENANCE_COMMANDS
+    parent_root = root_resolution.current_repository_root
+    required = resolve_optional_agent_canon_make_aliases(required, parent_root)
+    conditional = resolve_optional_agent_canon_make_aliases(conditional, parent_root)
+    conditional_for_resolution = resolve_optional_agent_canon_make_aliases(
+        conditional_for_resolution,
+        parent_root,
+    )
+    maintenance = resolve_optional_agent_canon_make_aliases(maintenance, parent_root)
     resolved_required = tuple(
         build_command_plan(command, source_root) for command in required
     )
@@ -609,6 +788,22 @@ def packet_for_skill(root_resolution: RootResolution, skill: str) -> SkillComman
     )
 
 
+def _resolved_executable_tokens(argv: tuple[str, ...]) -> tuple[str, ...]:
+    """Return executable path positions from one resolved argv."""
+    candidates: list[str] = []
+    if argv:
+        if argv[0] in SCRIPT_INTERPRETERS and len(argv) > 1:
+            candidates.append(argv[1])
+        else:
+            candidates.append(argv[0])
+    candidates.extend(
+        token
+        for index, token in enumerate(argv)
+        if index > 0 and argv[index - 1] == "exec"
+    )
+    return tuple(dict.fromkeys(candidates))
+
+
 def validate_command_plan_executables(
     root_resolution: RootResolution,
     packet: SkillCommandPacket,
@@ -626,23 +821,23 @@ def validate_command_plan_executables(
                     "agent_canon_command_preflight_invalid",
                     f"empty command for skill {packet.skill}",
                 )
-            executable = argv[1] if argv[0] in SCRIPT_INTERPRETERS and len(argv) > 1 else argv[0]
-            if not executable.startswith("/"):
-                continue
-            declared = Path(executable)
-            candidate = declared.resolve()
-            if declared.is_symlink() or not candidate.is_file():
-                raise SourceRootFailure(
-                    "agent_canon_command_preflight_missing",
-                    f"command executable is missing: {executable}",
-                )
-            try:
-                candidate.relative_to(root_resolution.source_root.resolve())
-            except ValueError as exc:
-                raise SourceRootFailure(
-                    "agent_canon_command_preflight_escape",
-                    f"command executable escapes source root: {executable}",
-                ) from exc
+            for executable in _resolved_executable_tokens(argv):
+                if not executable.startswith("/"):
+                    continue
+                declared = Path(executable)
+                candidate = declared.resolve()
+                if declared.is_symlink() or not candidate.is_file():
+                    raise SourceRootFailure(
+                        "agent_canon_command_preflight_missing",
+                        f"command executable is missing: {executable}",
+                    )
+                try:
+                    candidate.relative_to(root_resolution.source_root.resolve())
+                except ValueError as exc:
+                    raise SourceRootFailure(
+                        "agent_canon_command_preflight_escape",
+                        f"command executable escapes source root: {executable}",
+                    ) from exc
 
 
 def related_skills_for(root: Path, skill: str) -> tuple[str, ...]:
