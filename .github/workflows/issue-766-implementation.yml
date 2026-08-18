@@ -77,6 +77,38 @@ jobs:
       - name: Apply asserted canonical patch
         run: |
           cat .github/issue-766/part-* > .github/issue-766/apply_issue_766.py
+          python3 - <<'PY'
+          import ast
+          import base64
+          import gzip
+          from pathlib import Path
+
+          path = Path(".github/issue-766/apply_issue_766.py")
+          lines = path.read_text(encoding="utf-8").splitlines()
+          index = next(i for i, line in enumerate(lines) if line.startswith("_PATCH = "))
+          payload = ast.literal_eval(lines[index].split("=", 1)[1].strip())
+          source = gzip.decompress(base64.b64decode(payload)).decode("utf-8")
+          old = """replace_once(
+              RUNNER,
+              '''            \"result_dir\": str(context.paths.result_dir),\\n            \"log_dir\": str(context.paths.log_dir),\\n''',
+              '''            \"result_dir\": str(context.paths.result_dir),\\n            \"raw_dir\": str(context.paths.raw_dir),\\n            \"log_dir\": str(context.paths.log_dir),\\n''',
+          )"""
+          new = """runner_text = read(RUNNER)
+          runner_old = '''            \"result_dir\": str(context.paths.result_dir),\\n            \"log_dir\": str(context.paths.log_dir),\\n'''
+          runner_new = '''            \"result_dir\": str(context.paths.result_dir),\\n            \"raw_dir\": str(context.paths.raw_dir),\\n            \"log_dir\": str(context.paths.log_dir),\\n'''
+          runner_count = runner_text.count(runner_old)
+          if runner_count != 2:
+              raise RuntimeError(
+                  f\"{RUNNER}: expected two canonical path payloads, found {runner_count}\"
+              )
+          write(RUNNER, runner_text.replace(runner_old, runner_new))"""
+          if source.count(old) != 1:
+              raise SystemExit("runner raw-path patch assertion drifted")
+          source = source.replace(old, new)
+          encoded = base64.b64encode(gzip.compress(source.encode("utf-8"), mtime=0)).decode()
+          lines[index] = f"_PATCH = {encoded!r}"
+          path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+          PY
           python3 .github/issue-766/apply_issue_766.py
 
       - name: Restore canonical identity-test fixture
