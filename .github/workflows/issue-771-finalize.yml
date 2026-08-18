@@ -61,14 +61,36 @@ jobs:
           python3 tests/tools/test_update_agent_canon_removed_legacy.py
           python3 - <<'PY'
           from pathlib import Path
+          import shutil
           import tempfile
 
-          from tests.tools.test_update_agent_canon_latest_todos import (
-              test_latest_reports_pending_update_todos_without_failing,
-          )
+          from tests.tools import test_update_agent_canon_latest_todos as latest_todos
+          from tests.tools.test_update_agent_canon import SubmoduleUpdateAgentCanonTest
 
-          with tempfile.TemporaryDirectory() as tmp_dir:
-              test_latest_reports_pending_update_todos_without_failing(Path(tmp_dir))
+          original_make_superproject = SubmoduleUpdateAgentCanonTest.make_superproject
+
+          def make_superproject_with_parent_tools(self, *args, **kwargs):
+              repo = original_make_superproject(self, *args, **kwargs)
+              shutil.copytree(
+                  latest_todos.PROJECT_ROOT / 'tools',
+                  repo / 'tools',
+                  dirs_exist_ok=True,
+                  symlinks=True,
+              )
+              return repo
+
+          SubmoduleUpdateAgentCanonTest.make_superproject = (
+              make_superproject_with_parent_tools
+          )
+          try:
+              with tempfile.TemporaryDirectory() as tmp_dir:
+                  latest_todos.test_latest_reports_pending_update_todos_without_failing(
+                      Path(tmp_dir)
+                  )
+          finally:
+              SubmoduleUpdateAgentCanonTest.make_superproject = (
+                  original_make_superproject
+              )
           PY
 
       - name: Run exact /workspace bind-mount regression
