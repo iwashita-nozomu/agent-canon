@@ -11,122 +11,33 @@ on:
   push:
     branches:
       - feat/766-split-raw-annex-results
-  pull_request:
-    branches:
-      - main
 
 permissions:
   contents: write
-
-concurrency:
-  group: issue-766-implementation
-  cancel-in-progress: true
 
 jobs:
   implement-and-validate:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout branch
+      - name: Checkout active branch
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: feat/766-split-raw-annex-results
 
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Normalize asserted identity-test baseline
+      - name: Apply asserted implementation and skill migration
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("tests/tools/test_experiment_identity.py")
-          text = path.read_text(encoding="utf-8")
-          current_imports = '''    contained_path,
-              load_json_text,
-              report_relative_path,
-              result_relative_path,
-          '''
-          asserted_imports = '''    contained_path,
-              identity_from_manifest,
-              load_json_file,
-              load_json_text,
-              report_relative_path,
-              result_relative_path,
-          '''
-          current_assertions = '''    assert result_relative_path(identity) == Path("experiments/topic.v1/result/smoke.v2/run.3")
-              assert report_relative_path(identity) == Path("experiments/report/topic.v1/smoke.v2/run.3.md")
-          '''
-          asserted_assertions = '''    assert result_relative_path(identity) == Path("experiments/demo/result/formal/run-a")
-              assert report_relative_path(identity) == Path(
-                  "experiments/report/demo/formal/run-a.md"
-              )
-          '''
-          if text.count(current_imports) != 1 or text.count(current_assertions) != 1:
-              raise SystemExit("identity test baseline drifted before Issue #766 patch")
-          path.write_text(
-              text.replace(current_imports, asserted_imports).replace(
-                  current_assertions, asserted_assertions
-              ),
-              encoding="utf-8",
-          )
-          PY
-
-      - name: Apply asserted canonical patch
-        run: |
+          python3 .github/issue-766/identity_fixture.py prepare
           cat .github/issue-766/part-* > .github/issue-766/apply_issue_766.py
           python3 .github/issue-766/transform_patch.py
           python3 .github/issue-766/apply_issue_766.py
-
-      - name: Restore canonical identity-test fixture
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-
-          path = Path("tests/tools/test_experiment_identity.py")
-          text = path.read_text(encoding="utf-8")
-          patched_imports = '''    contained_path,
-              identity_from_manifest,
-              identity_from_raw_relative_path,
-              load_json_file,
-              load_json_text,
-              raw_relative_path,
-              report_relative_path,
-              result_relative_path,
-          '''
-          canonical_imports = '''    contained_path,
-              identity_from_raw_relative_path,
-              load_json_text,
-              raw_relative_path,
-              report_relative_path,
-              result_relative_path,
-          '''
-          patched_assertions = '''    assert result_relative_path(identity) == Path("experiments/demo/result/formal/run-a")
-              assert raw_relative_path(identity) == Path("experiments/demo/raw/formal/run-a")
-              assert identity_from_raw_relative_path(raw_relative_path(identity)) == identity
-              assert report_relative_path(identity) == Path(
-                  "experiments/report/demo/formal/run-a.md"
-              )
-          '''
-          canonical_assertions = '''    assert result_relative_path(identity) == Path("experiments/topic.v1/result/smoke.v2/run.3")
-              assert raw_relative_path(identity) == Path("experiments/topic.v1/raw/smoke.v2/run.3")
-              assert identity_from_raw_relative_path(raw_relative_path(identity)) == identity
-              assert report_relative_path(identity) == Path("experiments/report/topic.v1/smoke.v2/run.3.md")
-          '''
-          if text.count(patched_imports) != 1 or text.count(patched_assertions) != 1:
-              raise SystemExit("identity test patch result drifted")
-          path.write_text(
-              text.replace(patched_imports, canonical_imports).replace(
-                  patched_assertions, canonical_assertions
-              ),
-              encoding="utf-8",
-          )
-          PY
-
-      - name: Remove one-time patch transport
-        run: |
+          python3 .github/issue-766/identity_fixture.py restore
           rm -rf .github/issue-766
           rm -f .github/workflows/issue-766-implementation.yml
 
@@ -136,30 +47,26 @@ jobs:
           sudo apt-get install -y git-annex
           python3 -m pip install --upgrade pytest pyyaml tomli packaging
 
-      - name: Validate Python syntax and diff hygiene
+      - name: Validate syntax, identity, layout, runner, annex, and template
         run: |
           python3 -m compileall -q tools/experiments templates/experiments/_template tests/tools
           git diff --check
-
-      - name: Run identity and managed raw-layout tests
-        run: |
           python3 -m pytest -q tests/tools/test_experiment_identity.py
           python3 -m pytest -q tests/tools/test_experiment_raw_layout.py
           python3 -m pytest -q tests/tools/test_run_managed_experiment.py
-
-      - name: Run raw annex retention tests
-        run: python3 -m pytest -q tests/tools/test_save_experiment_result_annex.py
-
-      - name: Run template materialization smoke
-        run: |
+          python3 -m pytest -q tests/tools/test_save_experiment_result_annex.py
           python3 tools/ci/check_experiment_template.py --source-root .
           python3 -m pytest -q tests/tools/test_check_experiment_template.py
+          python3 -m pytest -q tests/tools/test_experiment_template_contracts.py
 
       - name: Reject compatibility and duplicate-owner drift
         run: |
-          test "$(git grep -l -- 'EXPERIMENT_RESULT_ANNEX_REPO' || true)" = ""
-          test "$(git grep -l -- 'git-annex-result-retention/v1' || true)" = ""
-          test "$(git grep -l -- '--result-dir experiments/<topic>/result/<variant>/<run_name>' || true)" = ""
+          legacy_env="$(git grep -n -- 'EXPERIMENT_RESULT_ANNEX_REPO' || true)"
+          legacy_schema="$(git grep -n -- 'git-annex-result-retention/v1' || true)"
+          legacy_cli="$(git grep -n -- '--result-dir experiments/<topic>/result/<variant>/<run_name>' || true)"
+          if [ -n "$legacy_env" ]; then printf '%s\n' "$legacy_env"; exit 1; fi
+          if [ -n "$legacy_schema" ]; then printf '%s\n' "$legacy_schema"; exit 1; fi
+          if [ -n "$legacy_cli" ]; then printf '%s\n' "$legacy_cli"; exit 1; fi
           test "$(git grep -l -- 'EXPERIMENT_RAW_DIR' tools/experiments/run_managed_experiment.py templates/experiments/_template/run.py | wc -l)" -eq 2
           test "$(find tools/experiments -maxdepth 1 -type f -name '*annex*.py' | wc -l)" -eq 1
 
