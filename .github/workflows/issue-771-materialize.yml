@@ -1,9 +1,11 @@
 name: Issue 771 materialization
 
 on:
-  push:
+  pull_request:
     branches:
-      - fix/771-root-delete-guard
+      - main
+    types:
+      - opened
     paths:
       - .github/workflows/issue-771-materialize.yml
 
