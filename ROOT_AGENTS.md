@@ -7,6 +7,7 @@ upstream design documents/design/entrypoint-owner-map.md root entrypoint grammar
 upstream design documents/runtime/SHARED_RUNTIME_SURFACES.md explicit live-agent-canon integration boundary
 upstream design documents/runtime/shared-runtime-surfaces.toml live integration manifest
 upstream design documents/conventions/software-engineering-principles.md contract-complete engineering decision policy
+upstream design agents/internal-routines/chatgpt-codex-routing.md request modality and Codex handoff owner
 upstream design agents/canonical/CODEX_WORKFLOW.md executable task and closeout owner
 upstream design agents/canonical/CODEX_SUBAGENTS.md subagent lifecycle owner
 downstream implementation tools/agent_tools/check_entrypoint_owner_map.py validates thin entrypoint structure
@@ -35,7 +36,8 @@ or network access as a fallback.
 
 | Task intent | Canonical owner in an explicit live integration |
 | --- | --- |
-| request interpretation and task transport | `vendor/agent-canon/agents/skills/agent-orchestration.md`, `vendor/agent-canon/agents/skills/codex-task-workflow.md` |
+| ChatGPT conversation closure vs Codex workspace execution | `vendor/agent-canon/agents/internal-routines/chatgpt-codex-routing.md` |
+| request interpretation and task transport after Codex admission | `vendor/agent-canon/agents/skills/agent-orchestration.md`, `vendor/agent-canon/agents/skills/codex-task-workflow.md` |
 | contract-complete implementation and engineering basis | `vendor/agent-canon/documents/conventions/software-engineering-principles.md`, `vendor/agent-canon/agents/skills/comprehensive-development.md`, task-specific Skill |
 | mathematical, algorithmic, and numerical obligations | `vendor/agent-canon/documents/design/semantic-responsibility-contract.md`, selected proof / optimization Skill |
 | design-to-implementation correspondence | `vendor/agent-canon/agents/internal-routines/design-implementation-correspondence.md` |
@@ -74,16 +76,24 @@ This entrypoint only routes to that contract.
 
 ## Task Entry
 
-Resolve the parent or AgentCanon owner before reading implementation detail.
-Use the parent owner for product behavior and the vendored owner for the
-explicit shared runtime surface. Read the selected Skill or canonical workflow
-before mutation. Bounded owner/path/validation work remains bounded; activation
-of design, research, orchestration, or subagents follows the selected owner's
-conditions.
+Resolve request modality through the vendored
+`agents/internal-routines/chatgpt-codex-routing.md` before repository
+orchestration. A `chatgpt` route performs no parent or vendored workspace
+execution. A `codex` route hands its typed scope and validation oracle to the
+vendored `agent-orchestration` owner.
 
-Questions and GitHub-only read inspections remain read-only unless the user
-requests mutation. Repository-changing work follows the selected owner surface;
-this entrypoint does not reproduce its steps or environment protocol.
+After Codex admission, resolve the parent or AgentCanon owner before reading
+implementation detail. Use the parent owner for product behavior and the
+vendored owner for the explicit shared runtime surface. Read the selected Skill
+or canonical workflow before mutation. Bounded owner/path/validation work
+remains bounded; activation of design, research, orchestration, or subagents
+follows the selected owner's conditions.
+
+Read-only web, connector, and supplied-material analysis remain ChatGPT work
+unless the requested result depends on local parent/vendor state, command
+observation, mutation, iterative validation, or durable repository delivery.
+Repository-changing work follows the selected owner surface; this entrypoint
+does not reproduce its steps or environment protocol.
 
 ## Validation Routing
 
