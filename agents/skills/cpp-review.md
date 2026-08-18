@@ -27,11 +27,18 @@ C / C++ 差分を build 境界、header 境界、所有権、例外・error path
 ## Required Checks
 
 - project-native configure / build / test evidence
+- When native static analysis is relevant and a CMake-generated database exists, use:
+  `python3 tools/static_analysis/cpp/static_analysis.py select-db --workspace-root <workspace-root> --build-dir <build-dir>`;
+  `python3 tools/static_analysis/cpp/static_analysis.py clangd-check --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`;
+  and `python3 tools/static_analysis/cpp/static_analysis.py clang-tidy --workspace-root <workspace-root> --source <source> --build-dir <build-dir>`.
+  The build directory is explicit per module; the tool does not enumerate or add include paths,
+  compiler flags, or provider-specific diagnostics.
 - `ctest` があるならその結果
-- CMake project なら `cmake -S "$ROOT/cpp" -B "$ROOT/build/cpp/<profile>" -DCMAKE_INSTALL_PREFIX="$ROOT/.state/cpp-install/<profile>"`、
-  `cmake --build "$ROOT/build/cpp/<profile>" --parallel`、
-  `ctest --test-dir "$ROOT/build/cpp/<profile>" --output-on-failure` の結果
-- install contract がある場合は `cmake --install "$ROOT/build/cpp/<profile>"` の結果
+- CMake project なら owning project-native source anchor と per-project build directory を使った
+  `cmake -S "<project-source>" -B "<build-dir>" -DCMAKE_INSTALL_PREFIX="<install-prefix>"`、
+  `cmake --build "<build-dir>" --parallel`、
+  `ctest --test-dir "<build-dir>" --output-on-failure` の結果
+- install contract がある場合は `cmake --install "<build-dir>"` の結果
 
 ## Core References
 
@@ -40,15 +47,13 @@ C / C++ 差分を build 境界、header 境界、所有権、例外・error path
 - `documents/conventions/coding-conventions-testing.md`
 - `documents/conventions/REVIEW_PROCESS.md`
 
-## Target graph readback
+## Project-native target graph readback
 
-- `cpp/CMakeLists.txt` が単一の native project entry として `cpp/src`、`cpp/include`、
-  `cpp/tests`、`cpp/experiments` を同じ configure graph に接続します。
-- `cpp-test-<name>` と `cpp-experiment-<name>` は `cpp-core` を consume し、
-  `cpp-tests` と `cpp-experiments` は build grouping を提供します。
-- root anchor、build tree、install prefix は `$ROOT/cpp`、`$ROOT/build/cpp/<profile>`、
-  `$ROOT/.state/cpp-install/<profile>` に read back します。run/result publication は
-  experiment lifecycle owner に残します。
+- The owning project-native CMake entry connects its production, test, and
+  experiment targets in one configure graph. Read back the project source
+  anchor, explicit build directory, install prefix, and target-to-provider
+  edges from that project's configure/build/test evidence. Run/result
+  publication remains with the experiment lifecycle owner.
 
 ## Docstring projection route
 

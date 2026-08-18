@@ -4,32 +4,61 @@
     "contract reference",
     "responsibility Exposes shared VS Code task entrypoints for AgentCanon validation commands.",
     "upstream design ../documents/runtime/SHARED_RUNTIME_SURFACES.md shared runtime surface policy",
-    "upstream implementation ../tools/lib/repo_paths.sh repository and AgentCanon tool-root resolver",
+    "upstream implementation ../tools/agent_tools shared AgentCanon tool root",
     "upstream implementation ../tools/bin/agent-canon AgentCanon CLI wrapper",
     "upstream implementation ../tools/agent_tools/check_convention_compliance.py convention compliance verifier",
     "upstream implementation ../tools/agent_tools/check_dependency_headers.py dependency header verifier",
     "@dependency-end"
   ],
   "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "cppBuildDirectory",
+      "type": "promptString",
+      "description": "CMake build directory containing compile_commands.json",
+      "default": "build/cpp/dev"
+    }
+  ],
   "tasks": [
     {
       "label": "AgentCanon: Docs Check",
       "type": "shell",
-      "command": "source \"${workspaceFolder}/tools/lib/repo_paths.sh\" && CANON_TOOLS_ROOT=\"$(agent_canon_tools_root \"${workspaceFolder}\")\" && \"${CANON_TOOLS_ROOT}/bin/agent-canon\" docs check",
+      "command": "if [ -d \"${workspaceFolder}/tools/agent-canon\" ]; then CANON_TOOLS_ROOT=\"${workspaceFolder}/tools/agent-canon\"; else CANON_TOOLS_ROOT=\"${workspaceFolder}/tools\"; fi; \"${CANON_TOOLS_ROOT}/bin/agent-canon\" docs check",
       "group": "test",
       "problemMatcher": []
     },
     {
       "label": "AgentCanon: Convention Check",
       "type": "shell",
-      "command": "source \"${workspaceFolder}/tools/lib/repo_paths.sh\" && CANON_TOOLS_ROOT=\"$(agent_canon_tools_root \"${workspaceFolder}\")\" && python3 \"${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py\"",
+      "command": "if [ -d \"${workspaceFolder}/tools/agent-canon\" ]; then CANON_TOOLS_ROOT=\"${workspaceFolder}/tools/agent-canon\"; else CANON_TOOLS_ROOT=\"${workspaceFolder}/tools\"; fi; python3 \"${CANON_TOOLS_ROOT}/agent_tools/check_convention_compliance.py\"",
       "group": "test",
       "problemMatcher": []
     },
     {
       "label": "AgentCanon: Dependency Headers",
       "type": "shell",
-      "command": "source \"${workspaceFolder}/tools/lib/repo_paths.sh\" && CANON_TOOLS_ROOT=\"$(agent_canon_tools_root \"${workspaceFolder}\")\" && python3 \"${CANON_TOOLS_ROOT}/agent_tools/check_dependency_headers.py\" --changed && bash \"${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh\" --changed --fail-missing && bash \"${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh\" --changed --require-header",
+      "command": "if [ -d \"${workspaceFolder}/tools/agent-canon\" ]; then CANON_TOOLS_ROOT=\"${workspaceFolder}/tools/agent-canon\"; else CANON_TOOLS_ROOT=\"${workspaceFolder}/tools\"; fi; python3 \"${CANON_TOOLS_ROOT}/agent_tools/check_dependency_headers.py\" --changed && bash \"${CANON_TOOLS_ROOT}/agent_tools/scan_dependency_headers.sh\" --changed --fail-missing && bash \"${CANON_TOOLS_ROOT}/agent_tools/check_dependency_header_format.sh\" --changed --require-header",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "C++: Select Compile Database",
+      "type": "shell",
+      "command": "if [ -d \"${workspaceFolder}/tools/agent-canon\" ]; then CANON_TOOLS_ROOT=\"${workspaceFolder}/tools/agent-canon\"; else CANON_TOOLS_ROOT=\"${workspaceFolder}/tools\"; fi; python3 \"${CANON_TOOLS_ROOT}/static_analysis/cpp/static_analysis.py\" select-db --workspace-root \"${workspaceFolder}\" --build-dir \"${input:cppBuildDirectory}\"",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "C++: clangd Check",
+      "type": "shell",
+      "command": "if [ -d \"${workspaceFolder}/tools/agent-canon\" ]; then CANON_TOOLS_ROOT=\"${workspaceFolder}/tools/agent-canon\"; else CANON_TOOLS_ROOT=\"${workspaceFolder}/tools\"; fi; python3 \"${CANON_TOOLS_ROOT}/static_analysis/cpp/static_analysis.py\" clangd-check --workspace-root \"${workspaceFolder}\" --build-dir \"${input:cppBuildDirectory}\" --source \"${file}\"",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "C++: clang-tidy",
+      "type": "shell",
+      "command": "if [ -d \"${workspaceFolder}/tools/agent-canon\" ]; then CANON_TOOLS_ROOT=\"${workspaceFolder}/tools/agent-canon\"; else CANON_TOOLS_ROOT=\"${workspaceFolder}/tools\"; fi; python3 \"${CANON_TOOLS_ROOT}/static_analysis/cpp/static_analysis.py\" clang-tidy --workspace-root \"${workspaceFolder}\" --build-dir \"${input:cppBuildDirectory}\" --source \"${file}\"",
       "group": "test",
       "problemMatcher": []
     }
