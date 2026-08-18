@@ -5,7 +5,7 @@ on:
     branches:
       - main
     types:
-      - opened
+      - synchronize
     paths:
       - .github/workflows/issue-771-materialize.yml
 
@@ -14,6 +14,7 @@ permissions:
 
 jobs:
   materialize:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -356,7 +357,7 @@ jobs:
           set -euo pipefail
           python3 tests/agent_tools/test_surface_manifest_root_absence.py
           python3 tests/agent_tools/test_surface_manifest_sync_protocol.py
-          python3 tests/tools/test_removed_legacy_update_write_set.py
+          python3 tests/tools/test_update_agent_canon_removed_legacy.py
           python3 tests/tools/test_update_agent_canon.py
           python3 tests/tools/test_update_agent_canon_latest_todos.py
 
