@@ -19,11 +19,11 @@ upstream implementation ../../../tools/agent_tools/chatgpt_codex_routing.py dete
 Canonical routing and policy:
 `agents/internal-routines/chatgpt-codex-routing.md`.
 
-## Tool Command
+## Tool Commands
 
-```bash
-python3 tools/agent_tools/chatgpt_codex_routing.py --input <packet.json>
-```
+<!-- skill-tool-commands:start -->
+`python3 tools/agent_tools/skill_tool_commands.py show --skill _chatgpt-codex-routing --format text`
+<!-- skill-tool-commands:end -->
 
 ## Invocation Boundary
 
